@@ -11,12 +11,12 @@
  * Idempotent — if none of the target files are tracked, returns skipped.
  */
 
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { LifecycleContext, StepResult } from './types.js';
 import { stepOk, stepSkipped, stepFailed } from './types.js';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /** Ephemeral planning files to remove from main after merge */
 const EPHEMERAL_PLANNING_FILES = [
@@ -43,35 +43,24 @@ export async function cleanPlanningArtifacts(
 
   try {
     // Build the list of files git is currently tracking in .planning/
-    // that match our ephemeral set. We include feedback/ glob separately.
+    // that match our ephemeral set. Single git ls-files call — was N serial
+    // subprocesses (one per ephemeral file + one for feedback/).
     let trackedFiles: string[] = [];
-
-    // Check individual ephemeral files
-    for (const file of EPHEMERAL_PLANNING_FILES) {
-      try {
-        const { stdout } = await execAsync(
-          `git ls-files -- ${file}`,
-          { cwd: projectPath, encoding: 'utf-8' },
-        );
-        if (stdout.trim()) {
-          trackedFiles.push(file);
-        }
-      } catch {
-        // git ls-files failure is non-fatal
-      }
-    }
-
-    // Check feedback/ directory
     try {
-      const { stdout } = await execAsync(
-        `git ls-files -- .planning/feedback/`,
+      const { stdout } = await execFileAsync(
+        'git',
+        ['ls-files', '--', ...EPHEMERAL_PLANNING_FILES, '.planning/feedback/'],
         { cwd: projectPath, encoding: 'utf-8' },
       );
-      if (stdout.trim()) {
+      trackedFiles = stdout.trim().split('\n').filter(Boolean);
+      // If any feedback files are tracked, replace them with the directory so
+      // git rm removes the entire feedback/ tree (matches original behavior).
+      if (trackedFiles.some(f => f.startsWith('.planning/feedback/'))) {
+        trackedFiles = trackedFiles.filter(f => !f.startsWith('.planning/feedback/'));
         trackedFiles.push('.planning/feedback/');
       }
     } catch {
-      // Non-fatal
+      // git ls-files failure is non-fatal
     }
 
     if (trackedFiles.length === 0) {
@@ -79,21 +68,22 @@ export async function cleanPlanningArtifacts(
     }
 
     // Remove tracked files from index and working tree
-    const fileArgs = trackedFiles.map(f => `"${f}"`).join(' ');
-    await execAsync(
-      `git rm -rf --ignore-unmatch ${fileArgs}`,
+    await execFileAsync(
+      'git',
+      ['rm', '-rf', '--ignore-unmatch', ...trackedFiles],
       { cwd: projectPath, encoding: 'utf-8' },
     );
 
     // Check if anything was actually staged for deletion
     try {
-      await execAsync('git diff --cached --quiet', { cwd: projectPath, encoding: 'utf-8' });
+      await execFileAsync('git', ['diff', '--cached', '--quiet'], { cwd: projectPath, encoding: 'utf-8' });
       // Nothing staged — files may have already been removed
       return stepSkipped(step, ['No staged deletions after git rm (already clean)']);
     } catch {
       // There are staged changes — commit them
-      await execAsync(
-        `git commit -m "chore: remove ephemeral planning state after ${issueId} merge"`,
+      await execFileAsync(
+        'git',
+        ['commit', '-m', `chore: remove ephemeral planning state after ${issueId} merge`],
         { cwd: projectPath, encoding: 'utf-8' },
       );
     }

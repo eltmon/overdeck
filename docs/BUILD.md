@@ -53,6 +53,9 @@ All TypeScript bundling uses [tsdown](https://tsdown.dev/) (powered by Rolldown,
 
 Standard Vite + React build configured in `src/dashboard/frontend/`.
 
+![Dashboard React Architecture](./diagrams/react-architecture.png)
+*Dashboard frontend component hierarchy: Entry → App Shell → State (Zustand) → Transport (Effect RPC) → Feature Pages → Shared Components → Hooks*
+
 - **Output**: `dist/dashboard/public/`
 - **TypeScript**: Checked via `tsc` before Vite build
 

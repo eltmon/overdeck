@@ -319,6 +319,26 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     console.warn(`[merge-agent] Could not kill agent sessions: ${err}`);
   }
 
+  // 5b. Delete work agent + planning state dirs from ~/.panopticon/agents/ (non-fatal)
+  // Event-driven cleanup — the merge is the moment the agent state becomes useless.
+  // See docs/REVIEW-AGENT-ARCHITECTURE.md "Dispatch mechanics" for the broader rule:
+  // state dirs are cleaned at the event that renders them obsolete, not by retention.
+  try {
+    const { rm } = await import('fs/promises');
+    const { AGENTS_DIR } = await import('../paths.js');
+    const issueLower = issueId.toLowerCase();
+    const agentDir = join(AGENTS_DIR, `agent-${issueLower}`);
+    const planningDir = join(AGENTS_DIR, `planning-${issueLower}`);
+    for (const dir of [agentDir, planningDir]) {
+      try {
+        await rm(dir, { recursive: true, force: true });
+      } catch { /* non-fatal */ }
+    }
+    console.log(`[merge-agent] ✓ Removed agent state dirs for ${issueId}`);
+  } catch (err) {
+    console.warn(`[merge-agent] Could not remove agent state dirs: ${err}`);
+  }
+
   // 6. Stop Docker containers + networks to prevent network pool exhaustion (non-fatal)
   // Orphaned Docker networks accumulate when workspaces are merged but containers are never
   // torn down, eventually exhausting Docker's address pool and blocking new workspace creation.
@@ -826,7 +846,7 @@ export async function spawnMergeAgentForBranches(
           markdownBody: blockMsg,
         });
         if (fileResult.success) {
-          await sendMessageToAgent(issueId, `SPECIALIST FEEDBACK: merge-agent reported BLOCKED for ${issueId}.\nRead and address: ${fileResult.relativePath}`);
+          await sendMessageToAgent(issueId, `SPECIALIST FEEDBACK: merge-agent reported BLOCKED for ${issueId}.\n\nRead ${fileResult.relativePath}, then immediately fix the blocking issues and re-submit. Do NOT stop at the prompt — keep working until the merge can proceed.`);
         } else {
           console.error(`[merge-agent] Failed to write feedback file for ${issueId}: ${fileResult.error}`);
         }

@@ -254,6 +254,40 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
 
     const taskFileIndex: Record<string, number> = { review: 0, test: 0, merge: 0 };
 
+    // Discover parallel review sessions for this issue (review-<issueId>-<timestamp>-<role>)
+    let reviewSessions: string[] = [];
+    try {
+      const allSessions = await listSessionNamesAsync();
+      reviewSessions = allSessions.filter(s => s.startsWith(`review-${issueId}-`));
+      // Keep only the most recent review round (highest timestamp) to avoid
+      // stale tabs from previous review rounds showing "Connection lost".
+      if (reviewSessions.length > 0) {
+        const timestamps = new Set<number>();
+        for (const s of reviewSessions) {
+          const prefix = `review-${issueId}-`;
+          const rest = s.slice(prefix.length);
+          const dashIdx = rest.indexOf('-');
+          if (dashIdx > 0) {
+            const ts = Number(rest.slice(0, dashIdx));
+            if (!isNaN(ts)) timestamps.add(ts);
+          }
+        }
+        if (timestamps.size > 1) {
+          const maxTs = Math.max(...timestamps);
+          reviewSessions = reviewSessions.filter(s => {
+            const prefix = `review-${issueId}-`;
+            const rest = s.slice(prefix.length);
+            const dashIdx = rest.indexOf('-');
+            if (dashIdx > 0) {
+              const ts = Number(rest.slice(0, dashIdx));
+              return !isNaN(ts) && ts === maxTs;
+            }
+            return false;
+          });
+        }
+      }
+    } catch { /* tmux may not be available */ }
+
     for (const ss of specialistSections) {
       const duration = ss.startedAt && ss.endedAt
         ? Math.floor((new Date(ss.endedAt).getTime() - new Date(ss.startedAt).getTime()) / 1000)
@@ -283,8 +317,18 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
         if (ageMs > STALE_THRESHOLD_MS) {
           ss.status = 'completed';
           transcriptParts[0] = `${ss.type.toUpperCase()} TIMED OUT (no result recorded)`;
+        } else if (ss.type === 'review' && reviewSessions.length > 0) {
+          // Parallel review: capture from all active review sessions
+          for (const tmuxName of reviewSessions) {
+            try {
+              const output = (await capturePaneAsync(tmuxName, 100)).trim();
+              if (output) {
+                transcriptParts.push(`\n--- Live Output (${tmuxName}) ---\n${output}`);
+              }
+            } catch { /* session may not be running */ }
+          }
         } else {
-          const tmuxName = `specialist-${ss.type === 'review' ? 'review-agent' : ss.type === 'test' ? 'test-agent' : 'merge-agent'}`;
+          const tmuxName = `specialist-${ss.type === 'test' ? 'test-agent' : 'merge-agent'}`;
           try {
             const output = (await capturePaneAsync(tmuxName, 100)).trim();
             if (output && (output.includes(issueId.toUpperCase()) || output.includes(issueId) || output.includes(issueLower))) {
@@ -302,9 +346,13 @@ async function fetchActivityData(issueId: string): Promise<unknown> {
 
       let tmuxSessionName: string | undefined;
       if (ss.status === 'running') {
-        const specialistType = ss.type === 'review' ? 'review-agent' : ss.type === 'test' ? 'test-agent' : 'merge-agent';
-        const resolved = resolveProjectFromIssue(issueId);
-        tmuxSessionName = getTmuxSessionName(specialistType as never, resolved?.projectKey);
+        if (ss.type === 'review' && reviewSessions.length > 0) {
+          tmuxSessionName = reviewSessions[0];
+        } else {
+          const specialistType = ss.type === 'test' ? 'test-agent' : 'merge-agent';
+          const resolved = resolveProjectFromIssue(issueId);
+          tmuxSessionName = getTmuxSessionName(specialistType as never, resolved?.projectKey);
+        }
       }
 
       sections.push({
@@ -1012,13 +1060,12 @@ async function fetchProjectTree(): Promise<unknown[]> {
         const hasRecentAgentActivity = lastActivity != null && (now - lastActivity) < recentMs;
         const isAgentLive = (agentStatus === 'active' || agentStatus === 'suspended') && (hasTmux || hasRecentAgentActivity);
 
-        const featureStat = await stat(featurePath).catch(() => null);
-        const isRecentWorkspace = featureStat ? (now - featureStat.mtimeMs) < recentMs : false;
+        const hasWorkspace = await pathExists(featurePath);
 
         const issueCanonicalState = issueStateMap.get(issueId) || '';
         const showByTrackerState = ['in_progress', 'in_review'].includes(issueCanonicalState);
 
-        if (!hasTmux && !isAgentLive && !isRecentWorkspace && !showByTrackerState) continue;
+        if (!hasTmux && !isAgentLive && !hasWorkspace && !showByTrackerState) continue;
 
         const [hasPlanning, hasPrd, hasState, isShadow] = await Promise.all([
           pathExists(planningDir),
@@ -1070,6 +1117,7 @@ async function fetchProjectTree(): Promise<unknown[]> {
           issueId, title, branch: `feature/${issueLower}`,
           status: isAgentTrulyActive ? 'running' : hasState ? 'has_state' : 'idle',
           stateLabel, agentStatus, hasPlanning, hasPrd, hasState, isShadow,
+          readyForMerge: centralReviewStatus?.readyForMerge ?? false,
         });
       }
     }
@@ -1099,7 +1147,7 @@ async function fetchProjectTree(): Promise<unknown[]> {
     }
 
     // Add tracker issues without workspaces that are in active states
-    const SHOW_ALWAYS_STATES = new Set(['in_progress', 'in_review', 'done']);
+    const SHOW_ALWAYS_STATES = new Set(['in_progress', 'in_review']);
     const projectPrefixes: string[] = [];
     if (project.config.issue_prefix) {
       projectPrefixes.push(project.config.issue_prefix.toUpperCase());

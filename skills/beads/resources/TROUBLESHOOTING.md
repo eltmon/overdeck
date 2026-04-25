@@ -55,10 +55,10 @@ bd version
 brew upgrade bd
 
 # Via go install
-go install github.com/steveyegge/beads/cmd/bd@latest
+go install github.com/gastownhall/beads/cmd/bd@latest
 
 # Via package manager
-# See https://github.com/steveyegge/beads#installing
+# See https://github.com/gastownhall/beads#installing
 ```
 
 **3. Restart daemon after upgrade:**
@@ -446,7 +446,7 @@ cat .beads/issues.jsonl | jq '.' | head -50
 
 If problems persist:
 
-1. **Check existing issues:** https://github.com/steveyegge/beads/issues
+1. **Check existing issues:** https://github.com/gastownhall/beads/issues
 2. **Create new issue** with:
    - bd version (`bd version`)
    - Operating system
@@ -486,4 +486,4 @@ If the **bd-issue-tracking skill** provides incorrect guidance:
 - [CLI Reference](CLI_REFERENCE.md) - Complete command documentation
 - [Dependencies Guide](DEPENDENCIES.md) - Understanding dependency types
 - [Workflows](WORKFLOWS.md) - Step-by-step workflow guides
-- [beads GitHub](https://github.com/steveyegge/beads) - Official documentation
+- [beads GitHub](https://github.com/gastownhall/beads) - Official documentation

@@ -252,7 +252,13 @@ const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming
   if (row.message.role === 'user') {
     return <UserMessageRow message={row.message} />;
   }
-  return <AssistantMessageRow message={row.message} isStreaming={isStreaming} />;
+  return (
+    <AssistantMessageRow
+      message={row.message}
+      durationStart={row.durationStart}
+      isStreaming={isStreaming}
+    />
+  );
 });
 
 // ─── User message ─────────────────────────────────────────────────────────────
@@ -325,13 +331,15 @@ function ContextMessageBlock({ message }: { message: ChatMessage }) {
 
 function AssistantMessageRow({
   message,
+  durationStart,
   isStreaming,
 }: {
   message: ChatMessage;
+  durationStart: string;
   isStreaming: boolean;
 }) {
   const duration = message.completedAt
-    ? formatElapsed(message.createdAt, message.completedAt)
+    ? formatElapsed(durationStart, message.completedAt)
     : null;
 
   return (

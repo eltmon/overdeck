@@ -1,8 +1,10 @@
 import { Schema } from "effect"
 import {
+  Activity,
   AgentId,
   AgentPhase,
   AgentResolution,
+  AgentRuntimeSnapshot,
   AgentSnapshot,
   AgentStatus,
   IssueId,
@@ -11,6 +13,7 @@ import {
   SequenceNumber,
   SpecialistSnapshot,
   SpecialistType,
+  WaitingReason,
 } from "./types"
 
 // ─── Agent Events ─────────────────────────────────────────────────────────────
@@ -79,6 +82,129 @@ export const AgentCreatedEvent = Schema.Struct({
   payload: Schema.Struct({ agentId: AgentId, issueId: IssueId, agent: AgentSnapshot }),
 })
 export type AgentCreatedEvent = typeof AgentCreatedEvent.Type
+
+// ─── Agent Runtime Events (PAN-800) ───────────────────────────────────────────
+// Canonical per-tool-call runtime signals. Fold into ReadModelState.agentRuntimeById
+// via the shared reducer. Server AgentStateService ref is derived from the same fold.
+
+export const AgentActivityChangedEvent = Schema.Struct({
+  type: Schema.Literal("agent.activity_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    activity: Activity,
+    currentTool: Schema.optional(Schema.String),
+  }),
+})
+export type AgentActivityChangedEvent = typeof AgentActivityChangedEvent.Type
+
+export const AgentThinkingStartedEvent = Schema.Struct({
+  type: Schema.Literal("agent.thinking_started"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    lastToolAt: Schema.String,
+  }),
+})
+export type AgentThinkingStartedEvent = typeof AgentThinkingStartedEvent.Type
+
+export const AgentThinkingStoppedEvent = Schema.Struct({
+  type: Schema.Literal("agent.thinking_stopped"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    resolvedBy: Schema.Literals(["tool", "waiting", "idle", "stopped"]),
+  }),
+})
+export type AgentThinkingStoppedEvent = typeof AgentThinkingStoppedEvent.Type
+
+export const AgentWaitingStartedEvent = Schema.Struct({
+  type: Schema.Literal("agent.waiting_started"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    reason: WaitingReason,
+    message: Schema.optional(Schema.String),
+  }),
+})
+export type AgentWaitingStartedEvent = typeof AgentWaitingStartedEvent.Type
+
+export const AgentWaitingClearedEvent = Schema.Struct({
+  type: Schema.Literal("agent.waiting_cleared"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    clearedBy: Schema.Literals(["user_response", "timeout", "stopped", "tool_resumed"]),
+  }),
+})
+export type AgentWaitingClearedEvent = typeof AgentWaitingClearedEvent.Type
+
+export const AgentMessageReceivedEvent = Schema.Struct({
+  type: Schema.Literal("agent.message_received"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    direction: Schema.Literals(["to_agent", "from_agent"]),
+    source: Schema.Literals(["user", "cloister", "specialist", "automated"]),
+  }),
+})
+export type AgentMessageReceivedEvent = typeof AgentMessageReceivedEvent.Type
+
+export const AgentModelSetEvent = Schema.Struct({
+  type: Schema.Literal("agent.model_set"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    model: Schema.String,
+    claudeSessionId: Schema.optional(Schema.String),
+  }),
+})
+export type AgentModelSetEvent = typeof AgentModelSetEvent.Type
+
+export const AgentCurrentIssueSetEvent = Schema.Struct({
+  type: Schema.Literal("agent.current_issue_set"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    currentIssue: Schema.optional(IssueId),
+  }),
+})
+export type AgentCurrentIssueSetEvent = typeof AgentCurrentIssueSetEvent.Type
+
+export const AgentResolutionChangedEvent = Schema.Struct({
+  type: Schema.Literal("agent.resolution_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    resolution: AgentResolution,
+    resolutionCount: Schema.Number,
+  }),
+})
+export type AgentResolutionChangedEvent = typeof AgentResolutionChangedEvent.Type
+
+/**
+ * Bootstrap-only event emitted by AgentStateService when it seeds a runtime
+ * snapshot from projection_cache. Not emitted by hooks.
+ */
+export const AgentStateRestoredEvent = Schema.Struct({
+  type: Schema.Literal("agent.state_restored"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    snapshot: AgentRuntimeSnapshot,
+  }),
+})
+export type AgentStateRestoredEvent = typeof AgentStateRestoredEvent.Type
 
 // ─── Planning Events ──────────────────────────────────────────────────────────
 
@@ -472,6 +598,17 @@ export const DomainEvent = Schema.Union([
   AgentStoppedEvent,
   AgentStatusChangedEvent,
   AgentOutputReceivedEvent,
+  // PAN-800 runtime events
+  AgentActivityChangedEvent,
+  AgentThinkingStartedEvent,
+  AgentThinkingStoppedEvent,
+  AgentWaitingStartedEvent,
+  AgentWaitingClearedEvent,
+  AgentMessageReceivedEvent,
+  AgentModelSetEvent,
+  AgentCurrentIssueSetEvent,
+  AgentResolutionChangedEvent,
+  AgentStateRestoredEvent,
   PlanningStartedEvent,
   PlanningFailedEvent,
   PlanningSyncEvent,

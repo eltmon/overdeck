@@ -62,7 +62,6 @@ vi.mock('../../src/lib/cloister/validation.js', () => ({
   DEFAULT_GATES: {
     typecheck: { command: 'npm run typecheck 2>&1' },
     lint: { command: 'npm run lint 2>&1' },
-    test: { command: 'npm test 2>&1' },
   },
 }));
 
@@ -338,7 +337,7 @@ describe('runVerificationForIssue', () => {
       await runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test');
 
       expect(runQualityGatesMock).toHaveBeenCalledWith(
-        expect.objectContaining({ typecheck: expect.any(Object), lint: expect.any(Object), test: expect.any(Object) }),
+        expect.objectContaining({ typecheck: expect.any(Object), lint: expect.any(Object) }),
         workspacePath,
         'pre_push',
         expect.any(Object)

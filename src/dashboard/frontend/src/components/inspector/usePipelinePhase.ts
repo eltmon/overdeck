@@ -36,7 +36,14 @@ export function derivePipelinePhase(
   const specialistSession = (role: string): string =>
     projectKey ? `specialist-${projectKey}-${issueId}-${role}` : `specialist-${role}`;
 
-  const reviewSession = specialistSession('review-agent');
+  // Parallel review sessions use review-<issueId>-<timestamp>-<role> naming.
+  // Prefer actual discovered session names from the backend when available.
+  // The coordinator is the top-level Review tab; per-role reviewer sessions
+  // render as child review tabs.
+  const reviewCoordinatorSession = reviewStatus?.reviewCoordinatorSessionName ?? null;
+  const reviewSessionNames = reviewStatus?.reviewSessionNames;
+  const liveReviewerSession = reviewSessionNames?.find(s => !deadSessions.has(s)) ?? null;
+
   const testSession = specialistSession('test-agent');
   const mergeSession = specialistSession('merge-agent');
 
@@ -50,7 +57,14 @@ export function derivePipelinePhase(
 
   if (ms === 'queued' || ms === 'merging' || ms === 'verifying') {
     phase = 'merging';
-    activeSession = deadSessions.has(mergeSession) ? null : mergeSession;
+    // Monorepo merges use the work agent for rebase (no merge-agent is spawned).
+    // Polyrepo merges spawn a merge-agent (work agent is stopped by then).
+    // If the work agent is alive, it's handling the merge — stream it.
+    if (workSession && (agent?.status === 'healthy' || agent?.status === 'starting')) {
+      activeSession = workSession;
+    } else {
+      activeSession = deadSessions.has(mergeSession) ? null : mergeSession;
+    }
   } else if (ms === 'merged') {
     phase = 'merged';
     activeSession = null;
@@ -59,12 +73,25 @@ export function derivePipelinePhase(
     activeSession = deadSessions.has(testSession) ? null : testSession;
   } else if (rs === 'reviewing') {
     phase = 'reviewing';
-    activeSession = deadSessions.has(reviewSession) ? null : reviewSession;
+    if (reviewCoordinatorSession && !deadSessions.has(reviewCoordinatorSession)) {
+      activeSession = reviewCoordinatorSession;
+    } else if (reviewSessionNames && reviewSessionNames.length > 0) {
+      activeSession = liveReviewerSession;
+    } else {
+      activeSession = null;
+    }
   } else if ((rs === 'failed' || rs === 'blocked') && (agent?.status === 'healthy' || agent?.status === 'starting')) {
     phase = 'review-feedback';
     activeSession = workSession;
+  } else if (agent?.agentPhase === 'planning' && (agent?.status === 'healthy' || agent?.status === 'starting')) {
+    phase = 'planning';
+    activeSession = workSession;
   } else if (agent?.status === 'healthy' || agent?.status === 'starting') {
     phase = 'working';
+    activeSession = workSession;
+  } else if (agent?.status === 'stopped' && agent?.agentPhase === 'review-response') {
+    // Agent called pan done and is on standby for UAT tweaks / review feedback.
+    phase = 'standby';
     activeSession = workSession;
   } else {
     phase = 'planning';
@@ -74,26 +101,48 @@ export function derivePipelinePhase(
   // Build available tabs — only include tabs that are relevant to the current state
   const tabs: TerminalTab[] = [];
 
-  // Work tab: always show if agent exists
+  const isPlanningAgent = agent?.agentPhase === 'planning';
+
+  // Work/Planning tab: always show if agent exists
   if (workSession) {
     tabs.push({
-      id: 'working',
-      label: 'Work',
+      id: isPlanningAgent ? 'planning' : 'working',
+      label: isPlanningAgent ? 'Planning' : 'Work',
       sessionName: workSession,
-      isActive: phase === 'working' || phase === 'review-feedback',
+      isActive: isPlanningAgent ? phase === 'planning' : phase === 'working' || phase === 'review-feedback' || phase === 'standby',
       disabled: deadSessions.has(workSession),
+      isRunning: isPlanningAgent ? phase === 'planning' : phase === 'working',
     });
   }
 
   // Review tab: show once review has started (not just pending)
+  const reviewSubStatuses = reviewStatus?.reviewSubStatuses;
+  const isReviewDone = rs === 'passed' || rs === 'failed' || rs === 'blocked';
   if (rs && rs !== 'pending') {
+    const hasLiveCoordinator = !!reviewCoordinatorSession && !deadSessions.has(reviewCoordinatorSession);
     tabs.push({
       id: 'reviewing',
       label: 'Review',
-      sessionName: reviewSession,
-      isActive: phase === 'reviewing',
-      disabled: deadSessions.has(reviewSession),
+      sessionName: reviewCoordinatorSession,
+      isActive: phase === 'reviewing' && hasLiveCoordinator && activeSession === reviewCoordinatorSession,
+      disabled: !hasLiveCoordinator || isReviewDone,
+      isRunning: phase === 'reviewing' && hasLiveCoordinator && !isReviewDone,
     });
+
+    if (reviewSessionNames && reviewSessionNames.length > 0) {
+      for (const sessionName of reviewSessionNames) {
+        const role = sessionName.split('-').pop() || 'review';
+        const isDone = reviewSubStatuses?.[role] === 'done';
+        tabs.push({
+          id: `reviewing-${role}`,
+          label: `Review (${role})`,
+          sessionName,
+          isActive: phase === 'reviewing' && activeSession === sessionName,
+          disabled: deadSessions.has(sessionName) || isDone || isReviewDone,
+          isRunning: phase === 'reviewing' && !isDone && !isReviewDone,
+        });
+      }
+    }
   }
 
   // Test tab: show once testing has started
@@ -104,17 +153,23 @@ export function derivePipelinePhase(
       sessionName: testSession,
       isActive: phase === 'testing',
       disabled: deadSessions.has(testSession),
+      isRunning: phase === 'testing',
     });
   }
 
   // Merge tab: show once merge has been queued or beyond
   if (ms && ms !== 'pending') {
+    // Monorepo merges stream the work agent (it handles rebase); polyrepo uses merge-agent.
+    const effectiveMergeSession = (workSession && (agent?.status === 'healthy' || agent?.status === 'starting'))
+      ? workSession
+      : mergeSession;
     tabs.push({
       id: 'merging',
       label: 'Merge',
-      sessionName: mergeSession,
+      sessionName: effectiveMergeSession,
       isActive: phase === 'merging',
-      disabled: ms === 'merged' || deadSessions.has(mergeSession),
+      disabled: ms === 'merged' || deadSessions.has(effectiveMergeSession),
+      isRunning: phase === 'merging',
     });
   }
 
@@ -139,18 +194,50 @@ export function usePipelinePhase(input: PipelinePhaseInput): PipelinePhaseResult
     });
   }, []);
 
+  // Cache review sessions: the backend discovers them from live tmux sessions,
+  // but by the time the review result (passed/failed) is emitted the sessions
+  // may already be killed. Without caching, tabs disappear immediately.
+  const cachedCoordinatorSessionRef = useRef<string | undefined>(undefined);
+  const cachedSessionNamesRef = useRef<string[] | undefined>(undefined);
+  const liveCoordinator = input.reviewStatus?.reviewCoordinatorSessionName;
+  const liveNames = input.reviewStatus?.reviewSessionNames;
+  if (liveCoordinator) {
+    cachedCoordinatorSessionRef.current = liveCoordinator;
+  }
+  if (liveNames && liveNames.length > 0) {
+    cachedSessionNamesRef.current = liveNames;
+  }
+  const effectiveInput = useMemo(() => {
+    if (!input.reviewStatus) return input;
+    const reviewStatus = { ...input.reviewStatus };
+    let changed = false;
+    if (!liveCoordinator && cachedCoordinatorSessionRef.current) {
+      reviewStatus.reviewCoordinatorSessionName = cachedCoordinatorSessionRef.current;
+      changed = true;
+    }
+    if ((!liveNames || liveNames.length === 0) && cachedSessionNamesRef.current) {
+      reviewStatus.reviewSessionNames = cachedSessionNamesRef.current;
+      changed = true;
+    }
+    if (!changed) return input;
+    return {
+      ...input,
+      reviewStatus,
+    };
+  }, [input, liveCoordinator, liveNames]);
+
   // Debounce phase changes by 1s to prevent auto-switch churn
   const resultRef = useRef<PipelinePhaseResult | null>(null);
   const [debouncedResult, setDebouncedResult] = useState<PipelinePhaseResult>(() =>
-    derivePipelinePhase(input, deadSessions),
+    derivePipelinePhase(effectiveInput, deadSessions),
   );
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const immediateResult = useMemo(
-    () => derivePipelinePhase(input, deadSessions),
+    () => derivePipelinePhase(effectiveInput, deadSessions),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- input.agent narrowed to id+status;
     // the full object reference changes on every parent render, which would reset the 1s debounce timer
-    [input.agent?.id, input.agent?.status, input.reviewStatus, input.projectKey, input.issueId, deadSessions],
+    [effectiveInput.agent?.id, effectiveInput.agent?.status, effectiveInput.reviewStatus, effectiveInput.projectKey, effectiveInput.issueId, deadSessions],
   );
 
   useEffect(() => {

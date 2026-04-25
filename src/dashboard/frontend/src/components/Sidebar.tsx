@@ -1,13 +1,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
-  Eye, LayoutGrid, Bot, Server, ArrowRightLeft,
+  Eye, LayoutGrid, Bot, Server,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
   Zap, Compass, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
   Hammer, Loader2, GitMerge,
 } from 'lucide-react';
 import { CloisterStatusBar } from './CloisterStatusBar';
 import { FreshnessIndicator } from './FreshnessIndicator';
+import { DeaconPauseToggle } from './DeaconPauseToggle';
 import { useTheme } from '../hooks/useTheme';
 import type { Tab } from './Header';
 
@@ -27,7 +28,6 @@ const NAV_GROUPS = [
     label: 'Infrastructure',
     items: [
       { id: 'resources' as Tab, label: 'Resources', icon: Server },
-      { id: 'handoffs' as Tab, label: 'Handoffs', icon: ArrowRightLeft },
     ],
   },
   {
@@ -225,6 +225,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
                   </kbd>
                 </button>
                 <div className="ml-auto flex items-center gap-1">
+                  <DeaconPauseToggle />
                   {isDev && (
                     <button
                       onClick={() => rebuildMutation.mutate()}
@@ -286,6 +287,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
                     : <Hammer className="w-3.5 h-3.5" />}
                 </button>
               )}
+              <DeaconPauseToggle compact />
               <button
                 onClick={toggleCollapsed}
                 className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"

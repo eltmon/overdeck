@@ -1,0 +1,70 @@
+#!/bin/bash
+# ~/.panopticon/bin/notification-hook  (PAN-800)
+#
+# Fires on Claude Code Notification events. If the notification looks like a
+# permission prompt or a request for human input, emits
+# agent.waiting_started(reason=...). Logs the raw payload for future analysis.
+#
+# PAN-709 note: the Notification event fires for system/desktop notifications
+# from Claude Code, NOT for in-terminal tool approval dialogs. In-terminal
+# prompts are detected separately by the deacon tmux-tail scanner (still
+# active during the PAN-800 migration; scheduled for replacement in Phase 5).
+
+set +e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=pan-hook-lib.sh
+. "$SCRIPT_DIR/pan-hook-lib.sh" 2>/dev/null || exit 0
+
+pan_resolve_agent_id || exit 0
+
+NOTIF_INFO=$(cat 2>/dev/null || echo '{}')
+
+HAVE_JQ=0
+if command -v jq >/dev/null 2>&1; then HAVE_JQ=1; fi
+
+NOTIF_MSG=""
+if [ "$HAVE_JQ" = "1" ]; then
+  NOTIF_MSG=$(echo "$NOTIF_INFO" | jq -r '.message // ""' 2>/dev/null || echo "")
+fi
+
+TS=$(date -Iseconds)
+
+# Log the raw notification for forensics. Kept at 500 entries.
+LOG_DIR="$HOME/.panopticon/logs"
+mkdir -p "$LOG_DIR" 2>/dev/null
+LOG_FILE="$LOG_DIR/notifications.jsonl"
+if [ "$HAVE_JQ" = "1" ]; then
+  jq -n --arg ts "$TS" --arg agent "$AGENT_ID" --argjson payload "$NOTIF_INFO" \
+    '{ts: $ts, agent: $agent, payload: $payload}' >> "$LOG_FILE" 2>/dev/null || true
+  if [ -f "$LOG_FILE" ]; then
+    TMP="$LOG_FILE.tmp"
+    tail -n 500 "$LOG_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$LOG_FILE" 2>/dev/null || true
+  fi
+fi
+
+# Classify the notification. The message strings come from Claude Code's own
+# notification payloads; we're pattern-matching the keywords that indicate the
+# agent is stalled waiting for the human.
+REASON=""
+if echo "$NOTIF_MSG" | grep -qiE '(permission|approval|allow.*tool|confirm.*tool)'; then
+  REASON="tool_permission"
+elif echo "$NOTIF_MSG" | grep -qiE '(question|needs.*input|waiting.*for|needs your)'; then
+  REASON="user_question"
+elif echo "$NOTIF_MSG" | grep -qiE '(disambiguat|choose|select|which)'; then
+  REASON="disambiguation"
+fi
+
+if [ -n "$REASON" ]; then
+  if [ "$HAVE_JQ" = "1" ]; then
+    BODY=$(jq -n --arg reason "$REASON" --arg msg "$NOTIF_MSG" --arg ts "$TS" \
+      '{kind: "waiting_start", reason: $reason, message: $msg, timestamp: $ts}')
+  else
+    # Fallback: minimal body, no message field. Escaping arbitrary NOTIF_MSG
+    # into JSON by hand is error-prone.
+    BODY="{\"kind\":\"waiting_start\",\"reason\":\"$REASON\",\"timestamp\":\"$TS\"}"
+  fi
+  pan_emit_event "$AGENT_ID" "$BODY"
+fi
+
+exit 0

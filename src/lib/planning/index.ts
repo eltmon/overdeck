@@ -27,18 +27,6 @@ export {
 } from './planning-agent.js';
 
 // Plan Utilities (shared between CLI and dashboard)
-export {
-  findPRDFiles,
-  analyzeComplexity,
-  generateStateContent,
-  estimateTaskDifficulty,
-  writePlanFiles,
-  copyToPRDDirectory,
-  executePlan,
-  type PlanIssue,
-  type PlanTask,
-  type DiscoveryDecision,
-  type ComplexityAnalysis,
-  type PlanResult,
-} from './plan-utils.js';
+// NOTE: plan-utils.ts was deleted — all functions were dead code.
+// Planning now uses spawn-planning-session.ts for agent-based planning.
 

@@ -15,6 +15,7 @@ vi.mock('../ModelPicker', () => ({
   ModelPicker: ({ value }: { value: string }) => <div data-testid="model-picker">{value}</div>,
   MODEL_EFFORT_SUPPORT: {
     'claude-sonnet-4-6': ['low', 'medium', 'high'],
+    'gpt-5.5': [],
     'gpt-5.4': [],
   },
   FALLBACK_DEFAULT_MODEL: 'claude-sonnet-4-6',

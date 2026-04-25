@@ -311,11 +311,17 @@ describe('PAN-154: Agent State Cleanup Logic', () => {
 
 describe('PAN-154: Retention Config', () => {
   it('should have correct default retention values', async () => {
-    // Import the actual default config
+    // Defaults tightened post-refactor: event-driven cleanup (runParallelReview
+    // Phase 6, postMergeLifecycle, executeCloseOut) deletes state at the event
+    // that renders it obsolete, so retention is a safety net rather than the
+    // primary mechanism. See docs/REVIEW-AGENT-ARCHITECTURE.md.
     const { DEFAULT_CLOISTER_CONFIG } = await import('../../../src/lib/cloister/config.js');
 
     expect(DEFAULT_CLOISTER_CONFIG.retention).toBeDefined();
-    expect(DEFAULT_CLOISTER_CONFIG.retention!.agent_state_days).toBe(30);
+    // Work/planning agent state: 7-day safety net (post-completion debugging window)
+    expect(DEFAULT_CLOISTER_CONFIG.retention!.agent_state_days).toBe(7);
+    // Reviewer state: 1-day safety net (pure ephemeral; Phase 6 deletes on happy path)
+    expect(DEFAULT_CLOISTER_CONFIG.retention!.reviewer_state_days).toBe(1);
     expect(DEFAULT_CLOISTER_CONFIG.retention!.health_staleness_hours).toBe(24);
   });
 });

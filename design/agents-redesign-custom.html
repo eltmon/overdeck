@@ -1,0 +1,1685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panopticon | Agents</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --obsidian-base: #0c0f16;
+      --obsidian-raised: #141820;
+      --obsidian-overlay: #1c2130;
+      --obsidian-emphasis: #252b3b;
+      --obsidian-border: rgba(255,255,255,0.06);
+      --obsidian-border-bright: rgba(255,255,255,0.12);
+
+      --signal-green: #22c55e;
+      --signal-amber: #f59e0b;
+      --signal-red: #ef4444;
+      --signal-blue: #3b82f6;
+      --signal-purple: #a855f7;
+      --signal-cyan: #06b6d4;
+
+      --text-primary: #dee4ff;
+      --text-secondary: #9faacf;
+      --text-muted: #6a7597;
+      --text-dim: #4a5570;
+
+      --font-display: 'Space Grotesk', system-ui, sans-serif;
+      --font-body: 'Inter', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--obsidian-base);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--obsidian-emphasis); border-radius: 10px; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 220px;
+      background: var(--obsidian-base);
+      border-right: 1px solid var(--obsidian-border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .sidebar-header {
+      padding: 20px 16px;
+      border-bottom: 1px solid var(--obsidian-border);
+    }
+    .sidebar-logo {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sidebar-logo svg { width: 22px; height: 22px; }
+    .sidebar-nav { flex: 1; padding: 12px 0; overflow-y: auto; }
+    .nav-group { margin-bottom: 16px; }
+    .nav-group-label {
+      font-family: var(--font-display);
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--text-dim);
+      padding: 0 20px;
+      margin-bottom: 6px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 18px;
+      margin: 0 8px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      border-left: 2px solid transparent;
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.03); color: var(--text-secondary); }
+    .nav-item.active {
+      background: rgba(59, 130, 246, 0.08);
+      color: var(--signal-blue);
+      border-left-color: var(--signal-blue);
+    }
+    .nav-item svg { width: 16px; height: 16px; opacity: 0.7; }
+    .nav-item.active svg { opacity: 1; }
+
+    /* ── Main Content ── */
+    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+    /* ── Top Bar ── */
+    .topbar {
+      height: 56px;
+      background: var(--obsidian-base);
+      border-bottom: 1px solid var(--obsidian-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      flex-shrink: 0;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 16px; }
+    .breadcrumb {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--signal-blue);
+    }
+    .page-title {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .topbar-actions { display: flex; align-items: center; gap: 10px; }
+    .btn {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--obsidian-border);
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,0.04); border-color: var(--obsidian-border-bright); }
+    .btn-primary {
+      background: var(--signal-blue);
+      color: #fff;
+    }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-icon { padding: 8px; }
+
+    /* ── Content Scroll Area ── */
+    .content { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+    /* ── View Mode Tabs ── */
+    .view-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--obsidian-border);
+      padding-bottom: 1px;
+    }
+    .view-tab {
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 8px 16px;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .view-tab:hover { color: var(--text-secondary); }
+    .view-tab.active { color: var(--signal-blue); border-bottom-color: var(--signal-blue); }
+    .view-tab svg { width: 14px; height: 14px; }
+
+    /* ── Stats Row ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: var(--obsidian-raised);
+      border: 1px solid var(--obsidian-border);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.15s;
+    }
+    .stat-card:hover { border-color: var(--obsidian-border-bright); }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+    }
+    .stat-card.green::before { background: var(--signal-green); }
+    .stat-card.cyan::before { background: var(--signal-cyan); }
+    .stat-card.purple::before { background: var(--signal-purple); }
+    .stat-card.amber::before { background: var(--signal-amber); }
+
+    .stat-label {
+      font-family: var(--font-display);
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .stat-value {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .stat-value.green { color: var(--signal-green); }
+    .stat-value.cyan { color: var(--signal-cyan); }
+    .stat-value.purple { color: var(--signal-purple); }
+    .stat-value.amber { color: var(--signal-amber); }
+    .stat-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .pulse-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--signal-green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    /* ── Section Header ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title .count {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .filter-chip {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--obsidian-border);
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+      background: transparent;
+    }
+    .filter-chip:hover { border-color: var(--obsidian-border-bright); color: var(--text-secondary); }
+    .filter-chip.active {
+      background: rgba(59, 130, 246, 0.12);
+      border-color: rgba(59, 130, 246, 0.3);
+      color: var(--signal-blue);
+    }
+
+    /* ── Agent Grid ── */
+    .agent-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .agent-card {
+      background: var(--obsidian-raised);
+      border: 1px solid var(--obsidian-border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+    .agent-card:hover {
+      border-color: var(--obsidian-border-bright);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    .agent-card.selected {
+      border-color: var(--signal-blue);
+      box-shadow: 0 0 0 1px var(--signal-blue), 0 8px 24px rgba(59,130,246,0.1);
+    }
+    .agent-card .accent-bar {
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+    }
+    .accent-bar.healthy { background: var(--signal-green); }
+    .accent-bar.warning { background: var(--signal-amber); }
+    .accent-bar.stuck { background: var(--signal-red); }
+    .accent-bar.dead { background: var(--text-dim); }
+    .accent-bar.planning { background: var(--signal-amber); }
+    .accent-bar.implementation { background: var(--signal-blue); }
+    .accent-bar.review { background: var(--signal-purple); }
+
+    .agent-card-inner { padding: 14px 16px 14px 20px; }
+
+    .agent-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .agent-id {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    .agent-badges { display: flex; align-items: center; gap: 6px; }
+    .phase-badge {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+    .phase-badge.planning { background: rgba(245,158,11,0.12); color: var(--signal-amber); }
+    .phase-badge.implementation { background: rgba(59,130,246,0.12); color: var(--signal-blue); }
+    .phase-badge.review { background: rgba(168,85,247,0.12); color: var(--signal-purple); }
+    .phase-badge.testing { background: rgba(34,197,94,0.12); color: var(--signal-green); }
+
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      position: relative;
+    }
+    .status-dot.healthy { background: var(--signal-green); box-shadow: 0 0 8px rgba(34,197,94,0.5); }
+    .status-dot.warning { background: var(--signal-amber); box-shadow: 0 0 8px rgba(245,158,11,0.5); }
+    .status-dot.stuck { background: var(--signal-red); box-shadow: 0 0 8px rgba(239,68,68,0.5); animation: alertPulse 1.5s ease-in-out infinite; }
+    .status-dot.dead { background: var(--text-dim); }
+    @keyframes alertPulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(239,68,68,0.5); }
+      50% { opacity: 0.6; box-shadow: 0 0 16px rgba(239,68,68,0.8); }
+    }
+
+    .agent-terminal {
+      background: rgba(0,0,0,0.35);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      line-height: 1.5;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      min-height: 54px;
+    }
+    .agent-terminal .line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .agent-terminal .ok { color: var(--signal-green); }
+    .agent-terminal .warn { color: var(--signal-amber); }
+    .agent-terminal .err { color: var(--signal-red); }
+    .agent-terminal .info { color: var(--signal-blue); }
+
+    .agent-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .agent-meta-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .agent-meta-left svg { width: 12px; height: 12px; opacity: 0.5; }
+    .agent-cost {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--signal-cyan);
+      background: rgba(6,182,212,0.08);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    /* ── Agent Table ── */
+    .agent-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .agent-table th {
+      text-align: left;
+      font-family: var(--font-display);
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--obsidian-border);
+      white-space: nowrap;
+    }
+    .agent-table td {
+      padding: 12px;
+      border-bottom: 1px solid var(--obsidian-border);
+      color: var(--text-secondary);
+      vertical-align: middle;
+    }
+    .agent-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .agent-table .cell-id {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    .agent-table .cell-issue {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--signal-blue);
+    }
+    .agent-table .cell-model { font-size: 12px; }
+    .agent-table .cell-uptime {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .agent-table .cell-cost {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--signal-cyan);
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 3px 10px;
+      border-radius: 999px;
+    }
+    .status-pill.healthy { background: rgba(34,197,94,0.12); color: var(--signal-green); }
+    .status-pill.warning { background: rgba(245,158,11,0.12); color: var(--signal-amber); }
+    .status-pill.stuck { background: rgba(239,68,68,0.12); color: var(--signal-red); }
+    .status-pill.dead { background: rgba(106,117,151,0.12); color: var(--text-muted); }
+
+    /* ── Timeline ── */
+    .timeline {
+      position: relative;
+      padding-left: 24px;
+    }
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 6px;
+      top: 0; bottom: 0;
+      width: 1px;
+      background: var(--obsidian-emphasis);
+    }
+    .timeline-event {
+      position: relative;
+      padding-bottom: 20px;
+    }
+    .timeline-event::before {
+      content: '';
+      position: absolute;
+      left: -21px;
+      top: 2px;
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      border: 2px solid var(--obsidian-base);
+    }
+    .timeline-event.started::before { background: var(--signal-green); }
+    .timeline-event.stopped::before { background: var(--text-dim); }
+    .timeline-event.error::before { background: var(--signal-red); }
+    .timeline-event.commit::before { background: var(--signal-blue); }
+    .timeline-event.complete::before { background: var(--signal-purple); }
+    .timeline-time {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-bottom: 2px;
+    }
+    .timeline-type {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 2px;
+    }
+    .timeline-type.started { color: var(--signal-green); }
+    .timeline-type.stopped { color: var(--text-dim); }
+    .timeline-type.error { color: var(--signal-red); }
+    .timeline-type.commit { color: var(--signal-blue); }
+    .timeline-type.complete { color: var(--signal-purple); }
+    .timeline-msg {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+    .timeline-agent {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--signal-blue);
+    }
+
+    /* ── Right Panel ── */
+    .right-panel {
+      width: 280px;
+      background: var(--obsidian-base);
+      border-left: 1px solid var(--obsidian-border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow-y: auto;
+    }
+    .panel-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--obsidian-border);
+    }
+    .panel-section-title {
+      font-family: var(--font-display);
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .activity-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 6px 0;
+      font-size: 12px;
+    }
+    .activity-time {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      min-width: 36px;
+      padding-top: 1px;
+    }
+    .activity-indicator {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      margin-top: 5px;
+      flex-shrink: 0;
+    }
+    .activity-indicator.spawn { background: var(--signal-green); }
+    .activity-indicator.complete { background: var(--signal-purple); }
+    .activity-indicator.error { background: var(--signal-red); }
+    .activity-indicator.deacon { background: var(--signal-blue); }
+    .activity-text { color: var(--text-secondary); line-height: 1.4; }
+    .activity-text strong { color: var(--text-primary); font-weight: 500; }
+    .activity-text .issue-ref { color: var(--signal-blue); font-family: var(--font-mono); }
+
+    .donut-container {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .donut-chart {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      background: conic-gradient(
+        var(--signal-amber) 0deg 90deg,
+        var(--signal-blue) 90deg 180deg,
+        var(--signal-purple) 180deg 252deg,
+        var(--signal-green) 252deg 360deg
+      );
+      position: relative;
+      flex-shrink: 0;
+    }
+    .donut-chart::after {
+      content: '';
+      position: absolute;
+      inset: 14px;
+      background: var(--obsidian-base);
+      border-radius: 50%;
+    }
+    .donut-legend { flex: 1; }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      padding: 3px 0;
+    }
+    .legend-label { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+    .legend-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .legend-count { font-family: var(--font-mono); color: var(--text-primary); font-weight: 500; }
+
+    .gauge { margin-bottom: 10px; }
+    .gauge-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+    .gauge-label { color: var(--text-muted); }
+    .gauge-value { font-family: var(--font-mono); color: var(--text-secondary); }
+    .gauge-bar {
+      height: 4px;
+      background: var(--obsidian-emphasis);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .gauge-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width 0.5s ease;
+    }
+    .gauge-fill.blue { background: var(--signal-blue); }
+    .gauge-fill.purple { background: var(--signal-purple); }
+
+    /* ── Detail Slide-out ── */
+    .detail-panel {
+      position: fixed;
+      top: 0; right: 0;
+      width: 520px;
+      height: 100vh;
+      background: var(--obsidian-raised);
+      border-left: 1px solid var(--obsidian-border);
+      box-shadow: -20px 0 60px rgba(0,0,0,0.5);
+      z-index: 100;
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+    }
+    .detail-panel.open { transform: translateX(0); }
+    .detail-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 99;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .detail-overlay.open { opacity: 1; pointer-events: auto; }
+
+    .detail-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--obsidian-border);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+    }
+    .detail-title {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+    .detail-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .detail-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: var(--radius-sm);
+      transition: all 0.15s;
+    }
+    .detail-close:hover { color: var(--text-primary); background: rgba(255,255,255,0.05); }
+    .detail-close svg { width: 18px; height: 18px; }
+
+    .detail-tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--obsidian-border);
+      padding: 0 24px;
+    }
+    .detail-tab {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 10px 16px;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: all 0.15s;
+    }
+    .detail-tab:hover { color: var(--text-secondary); }
+    .detail-tab.active { color: var(--signal-blue); border-bottom-color: var(--signal-blue); }
+
+    .detail-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+    }
+    .detail-section {
+      margin-bottom: 24px;
+    }
+    .detail-section-title {
+      font-family: var(--font-display);
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+    .detail-terminal {
+      background: rgba(0,0,0,0.5);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.6;
+      color: var(--text-muted);
+      min-height: 200px;
+    }
+    .detail-info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .detail-info-item {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--obsidian-border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+    }
+    .detail-info-label {
+      font-size: 10px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 4px;
+    }
+    .detail-info-value {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .detail-actions {
+      padding: 16px 24px;
+      border-top: 1px solid var(--obsidian-border);
+      display: flex;
+      gap: 8px;
+    }
+    .detail-actions .btn { flex: 1; justify-content: center; }
+
+    /* ── Cloister Banner ── */
+    .cloister-banner {
+      background: var(--obsidian-raised);
+      border: 1px solid var(--obsidian-border);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .cloister-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .cloister-icon {
+      width: 36px; height: 36px;
+      border-radius: var(--radius-sm);
+      background: rgba(59,130,246,0.1);
+      border: 1px solid rgba(59,130,246,0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .cloister-icon svg { width: 18px; height: 18px; color: var(--signal-blue); }
+    .cloister-title {
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .cloister-status {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .cloister-patrol-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--signal-green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .cloister-right { display: flex; align-items: center; gap: 16px; }
+    .cloister-metric {
+      text-align: center;
+    }
+    .cloister-metric-value {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .cloister-metric-label {
+      font-size: 9px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-top: 2px;
+    }
+
+    /* ── Topology View ── */
+    .topology-canvas {
+      background: var(--obsidian-raised);
+      border: 1px solid var(--obsidian-border);
+      border-radius: var(--radius-md);
+      height: 500px;
+      position: relative;
+      overflow: hidden;
+    }
+    .topology-node {
+      position: absolute;
+      background: var(--obsidian-overlay);
+      border: 1px solid var(--obsidian-border);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .topology-node:hover {
+      border-color: var(--signal-blue);
+      box-shadow: 0 0 20px rgba(59,130,246,0.15);
+    }
+    .topology-node.central {
+      background: rgba(59,130,246,0.08);
+      border-color: rgba(59,130,246,0.3);
+    }
+    .topology-node-title {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+    .topology-node-meta {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    .topology-line {
+      position: absolute;
+      height: 1px;
+      background: var(--obsidian-emphasis);
+      transform-origin: left center;
+    }
+
+    /* ── View Toggle Visibility ── */
+    .view-content { display: none; }
+    .view-content.active { display: block; }
+
+    /* ── Responsive ── */
+    @media (max-width: 1200px) {
+      .right-panel { display: none; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+        </svg>
+        Panopticon
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-group">
+        <div class="nav-group-label">Operations</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Command Deck</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Board</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>Awaiting Merge</div>
+        <div class="nav-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 013 3v2a3 3 0 01-3 3 3 3 0 01-3-3V5a3 3 0 013-3z"/><path d="M19 10a2 2 0 012 2v1a2 2 0 01-2 2 2 2 0 01-2-2v-1a2 2 0 012-2z"/><path d="M5 10a2 2 0 012 2v1a2 2 0 01-2 2 2 2 0 01-2-2v-1a2 2 0 012-2z"/><path d="M12 14v4"/><path d="M8 18h8"/><path d="M7 22h10"/></svg>Agents</div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">Infrastructure</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>Resources</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>Handoffs</div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">Observability</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>Activity</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Metrics</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Costs</div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">System</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>Skills</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Settings</div>
+        <div class="nav-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>God View</div>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div>
+          <div class="breadcrumb">Orchestration Module</div>
+          <div class="page-title">Agents</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          Filter
+        </button>
+        <button class="btn btn-primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Deploy Agent
+        </button>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <div class="content">
+      <!-- View Tabs -->
+      <div class="view-tabs">
+        <div class="view-tab active" onclick="switchView('grid')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Live Grid
+        </div>
+        <div class="view-tab" onclick="switchView('table')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          Command Table
+        </div>
+        <div class="view-tab" onclick="switchView('timeline')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Timeline
+        </div>
+        <div class="view-tab" onclick="switchView('topology')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          Topology
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="stat-card green">
+          <div class="stat-label">Active Agents</div>
+          <div class="stat-value green">12</div>
+          <div class="stat-meta"><span class="pulse-dot"></span> 8 healthy, 2 warning, 2 stuck</div>
+        </div>
+        <div class="stat-card cyan">
+          <div class="stat-label">Total Cost Today</div>
+          <div class="stat-value cyan">$142.39</div>
+          <div class="stat-meta">+$23.12 from yesterday</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-label">Cloister Patrol</div>
+          <div class="stat-value purple" style="font-size: 20px; margin-top: 4px;">Patrolling</div>
+          <div class="stat-meta"><span class="pulse-dot"></span> Last check 14s ago</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-label">Alerts</div>
+          <div class="stat-value" style="font-size: 20px; margin-top: 4px; color: var(--signal-red);">2 stuck</div>
+          <div class="stat-meta"><span style="color: var(--signal-amber)">1 needs input</span> &middot; 0 dead</div>
+        </div>
+      </div>
+
+      <!-- Cloister Banner -->
+      <div class="cloister-banner">
+        <div class="cloister-left">
+          <div class="cloister-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+          </div>
+          <div>
+            <div class="cloister-title">Cloister Deacon</div>
+            <div class="cloister-status"><span class="cloister-patrol-dot"></span> Lifecycle manager orchestrating patrol loops and specialist handoffs</div>
+          </div>
+        </div>
+        <div class="cloister-right">
+          <div class="cloister-metric">
+            <div class="cloister-metric-value" style="color: var(--signal-green)">8</div>
+            <div class="cloister-metric-label">Active</div>
+          </div>
+          <div class="cloister-metric">
+            <div class="cloister-metric-value" style="color: var(--signal-amber)">2</div>
+            <div class="cloister-metric-label">Warning</div>
+          </div>
+          <div class="cloister-metric">
+            <div class="cloister-metric-value" style="color: var(--signal-red)">2</div>
+            <div class="cloister-metric-label">Stuck</div>
+          </div>
+          <div class="cloister-metric">
+            <div class="cloister-metric-value">3</div>
+            <div class="cloister-metric-label">Specialists</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GRID VIEW -->
+      <div id="view-grid" class="view-content active">
+        <div class="section-header">
+          <div class="section-title">
+            Work Agents
+            <span class="count">8 running</span>
+          </div>
+          <div class="filter-bar">
+            <button class="filter-chip active">All</button>
+            <button class="filter-chip">Planning</button>
+            <button class="filter-chip">Implementation</button>
+            <button class="filter-chip">Review</button>
+            <button class="filter-chip">Testing</button>
+          </div>
+        </div>
+
+        <div class="agent-grid">
+          <!-- Card 1 -->
+          <div class="agent-card" onclick="openDetail('agent-pan-505')">
+            <div class="accent-bar planning"></div>
+            <div class="agent-card-inner">
+              <div class="agent-card-header">
+                <span class="agent-id">agent-pan-505</span>
+                <div class="agent-badges">
+                  <span class="phase-badge planning">Planning</span>
+                  <span class="status-dot healthy"></span>
+                </div>
+              </div>
+              <div class="agent-terminal">
+                <div class="line"><span class="info">$</span> pan plan PAN-505 --model claude-opus</div>
+                <div class="line"><span class="ok">✓</span> PRD loaded from docs/prds/planned/</div>
+                <div class="line"><span class="info">→</span> Analyzing 14 source files...</div>
+              </div>
+              <div class="agent-card-footer">
+                <div class="agent-meta-left">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+                  <span>opus-4.6</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>2h 14m</span>
+                </div>
+                <span class="agent-cost">$14.29</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2 -->
+          <div class="agent-card" onclick="openDetail('agent-min-826')">
+            <div class="accent-bar implementation"></div>
+            <div class="agent-card-inner">
+              <div class="agent-card-header">
+                <span class="agent-id">agent-min-826</span>
+                <div class="agent-badges">
+                  <span class="phase-badge implementation">Implementation</span>
+                  <span class="status-dot healthy"></span>
+                </div>
+              </div>
+              <div class="agent-terminal">
+                <div class="line"><span class="ok">✓</span> Task 3/7 completed: Update API schema</div>
+                <div class="line"><span class="info">→</span> Running typecheck on changed files...</div>
+                <div class="line"><span class="ok">✓</span> 0 errors, 0 warnings</div>
+              </div>
+              <div class="agent-card-footer">
+                <div class="agent-meta-left">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+                  <span>sonnet-4.6</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>5h 42m</span>
+                </div>
+                <span class="agent-cost">$8.12</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 3 - STUCK -->
+          <div class="agent-card" onclick="openDetail('agent-pan-442')">
+            <div class="accent-bar stuck"></div>
+            <div class="agent-card-inner">
+              <div class="agent-card-header">
+                <span class="agent-id">agent-pan-442</span>
+                <div class="agent-badges">
+                  <span class="phase-badge implementation">Implementation</span>
+                  <span class="status-dot stuck"></span>
+                </div>
+              </div>
+              <div class="agent-terminal">
+                <div class="line"><span class="err">✗</span> Test failed: handoff-panel.test.tsx</div>
+                <div class="line"><span class="warn">!</span> Same failure 3 times — possible stuck</div>
+                <div class="line"><span class="err">✗</span> Verification gate blocking completion</div>
+              </div>
+              <div class="agent-card-footer">
+                <div class="agent-meta-left">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+                  <span>sonnet-4.6</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>12h 19m</span>
+                </div>
+                <span class="agent-cost">$42.50</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 4 -->
+          <div class="agent-card" onclick="openDetail('agent-krux-15')">
+            <div class="accent-bar review"></div>
+            <div class="agent-card-inner">
+              <div class="agent-card-header">
+                <span class="agent-id">agent-krux-15</span>
+                <div class="agent-badges">
+                  <span class="phase-badge review">Review</span>
+                  <span class="status-dot healthy"></span>
+                </div>
+              </div>
+              <div class="agent-terminal">
+                <div class="line"><span class="ok">✓</span> Code review completed for 23 files</div>
+                <div class="line"><span class="info">→</span> Waiting for merge verification...</div>
+                <div class="line"><span class="ok">✓</span> All acceptance criteria met</div>
+              </div>
+              <div class="agent-card-footer">
+                <div class="agent-meta-left">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+                  <span>opus-4.6</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>1h 03m</span>
+                </div>
+                <span class="agent-cost">$3.21</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 5 -->
+          <div class="agent-card" onclick="openDetail('agent-min-801')">
+            <div class="accent-bar implementation"></div>
+            <div class="agent-card-inner">
+              <div class="agent-card-header">
+                <span class="agent-id">agent-min-801</span>
+                <div class="agent-badges">
+                  <span class="phase-badge implementation">Implementation</span>
+                  <span class="status-dot warning"></span>
+                </div>
+              </div>
+              <div class="agent-terminal">
+                <div class="line"><span class="ok">✓</span> Migrated 4 components to new API</div>
+                <div class="line"><span class="warn">!</span> 2 deprecation warnings in build</div>
+                <div class="line"><span class="info">→</span> Running integration tests...</div>
+              </div>
+              <div class="agent-card-footer">
+                <div class="agent-meta-left">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+                  <span>sonnet-4.6</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>8h 07m</span>
+                </div>
+                <span class="agent-cost">$18.94</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 6 - NEEDS INPUT -->
+          <div class="agent-card" onclick="openDetail('planning-pan-578')">
+            <div class="accent-bar planning"></div>
+            <div class="agent-card-inner">
+              <div class="agent-card-header">
+                <span class="agent-id">planning-pan-578</span>
+                <div class="agent-badges">
+                  <span class="phase-badge planning">Planning</span>
+                  <span class="status-dot warning"></span>
+                </div>
+              </div>
+              <div class="agent-terminal">
+                <div class="line"><span class="ok">✓</span> Analyzed 8 source files</div>
+                <div class="line"><span class="warn">?</span> Question: Should we use Effect.ts or RxJS?</div>
+                <div class="line"><span class="info">→</span> Waiting for user input...</div>
+              </div>
+              <div class="agent-card-footer">
+                <div class="agent-meta-left">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+                  <span>opus-4.6</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>45m</span>
+                </div>
+                <span class="agent-cost">$2.18</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <div class="section-title">
+            Specialists
+            <span class="count">3 active</span>
+          </div>
+        </div>
+        <div class="agent-grid">
+          <div class="agent-card" onclick="openDetail('specialist-pan-505-review')">
+            <div class="accent-bar" style="background: var(--signal-purple)"></div>
+            <div class="agent-card-inner">
+              <div class="agent-card-header">
+                <span class="agent-id">specialist-pan-505-review</span>
+                <div class="agent-badges">
+                  <span class="phase-badge" style="background: rgba(168,85,247,0.12); color: var(--signal-purple)">Review</span>
+                  <span class="status-dot healthy"></span>
+                </div>
+              </div>
+              <div class="agent-terminal">
+                <div class="line"><span class="info">$</span> pan review PAN-505</div>
+                <div class="line"><span class="ok">✓</span> Typecheck passed</div>
+                <div class="line"><span class="ok">✓</span> Tests passed (42/42)</div>
+              </div>
+              <div class="agent-card-footer">
+                <div class="agent-meta-left">
+                  <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-dim)">PAN-505</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>18m</span>
+                </div>
+                <span class="agent-cost">$0.89</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TABLE VIEW -->
+      <div id="view-table" class="view-content">
+        <div class="section-header">
+          <div class="section-title">
+            All Agents
+            <span class="count">12 total</span>
+          </div>
+          <div class="filter-bar">
+            <button class="filter-chip active">All</button>
+            <button class="filter-chip">Running</button>
+            <button class="filter-chip">Stopped</button>
+            <button class="filter-chip">Stuck</button>
+          </div>
+        </div>
+        <div style="background: var(--obsidian-raised); border: 1px solid var(--obsidian-border); border-radius: var(--radius-md); overflow: hidden;">
+          <table class="agent-table">
+            <thead>
+              <tr>
+                <th>Agent</th>
+                <th>Issue</th>
+                <th>Phase</th>
+                <th>Model</th>
+                <th>Status</th>
+                <th>Uptime</th>
+                <th style="text-align: right">Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr onclick="openDetail('agent-pan-505')" style="cursor: pointer">
+                <td><span class="cell-id">agent-pan-505</span></td>
+                <td><span class="cell-issue">PAN-505</span></td>
+                <td><span class="phase-badge planning">Planning</span></td>
+                <td><span class="cell-model">claude-opus-4.6</span></td>
+                <td><span class="status-pill healthy"><span class="pulse-dot"></span> Healthy</span></td>
+                <td><span class="cell-uptime">2h 14m</span></td>
+                <td style="text-align: right"><span class="cell-cost">$14.29</span></td>
+              </tr>
+              <tr onclick="openDetail('agent-min-826')" style="cursor: pointer">
+                <td><span class="cell-id">agent-min-826</span></td>
+                <td><span class="cell-issue">MIN-826</span></td>
+                <td><span class="phase-badge implementation">Implementation</span></td>
+                <td><span class="cell-model">claude-sonnet-4.6</span></td>
+                <td><span class="status-pill healthy"><span class="pulse-dot"></span> Healthy</span></td>
+                <td><span class="cell-uptime">5h 42m</span></td>
+                <td style="text-align: right"><span class="cell-cost">$8.12</span></td>
+              </tr>
+              <tr onclick="openDetail('agent-pan-442')" style="cursor: pointer">
+                <td><span class="cell-id">agent-pan-442</span></td>
+                <td><span class="cell-issue">PAN-442</span></td>
+                <td><span class="phase-badge implementation">Implementation</span></td>
+                <td><span class="cell-model">claude-sonnet-4.6</span></td>
+                <td><span class="status-pill stuck">Stuck</span></td>
+                <td><span class="cell-uptime">12h 19m</span></td>
+                <td style="text-align: right"><span class="cell-cost">$42.50</span></td>
+              </tr>
+              <tr onclick="openDetail('agent-krux-15')" style="cursor: pointer">
+                <td><span class="cell-id">agent-krux-15</span></td>
+                <td><span class="cell-issue">KRUX-15</span></td>
+                <td><span class="phase-badge review">Review</span></td>
+                <td><span class="cell-model">claude-opus-4.6</span></td>
+                <td><span class="status-pill healthy"><span class="pulse-dot"></span> Healthy</span></td>
+                <td><span class="cell-uptime">1h 03m</span></td>
+                <td style="text-align: right"><span class="cell-cost">$3.21</span></td>
+              </tr>
+              <tr onclick="openDetail('agent-min-801')" style="cursor: pointer">
+                <td><span class="cell-id">agent-min-801</span></td>
+                <td><span class="cell-issue">MIN-801</span></td>
+                <td><span class="phase-badge implementation">Implementation</span></td>
+                <td><span class="cell-model">claude-sonnet-4.6</span></td>
+                <td><span class="status-pill warning">Warning</span></td>
+                <td><span class="cell-uptime">8h 07m</span></td>
+                <td style="text-align: right"><span class="cell-cost">$18.94</span></td>
+              </tr>
+              <tr onclick="openDetail('planning-pan-578')" style="cursor: pointer">
+                <td><span class="cell-id">planning-pan-578</span></td>
+                <td><span class="cell-issue">PAN-578</span></td>
+                <td><span class="phase-badge planning">Planning</span></td>
+                <td><span class="cell-model">claude-opus-4.6</span></td>
+                <td><span class="status-pill warning">Needs Input</span></td>
+                <td><span class="cell-uptime">45m</span></td>
+                <td style="text-align: right"><span class="cell-cost">$2.18</span></td>
+              </tr>
+              <tr style="opacity: 0.5">
+                <td><span class="cell-id">agent-pan-390</span></td>
+                <td><span class="cell-issue">PAN-390</span></td>
+                <td><span class="phase-badge" style="background: rgba(106,117,151,0.12); color: var(--text-muted)">—</span></td>
+                <td><span class="cell-model">—</span></td>
+                <td><span class="status-pill dead">Stopped</span></td>
+                <td><span class="cell-uptime">—</span></td>
+                <td style="text-align: right"><span class="cell-cost">$67.23</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TIMELINE VIEW -->
+      <div id="view-timeline" class="view-content">
+        <div class="section-header">
+          <div class="section-title">Agent Lifecycle Events</div>
+        </div>
+        <div style="background: var(--obsidian-raised); border: 1px solid var(--obsidian-border); border-radius: var(--radius-md); padding: 24px;">
+          <div class="timeline">
+            <div class="timeline-event started">
+              <div class="timeline-time">14:32:18</div>
+              <div class="timeline-type started">Started</div>
+              <div class="timeline-msg"><span class="timeline-agent">agent-pan-505</span> spawned for PAN-505 (planning phase)</div>
+            </div>
+            <div class="timeline-event complete">
+              <div class="timeline-time">14:28:05</div>
+              <div class="timeline-type complete">Completed</div>
+              <div class="timeline-msg"><span class="timeline-agent">specialist-pan-390-review</span> review passed, merging to main</div>
+            </div>
+            <div class="timeline-event error">
+              <div class="timeline-time">14:15:42</div>
+              <div class="timeline-type error">Stuck Detected</div>
+              <div class="timeline-msg"><span class="timeline-agent">agent-pan-442</span> failed verification 3x — marked stuck</div>
+            </div>
+            <div class="timeline-event commit">
+              <div class="timeline-time">14:10:11</div>
+              <div class="timeline-type commit">Commit</div>
+              <div class="timeline-msg"><span class="timeline-agent">agent-min-826</span> pushed 4 files to feature/MIN-826</div>
+            </div>
+            <div class="timeline-event started">
+              <div class="timeline-time">13:58:33</div>
+              <div class="timeline-type started">Started</div>
+              <div class="timeline-msg"><span class="timeline-agent">specialist-pan-505-review</span> spawned for review</div>
+            </div>
+            <div class="timeline-event stopped">
+              <div class="timeline-time">13:45:20</div>
+              <div class="timeline-type stopped">Stopped</div>
+              <div class="timeline-msg"><span class="timeline-agent">agent-pan-390</span> completed work, session ended</div>
+            </div>
+            <div class="timeline-event started">
+              <div class="timeline-time">13:30:00</div>
+              <div class="timeline-type started">Started</div>
+              <div class="timeline-msg"><span class="timeline-agent">agent-krux-15</span> spawned for KRUX-15</div>
+            </div>
+            <div class="timeline-event commit">
+              <div class="timeline-time">12:15:08</div>
+              <div class="timeline-type commit">Commit</div>
+              <div class="timeline-msg"><span class="timeline-agent">agent-min-801</span> pushed migration files</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TOPOLOGY VIEW -->
+      <div id="view-topology" class="view-content">
+        <div class="section-header">
+          <div class="section-title">Agent Topology</div>
+        </div>
+        <div class="topology-canvas">
+          <!-- Central Cloister -->
+          <div class="topology-node central" style="left: 50%; top: 50%; transform: translate(-50%, -50%);">
+            <div class="topology-node-title">Cloister Deacon</div>
+            <div class="topology-node-meta">Patrol &middot; 3 specialists</div>
+          </div>
+          <!-- Work Agents -->
+          <div class="topology-node" style="left: 15%; top: 20%;">
+            <div class="topology-node-title">agent-pan-505</div>
+            <div class="topology-node-meta">PAN-505 &middot; Planning</div>
+          </div>
+          <div class="topology-node" style="left: 75%; top: 15%;">
+            <div class="topology-node-title">agent-min-826</div>
+            <div class="topology-node-meta">MIN-826 &middot; Implementation</div>
+          </div>
+          <div class="topology-node" style="left: 80%; top: 55%;">
+            <div class="topology-node-title">agent-pan-442</div>
+            <div class="topology-node-meta">PAN-442 &middot; Stuck</div>
+          </div>
+          <div class="topology-node" style="left: 70%; top: 80%;">
+            <div class="topology-node-title">agent-krux-15</div>
+            <div class="topology-node-meta">KRUX-15 &middot; Review</div>
+          </div>
+          <div class="topology-node" style="left: 20%; top: 75%;">
+            <div class="topology-node-title">agent-min-801</div>
+            <div class="topology-node-meta">MIN-801 &middot; Implementation</div>
+          </div>
+          <div class="topology-node" style="left: 10%; top: 50%;">
+            <div class="topology-node-title">planning-pan-578</div>
+            <div class="topology-node-meta">PAN-578 &middot; Needs Input</div>
+          </div>
+          <!-- Specialists -->
+          <div class="topology-node" style="left: 45%; top: 15%; background: rgba(168,85,247,0.08); border-color: rgba(168,85,247,0.2);">
+            <div class="topology-node-title" style="color: var(--signal-purple)">specialist-pan-505-r</div>
+            <div class="topology-node-meta">Review Agent</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Panel -->
+  <aside class="right-panel">
+    <div class="panel-section">
+      <div class="panel-section-title">Recent Activity</div>
+      <div class="activity-item">
+        <span class="activity-time">14:32</span>
+        <span class="activity-indicator spawn"></span>
+        <span class="activity-text"><strong>agent-pan-505</strong> <span class="issue-ref">PAN-505</span> started</span>
+      </div>
+      <div class="activity-item">
+        <span class="activity-time">14:28</span>
+        <span class="activity-indicator complete"></span>
+        <span class="activity-text"><strong>specialist-pan-390</strong> review complete</span>
+      </div>
+      <div class="activity-item">
+        <span class="activity-time">14:15</span>
+        <span class="activity-indicator error"></span>
+        <span class="activity-text"><strong>agent-pan-442</strong> <span class="issue-ref">PAN-442</span> stuck</span>
+      </div>
+      <div class="activity-item">
+        <span class="activity-time">14:10</span>
+        <span class="activity-indicator deacon"></span>
+        <span class="activity-text">Cloister patrol: 2 agents stuck</span>
+      </div>
+      <div class="activity-item">
+        <span class="activity-time">13:58</span>
+        <span class="activity-indicator spawn"></span>
+        <span class="activity-text"><strong>specialist-pan-505</strong> spawned</span>
+      </div>
+      <div class="activity-item">
+        <span class="activity-time">13:45</span>
+        <span class="activity-indicator complete"></span>
+        <span class="activity-text"><strong>agent-pan-390</strong> completed</span>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-section-title">Agent Distribution</div>
+      <div class="donut-container">
+        <div class="donut-chart"></div>
+        <div class="donut-legend">
+          <div class="legend-item">
+            <span class="legend-label"><span class="legend-dot" style="background: var(--signal-amber)"></span> Planning</span>
+            <span class="legend-count">3</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-label"><span class="legend-dot" style="background: var(--signal-blue)"></span> Implementation</span>
+            <span class="legend-count">4</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-label"><span class="legend-dot" style="background: var(--signal-purple)"></span> Review</span>
+            <span class="legend-count">2</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-label"><span class="legend-dot" style="background: var(--signal-green)"></span> Testing</span>
+            <span class="legend-count">1</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-section-title">System Health</div>
+      <div class="gauge">
+        <div class="gauge-header">
+          <span class="gauge-label">CPU</span>
+          <span class="gauge-value">42%</span>
+        </div>
+        <div class="gauge-bar"><div class="gauge-fill blue" style="width: 42%"></div></div>
+      </div>
+      <div class="gauge">
+        <div class="gauge-header">
+          <span class="gauge-label">Memory</span>
+          <span class="gauge-value">68%</span>
+        </div>
+        <div class="gauge-bar"><div class="gauge-fill purple" style="width: 68%"></div></div>
+      </div>
+      <div class="gauge">
+        <div class="gauge-header">
+          <span class="gauge-label">Disk</span>
+          <span class="gauge-value">23%</span>
+        </div>
+        <div class="gauge-bar"><div class="gauge-fill blue" style="width: 23%"></div></div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-section-title">Cluster</div>
+      <div style="font-size: 11px; color: var(--text-muted); line-height: 1.8;">
+        <div style="display: flex; justify-content: space-between;"><span>Health</span><span style="color: var(--signal-green); font-family: var(--font-mono)">99.8%</span></div>
+        <div style="display: flex; justify-content: space-between;"><span>Latency</span><span style="color: var(--text-secondary); font-family: var(--font-mono)">24ms</span></div>
+        <div style="display: flex; justify-content: space-between;"><span>Version</span><span style="color: var(--text-secondary); font-family: var(--font-mono)">v0.5.0</span></div>
+        <div style="display: flex; justify-content: space-between;"><span>Uptime</span><span style="color: var(--text-secondary); font-family: var(--font-mono)">14d 6h</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Detail Panel Overlay -->
+  <div class="detail-overlay" id="detailOverlay" onclick="closeDetail()"></div>
+
+  <!-- Detail Panel -->
+  <div class="detail-panel" id="detailPanel">
+    <div class="detail-header">
+      <div>
+        <div class="detail-title" id="detailTitle">agent-pan-505</div>
+        <div class="detail-subtitle">
+          <span style="color: var(--signal-blue)">PAN-505</span>
+          <span>&middot;</span>
+          <span style="color: var(--signal-amber)">Planning</span>
+          <span>&middot;</span>
+          <span>2h 14m uptime</span>
+        </div>
+      </div>
+      <button class="detail-close" onclick="closeDetail()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="detail-tabs">
+      <div class="detail-tab active">Terminal</div>
+      <div class="detail-tab">Tasks</div>
+      <div class="detail-tab">Files</div>
+      <div class="detail-tab">Timeline</div>
+    </div>
+    <div class="detail-body">
+      <div class="detail-section">
+        <div class="detail-section-title">Live Terminal</div>
+        <div class="detail-terminal">
+          <div>$ pan plan PAN-505 --model claude-opus-4.6</div>
+          <div style="color: var(--signal-green)">✓ Connected to workspace feature-pan-505</div>
+          <div style="color: var(--text-muted)">→ Loading PRD from docs/prds/planned/PAN-505-...</div>
+          <div style="color: var(--signal-green)">✓ PRD loaded (14 sections, 3 acceptance criteria)</div>
+          <div style="color: var(--text-muted)">→ Analyzing source tree...</div>
+          <div style="color: var(--signal-green)">✓ Found 14 relevant files</div>
+          <div style="color: var(--text-muted)">→ Building execution plan...</div>
+          <div style="color: var(--signal-blue)">? Which approach: Effect.ts or RxJS?</div>
+          <div style="color: var(--signal-amber)">! Waiting for user input...</div>
+        </div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-section-title">Agent Info</div>
+        <div class="detail-info-grid">
+          <div class="detail-info-item">
+            <div class="detail-info-label">Model</div>
+            <div class="detail-info-value">claude-opus-4.6</div>
+          </div>
+          <div class="detail-info-item">
+            <div class="detail-info-label">Runtime</div>
+            <div class="detail-info-value">tsx watch</div>
+          </div>
+          <div class="detail-info-item">
+            <div class="detail-info-label">Workspace</div>
+            <div class="detail-info-value">feature-pan-505</div>
+          </div>
+          <div class="detail-info-item">
+            <div class="detail-info-label">Branch</div>
+            <div class="detail-info-value">feature/pan-505</div>
+          </div>
+          <div class="detail-info-item">
+            <div class="detail-info-label">Cost</div>
+            <div class="detail-info-value" style="color: var(--signal-cyan)">$14.29</div>
+          </div>
+          <div class="detail-info-item">
+            <div class="detail-info-label">PID</div>
+            <div class="detail-info-value">48291</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="detail-actions">
+      <button class="btn btn-ghost">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        Message
+      </button>
+      <button class="btn btn-ghost">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        Attach
+      </button>
+      <button class="btn" style="background: rgba(239,68,68,0.12); color: var(--signal-red); border: 1px solid rgba(239,68,68,0.2);">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        Stop
+      </button>
+    </div>
+  </div>
+
+  <script>
+    function switchView(view) {
+      document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.view-content').forEach(c => c.classList.remove('active'));
+      event.target.closest('.view-tab').classList.add('active');
+      document.getElementById('view-' + view).classList.add('active');
+    }
+
+    function openDetail(agentId) {
+      document.getElementById('detailTitle').textContent = agentId;
+      document.getElementById('detailPanel').classList.add('open');
+      document.getElementById('detailOverlay').classList.add('open');
+    }
+
+    function closeDetail() {
+      document.getElementById('detailPanel').classList.remove('open');
+      document.getElementById('detailOverlay').classList.remove('open');
+    }
+  </script>
+
+</body>
+</html>

@@ -1,6 +1,6 @@
 # Beads Skill for Claude Code
 
-A comprehensive skill for using [beads](https://github.com/steveyegge/beads) (bd) issue tracking with Claude Code.
+A comprehensive skill for using [beads](https://github.com/gastownhall/beads) (bd) issue tracking with Claude Code.
 
 ## What This Skill Does
 
@@ -91,7 +91,7 @@ NEXT: Implement rate limiting"
 
 ## Requirements
 
-- [bd CLI](https://github.com/steveyegge/beads) installed (`brew install steveyegge/beads/bd`)
+- [bd CLI](https://github.com/gastownhall/beads) installed (`brew install gastownhall/beads/bd` or `curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash`)
 - A git repository (bd requires git for sync)
 - Initialized database (`bd init` in project root)
 
@@ -99,7 +99,9 @@ NEXT: Implement rate limiting"
 
 | Version | Features |
 |---------|----------|
-| v0.43.0+ | Full support: agents, gates, worktrees, chemistry patterns |
+| v1.0.2+ | Full support: batch, rules audit, gate improvements |
+| v0.62.0+ | Gate types, worktree fixes, performance improvements |
+| v0.43.0+ | Agents, gates, worktrees, chemistry patterns |
 | v0.40.0+ | Agent beads, async gates, worktree management |
 | v0.34.0+ | Molecules, wisps, cross-project dependencies |
 | v0.15.0+ | Core: dependencies, notes, status tracking |
@@ -107,7 +109,7 @@ NEXT: Implement rate limiting"
 
 ## Contributing
 
-This skill is maintained at [github.com/steveyegge/beads](https://github.com/steveyegge/beads) in the `skills/beads/` directory.
+This skill is maintained at [github.com/gastownhall/beads](https://github.com/gastownhall/beads) in the `skills/beads/` directory.
 
 Issues and PRs welcome for:
 - Documentation improvements

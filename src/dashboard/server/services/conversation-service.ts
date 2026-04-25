@@ -7,7 +7,7 @@
  * All file I/O uses fs/promises (no sync calls).
  */
 
-import { readdir, stat, readFile, watch } from 'node:fs/promises';
+import { readdir, stat, watch, open } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { ChatMessage, WorkLogEntry } from '@panopticon/contracts';
@@ -33,6 +33,21 @@ export interface ParseResult {
   streaming: boolean;
   /** Total estimated cost in USD computed from assistant message usage data. */
   totalCost: number;
+  /** Unpaired tool_use entries waiting for tool_result (persist across incremental calls). */
+  pendingToolUse: Map<string, WorkLogEntry>;
+  /** Pre-arrived tool_result entries waiting for tool_use (persist across incremental calls). */
+  unresolvedResults: Map<string, { resultText?: string; isError: boolean; rawContent: unknown }>;
+  /** Last sequence number assigned (persist across incremental calls). */
+  lastSequence: number;
+  /** File modification time in ms from the stat call made during parsing. */
+  mtimeMs: number;
+}
+
+/** State carried across incremental parseConversationMessages calls. */
+export interface ParseState {
+  pendingToolUse: Map<string, WorkLogEntry>;
+  unresolvedResults: Map<string, { resultText?: string; isError: boolean; rawContent: unknown }>;
+  lastSequence: number;
 }
 
 export interface ConversationActivitySummary {
@@ -116,6 +131,10 @@ export async function discoverSessionFile(
 
 // ─── JSONL parsing ────────────────────────────────────────────────────────────
 
+/** Maximum bytes to read in a single incremental chunk (10 MB). */
+const MAX_READ_BYTES = 10 * 1024 * 1024;
+const MAX_FALLBACK_BYTES = 5 * 1024 * 1024;
+
 interface JsonlUsage {
   input_tokens?: number;
   output_tokens?: number;
@@ -142,6 +161,7 @@ interface JsonlEntry {
 interface ContentBlock {
   type?: string;
   text?: string;
+  thinking?: string;
   id?: string;
   name?: string;
   input?: unknown;
@@ -174,13 +194,76 @@ function isSystemInjection(text: string): boolean {
 export async function parseConversationMessages(
   sessionFile: string,
   fromByteOffset = 0,
+  priorState?: ParseState,
 ): Promise<ParseResult> {
-  const buffer = await readFile(sessionFile);
-  const text = buffer.toString('utf-8');
-  const newByteOffset = buffer.length;
+  // Read only new content from the byte offset — avoids re-reading the entire JSONL every tick
+  const fileStats = await stat(sessionFile);
+  const fileSize = fileStats.size;
 
-  // Parse only new content from the byte offset
-  const newText = text.slice(fromByteOffset);
+  // File was truncated or rotated since last read — signal reset to caller
+  if (fromByteOffset > fileSize) {
+    return {
+      messages: [],
+      workLog: [],
+      byteOffset: 0,
+      streaming: false,
+      totalCost: 0,
+      pendingToolUse: priorState?.pendingToolUse ?? new Map(),
+      unresolvedResults: priorState?.unresolvedResults ?? new Map(),
+      lastSequence: priorState?.lastSequence ?? 0,
+      mtimeMs: fileStats.mtimeMs,
+    };
+  }
+
+  const toRead = Math.max(0, Math.min(fileSize - fromByteOffset, MAX_READ_BYTES));
+  const isIncremental = fromByteOffset > 0;
+
+  let newText = '';
+  let newByteOffset = fromByteOffset;
+
+  if (toRead > 0) {
+    const fh = await open(sessionFile, 'r');
+    try {
+      const buf = Buffer.alloc(toRead);
+      const { bytesRead } = await fh.read(buf, 0, toRead, fromByteOffset);
+
+      if (bytesRead > 0) {
+        const lastNewline = buf.lastIndexOf('\n', bytesRead - 1);
+
+        if (lastNewline !== -1) {
+          // At least one complete line — advance only past complete lines
+          newText = buf.toString('utf-8', 0, lastNewline + 1);
+          newByteOffset = fromByteOffset + lastNewline + 1;
+        } else if (!isIncremental && fromByteOffset + bytesRead >= fileSize) {
+          // Full parse at EOF with no trailing newline — include trailing bytes
+          newText = buf.toString('utf-8', 0, bytesRead);
+          newByteOffset = fromByteOffset + bytesRead;
+        } else if (fromByteOffset + bytesRead >= fileSize) {
+          // Incremental parse at EOF with no newline — don't advance, wait for completion
+          newByteOffset = fromByteOffset;
+        } else {
+          // No newline in a full chunk and more file remains (line exceeds MAX_READ_BYTES).
+          // Read more to find a newline boundary, but cap to avoid OOM on pathological files.
+          const remaining = Math.min(fileSize - fromByteOffset, MAX_FALLBACK_BYTES);
+          const fullBuf = Buffer.alloc(remaining);
+          const { bytesRead: fullBytesRead } = await fh.read(fullBuf, 0, remaining, fromByteOffset);
+          const fullLastNewline = fullBuf.lastIndexOf('\n', fullBytesRead - 1);
+          if (fullLastNewline !== -1) {
+            newText = fullBuf.toString('utf-8', 0, fullLastNewline + 1);
+            newByteOffset = fromByteOffset + fullLastNewline + 1;
+          } else if (!isIncremental) {
+            newText = fullBuf.toString('utf-8', 0, fullBytesRead);
+            newByteOffset = fromByteOffset + fullBytesRead;
+          } else {
+            newByteOffset = fromByteOffset;
+          }
+        }
+      }
+    } finally {
+      await fh.close();
+    }
+  }
+
   const lines = newText.split('\n').filter((l) => l.trim());
 
   const messages: ChatMessage[] = [];
@@ -192,15 +275,20 @@ export async function parseConversationMessages(
   // Track last user message timestamp for duration calculation
   let lastUserTimestamp: string | null = null;
   // Map tool_use id → WorkLogEntry (waiting for tool_result)
-  const pendingToolUse = new Map<string, WorkLogEntry>();
+  const pendingToolUse = priorState?.pendingToolUse ?? new Map<string, WorkLogEntry>();
+  // Map tool_use id → pre-arrived tool_result (waiting for tool_use)
+  const unresolvedResults = priorState?.unresolvedResults ?? new Map<string, { resultText?: string; isError: boolean; rawContent: unknown }>();
+  // Monotonic sequence counter per JSONL line
+  let sequence = priorState?.lastSequence ?? 0;
 
   for (const line of lines) {
     let entry: JsonlEntry;
     try {
-      entry = JSON.parse(line) as JsonlEntry;
+      entry = JSON.parse(line.replace(/\r$/, '')) as JsonlEntry;
     } catch {
       continue;
     }
+    const lineSequence = sequence++;
 
     if (entry.type === 'user' && entry.message) {
       const msg = entry.message;
@@ -223,6 +311,7 @@ export async function parseConversationMessages(
             role: 'user',
             text: rawContent,
             createdAt: ts,
+            sequence: lineSequence,
           });
         }
       } else if (Array.isArray(rawContent)) {
@@ -230,17 +319,17 @@ export async function parseConversationMessages(
         for (const block of rawContent as ContentBlock[]) {
           if (block.type === 'tool_result' && block.tool_use_id) {
             const pending = pendingToolUse.get(block.tool_use_id);
+            let resultText: string | undefined;
+            if (typeof block.content === 'string') {
+              resultText = block.content;
+            } else if (Array.isArray(block.content)) {
+              resultText = (block.content as Array<{ type?: string; text?: string }>)
+                .filter(b => b.type === 'text' && b.text)
+                .map(b => b.text)
+                .join('\n');
+            }
             if (pending) {
               pendingToolUse.delete(block.tool_use_id);
-              let resultText: string | undefined;
-              if (typeof block.content === 'string') {
-                resultText = block.content;
-              } else if (Array.isArray(block.content)) {
-                resultText = (block.content as Array<{ type?: string; text?: string }>)
-                  .filter(b => b.type === 'text' && b.text)
-                  .map(b => b.text)
-                  .join('\n');
-              }
               workLog.push({
                 ...pending,
                 detail: block.is_error
@@ -248,6 +337,12 @@ export async function parseConversationMessages(
                   : pending.detail,
                 result: resultText,
                 tone: block.is_error ? 'error' : pending.tone,
+              });
+            } else {
+              unresolvedResults.set(block.tool_use_id, {
+                resultText,
+                isError: block.is_error ?? false,
+                rawContent: block.content,
               });
             }
           }
@@ -268,6 +363,7 @@ export async function parseConversationMessages(
             role: 'user',
             text: textBlocks.join('\n'),
             createdAt: ts,
+            sequence: lineSequence,
           });
         }
       }
@@ -289,9 +385,19 @@ export async function parseConversationMessages(
       }
 
       let assistantText = '';
+      let blockIndex = 0;
       for (const block of content as ContentBlock[]) {
         if (block.type === 'text' && block.text) {
           assistantText += block.text;
+        } else if (block.type === 'thinking' && block.thinking) {
+          workLog.push({
+            id: `${entry.uuid ?? msg.id ?? `asst-${messages.length}`}-thinking-${blockIndex}`,
+            createdAt: entry.timestamp ?? new Date().toISOString(),
+            label: 'thinking',
+            detail: block.thinking,
+            tone: 'thinking',
+            sequence: lineSequence,
+          });
         } else if (block.type === 'tool_use' && block.id) {
           // WorkLogEntry for the tool call
           const toolEntry: WorkLogEntry = {
@@ -301,9 +407,24 @@ export async function parseConversationMessages(
             tone: 'tool',
             toolTitle: block.name,
             detail: block.input ? JSON.stringify(block.input) : undefined,
+            sequence: lineSequence,
           };
-          pendingToolUse.set(block.id, toolEntry);
+          const unresolved = unresolvedResults.get(block.id);
+          if (unresolved) {
+            unresolvedResults.delete(block.id);
+            workLog.push({
+              ...toolEntry,
+              detail: unresolved.isError
+                ? `Error: ${unresolved.resultText ?? JSON.stringify(unresolved.rawContent)}`
+                : toolEntry.detail,
+              result: unresolved.resultText,
+              tone: unresolved.isError ? 'error' : toolEntry.tone,
+            });
+          } else {
+            pendingToolUse.set(block.id, toolEntry);
+          }
         }
+        blockIndex++;
       }
 
       if (assistantText) {
@@ -315,9 +436,10 @@ export async function parseConversationMessages(
           id: entry.uuid ?? msg.id ?? `asst-${messages.length}`,
           role: 'assistant',
           text: assistantText,
-          // createdAt = when the user sent the request (for duration calculation)
-          // completedAt = when this assistant response finished
-          createdAt: lastUserTimestamp ?? entry.timestamp ?? new Date().toISOString(),
+          // createdAt = when the assistant response was generated (preserves
+          // chronological order for interleaving with work log entries).
+          // Duration start is computed separately in session-logic.ts.
+          createdAt: entry.timestamp ?? new Date().toISOString(),
           // Any terminal stop reason (end_turn, max_tokens, stop_sequence) marks the response as done.
           // tool_use means more exchanges are coming, so leave completedAt unset.
           // Use || fallback in case entry.timestamp is null (not just undefined).
@@ -325,6 +447,7 @@ export async function parseConversationMessages(
             ? (entry.timestamp || new Date().toISOString())
             : undefined,
           streaming: !msg.stop_reason,
+          sequence: lineSequence,
         };
       }
     }
@@ -335,26 +458,66 @@ export async function parseConversationMessages(
     messages.push(pendingAssistant);
   }
 
-  // Flush any tool_use entries that never got a result (still running)
-  for (const [, entry] of pendingToolUse) {
-    workLog.push(entry);
+  // Flush any tool_use entries that never got a result (still running).
+  // Only flush on non-incremental parses; incremental callers pass priorState
+  // and will receive pendingToolUse back for the next call.
+  if (!priorState) {
+    for (const [, entry] of pendingToolUse) {
+      workLog.push(entry);
+    }
+    pendingToolUse.clear();
   }
 
-  // Streaming detection: last assistant message has no stop_reason and file was modified < 5s ago
+  // Sort by (createdAt, sequence) so the conversation view matches terminal order.
+  // Use direct string comparison (not localeCompare) — ISO 8601 timestamps sort lexicographically.
+  messages.sort((a, b) => {
+    if (a.createdAt < b.createdAt) return -1;
+    if (a.createdAt > b.createdAt) return 1;
+    return (a.sequence ?? 0) - (b.sequence ?? 0);
+  });
+  workLog.sort((a, b) => {
+    if (a.createdAt < b.createdAt) return -1;
+    if (a.createdAt > b.createdAt) return 1;
+    return (a.sequence ?? 0) - (b.sequence ?? 0);
+  });
+
+  // Streaming detection: agent is active if the last assistant message is incomplete,
+  // or if there are pending/unresolved tools (mid-turn), or a user message arrived
+  // (agent is about to respond), and the file was modified recently.
   let streaming = false;
   const lastMsg = messages[messages.length - 1];
-  if (lastMsg?.role === 'assistant' && !lastMsg.completedAt) {
-    const fileStat = await stat(sessionFile);
-    streaming = Date.now() - fileStat.mtimeMs < 5000;
+  const assistantIncomplete = lastMsg?.role === 'assistant' && !lastMsg.completedAt;
+  const fileRecent = Date.now() - fileStats.mtimeMs < 5000;
+  if (assistantIncomplete && fileRecent) {
+    streaming = true;
+  } else if (lastMsg?.role === 'user' && fileRecent) {
+    streaming = true;
   }
 
-  return { messages, workLog, byteOffset: newByteOffset, streaming, totalCost };
+  return {
+    messages,
+    workLog,
+    byteOffset: newByteOffset,
+    streaming,
+    totalCost,
+    pendingToolUse,
+    unresolvedResults,
+    lastSequence: sequence,
+    mtimeMs: fileStats.mtimeMs,
+  };
 }
 
 export async function summarizeConversationActivity(
   sessionFile: string,
 ): Promise<ConversationActivitySummary> {
-  const { messages, workLog, streaming } = await parseConversationMessages(sessionFile);
+  // Parse from the last compact boundary instead of the full file — avoids
+  // re-reading potentially megabytes of history on every list enrichment tick.
+  // Pass an empty priorState so pendingToolUse stays populated rather than being
+  // flushed into workLog. This lets us detect genuinely pending tools.
+  const { messages, streaming, pendingToolUse, mtimeMs } = await parseFromLastCompactBoundary(
+    sessionFile,
+    { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 },
+  );
   const lastMsg = messages[messages.length - 1];
   // Agent is idle only when the last message is an assistant message with a terminal
   // completedAt (stop_reason was end_turn/max_tokens/stop_sequence). Any other state
@@ -364,13 +527,21 @@ export async function summarizeConversationActivity(
     lastMsg?.role === 'user' ||
     (lastMsg?.role === 'assistant' && !lastMsg.completedAt);
 
-  // Find the most recent pending tool (tool_use sent but tool_result not yet received)
+  // Find the most recent pending tool (tool_use sent but tool_result not yet received).
+  // pendingToolUse holds the actual unpaired tool_uses, so this works correctly for
+  // parallel tool calls where multiple tools are in flight simultaneously.
+  // Time-bound: if the file hasn't been modified in 30s, the agent has likely crashed
+  // and pending tools are stale — don't report a stale currentTool.
+  const fileRecent = Date.now() - mtimeMs < 30_000;
+
   let currentTool: string | null = null;
-  for (let i = workLog.length - 1; i >= 0; i--) {
-    const entry = workLog[i];
-    if (entry.tone === 'tool' && !entry.result && entry.toolTitle) {
-      currentTool = entry.toolTitle;
-      break;
+  if (fileRecent) {
+    let maxSequence = -1;
+    for (const entry of pendingToolUse.values()) {
+      if (entry.toolTitle && (entry.sequence ?? -1) > maxSequence) {
+        maxSequence = entry.sequence ?? -1;
+        currentTool = entry.toolTitle;
+      }
     }
   }
 
@@ -380,50 +551,173 @@ export async function summarizeConversationActivity(
 // ─── Compact boundary offset cache ───────────────────────────────────────────
 
 /**
- * In-memory cache mapping JSONL file path → last compact_boundary byte offset.
+ * In-memory cache mapping JSONL file path → last compact_boundary byte offset
+ * and the byte offset up to which we've scanned complete lines.
  * Persists across requests so we don't re-scan the entire file each time.
  */
-const compactOffsetCache = new Map<string, { boundaryOffset: number; fileSize: number }>();
+const compactOffsetCache = new Map<string, { boundaryOffset: number; scannedUpTo: number }>();
 
 /**
  * Find the byte offset of the last `compact_boundary` system entry in a JSONL file.
  *
- * Uses an in-memory cache keyed by file path + size. When the file grows beyond
- * the cached size, only the new portion is scanned. Returns 0 if no boundary found.
+ * Uses an in-memory cache keyed by file path. When the file grows beyond
+ * the cached scan position, only the new portion is scanned. Returns 0 if no boundary found.
  */
 export async function findLastCompactBoundary(sessionFile: string): Promise<number> {
-  const buffer = await readFile(sessionFile);
-  const fileSize = buffer.length;
-  const text = buffer.toString('utf-8');
+  const fileStats = await stat(sessionFile);
+  const fileSize = fileStats.size;
 
   const cached = compactOffsetCache.get(sessionFile);
 
-  // If file hasn't grown since last scan, return cached offset
-  if (cached && cached.fileSize === fileSize) {
+  // If file hasn't grown since last scan, return cached offset without reading
+  if (cached && cached.scannedUpTo === fileSize) {
     return cached.boundaryOffset;
   }
 
-  // Scan from the cached offset (or start) forward — compact boundaries only append
-  const scanFrom = cached?.boundaryOffset ?? 0;
-  let lastBoundaryOffset = cached?.boundaryOffset ?? 0;
-
-  // Walk through lines, tracking byte position
-  let bytePos = 0;
-  const lines = text.split('\n');
-  for (const line of lines) {
-    if (bytePos >= scanFrom && line.trim()) {
-      try {
-        const entry = JSON.parse(line);
-        if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
-          lastBoundaryOffset = bytePos;
+  // No cache or file shrank — scan entire file in capped chunks
+  if (!cached || fileSize < cached.scannedUpTo) {
+    let lastBoundaryOffset = 0;
+    let scanPos = 0;
+    const fh = await open(sessionFile, 'r');
+    try {
+      while (scanPos < fileSize) {
+        const toRead = Math.min(fileSize - scanPos, MAX_READ_BYTES);
+        let buf: Buffer;
+        let bytesRead: number;
+        try {
+          buf = Buffer.alloc(toRead);
+          const result = await fh.read(buf, 0, toRead, scanPos);
+          bytesRead = result.bytesRead;
+        } catch {
+          break;
         }
-      } catch { /* skip invalid lines */ }
+
+        if (bytesRead === 0) break;
+
+        let scanBytes = bytesRead;
+        const lastNewline = buf.lastIndexOf('\n', bytesRead - 1);
+
+        if (lastNewline !== -1) {
+          scanBytes = lastNewline + 1;
+        } else if (scanPos + bytesRead < fileSize) {
+          // No newline in chunk and more file remains — read more, capped
+          const remaining = Math.min(fileSize - scanPos, MAX_FALLBACK_BYTES);
+          const fullBuf = Buffer.alloc(remaining);
+          let fullBytesRead: number;
+          try {
+            const result = await fh.read(fullBuf, 0, remaining, scanPos);
+            fullBytesRead = result.bytesRead;
+          } catch {
+            break;
+          }
+          const fullLastNewline = fullBuf.lastIndexOf('\n', fullBytesRead - 1);
+          if (fullLastNewline !== -1) {
+            scanBytes = fullLastNewline + 1;
+            buf = fullBuf;
+          } else {
+            scanBytes = fullBytesRead;
+            buf = fullBuf;
+          }
+        }
+
+        const text = buf.toString('utf-8', 0, scanBytes);
+        let bytePos = scanPos;
+        const lines = text.split('\n');
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const cleanLine = line.replace(/\r$/, '');
+              const entry = JSON.parse(cleanLine);
+              if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
+                lastBoundaryOffset = bytePos;
+              }
+            } catch { /* skip invalid lines */ }
+          }
+          bytePos += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
+        }
+
+        scanPos += scanBytes;
+      }
+    } finally {
+      await fh.close();
     }
-    bytePos += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
+
+    compactOffsetCache.set(sessionFile, { boundaryOffset: lastBoundaryOffset, scannedUpTo: fileSize });
+    return lastBoundaryOffset;
   }
 
-  compactOffsetCache.set(sessionFile, { boundaryOffset: lastBoundaryOffset, fileSize });
-  return lastBoundaryOffset;
+  // File grew — read only the new portion, respecting complete-line boundaries
+  const newBytes = fileSize - cached.scannedUpTo;
+  const toRead = Math.min(newBytes, MAX_READ_BYTES);
+  const fh = await open(sessionFile, 'r');
+  try {
+    let buf: Buffer;
+    let bytesRead: number;
+    try {
+      buf = Buffer.alloc(toRead);
+      const result = await fh.read(buf, 0, toRead, cached.scannedUpTo);
+      bytesRead = result.bytesRead;
+    } catch {
+      compactOffsetCache.set(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
+      return cached.boundaryOffset;
+    }
+
+    let scanBytes = 0;
+    if (bytesRead > 0) {
+      const lastNewline = buf.lastIndexOf('\n', bytesRead - 1);
+      if (lastNewline !== -1) {
+        scanBytes = lastNewline + 1;
+      } else if (cached.scannedUpTo + bytesRead < fileSize) {
+        // No newline in chunk and more file remains — read to EOF, capped
+        const remaining = Math.min(fileSize - cached.scannedUpTo, MAX_FALLBACK_BYTES);
+        const fullBuf = Buffer.alloc(remaining);
+        let fullBytesRead: number;
+        try {
+          const result = await fh.read(fullBuf, 0, remaining, cached.scannedUpTo);
+          fullBytesRead = result.bytesRead;
+        } catch {
+          compactOffsetCache.set(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
+          return cached.boundaryOffset;
+        }
+        const fullLastNewline = fullBuf.lastIndexOf('\n', fullBytesRead - 1);
+        if (fullLastNewline !== -1) {
+          scanBytes = fullLastNewline + 1;
+          buf = fullBuf;
+        } else {
+          // No newline even at EOF — don't scan partial trailing line
+          compactOffsetCache.set(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
+          return cached.boundaryOffset;
+        }
+      } else {
+        // At EOF with no newline — don't scan partial trailing line
+        compactOffsetCache.set(sessionFile, { boundaryOffset: cached.boundaryOffset, scannedUpTo: fileSize });
+        return cached.boundaryOffset;
+      }
+    }
+
+    const text = buf.toString('utf-8', 0, scanBytes);
+
+    let lastBoundaryOffset = cached.boundaryOffset;
+    let bytePos = cached.scannedUpTo;
+    const lines = text.split('\n');
+    for (const line of lines) {
+      if (line.trim()) {
+        try {
+          const cleanLine = line.replace(/\r$/, '');
+          const entry = JSON.parse(cleanLine);
+          if (entry.type === 'system' && entry.subtype === 'compact_boundary') {
+            lastBoundaryOffset = bytePos;
+          }
+        } catch { /* skip invalid lines */ }
+      }
+      bytePos += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
+    }
+
+    compactOffsetCache.set(sessionFile, { boundaryOffset: lastBoundaryOffset, scannedUpTo: cached.scannedUpTo + scanBytes });
+    return lastBoundaryOffset;
+  } finally {
+    await fh.close();
+  }
 }
 
 /**
@@ -435,9 +729,10 @@ export async function findLastCompactBoundary(sessionFile: string): Promise<numb
  */
 export async function parseFromLastCompactBoundary(
   sessionFile: string,
+  priorState?: ParseState,
 ): Promise<ParseResult> {
   const boundaryOffset = await findLastCompactBoundary(sessionFile);
-  return parseConversationMessages(sessionFile, boundaryOffset);
+  return parseConversationMessages(sessionFile, boundaryOffset, priorState);
 }
 
 // ─── File watcher ─────────────────────────────────────────────────────────────
@@ -457,27 +752,58 @@ export function watchConversation(
   callback: (result: ParseResult) => void,
 ): ConversationWatchHandle {
   let byteOffset = 0;
+  let priorState: ParseState | undefined;
   let stopped = false;
+  let isParsing = false;
   let abortController: AbortController | null = null;
   let pollInterval: ReturnType<typeof setTimeout> | null = null;
 
   async function handleChange(): Promise<void> {
-    if (stopped) return;
+    if (stopped || isParsing) return;
+    isParsing = true;
     try {
-      const result = await parseConversationMessages(sessionFile, byteOffset);
-      if (result.byteOffset > byteOffset) {
+      const result = await parseConversationMessages(sessionFile, byteOffset, priorState);
+      if (result.byteOffset < byteOffset) {
+        // File was truncated or rotated — reset to full re-parse
+        byteOffset = 0;
+        priorState = undefined;
+        const fullResult = await parseConversationMessages(sessionFile, 0);
+        if (fullResult.byteOffset > 0) {
+          byteOffset = fullResult.byteOffset;
+          priorState = {
+            pendingToolUse: fullResult.pendingToolUse,
+            unresolvedResults: fullResult.unresolvedResults,
+            lastSequence: fullResult.lastSequence,
+          };
+          // Include in-flight tools so the live view shows pending work
+          const workLog = [...fullResult.workLog, ...fullResult.pendingToolUse.values()];
+          callback({ ...fullResult, workLog });
+        }
+      } else if (result.byteOffset > byteOffset) {
         byteOffset = result.byteOffset;
-        callback(result);
+        priorState = {
+          pendingToolUse: result.pendingToolUse,
+          unresolvedResults: result.unresolvedResults,
+          lastSequence: result.lastSequence,
+        };
+        // Include in-flight tools so the live view shows pending work
+        const workLog = [...result.workLog, ...result.pendingToolUse.values()];
+        callback({ ...result, workLog });
       }
     } catch {
       // File may have been rotated or is temporarily unavailable
+    } finally {
+      isParsing = false;
     }
   }
 
   // Try fs.watch first (inotify on Linux)
+  // Create AbortController synchronously so stop() can always abort,
+  // even if called before the async startWatch() body runs.
+  abortController = new AbortController();
+
   async function startWatch(): Promise<void> {
     try {
-      abortController = new AbortController();
       const watcher = watch(sessionFile, { signal: abortController.signal });
       for await (const _event of watcher) {
         await handleChange();

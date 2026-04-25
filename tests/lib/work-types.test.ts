@@ -231,7 +231,7 @@ describe('work-types', () => {
       expect(metadata.description).toBeTruthy();
     });
 
-    it('should work for all 23 work types', () => {
+    it('should work for all 25 work types', () => {
       getAllWorkTypes().forEach((id) => {
         const metadata = getWorkTypeMetadata(id);
         expect(metadata).toBeDefined();

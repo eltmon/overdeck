@@ -155,10 +155,15 @@ describe('derivePipelinePhase precedence table', () => {
 
   describe('reviewing phase', () => {
     it('returns reviewing when reviewStatus === reviewing', () => {
-      const input = makeInput({ reviewStatus: makeReviewStatus({ reviewStatus: 'reviewing' }) });
+      const input = makeInput({
+        reviewStatus: makeReviewStatus({
+          reviewStatus: 'reviewing',
+          reviewCoordinatorSessionName: 'review-coordinator-pan-509-1234567890',
+        }),
+      });
       const { phase, activeSession } = derivePipelinePhase(input);
       expect(phase).toBe('reviewing');
-      expect(activeSession).toBe('specialist-panopticon-pan-509-review-agent');
+      expect(activeSession).toBe('review-coordinator-pan-509-1234567890');
     });
 
     it('does NOT return reviewing when reviewStatus !== reviewing', () => {
@@ -177,8 +182,13 @@ describe('derivePipelinePhase precedence table', () => {
     });
 
     it('returns null activeSession when review session is dead', () => {
-      const input = makeInput({ reviewStatus: makeReviewStatus({ reviewStatus: 'reviewing' }) });
-      const dead = new Set(['specialist-panopticon-pan-509-review-agent']);
+      const input = makeInput({
+        reviewStatus: makeReviewStatus({
+          reviewStatus: 'reviewing',
+          reviewCoordinatorSessionName: 'review-coordinator-pan-509-1234567890',
+        }),
+      });
+      const dead = new Set(['review-coordinator-pan-509-1234567890']);
       const { activeSession } = derivePipelinePhase(input, dead);
       expect(activeSession).toBeNull();
     });
@@ -295,6 +305,81 @@ describe('derivePipelinePhase precedence table', () => {
       expect(phase).toBe('planning');
     });
   });
+
+  describe('monorepo merge fallback', () => {
+    it('uses work agent session when mergeStatus is merging and work agent is healthy', () => {
+      const input = makeInput({
+        agent: makeAgent({ status: 'healthy' }),
+        reviewStatus: makeReviewStatus({ mergeStatus: 'merging' }),
+      });
+      const { phase, activeSession, availableTerminals } = derivePipelinePhase(input);
+      expect(phase).toBe('merging');
+      expect(activeSession).toBe('agent-abc');
+      const mergeTab = availableTerminals.find(t => t.id === 'merging');
+      expect(mergeTab?.sessionName).toBe('agent-abc');
+    });
+
+    it('uses merge-agent session when work agent is stopped (polyrepo)', () => {
+      const input = makeInput({
+        agent: makeAgent({ status: 'stopped' }),
+        reviewStatus: makeReviewStatus({ mergeStatus: 'merging' }),
+      });
+      const { activeSession, availableTerminals } = derivePipelinePhase(input);
+      expect(activeSession).toBe('specialist-panopticon-pan-509-merge-agent');
+      const mergeTab = availableTerminals.find(t => t.id === 'merging');
+      expect(mergeTab?.sessionName).toBe('specialist-panopticon-pan-509-merge-agent');
+    });
+  });
+
+  describe('review tab disabled when review is complete', () => {
+    it('disables review tab when reviewStatus is passed', () => {
+      const input = makeInput({
+        reviewStatus: makeReviewStatus({ reviewStatus: 'passed' }),
+      });
+      const { availableTerminals } = derivePipelinePhase(input);
+      const reviewTab = availableTerminals.find(t => t.id === 'reviewing');
+      expect(reviewTab?.disabled).toBe(true);
+      expect(reviewTab?.isRunning).toBe(false);
+    });
+
+    it('disables review tab when reviewStatus is failed', () => {
+      const input = makeInput({
+        agent: makeAgent({ status: 'healthy' }),
+        reviewStatus: makeReviewStatus({ reviewStatus: 'failed' }),
+      });
+      const { availableTerminals } = derivePipelinePhase(input);
+      const reviewTab = availableTerminals.find(t => t.id === 'reviewing');
+      expect(reviewTab?.disabled).toBe(true);
+      expect(reviewTab?.isRunning).toBe(false);
+    });
+
+    it('disables review tab when reviewStatus is blocked', () => {
+      const input = makeInput({
+        agent: makeAgent({ status: 'healthy' }),
+        reviewStatus: makeReviewStatus({ reviewStatus: 'blocked' }),
+      });
+      const { availableTerminals } = derivePipelinePhase(input);
+      const reviewTab = availableTerminals.find(t => t.id === 'reviewing');
+      expect(reviewTab?.disabled).toBe(true);
+      expect(reviewTab?.isRunning).toBe(false);
+    });
+
+    it('disables parallel review tabs when reviewStatus is passed', () => {
+      const input = makeInput({
+        reviewStatus: makeReviewStatus({
+          reviewStatus: 'passed',
+          reviewSessionNames: ['review-pan-509-1234567890-sme', 'review-pan-509-1234567890-security'],
+        }),
+      });
+      const { availableTerminals } = derivePipelinePhase(input);
+      const smeTab = availableTerminals.find(t => t.id === 'reviewing-sme');
+      const secTab = availableTerminals.find(t => t.id === 'reviewing-security');
+      expect(smeTab?.disabled).toBe(true);
+      expect(secTab?.disabled).toBe(true);
+      expect(smeTab?.isRunning).toBe(false);
+      expect(secTab?.isRunning).toBe(false);
+    });
+  });
 });
 
 // ─── availableTerminals tests ──────────────────────────────────────────────────
@@ -338,11 +423,38 @@ describe('derivePipelinePhase availableTerminals', () => {
     expect(availableTerminals.find(t => t.id === 'merging')).toBeTruthy();
   });
 
-  it('marks Review tab as active when phase is reviewing', () => {
-    const input = makeInput({ reviewStatus: makeReviewStatus({ reviewStatus: 'reviewing' }) });
+  it('marks Review tab as active when phase is reviewing and coordinator exists', () => {
+    const input = makeInput({
+      reviewStatus: makeReviewStatus({
+        reviewStatus: 'reviewing',
+        reviewCoordinatorSessionName: 'review-coordinator-pan-509-1234567890',
+      }),
+    });
     const { availableTerminals } = derivePipelinePhase(input);
     const reviewTab = availableTerminals.find(t => t.id === 'reviewing');
     expect(reviewTab?.isActive).toBe(true);
+  });
+
+  it('includes coordinator Review tab plus per-reviewer tabs during parallel review', () => {
+    const input = makeInput({
+      reviewStatus: makeReviewStatus({
+        reviewStatus: 'reviewing',
+        reviewCoordinatorSessionName: 'review-coordinator-pan-509-1234567890',
+        reviewSessionNames: [
+          'review-pan-509-1234567891-correctness',
+          'review-pan-509-1234567891-security',
+          'review-pan-509-1234567891-performance',
+          'review-pan-509-1234567891-requirements',
+        ],
+      }),
+    });
+    const { activeSession, availableTerminals } = derivePipelinePhase(input);
+    expect(activeSession).toBe('review-coordinator-pan-509-1234567890');
+    expect(availableTerminals.find(t => t.id === 'reviewing')?.sessionName).toBe('review-coordinator-pan-509-1234567890');
+    expect(availableTerminals.find(t => t.id === 'reviewing-correctness')).toBeTruthy();
+    expect(availableTerminals.find(t => t.id === 'reviewing-security')).toBeTruthy();
+    expect(availableTerminals.find(t => t.id === 'reviewing-performance')).toBeTruthy();
+    expect(availableTerminals.find(t => t.id === 'reviewing-requirements')).toBeTruthy();
   });
 
   it('marks Work tab as active when phase is working', () => {
@@ -365,5 +477,22 @@ describe('derivePipelinePhase availableTerminals', () => {
     const { availableTerminals } = derivePipelinePhase(input);
     // No specialist tabs when reviewStatus is absent
     expect(availableTerminals.filter(t => t.id !== 'working')).toHaveLength(0);
+  });
+
+  it('marks done sub-reviewers as disabled with no spinner', () => {
+    const input = makeInput({
+      reviewStatus: makeReviewStatus({
+        reviewStatus: 'reviewing',
+        reviewSessionNames: ['review-pan-509-123-correctness', 'review-pan-509-123-performance'],
+        reviewSubStatuses: { correctness: 'done', performance: 'running' },
+      }),
+    });
+    const { availableTerminals } = derivePipelinePhase(input);
+    const correctnessTab = availableTerminals.find(t => t.id === 'reviewing-correctness');
+    const performanceTab = availableTerminals.find(t => t.id === 'reviewing-performance');
+    expect(correctnessTab?.disabled).toBe(true);
+    expect(correctnessTab?.isRunning).toBe(false);
+    expect(performanceTab?.disabled).toBe(false);
+    expect(performanceTab?.isRunning).toBe(true);
   });
 });

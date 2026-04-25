@@ -14,12 +14,10 @@ import {
   User,
   Tag,
   FileText,
-  ListTodo,
   RefreshCw,
   Box,
   Play,
   GitMerge,
-  ScrollText,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
@@ -233,6 +231,18 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     staleTime: 10000,
   });
 
+  const { data: planningState } = useQuery({
+    queryKey: ['planning-state', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/issues/${issueId}/planning-state`);
+      if (!res.ok) throw new Error('Failed to fetch planning state');
+      return res.json() as Promise<{ hasPlan: boolean; hasBeads: boolean; beadsCount: number; planningComplete: boolean }>;
+    },
+    enabled: !!issueId,
+    refetchInterval: 30000,
+    staleTime: 15000,
+  });
+
   const startAgentMutation = useMutation({
     mutationFn: async (message?: string) => {
       const shouldResume = !!(agent && agent.status === 'stopped' && agentLifecycle?.canResumeSession);
@@ -380,25 +390,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     },
   });
 
-  const mergeMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/issues/${issueId}/merge`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to merge');
-      }
-      return res.json();
-    },
-    onSuccess: async () => {
-      queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
-      await refreshDashboardState(queryClient);
-      onClose();
-    },
-  });
-
   const cancelMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch(`/api/issues/${issueId}/cancel`, {
@@ -439,25 +430,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     },
     onError: (err: Error) => {
       toast.error(err.message, { duration: 8000 });
-    },
-  });
-
-  const resetReviewMutation = useMutation({
-    mutationFn: async (options?: { rerun?: boolean }) => {
-      const res = await fetch(`/api/review/${issueId}/reset`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rerun: options?.rerun ?? false }),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to reset review cycles');
-      }
-      return res.json();
-    },
-    onSuccess: async () => {
-      queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
-      await refreshDashboardState(queryClient);
     },
   });
 
@@ -523,18 +495,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     },
   });
 
-  const killMutation = useMutation({
-    mutationFn: async () => {
-      if (!agent) throw new Error('No agent');
-      const res = await fetch(`/api/agents/${agent.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to kill');
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
-      onClose();
-    },
-  });
-
   const refreshDbMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}/refresh-db`, {
@@ -548,6 +508,25 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workspace', issueId] }),
+  });
+
+  const copySettingsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/issues/${issueId}/copy-settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to copy settings');
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
+      toast.success('Panopticon settings copied into workspace');
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Failed to copy settings');
+    },
   });
 
   const handleCopy = useCallback(() => {
@@ -577,16 +556,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     }
   };
 
-  const handleMerge = async () => {
-    if (await confirm({
-      title: 'Merge to Main',
-      message: `Merge ${issueId} to main?\n\nReview and tests have passed. This will:\n- Merge the feature branch to main\n- Run final verification tests\n- Clean up workspace`,
-      confirmLabel: 'Merge',
-    })) {
-      mergeMutation.mutate();
-    }
-  };
-
   const handleCancel = async () => {
     if (await confirm({
       title: 'Cancel Issue',
@@ -605,22 +574,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       confirmLabel: 'Reopen',
     })) {
       reopenMutation.mutate(undefined);
-    }
-  };
-
-  const handleResetReview = async () => {
-    if (await confirm({
-      title: 'Reset & Re-run Pipeline',
-      message: `Reset all review/test/merge cycles for ${issueId}?\n\nThis will:\n- Clear review, test, and merge status\n- Reset the circuit breaker counter\n- Remove queued specialist tasks\n- Re-dispatch to review specialist\n\nTracker status will NOT change.`,
-      confirmLabel: 'Reset & Re-run',
-    })) {
-      resetReviewMutation.mutate({ rerun: true });
-    }
-  };
-
-  const handleKill = async () => {
-    if (agent && await confirm({ title: 'Kill Agent', message: `Kill agent ${agent.id}?`, variant: 'destructive', confirmLabel: 'Kill' })) {
-      killMutation.mutate();
     }
   };
 
@@ -795,14 +748,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
                 <span>PRD</span>
               </button>
             )}
-            <button onClick={() => setShowBeads(true)} className="flex items-center gap-1.5 text-primary hover:text-primary/80">
-              <ListTodo className="w-3 h-3" />
-              <span>Beads Tasks</span>
-            </button>
-            <button onClick={() => setShowVBrief(true)} className="flex items-center gap-1.5 text-signal-review hover:text-signal-review/80">
-              <ScrollText className="w-3 h-3" />
-              <span>vBRIEF</span>
-            </button>
           </div>
         </div>
 
@@ -960,29 +905,31 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
         {/* Actions */}
         <ActionsSection
           agent={agent}
+          issueId={issueId}
           reviewStatus={reviewStatus}
           reviewStatusLoading={reviewStatusLoading}
           workspace={workspace}
-          mergeMutation={mergeMutation}
+          hasPlan={planningState?.hasPlan ?? false}
+          beadsCount={planningState?.beadsCount ?? 0}
           reviewMutation={reviewMutation}
-          killMutation={killMutation}
           cancelMutation={cancelMutation}
-          reopenMutation={reopenMutation}
-          resetReviewMutation={resetReviewMutation}
           startAgentMutation={startAgentMutation}
           createWorkspaceMutation={createWorkspaceMutation}
           syncMainMutation={syncMainMutation}
+          copySettingsMutation={copySettingsMutation}
           resetSessionMutation={resetSessionMutation}
-          onMerge={handleMerge}
+          reopenMutation={reopenMutation}
           onReview={handleReview}
-          onKill={handleKill}
+          onKillSuccess={onClose}
           onCancel={handleCancel}
-          onReopen={handleReopen}
-          onResetReview={handleResetReview}
           onResetSession={() => resetSessionMutation.mutate()}
           onDismissPending={() => dismissPendingMutation.mutate()}
           onStartAgent={(message?: string) => startAgentMutation.mutate(message)}
           onCreateWorkspace={() => createWorkspaceMutation.mutate()}
+          onCopySettings={() => copySettingsMutation.mutate()}
+          onReopen={handleReopen}
+          onViewBeads={() => setShowBeads(true)}
+          onViewVBrief={() => setShowVBrief(true)}
           lifecycle={agentLifecycle}
           agentLaunchState={agentLaunchState}
         />

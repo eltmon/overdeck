@@ -7,7 +7,6 @@ import { httpHandler } from './http-handler.js';
  *   GET  /api/issues
  *   GET  /api/issues/:id/analyze
  *   POST /api/issues/:id/plan
- *   GET  /api/issues/:id/handoffs
  *   POST /api/issues/:issueId/close
  *   POST /api/issues/:id/start-planning
  *   POST /api/issues/:id/abort-planning
@@ -26,7 +25,7 @@ import { httpHandler } from './http-handler.js';
 
 import { exec, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { copyFile, mkdir, readdir, readFile, rm, writeFile, access } from 'node:fs/promises';
+import { appendFile, copyFile, mkdir, readdir, readFile, rm, writeFile, access } from 'node:fs/promises';
 import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/spawn-planning-session.js';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -43,7 +42,6 @@ import { clearReviewStatus } from '../review-status.js';
 import { reopenWorkspaceState } from '../../../lib/reopen.js';
 import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
-import { readIssueHandoffEvents } from '../../../lib/cloister/handoff-logger.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
@@ -52,6 +50,8 @@ import { LinearClient } from '../services/linear-client.js';
 import { GitHubClient } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
 import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../../../lib/tmux.js';
+import { getAgentStateAsync, normalizeAgentId } from '../../../lib/agents.js';
+import type { LifecycleContext, StepResult } from '../../../lib/lifecycle/types.js';
 import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
 
 const execAsync = promisify(exec);
@@ -359,90 +359,6 @@ const getIssueAnalyzeRoute = HttpRouter.add(
         estimatedTasks: Math.max(estimatedTasks, subsystems.length + 1),
       },
     });
-  })),
-);
-
-// ─── Route: POST /api/issues/:id/plan ────────────────────────────────────────
-
-const postIssuePlanRoute = HttpRouter.add(
-  'POST',
-  '/api/issues/:id/plan',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
-    const body = yield* readJsonBody;
-    const linear = yield* LinearClient;
-
-    const { answers, tasks } = body as any;
-
-    if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
-      return jsonResponse({ error: 'Tasks are required' }, { status: 400 });
-    }
-
-    const issue = yield* Effect.promise(() =>
-      Effect.runPromise(linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null)))),
-    );
-
-    if (!issue) {
-      return jsonResponse({ error: 'Issue not found' }, { status: 404 });
-    }
-
-    const issuePrefix = extractPrefix(issue.identifier) ?? issue.identifier.split('-')[0];
-    const projectPath = getProjectPath(undefined, issuePrefix);
-
-    const { findPRDFiles, analyzeComplexity, executePlan } = yield* Effect.promise(() =>
-      import('../../../lib/planning/plan-utils.js'),
-    );
-
-    const prdFiles = yield* Effect.promise(() => findPRDFiles(issue.identifier, projectPath));
-
-    const planIssue = {
-      id: issue.id,
-      identifier: issue.identifier,
-      title: issue.title,
-      description: issue.description || undefined,
-      url: issue.url,
-    };
-
-    const complexity = analyzeComplexity(planIssue, prdFiles);
-
-    const decisions: Array<{ question: string; answer: string }> = [];
-    if (answers) {
-      if (answers.scope) decisions.push({ question: 'Scope', answer: answers.scope });
-      if (answers.approach) decisions.push({ question: 'Technical approach', answer: answers.approach });
-      if (answers.edgeCases) decisions.push({ question: 'Edge cases', answer: answers.edgeCases });
-      if (answers.testing?.length > 0) decisions.push({ question: 'Testing', answer: answers.testing.join(', ') });
-      if (answers.outOfScope) decisions.push({ question: 'Out of scope', answer: answers.outOfScope });
-    }
-
-    const result = yield* Effect.promise(() =>
-      executePlan(planIssue, tasks, decisions, projectPath, { commitAndPush: true, prdFiles }),
-    );
-
-    return jsonResponse({
-      success: true,
-      complexity,
-      existingPRDs: prdFiles.length > 0 ? prdFiles.map((f: string) => f.replace(projectPath, '.')) : undefined,
-      tasks,
-      files: {
-        state: result.files.state.replace(projectPath, '.'),
-        prd: result.files.prd ? result.files.prd.replace(projectPath, '.') : undefined,
-      },
-      prdCommitted: result.prdCommitted,
-    });
-  })),
-);
-
-// ─── Route: GET /api/issues/:id/handoffs ─────────────────────────────────────
-
-const getIssueHandoffsRoute = HttpRouter.add(
-  'GET',
-  '/api/issues/:id/handoffs',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const issueId = params['id'] ?? '';
-    const handoffs = readIssueHandoffEvents(issueId);
-    return jsonResponse({ handoffs });
   })),
 );
 
@@ -944,7 +860,16 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     });
 
     if (!skipKill) {
-      yield* Effect.promise(() => killSessionAsync(sessionName).catch(() => {}));
+      yield* Effect.promise(async () => {
+        try {
+          await killSessionAsync(sessionName);
+        } catch (error: unknown) {
+          const msg = error instanceof Error ? error.message : String(error);
+          if (!/can't find session|session not found|no session found/i.test(msg)) {
+            console.error(`[complete-planning] kill-session failed for ${sessionName}:`, msg);
+          }
+        }
+      });
     }
 
     // Mark planning agent as stopped so KanbanBoard shows "Start Agent" instead of "Watch Planning"
@@ -1467,6 +1392,233 @@ const postIssueReopenRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/issues/:id/restart-from-plan ────────────────────────────
+
+const postIssueRestartFromPlanRoute = HttpRouter.add(
+  'POST',
+  '/api/issues/:id/restart-from-plan',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const lifecycle = yield* IssueLifecycle;
+    const eventStore = yield* EventStoreService;
+    const issueLower = id.toLowerCase();
+
+    // 1. Resolve workspace path
+    const githubCheck = isGitHubIssue(id);
+    let projectPath = '';
+    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
+      const localPaths = getGitHubLocalPaths();
+      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
+    }
+    if (!projectPath) {
+      const issuePrefix = extractPrefix(id) ?? id.split('-')[0];
+      try { projectPath = getProjectPath(undefined, issuePrefix); } catch { projectPath = ''; }
+    }
+
+    const workspacePath = projectPath
+      ? join(projectPath, 'workspaces', `feature-${issueLower}`)
+      : '';
+
+    if (!workspacePath || !existsSync(workspacePath)) {
+      return jsonResponse({ success: false, error: 'Workspace not found' }, { status: 404 });
+    }
+
+    // 2. Kill work agent tmux session and remove agent state dir
+    yield* Effect.promise(async () => {
+      const workAgentSession = `agent-${issueLower}`;
+      try {
+        if (await sessionExistsAsync(workAgentSession)) {
+          await killSessionAsync(workAgentSession);
+          console.log(`[restart-from-plan] Killed work agent session ${workAgentSession}`);
+        }
+      } catch { /* non-fatal */ }
+      const agentStateDir = join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`);
+      if (existsSync(agentStateDir)) {
+        try {
+          await rm(agentStateDir, { recursive: true, force: true });
+          console.log(`[restart-from-plan] Removed agent state dir ${agentStateDir}`);
+        } catch { /* non-fatal */ }
+      }
+    });
+
+    // 2b. Clean up stale specialist artifacts (.pan/ and feedback) that survive git resets
+    yield* Effect.promise(async () => {
+      const dirsToClean = [
+        join(workspacePath, '.pan', 'review'),
+        join(workspacePath, '.pan', 'prompts'),
+        join(workspacePath, '.pan', 'events'),
+        join(workspacePath, '.planning', 'feedback'),
+      ];
+      for (const dir of dirsToClean) {
+        if (existsSync(dir)) {
+          try {
+            await rm(dir, { recursive: true, force: true });
+            console.log(`[restart-from-plan] Cleaned ${dir}`);
+          } catch { /* non-fatal */ }
+        }
+      }
+    });
+
+    // 3. Find the planning commit and reset to it
+    // Planning commits come from two sources:
+    //   - complete-planning endpoint: "Complete planning for PAN-XXX"
+    //   - agent start flow: "chore: planning artifacts for PAN-XXX before agent start"
+    // Fall back to finding the commit that added plan.vbrief.json.
+    // If no commit is found, fall back to manual file cleanup preserving .planning/ and .beads/.
+    const resetResult = yield* Effect.promise(async (): Promise<{ success: boolean; error?: string; commit?: string; method?: string }> => {
+      try {
+        let planningCommit = '';
+        let method = '';
+
+        // Try 1: complete-planning endpoint message
+        if (!planningCommit) {
+          try {
+            const { stdout } = await execAsync(
+              `git log --grep="Complete planning for ${id}" --format=%H -1`,
+              { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+            );
+            planningCommit = stdout.trim();
+            if (planningCommit) method = 'complete-planning message';
+          } catch { /* ignore */ }
+        }
+
+        // Try 2: agent start flow message
+        if (!planningCommit) {
+          try {
+            const { stdout } = await execAsync(
+              `git log --grep="chore: planning artifacts for ${id}" --format=%H -1`,
+              { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+            );
+            planningCommit = stdout.trim();
+            if (planningCommit) method = 'agent-start message';
+          } catch { /* ignore */ }
+        }
+
+        // Try 3: commit that added plan.vbrief.json (message-agnostic)
+        if (!planningCommit) {
+          try {
+            const { stdout } = await execAsync(
+              `git log --diff-filter=A --format=%H -1 -- .planning/plan.vbrief.json`,
+              { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+            );
+            planningCommit = stdout.trim();
+            if (planningCommit) method = 'plan.vbrief.json add';
+          } catch { /* ignore */ }
+        }
+
+        if (planningCommit) {
+          await execAsync(`git reset --hard ${planningCommit}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
+          console.log(`[restart-from-plan] Reset branch to planning commit ${planningCommit} for ${id}`);
+          return { success: true, commit: planningCommit, method };
+        }
+
+        // Fallback: manual cleanup — preserve .planning/ and .beads/, reset everything else to main
+        console.log(`[restart-from-plan] No planning commit for ${id}, using manual cleanup`);
+        method = 'manual-cleanup';
+
+        // 3a. Save planning artifacts and beads to temp
+        const tmpDir = join(homedir(), '.panopticon', 'tmp', `restart-${issueLower}`);
+        await mkdir(tmpDir, { recursive: true });
+        const planningDir = join(workspacePath, '.planning');
+        const beadsDir = join(workspacePath, '.beads');
+        if (existsSync(planningDir)) {
+          await execAsync(`cp -r "${planningDir}" "${tmpDir}/.planning"`, { encoding: 'utf-8' });
+        }
+        if (existsSync(beadsDir)) {
+          await execAsync(`cp -r "${beadsDir}" "${tmpDir}/.beads"`, { encoding: 'utf-8' });
+        }
+
+        // 3b. Reset all tracked files to main state
+        try {
+          await execAsync(`git checkout main -- .`, { cwd: workspacePath, encoding: 'utf-8', timeout: 30000 });
+        } catch { /* main may not have all files */ }
+
+        // 3c. Remove untracked files and directories (preserve .planning and .beads)
+        try {
+          await execAsync(`git clean -fd -e .planning -e .beads`, { cwd: workspacePath, encoding: 'utf-8', timeout: 30000 });
+        } catch { /* ignore */ }
+
+        // 3d. Restore saved artifacts
+        if (existsSync(join(tmpDir, '.planning'))) {
+          await execAsync(`rm -rf "${planningDir}" && cp -r "${tmpDir}/.planning" "${planningDir}"`, { encoding: 'utf-8' });
+        }
+        if (existsSync(join(tmpDir, '.beads'))) {
+          await execAsync(`rm -rf "${beadsDir}" && cp -r "${tmpDir}/.beads" "${beadsDir}"`, { encoding: 'utf-8' });
+        }
+        // Clean up temp
+        try { await rm(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+
+        console.log(`[restart-from-plan] Manual cleanup complete for ${id}`);
+        return { success: true, commit: 'manual-cleanup', method };
+      } catch (err: any) {
+        return { success: false, error: err.message || 'Git reset failed' };
+      }
+    });
+
+    if (!resetResult.success) {
+      return jsonResponse({ success: false, error: resetResult.error }, { status: 400 });
+    }
+
+    // 4. Reset specialist pipeline states
+    clearReviewStatus(id.toUpperCase());
+
+    // 5. Append "Restarted from Plan" section to STATE.md
+    yield* Effect.promise(async () => {
+      const statePath = join(workspacePath, '.planning', 'STATE.md');
+      if (existsSync(statePath)) {
+        const date = new Date().toISOString().slice(0, 10);
+        const lines = [
+          '',
+          `## Restarted from Plan — ${date}`,
+          '',
+          `**Branch reset to planning commit:** ${resetResult.commit}`,
+          '',
+          'All implementation work has been reset. Specialist states cleared. Resume implementation from the plan.',
+        ];
+        await appendFile(statePath, lines.join('\n') + '\n', 'utf-8');
+      }
+    });
+
+    // 6. Move issue to In Progress
+    yield* lifecycle.transitionTo(id, 'in_progress').pipe(Effect.catch(() => Effect.void));
+
+    // 7. Emit events
+    yield* eventStore.append({
+      type: 'agent.stopped',
+      timestamp: new Date().toISOString(),
+      payload: { agentId: `agent-${issueLower}` },
+    } as any);
+    yield* eventStore.append({
+      type: 'issue.statusChanged',
+      timestamp: new Date().toISOString(),
+      payload: { issueId: id, status: 'In Progress', canonicalStatus: 'in_progress' },
+    });
+    yield* eventStore.append({
+      type: 'pipeline.status_changed',
+      timestamp: new Date().toISOString(),
+      payload: {
+        issueId: id,
+        status: {
+          issueId: id,
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          readyForMerge: false,
+        },
+      },
+    });
+    try { getIssueDataService().patchIssue(id, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
+
+    return jsonResponse({
+      success: true,
+      message: `Issue ${id} restarted from plan. Branch reset to ${resetResult.commit}`,
+      issueId: id,
+      newState: 'In Progress',
+      planningCommit: resetResult.commit,
+    });
+  })),
+);
+
 // ─── Route: POST /api/issues/:id/move-status ─────────────────────────────────
 
 const postIssueMoveStatusRoute = HttpRouter.add(
@@ -1705,6 +1857,47 @@ const postIssueDeepWipeRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/issues/:id/copy-settings ───────────────────────────────
+
+const postIssueCopySettingsRoute = HttpRouter.add(
+  'POST',
+  '/api/issues/:id/copy-settings',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+
+    const githubCheck = isGitHubIssue(id);
+    let projectPath = '';
+    if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
+      const localPaths = getGitHubLocalPaths();
+      projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
+    }
+    if (!projectPath) {
+      const issuePrefix = extractPrefix(id) ?? id.split('-')[0];
+      try { projectPath = getProjectPath(undefined, issuePrefix); } catch { projectPath = ''; }
+    }
+
+    const workspacePath = projectPath
+      ? join(projectPath, 'workspaces', `feature-${id.toLowerCase()}`)
+      : '';
+
+    if (!workspacePath || !existsSync(workspacePath)) {
+      return jsonResponse({ success: false, error: 'Workspace not found' }, { status: 404 });
+    }
+
+    const { copyPanopticonSettingsToWorkspace } = yield* Effect.promise(() =>
+      import('../../../lib/workspace-manager.js')
+    );
+
+    const result = copyPanopticonSettingsToWorkspace(workspacePath);
+    return jsonResponse({
+      success: result.errors.length === 0 || result.copied.length > 0,
+      copied: result.copied.map(p => p.replace(workspacePath + '/', '')),
+      errors: result.errors,
+    });
+  })),
+);
+
 // ─── Route: POST /api/issues/:id/close-out ───────────────────────────────────
 
 const postIssueCloseOutRoute = HttpRouter.add(
@@ -1770,13 +1963,205 @@ const postIssueCloseOutRoute = HttpRouter.add(
     return jsonResponse({
       success: result.success,
       issueId: result.issueId,
-      steps: result.steps.map((s: any) => ({
+      steps: result.steps.map((s: StepResult) => ({
         name: s.step,
         status: s.success ? (s.skipped ? 'skipped' : 'passed') : 'failed',
         message: s.error || (s.details ? s.details.join('; ') : undefined),
       })),
-      error: result.success ? undefined : result.steps.find((s: any) => !s.success)?.error,
+      error: result.success ? undefined : result.steps.find((s: StepResult) => !s.success)?.error,
     });
+  })),
+);
+
+const MAX_BULK_CLOSE_OUT = 50;
+
+const VALID_TMUX_NAME_RE = /^[a-zA-Z0-9._-]+$/;
+
+/** Normalize an issue ID to a planning session name, mirroring normalizeAgentId logic. */
+function normalizePlanningId(issueId: string): string {
+  if (issueId.startsWith('planning-')) return issueId;
+  return `planning-${issueId.toLowerCase()}`;
+}
+
+async function hasActiveAgentForIssue(issueId: string): Promise<boolean> {
+  const agentId = normalizeAgentId(issueId);
+  const planningId = normalizePlanningId(issueId);
+
+  // Only query tmux for valid session names (GitHub IDs like owner/repo#123 produce invalid names)
+  if (VALID_TMUX_NAME_RE.test(agentId) && await sessionExistsAsync(agentId)) return true;
+  if (VALID_TMUX_NAME_RE.test(planningId) && await sessionExistsAsync(planningId)) return true;
+
+  const agentState = await getAgentStateAsync(agentId);
+  if (agentState && agentState.status !== 'dead' && agentState.status !== 'stopped' && agentState.status !== 'failed') return true;
+
+  const planningState = await getAgentStateAsync(planningId);
+  if (planningState && planningState.status !== 'dead' && planningState.status !== 'stopped' && planningState.status !== 'failed') return true;
+
+  return false;
+}
+
+// ─── Route: POST /api/issues/bulk-close-out ──────────────────────────────────
+
+/** Validate issue ID format (PAN-123, TEAM-456, or GitHub owner/repo#number) */
+function isValidIssueId(id: string): boolean {
+  if (typeof id !== 'string') return false;
+  // Linear-style: PREFIX-123
+  if (/^[A-Z][A-Z0-9]*-\d+$/.test(id)) return true;
+  // GitHub-style: owner/repo#number (alphanumeric, hyphens, underscores, periods only)
+  if (/^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+#\d+$/.test(id)) return true;
+  return false;
+}
+
+const postIssuesBulkCloseOutRoute = HttpRouter.add(
+  'POST',
+  '/api/issues/bulk-close-out',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+
+    // Content-Type enforcement — exact match, no substring trickery
+    const contentType = (request.headers as Record<string, string | string[] | undefined>)['content-type'];
+    const contentTypeStr = Array.isArray(contentType) ? contentType[0] : contentType;
+    const isJsonContentType = (() => {
+      if (!contentTypeStr) return false;
+      const [mime] = contentTypeStr.toLowerCase().split(';');
+      return mime.trim() === 'application/json';
+    })();
+    if (!isJsonContentType) {
+      return jsonResponse({ error: 'Content-Type must be application/json' }, { status: 400 });
+    }
+
+    const body = yield* Effect.promise(() => request.json().catch(() => ({})));
+    const rawIssueIds = Array.isArray(body.issueIds) ? body.issueIds : [];
+    const issueIds = [...new Set(rawIssueIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0))];
+
+    // Origin check — parse as URL and validate hostname exactly
+    const origin = (request.headers as Record<string, string | string[] | undefined>)['origin'];
+    const originStr = Array.isArray(origin) ? origin[0] : origin;
+    const isValidOrigin = (() => {
+      if (!originStr) return false;
+      try {
+        const url = new URL(originStr);
+        return url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+      } catch {
+        return false;
+      }
+    })();
+    if (!isValidOrigin) {
+      return jsonResponse({ error: 'Invalid origin' }, { status: 403 });
+    }
+
+    // Input validation
+    if (issueIds.length === 0) {
+      return jsonResponse({ error: 'issueIds array is required' }, { status: 400 });
+    }
+    if (issueIds.length > MAX_BULK_CLOSE_OUT) {
+      return jsonResponse({ error: `Maximum ${MAX_BULK_CLOSE_OUT} issues allowed` }, { status: 400 });
+    }
+
+    const invalidIds = issueIds.filter(id => !isValidIssueId(id));
+    if (invalidIds.length > 0) {
+      return jsonResponse({ error: `Invalid issue ID format: ${invalidIds.join(', ')}` }, { status: 400 });
+    }
+
+    const eventStore = yield* EventStoreService;
+    const { closeOut } = yield* Effect.promise(() => import('../../../lib/lifecycle/index.js'));
+    const issueDataService = getIssueDataService();
+
+    // Sequential execution — closeOut touches filesystem/git, parallel runs risk index-lock races
+    const results: Array<{ issueId: string; success: boolean; error?: string; skipped: boolean }> = [];
+    for (const id of issueIds) {
+      // Server-side active-agent guardrail
+      const hasActiveAgent = yield* Effect.promise(() => hasActiveAgentForIssue(id));
+      if (hasActiveAgent) {
+        results.push({ issueId: id, success: false, error: 'Skipped: active agent running', skipped: true });
+        continue;
+      }
+
+      const githubCheck = isGitHubIssue(id);
+      let projectPath = '';
+
+      if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
+        const localPaths = getGitHubLocalPaths();
+        projectPath = localPaths[`${githubCheck.owner}/${githubCheck.repo}`] || '';
+      }
+      if (!projectPath) {
+        const issuePrefix = extractPrefix(id);
+        if (issuePrefix) {
+          projectPath = getProjectPath(undefined, issuePrefix);
+        }
+      }
+      if (!projectPath) {
+        results.push({ issueId: id, success: false, error: `Could not resolve project path for ${id}`, skipped: false });
+        continue;
+      }
+
+      const ctx: LifecycleContext = {
+        issueId: id,
+        projectPath,
+        ...(githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number
+          ? { github: { owner: githubCheck.owner, repo: githubCheck.repo, number: githubCheck.number } }
+          : {}),
+      };
+
+      const issueSource = issueDataService.getIssueSource(id);
+      if (issueSource === 'rally') {
+        const rallyConfig = getRallyConfig();
+        if (rallyConfig) {
+          ctx.rally = {
+            apiKey: rallyConfig.apiKey,
+            server: rallyConfig.server,
+            workspace: rallyConfig.workspace,
+            project: rallyConfig.project,
+          };
+        }
+      }
+
+      const closeResult = yield* Effect.tryPromise({
+        try: () => closeOut(ctx),
+        catch: (error) => ({
+          workflow: 'close-out' as const,
+          issueId: id,
+          success: false,
+          steps: [{
+            step: 'close-out',
+            success: false,
+            skipped: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          }],
+          duration: 0,
+        }),
+      });
+
+      if (closeResult.success) {
+        yield* eventStore.append({
+          type: 'issue.statusChanged',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: id, status: 'Done', canonicalStatus: 'done' },
+        });
+        try {
+          issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done' });
+        } catch (e) {
+          console.error('Failed to patch issue status:', e);
+        }
+      }
+
+      const failedStep = closeResult.steps.find((s: StepResult) => !s.success);
+      results.push({
+        issueId: id,
+        success: closeResult.success,
+        error: closeResult.success ? undefined : failedStep?.error,
+        skipped: false,
+      });
+    }
+
+    // Invalidate trackers once if any issue closed successfully
+    const anySucceeded = results.some(r => r.success);
+    if (anySucceeded) {
+      issueDataService.invalidateTracker('github').catch((e: Error) => { console.error('Failed to invalidate github tracker:', e); });
+      issueDataService.invalidateTracker('linear').catch((e: Error) => { console.error('Failed to invalidate linear tracker:', e); });
+    }
+
+    return jsonResponse({ results });
   })),
 );
 
@@ -1925,6 +2310,7 @@ const getIssuePlanningStateRoute = HttpRouter.add(
       : '';
     const planPath = workspacePath ? join(workspacePath, '.planning', 'plan.vbrief.json') : '';
     const hasPlan = !!planPath && existsSync(planPath);
+    const planningComplete = workspacePath && existsSync(join(workspacePath, '.planning', '.planning-complete'));
 
     // bd query is best-effort: a missing/broken database must NOT prevent the
     // chip from coloring vBRIEF correctly. Errors are swallowed inside the
@@ -1948,6 +2334,7 @@ const getIssuePlanningStateRoute = HttpRouter.add(
       hasPlan,
       hasBeads: beadsCount > 0,
       beadsCount,
+      planningComplete,
       workspacePath,
     });
   })),
@@ -2076,8 +2463,6 @@ const getIssueCostsRoute = HttpRouter.add(
 export const issuesRouteLayer = Layer.mergeAll(
   getIssuesRoute,
   getIssueAnalyzeRoute,
-  postIssuePlanRoute,
-  getIssueHandoffsRoute,
   postIssueCloseRoute,
   postIssueStartPlanningRoute,
   postIssueAbortPlanningRoute,
@@ -2086,10 +2471,13 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssueResetRoute,
   postIssueCancelRoute,
   postIssueReopenRoute,
+  postIssueRestartFromPlanRoute,
   postIssueMoveStatusRoute,
   postIssueCleanupWorkspaceRoute,
   postIssueDeepWipeRoute,
+  postIssueCopySettingsRoute,
   postIssueCloseOutRoute,
+  postIssuesBulkCloseOutRoute,
   getIssueBeadsRoute,
   getIssuePlanningStateRoute,
   postIssueGenerateTasksRoute,

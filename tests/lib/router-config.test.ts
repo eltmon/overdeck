@@ -109,6 +109,9 @@ describe('router-config', () => {
       expect(openaiProvider?.baseURL).toBe('https://api.openai.com/v1');
       expect(openaiProvider?.apiKey).toBe('sk-test-key');
       expect(openaiProvider?.models).toEqual([
+        'gpt-5.5',
+        'gpt-5.5-mini',
+        'gpt-5.5-nano',
         'gpt-5.4',
         'gpt-5.4-mini',
         'gpt-5.4-nano',

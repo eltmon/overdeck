@@ -26,6 +26,12 @@ export interface ReviewStatus {
   readyForMerge: boolean;
   autoRequeueCount?: number;
   history?: StatusHistoryEntry[];
+  /** Active parallel review coordinator session (review-coordinator-<issueId>-<timestamp>) */
+  reviewCoordinatorSessionName?: string;
+  /** Active parallel review session names (review-<issueId>-<timestamp>-<role>) */
+  reviewSessionNames?: string[];
+  /** Per-role completion status for parallel review sub-agents */
+  reviewSubStatuses?: Record<string, 'running' | 'done'>;
 }
 
 export interface ContainerStatus {

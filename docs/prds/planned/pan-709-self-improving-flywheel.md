@@ -31,29 +31,31 @@ Ship all of this in one epic. No phased rollout.
 
 ## Dependencies — aligned with PAN-705 (Command Taxonomy Reorg)
 
-[PAN-705](https://github.com/eltmon/panopticon-cli/issues/705) lands **before** this epic and reshapes three surfaces PAN-709 touches: the CLI command tree, the `~/.claude/skills/` set, and dashboard HTTP routes. PAN-709 assumes PAN-705's end-state and layers on top of it. Five alignment rules:
+[PAN-705](https://github.com/eltmon/panopticon-cli/issues/705) is **already merged**. It reshaped three surfaces PAN-709 touches: the CLI command tree, the `~/.claude/skills/` set, and dashboard HTTP routes. PAN-709 builds on PAN-705's end-state. The following alignment rules describe **current reality**, not future dependencies:
 
-### 1. Ordering is fixed
+### 1. Operator skills are already renamed
 
-**PAN-705 must merge before PAN-709 starts planning.** If PAN-705 slips, PAN-709 waits — do not start planning against the legacy command surface. The planner pulls the latest `docs/QUICK-REFERENCE.md` from main before generating the vBRIEF and verifies every command referenced in the PRD still exists under its new name.
+Operator skills already match CLI verbs 1:1 (`pan-start`, `pan-show`, `pan-review`, `pan-done`, `pan-approve`, `pan-close`, `pan-issues`, `pan-plan`, `pan-status`) and long-tail admin skills live under the `/pan` umbrella. PAN-709 does not rename any operator skills — it introduces a new category on top of the existing surface.
 
 ### 2. Skill naming — operator vs. agent split
 
-PAN-705 renames operator skills to match CLI verbs 1:1 (`pan-start`, `pan-show`, `pan-review`, `pan-done`, `pan-approve`, `pan-close`, `pan-issues`, `pan-plan`, `pan-status`) and hides long-tail admin skills under the `/pan` umbrella. PAN-709 introduces a new category — **agent-audience skills** — that doesn't fit this rule because they're not CLI commands at all, they're reference knowledge for autonomous agents.
+PAN-709 introduces **agent-audience skills** — reference knowledge for autonomous agents. They are not CLI commands and do not fit the `pan-<verb>` rule.
 
 **Naming conventions by audience:**
 
 | Audience | Naming convention | Example | Description format |
 |----------|-------------------|---------|--------------------|
 | `operator` | Match CLI verb 1:1 (PAN-705 rule) | `pan-approve` | `"pan approve <id> — merge a ready-for-merge issue"` (lead with literal CLI) |
-| `agent` | Workflow or pattern name (no `pan-` prefix) | `retro-workflow`, `recover-from-rebase-conflict` | `"Triggered when <condition>. Use to <action>."` (lead with trigger context — agents don't type CLI verbs) |
+| `agent` | `wf-<name>` for workflow skills; descriptive for reference skills | `wf-retro`, `wf-work-complete`, `clear-writing` | `"Triggered when <condition>. Use to <action>."` (lead with trigger context — agents don't type CLI verbs) |
 | `both` | CLI verb if it's a CLI command both sides invoke | `pan-sync` | Operator-style description |
+
+**Agent workflow skills use the `wf-` prefix.** This makes them immediately distinguishable from operator `pan-<verb>` skills in any listing. Reference skills (e.g., `clear-writing`, `code-review`) that are not step-by-step workflows do not need the `wf-` prefix — they use descriptive names.
 
 **Agent skills are NOT registered under the `/pan` umbrella.** They're not slash commands — they're loaded into workspace `CLAUDE.md` by `pan sync` at workspace creation. The slash menu only shows operator skills.
 
 ### 3. `pan sync` — two changes, one codebase
 
-PAN-705 already changes `pan sync` to delete legacy skill files on upgrade (clean slate). PAN-709 layers **audience-aware distribution** on top of that cleaned-up state:
+PAN-705 changed `pan sync` to delete legacy skill files on upgrade (clean slate). PAN-709 layers **audience-aware distribution** on top of that cleaned-up state:
 
 1. Clean-slate delete (PAN-705 behavior — unchanged by PAN-709)
 2. Read each skill's `audience` field
@@ -66,7 +68,7 @@ The implementation of #2 and #3 happens in the same `pan sync` code module PAN-7
 
 ### 4. Dashboard API routes follow PAN-705 conventions
 
-PAN-705 renames `/api/work/*` → `/api/issues/*`, `/api/review/*`, `/api/show/*`, `/api/admin/*`. PAN-709 adds new API routes for the flywheel subsystem; these follow the same pattern from the start — **no `/api/work/flywheel/*` or legacy-shaped paths.**
+PAN-705 renamed `/api/work/*` → `/api/issues/*`, `/api/review/*`, `/api/show/*`, `/api/admin/*`. PAN-709 adds new API routes for the flywheel subsystem; these follow the same pattern from the start — **no `/api/work/flywheel/*` or legacy-shaped paths.**
 
 PAN-709's new routes:
 - `/api/flywheel/retros` — list retros
@@ -75,23 +77,30 @@ PAN-709's new routes:
 - `/api/flywheel/daemon/status` — autonomous daemon state (for dashboard banner)
 - `/api/admin/skills/audit` — PAN-709's audit command endpoint (under `/api/admin/` per PAN-705)
 
-### 5. Audience backfill runs AFTER PAN-705's rename
+### 5. Audience backfill and skill renaming
 
-PAN-709 proposes a one-time backfill issue that audits every existing skill and adds the `audience` field. **This backfill runs after PAN-705's rename completes**, so the audit sees the new canonical names (`pan-start`, `pan-show`, …) rather than legacy names (`pan-work-done`, `pan-issue`, …). Sequencing:
+PAN-709 files a one-time backfill issue that:
+1. Audits every existing skill and adds the `audience` field
+2. **Renames existing agent workflow skills to the `wf-` prefix** (dogfooding the new convention)
 
-1. PAN-705 merges → skill renames applied via `pan sync` clean-slate delete + rewrite
-2. PAN-709 starts → adds audience field to frontmatter schema, updates `pan sync` to respect it (default `operator` for missing)
-3. PAN-709 files the backfill as its own `flywheel-change` issue → agent walks `skills/`, classifies each, commits the audience field
-4. Retro-agent and synthesis step enforce audience field on any *new* skills proposed after backfill
+This backfill is itself a `flywheel-change` issue and flows through the normal pipeline.
+
+Skills to rename:
+- `work-complete` → `wf-work-complete`
+- `rebase-and-submit` → `wf-rebase`
+- `all-up` → TBD based on audience classification (`agent` or `both`)
+
+Skills that stay as-is (reference skills, not step-by-step workflows):
+- `beads`, `code-review`, `refactor`, `clear-writing`, `github-cli`
+
+Sequencing:
+1. PAN-709 adds `audience` field to frontmatter schema, updates `pan sync` to respect it (default `operator` for missing)
+2. PAN-709 files the backfill as its own `flywheel-change` issue → agent walks `skills/`, classifies each, adds the audience field, and renames workflow skills
+3. Retro-agent and synthesis step enforce audience field on any *new* skills proposed after backfill
 
 ### 6. Operator-skill description format for any new operator skills PAN-709 adds
 
 If PAN-709's retro process proposes a new operator-audience skill, it **must** follow PAN-705's description format: `"pan <verb> <args> — one-line what it does"`. The retro-agent's prompt enforces this; the review agent's skill-lint validates it. Agent-audience skills follow a different convention (see table above) and are exempt from this rule.
-
-### What PAN-709 does NOT depend on
-
-- PAN-705's Phase 4.5 dashboard alignment does not block PAN-709. If PAN-705 lands the CLI changes but the dashboard renames slip into a follow-up, PAN-709 can still proceed; its new `/api/flywheel/*` routes use the new convention independently of whether `/api/work/*` is fully removed yet.
-- PAN-705's first-launch upgrade announcement is independent of PAN-709.
 
 ---
 
@@ -204,7 +213,7 @@ If PAN-709's retro process proposes a new operator-audience skill, it **must** f
 > - no_op: <one-line explanation>
 > ```
 
-**New skill supporting retro-agent:** `retro-workflow` (agent audience) — checklist the retro-agent follows to read inputs in the right order, apply the surprise filter, write the output, and validate its own schema before exiting.
+**New skill supporting retro-agent:** `wf-retro` (agent audience) — checklist the retro-agent follows to read inputs in the right order, apply the surprise filter, write the output, and validate its own schema before exiting.
 
 ### 2. Retro storage
 
@@ -426,7 +435,7 @@ Add a new nav entry in the docs site under "How It Works" → "The Flywheel."
 
 ### 12. Updated `all-up` skill
 
-Add Step 8 (synthesis) between current Step 7 and Step 7.5. Document the new rules:
+Add Step 8 (synthesis) after Step 7.5. Document the new rules:
 
 - Skill changes are **never** inline edits during `/all-up`. Always file a `flywheel-change` issue via synthesis.
 - Substrate bugs: tier-gated — blocker tier (stopping issues in *this* run) can be inline; non-blocker becomes a `flywheel-change` issue too (but with a different label like `substrate-improvement`).

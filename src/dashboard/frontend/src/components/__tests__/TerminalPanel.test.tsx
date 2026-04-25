@@ -18,6 +18,10 @@ vi.mock('../chat/MessagesTimeline', () => ({
   ),
 }));
 
+// NOTE: TerminalPanel no longer renders MessagesTimeline for stopped agents.
+// The conversation endpoint is not fetched; only raw output is shown.
+// These tests verify the current behavior (raw output fallback).
+
 vi.mock('lucide-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('lucide-react')>();
   return {
@@ -131,7 +135,7 @@ describe('TerminalPanel — stopped agent content rendering', () => {
     });
   });
 
-  it('renders pre element when agent is stopped even if conversation has messages', async () => {
+  it('renders raw output fallback when agent is stopped (MessagesTimeline removed)', async () => {
     const messages = [
       { role: 'user', content: [{ type: 'text', text: 'hello' }] },
       { role: 'assistant', content: [{ type: 'text', text: 'world' }] },
@@ -139,25 +143,30 @@ describe('TerminalPanel — stopped agent content rendering', () => {
 
     renderPanel(
       makeAgent(),
-      makeFetch({ tmuxAlive: false, conversationMessages: messages, output: 'last terminal output' }),
+      makeFetch({ tmuxAlive: false, conversationMessages: messages, output: '' }),
     );
 
     await waitFor(() => {
-      expect(screen.getByText('last terminal output')).toBeInTheDocument();
+      expect(screen.getByText('No saved output available.')).toBeInTheDocument();
     });
-    // MessagesTimeline is not rendered — stopped agents show raw output only
+    // MessagesTimeline is no longer rendered for stopped agents
     expect(screen.queryByTestId('messages-timeline')).not.toBeInTheDocument();
   });
 
-  it('shows "Last output" header label when agent is stopped', async () => {
+  it('shows "Last output" header label when stopped regardless of conversation', async () => {
+    const messages = [{ role: 'user', content: [{ type: 'text', text: 'hi' }] }];
+
     renderPanel(
       makeAgent(),
-      makeFetch({ tmuxAlive: false, conversationMessages: [], output: 'some output' }),
+      makeFetch({ tmuxAlive: false, conversationMessages: messages, output: 'some output' }),
+
     );
 
     await waitFor(() => {
       expect(screen.getByText('Last output')).toBeInTheDocument();
     });
+    // "Conversation" header was removed when MessagesTimeline was removed
+    expect(screen.queryByText('Conversation')).not.toBeInTheDocument();
   });
 
   it('shows "Last output" header label when stopped with no messages', async () => {

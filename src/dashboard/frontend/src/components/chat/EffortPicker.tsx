@@ -7,6 +7,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { usePickerPosition } from './usePickerPosition';
 import styles from '../MissionControl/styles/mission-control.module.css';
 
 // ─── Effort definitions ───────────────────────────────────────────────────────
@@ -48,10 +49,8 @@ interface EffortPickerProps {
 
 export function EffortPicker({ value, onChange, disabled = false, availableLevels }: EffortPickerProps) {
   const [open, setOpen] = useState(false);
-  const [dropdownAlign, setDropdownAlign] = useState<'left' | 'right'>('left');
-  const [openUp, setOpenUp] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const { openUp, align, maxHeight } = usePickerPosition(open, ref, { preferredHeight: 240 });
 
   // If model doesn't support effort, show a hint instead
   const noEffort = availableLevels !== undefined && availableLevels.length === 0;
@@ -60,27 +59,6 @@ export function EffortPicker({ value, onChange, disabled = false, availableLevel
     : EFFORT_LEVELS;
 
   const selected = filteredLevels.find((e) => e.id === value) ?? filteredLevels[0] ?? EFFORT_LEVELS[1]!;
-
-  // Adjust dropdown alignment if it would overflow the viewport
-  useEffect(() => {
-    if (!open || !dropdownRef.current || !ref.current) return;
-
-    const dropdownRect = dropdownRef.current.getBoundingClientRect();
-
-    // If dropdown extends past right edge of viewport, align to right
-    if (dropdownRect.right > window.innerWidth - 8) {
-      setDropdownAlign('right');
-    } else {
-      setDropdownAlign('left');
-    }
-
-    // If dropdown extends past bottom edge of viewport, open upward
-    if (dropdownRect.bottom > window.innerHeight - 8) {
-      setOpenUp(true);
-    } else {
-      setOpenUp(false);
-    }
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -121,9 +99,11 @@ export function EffortPicker({ value, onChange, disabled = false, availableLevel
 
       {open && (
         <div
-          ref={dropdownRef}
           className={`${styles.pickerDropdown} ${openUp ? styles.pickerDropdownUp : ''}`}
-          style={dropdownAlign === 'right' ? { left: 'auto', right: 0 } : {}}
+          style={{
+            maxHeight: `${maxHeight}px`,
+            ...(align === 'right' ? { left: 'auto', right: 0 } : {}),
+          }}
         >
           {filteredLevels.map((level) => (
             <button

@@ -4,10 +4,19 @@ import { writeFileSync, chmodSync, appendFileSync, mkdirSync, existsSync, unlink
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { randomUUID } from 'node:crypto';
 import { getPanopticonHome } from './paths.js';
 import { loadConfig, type TmuxConfigMode } from './config-yaml.js';
 
 const execFileAsync = promisify(execFile);
+
+const VALID_SESSION_NAME_RE = /^[a-zA-Z0-9._-]+$/;
+
+function validateSessionName(name: string): void {
+  if (!VALID_SESSION_NAME_RE.test(name)) {
+    throw new Error(`Invalid tmux session name: ${name}`);
+  }
+}
 
 const MANAGED_TMUX_SOCKET_NAME = 'panopticon';
 const MANAGED_TMUX_CONFIG_CONTENT = [
@@ -226,7 +235,6 @@ function logSendKeys(sessionName: string, keys: string, caller?: string): void {
       timestamp: new Date().toISOString(),
       sessionName,
       keysLength: keys.length,
-      keysPreview: keys.length > 200 ? keys.slice(0, 200) + '...' : keys,
       caller: callerInfo,
       pid: process.pid,
       tmuxConfigMode: getTmuxConfigMode(),
@@ -361,6 +369,7 @@ export function createSession(
     try {
       tmuxExecSync(['send-keys', '-t', name, `bash ${tmpFile}`]);
       tmuxExecSync(['send-keys', '-t', name, 'C-m']);
+      execSync('sleep 2');
     } finally {
       try { unlinkSync(tmpFile); } catch {}
     }
@@ -403,6 +412,7 @@ export async function resizeWindowAsync(target: string, cols: number, rows: numb
  * MUST be used from the dashboard server and any async context.
  */
 export async function sendKeysAsync(sessionName: string, keys: string, caller?: string): Promise<void> {
+  validateSessionName(sessionName);
   logSendKeys(sessionName, keys, caller);
 
   // Mirror the sync `sendKeys` pattern: one temp file, one load-buffer, one
@@ -411,15 +421,28 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
   // per line, which made large prompts take seconds (PAN-785).
   // `paste-buffer -d` drops the buffer in the same call so we don't need a
   // separate delete-buffer round-trip.
-  const sendId = `${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const sendId = randomUUID();
   const tmpFile = join(tmpdir(), `pan-sendkeys-${sendId}.txt`);
+  // Use a named tmux buffer so concurrent sendKeysAsync calls (e.g. spawning
+  // 4 parallel reviewers) don't race on the global unnamed buffer.
+  const bufferName = `pan-${sendId}`;
 
   try {
     await writeFile(tmpFile, keys, 'utf-8');
-    await tmuxExecAsync(['load-buffer', tmpFile], { encoding: 'utf-8' });
-    await tmuxExecAsync(['paste-buffer', '-d', '-t', sessionName], { encoding: 'utf-8' });
-    await new Promise(r => setTimeout(r, 300));
+    await tmuxExecAsync(['load-buffer', '-b', bufferName, tmpFile], { encoding: 'utf-8' });
+    await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-t', sessionName], { encoding: 'utf-8' });
+    // Explicitly delete the named buffer — paste-buffer -d only drops the default buffer.
+    await tmuxExecAsync(['delete-buffer', '-b', bufferName], { encoding: 'utf-8' }).catch(() => {});
+    // Scale delay with prompt size — large pastes need more time to render before
+    // Enter arrives. Hybrid formula: 15ms/line + 50ms per 1000 chars, minimum 600ms.
+    // (PAN-699: 300ms was insufficient for small messages when Claude Code shows
+    // warning banners; 600ms provides headroom for TUI render latency.)
+    const lineDelay = keys.split('\n').length * 15;
+    const lengthDelay = Math.floor(keys.length / 1000) * 50;
+    const delayMs = Math.max(600, Math.min(3000, lineDelay + lengthDelay));
+    await new Promise(r => setTimeout(r, delayMs));
     await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
+    logSendKeys(sessionName, '[Enter sent]', caller);
   } finally {
     await unlink(tmpFile).catch(() => {});
   }
@@ -430,14 +453,18 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
  * Only use from CLI commands — NEVER from the dashboard server.
  */
 export function sendKeys(sessionName: string, keys: string, caller?: string): void {
+  validateSessionName(sessionName);
   logSendKeys(sessionName, keys, caller);
 
-  const tmpFile = join(tmpdir(), `pan-sendkeys-${process.pid}-${Date.now()}.txt`);
+  const sendId = randomUUID();
+  const tmpFile = join(tmpdir(), `pan-sendkeys-${sendId}.txt`);
+  const bufferName = `pan-${sendId}`;
   try {
     writeFileSync(tmpFile, keys);
-    tmuxExecSync(['load-buffer', tmpFile]);
-    tmuxExecSync(['paste-buffer', '-t', sessionName]);
-    execSync('sleep 0.3');
+    tmuxExecSync(['load-buffer', '-b', bufferName, tmpFile]);
+    tmuxExecSync(['paste-buffer', '-b', bufferName, '-t', sessionName]);
+    try { tmuxExecSync(['delete-buffer', '-b', bufferName], { stdio: 'ignore' }); } catch {}
+    execSync('sleep 0.6');
     tmuxExecSync(['send-keys', '-t', sessionName, 'C-m']);
   } finally {
     try { unlinkSync(tmpFile); } catch {}
@@ -501,11 +528,26 @@ export async function listPaneValuesAsync(target: string, format: string): Promi
 export async function waitForClaudePrompt(sessionName: string, timeoutMs: number = 15000): Promise<boolean> {
   const start = Date.now();
   const poll = 500;
+  let consecutivePromptPolls = 0;
+
   while (Date.now() - start < timeoutMs) {
+    if (!await sessionExistsAsync(sessionName)) return false;
+
     const output = await capturePaneAsync(sessionName, 10);
     const lines = output.split('\n').filter(l => l.trim());
-    const lastLine = lines[lines.length - 1] || '';
-    if (lastLine.includes('❯')) return true;
+    // Use lines.some() instead of lastLine — the status bar/footer is often the
+    // last line, so checking only lastLine misses the prompt. (feature/pan-704)
+    const hasPromptLine = lines.some(line => line.includes('❯'));
+
+    if (hasPromptLine) {
+      consecutivePromptPolls += 1;
+      if (consecutivePromptPolls >= 2 && await sessionExistsAsync(sessionName)) {
+        return true;
+      }
+    } else {
+      consecutivePromptPolls = 0;
+    }
+
     await new Promise(r => setTimeout(r, poll));
   }
   return false;
@@ -522,23 +564,37 @@ export async function confirmDelivery(
 ): Promise<boolean> {
   const start = Date.now();
   const poll = 1000;
-  const beforeLineCount = outputBefore.split('\n').filter(l => l.trim()).length;
+  const beforeText = outputBefore.trimEnd();
+  const processingPatterns = [
+    '●',
+    '⎿',
+    'Read',
+    '✻',
+    '✶',
+    '✽',
+    '✢',
+    'Generating',
+    'thinking',
+    'thought for',
+    'Retrying in',
+    'API Error',
+    "You've hit your limit",
+    'Tool use',
+  ];
 
   while (Date.now() - start < timeoutMs) {
     await new Promise(r => setTimeout(r, poll));
     const after = await capturePaneAsync(sessionName, 50);
-    const afterLines = after.split('\n').filter(l => l.trim());
-    const afterLineCount = afterLines.length;
+    const afterText = after.trimEnd();
+    if (afterText === beforeText) continue;
 
-    if (afterLineCount > beforeLineCount + 1) return true;
+    const newOutput = afterText.startsWith(beforeText)
+      ? afterText.slice(beforeText.length)
+      : afterText;
 
-    const newOutput = afterLines.slice(beforeLineCount).join('\n');
-    if (
-      newOutput.includes('●') || newOutput.includes('⎿') || newOutput.includes('Read') ||
-      newOutput.includes('✻') || newOutput.includes('·') || newOutput.includes('✶') ||
-      newOutput.includes('✽') || newOutput.includes('✢') || newOutput.includes('Generating') ||
-      newOutput.includes('thinking') || newOutput.includes('thought for')
-    ) return true;
+    if (processingPatterns.some(pattern => newOutput.includes(pattern))) {
+      return true;
+    }
   }
   return false;
 }

@@ -63,6 +63,7 @@ import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
 import { loadReviewStatuses, setReviewStatus } from '../review-status.js';
 import { sessionExistsAsync } from '../tmux.js';
+import { emitActivityEntry } from '../activity-logger.js';
 
 // State file for cross-process communication
 const CLOISTER_STATE_FILE = join(PANOPTICON_HOME, 'cloister.state');
@@ -280,13 +281,18 @@ export class CloisterService {
     // If Cloister dies mid-verification, the status is left stuck at 'running' and the
     // pipeline halts indefinitely. On startup, reset any such states to 'pending' so
     // verification reruns automatically. Verification is idempotent — this is always safe.
+    let resetVerificationCount = 0;
     try {
       const statuses = loadReviewStatuses();
       for (const [issueId, status] of Object.entries(statuses)) {
         if (status.verificationStatus === 'running') {
           setReviewStatus(issueId, { verificationStatus: 'pending' });
           console.log(`  ✓ Reset orphaned verification 'running' → 'pending' for ${issueId}`);
+          resetVerificationCount++;
         }
+      }
+      if (resetVerificationCount > 0) {
+        emitActivityEntry({ source: 'cloister', level: 'warn', message: `Reset ${resetVerificationCount} orphaned verification 'running' → 'pending' on startup` });
       }
     } catch (error) {
       console.error('  ✗ Failed to reset orphaned verification states:', error);
@@ -300,6 +306,7 @@ export class CloisterService {
     // On startup, clear currentIssue and reset state from any specialist agent that is:
     //   (a) idle — safe: idle means no active task, currentIssue is leftover
     //   (b) active but tmux session no longer running — state is stale from a crash
+    let clearedSpecialistCount = 0;
     try {
       if (existsSync(AGENTS_DIR)) {
         const { isRunning: isSpecialistRunning } = await import('./specialists.js');
@@ -314,6 +321,7 @@ export class CloisterService {
           if (runtimeState.state === 'idle') {
             saveAgentRuntimeState(entry.name, { currentIssue: undefined });
             console.log(`  ✓ Cleared stale currentIssue '${runtimeState.currentIssue}' from idle ${entry.name}`);
+            clearedSpecialistCount++;
           } else if (runtimeState.state === 'active') {
             // Check if the process is actually alive — if not, the state is stale from a crash.
             // For issue-scoped specialists, check the exact tmux session instead of the legacy
@@ -328,9 +336,13 @@ export class CloisterService {
                 currentIssue: undefined,
               });
               console.log(`  ✓ Cleared stale active state for crashed specialist ${entry.name} (was working on '${runtimeState.currentIssue}')`);
+              clearedSpecialistCount++;
             }
           }
         }
+      }
+      if (clearedSpecialistCount > 0) {
+        emitActivityEntry({ source: 'cloister', level: 'warn', message: `Cleared ${clearedSpecialistCount} stale specialist state(s) on startup` });
       }
     } catch (error) {
       console.error('  ✗ Failed to clear stale specialist states:', error);
@@ -379,6 +391,7 @@ export class CloisterService {
 
       if (orphanedReviewing.length > 0) {
         console.log(`  ⚠ Found ${orphanedReviewing.length} issue(s) with orphaned reviewStatus='reviewing'`);
+        emitActivityEntry({ source: 'cloister', level: 'warn', message: `Found ${orphanedReviewing.length} orphaned reviewStatus='reviewing' issue(s) on startup`, details: orphanedReviewing.join(', ') });
 
         for (const issueId of orphanedReviewing) {
 
@@ -389,6 +402,7 @@ export class CloisterService {
           if (!workspace) {
             console.log(`  ⚠ ${issueId}: orphaned reviewing but no workspace found — resetting to pending`);
             setReviewStatus(issueId, { reviewStatus: 'pending' });
+            emitActivityEntry({ source: 'cloister', level: 'warn', message: `${issueId} orphaned reviewing reset to pending — no workspace found`, issueId });
             continue;
           }
 
@@ -396,6 +410,7 @@ export class CloisterService {
           if (!resolved) {
             console.log(`  ⚠ ${issueId}: orphaned reviewing but no project configured — resetting to pending`);
             setReviewStatus(issueId, { reviewStatus: 'pending' });
+            emitActivityEntry({ source: 'cloister', level: 'warn', message: `${issueId} orphaned reviewing reset to pending — no project configured`, issueId });
             continue;
           }
 
@@ -403,6 +418,7 @@ export class CloisterService {
           await dispatchParallelReview({ issueId, workspace, branch });
           // dispatchParallelReview sets reviewStatus='reviewing' internally
           console.log(`  ✓ Re-dispatched recovery review for ${issueId}`);
+          emitActivityEntry({ source: 'cloister', level: 'info', message: `Re-dispatched recovery review for ${issueId}`, issueId });
         }
       }
     } catch (error) {
@@ -418,8 +434,10 @@ export class CloisterService {
       console.log('  → Starting deacon health monitor...');
       startDeacon();
       console.log('  ✓ Deacon started');
+      emitActivityEntry({ source: 'cloister', level: 'info', message: 'Deacon health monitor started' });
     } catch (error) {
       console.error('  ✗ Failed to start deacon:', error);
+      emitActivityEntry({ source: 'cloister', level: 'error', message: `Failed to start deacon: ${error instanceof Error ? error.message : String(error)}` });
     }
 
     this.running = true;
@@ -427,6 +445,7 @@ export class CloisterService {
     this._statusCache = null;
     writeStateFile(true);
     this.emit({ type: 'started' });
+    emitActivityEntry({ source: 'cloister', level: 'info', message: 'Cloister agent watchdog started' });
 
     // Start monitoring loop
     this.startMonitoringLoop();

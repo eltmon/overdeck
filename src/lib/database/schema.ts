@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 23;
+export const SCHEMA_VERSION = 27;
 
 /**
  * Initialize the complete database schema.
@@ -84,7 +84,19 @@ export function initSchema(db: Database.Database): void {
       stuck_at              TEXT,
       stuck_details         TEXT,
       -- PAN-653: commit SHA at which review passed (used by deacon to detect new pushes)
-      reviewed_at_commit    TEXT
+      reviewed_at_commit    TEXT,
+      -- PAN-699: timestamp when review agents were dispatched (deacon timeout detection)
+      review_spawned_at     TEXT,
+      -- PAN-699: number of test-agent dispatch retries (circuit breaker)
+      test_retry_count      INTEGER DEFAULT 0,
+      -- PAN-794: parallel-review re-dispatch retry counter (scoped to current recovery cycle)
+      review_retry_count    INTEGER DEFAULT 0,
+      -- PAN-794: ISO timestamp marking the start of the current recovery cycle (breaker history cutoff)
+      recovery_started_at   TEXT,
+      -- Human-requested deacon ignore: when set, patrol skips this issue entirely
+      deacon_ignored          INTEGER NOT NULL DEFAULT 0,
+      deacon_ignored_at       TEXT,
+      deacon_ignored_reason   TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -142,6 +154,16 @@ export function initSchema(db: Database.Database): void {
       value       TEXT NOT NULL,  -- JSON string
       expires_at  TEXT,
       created_at  TEXT NOT NULL
+    );
+
+    -- ===== App Settings (global key/value) =====
+    -- Generic persisted settings that survive restarts. Currently used for the
+    -- global deacon pause flag; add keys here rather than spawning new tables
+    -- for every bool/string the dashboard wants to remember.
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key         TEXT PRIMARY KEY,
+      value       TEXT NOT NULL,
+      updated_at  TEXT NOT NULL
     );
 
     -- ===== Rate Limits =====
@@ -641,6 +663,51 @@ export function runMigrations(db: Database.Database): void {
   // Deacon's circuit breaker for failed-merge retries — must persist across restarts.
   if (currentVersion < 23) {
     try { db.exec(`ALTER TABLE review_status ADD COLUMN merge_retry_count INTEGER DEFAULT 0`); } catch { /* already exists */ }
+  }
+
+  // v23 → v24: add review_spawned_at and test_retry_count columns (PAN-699)
+  // review_spawned_at: tracks when parallel review was dispatched for orphan detection
+  // test_retry_count: circuit breaker for test-agent dispatch retries
+  if (currentVersion < 24) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN review_spawned_at TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN test_retry_count INTEGER DEFAULT 0`); } catch { /* already exists */ }
+  }
+
+  // v24 → v25: add review_retry_count and recovery_started_at columns (PAN-794)
+  // Circuit breaker for parallel-review re-dispatch loops + explicit cycle boundary.
+  if (currentVersion < 25) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN review_retry_count INTEGER DEFAULT 0`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN recovery_started_at TEXT`); } catch { /* already exists */ }
+  }
+
+  // v25 → v26: add human-set deacon-ignore flag (per-issue opt-out of patrol).
+  if (currentVersion < 26) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN deacon_ignored INTEGER NOT NULL DEFAULT 0`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN deacon_ignored_at TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN deacon_ignored_reason TEXT`); } catch { /* already exists */ }
+  }
+
+  // v26 → v27: add app_settings table for persisted global flags.
+  // Seed `deacon.globally_paused` = true on first install of this migration so
+  // the dashboard comes up with Deacon frozen during the PAN-794 cutover. The
+  // toggle in the UI flips it back to false when we're ready to let Deacon run.
+  if (currentVersion < 27) {
+    try {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS app_settings (
+          key         TEXT PRIMARY KEY,
+          value       TEXT NOT NULL,
+          updated_at  TEXT NOT NULL
+        )
+      `);
+    } catch { /* already exists */ }
+    try {
+      db.prepare(
+        `INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`
+      ).run('deacon.globally_paused', 'true', new Date().toISOString());
+    } catch (err) {
+      console.warn('[schema] Failed to seed deacon.globally_paused:', err);
+    }
   }
 
   // After all migrations, set the version

@@ -76,7 +76,7 @@ async function compactCommand(options: CompactOptions): Promise<void> {
   // Check if bd is available
   if (!(await isBdAvailable())) {
     console.error(chalk.red('Error: bd (beads) CLI not found in PATH'));
-    console.log(chalk.dim('Install beads: https://github.com/steveyegge/beads'));
+    console.log(chalk.dim('Install beads: https://github.com/gastownhall/beads'));
     process.exit(1);
   }
 
@@ -249,6 +249,14 @@ export function registerBeadsCommands(program: Command): void {
     .action(async (options) => {
       await upgradeCommand(options.check);
     });
+
+  beads
+    .command('doctor')
+    .description('Run bd doctor --fix to check and fix beads database issues')
+    .option('--dry-run', 'Check only, do not fix')
+    .action(async (options) => {
+      await doctorCommand(options.dryRun);
+    });
 }
 
 /**
@@ -271,7 +279,7 @@ async function upgradeCommand(checkOnly: boolean = false): Promise<void> {
   let latestVersion = 'unknown';
   try {
     const { stdout } = await execAsync(
-      'curl -sL https://api.github.com/repos/steveyegge/beads/releases/latest | jq -r .tag_name',
+      'curl -sL https://api.github.com/repos/gastownhall/beads/releases/latest | jq -r .tag_name',
       { encoding: 'utf-8' }
     );
     latestVersion = stdout.trim().replace(/^v/, '');
@@ -305,14 +313,14 @@ async function upgradeCommand(checkOnly: boolean = false): Promise<void> {
     if (plat === 'darwin') {
       // macOS - try homebrew upgrade
       try {
-        execSync('brew upgrade steveyegge/beads/bd 2>/dev/null || brew install steveyegge/beads/bd', {
+        execSync('brew upgrade gastownhall/beads/bd 2>/dev/null || brew install gastownhall/beads/bd', {
           stdio: 'pipe',
           timeout: 120000,
         });
         spinner.succeed('beads upgraded via Homebrew');
       } catch {
         // Fall back to install script
-        execSync('curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash', {
+        execSync('curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash', {
           stdio: 'pipe',
           timeout: 120000,
         });
@@ -320,7 +328,7 @@ async function upgradeCommand(checkOnly: boolean = false): Promise<void> {
       }
     } else {
       // Linux/WSL - use install script
-      execSync('curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash', {
+      execSync('curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash', {
         stdio: 'pipe',
         timeout: 120000,
       });
@@ -340,7 +348,36 @@ async function upgradeCommand(checkOnly: boolean = false): Promise<void> {
     console.error(chalk.red(error.message));
     console.log('');
     console.log(chalk.dim('Manual upgrade:'));
-    console.log(chalk.dim('  curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash'));
+    console.log(chalk.dim('  curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash'));
     process.exit(1);
+  }
+}
+
+/**
+ * Run bd doctor to check and fix beads database issues
+ */
+async function doctorCommand(dryRun: boolean = false): Promise<void> {
+  const spinner = ora('Running beads doctor...').start();
+
+  try {
+    if (dryRun) {
+      const { stdout } = await execAsync('bd doctor', { encoding: 'utf-8' });
+      spinner.succeed('Beads doctor check complete');
+      console.log(stdout);
+      return;
+    }
+
+    const { stdout } = await execAsync('bd doctor --fix', { encoding: 'utf-8' });
+    spinner.succeed('Beads doctor fix complete');
+    console.log(stdout);
+  } catch (error: any) {
+    // bd doctor exits non-zero when there are fixable issues, but still outputs useful info
+    spinner.warn('Beads doctor completed with warnings');
+    if (error.stdout) {
+      console.log(error.stdout);
+    }
+    if (error.stderr) {
+      console.error(chalk.yellow(error.stderr));
+    }
   }
 }

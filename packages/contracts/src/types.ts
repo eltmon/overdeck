@@ -21,7 +21,7 @@ export type AgentStatus = typeof AgentStatus.Type
 export const AgentPhase = Schema.Literals(["planning", "exploration", "implementation", "testing", "documentation", "pre_push", "post_push", "review", "review-response", "merge"])
 export type AgentPhase = typeof AgentPhase.Type
 
-export const AgentResolution = Schema.Literals(["working", "done", "needs_input", "stuck", "completed", "unclear"])
+export const AgentResolution = Schema.Literals(["working", "done", "needs_input", "stuck", "completed", "unclear", "abandoned"])
 export type AgentResolution = typeof AgentResolution.Type
 
 export const SpecialistType = Schema.Literals(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"])
@@ -41,6 +41,63 @@ export type MergeStatusValue = typeof MergeStatusValue.Type
 
 export const VerificationStatusValue = Schema.Literals(["pending", "running", "passed", "failed", "skipped"])
 export type VerificationStatusValue = typeof VerificationStatusValue.Type
+
+// ─── Agent Runtime (PAN-800) ─────────────────────────────────────────────────
+// High-frequency per-tool-call surface. Kept separate from AgentSnapshot because
+// AgentSnapshot is the low-frequency lifecycle projection (config, status, cost)
+// and merging them means every tool call re-diffs a giant object on the frontend.
+
+export const Activity = Schema.Literals([
+  "working",   // tool in flight, or tool completed <30s ago
+  "thinking",  // no tool in flight, waiting for model
+  "waiting",   // needs human (permission, answer, disambiguation)
+  "idle",      // Stop hook fired, waiting for next turn
+  "stopped",   // session ended
+])
+export type Activity = typeof Activity.Type
+
+export const WaitingReason = Schema.Literals([
+  "tool_permission",
+  "user_question",
+  "disambiguation",
+  "other",
+])
+export type WaitingReason = typeof WaitingReason.Type
+
+export const ThinkingState = Schema.Struct({
+  since: Schema.String,        // ISO timestamp
+  lastToolAt: Schema.String,   // timestamp of the tool that preceded this thinking state
+})
+export type ThinkingState = typeof ThinkingState.Type
+
+export const WaitingState = Schema.Struct({
+  reason: WaitingReason,
+  startedAt: Schema.String,
+  message: Schema.optional(Schema.String),
+  notificationSent: Schema.optional(Schema.Boolean),
+})
+export type WaitingState = typeof WaitingState.Type
+
+export const AgentRuntimeSnapshot = Schema.Struct({
+  id: AgentId,
+  activity: Activity,
+  lastActivity: Schema.String,                    // ISO timestamp of last event for this agent
+  currentTool: Schema.optional(Schema.String),   // set when activity === "working"
+  thinking: Schema.optional(ThinkingState),       // set when activity === "thinking"
+  waiting: Schema.optional(WaitingState),         // set when activity === "waiting"
+  claudeSessionId: Schema.optional(Schema.String),
+  model: Schema.optional(Schema.String),
+  lastMessageAt: Schema.optional(Schema.String),  // last user→agent message delivered
+  // Lifecycle resolution signal emitted by work-agent-stop-hook. Values mirror
+  // AgentResolution so the enrichment poller can consume this as input.
+  resolution: Schema.optional(AgentResolution),
+  resolutionCount: Schema.optional(Schema.Number),
+  resolutionUpdatedAt: Schema.optional(Schema.String),
+  // For specialists: the issue currently being processed.
+  currentIssue: Schema.optional(IssueId),
+  updatedAtSequence: SequenceNumber,              // event sequence that produced this snapshot
+})
+export type AgentRuntimeSnapshot = typeof AgentRuntimeSnapshot.Type
 
 // ─── Agent ────────────────────────────────────────────────────────────────────
 
@@ -64,6 +121,9 @@ export const AgentSnapshot = Schema.Struct({
   pendingQuestionCount: Schema.optional(Schema.Number),
   resolution: Schema.optional(AgentResolution),
   resolutionCount: Schema.optional(Schema.Number),
+  // PAN-800 — bumped on every runtime event so subscribers can cheaply detect
+  // a change without diffing the full AgentRuntimeSnapshot.
+  runtimeSnapshotSequence: Schema.optional(SequenceNumber),
 })
 export type AgentSnapshot = typeof AgentSnapshot.Type
 
@@ -98,6 +158,24 @@ export const ReviewStatusSnapshot = Schema.Struct({
   stuckDetails: Schema.optional(Schema.String),
   /** Commit SHA at which review passed; deacon uses this to detect new pushes after review */
   reviewedAtCommit: Schema.optional(Schema.String),
+  /** PAN-699: timestamp when review agents were dispatched */
+  reviewSpawnedAt: Schema.optional(Schema.String),
+  /** PAN-699: number of test-agent dispatch retries */
+  testRetryCount: Schema.optional(Schema.Number),
+  /** PAN-794: parallel-review re-dispatch retry counter (current recovery cycle) */
+  reviewRetryCount: Schema.optional(Schema.Number),
+  /** PAN-794: ISO timestamp marking the start of the current recovery cycle */
+  recoveryStartedAt: Schema.optional(Schema.String),
+  /** Human-requested patrol opt-out — when true, Deacon ignores this issue. */
+  deaconIgnored: Schema.optional(Schema.Boolean),
+  deaconIgnoredAt: Schema.optional(Schema.String),
+  deaconIgnoredReason: Schema.optional(Schema.String),
+  /** Active parallel review coordinator tmux session name (e.g. review-coordinator-PAN-540-1234). */
+  reviewCoordinatorSessionName: Schema.optional(Schema.String),
+  /** Active parallel review tmux session names (e.g. review-PAN-540-1234-correctness). Discovered at emission time. */
+  reviewSessionNames: Schema.optional(Schema.Array(Schema.String)),
+  /** Per-role review completion status (keyed by role: 'correctness' | 'security' | ...) */
+  reviewSubStatuses: Schema.optional(Schema.Record(Schema.String, Schema.Literals(["running", "done"]))),
 })
 export type ReviewStatusSnapshot = typeof ReviewStatusSnapshot.Type
 

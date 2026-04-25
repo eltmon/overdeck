@@ -1,57 +1,53 @@
 #!/bin/bash
-# ~/.panopticon/bin/work-agent-stop-hook
-# Called when any agent goes idle — detects work agents that forgot "pan work done"
+# ~/.panopticon/bin/work-agent-stop-hook  (PAN-800)
 #
-# Uses evidence-based detection first (STATE.md, git, beads), then falls back to
-# a lightweight AI model for ambiguous cases. Writes resolution to runtime.json.
+# Detects work agents that forgot to call `pan work done` after finishing their
+# implementation, and nudges them via tmux. Writes the lifecycle resolution
+# signal through POST /api/agents/:id/heartbeat (kind=resolution_set) —
+# runtime.json is no longer touched.
 #
-# The model used is configurable via PANOPTICON_COMPLETION_CHECK_MODEL env var
-# or defaults to the models.overrides.completion-check-hook setting in config.yaml,
-# falling back to claude-haiku-4-5.
+# Escalation tiers:
+#   working   — default while tool activity is recent
+#   done      — STATE.md marked complete AND branch pushed
+#   needs_input — LLM verdict STOPPED_FOR_INPUT
+#   stuck     — 2+ consecutive UNCLEAR LLM verdicts
+#
+# The model used for the completion-check LLM is configurable via
+# PANOPTICON_COMPLETION_CHECK_MODEL or the completion-check-hook override
+# in ~/.panopticon/config.yaml.
 
-# Don't use set -e - resilient to failures, never break Claude Code execution
+set +e
 
-# Get agent ID
-if [ -n "$PANOPTICON_AGENT_ID" ]; then
-  AGENT_ID="$PANOPTICON_AGENT_ID"
-elif [ -n "$TMUX" ]; then
-  AGENT_ID=$(tmux display-message -p '#S' 2>/dev/null)
-else
-  exit 0
-fi
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=pan-hook-lib.sh
+. "$SCRIPT_DIR/pan-hook-lib.sh" 2>/dev/null || exit 0
 
-# Only run for work agents (agent-min-XXX, agent-pan-XXX, etc.)
+pan_resolve_agent_id || exit 0
+
+# Only run for work agents (agent-*, excluding specialists).
 case "$AGENT_ID" in
   agent-*)
-    # Check it's not a specialist
     case "$AGENT_ID" in
       specialist-*) exit 0 ;;
     esac
     ;;
   *)
-    exit 0  # Not a work agent
+    exit 0
     ;;
 esac
 
-# Extract issue ID from agent ID (e.g., "agent-min-725" -> "MIN-725")
 ISSUE_ID=$(echo "$AGENT_ID" | sed 's/^agent-//' | tr '[:lower:]' '[:upper:]')
 
 AGENT_STATE_DIR="$HOME/.panopticon/agents/$AGENT_ID"
 LOG_DIR="$HOME/.panopticon/logs"
 mkdir -p "$LOG_DIR"
 
-# Skip if completion marker already exists (agent already called pan work done)
 COMPLETED_FILE="$AGENT_STATE_DIR/completed"
-if [ -f "$COMPLETED_FILE" ]; then
-  exit 0
-fi
+[ -f "$COMPLETED_FILE" ] && exit 0
 
-# Skip if issue is actively being processed by specialists (reviewing/passed/queued).
-# DO NOT skip if the agent is blocked, failed, or has verification failures —
-# those agents need to act and may have gone idle without resubmitting.
+# Skip if the issue is actively flowing through the specialist pipeline.
 REVIEW_STATUS_FILE="$HOME/.panopticon/review-status.json"
 if [ -f "$REVIEW_STATUS_FILE" ]; then
-  # Check if this issue is actively in the specialist pipeline (case-insensitive)
   IN_ACTIVE_PIPELINE=$(python3 -c "
 import json, sys
 try:
@@ -60,29 +56,23 @@ try:
     issue = '$ISSUE_ID'
     status = statuses.get(issue) or statuses.get(issue.lower()) or statuses.get(issue.upper())
     if not status:
-        print('no')
-        sys.exit(0)
+        print('no'); sys.exit(0)
     review = status.get('reviewStatus', '')
     test = status.get('testStatus', '')
     merge = status.get('mergeStatus', '')
     ready = status.get('readyForMerge', False)
     verification = status.get('verificationStatus', '')
-    # Active pipeline: review is in progress or passed, tests passed, ready to merge
     is_active = (
         review in ('reviewing', 'passed') and
         test in ('passed', 'reviewing', 'pending') and
         (ready or merge in ('queued', 'merging', 'verifying'))
     )
-    # Also NOT active if blocked, failed, or verification failed
     needs_action = (
         review in ('blocked', 'failed') or
         verification == 'failed'
     )
-    if is_active and not needs_action:
-        print('yes')
-    else:
-        print('no')
-except:
+    print('yes' if (is_active and not needs_action) else 'no')
+except Exception:
     print('no')
 " 2>/dev/null || echo "no")
   if [ "$IN_ACTIVE_PIPELINE" = "yes" ]; then
@@ -92,80 +82,89 @@ except:
   fi
 fi
 
-# Cooldown: don't nudge more than once per 10 minutes
+# Cooldown: don't nudge more than once per 10 minutes.
 NUDGE_FILE="$AGENT_STATE_DIR/.last-completion-nudge"
 if [ -f "$NUDGE_FILE" ]; then
   LAST_NUDGE=$(cat "$NUDGE_FILE" 2>/dev/null || echo "0")
   NOW=$(date +%s)
-  ELAPSED=$(( NOW - LAST_NUDGE ))
-  if [ "$ELAPSED" -lt 600 ]; then
-    exit 0  # Too soon since last nudge
+  if [ $(( NOW - LAST_NUDGE )) -lt 600 ]; then
+    exit 0
   fi
 fi
 
-# ============================================================================
-# Helper: write resolution to runtime.json
-# ============================================================================
-write_resolution() {
+# Local cache of the last resolution THIS HOOK emitted for this agent.
+# Authoritative for "what did I say last time" — avoids dashboard round-trips
+# that can silently fail under load and reset the ratchet to count=1.
+RESOLUTION_CACHE="$AGENT_STATE_DIR/last-resolution.tsv"
+RESOLUTION_LOCK="$AGENT_STATE_DIR/last-resolution.lock"
+
+# Read last-emitted resolution from local cache. Echoes "resolution count"
+# (space-separated) or empty string if cache missing/unreadable.
+read_cached_resolution() {
+  [ -f "$RESOLUTION_CACHE" ] || return 0
+  local line
+  line=$(flock -s -w 1 "$RESOLUTION_LOCK" -c "cat '$RESOLUTION_CACHE'" 2>/dev/null || echo "")
+  [ -z "$line" ] && return 0
+  local res count
+  res=$(echo "$line" | awk -F'\t' '{print $1}')
+  count=$(echo "$line" | awk -F'\t' '{print $2}')
+  # Sanity: count must be numeric
+  case "$count" in
+    ''|*[!0-9]*) return 0 ;;
+  esac
+  echo "$res $count"
+}
+
+# Write last-emitted resolution to local cache (flock-guarded).
+write_cached_resolution() {
+  local res="$1" count="$2"
+  local tmp="$RESOLUTION_CACHE.tmp.$$"
+  printf '%s\t%s\t%s\n' "$res" "$count" "$(date -Iseconds)" > "$tmp" 2>/dev/null || return 0
+  flock -x -w 1 "$RESOLUTION_LOCK" -c "mv '$tmp' '$RESOLUTION_CACHE'" 2>/dev/null || rm -f "$tmp"
+}
+
+# Emit a resolution event via the heartbeat endpoint.
+# Uses the local cache as the source of truth for prev resolution/count
+# (the dashboard snapshot is unreliable under load); falls back to the
+# dashboard only if no local cache exists (first emit for this agent).
+emit_resolution() {
   local resolution="$1"
-  local runtime_file="$AGENT_STATE_DIR/runtime.json"
-
-  # Read existing resolution count
-  local existing_count=0
-  local existing_resolution=""
-  if [ -f "$runtime_file" ]; then
-    existing_resolution=$(python3 -c "import json,sys; d=json.load(open('$runtime_file')); print(d.get('resolution',''))" 2>/dev/null || echo "")
-    existing_count=$(python3 -c "import json,sys; d=json.load(open('$runtime_file')); print(d.get('resolutionCount',0))" 2>/dev/null || echo "0")
+  local prev_resolution="" prev_count=0 prev_source=""
+  local cached
+  cached=$(read_cached_resolution)
+  if [ -n "$cached" ]; then
+    prev_resolution=$(echo "$cached" | awk '{print $1}')
+    prev_count=$(echo "$cached" | awk '{print $2}')
+    prev_source="cache"
+  else
+    # No local cache — bootstrap from dashboard snapshot if available.
+    local snap
+    snap=$(curl -s -m 0.5 "$PAN_DASHBOARD_URL/api/agents/$AGENT_ID/runtime" 2>/dev/null || echo "")
+    if [ -n "$snap" ] && command -v jq >/dev/null 2>&1; then
+      prev_resolution=$(echo "$snap" | jq -r '.snapshot.resolution // ""' 2>/dev/null || echo "")
+      prev_count=$(echo "$snap" | jq -r '.snapshot.resolutionCount // 0' 2>/dev/null || echo "0")
+      prev_source="dashboard"
+    else
+      prev_source="none"
+    fi
   fi
-
-  # Increment count if same resolution, reset if changed
   local new_count
-  if [ "$existing_resolution" = "$resolution" ]; then
-    new_count=$(( existing_count + 1 ))
+  if [ "$prev_resolution" = "$resolution" ]; then
+    new_count=$(( prev_count + 1 ))
   else
     new_count=1
   fi
 
-  local now_iso
-  now_iso=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  local body="{\"kind\":\"resolution_set\",\"resolution\":\"$resolution\",\"resolutionCount\":$new_count}"
+  pan_emit_event "$AGENT_ID" "$body"
 
-  # Merge into runtime.json using python3 (jq not always available)
-  python3 - <<PYEOF 2>/dev/null || true
-import json, os
+  write_cached_resolution "$resolution" "$new_count"
 
-runtime_file = "$runtime_file"
-resolution = "$resolution"
-new_count = $new_count
-now_iso = "$now_iso"
-
-# Read existing
-data = {}
-if os.path.exists(runtime_file):
-    try:
-        with open(runtime_file) as f:
-            data = json.load(f)
-    except Exception:
-        pass
-
-# Update resolution fields
-data['resolution'] = resolution
-data['resolutionCount'] = new_count
-data['resolutionUpdatedAt'] = now_iso
-
-# Write back
-with open(runtime_file, 'w') as f:
-    json.dump(data, f, indent=2)
-PYEOF
-
-  echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID resolution=$resolution count=$new_count" \
+  echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID resolution=$resolution count=$new_count (prev=$prev_resolution/$prev_count src=$prev_source)" \
     >> "$LOG_DIR/hooks.log" 2>/dev/null || true
 }
 
-# ============================================================================
-# Phase 1: Evidence-Based Completion Detection
-# ============================================================================
-
-# Read workspace path from state.json
+# ── Phase 1: evidence-based completion detection ─────────────────────────
 WORKSPACE=""
 STATE_FILE="$AGENT_STATE_DIR/state.json"
 if [ -f "$STATE_FILE" ]; then
@@ -174,207 +173,143 @@ fi
 
 STATE_MD_COMPLETE=false
 BRANCH_PUSHED=false
-BEADS_CLOSED=false
 
-# Check 1: STATE.md completion markers
 if [ -n "$WORKSPACE" ] && [ -f "$WORKSPACE/.planning/STATE.md" ]; then
   if grep -qiE '(^##?\s*(Status|Current Status).*:.*\b(COMPLETE|DONE|FINISHED)\b|^Status:\s*(COMPLETE|DONE|FINISHED)|implementation[[:space:]]+complete|all[[:space:]]+tasks[[:space:]]+complete)' "$WORKSPACE/.planning/STATE.md" 2>/dev/null; then
     STATE_MD_COMPLETE=true
   fi
 fi
 
-# Check 2: Branch pushed to remote (git log origin/<branch>..HEAD is empty)
-if [ -n "$WORKSPACE" ] && [ -d "$WORKSPACE/.git" ] || ([ -n "$WORKSPACE" ] && git -C "$WORKSPACE" rev-parse --git-dir >/dev/null 2>&1); then
+if [ -n "$WORKSPACE" ] && git -C "$WORKSPACE" rev-parse --git-dir >/dev/null 2>&1; then
   BRANCH=$(git -C "$WORKSPACE" branch --show-current 2>/dev/null || echo "")
   if [ -n "$BRANCH" ]; then
     UNPUSHED=$(git -C "$WORKSPACE" log "origin/$BRANCH..HEAD" --oneline 2>/dev/null || echo "no-remote")
-    if [ "$UNPUSHED" = "" ]; then
-      BRANCH_PUSHED=true
-    fi
+    [ "$UNPUSHED" = "" ] && BRANCH_PUSHED=true
   fi
 fi
 
-# Check 3: Beads closed (all tasks done)
-if [ -n "$WORKSPACE" ] && [ -d "$WORKSPACE/.planning/beads" ]; then
-  OPEN_BEADS=$(bd list --status open 2>/dev/null | grep -c '.' || echo "0")
-  if [ "$OPEN_BEADS" = "0" ]; then
-    BEADS_CLOSED=true
-  fi
-elif [ -z "$WORKSPACE" ] || [ ! -d "$WORKSPACE/.planning/beads" ]; then
-  # No beads directory = treat as N/A (closed)
-  BEADS_CLOSED=true
-fi
+nudge_agent() {
+  local msg="$1"
+  local tmpfile
+  tmpfile=$(mktemp)
+  echo "$msg" > "$tmpfile"
+  tmux load-buffer "$tmpfile" 2>/dev/null
+  tmux paste-buffer -t "$AGENT_ID" 2>/dev/null
+  sleep 0.3
+  tmux send-keys -t "$AGENT_ID" C-m 2>/dev/null
+  rm -f "$tmpfile"
+}
 
-# Apply decision matrix from spec
 if [ "$STATE_MD_COMPLETE" = "true" ] && [ "$BRANCH_PUSHED" = "true" ]; then
-  # Strong evidence: agent completed but forgot pan work done
-  echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID evidence=FORGOT_COMPLETION (STATE.md=complete, branch=pushed, beads=$BEADS_CLOSED)" \
-    >> "$LOG_DIR/hooks.log" 2>/dev/null || true
-
-  write_resolution "done"
-
-  # Record nudge timestamp for cooldown
-  mkdir -p "$AGENT_STATE_DIR"
+  emit_resolution "done"
   date +%s > "$NUDGE_FILE" 2>/dev/null || true
-
-  NUDGE_MSG="Your STATE.md indicates work is complete and your branch is pushed. You MUST run this command now:
+  nudge_agent "Your STATE.md indicates work is complete and your branch is pushed. You MUST run this command now:
 
 pan work done $ISSUE_ID -c \"Implementation complete\"
 
 If you still have remaining tasks, continue working on them. Do NOT stop until all work is done AND you have called pan work done."
-
-  TMPFILE=$(mktemp)
-  echo "$NUDGE_MSG" > "$TMPFILE"
-  tmux load-buffer "$TMPFILE" 2>/dev/null
-  tmux paste-buffer -t "$AGENT_ID" 2>/dev/null
-  sleep 0.3
-  tmux send-keys -t "$AGENT_ID" C-m 2>/dev/null
-  rm -f "$TMPFILE"
-
-  echo "[$(date -Iseconds)] work-agent-stop-hook: Sent FORGOT_COMPLETION nudge to $AGENT_ID" \
-    >> "$LOG_DIR/hooks.log" 2>/dev/null || true
-
   exit 0
+fi
 
-elif [ "$STATE_MD_COMPLETE" = "true" ] && [ "$BRANCH_PUSHED" = "false" ]; then
-  # STATE.md says done but branch not yet pushed — agent is still working (pushing)
-  echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID evidence=STILL_WORKING (STATE.md=complete, branch=not-pushed)" \
+if [ "$STATE_MD_COMPLETE" = "true" ] && [ "$BRANCH_PUSHED" = "false" ]; then
+  echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID still_working (STATE.md=complete, branch=not-pushed)" \
     >> "$LOG_DIR/hooks.log" 2>/dev/null || true
   exit 0
 fi
 
-# ============================================================================
-# Heuristic pre-check: skip expensive AI call if clearly mid-work
-# ============================================================================
-OUTPUT=$(tmux capture-pane -t "$AGENT_ID" -p -S -80 2>/dev/null || echo "")
-if [ -z "$OUTPUT" ]; then
-  exit 0
-fi
+# ── Phase 2: pane heuristic before the LLM call ──────────────────────────
+# Capture 200 lines to give the LLM enough context (a short summary in the
+# final chunk alongside earlier tool output is often the key disambiguator).
+# Prompt-indicator regex covers Claude Code (Worked for) and non-Claude runtimes
+# routed through Claude Code (Sautéed/Cooking/Thinking) that share the `❯` prompt.
+OUTPUT=$(tmux capture-pane -t "$AGENT_ID" -p -S -200 2>/dev/null || echo "")
+[ -z "$OUTPUT" ] && exit 0
+echo "$OUTPUT" | tail -20 | grep -qE '(^❯|Worked for|Sautéed|Cooking|Thinking for)' || exit 0
 
-# Check if the agent appears to be at an idle prompt (not mid-response)
-if ! echo "$OUTPUT" | tail -10 | grep -qE '(^❯|Worked for)'; then
-  exit 0  # Agent doesn't appear to be at an idle prompt
-fi
-
-# ============================================================================
-# LLM fallback for ambiguous cases
-# ============================================================================
+# ── Phase 3: LLM fallback ────────────────────────────────────────────────
 COMPLETION_MODEL="${PANOPTICON_COMPLETION_CHECK_MODEL:-}"
 if [ -z "$COMPLETION_MODEL" ]; then
   CONFIG_FILE="$HOME/.panopticon/config.yaml"
-  if [ -f "$CONFIG_FILE" ] && command -v grep &> /dev/null; then
+  if [ -f "$CONFIG_FILE" ]; then
     COMPLETION_MODEL=$(grep 'completion-check-hook:' "$CONFIG_FILE" 2>/dev/null | awk '{print $2}' | tr -d '"' || echo "")
   fi
 fi
 COMPLETION_MODEL="${COMPLETION_MODEL:-claude-haiku-4-5}"
 
-# Read current resolution count from runtime.json for escalation logic
-CURRENT_RESOLUTION=$(python3 -c "
-import json, os
-f = '$AGENT_STATE_DIR/runtime.json'
-if os.path.exists(f):
-    try:
-        d = json.load(open(f))
-        print(d.get('resolution', ''))
-    except Exception:
-        print('')
-else:
-    print('')
-" 2>/dev/null || echo "")
+ANALYSIS_PROMPT="You are analyzing a work agent's terminal output to determine whether it finished its implementation but failed to call 'pan work done' as its final action.
 
-CURRENT_COUNT=$(python3 -c "
-import json, os
-f = '$AGENT_STATE_DIR/runtime.json'
-if os.path.exists(f):
-    try:
-        d = json.load(open(f))
-        print(d.get('resolutionCount', 0))
-    except Exception:
-        print(0)
-else:
-    print(0)
-" 2>/dev/null || echo "0")
+The agent was working on issue $ISSUE_ID. The contract is: once every task is complete, the agent MUST run \`pan work done <ISSUE_ID>\` as a Bash command. Finishing work without running that command is a failure — the pipeline stalls.
 
-ANALYSIS_PROMPT="You are analyzing a work agent's terminal output to determine if it finished its work but forgot to call 'pan work done'.
-
-The agent was working on issue $ISSUE_ID. Here is the last 80 lines of its terminal output:
+Here is the last 200 lines of its terminal output:
 
 <terminal_output>
 $OUTPUT
 </terminal_output>
 
-Respond with EXACTLY one of these words (nothing else):
-- FORGOT_COMPLETION — if the agent clearly finished its implementation work (closed beads, committed code, ran tests) but stopped without calling 'pan work done'
-- STILL_WORKING — if the agent appears to have more work to do (mentioned next steps, was mid-task)
-- STOPPED_FOR_INPUT — if the agent stopped because it needs human input or hit a blocker
-- UNCLEAR — if you cannot determine the state"
+Decide FORGOT_COMPLETION if ANY of these are true AND the transcript does NOT show a 'pan work done' Bash invocation in the tail:
+- the agent wrote a summary/wrap-up message ('all tests pass', 'implementation complete', 'all beads closed', 'ready for review', etc.) and then stopped
+- the agent closed beads or ran 'bd close' and finished with a prompt
+- the agent committed + pushed and the last message is a status summary instead of a pan-work-done command
 
-RESULT=$(echo "$ANALYSIS_PROMPT" | claude -p --model "$COMPLETION_MODEL" --max-tokens 20 2>/dev/null || echo "UNCLEAR")
+Decide STILL_WORKING only if the tail clearly shows an in-progress task (mid-edit, running tests, reading files) with no wrap-up summary.
+Decide STOPPED_FOR_INPUT only if the agent explicitly asked the human a question or flagged a blocker.
+Use UNCLEAR only as a last resort when the tail is genuinely ambiguous (e.g. no summary and no active work).
+
+Respond with EXACTLY one word, nothing else: FORGOT_COMPLETION | STILL_WORKING | STOPPED_FOR_INPUT | UNCLEAR"
+
+CLAUDE_STDERR="$LOG_DIR/work-agent-stop-hook.claude-stderr.log"
+RESULT=$(echo "$ANALYSIS_PROMPT" | claude -p --model "$COMPLETION_MODEL" 2>>"$CLAUDE_STDERR")
+CLAUDE_RC=$?
+if [ $CLAUDE_RC -ne 0 ] || [ -z "$RESULT" ]; then
+  echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID claude -p failed rc=$CLAUDE_RC (see $CLAUDE_STDERR), fallback to UNCLEAR" \
+    >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+  RESULT="UNCLEAR"
+fi
 VERDICT=$(echo "$RESULT" | tr -d '[:space:]' | head -c 30)
 
-echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID ($ISSUE_ID) -> $VERDICT (model: $COMPLETION_MODEL)" \
+echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID ($ISSUE_ID) -> $VERDICT (model: $COMPLETION_MODEL, rc=$CLAUDE_RC)" \
   >> "$LOG_DIR/hooks.log" 2>/dev/null || true
 
-if [ "$VERDICT" = "FORGOT_COMPLETION" ]; then
-  write_resolution "done"
-
-  # Record nudge timestamp for cooldown
-  mkdir -p "$AGENT_STATE_DIR"
-  date +%s > "$NUDGE_FILE" 2>/dev/null || true
-
-  NUDGE_MSG="You stopped without calling pan work done. If your implementation is complete, you MUST run this command now:
+case "$VERDICT" in
+  FORGOT_COMPLETION)
+    emit_resolution "done"
+    date +%s > "$NUDGE_FILE" 2>/dev/null || true
+    nudge_agent "You stopped without calling pan work done. If your implementation is complete, you MUST run this command now:
 
 pan work done $ISSUE_ID -c \"Implementation complete\"
 
 If you still have remaining tasks, continue working on them. Do NOT stop until all work is done AND you have called pan work done."
-
-  TMPFILE=$(mktemp)
-  echo "$NUDGE_MSG" > "$TMPFILE"
-  tmux load-buffer "$TMPFILE" 2>/dev/null
-  tmux paste-buffer -t "$AGENT_ID" 2>/dev/null
-  sleep 0.3
-  tmux send-keys -t "$AGENT_ID" C-m 2>/dev/null
-  rm -f "$TMPFILE"
-
-  echo "[$(date -Iseconds)] work-agent-stop-hook: Sent FORGOT_COMPLETION nudge to $AGENT_ID" \
-    >> "$LOG_DIR/hooks.log" 2>/dev/null || true
-
-elif [ "$VERDICT" = "STOPPED_FOR_INPUT" ]; then
-  write_resolution "needs_input"
-
-elif [ "$VERDICT" = "UNCLEAR" ]; then
-  # Escalate to stuck after 2+ UNCLEAR results
-  if [ "$CURRENT_RESOLUTION" = "unclear" ] || [ "$CURRENT_COUNT" -ge 2 ]; then
-    write_resolution "stuck"
-    echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID escalated to stuck after $CURRENT_COUNT UNCLEAR results" \
+    ;;
+  STOPPED_FOR_INPUT)
+    emit_resolution "needs_input"
+    ;;
+  UNCLEAR)
+    # Escalate to stuck after 2+ consecutive UNCLEAR — the hook has looked at
+    # this agent's tail twice and still can't tell what it's doing, which is
+    # itself signal. Uses the local resolution cache (not the dashboard) so
+    # this decision is deterministic even when the dashboard is unreachable.
+    escalate_to_stuck=false
+    esc_prev_resolution=""
+    esc_prev_count=0
+    esc_cached=$(read_cached_resolution)
+    if [ -n "$esc_cached" ]; then
+      esc_prev_resolution=$(echo "$esc_cached" | awk '{print $1}')
+      esc_prev_count=$(echo "$esc_cached" | awk '{print $2}')
+      # Stay stuck once escalated (don't ratchet back to unclear on subsequent
+      # UNCLEAR verdicts — deacon's poke logic counts consecutive stuck heartbeats).
+      if { [ "$esc_prev_resolution" = "unclear" ] && [ "$esc_prev_count" -ge 1 ]; } \
+         || [ "$esc_prev_resolution" = "stuck" ]; then
+        escalate_to_stuck=true
+      fi
+    fi
+    echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID UNCLEAR gate prev=$esc_prev_resolution/$esc_prev_count escalate=$escalate_to_stuck" \
       >> "$LOG_DIR/hooks.log" 2>/dev/null || true
-  else
-    # First UNCLEAR — track it but don't escalate yet
-    python3 - <<PYEOF 2>/dev/null || true
-import json, os
-
-runtime_file = "$AGENT_STATE_DIR/runtime.json"
-data = {}
-if os.path.exists(runtime_file):
-    try:
-        with open(runtime_file) as f:
-            data = json.load(f)
-    except Exception:
-        pass
-
-existing = data.get('resolution', '')
-count = data.get('resolutionCount', 0)
-if existing == 'unclear':
-    data['resolutionCount'] = count + 1
-else:
-    data['resolution'] = 'unclear'
-    data['resolutionCount'] = 1
-data['resolutionUpdatedAt'] = "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-
-with open(runtime_file, 'w') as f:
-    json.dump(data, f, indent=2)
-PYEOF
-  fi
-fi
+    if [ "$escalate_to_stuck" = "true" ]; then
+      emit_resolution "stuck"
+    else
+      emit_resolution "unclear"
+    fi
+    ;;
+esac
 
 exit 0

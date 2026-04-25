@@ -187,6 +187,30 @@ Work agents cannot start without beads tasks in the workspace. The start-agent e
 returns 422 if `.beads/issues.jsonl` does not exist. Planning must create beads via
 `bd create` before handing off to implementation.
 
+## Stash Hygiene
+
+Stashes are git refs — they persist until explicitly dropped. Left alone, they accumulate fast (we cleared out 106 stashes during the 1.0 stabilization audit on 2026-04-23). The goal is to keep the list short enough that it stays meaningful.
+
+**Naming rules (when Panopticon code creates a stash):**
+- Start with a category prefix so stashes are greppable:
+  - `pre-merge:PAN-XXX:<iso-timestamp>` — safety snapshot before a merge operation
+  - `pre-spawn:PAN-XXX:<iso-timestamp>` — planning-debris snapshot before an agent start
+  - `review-temp:PAN-XXX:<n>` — short-lived stash during a review-request roundtrip
+  - `salvageable:PAN-XXX:<iso-timestamp>:<short-description>` — explicitly flagged as user work that may need recovery (e.g. uncommitted edits discovered during cleanup)
+
+**Drop-on-completion rules:**
+- `pre-merge:*` — drop once the merge succeeds (or the merge flow rolls back).
+- `pre-spawn:*` — drop once the agent has checkpointed its first real commit.
+- `review-temp:*` — drop when the review request completes (success OR failure).
+- `salvageable:*` — NEVER drop automatically. These must be either recovered to a branch or reviewed by the user.
+
+**Triage cadence:**
+- Any stash older than 4 weeks that is NOT `salvageable:*` is a candidate for cleanup.
+- Any `salvageable:*` stash surfaces in the dashboard's workspace inspector so the user can see it and decide.
+
+**Recovery:**
+- `git stash drop` preserves the stash commit in the reflog for 90 days. Anything dropped accidentally is recoverable during that window.
+
 ## CRITICAL: postMergeLifecycle Idempotency
 
 `onMergeComplete()` and `/api/specialists/done` have idempotency guards to prevent
