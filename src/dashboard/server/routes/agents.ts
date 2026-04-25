@@ -113,6 +113,11 @@ function getIssueDataService(): import('../services/issue-data-service.js').Issu
 const AGENTS_CACHE_TTL_MS = 5000;
 let agentsCache: { data: unknown[] | null; timestamp: number } = { data: null, timestamp: 0 };
 
+/** Invalidate the agents cache so the next request re-reads all agent state. */
+export function invalidateAgentsCache(): void {
+  agentsCache = { data: null, timestamp: 0 };
+}
+
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
 // Read the request body as unknown JSON
@@ -645,6 +650,7 @@ const deleteAgentRoute = HttpRouter.add(
       timestamp: new Date().toISOString(),
       payload: { agentId: id },
     })));
+    invalidateAgentsCache();
     return jsonResponse({ success: true });
   })),
 );
@@ -1065,6 +1071,7 @@ const postAgentSuspendRoute = HttpRouter.add(
       payload: { agentId: id },
     })));
 
+    invalidateAgentsCache();
     return jsonResponse({ success: true });
   })),
 );
@@ -1121,6 +1128,7 @@ const postAgentResumeRoute = HttpRouter.add(
       yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_succeeded', {
         hasMessage: !!message,
       }));
+      invalidateAgentsCache();
       return jsonResponse({ success: true, resumed: true, lifecycle: getWorkAgentLifecycleState(id) });
     } else {
       yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_failed', {
@@ -1467,6 +1475,16 @@ const postAgentsRoute = HttpRouter.add(
     try {
       const { readPlan } = yield* Effect.promise(() => import('../../../lib/vbrief/io.js'));
       const planDoc = readPlan(planPath);
+      const planIssueId = planDoc?.plan?.id;
+      if (planIssueId && planIssueId.toLowerCase() !== issueLower) {
+        return jsonResponse({
+          error: `Plan in workspace is for ${planIssueId.toUpperCase()}, not ${issueId}. The workspace contains stale planning artifacts from a different issue.`,
+          hint: 'Run planning for this issue first, or clean the workspace .planning/ directory.',
+          issueId,
+          expectedIssue: issueId,
+          actualIssue: planIssueId.toUpperCase(),
+        }, { status: 422 });
+      }
       const itemCount = planDoc?.plan?.items?.length ?? 0;
       if (itemCount === 0) {
         return jsonResponse({
@@ -1597,6 +1615,7 @@ const postAgentsRoute = HttpRouter.add(
         payload: { issueId, status: 'In Progress', canonicalStatus: 'in_progress' },
       })));
       try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
+      invalidateAgentsCache();
       return jsonResponse({
         success: true,
         message: `Starting remote agent for ${issueId}`,
@@ -1903,6 +1922,7 @@ const postAgentsRoute = HttpRouter.add(
             payload: { issueId, status: 'In Progress', canonicalStatus: 'in_progress' },
           })));
           try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
+          invalidateAgentsCache();
           return jsonResponse({
             success: true,
             message: `Starting containers and agent for ${issueId} (this may take a few minutes)`,
@@ -1961,6 +1981,7 @@ const postAgentsRoute = HttpRouter.add(
       payload: { issueId, status: 'In Progress', canonicalStatus: 'in_progress' },
     })));
     try { getIssueDataService().patchIssue(issueId, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
+    invalidateAgentsCache();
     return jsonResponse({
       success: true,
       message: `Starting agent for ${issueId}`,
@@ -2116,6 +2137,7 @@ const postAgentResetSessionRoute = HttpRouter.add(
     })));
 
     console.log(`[reset-session] Cleared session for ${id} (was: ${previousSessionId.slice(0, 8)}...)`);
+    invalidateAgentsCache();
     return jsonResponse({ success: true, agentId: id, previousSessionId, lifecycle: getWorkAgentLifecycleState(id) });
   })),
 );
