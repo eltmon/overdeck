@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 28;
+export const SCHEMA_VERSION = 29;
 
 /**
  * Initialize the complete database schema.
@@ -225,6 +225,11 @@ export function initSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_conversations_created_at
       ON conversations(created_at);
+
+    CREATE INDEX IF NOT EXISTS idx_conversations_archived_created
+      ON conversations(archived_at, created_at);
+    CREATE INDEX IF NOT EXISTS idx_conversations_status_archived_created
+      ON conversations(status, archived_at, created_at);
 
     -- ===== Favorites (PAN-662: conversation favorites) =====
     CREATE TABLE IF NOT EXISTS favorites (
@@ -711,7 +716,7 @@ export function runMigrations(db: Database.Database): void {
     }
   }
 
-  // v27 → v28: replace session_file with claude_session_id (PAN-???)
+  // v27 → v28: replace session_file with claude_session_id (PAN-451)
   // Storing the full JSONL path in the DB caused divergence when tmux sessions
   // were restarted — the path could go stale while a new JSONL file was written.
   // Store the session UUID instead and compute the path on demand.
@@ -728,6 +733,17 @@ export function runMigrations(db: Database.Database): void {
         db.prepare(`UPDATE conversations SET claude_session_id = ? WHERE id = ?`).run(sessionId, conv.id);
       }
     }
+  }
+
+  // v28 → v29: add composite index on conversations(status, archived_at, created_at)
+  // for the kanban list query that filters by status + archived_at and orders by created_at.
+  if (currentVersion < 29) {
+    try {
+      db.exec(`
+        CREATE INDEX IF NOT EXISTS idx_conversations_status_archived_created
+          ON conversations(status, archived_at, created_at)
+      `);
+    } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

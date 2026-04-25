@@ -74,7 +74,29 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
 
 // ─── Read operations ──────────────────────────────────────────────────────────
 
-export function listConversations(): Conversation[] {
+export function listConversations(options?: { limit?: number; offset?: number }): Conversation[] {
+  const db = getDatabase();
+  let sql = `SELECT id, name, tmux_session, status, cwd, issue_id,
+              created_at, ended_at, last_attached_at, session_file, title,
+              title_source, title_seed, total_cost, archived_at, model, effort,
+              fork_status, fork_error
+       FROM conversations
+       WHERE archived_at IS NULL
+       ORDER BY created_at DESC`;
+  const params: number[] = [];
+  if (options?.limit !== undefined) {
+    sql += ' LIMIT ?';
+    params.push(options.limit);
+  }
+  if (options?.offset !== undefined) {
+    sql += ' OFFSET ?';
+    params.push(options.offset);
+  }
+  const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
+  return rows.map(rowToConversation);
+}
+
+export function listActiveConversations(): Conversation[] {
   const db = getDatabase();
   const rows = db
     .prepare(
@@ -83,7 +105,7 @@ export function listConversations(): Conversation[] {
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error
        FROM conversations
-       WHERE archived_at IS NULL
+       WHERE archived_at IS NULL AND status = 'active'
        ORDER BY created_at DESC`,
     )
     .all() as Record<string, unknown>[];
@@ -134,6 +156,16 @@ export function listArchivedConversations(): Conversation[] {
     )
     .all() as Record<string, unknown>[];
   return rows.map(rowToConversation);
+}
+
+export function listArchivedConversationNames(): string[] {
+  const db = getDatabase();
+  const rows = db
+    .prepare(
+      `SELECT name FROM conversations WHERE archived_at IS NOT NULL`,
+    )
+    .all() as Array<{ name: string }>;
+  return rows.map((row) => row.name);
 }
 
 // ─── Write operations ─────────────────────────────────────────────────────────
@@ -251,8 +283,16 @@ export function updateConversationCost(name: string, totalCost: number): void {
   ).run(totalCost, name);
 }
 
-/** Update the model for a conversation (used by backfill). */
-export function updateConversationModel(name: string, model: string): void {
+/** Set the model for a conversation unconditionally. */
+export function setConversationModel(name: string, model: string): void {
+  const db = getDatabase();
+  db.prepare(
+    `UPDATE conversations SET model = ? WHERE name = ?`,
+  ).run(model, name);
+}
+
+/** Backfill the model for a conversation only when currently NULL. */
+export function backfillConversationModel(name: string, model: string): void {
   const db = getDatabase();
   db.prepare(
     `UPDATE conversations SET model = ? WHERE name = ? AND model IS NULL`,

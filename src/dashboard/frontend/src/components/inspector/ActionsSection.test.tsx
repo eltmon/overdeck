@@ -13,6 +13,19 @@ import { render as rtlRender, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ActionsSection } from './ActionsSection';
 import { DialogProvider } from '../DialogProvider';
+
+vi.mock('../DialogProvider', () => ({
+  DialogProvider: ({ children }: { children: React.ReactNode }) => children,
+  useConfirm: () => vi.fn().mockResolvedValue(true),
+  useAlert: () => vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../hooks/useResetIssue', () => ({
+  useResetIssue: () => ({
+    confirmAndReset: vi.fn().mockResolvedValue(true),
+    isPending: false,
+  }),
+}));
 import type { UseMutationResult } from '@tanstack/react-query';
 import type { Agent, WorkAgentLifecycle } from '../../types';
 import type { ReviewStatus, WorkspaceInfo } from './types';
@@ -241,12 +254,6 @@ describe('ActionsSection', () => {
     expect(screen.getByTestId('merge-btn')).toBeInTheDocument();
   });
 
-  it('shows Merge button when ready for merge', () => {
-    const reviewStatus = makeReviewStatus({ readyForMerge: true });
-    renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);
-    expect(screen.getByTestId('merge-btn')).toBeInTheDocument();
-  });
-
   it('shows Merged badge when mergeStatus is merged', () => {
     const reviewStatus = makeReviewStatus({ mergeStatus: 'merged' });
     renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);
@@ -255,7 +262,7 @@ describe('ActionsSection', () => {
 
   it('shows Reopen button when review has a terminal status', () => {
     const reviewStatus = makeReviewStatus({ reviewStatus: 'passed' });
-    renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} />);
+    renderWithDialog(<ActionsSection {...defaultProps} reviewStatus={reviewStatus} onReopen={vi.fn()} />);
     expect(screen.getByText('Reopen')).toBeInTheDocument();
   });
 

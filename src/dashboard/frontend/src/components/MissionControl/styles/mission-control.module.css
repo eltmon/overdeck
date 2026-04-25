@@ -2362,6 +2362,92 @@
   cursor: not-allowed;
 }
 
+/* ─── Composer Image Strip ──────────────────────────────────────────────────── */
+
+.composerImageStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mc-space-2);
+  padding: var(--mc-space-2) var(--mc-space-3) 0;
+}
+
+.composerImageCard {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--mc-space-2);
+  padding: var(--mc-space-1) var(--mc-space-2);
+  background: var(--mc-bg-elevated);
+  border: 1px solid var(--mc-border);
+  border-radius: var(--mc-radius);
+  max-width: 200px;
+}
+
+.composerImageThumb {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: var(--mc-radius-sm);
+}
+
+.composerImageMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.composerImageName {
+  font-size: 11px;
+  color: var(--mc-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.composerImageStatus {
+  font-size: 10px;
+  color: var(--mc-text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.composerImageError {
+  font-size: 10px;
+  color: var(--mc-error);
+}
+
+.composerImageRemoveButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  color: var(--mc-text-muted);
+  cursor: pointer;
+  border-radius: var(--mc-radius-sm);
+  margin-left: auto;
+  padding: 0;
+}
+
+.composerImageRemoveButton:hover {
+  background: var(--mc-bg-hover);
+  color: var(--mc-text-primary);
+}
+
+/* Spinner animation for uploading images */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
 /* Model/Effort pickers */
 .pickerContainer {
   position: relative;

@@ -298,6 +298,8 @@ export interface ComposerPromptEditorProps {
   editorRef?: React.RefObject<LexicalEditor | null>;
   /** Callback whenever text content changes */
   onChange?: (text: string) => void;
+  /** Paste handler registered on the editor root element */
+  onPaste?: (event: React.ClipboardEvent<HTMLDivElement>) => void;
 }
 
 // ─── Slash Menu ───────────────────────────────────────────────────────────────
@@ -433,6 +435,7 @@ export function ComposerPromptEditor({
   onCommandKeyDown,
   editorRef,
   onChange,
+  onPaste,
 }: ComposerPromptEditorProps) {
   const draft = loadDraft(conversationName);
 
@@ -591,6 +594,7 @@ export function ComposerPromptEditor({
             contentEditable={
               <ContentEditable
                 className={styles.composerEditable}
+                onPaste={onPaste}
                 aria-placeholder={placeholder}
                 placeholder={() =>
                   !text ? (
