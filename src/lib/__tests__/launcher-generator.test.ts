@@ -94,14 +94,14 @@ describe('generateLauncherScript', () => {
       export ANTHROPIC_BASE_URL="http://proxy"
       trap '' HUP
       prompt=$(cat "/tmp/init-prompt.txt")
-      echo "[launcher] Claude starting at $(date)" >> /tmp/pan-launcher-debug.log
+      echo "[launcher] Claude starting at $(date)" >> "/tmp/pan-launcher-debug.log"
       claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 "$prompt"
       CLAUDE_EXIT=$?
-      echo "[launcher] Claude exited with code $CLAUDE_EXIT at $(date)" >> /tmp/pan-launcher-debug.log
+      echo "[launcher] Claude exited with code $CLAUDE_EXIT at $(date)" >> "/tmp/pan-launcher-debug.log"
       echo ""
       echo "Planning agent has exited. Session kept alive for review."
       echo "Click 'Done' in the dashboard when ready to hand off to implementation."
-      echo "[launcher] Keep-alive loop starting at $(date)" >> /tmp/pan-launcher-debug.log
+      echo "[launcher] Keep-alive loop starting at $(date)" >> "/tmp/pan-launcher-debug.log"
       while true; do sleep 60; done
       "
     `);
@@ -222,7 +222,7 @@ describe('generateLauncherScript', () => {
       export ANTHROPIC_BASE_URL="http://proxy"
       cd -- "/workspace/project"
       trap '' HUP
-      'claude' --session-id "sess-conv" --effort "high"
+      claude --session-id "sess-conv" --effort "high"
       echo ""
       echo "Conversation session ended. Close this panel or click Resume to start a new session."
       while true; do sleep 60; done
@@ -249,7 +249,7 @@ describe('generateLauncherScript', () => {
       export LC_ALL=C.UTF-8
       cd -- "/workspace/project"
       trap '' HUP
-      'claude' --resume "sess-resume"
+      claude --resume "sess-resume"
       echo ""
       echo "Conversation session ended. Close this panel or click Resume to start a new session."
       while true; do sleep 60; done

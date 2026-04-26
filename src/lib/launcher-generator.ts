@@ -14,6 +14,11 @@ export interface LauncherConfig {
   workingDir: string;
 
   // Command construction
+  /**
+   * Base command to run (e.g. 'claude', 'claude --model gpt-5.4').
+   * For conversation agents this must be a single unquoted token;
+   * the generator does NOT tokenize shell-quoted arguments.
+   */
   baseCommand?: string;
   promptFile?: string;
   promptInline?: string;
@@ -155,7 +160,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
 
   // Debug log — start
   if (config.debugLog) {
-    lines.push(`echo "[launcher] Claude starting at $(date)" >> ${config.debugLog}`);
+    lines.push(`echo "[launcher] Claude starting at $(date)" >> "${config.debugLog}"`);
   }
 
   // Build the main command
@@ -167,7 +172,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
   // Debug log — exit
   if (config.debugLog) {
     lines.push('CLAUDE_EXIT=$?');
-    lines.push(`echo "[launcher] Claude exited with code $CLAUDE_EXIT at $(date)" >> ${config.debugLog}`);
+    lines.push(`echo "[launcher] Claude exited with code $CLAUDE_EXIT at $(date)" >> "${config.debugLog}"`);
   }
 
   // Post-exit echo messages
@@ -176,7 +181,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
     lines.push('echo "Planning agent has exited. Session kept alive for review."');
     lines.push('echo "Click \'Done\' in the dashboard when ready to hand off to implementation."');
     if (config.debugLog) {
-      lines.push(`echo "[launcher] Keep-alive loop starting at $(date)" >> ${config.debugLog}`);
+      lines.push(`echo "[launcher] Keep-alive loop starting at $(date)" >> "${config.debugLog}"`);
     }
   }
 
@@ -228,11 +233,6 @@ const PROVIDER_ENV_UNSETS = [
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
 ];
 
-/** Quote a string for safe use in a bash script using single-quote wrapping. */
-function shellQuote(str: string): string {
-  return "'" + str.replace(/'/g, "'\"'\"'") + "'";
-}
-
 function buildCommand(config: LauncherConfig): string[] {
   const parts: string[] = [];
 
@@ -248,9 +248,7 @@ function buildCommand(config: LauncherConfig): string[] {
       if (config.extraArgs) {
         args.push(config.extraArgs);
       }
-      // Shell-quote each token of baseCommand so paths with spaces are safe
-      const quotedBase = config.baseCommand.split(' ').map(shellQuote).join(' ');
-      parts.push(`${quotedBase} ${args.join(' ')}`.trim());
+      parts.push(`${config.baseCommand} ${args.join(' ')}`.trim());
     }
     return parts;
   }
@@ -267,7 +265,8 @@ function buildCommand(config: LauncherConfig): string[] {
       }
       const permissionFlags = config.permissionFlags?.join(' ') ?? '';
       const promptRef = config.promptFile ? '"$prompt"' : '';
-      parts.push(`claude ${permissionFlags} ${args.join(' ')} ${promptRef}`.trim().replace(/\s+/g, ' '));
+      const binary = config.baseCommand?.split(' ')[0] ?? 'claude';
+      parts.push(`${binary} ${permissionFlags} ${args.join(' ')} ${promptRef}`.trim().replace(/\s+/g, ' '));
     }
     return parts;
   }
