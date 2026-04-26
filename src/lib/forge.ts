@@ -12,7 +12,7 @@ import {
 
 const execAsync = promisify(exec);
 const GITHUB_MERGE_POLL_INTERVAL_MS = 5000;
-const GITHUB_MERGE_TIMEOUT_MS = 2 * 60 * 1000;
+const GITHUB_MERGE_TIMEOUT_MS = 15 * 60 * 1000;
 
 export type ForgeType = 'github' | 'gitlab';
 
