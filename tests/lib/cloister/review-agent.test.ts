@@ -51,6 +51,21 @@ vi.mock('../../../src/lib/cloister/config.js', () => ({
   loadCloisterConfig: mockLoadCloisterConfig,
 }));
 
+const { mockKillSessionAsync } = vi.hoisted(() => ({
+  mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../../src/lib/tmux.js', async () => {
+  const actual = await vi.importActual('../../../src/lib/tmux.js');
+  return {
+    ...actual as object,
+    listSessionNamesAsync: vi.fn().mockResolvedValue([]),
+    sessionExistsAsync: vi.fn().mockResolvedValue(false),
+    killSessionAsync: mockKillSessionAsync,
+    setOptionAsync: vi.fn().mockResolvedValue(undefined),
+  };
+});
+
 describe('dispatchParallelReview', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -927,6 +942,64 @@ describe('runParallelReview', () => {
     expect(postReviewFn).not.toHaveBeenCalled();
     expect(result.reviewResult).toBe('COMMENTED');
     expect(result.notes).toContain('correctness');
+  });
+
+  it('PAN-846: kills reviewer and synthesis sessions in finally after returning', async () => {
+    mockKillSessionAsync.mockClear();
+
+    const spawnFn = vi.fn().mockResolvedValue(undefined);
+    const waitFn = vi.fn().mockResolvedValue('completed');
+    const waitSynthesisFn = vi.fn().mockResolvedValue('completed');
+    const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
+    const parseSynthesisFn = vi.fn().mockResolvedValue(approvedResult);
+    const postReviewFn = vi.fn().mockResolvedValue(undefined);
+    const resolvePromptTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
+
+    const { result } = await runParallelReview(
+      baseContext(),
+      ['src/foo.ts'],
+      [{ name: 'correctness', focus: ['logic'] }],
+      { spawnFn, waitFn, waitSynthesisFn, parseSynthesisFn, postReviewFn, resolvePromptTemplateFn },
+    );
+
+    expect(result.reviewResult).toBe('APPROVED');
+
+    // killSessionAsync must be called for the reviewer AND synthesis sessions
+    expect(mockKillSessionAsync).toHaveBeenCalledTimes(2);
+    expect(mockKillSessionAsync).toHaveBeenCalledWith(
+      'specialist-panopticon-cli-PAN-999-review-correctness',
+    );
+    expect(mockKillSessionAsync).toHaveBeenCalledWith(
+      'specialist-panopticon-cli-PAN-999-review-synthesis',
+    );
+  });
+
+  it('PAN-846: kills reviewer sessions in finally even when reviewers fail', async () => {
+    mockKillSessionAsync.mockClear();
+
+    const spawnFn = vi.fn().mockResolvedValue(undefined);
+    const waitFn = vi.fn().mockResolvedValue('failed');
+    const parseSynthesisFn = vi.fn();
+    const postReviewFn = vi.fn();
+    const resolvePromptTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
+
+    const { result } = await runParallelReview(
+      baseContext(),
+      [],
+      [{ name: 'correctness' }],
+      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolvePromptTemplateFn },
+    );
+
+    expect(result.reviewResult).toBe('COMMENTED');
+
+    // Even on abort, reviewer and synthesis sessions are killed
+    expect(mockKillSessionAsync).toHaveBeenCalledTimes(2);
+    expect(mockKillSessionAsync).toHaveBeenCalledWith(
+      'specialist-panopticon-cli-PAN-999-review-correctness',
+    );
+    expect(mockKillSessionAsync).toHaveBeenCalledWith(
+      'specialist-panopticon-cli-PAN-999-review-synthesis',
+    );
   });
 });
 
