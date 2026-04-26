@@ -4098,7 +4098,17 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       if (!artifactMerged) {
         const error = `${primaryForge} merge failed: ${prMergeErr.message}`;
         console.error(`[merge] ${error}`);
-        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
+        const isTransient =
+          prMergeErr.message?.includes('Timed out waiting for GitHub PR') ||
+          prMergeErr.message?.includes('ECONNRESET') ||
+          prMergeErr.message?.includes('ETIMEDOUT') ||
+          prMergeErr.message?.includes('ECONNREFUSED');
+        if (isTransient) {
+          setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error });
+          // readyForMerge stays true so the issue remains in Awaiting Merge for retry
+        } else {
+          setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
+        }
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 500, error };
       }
