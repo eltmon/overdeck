@@ -26,6 +26,8 @@ export interface TerminalTab {
 }
 
 interface TerminalTabsProps {
+  /** Issue identifier (e.g. "pan-509") used for testid suffixes */
+  issueId: string;
   tabs: TerminalTab[];
   /** The session name currently being displayed */
   selectedSession: string | null;
@@ -85,7 +87,16 @@ export function savePinState(issueId: string, sessionName: string | null): void 
   }
 }
 
+const TAB_ID_TO_SESSION_TYPE: Record<string, string> = {
+  planning: 'planning',
+  working: 'work',
+  reviewing: 'review',
+  testing: 'test',
+  merging: 'merge',
+};
+
 export function TerminalTabs({
+  issueId,
   tabs,
   selectedSession,
   activePhase,
@@ -105,6 +116,7 @@ export function TerminalTabs({
       <span
         className="text-xs font-semibold px-1.5 py-0.5 rounded mr-1"
         style={{ backgroundColor: phaseColors.bg, color: phaseColors.text, fontSize: '10px' }}
+        data-testid={`inspector-phase-${issueId}`}
       >
         {phaseLabel}
       </span>
@@ -113,6 +125,7 @@ export function TerminalTabs({
       <div className="flex items-center gap-0.5 flex-1 min-w-0 overflow-x-auto">
         {tabs.map(tab => {
           const isSelected = tab.sessionName === selectedSession;
+          const sessionType = TAB_ID_TO_SESSION_TYPE[tab.id] ?? tab.id;
           return (
             <button
               key={tab.id}
@@ -128,6 +141,7 @@ export function TerminalTabs({
               }}
               title={tab.disabled ? 'Session not available' : tab.label}
               className="text-xs px-2 py-0.5 rounded transition-colors whitespace-nowrap"
+              data-testid={`inspector-tab-${sessionType}`}
               style={{
                 color: tab.disabled
                   ? textMuted
@@ -173,6 +187,7 @@ export function TerminalTabs({
         onClick={onTogglePin}
         title={pinned ? 'Pinned — click to follow phase automatically' : 'Auto-following phase — click to pin current session'}
         className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded transition-colors ml-1 shrink-0"
+        data-testid="inspector-pin-toggle"
         style={{
           color: pinned ? '#fbbf24' : textMuted,
           backgroundColor: 'transparent',

@@ -3,15 +3,15 @@
 ## Status: In Progress
 
 ## Current Phase
-pan-miz5 closed. Picking up pan-yr25 next (TerminalTabs.tsx).
+pan-yr25 closed. Picking up pan-53xq next (KanbanBoard.tsx).
 
 ## Completed Work
 - [x] pan-0hfc: Added optional `'data-testid'?: string` prop to StopAgentButton + RecoverButton, spread onto the rendered button in both card and inspector variants. (commit: adf2a419)
-- [x] pan-miz5: Added `inspector-panel-{issueId}` (on a `display:contents` wrapper to preserve layout while keeping `workspace-sidebar` on the scrollable element), `inspector-open-terminal-{issueId}`, and `inspector-close` to InspectorPanel.tsx.
+- [x] pan-miz5: Added `inspector-panel-{issueId}` (on a `display:contents` wrapper to preserve layout while keeping `workspace-sidebar` on the scrollable element), `inspector-open-terminal-{issueId}`, and `inspector-close` to InspectorPanel.tsx. (commit: 2b61a379)
+- [x] pan-yr25: Added `inspector-phase-{issueId}`, `inspector-tab-{sessionType}` (planning/work/review/test/merge mapping for known PipelinePhases, raw `tab.id` fallback otherwise), and `inspector-pin-toggle` to TerminalTabs.tsx. Required adding `issueId: string` to `TerminalTabsProps` and threading it through DetailPanelLayout.tsx.
 
 ## Remaining Work
 - [ ] pan-53xq: Step 2 — Add card-* testids to KanbanBoard.tsx
-- [ ] pan-yr25: Step 4 — Add inspector-* testids to TerminalTabs.tsx
 - [ ] pan-i15e: Step 5 — Add inspector-* testids to ActionsSection.tsx
 - [ ] pan-g67r: Step 6 — Add sidebar-* testids to Sidebar.tsx
 - [ ] pan-ld6t: Step 7 — Add testids to StoppedAgentsBanner.tsx

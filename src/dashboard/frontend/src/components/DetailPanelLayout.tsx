@@ -252,6 +252,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
         <div className="flex flex-col" style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
           {availableTerminals.length > 0 && (
             <TerminalTabs
+              issueId={issueId}
               tabs={availableTerminals}
               selectedSession={selectedSession}
               activePhase={phase}
