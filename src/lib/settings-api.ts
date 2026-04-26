@@ -150,29 +150,27 @@ export function getDefaultConversationModelApi(): ModelId {
   return resolveModelId('claude-sonnet-4-6');
 }
 
+const CONVOY_TO_REVIEW_MAP: Record<string, string> = {
+  'convoy:security-reviewer': 'review:security',
+  'convoy:performance-reviewer': 'review:performance',
+  'convoy:correctness-reviewer': 'review:correctness',
+  'convoy:requirements-reviewer': 'review:requirements',
+  'convoy:synthesis-agent': 'review:synthesis',
+};
+
 export function loadSettingsApi(): ApiSettingsConfig {
   const { config } = loadConfig();
 
-  // Migrate legacy convoy:* keys → review:* equivalents (defensive: loadConfig
-  // also does this, but API consumers may mock loadConfig with unmigrated keys)
-  const CONVOY_KEY_MIGRATION: Record<string, WorkTypeId> = {
-    'convoy:security-reviewer': 'review:security',
-    'convoy:performance-reviewer': 'review:performance',
-    'convoy:correctness-reviewer': 'review:correctness',
-    'convoy:requirements-reviewer': 'review:requirements',
-    'convoy:synthesis-agent': 'review:synthesis',
-  };
-  const overrides: Record<string, string> = { ...config.overrides };
-  for (const [oldKey, newKey] of Object.entries(CONVOY_KEY_MIGRATION)) {
-    if (oldKey in overrides) {
-      overrides[newKey] = overrides[oldKey]!;
-      delete overrides[oldKey];
-    }
+  // Migrate convoy:* override keys to review:* equivalents (PAN-540)
+  const migratedOverrides: Record<string, string> = {};
+  for (const [key, value] of Object.entries(config.overrides)) {
+    const mappedKey = CONVOY_TO_REVIEW_MAP[key] ?? key;
+    migratedOverrides[mappedKey] = value as string;
   }
 
   // Detect deprecated models in current overrides
   const deprecationWarnings: ApiDeprecationWarning[] = [];
-  for (const [workType, modelId] of Object.entries(overrides)) {
+  for (const [workType, modelId] of Object.entries(migratedOverrides)) {
     if (modelId && MODEL_DEPRECATIONS[modelId]) {
       deprecationWarnings.push({
         workType: workType as WorkTypeId,
@@ -193,7 +191,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         kimi: config.enabledProviders.has('kimi'),
         openrouter: config.enabledProviders.has('openrouter'),
       },
-      overrides,
+      overrides: migratedOverrides,
       gemini_thinking_level: config.geminiThinkingLevel,
       default_conversation_model: getDefaultConversationModelApi(),
     },
