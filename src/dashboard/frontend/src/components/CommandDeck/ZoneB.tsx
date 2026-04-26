@@ -6,6 +6,10 @@
  * blocks (<RoleBadge> + <StatusDot>) so the strip already has gentle
  * motion when something is alive.
  *
+ * Subscribes to agentRuntimeById from the store so runtime events
+ * (activity_changed, thinking_started, waiting_started) drive motion
+ * within 200ms via the centralized motion catalog (PAN-847).
+ *
  * Includes <ZoneBActionStrip> for session-scoped actions (stopSession,
  * viewTerminal) so the full canonical action surface is reachable.
  */
@@ -13,6 +17,7 @@
 import { useMemo } from 'react';
 import type { SessionNode as SessionNodeType, SessionNodePresence } from '@panopticon/contracts';
 import { useLiveFlash } from '../../lib/useLiveFlash';
+import { useDashboardStore } from '../../lib/store';
 import { RoleBadge, type ReviewerRole } from './RoleBadge';
 import { StatusDot, type StatusDotStatus } from './StatusDot';
 import { ZoneBActionStrip } from './ZoneBActionStrip';
@@ -67,14 +72,36 @@ function mapRoundStatus(status?: string): RoundVerdict {
   }
 }
 
+function deriveDotStatus(
+  presence: SessionNodePresence,
+  runtime?: { activity?: string; thinking?: unknown; waiting?: unknown },
+): StatusDotStatus {
+  if (runtime?.thinking) return 'thinking';
+  if (runtime?.waiting) return 'waiting';
+  return presenceToStatus(presence);
+}
+
+function isErrorStatus(status: string): boolean {
+  return status === 'error' || status === 'failed' || status === 'crashed';
+}
+
 export function ZoneB({ session, onViewTerminal }: ZoneBProps) {
   const reviewerRole = isReviewerRole(session.role) ? session.role : undefined;
-  const status = presenceToStatus(session.presence);
   const label = session.role ? `${session.type}:${session.role}` : session.type;
+
+  // Subscribe to runtime state so motion catalog events drive UI within 200ms (PAN-847)
+  const runtime = useDashboardStore((s) => s.agentRuntimeById[session.sessionId]);
+
+  const status = deriveDotStatus(session.presence, runtime);
+  const currentTool = runtime?.currentTool ?? session.status;
 
   // Live flash when session presence or status changes (blocker-8)
   const flashKey = `${session.sessionId}:${session.presence}:${session.status}`;
   const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
+
+  // Error shake when agent enters error state (PAN-847 motion catalog)
+  const errorShakeKey = `${session.sessionId}:error:${isErrorStatus(session.status)}`;
+  const errorShakeClass = useLiveFlash(errorShakeKey, 'kf-error-shake', 600);
 
   // Round history mini-cards from roundMetadata (PAN-830 high-1)
   const roundHistory = useMemo(() => {
@@ -88,12 +115,14 @@ export function ZoneB({ session, onViewTerminal }: ZoneBProps) {
     }));
   }, [session.roundMetadata]);
 
-  const isIdle = session.presence === 'idle';
+  const isIdle = session.presence === 'idle' && !runtime?.thinking && !runtime?.waiting;
+  const isWaiting = !!runtime?.waiting;
+  const isThinking = !!runtime?.thinking;
 
   return (
     <div
       data-testid="zone-b"
-      className={flashClass}
+      className={`${flashClass} ${errorShakeClass}`.trim()}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -118,17 +147,50 @@ export function ZoneB({ session, onViewTerminal }: ZoneBProps) {
         <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
           {session.model}
         </span>
-        {/* Phase + tool inline (PAN-830 high-1) */}
-        <ToolFlash currentTool={session.status} />
+        {/* Phase + tool inline — wired to runtime currentTool for motion catalog (PAN-847) */}
+        <ToolFlash currentTool={currentTool} />
         <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))', marginLeft: 'auto' }}>
           {formatDuration(session.duration)}
         </span>
         <ZoneBActionStrip session={session} onViewTerminal={onViewTerminal} />
       </div>
 
+      {/* Waiting ribbon (PAN-847 motion catalog) */}
+      {isWaiting && (
+        <div
+          data-testid="zone-b-waiting-ribbon"
+          style={{
+            padding: '2px 12px',
+            fontSize: 11,
+            color: 'var(--mc-warning, #f97316)',
+            background: 'color-mix(in srgb, var(--mc-warning) 8%, transparent)',
+            borderTop: '1px dashed var(--mc-border, var(--border))',
+          }}
+        >
+          {runtime?.waiting?.message ?? 'Agent waiting for permission…'}
+        </div>
+      )}
+
+      {/* Thinking indicator (PAN-847 motion catalog) */}
+      {isThinking && (
+        <div
+          data-testid="zone-b-thinking-indicator"
+          style={{
+            padding: '2px 12px',
+            fontSize: 11,
+            color: 'var(--mc-primary, var(--primary))',
+            background: 'color-mix(in srgb, var(--primary) 8%, transparent)',
+            borderTop: '1px dashed var(--mc-border, var(--border))',
+          }}
+        >
+          Thinking…
+        </div>
+      )}
+
       {/* Idle warning ribbon (PAN-830 high-1) */}
       {isIdle && (
         <div
+          data-testid="zone-b-idle-ribbon"
           style={{
             padding: '2px 12px',
             fontSize: 11,
