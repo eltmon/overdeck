@@ -35,7 +35,7 @@ vi.mock('../../../src/lib/github-app.js', () => ({
   parsePullRequestRef: parsePullRequestRefMock,
 }));
 
-import { getForgeAdapter } from '../../../src/lib/forge.js';
+import { getForgeAdapter, GITHUB_MERGE_TIMEOUT_MS } from '../../../src/lib/forge.js';
 
 describe('forge adapters', () => {
   beforeEach(() => {
@@ -189,5 +189,9 @@ describe('forge adapters', () => {
     ).resolves.toBeUndefined();
 
     expect(mergePullRequestWithAppMock).not.toHaveBeenCalled();
+  });
+
+  it('has a GitHub merge timeout of at least 15 minutes', () => {
+    expect(GITHUB_MERGE_TIMEOUT_MS).toBe(15 * 60 * 1000);
   });
 });

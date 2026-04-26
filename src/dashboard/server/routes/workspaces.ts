@@ -152,6 +152,32 @@ async function ensureWorkAgentReadyForMerge(
   };
 }
 
+/**
+ * Check whether origin/branchName already contains origin/targetBranch.
+ * If true, no rebase is needed — the branch is already up to date with target.
+ */
+export async function isBranchAlreadyRebased(
+  workspacePath: string,
+  branchName: string,
+  targetBranch: string,
+): Promise<{ alreadyRebased: boolean; currentHead?: string }> {
+  try {
+    await execAsync(`git fetch origin ${targetBranch}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
+    await execAsync(`git fetch origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
+    await execAsync(
+      `git merge-base --is-ancestor origin/${targetBranch} origin/${branchName}`,
+      { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
+    );
+    const { stdout: currentHead } = await execAsync(
+      `git rev-parse origin/${branchName}`,
+      { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
+    );
+    return { alreadyRebased: true, currentHead: currentHead.trim() };
+  } catch {
+    return { alreadyRebased: false };
+  }
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PORT = parseInt(process.env.API_PORT || process.env.PORT || '3011', 10);
@@ -3912,26 +3938,11 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
 
     // Pre-check: if origin/<branch> already contains origin/<target>, the branch
     // is already rebased — no rebase or push is needed.
-    let alreadyRebased = false;
-    try {
-      await execAsync(`git fetch origin ${targetBranch}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
-      await execAsync(`git fetch origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
-      await execAsync(
-        `git merge-base --is-ancestor origin/${targetBranch} origin/${branchName}`,
-        { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
-      );
-      alreadyRebased = true;
-    } catch {
-      // is-ancestor exited non-zero → branch is behind target → real rebase needed
-    }
+    const { alreadyRebased, currentHead } = await isBranchAlreadyRebased(workspacePath, branchName, targetBranch);
 
     if (alreadyRebased) {
-      const { stdout: currentHead } = await execAsync(
-        `git rev-parse origin/${branchName}`,
-        { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
-      );
       console.log(`[merge] ${branchName} already contains origin/${targetBranch} — skipping rebase request for ${issueId}`);
-      rebaseResult = { success: true, newHead: currentHead.trim() };
+      rebaseResult = { success: true, newHead: currentHead! };
     } else {
       try {
         const recovery = await ensureWorkAgentReadyForMerge(issueId, workspacePath, rebaseMsg);
