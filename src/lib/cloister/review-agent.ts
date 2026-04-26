@@ -13,6 +13,7 @@ import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
 import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync } from '../tmux.js';
 import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agents.js';
+import { generateLauncherScript } from '../launcher-generator.js';
 import { getModelId, hasOverride } from '../work-type-router.js';
 import { AGENTS_DIR, CACHE_AGENTS_DIR, CACHE_REVIEW_PROMPTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
 import { writeFeedbackFile } from './feedback-writer.js';
@@ -520,23 +521,16 @@ async function spawnReviewer(
   // whose env map is empty, so tmux -e flags would add nothing and the parent
   // session's ANTHROPIC_BASE_URL pointing at a proxy would leak through.
   const launcherPath = join(tmpdir(), `pan-reviewer-${sessionName}.sh`);
-  const launcherContent = [
-    '#!/bin/bash',
-    'set -o pipefail',
-    `cd "${packageRoot}"`,
-    // Pin PANOPTICON_AGENT_ID to the canonical reviewer session name so the
-    // heartbeat hook attributes events under ~/.panopticon/agents/<sessionName>/
-    // (NOT the parent work agent's directory). Clear the other inherited vars
-    // so review sub-agents don't masquerade as the parent issue's session.
-    `export PANOPTICON_AGENT_ID="${sessionName}"`,
-    'unset PANOPTICON_ISSUE_ID PANOPTICON_SESSION_TYPE',
-    providerExports.trimEnd(),
-    // Pass --session-id so Claude Code writes its JSONL transcript under the
-    // UUID we already persisted to session.id above. claudish passes unknown
-    // flags through to claude, so this works for both direct and routed providers.
-    `exec ${claudeCmd} --session-id "${claudeSessionId}"`,
-    '',
-  ].join('\n');
+  const launcherContent = generateLauncherScript({
+    agentType: 'review',
+    workingDir: packageRoot,
+    setPipefail: true,
+    unsetPanopticonEnv: true,
+    panopticonEnv: { agentId: sessionName },
+    providerExports: providerExports.trimEnd(),
+    baseCommand: claudeCmd,
+    sessionId: claudeSessionId,
+  });
   await writeFile(launcherPath, launcherContent, { mode: 0o755 });
 
   console.log(`[review-agent] Spawning reviewer ${sessionName}: model=${model}, claudeSessionId=${claudeSessionId}, launcher=${launcherPath}`);
