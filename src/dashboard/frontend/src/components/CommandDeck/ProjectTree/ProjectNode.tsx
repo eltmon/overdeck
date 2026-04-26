@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { SessionNode } from '@panopticon/contracts';
 import { FeatureItem, type TreeSessionFilter } from './FeatureItem';
@@ -45,14 +45,106 @@ interface ProjectNodeProps {
   onViewJsonl?: (sessionId: string) => void;
 }
 
+interface ContextMenuState {
+  x: number;
+  y: number;
+  open: boolean;
+}
+
+function ProjectNodeMenu({
+  x,
+  y,
+  onClose,
+  projectName,
+}: {
+  x: number;
+  y: number;
+  onClose: () => void;
+  projectName: string;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    const handleScroll = () => onClose();
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('scroll', handleScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      ref={menuRef}
+      style={{
+        position: 'fixed',
+        left: x,
+        top: y,
+        zIndex: 1000,
+        background: 'var(--card)',
+        border: '1px solid var(--mc-border, var(--border))',
+        borderRadius: 6,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        padding: '4px 0',
+        minWidth: 160,
+        fontSize: 12,
+      }}
+    >
+      <button
+        style={{
+          display: 'block',
+          width: '100%',
+          padding: '6px 12px',
+          border: 'none',
+          background: 'none',
+          textAlign: 'left',
+          cursor: 'pointer',
+          color: 'var(--foreground)',
+          fontSize: 12,
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLElement).style.background = 'var(--accent)';
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLElement).style.background = 'transparent';
+        }}
+        onClick={() => {
+          navigator.clipboard?.writeText(projectName).catch(() => { /* ignore */ });
+          onClose();
+        }}
+      >
+        Copy project name
+      </button>
+    </div>
+  );
+}
+
 export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter, onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl }: ProjectNodeProps) {
   const [expanded, setExpanded] = useState(features.length > 0);
+  const [menu, setMenu] = useState<ContextMenuState>({ x: 0, y: 0, open: false });
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenu({ x: e.clientX, y: e.clientY, open: true });
+  }, []);
+
+  const closeMenu = useCallback(() => {
+    setMenu((m) => ({ ...m, open: false }));
+  }, []);
 
   return (
     <div className={styles.projectNode}>
       <button
         className={styles.projectHeader}
         onClick={() => setExpanded(!expanded)}
+        onContextMenu={handleContextMenu}
       >
         <ChevronRight
           className={`${styles.chevron} ${expanded ? styles.chevronOpen : ''}`}
@@ -61,6 +153,15 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
         <span className={styles.projectName}>{name}</span>
         <span className={styles.featureCount}>{features.length}</span>
       </button>
+
+      {menu.open && (
+        <ProjectNodeMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={closeMenu}
+          projectName={name}
+        />
+      )}
 
       {expanded && (
         features.length > 0 ? (

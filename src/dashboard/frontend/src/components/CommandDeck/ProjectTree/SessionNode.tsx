@@ -164,8 +164,8 @@ export function SessionNode({
   }, [menu.open, closeMenu]);
 
   const canPause = session.presence === 'active' && onPauseSession;
-  const canResume = session.presence !== 'active' && onResumeSession;
-  const canStop = (session.presence === 'active' || session.presence === 'idle') && onStopSession;
+  const canResume = session.presence === 'suspended' && onResumeSession;
+  const canStop = (session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended') && onStopSession;
   const canRestart = onRestartSession && issueId != null;
   const canDeepWipe = onDeepWipe && issueId != null;
   const hasLifecycleActions = canPause || canResume || canStop || canRestart;

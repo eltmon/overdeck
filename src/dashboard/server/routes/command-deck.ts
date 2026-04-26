@@ -87,6 +87,16 @@ const CLOSED_ISSUES_TTL_MS = 120_000; // 2 minutes
 const costCache = new Map<string, { timestamp: number; data: { totalCost: number; costByStage: Record<string, { cost: number; tokens: number }> } }>();
 const COST_CACHE_TTL_MS = 30_000; // 30 seconds
 
+/** Evict expired entries from a TTL cache Map to prevent unbounded growth. */
+function sweepExpired<T>(cache: Map<string, { timestamp: number; data: T }>, ttlMs: number): void {
+  const cutoff = Date.now() - ttlMs;
+  for (const [key, entry] of cache) {
+    if (entry.timestamp < cutoff) {
+      cache.delete(key);
+    }
+  }
+}
+
 function getProjectPath(issuePrefix?: string): string {
   if (!issuePrefix) return join(homedir(), 'Projects');
 
@@ -147,6 +157,7 @@ async function derivePresence(
   if (!rtState) return 'idle';
 
   if (rtState.state === 'active') return 'active';
+  if (rtState.state === 'suspended') return 'suspended';
   if (rtState.state === 'idle' || rtState.state === 'waiting-on-human') {
     // Supplemental checks: heartbeat or output.log mtime within 5s indicates
     // recent activity that may not yet be reflected in the in-process state mirror.
@@ -538,6 +549,7 @@ export async function fetchActivityDataWithContext(
           Object.entries(issueData.stages || {}).map(([stage, stats]) => [stage, { cost: stats.cost, tokens: stats.tokens }])
         );
       }
+      sweepExpired(costCache, COST_CACHE_TTL_MS);
       costCache.set(cacheKey, { timestamp: Date.now(), data: { totalCost, costByStage } });
     }
   } catch { /* cost data optional */ }
@@ -1243,23 +1255,26 @@ async function fetchProjectTree(): Promise<unknown[]> {
     ? ghConfig.repos.map((r) => `${r.owner}/${r.repo}`)
     : ['eltmon/panopticon-cli'];
 
-  for (const repo of repos) {
+  await Promise.all(repos.map(async (repo) => {
     const cached = closedIssuesCache.get(repo);
     if (cached && (Date.now() - cached.timestamp) < CLOSED_ISSUES_TTL_MS) {
       closedIssues.push(...cached.data);
-    } else {
-      try {
-        const { stdout } = await execAsync(
-          `gh issue list --repo ${repo} --state closed --limit 200 --json number,title 2>/dev/null || echo "[]"`
-        );
-        const parsed = JSON.parse(stdout.trim()) as Array<{ number: number; title: string }>;
-        closedIssuesCache.set(repo, { timestamp: Date.now(), data: parsed });
-        closedIssues.push(...parsed);
-      } catch {
-        closedIssuesCache.set(repo, { timestamp: Date.now(), data: [] });
-      }
+      return;
     }
-  }
+    try {
+      const { stdout } = await execFileAsync('gh', [
+        'issue', 'list', '--repo', repo, '--state', 'closed',
+        '--limit', '200', '--json', 'number,title',
+      ], { encoding: 'utf-8', timeout: 15000 });
+      const parsed = JSON.parse(stdout.trim()) as Array<{ number: number; title: string }>;
+      sweepExpired(closedIssuesCache, CLOSED_ISSUES_TTL_MS);
+      closedIssuesCache.set(repo, { timestamp: Date.now(), data: parsed });
+      closedIssues.push(...parsed);
+    } catch {
+      sweepExpired(closedIssuesCache, CLOSED_ISSUES_TTL_MS);
+      closedIssuesCache.set(repo, { timestamp: Date.now(), data: [] });
+    }
+  }));
 
   for (const ci of closedIssues) {
     const key = `PAN-${ci.number}`;

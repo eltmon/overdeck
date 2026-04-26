@@ -29,6 +29,7 @@ All PAN-847 beads implemented. Ready for verification and merge.
 ## Specialist Feedback
 - None yet
 - **[2026-04-26T16:35Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
+- **[2026-04-26T16:53Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
 
 ## Quality Gates
 - `npm run typecheck` — passed

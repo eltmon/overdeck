@@ -188,4 +188,23 @@ describe('PrDiffTab', () => {
     render(<PrDiffTab issueId={ISSUE} />);
     expect(screen.getByTestId('prdiff-tab-checks-empty')).toBeInTheDocument();
   });
+
+  it('renders a 5k-line diff in under 100ms (smoke test)', () => {
+    const lines: string[] = [];
+    for (let i = 0; i < 5000; i++) {
+      lines.push(i % 3 === 0 ? `+const line${i} = ${i};` : i % 3 === 1 ? `-const old${i} = ${i};` : ` const neutral${i} = ${i};`);
+    }
+    prResult.data = {
+      issueId: ISSUE,
+      pr: makePr(),
+      diff: lines.join('\n'),
+    };
+    const start = performance.now();
+    render(<PrDiffTab issueId={ISSUE} />);
+    const elapsed = performance.now() - start;
+    expect(screen.getByTestId('prdiff-tab-diff-body')).toBeInTheDocument();
+    // Threshold is 500ms in jsdom (slower than real browser) to catch
+    // regressions that would blow past the 100ms real-world target.
+    expect(elapsed).toBeLessThan(500);
+  });
 });

@@ -1,6 +1,6 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
-import { Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge, ChevronRight, ChevronDown } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge, ChevronRight, ChevronDown, FolderOpen, FileText, Trash2 } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
 import type { ProjectFeature } from './ProjectNode';
 import { SessionNode } from './SessionNode';
@@ -26,6 +26,12 @@ interface FeatureItemProps {
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
+}
+
+interface ContextMenuState {
+  x: number;
+  y: number;
+  open: boolean;
 }
 
 function StatusIcon({ status, agentStatus, stateLabel, isRally, readyForMerge }: { status: string; agentStatus: string | null; stateLabel: string; isRally?: boolean; readyForMerge?: boolean }) {
@@ -75,10 +81,11 @@ const TYPE_PRIORITY: Record<string, number> = {
 const PRESENCE_PRIORITY: Record<string, number> = {
   active: 0,
   idle: 1,
-  ended: 2,
+  suspended: 2,
+  ended: 3,
 };
 
-/** Pick the best session to auto-select: active > idle > ended; among active prefer work > review > test. */
+/** Pick the best session to auto-select: active > idle > suspended > ended; among active prefer work > review > test. */
 export function pickBestSession(sessions: SessionNodeType[]): string | null {
   if (sessions.length === 0) return null;
   const sorted = [...sessions].sort((a, b) => {
@@ -146,7 +153,7 @@ function computeDominantStatus(sessions: SessionNodeType[]): StatusDotStatus {
 /** Whether a session passes the tree filter. */
 function sessionMatchesFilter(session: SessionNodeType, filter: TreeSessionFilter): boolean {
   if (filter === 'all') return true;
-  if (filter === 'alive') return session.presence === 'active' || session.presence === 'idle';
+  if (filter === 'alive') return session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended';
   if (filter === 'failed') {
     const st = (session.status || '').toLowerCase();
     return st.includes('fail') || st.includes('error') || st.includes('stuck');
@@ -154,11 +161,169 @@ function sessionMatchesFilter(session: SessionNodeType, filter: TreeSessionFilte
   return true;
 }
 
+function FeatureMenu({
+  x,
+  y,
+  onClose,
+  feature,
+  bestSessionId,
+  hasJsonl,
+  onOpenStateDir,
+  onDeepWipe,
+  onViewJsonl,
+}: {
+  x: number;
+  y: number;
+  onClose: () => void;
+  feature: ProjectFeature;
+  bestSessionId: string | null;
+  hasJsonl: boolean;
+  onOpenStateDir?: (sessionId: string) => void;
+  onDeepWipe?: (issueId: string) => void;
+  onViewJsonl?: (sessionId: string) => void;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    const handleScroll = () => onClose();
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('scroll', handleScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      ref={menuRef}
+      style={{
+        position: 'fixed',
+        left: x,
+        top: y,
+        zIndex: 1000,
+        background: 'var(--card)',
+        border: '1px solid var(--mc-border, var(--border))',
+        borderRadius: 6,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        padding: '4px 0',
+        minWidth: 160,
+        fontSize: 12,
+      }}
+    >
+      {bestSessionId && onOpenStateDir && (
+        <button
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            width: '100%',
+            padding: '6px 12px',
+            border: 'none',
+            background: 'none',
+            textAlign: 'left',
+            cursor: 'pointer',
+            color: 'var(--foreground)',
+            fontSize: 12,
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.background = 'var(--accent)';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.background = 'transparent';
+          }}
+          onClick={() => {
+            onOpenStateDir(bestSessionId);
+            onClose();
+          }}
+        >
+          <FolderOpen size={14} />
+          Open State Dir
+        </button>
+      )}
+      {hasJsonl && bestSessionId && onViewJsonl && (
+        <button
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            width: '100%',
+            padding: '6px 12px',
+            border: 'none',
+            background: 'none',
+            textAlign: 'left',
+            cursor: 'pointer',
+            color: 'var(--foreground)',
+            fontSize: 12,
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.background = 'var(--accent)';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.background = 'transparent';
+          }}
+          onClick={() => {
+            onViewJsonl(bestSessionId);
+            onClose();
+          }}
+        >
+          <FileText size={14} />
+          View JSONL
+        </button>
+      )}
+      {onDeepWipe && (
+        <>
+          <div style={{ height: 1, background: 'var(--mc-border, var(--border))', margin: '4px 8px' }} />
+          <button
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              width: '100%',
+              padding: '6px 12px',
+              border: 'none',
+              background: 'none',
+              textAlign: 'left',
+              cursor: 'pointer',
+              color: 'var(--mc-error, #ef4444)',
+              fontSize: 12,
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.background = 'var(--accent)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.background = 'transparent';
+            }}
+            onClick={() => {
+              const confirmed = window.confirm(
+                `Deep wipe will destroy all data for ${feature.issueId} including workspace, state, and git branches. This cannot be undone.\n\nAre you absolutely sure?`,
+              );
+              if (confirmed) {
+                onDeepWipe(feature.issueId);
+              }
+              onClose();
+            }}
+          >
+            <Trash2 size={14} />
+            Deep Wipe
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl }: FeatureItemProps) {
   const [expanded, setExpanded] = useState(() => {
     const persisted = readExpanded(feature.issueId);
     return persisted ?? defaultExpandedFromState(feature.stateLabel);
   });
+  const [menu, setMenu] = useState<ContextMenuState>({ x: 0, y: 0, open: false });
 
   // Derive best session once per data change instead of on every click (PAN-821 review)
   // Respect the tree filter so auto-select picks a visible session.
@@ -166,6 +331,10 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   const hasVisibleSessions = visibleSessions.length > 0;
   const bestSessionId = useMemo(() =>
     visibleSessions.length > 0 ? pickBestSession(visibleSessions) : null,
+  [visibleSessions]);
+
+  const hasJsonl = useMemo(() =>
+    visibleSessions.some(s => s.hasJsonl),
   [visibleSessions]);
 
   // Dominant session state for the feature row StatusDot (blocker-7)
@@ -195,6 +364,16 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     }
   }, [onSelect, bestSessionId, feature.issueId, onSelectSession, expanded]);
 
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenu({ x: e.clientX, y: e.clientY, open: true });
+  }, []);
+
+  const closeMenu = useCallback(() => {
+    setMenu((m) => ({ ...m, open: false }));
+  }, []);
+
   const progressPct = feature.isRally && feature.childCount && feature.childCount > 0
     ? Math.round((feature.completedCount || 0) / feature.childCount * 100)
     : null;
@@ -217,6 +396,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
         <button
           className={`${styles.featureItem} ${isSelected ? styles.featureItemSelected : ''}`}
           onClick={handleRowClick}
+          onContextMenu={handleContextMenu}
         >
           <span className={styles.featureStatus}>
             {feature.isShadow ? (
@@ -265,6 +445,20 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           )}
         </button>
       </div>
+
+      {menu.open && (
+        <FeatureMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={closeMenu}
+          feature={feature}
+          bestSessionId={bestSessionId}
+          hasJsonl={hasJsonl}
+          onOpenStateDir={onOpenStateDir}
+          onDeepWipe={onDeepWipe}
+          onViewJsonl={onViewJsonl}
+        />
+      )}
 
       {expanded && hasVisibleSessions && (
         <div className={styles.sessionList}>

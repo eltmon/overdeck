@@ -26,6 +26,7 @@ import { ToolFlash } from './ToolFlash';
 
 interface ZoneBProps {
   session: SessionNodeType;
+  issueId?: string;
   onViewTerminal?: () => void;
 }
 
@@ -45,6 +46,7 @@ function presenceToStatus(presence: SessionNodePresence): StatusDotStatus {
   switch (presence) {
     case 'active': return 'active';
     case 'idle':   return 'idle';
+    case 'suspended': return 'idle';
     case 'ended':  return 'ended';
   }
 }
@@ -85,7 +87,7 @@ function isErrorStatus(status: string): boolean {
   return status === 'error' || status === 'failed' || status === 'crashed';
 }
 
-export function ZoneB({ session, onViewTerminal }: ZoneBProps) {
+export function ZoneB({ session, issueId, onViewTerminal }: ZoneBProps) {
   const reviewerRole = isReviewerRole(session.role) ? session.role : undefined;
   const label = session.role ? `${session.type}:${session.role}` : session.type;
 
@@ -167,7 +169,7 @@ export function ZoneB({ session, onViewTerminal }: ZoneBProps) {
         <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))', marginLeft: 'auto' }}>
           {formatDuration(session.duration)}
         </span>
-        <ZoneBActionStrip session={session} onViewTerminal={onViewTerminal} />
+        <ZoneBActionStrip session={session} issueId={issueId} onViewTerminal={onViewTerminal} />
       </div>
 
       {/* Summary line — cost rate + rounds + output preview (PAN-847) */}

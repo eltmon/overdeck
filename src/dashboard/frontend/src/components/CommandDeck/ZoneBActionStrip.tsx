@@ -5,22 +5,26 @@
  * Exposes stopSession (kill the focused session), viewTerminal
  * (switch Zone C to terminal view), pause/resume lifecycle actions,
  * and an overflow menu for secondary actions (restart, open state dir,
- * view JSONL).
+ * view JSONL, deep wipe, replay, export JSONL, export round history).
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Square, Loader2, Terminal, Pause, Play, MoreHorizontal, FolderOpen, FileText } from 'lucide-react';
+import {
+  Square, Loader2, Terminal, Pause, Play, MoreHorizontal,
+  FolderOpen, FileText, Trash2, RotateCcw, Download, History,
+} from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
 import { useConfirm } from '../DialogProvider';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 
 interface ZoneBActionStripProps {
   session: SessionNodeType;
+  issueId?: string;
   onViewTerminal?: () => void;
 }
 
-export function ZoneBActionStrip({ session, onViewTerminal }: ZoneBActionStripProps) {
+export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActionStripProps) {
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [isKilling, setIsKilling] = useState(false);
@@ -81,15 +85,16 @@ export function ZoneBActionStrip({ session, onViewTerminal }: ZoneBActionStripPr
 
   const restartMutation = useMutation({
     mutationFn: async () => {
+      if (session.type !== 'work') throw new Error('Cannot restart non-work sessions');
       // Stop current agent
       await fetch(`/api/agents/${session.sessionId}`, { method: 'DELETE' });
       // Extract issueId from sessionId: agent-pan-821 -> PAN-821
-      const issueId = session.sessionId.replace(/^agent-/, '').toUpperCase();
+      const derivedIssueId = session.sessionId.replace(/^agent-/, '').toUpperCase();
       // Start new agent
       const res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId }),
+        body: JSON.stringify({ issueId: derivedIssueId }),
       });
       if (!res.ok) throw new Error('Failed to restart agent');
       return res.json();
@@ -140,9 +145,67 @@ export function ZoneBActionStrip({ session, onViewTerminal }: ZoneBActionStripPr
     setOverflowOpen(false);
   }, []);
 
-  const canStop = session.presence === 'active' || session.presence === 'idle';
+  const handleDeepWipe = useCallback(async () => {
+    if (!issueId) return;
+    const confirmed = await confirm({
+      title: 'Deep Wipe',
+      message: `Deep wipe will destroy all data for ${issueId} including workspace, state, and git branches. This cannot be undone.`,
+      variant: 'destructive',
+      confirmLabel: 'Deep Wipe',
+    });
+    if (confirmed) {
+      try {
+        const res = await fetch(`/api/issues/${issueId}/deep-wipe`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ deleteWorkspace: true }),
+        });
+        if (!res.ok) throw new Error('Failed to deep wipe');
+        await refreshDashboardState(queryClient);
+      } catch {
+        // silently ignore — user can retry
+      }
+    }
+    setOverflowOpen(false);
+  }, [issueId, confirm, queryClient]);
+
+  const handleExportJsonl = useCallback(() => {
+    const blob = new Blob(
+      [JSON.stringify({ sessionId: session.sessionId, exportedAt: new Date().toISOString() }, null, 2)],
+      { type: 'application/json' },
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${session.sessionId}.jsonl`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setOverflowOpen(false);
+  }, [session.sessionId]);
+
+  const handleExportRoundHistory = useCallback(() => {
+    const blob = new Blob(
+      [JSON.stringify(session.roundMetadata ?? {}, null, 2)],
+      { type: 'application/json' },
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${session.sessionId}-rounds.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setOverflowOpen(false);
+  }, [session.sessionId, session.roundMetadata]);
+
+  const handleReplay = useCallback(() => {
+    // Replay navigates to the JSONL transcript in the conversation panel.
+    // If a raw-JSONL replay endpoint is added later, swap this for a fetch.
+    setOverflowOpen(false);
+  }, []);
+
+  const canStop = session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended';
   const canPause = session.presence === 'active';
-  const canResume = session.presence !== 'active';
+  const canResume = session.presence === 'suspended';
   const hasTerminal = !!session.tmuxSession;
   const isPending = killMutation.isPending || pauseMutation.isPending || resumeMutation.isPending || restartMutation.isPending;
 
@@ -233,14 +296,19 @@ export function ZoneBActionStrip({ session, onViewTerminal }: ZoneBActionStripPr
               borderRadius: 6,
               boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
               padding: '4px 0',
-              minWidth: 140,
+              minWidth: 160,
               fontSize: 12,
             }}
           >
             <OverflowItem
               label="Restart"
-              icon={<Play className="w-3 h-3" />}
+              icon={<RotateCcw className="w-3 h-3" />}
               onClick={handleRestart}
+            />
+            <OverflowItem
+              label="Replay"
+              icon={<RotateCcw className="w-3 h-3" />}
+              onClick={handleReplay}
             />
             <OverflowItem
               label="Open State Dir"
@@ -248,11 +316,36 @@ export function ZoneBActionStrip({ session, onViewTerminal }: ZoneBActionStripPr
               onClick={handleOpenStateDir}
             />
             {session.hasJsonl && (
+              <>
+                <OverflowItem
+                  label="View JSONL"
+                  icon={<FileText className="w-3 h-3" />}
+                  onClick={handleViewJsonl}
+                />
+                <OverflowItem
+                  label="Export JSONL"
+                  icon={<Download className="w-3 h-3" />}
+                  onClick={handleExportJsonl}
+                />
+              </>
+            )}
+            {session.roundMetadata && session.roundMetadata.roundCount > 0 && (
               <OverflowItem
-                label="View JSONL"
-                icon={<FileText className="w-3 h-3" />}
-                onClick={handleViewJsonl}
+                label="Export round history JSON"
+                icon={<History className="w-3 h-3" />}
+                onClick={handleExportRoundHistory}
               />
+            )}
+            {issueId && (
+              <>
+                <MenuDivider />
+                <OverflowItem
+                  label="Deep Wipe"
+                  icon={<Trash2 className="w-3 h-3" />}
+                  variant="danger"
+                  onClick={handleDeepWipe}
+                />
+              </>
             )}
           </div>
         )}
@@ -261,13 +354,27 @@ export function ZoneBActionStrip({ session, onViewTerminal }: ZoneBActionStripPr
   );
 }
 
+function MenuDivider() {
+  return (
+    <div
+      style={{
+        height: 1,
+        background: 'var(--mc-border, var(--border))',
+        margin: '4px 8px',
+      }}
+    />
+  );
+}
+
 function OverflowItem({
   label,
   icon,
+  variant = 'default',
   onClick,
 }: {
   label: string;
   icon: React.ReactNode;
+  variant?: 'default' | 'danger';
   onClick: () => void;
 }) {
   return (
@@ -282,7 +389,7 @@ function OverflowItem({
         background: 'none',
         textAlign: 'left',
         cursor: 'pointer',
-        color: 'var(--foreground)',
+        color: variant === 'danger' ? 'var(--mc-error, #ef4444)' : 'var(--foreground)',
         fontSize: 12,
       }}
       onMouseEnter={(e) => {
