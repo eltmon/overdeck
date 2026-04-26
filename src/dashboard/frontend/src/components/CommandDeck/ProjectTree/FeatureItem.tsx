@@ -124,11 +124,11 @@ function writeExpanded(issueId: string, expanded: boolean): void {
   } catch { /* ignore */ }
 }
 
-/** Compute the default expand state from the issue's pipeline status.
- *  Done / terminal states default collapsed; everything in-flight defaults expanded. */
-function defaultExpandedFromState(stateLabel: string): boolean {
-  const terminal = ['done', 'canceled', 'closed', 'merged'];
-  return !terminal.includes(stateLabel.toLowerCase());
+/** Default to collapsed for every issue. The session list dominates the
+ *  tree height when expanded — collapsed-by-default keeps the tree scannable.
+ *  Users can expand individual features; that choice is persisted. */
+function defaultExpandedFromState(_stateLabel: string): boolean {
+  return false;
 }
 
 /** Compute the dominant session presence for the feature row StatusDot.
