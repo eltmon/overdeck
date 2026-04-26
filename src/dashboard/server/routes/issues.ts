@@ -2723,96 +2723,112 @@ export async function fetchIssueDiscussions(
   }
 
   if (prNumber !== null && prRepoArg && prOwner && prRepo) {
+    // Three independent gh API calls. Each takes 200–800ms; running them
+    // sequentially compounded latency on every 30s poll. Fan out with
+    // Promise.all (each block catches its own error so the outer await never
+    // rejects) and the slowest call now governs total wall-clock instead of
+    // the sum of all three.
+    const collectedItems: DiscussionItem[] = [];
+
     // 4. PR conversation comments (issue-comments endpoint against the PR).
-    try {
-      const { stdout } = await execAsync(
-        `gh api "repos/${prOwner}/${prRepo}/issues/${prNumber}/comments?per_page=100"`,
-        { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
-      );
-      const arr = JSON.parse(stdout) as Array<{
-        id: number;
-        user?: { login?: string } | null;
-        body?: string | null;
-        created_at?: string;
-        html_url?: string;
-      }>;
-      for (const c of arr) {
-        items.push({
-          id: `gh-pr-conv-${c.id}`,
-          source: 'github-pr-conversation',
-          author: c.user?.login ?? 'unknown',
-          body: c.body ?? '',
-          createdAt: c.created_at ?? '',
-          url: c.html_url,
-          prNumber,
-        });
+    const prConversation = (async () => {
+      try {
+        const { stdout } = await execAsync(
+          `gh api "repos/${prOwner}/${prRepo}/issues/${prNumber}/comments?per_page=100"`,
+          { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
+        );
+        const arr = JSON.parse(stdout) as Array<{
+          id: number;
+          user?: { login?: string } | null;
+          body?: string | null;
+          created_at?: string;
+          html_url?: string;
+        }>;
+        for (const c of arr) {
+          collectedItems.push({
+            id: `gh-pr-conv-${c.id}`,
+            source: 'github-pr-conversation',
+            author: c.user?.login ?? 'unknown',
+            body: c.body ?? '',
+            createdAt: c.created_at ?? '',
+            url: c.html_url,
+            prNumber,
+          });
+        }
+      } catch (err: any) {
+        errors.push(`gh pr conversation failed: ${err?.message ?? String(err)}`);
       }
-    } catch (err: any) {
-      errors.push(`gh pr conversation failed: ${err?.message ?? String(err)}`);
-    }
+    })();
 
     // 5. PR review submissions (approve / changes-requested / commented).
-    try {
-      const { stdout } = await execAsync(
-        `gh api "repos/${prOwner}/${prRepo}/pulls/${prNumber}/reviews?per_page=100"`,
-        { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
-      );
-      const arr = JSON.parse(stdout) as Array<{
-        id: number;
-        user?: { login?: string } | null;
-        body?: string | null;
-        state?: string;
-        submitted_at?: string;
-        html_url?: string;
-      }>;
-      for (const r of arr) {
-        if (!r.body && r.state === 'COMMENTED') continue; // empty comment-only reviews are noise
-        items.push({
-          id: `gh-pr-review-${r.id}`,
-          source: 'github-pr-review',
-          author: r.user?.login ?? 'unknown',
-          body: r.body ?? '',
-          createdAt: r.submitted_at ?? '',
-          url: r.html_url,
-          prNumber,
-          reviewState: r.state,
-        });
+    const prReviews = (async () => {
+      try {
+        const { stdout } = await execAsync(
+          `gh api "repos/${prOwner}/${prRepo}/pulls/${prNumber}/reviews?per_page=100"`,
+          { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
+        );
+        const arr = JSON.parse(stdout) as Array<{
+          id: number;
+          user?: { login?: string } | null;
+          body?: string | null;
+          state?: string;
+          submitted_at?: string;
+          html_url?: string;
+        }>;
+        for (const r of arr) {
+          if (!r.body && r.state === 'COMMENTED') continue; // empty comment-only reviews are noise
+          collectedItems.push({
+            id: `gh-pr-review-${r.id}`,
+            source: 'github-pr-review',
+            author: r.user?.login ?? 'unknown',
+            body: r.body ?? '',
+            createdAt: r.submitted_at ?? '',
+            url: r.html_url,
+            prNumber,
+            reviewState: r.state,
+          });
+        }
+      } catch (err: any) {
+        errors.push(`gh pr reviews failed: ${err?.message ?? String(err)}`);
       }
-    } catch (err: any) {
-      errors.push(`gh pr reviews failed: ${err?.message ?? String(err)}`);
-    }
+    })();
 
     // 6. Inline PR review comments (review-thread replies on diff lines).
-    try {
-      const { stdout } = await execAsync(
-        `gh api "repos/${prOwner}/${prRepo}/pulls/${prNumber}/comments?per_page=100"`,
-        { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
-      );
-      const arr = JSON.parse(stdout) as Array<{
-        id: number;
-        user?: { login?: string } | null;
-        body?: string | null;
-        created_at?: string;
-        html_url?: string;
-        path?: string;
-        line?: number | null;
-      }>;
-      for (const c of arr) {
-        items.push({
-          id: `gh-pr-rc-${c.id}`,
-          source: 'github-pr-review-comment',
-          author: c.user?.login ?? 'unknown',
-          body: c.body ?? '',
-          createdAt: c.created_at ?? '',
-          url: c.html_url,
-          prNumber,
-          filePath: c.path,
-          line: typeof c.line === 'number' ? c.line : undefined,
-        });
+    const prInlineComments = (async () => {
+      try {
+        const { stdout } = await execAsync(
+          `gh api "repos/${prOwner}/${prRepo}/pulls/${prNumber}/comments?per_page=100"`,
+          { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
+        );
+        const arr = JSON.parse(stdout) as Array<{
+          id: number;
+          user?: { login?: string } | null;
+          body?: string | null;
+          created_at?: string;
+          html_url?: string;
+          path?: string;
+          line?: number | null;
+        }>;
+        for (const c of arr) {
+          collectedItems.push({
+            id: `gh-pr-rc-${c.id}`,
+            source: 'github-pr-review-comment',
+            author: c.user?.login ?? 'unknown',
+            body: c.body ?? '',
+            createdAt: c.created_at ?? '',
+            url: c.html_url,
+            prNumber,
+            filePath: c.path,
+            line: typeof c.line === 'number' ? c.line : undefined,
+          });
+        }
+      } catch (err: any) {
+        errors.push(`gh pr review comments failed: ${err?.message ?? String(err)}`);
       }
-    } catch (err: any) {
-      errors.push(`gh pr review comments failed: ${err?.message ?? String(err)}`);
-    }
+    })();
+
+    await Promise.all([prConversation, prReviews, prInlineComments]);
+    items.push(...collectedItems);
   }
 
   // Sort chronologically (oldest first). Items with no createdAt sink to the bottom.

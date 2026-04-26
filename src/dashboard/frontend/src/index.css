@@ -309,6 +309,26 @@ body::after {
   }
 }
 
+/* ─── Accessibility: honor prefers-reduced-motion (PAN-830) ────────────────────
+ * Users who set their OS to "reduce motion" must not see the constant pulsing
+ * dots, shimmer gradients, or shake animations. This rule disables every ambient
+ * keyframe animation while preserving instantaneous state changes (color, layout). */
+@media (prefers-reduced-motion: reduce) {
+  .anim-alive-dot-active,
+  .anim-alive-dot-thinking,
+  .anim-alive-dot-waiting,
+  .anim-alive-dot-idle,
+  .anim-stuck-shake,
+  .anim-error-shake,
+  .anim-row-flash,
+  .anim-round-active {
+    animation: none !important;
+  }
+  .anim-round-active {
+    background: color-mix(in srgb, var(--primary) 14%, transparent);
+  }
+}
+
 /* ─── Prose notes (review/test notes in inspector) ─────────────────────────── */
 .prose-notes p          { margin: 0 0 0.4em; line-height: 1.5; }
 .prose-notes p:last-child { margin-bottom: 0; }

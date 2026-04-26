@@ -6,6 +6,7 @@ import { existsSync } from 'fs';
 import { readFile, writeFile, unlink, mkdir, appendFile, readdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { tmpdir } from 'os';
+import { randomUUID } from 'crypto';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
@@ -487,6 +488,25 @@ async function spawnReviewer(
   const claudeCmd = getAgentRuntimeBaseCommand(model);
   const providerExports = getProviderExportsForModel(model);
 
+  // Pre-generate the Claude session UUID and persist it to the canonical reviewer
+  // agent directory BEFORE Claude starts. Without this, jsonl-resolver has nothing
+  // to look up: session.id is missing, sessions.json hasn't been written yet (the
+  // heartbeat hook only fires after a tool use), and the runtime-state mirror is
+  // empty. The Conversation/Activity tabs would render no transcript.
+  //
+  // The resolver lookup order in jsonl-resolver.ts is:
+  //   1. ~/.panopticon/agents/<sessionName>/session.id
+  //   2. sessions.json (heartbeat hook output)
+  //   3. runtime-state mirror
+  //
+  // Pre-writing session.id wins on the first lookup, and the heartbeat hook will
+  // later append the same UUID to sessions.json (because PANOPTICON_AGENT_ID is
+  // pinned to the canonical session name below).
+  const claudeSessionId = randomUUID();
+  const reviewerAgentDir = join(AGENTS_DIR, sessionName);
+  await mkdir(reviewerAgentDir, { recursive: true });
+  await writeFile(join(reviewerAgentDir, 'session.id'), claudeSessionId, 'utf-8');
+
   // Write a launcher script that unsets all stale provider env vars and re-exports
   // the correct ones for the target model before exec-ing the agent runtime.
   // Using a script (rather than tmux -e flags) ensures that stale ANTHROPIC_BASE_URL
@@ -498,21 +518,30 @@ async function spawnReviewer(
     '#!/bin/bash',
     'set -o pipefail',
     `cd "${packageRoot}"`,
-    // Prevent inherited Panopticon env from attributing review sub-agent heartbeats
-    // and session IDs to the parent work agent (PAN-XXX).
-    'unset PANOPTICON_AGENT_ID PANOPTICON_ISSUE_ID PANOPTICON_SESSION_TYPE',
+    // Pin PANOPTICON_AGENT_ID to the canonical reviewer session name so the
+    // heartbeat hook attributes events under ~/.panopticon/agents/<sessionName>/
+    // (NOT the parent work agent's directory). Clear the other inherited vars
+    // so review sub-agents don't masquerade as the parent issue's session.
+    `export PANOPTICON_AGENT_ID="${sessionName}"`,
+    'unset PANOPTICON_ISSUE_ID PANOPTICON_SESSION_TYPE',
     providerExports.trimEnd(),
-    `exec ${claudeCmd}`,
+    // Pass --session-id so Claude Code writes its JSONL transcript under the
+    // UUID we already persisted to session.id above. claudish passes unknown
+    // flags through to claude, so this works for both direct and routed providers.
+    `exec ${claudeCmd} --session-id "${claudeSessionId}"`,
     '',
   ].join('\n');
   await writeFile(launcherPath, launcherContent, { mode: 0o755 });
 
-  console.log(`[review-agent] Spawning reviewer ${sessionName}: model=${model}, launcher=${launcherPath}`);
+  console.log(`[review-agent] Spawning reviewer ${sessionName}: model=${model}, claudeSessionId=${claudeSessionId}, launcher=${launcherPath}`);
   console.log(`[review-agent] Launcher content:\n${launcherContent}`);
 
   await createSessionAsync(sessionName, packageRoot, `bash ${launcherPath}`, {
     env: {
-      PANOPTICON_AGENT_ID: '',
+      // Mirror the launcher's PANOPTICON_AGENT_ID into the tmux session env so
+      // the value is visible to processes that inspect the env-from-tmux path
+      // (not just the launcher exec chain).
+      PANOPTICON_AGENT_ID: sessionName,
       PANOPTICON_ISSUE_ID: '',
       PANOPTICON_SESSION_TYPE: '',
     },
@@ -691,6 +720,9 @@ export async function runParallelReview(
   // `reviewId` is used for output dirs (.pan/review/<reviewId>/) and history
   // records only. The tmux sessions stay canonical and are reused across rounds.
   const reviewId = `review-${context.issueId}-${Date.now()}`;
+  // Capture wall-clock start so we can persist accurate per-round timing into
+  // round-N.json artifacts (consumed by Command Deck round dividers).
+  const roundStartedAt = new Date().toISOString();
 
   // Guard: fail fast if no reviewers are enabled
   if (agents.length === 0) {
@@ -888,6 +920,7 @@ export async function runParallelReview(
       outputDir,
       reviewerResults,
       result,
+      startedAt: roundStartedAt,
     });
   } catch (err) {
     console.error(`[review-agent] archiveReviewerRound failed for ${reviewId} (non-fatal):`, err);
@@ -916,6 +949,20 @@ export interface ReviewerRoundArtifact {
   reviewResult: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED';
   success: boolean;
   archivedAt: string;
+  /** Wall-clock start of the round (set by runParallelReview before spawning reviewers). */
+  startedAt: string;
+  /** Wall-clock end of the round (= archivedAt; kept distinct so the frontend can render
+   *  duration without coupling to "archived" semantics). */
+  endedAt: string;
+  /** Round duration in seconds, or null when timestamps are missing/invalid. */
+  durationSec: number | null;
+  /** Count of findings reported by this round's synthesis (security + performance issues).
+   *  Per-role artifacts inherit the synthesis count so the frontend has a non-null number
+   *  to render on every reviewer card; cost is omitted intentionally — accurate per-round
+   *  cost tracking requires session-level cost attribution which is not yet wired through. */
+  findings?: number;
+  /** Round cost in USD (omitted when not yet tracked — see findings comment above). */
+  cost?: number;
 }
 
 /**
@@ -934,16 +981,32 @@ export async function archiveReviewerRound(opts: {
   outputDir: string;
   reviewerResults: Array<{ role: string; status: 'completed' | 'failed'; outputFile: string }>;
   result: ReviewResult;
+  /** Wall-clock start of this round (captured at runParallelReview entry). */
+  startedAt: string;
   /** Override the agents dir root. Defaults to AGENTS_DIR — only tests should pass this. */
   agentsDirOverride?: string;
 }): Promise<void> {
-  const { projectKey, issueId, agents, reviewId, outputDir, reviewerResults, result } = opts;
+  const { projectKey, issueId, agents, reviewId, outputDir, reviewerResults, result, startedAt } = opts;
   const agentsDir = opts.agentsDirOverride ?? AGENTS_DIR;
   const roles: ReviewerRole[] = [
     ...agents.map(a => a.name as ReviewerRole),
     'synthesis',
   ];
   const archivedAt = new Date().toISOString();
+  // endedAt is the moment we archive (= synthesis completed). Kept distinct from
+  // archivedAt so the frontend can render durations without coupling to "archived".
+  const endedAt = archivedAt;
+  // Compute duration; guard NaN from invalid timestamps the same way reviewer-tree.ts does.
+  let durationSec: number | null = null;
+  if (startedAt) {
+    const ms = new Date(endedAt).getTime() - new Date(startedAt).getTime();
+    if (Number.isFinite(ms)) durationSec = Math.floor(ms / 1000);
+  }
+  // Findings count = parsed-synthesis security + performance issues. This is a
+  // floor (the synthesis emits richer counts in its appendix prose), but it's a
+  // non-null number we can actually trust without re-parsing markdown here.
+  const findings =
+    (result.securityIssues?.length ?? 0) + (result.performanceIssues?.length ?? 0);
   let archived = 0;
   for (const role of roles) {
     const sessionName = getReviewerSessionName(role, projectKey, issueId);
@@ -980,6 +1043,10 @@ export async function archiveReviewerRound(opts: {
       reviewResult: result.reviewResult,
       success: result.success,
       archivedAt,
+      startedAt,
+      endedAt,
+      durationSec,
+      findings,
     };
 
     try {

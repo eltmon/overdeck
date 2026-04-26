@@ -3,20 +3,21 @@
  *
  * Visible only in agent-selected mode. Shows the focused session's role/type,
  * presence, model, and elapsed duration. Reuses the pan-d53s liveness building
- * blocks (`<RoleBadge>` + `<StatusDot>`) so the strip already has gentle
+ * blocks (<RoleBadge> + <StatusDot>) so the strip already has gentle
  * motion when something is alive.
  *
- * Phase, round number, current tool, and per-session cost will land in
- * follow-up beads — they require subscribing to live agent events that are
- * out of scope for the Phase-2 shell.
+ * Includes <ZoneBActionStrip> for session-scoped actions (stopSession,
+ * viewTerminal) so the full canonical action surface is reachable.
  */
 
 import type { SessionNode as SessionNodeType, SessionNodePresence } from '@panopticon/contracts';
 import { RoleBadge, type ReviewerRole } from './RoleBadge';
 import { StatusDot, type StatusDotStatus } from './StatusDot';
+import { ZoneBActionStrip } from './ZoneBActionStrip';
 
 interface ZoneBProps {
   session: SessionNodeType;
+  onViewTerminal?: () => void;
 }
 
 const REVIEWER_ROLES: readonly ReviewerRole[] = [
@@ -46,7 +47,7 @@ function formatDuration(seconds: number): string {
   return `${Math.round(seconds / 3600)}h`;
 }
 
-export function ZoneB({ session }: ZoneBProps) {
+export function ZoneB({ session, onViewTerminal }: ZoneBProps) {
   const reviewerRole = isReviewerRole(session.role) ? session.role : undefined;
   const status = presenceToStatus(session.presence);
   const label = session.role ? `${session.type}:${session.role}` : session.type;
@@ -74,6 +75,7 @@ export function ZoneB({ session }: ZoneBProps) {
       <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))', marginLeft: 'auto' }}>
         {formatDuration(session.duration)}
       </span>
+      <ZoneBActionStrip session={session} onViewTerminal={onViewTerminal} />
     </div>
   );
 }

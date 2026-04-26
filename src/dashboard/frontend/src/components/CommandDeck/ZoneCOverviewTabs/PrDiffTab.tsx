@@ -92,9 +92,18 @@ function StateBadge({ pr }: { pr: PullRequestData }) {
 export function PrDiffTab({ issueId }: PrDiffTabProps) {
   const { data, isLoading, isError } = usePrQuery(issueId);
 
+  // fileMax drives the bar-chart scale. Naively using `Math.max(...)` lets one
+  // 50,000-line file squash every smaller file's bar into sub-pixel territory.
+  // Cap at the 95th percentile so the long tail of huge files doesn't make the
+  // common range invisible, and floor at 1 to avoid divide-by-zero.
   const fileMax = useMemo(() => {
-    if (!data?.pr?.files) return 1;
-    return Math.max(1, ...data.pr.files.map((f) => f.additions + f.deletions));
+    const totals = data?.pr?.files?.map((f) => f.additions + f.deletions) ?? [];
+    if (totals.length === 0) return 1;
+    const sorted = [...totals].sort((a, b) => a - b);
+    // 95th-percentile index, clamped into bounds. For tiny lists this naturally
+    // collapses to the actual max.
+    const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95));
+    return Math.max(1, sorted[idx] ?? 1);
   }, [data]);
 
   if (isLoading) {
@@ -328,8 +337,13 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
           <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 3 }}>
             {pr.files.map((f) => {
               const total = f.additions + f.deletions;
-              const addPct = total === 0 ? 0 : (f.additions / fileMax) * 100;
-              const delPct = total === 0 ? 0 : (f.deletions / fileMax) * 100;
+              // Clamp percentages to [0, 100] so files above the 95p cap don't
+              // overflow the bar; guarantee a minimum 4% sliver when there are
+              // any changes so very small files still register visually.
+              const rawAddPct = total === 0 ? 0 : (f.additions / fileMax) * 100;
+              const rawDelPct = total === 0 ? 0 : (f.deletions / fileMax) * 100;
+              const addPct = Math.min(100, total > 0 && f.additions > 0 ? Math.max(rawAddPct, 4) : rawAddPct);
+              const delPct = Math.min(100 - addPct, total > 0 && f.deletions > 0 ? Math.max(rawDelPct, 4) : rawDelPct);
               return (
                 <li
                   key={f.path}

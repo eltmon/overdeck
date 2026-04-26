@@ -30,7 +30,8 @@ export interface ReviewerRoundSummary {
   status?: string;
   startedAt?: string;
   endedAt?: string;
-  durationSec?: number;
+  /** Server returns null when timestamps were missing/invalid; consumers should handle null. */
+  durationSec?: number | null;
   cost?: number;
   findings?: number;
 }

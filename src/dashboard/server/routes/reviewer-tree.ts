@@ -32,6 +32,16 @@ export interface ReviewerRoundSummary {
   reviewResult?: string;
   success?: boolean;
   archivedAt?: string;
+  /** Wall-clock start of the round (ISO 8601). */
+  startedAt?: string;
+  /** Wall-clock end of the round (ISO 8601, equal to archive time). */
+  endedAt?: string;
+  /** Round duration in seconds. Null when timestamps were missing/invalid in the artifact. */
+  durationSec?: number | null;
+  /** Number of findings reported by this round's synthesis (security + performance). */
+  findings?: number;
+  /** Round cost in USD; omitted when not yet tracked. */
+  cost?: number;
 }
 
 export interface ReviewerRoundMetadata {
@@ -129,6 +139,11 @@ export async function readReviewerRounds(
         reviewResult?: string;
         success?: boolean;
         archivedAt?: string;
+        startedAt?: string;
+        endedAt?: string;
+        durationSec?: number | null;
+        findings?: number;
+        cost?: number;
       };
       history.push({
         round: parsed.round ?? rf.round,
@@ -136,6 +151,11 @@ export async function readReviewerRounds(
         reviewResult: parsed.reviewResult,
         success: parsed.success,
         archivedAt: parsed.archivedAt,
+        startedAt: parsed.startedAt,
+        endedAt: parsed.endedAt,
+        durationSec: parsed.durationSec,
+        findings: parsed.findings,
+        cost: parsed.cost,
       });
     } catch { /* skip malformed artifact */ }
   }
@@ -192,7 +212,10 @@ export async function buildReviewerNodes(
         startedAt: opts.startedAt,
         endedAt: opts.endedAt,
         duration: opts.startedAt && opts.endedAt
-          ? Math.floor((new Date(opts.endedAt).getTime() - new Date(opts.startedAt).getTime()) / 1000)
+          ? (() => {
+              const ms = new Date(opts.endedAt).getTime() - new Date(opts.startedAt).getTime();
+              return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
+            })()
           : null,
         status,
         presence,

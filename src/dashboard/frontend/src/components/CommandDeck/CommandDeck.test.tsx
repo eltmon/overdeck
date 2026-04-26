@@ -45,6 +45,14 @@ vi.mock('./SessionView/IssueHeader', () => ({
   ),
 }));
 
+vi.mock('./ZoneActionStrip', () => ({
+  ZoneActionStrip: () => <div data-testid="zone-action-strip" />,
+}));
+
+vi.mock('./ZoneBActionStrip', () => ({
+  ZoneBActionStrip: () => <div data-testid="zone-b-action-strip" />,
+}));
+
 vi.mock('./SessionView/SessionPanel', () => ({
   SessionPanel: (props: any) => (
     <div data-testid="session-panel" data-session={props.session.sessionId} data-issue={props.issueId} />
@@ -257,7 +265,7 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     expect(screen.queryByTestId('detail-panel')).not.toBeInTheDocument();
   });
 
-  it('renders IssueWorkbench in issue-selected mode when feature is selected without a session', async () => {
+  it('auto-selects best session when feature is clicked (B5)', async () => {
     renderCommandDeck();
 
     // Switch to Projects tab
@@ -266,19 +274,18 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
 
     await screen.findByTestId('project-node');
 
-    // Click feature row (not session)
+    // Click feature row — should auto-select the active session
     fireEvent.click(screen.getByTestId('feature-PAN-821'));
 
-    // Verify IssueWorkbench renders in issue-selected mode with the tab strip
+    // Verify IssueWorkbench renders in agent-selected mode (best session auto-selected)
     const workbench = screen.getByTestId('issue-workbench');
     expect(workbench).toBeInTheDocument();
-    expect(workbench).toHaveAttribute('data-mode', 'issue-selected');
-    expect(screen.getByTestId('zone-c-overview')).toBeInTheDocument();
-    // ZoneA still renders IssueHeader, but the agent-selected SessionPanel is NOT rendered
+    expect(workbench).toHaveAttribute('data-mode', 'agent-selected');
+    expect(screen.getByTestId('session-panel')).toBeInTheDocument();
     expect(screen.getByTestId('issue-header')).toBeInTheDocument();
-    expect(screen.queryByTestId('session-panel')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('zone-b')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('zone-c-overview')).not.toBeInTheDocument();
   });
+
 
   it('clears session view when switching to a conversation', async () => {
     renderCommandDeck();
