@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ListTodo, FileText, RefreshCw, ExternalLink, AlertTriangle } from 'lucide-react';
 import type { ReviewStatus } from '../../inspector/types';
-import { isReviewPipelineStuck } from '../../lib/pipeline-state';
+import { isReviewPipelineStuck } from '../../../lib/pipeline-state';
 import styles from '../styles/command-deck.module.css';
 
 interface PlanningData {
