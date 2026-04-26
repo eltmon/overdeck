@@ -12,8 +12,8 @@ Implementing backend perf beads (cache keying + async fan-out) before moving to 
 - [x] pan-l4jb: Liveness: centralized event-to-motion catalog wiring (commit: 2dc204c1)
 
 ## Remaining Work
-- [ ] pan-6zyx: Zone A enrichment: activity sparkline, quality-gates, stash warning, acceptance progress
-- [ ] pan-6zyx: Zone A enrichment: activity sparkline, quality-gates, stash warning, acceptance progress
+- [x] pan-6zyx: Zone A enrichment: activity sparkline, quality-gates, stash warning, acceptance progress (commit: 8c6cc61c)
+- [ ] pan-mc22: Zone B enrichment: output buffer, idle/thinking/waiting states, cost rate, summary line
 - [ ] pan-mc22: Zone B enrichment: output buffer, idle/thinking/waiting states, cost rate, summary line
 - [ ] pan-sjj5: Overview tab: real test summary and PR summary cards
 - [ ] pan-35kn: Density rule: suppress default-value badges in Zone A
