@@ -2527,8 +2527,17 @@ export async function fetchIssuePullRequest(issueId: string): Promise<IssuePrEnd
   // Find the PR number for the feature branch (open or closed/merged).
   let prNumber: string;
   try {
-    const { stdout } = await execAsync(
-      `gh pr list --repo ${repoArg} --head "${branchName}" --state all --json number --limit 1 --jq '.[0].number'`,
+    const { stdout } = await execFileAsync(
+      'gh',
+      [
+        'pr', 'list',
+        '--repo', repoArg,
+        '--head', branchName,
+        '--state', 'all',
+        '--json', 'number',
+        '--limit', '1',
+        '--jq', '.[0].number',
+      ],
       { encoding: 'utf-8', timeout: 15000 },
     );
     prNumber = stdout.trim();
@@ -2546,12 +2555,22 @@ export async function fetchIssuePullRequest(issueId: string): Promise<IssuePrEnd
   let diffError: string | undefined;
   try {
     const [viewResult, diffResult] = await Promise.allSettled([
-      execAsync(
-        `gh pr view ${prNumber} --repo ${repoArg} --json ${GH_PR_VIEW_FIELDS}`,
+      execFileAsync(
+        'gh',
+        [
+          'pr', 'view', prNumber,
+          '--repo', repoArg,
+          '--json', GH_PR_VIEW_FIELDS,
+        ],
         { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
       ),
-      execAsync(
-        `gh pr diff ${prNumber} --repo ${repoArg} --patch`,
+      execFileAsync(
+        'gh',
+        [
+          'pr', 'diff', prNumber,
+          '--repo', repoArg,
+          '--patch',
+        ],
         { encoding: 'utf-8', timeout: 30000, maxBuffer: 16 * 1024 * 1024 },
       ),
     ]);

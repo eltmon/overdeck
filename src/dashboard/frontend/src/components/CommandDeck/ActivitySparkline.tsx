@@ -6,9 +6,12 @@
  * the left as time advances.
  */
 
+export type SparklineCategory = 'success' | 'info' | 'review' | 'warning' | 'failure';
+
 export interface SparklineEvent {
   timestamp: number;
   weight?: number;
+  category?: SparklineCategory;
 }
 
 interface ActivitySparklineProps {
@@ -19,6 +22,19 @@ interface ActivitySparklineProps {
   height?: number;
   now?: number;
   className?: string;
+}
+
+const CATEGORY_COLORS: Record<SparklineCategory, string> = {
+  success: '#22c55e', // green
+  info: '#3b82f6',    // blue
+  review: '#a855f7',  // purple
+  warning: '#f97316', // orange
+  failure: '#ef4444', // red
+};
+
+function barColor(category: SparklineCategory | undefined): string {
+  if (!category) return 'var(--primary)';
+  return CATEGORY_COLORS[category] ?? 'var(--primary)';
 }
 
 export function ActivitySparkline({
@@ -36,6 +52,7 @@ export function ActivitySparkline({
   const bucketMs = windowMs / buckets;
 
   const counts: number[] = new Array(buckets).fill(0);
+  const categories: (SparklineCategory | undefined)[] = new Array(buckets).fill(undefined);
   for (const ev of events) {
     if (ev.timestamp < windowStart || ev.timestamp > nowMs) continue;
     const offset = ev.timestamp - windowStart;
@@ -43,6 +60,13 @@ export function ActivitySparkline({
     if (idx >= buckets) idx = buckets - 1;
     if (idx < 0) idx = 0;
     counts[idx]! += ev.weight ?? 1;
+    // If multiple events in a bucket, prefer warning > failure > review > success > info
+    const prev = categories[idx];
+    const next = ev.category;
+    const rank = { failure: 4, warning: 3, review: 2, success: 1, info: 0 } as const;
+    if (!prev || (next && (rank[next] ?? -1) > (rank[prev] ?? -1))) {
+      categories[idx] = next;
+    }
   }
 
   const maxCount = Math.max(1, ...counts);
@@ -77,7 +101,7 @@ export function ActivitySparkline({
             width={barWidth - gap}
             height={barHeight}
             rx={1}
-            fill={count > 0 ? 'var(--primary)' : 'var(--border)'}
+            fill={count > 0 ? barColor(categories[i]) : 'var(--border)'}
             opacity={count > 0 ? 0.85 : 0.35}
           >
             <title>{`${count} event${count === 1 ? '' : 's'}`}</title>

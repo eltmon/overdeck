@@ -156,9 +156,22 @@ export function OverviewTab({ issueId, onSwitchTab }: OverviewTabProps) {
   const sparklineEvents = useMemo(
     () =>
       sections
-        .map((s) => Date.parse(s.startedAt))
-        .filter((n) => !Number.isNaN(n))
-        .map((timestamp) => ({ timestamp })),
+        .map((s) => ({
+          ts: Date.parse(s.startedAt),
+          category: (
+            {
+              planning: 'info' as const,
+              work: 'info' as const,
+              review: 'review' as const,
+              reviewer: 'review' as const,
+              test: 'success' as const,
+              merge: 'success' as const,
+              legacy: 'warning' as const,
+            } as const
+          )[s.type as string] ?? 'info',
+        }))
+        .filter((e) => !Number.isNaN(e.ts))
+        .map((e) => ({ timestamp: e.ts, category: e.category })),
     [sections],
   );
 

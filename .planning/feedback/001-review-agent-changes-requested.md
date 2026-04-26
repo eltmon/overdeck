@@ -2,211 +2,200 @@
 specialist: review-agent
 issueId: PAN-830
 outcome: changes-requested
-timestamp: 2026-04-26T12:22:12Z
+timestamp: 2026-04-26T13:42:40Z
 ---
 
 # Verdict: CHANGES_REQUESTED
 
 ## Summary
-
-PAN-830 implements the Unified Command Deck: three-zone shell (Zone A/B/C), canonical reviewer naming with session reuse across rounds, JSONL path resolution fix, liveness building blocks (RoleBadge, StatusDot, LiveCounter, ToolFlash, ActivitySparkline), and 10-tab overview panel. Core infrastructure is solid and the command injection hardening (added to `issues.ts` and `command-deck.ts`) is correct and necessary.
-
-However, this PR has **9 blockers** that must be addressed before merge:
-- 2 command-injection vectors (correctness, MUST fix before merge)
-- 1 React Rules-of-Hooks violation in `PrDiffTab` (both correctness and performance flagged this, MUST fix)
-- 6 missing PRD acceptance criteria (requirements, MUST fix before merge)
-
-Additionally, 3 high-priority performance issues and 4 nits are listed below. The work agent should address blockers first, then the high-priority performance items before signaling completion.
-
----
+PAN-830 delivers a major three-zone Command Deck surface with reviewer canonical naming, JSONL resolution, liveness primitives, and a fully-wired tabbed overview. The core architecture is sound and 19 of 28 requirements are implemented correctly. However, 4 blockers prevent merge: (1) the review-orchestrator node is missing from the session tree (PRD specifies 6 nodes, 5 are emitted), (2) the composer addressing line and spawn-and-send exceptions are not implemented, (3) task files are redundantly re-read from disk on every 5-second activity poll (hot path), and (4) `fetchIssuePullRequest` still uses shell interpolation via `execAsync` instead of `execFileAsync`. Additionally, 10 high-priority items cover Zone A/B enrichment gaps, missing color coding on ActivitySparkline, O(P×I) nested loops in the project tree endpoint, and syncCache called on every poll. Security is clean. All issues must be addressed before this PR can merge.
 
 ## Blockers (MUST fix before merge)
 
-### 1. Command injection via `reason` parameter in `closeIssuePullRequest` — `src/dashboard/server/routes/issues.ts:155` — `!`
-
-**Raised by**: correctness
-
-**Why it blocks**: User-controlled `reason` string is interpolated directly into a shell command. A `reason` containing `"` or `$(...)` enables arbitrary command execution as the server process user. Same class of bug fixed in commit `e65a3c8c` for other locations but missed here.
-
-**Fix**: Use `execFileAsync` with an argument array (the discussions endpoint already does this for `gh pr list`):
-
-```typescript
-await execFileAsync('gh', [
-  'pr', 'close', prNumber,
-  '--repo', `${githubCheck.owner}/${githubCheck.repo}`,
-  '--comment', reason,
-], { encoding: 'utf-8', timeout: 15000 });
-```
-
-### 2. Shell injection via `providerEnvStr` in status-review — `src/dashboard/server/routes/command-deck.ts:807` — `!`
-
-**Raised by**: correctness
-
-**Why it blocks**: `providerEnvStr` is built from API key values interpolated into a shell command string. If any API key contains `"` or `$()`, command injection occurs. Even without malicious intent, keys containing special characters break the `exec` call silently.
-
-**Fix**: Use `env` option of `execAsync` instead of shell interpolation:
-
-```typescript
-const env = { ...process.env, ...envVars };
-await execAsync(`${cliCmd} -p${modelFlag} --no-session-persistence`, {
-  encoding: 'utf-8', timeout: 120000, maxBuffer: 1024 * 1024,
-  env,
-  input: await readFile(promptFile, 'utf-8'),
-});
-```
-
-### 3. `useMemo` called inside JSX conditional render — `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/PrDiffTab.tsx:424-431` — `!`
-
-**Raised by**: correctness, performance
-
-**Why it blocks**: React hooks **must** be called at the top level of a component function, never inside conditionals or nested functions. The `useMemo` call inside a JSX conditional block violates Rules of Hooks and causes stale memoized values, incorrect hook ordering after conditional toggles, and unpredictable behavior during Fast Refresh or concurrent rendering. This is a correctness issue, not just a performance concern.
-
-**Fix**: Move the memo to the component top level:
-
-```tsx
-export function PrDiffTab({ issueId }: PrDiffTabProps) {
-  const { data, isLoading, isError } = usePrQuery(issueId);
-  const diffRows = useMemo(() => {
-    if (!data?.diff) return null;
-    return data.diff.split('\n').map((line, idx) => {
-      const color = diffLineColor(line);
-      return <div key={idx} style={color ? { color } : undefined}>{line || '\u00A0'}</div>;
-    });
-  }, [data?.diff]);
-  // ...
-  {data.diff && diffRows && (
-    <pre>{diffRows}</pre>
-  )}
-}
-```
-
-### 4. Tree status filter `[All] [Alive] [Failed]` not implemented — `!`
-
+### 1. Review-orchestrator node missing from session tree — `command-deck.ts` + `reviewer-tree.ts` — `!`
 **Raised by**: requirements
+**Why it blocks**: The PRD requires exactly 6 reviewer nodes (1 orchestrator + 5 roles) per issue. Only 5 role nodes are emitted; the orchestrator node (`getTmuxSessionName('review', projectKey, issueId)`) is never created. Users cannot see or interact with the review orchestrator session in the Command Deck tree.
 
-**Why it blocks**: Explicitly stated in PRD tree behavior section as a required feature. Users cannot filter the session tree to focus on active or failed sessions.
+The comment at `reviewer-tree.ts:11` explicitly states "The orchestrator (parent `review` node) is emitted by the caller" — but the caller (`command-deck.ts`) does not emit it either. This is not a partial implementation; it is absent.
 
-**Fix**: Add filter UI in `ProjectNode` or tree header with filter logic applied to `features.sessions` before rendering.
-
-### 5. Right-click context menu on session nodes not implemented — `!`
-
-**Raised by**: requirements
-
-**Why it blocks**: Explicitly stated in PRD tree behavior section. Users cannot access session actions directly from the tree; they must select the session first and use Zone B.
-
-**Fix**: Add `onContextMenu` handler on session rows in `FeatureItem` or tree rendering, mirroring Zone B contextual actions.
-
-### 6. Done-state collapse / in-flight expand defaults not implemented — `!`
-
-**Raised by**: requirements
-
-**Why it blocks**: Explicitly stated in PRD tree behavior section. Currently all project nodes default to the same expand state regardless of issue status, violating the PRD's density principle.
-
-**Fix**: `ProjectNode` or `FeatureItem` should read issue status and set `expanded` accordingly — done-state issues default to collapsed; in-flight issues default to expanded.
-
-### 7. Issue-row StatusDot dominant aggregation not implemented — `!`
-
-**Raised by**: requirements
-
-**Why it blocks**: Explicitly stated in PRD tree behavior section. The issue/feature row in the tree should show a `StatusDot` reflecting the dominant state of its child sessions.
-
-**Fix**: `FeatureItem` should compute dominant session state and render `StatusDot` on the issue row.
-
-### 8. Event-driven motion catalog not wired to domain events — `!`
-
-**Raised by**: requirements
-
-**Why it blocks**: The PRD acceptance criterion explicitly requires: "Every domain event in the catalog triggers its prescribed motion within 200ms." The liveness components (LiveCounter, ToolFlash, StatusDot, ActivitySparkline) exist and can animate, but they are not connected to domain events. Data updates only via `useQuery` polling — the core "north-star principle: liveness" is not realized.
-
-**Fix**: Add `subscribeDomainEvents` event listeners/hooks in `IssueWorkbench`, `ZoneA`, `ZoneB`, `ZoneCOverview` that subscribe to domain events and trigger matching animations within 200ms.
-
-### 9. `getZoneAActions` missing explicit branches for many pipeline states — `~` (High, blocking per requirements policy)
-
-**Raised by**: requirements
-
-**Why it blocks**: The PRD specifies a 16+ state-to-actions table. The current implementation uses a simpler 5-branch heuristic (merge, reviewTest, recover, stopAgent/startAgent/resumeSession, artifacts). Several explicit pipeline states from the PRD table are missing: `Planning` (active), `Planning Done · Awaiting Work`, `In Progress · work idle`, `Verification failing`, `In Review · reviewers running`, `In Review · CHANGES_REQUESTED`, `In Review · APPROVED`, `Testing · running`, `Testing · failures`, `Ready to Merge`, `Merging`, `Merged`, `Done`.
-
-**Fix**: Add explicit conditional branches in `getZoneAActions` matching the full PRD state-to-actions table.
+**Fix**: In `command-deck.ts` before the `buildReviewerNodes` loop (around line 435), emit a parent orchestrator node with type `'review'` and the canonical session name. Alternatively, add orchestrator emission inside `buildReviewerNodes` with a flag to skip role children when emitting the parent.
 
 ---
 
-## High Priority (SHOULD fix; may still approve if justified)
+### 2. Composer addressing line and spawn-and-send exceptions not implemented — `ZoneCConversation.tsx` / `ComposerFooter` — `!`
+**Raised by**: requirements
+**Why it blocks**: REQ-28 is a hard requirement: the composer must show an addressing line (`addressing: specialist-panopticon-540-review-correctness`) in agent-selected mode, and in issue-selected mode it should be disabled with a contextual hint OR show "Spawn & Send" when zero sessions exist. None of this is implemented. The `ComposerPlaceholder` in `IssueWorkbench.tsx` does not handle any of these cases.
 
-### 1. Sequential file reads in `readReviewerRounds` — `src/dashboard/server/routes/reviewer-tree.ts:132-161` — `⊗`
+**Fix**: In `ZoneCConversation.tsx`, add an addressing line when a session is selected (agent-selected mode). In `ComposerPlaceholder` (or a new wrapper), implement: (1) disabled composer with hint in issue-selected mode, (2) "Spawn & Send" exception when sessions.length === 0, (3) "Spawn Work & Send" when all sessions have ended.
 
+---
+
+### 3. Task files double-read on 5-second activity poll hot path — `command-deck.ts:407` — `!`
 **Raised by**: performance
+**Why it blocks**: `fetchActivityDataWithContext` reads all task files into `taskFileContents` Map at lines 333–343, then at line 407 re-reads each file from disk via `readOptional(join(tasksDir, taskFiles[taskIdx]!))` instead of looking up the already-cached content. The activity endpoint (`/api/command-deck/activity/:id`) is polled every 5 seconds from `useActivityQuery`. With 3–10 task files per issue, this multiplies filesystem I/O by 3–10× on the hottest server path introduced by this PR.
 
-`readReviewerRounds` calls `readFile` sequentially in a `for…of` loop. With 5 roles and 10+ rounds per role, this means 50+ sequential disk reads on every activity poll (every 10 s). Fix by parallelizing with `Promise.all`.
+**Fix**: Replace the disk re-read at line 407 with a Map lookup:
+```typescript
+const taskContent = taskFileContents.get(taskFiles[taskIdx]!);
+if (taskContent) {
+  const meaningfulLines = taskContent.split('\n').filter(l =>
+    !l.startsWith('```') && !l.startsWith('# EXECUTE') && !l.startsWith('⚠️')
+  );
+  transcriptParts.push(`\n--- Task ---\n${meaningfulLines.slice(0, 5).join('\n')}`);
+}
+```
 
-### 2. Unvirtualized discussion list in `DiscussionsTab` — `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/DiscussionsTab.tsx:317-319` — `~`
+---
 
+### 4. `fetchIssuePullRequest` uses `execAsync` (shell interpolation) instead of `execFileAsync` — `issues.ts:2530–2532` — `!`
+**Raised by**: correctness
+**Why it blocks**: `fetchIssuePullRequest` constructs shell commands via string interpolation through `execAsync`, while `fetchIssueDiscussions` (lines 2733–2744) correctly uses `execFileAsync` with argument arrays for the same `gh pr list` operation. `execAsync` passes commands to `/bin/sh -c`, where `$`, backticks, and `"` are interpreted. `repoArg` and `branchName` are currently safe, but the inconsistency means one path is hardened and the other is not — and if `isGitHubIssue` validation is ever relaxed or this function is called from another context, shell injection becomes possible. This is a reachable code path in production.
+
+**Fix**: Replace the three `execAsync` calls in `fetchIssuePullRequest` with `execFileAsync` + argument arrays, matching the pattern in `fetchIssueDiscussions`:
+```typescript
+const { stdout } = await execFileAsync(
+  'gh',
+  ['pr', 'list', '--repo', repoArg, '--head', branchName, '--state', 'all',
+   '--json', 'number', '--limit', '1', '--jq', '.[0].number'],
+  { encoding: 'utf-8', timeout: 15000 },
+);
+```
+
+---
+
+## High Priority (SHOULD fix; synthesis may still approve if justified)
+
+### 1. Zone B has no detailed elements (phase+tool, round history, cost rate, output buffer, idle warning) — `ZoneB.tsx` — `~`
+**Raised by**: requirements
+**Why it blocks**: The PRD specifies five detailed Zone B elements: "Phase + tool inline (live)", "Round history mini-cards", "Per-session cost rate", "Output buffer counter", "Idle warning ribbon". None of the five are implemented. The component is a stripped-down status strip.
+
+**Fix**: Expand `ZoneB.tsx` using the already-built `ToolFlash`, `RoundCard`, and `LiveCounter` components. Add: phase+tool line from `session.currentTool`, round history from `session.roundHistory`, cost rate from `session.costPerMinute`, output buffer counter, and idle warning ribbon.
+
+---
+
+### 2. Zone A has no detailed elements (stage dots, quality gates, sparkline, stuck ribbon, stash warning) — `ZoneA.tsx` — `~`
+**Raised by**: requirements
+**Why it blocks**: The PRD specifies five detailed Zone A enrichments: "Six circles connected by a thin line" (stage dots planning·work·verify·review·test·merge), "Quality gates rollup pills", "Activity sparkline", "Stuck warning ribbon", "Salvageable stash warning". None are implemented. The current `IssueHeader` is significantly simpler.
+
+**Fix**: Add sub-components (or expand `ZoneA.tsx`/`IssueHeader.tsx`) for: 6 stage dots with done/current/pending states, quality gates rollup, activity sparkline in header, stuck warning ribbon, salvageable stash warning.
+
+---
+
+### 3. ActivitySparkline has no event-type color coding — `ActivitySparkline.tsx` — `~`
+**Raised by**: requirements
+**Why it blocks**: The PRD requires color-coded bars (green=success, blue=info, purple=review, orange=warning, red=failure). All bars currently use `var(--primary)`. The `SparklineEvent` interface lacks a `type` or `category` field, so color-coding is impossible with the current API.
+
+**Fix**: Extend `SparklineEvent` with a `category` field and add color mapping in `ActivitySparkline.tsx` using the PRD's color scheme.
+
+---
+
+### 4. `syncCache()` called on every 5-second activity poll — `command-deck.ts:502` — `~`
 **Raised by**: performance
+**Why it blocks**: `syncCache()` is invoked unconditionally on every `fetchActivityData` call. If it re-scans the cost tracking directory, this is redundant filesystem scanning at human timescales (agent completions), not every 5 seconds. With multiple concurrent users, this amplifies server load unnecessarily.
 
-Discussion feed renders all items without virtualization. On a busy PR with 200+ comments/reviews/threads, this creates a large React tree and heavy markdown parsing upfront, causing scroll jank and slow initial render.
+**Fix**: Either (1) make `syncCache` a no-op when its mtime hasn't changed, (2) cache the cost lookup with a short TTL (e.g., 30s), or (3) move sync to a background job.
 
-### 3. `existsSync` inside async server path in `getProjectPath` — `src/dashboard/server/routes/command-deck.ts:106` — `~`
+---
 
+### 5. O(P × I) nested loops in `fetchProjectTree` — `command-deck.ts:1289–1307, 1325–1347` — `~`
 **Raised by**: performance
+**Why it blocks**: `fetchProjectTree` iterates over all issues twice inside the per-project loop. With 10 projects and 500 issues, that's 10,000 iterations per call. The endpoint is polled every 10 seconds. Pre-grouping issues by source/project prefix reduces this to O(P + I).
 
-`getProjectPath` uses dynamic `require('node:fs').existsSync` inside an async function. The dynamic `require` may break when bundled by `tsdown` for production. Replace `require('node:fs')` with a static import of `existsSync` at the top of the file.
+**Fix**: Pre-group `allIssues` into `rallyIssuesByProject` and `trackerIssuesByPrefix` Maps before the project loop. Then use direct Map lookups inside the loop instead of scanning all issues twice per project.
 
-### 4. Sequential `gh` CLI calls in `fetchIssuePullRequest` — `src/dashboard/server/routes/issues.ts:2517-2551` — `~`
+---
 
+### 6. Date object allocation in sort comparator — `command-deck.ts:492–496` — `~`
 **Raised by**: performance
+**Why it blocks**: The `sections.sort()` comparator allocates `new Date()` objects on every comparison. With 20+ sections (planning + work + 5 reviewers + test + merge), that's ~200 Date allocations per request on a 5-second poll.
 
-Three sequential `gh pr list` → `gh pr view` → `gh pr diff` calls. Steps 2 and 3 depend only on the PR number and can run in parallel. On slow GitHub API conditions, this exceeds 2 s latency.
+**Fix**: Use lexical string comparison since ISO 8601 strings sort lexicographically:
+```typescript
+return a.startedAt.localeCompare(b.startedAt);
+```
+
+---
+
+### 7. Reviewer JSONL resolution uses wrong project directory — `reviewer-tree.ts:189–192` — `~`
+**Raised by**: correctness
+**Why it blocks**: `buildReviewerNodes` passes `opts.workspacePath` to `resolveJsonlPath`, but reviewer sessions are spawned from `packageRoot`. Claude Code stores JSONL transcripts relative to the cwd at launch time, so the encoded paths differ and `hasJsonl` is always `false`. Reviewer conversations never render in Zone C.
+
+**Fix**: Pass the reviewer's actual cwd (`packageRoot`) to `resolveJsonlPath` for reviewer sessions, or add a `cwdOverride` parameter to `BuildReviewerNodesOptions`.
+
+---
+
+### 8. Round divider wiring from `roundMetadata` to timeline not implemented — `ZoneCConversation.tsx` — `~`
+**Raised by**: requirements
+**Why it blocks**: `RoundMarker` interface exists in `MessagesTimeline.tsx` and `ZoneCConversation` accepts `roundMarkers` prop, but no code derives `roundMarkers` from session `roundMetadata`. The derivation is explicitly marked as deferred in a comment.
+
+**Fix**: Derive `RoundMarker[]` from `session.roundMetadata` in `IssueWorkbench` or `ZoneCConversation` and pass them through to `ConversationPanel`.
+
+---
+
+### 9. Parity smoke test does not walk existing surfaces — `commandDeckActions.test.ts` — `~`
+**Raised by**: requirements
+**Why it blocks**: The test verifies that Command Deck action keys are reachable from pipeline states, but does not walk the actual existing surfaces (KanbanBoard, InspectorPanel, BadgeBar, StatusFlowControl, WorkspacePane) to assert their labeled actions are present in `getZoneAActions`/`getZoneBActions`. It only tests the inverse, which doesn't catch drift.
+
+**Fix**: Extend the smoke test to read action labels from the existing surface files and assert presence in the Command Deck action output.
 
 ---
 
 ## Nits (advisory — safe to defer)
 
-- `src/dashboard/server/routes/reviewer-tree.ts:101` — `≉` — Legacy reviewer-role parser uses `dashIdx <= 0` instead of `dashIdx < 0`, accidentally rejecting position-0 dashes. Minor edge case, safe to defer.
-- `src/dashboard/server/routes/command-deck.ts:781-808` — `?` — status-review uses `cat | cliCmd` pipe; consider using `execAsync`'s `input` option instead.
-- `src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx:189-196` — `?` — `dedupedVirtualItems` IIFE runs every render; should be `useMemo`'d.
-- `src/dashboard/server/routes/issues.ts:2710-2712` — `?` — `fetchIssueDiscussions` throws on invalid issue ID; consider returning an error response object instead of throwing a rejected promise.
+- `CommandDeck/index.tsx:61` — `≉` — `pickBestSession` sorts instead of scanning. Use a single linear scan instead of copying and sorting the entire sessions array. (performance)
+- `MessagesTimeline.tsx:189` — `≉` — Defensive deduping of virtual items is unnecessary; `useVirtualizer.getVirtualItems()` does not produce duplicates. Remove `dedupedVirtualItems`. (performance)
+- `ZoneCOverviewTabs/OverviewTab.tsx:301–309` — `?` — PR summary placeholder text is stale; the PR/Diff tab was fully implemented. Update the placeholder or wire in `usePrQuery` data. (requirements)
+- `ZoneCOverviewTabs/OverviewTab.tsx:291–299` — `?` — Test summary is a documented placeholder (D9: deferred). No action required, flagged for completeness. (requirements)
+- `src/dashboard/frontend/src/components/CommandDeck/index.tsx:211–242` — `?` — WebSocket subscription re-runs every 10s because `projects` is a new array identity on every `useQuery` refetch. Consider using a stable project-key list. (performance)
 
 ---
 
 ## Cross-cutting groups
 
-**Command injection (fix together):**
-- [blocker-1] `issues.ts:155` — `reason` parameter interpolated into shell command
-- [blocker-2] `command-deck.ts:807` — `providerEnvStr` interpolated into shell command
+**command-deck.ts:jsonl-and-task-file-lookups** (related: both involve path resolution and file content retrieval):
+- [blocker-3] Task files double-read on activity poll (command-deck.ts:407) — fix by using cached Map
+- [high-7] Reviewer JSONL resolution uses wrong project directory (reviewer-tree.ts:189) — fix by passing packageRoot instead of workspacePath
+- [high-4] syncCache called on every 5-second poll (command-deck.ts:502) — fix by adding TTL or mtime-based guard
 
-**React hooks violations (fix together):**
-- [blocker-3] `PrDiffTab.tsx:424-431` — `useMemo` called inside JSX conditional render
+**command-deck.ts:performance-on-poll-endpoints** (activity and project tree polled frequently):
+- [blocker-3] Task files double-read (command-deck.ts:407)
+- [high-4] syncCache on every poll (command-deck.ts:502)
+- [high-5] O(P×I) nested loops in fetchProjectTree (command-deck.ts:1289)
+- [high-6] Date allocation in sort comparator (command-deck.ts:492)
+- [nit-1] pickBestSession sorts instead of scanning (index.tsx:61)
 
-**Tree behavior requirements (fix together — all relate to tree rendering):**
-- [blocker-4] Tree status filter `[All] [Alive] [Failed]` toggle missing
-- [blocker-5] Right-click session-action menu missing
-- [blocker-6] Done-state collapse / in-flight expand defaults missing
-- [blocker-7] Issue-row StatusDot dominant aggregation missing
+**requirements-gaps-cluster** (Zone A/B and tab enrichment partially implemented):
+- [high-1] Zone B missing 5 elements
+- [high-2] Zone A missing 5 elements
+- [high-3] ActivitySparkline color coding absent
+- [high-8] Round divider wiring not implemented
+- [nit-3] OverviewTab PR summary placeholder stale
+- [nit-4] OverviewTab test summary placeholder (documented defer)
 
-**Domain event wiring (all relate to connecting liveness components to event stream):**
-- [blocker-8] Event-driven motion catalog not wired
-- [high-4] `existsSync` dynamic require in dashboard route (can be part of the same cleanup pass)
+**session-tree-orchestrator-gap** (reviewer tree missing parent orchestrator):
+- [blocker-1] Review-orchestrator node missing from session tree (command-deck.ts + reviewer-tree.ts)
+- [blocker-2] Composer addressing line and spawn-and-send exceptions not implemented (ZoneCConversation.tsx)
 
 ---
 
 ## What's good
-
-- Command injection hardening was correctly applied to both identified vectors (`issues.ts` and `command-deck.ts`) — same class of bug, same fix pattern.
-- Canonical reviewer naming + session reuse across rounds is correctly implemented with proper `sessionExistsAsync` check and `remain-on-exit on`.
-- JSONL path resolution fix (`jsonl-resolver.ts`) correctly handles all three fallback levels.
-- Three-zone shell structure (Zone A/B/C) is clean and properly gated on `isAgentSelected` vs issue-selected mode.
-- All 10 tabs are wired and render their respective data without leaving Command Deck.
-- TanStack Query polling cadence is appropriate (10 s for projects/costs/conversations, 30 s for discussions/PR/diff).
-- `applySessionTreeDelta` is O(F+S) as documented — correct and efficient.
-- Round dividers rendering in `MessagesTimeline` is correctly wired (even if the data derivation is deferred).
-- No refresh buttons in Command Deck UI — data updates via polling and domain events as specified.
+- Three-zone Command Deck architecture (Zone A/B/C dispatch, tab wiring) is correctly implemented across all components
+- Reviewer canonical naming and session resumption across rounds (`runParallelReview` + `sessionExistsAsync`) works as specified
+- JSONL resolver is a clean extraction with proper fallback lookup order (session.id → sessions.json → runtime state)
+- Canonical reviewer round archival (`archiveReviewerRound`) correctly writes round-N.json artifacts
+- All 5 liveness components (StatusDot, LiveCounter, ActivitySparkline, RoundCard, ToolFlash) are implemented with tests
+- Security review is clean: shell interpolation fixed in command-deck.ts, JSONL path resolution avoids user-controlled path concatenation, frontend markdown uses the existing allowlisted renderer
+- Reviewer tree emits 5 role nodes in correct `REVIEWER_ROLES` order; the architecture is correct except for the missing orchestrator parent
+- PR/Discussions backend endpoints (`fetchIssuePullRequest`, `fetchIssueDiscussions`) are well-structured with proper error handling (the `execAsync` issue in `fetchIssuePullRequest` is a blocker, but the overall structure is sound)
+- 19 of 28 PRD requirements are fully implemented
 
 ---
 
 ## Review stats
-
-- Blockers: 9   High: 4   Medium: 0   Nits: 4
-- By reviewer: correctness=5 (2 critical, 3 warnings), security=0, performance=8 (1 critical, 1 should-fix, 4 consider-fix, 2 noted), requirements=14 (6 missing, 8 partial)
-- Files touched: ~60   Files with findings: ~14
+- Blockers: 4   High: 10   Medium: 0   Nits: 5
+- By reviewer: correctness=4 findings (0 critical, 2 warnings, 2 suggestions), security=0 findings (clean), performance=6 findings (1 critical, 3 warnings, 2 optimizations), requirements=9 findings (2 blockers, 7 partial/high)
+- Files touched: 93 (across all reviewers)
+- Files with findings: 17 (command-deck.ts, reviewer-tree.ts, issues.ts, ZoneB.tsx, ZoneA.tsx, ActivitySparkline.tsx, ZoneCConversation.tsx, commandDeckActions.test.ts, index.tsx, MessagesTimeline.tsx, OverviewTab.tsx)
 
 ---
 

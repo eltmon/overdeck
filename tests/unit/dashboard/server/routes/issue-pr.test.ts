@@ -36,6 +36,18 @@ vi.mock('node:child_process', async (importOriginal) => {
       );
       return { unref: vi.fn() };
     },
+    execFile: (...args: unknown[]) => {
+      const cb = args[args.length - 1] as Function;
+      const file = args[0] as string;
+      const cmdArgs = args[1] as string[];
+      const command = `${file} ${cmdArgs.join(' ')}`;
+      const result = mockExec(command);
+      Promise.resolve(result).then(
+        (val: any) => cb(null, val),
+        (err: Error) => cb(err),
+      );
+      return { unref: vi.fn() };
+    },
   };
 });
 
@@ -98,7 +110,7 @@ describe('fetchIssuePullRequest — GET /api/issues/:id/pr', () => {
     expect(mockExec).toHaveBeenCalledTimes(1);
     const [cmd] = mockExec.mock.calls[0]!;
     expect(cmd).toContain('gh pr list');
-    expect(cmd).toContain('--head "feature/pan-830"');
+    expect(cmd).toContain('--head feature/pan-830');
     expect(cmd).toContain('eltmon/panopticon-cli');
   });
 

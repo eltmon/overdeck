@@ -81,6 +81,10 @@ const projectPathCache = new Map<string, string>();
 let closedIssuesCache: { timestamp: number; data: Array<{ number: number; title: string }> } | null = null;
 const CLOSED_ISSUES_TTL_MS = 120_000; // 2 minutes
 
+/** TTL cache for cost data to avoid re-scanning cost events on every 5s poll (PAN-830 review high-4). */
+let costCache: { timestamp: number; data: { totalCost: number; costByStage: Record<string, { cost: number; tokens: number }> } } | null = null;
+const COST_CACHE_TTL_MS = 30_000; // 30 seconds
+
 function getProjectPath(issuePrefix?: string): string {
   if (!issuePrefix) return join(homedir(), 'Projects');
 
@@ -404,7 +408,7 @@ export async function fetchActivityDataWithContext(
       const taskFiles = taskFilesByType[ss.type] || [];
       const taskIdx = taskFileIndex[ss.type] || 0;
       if (taskIdx < taskFiles.length) {
-        const taskContent = await readOptional(join(tasksDir, taskFiles[taskIdx]!));
+        const taskContent = taskFileContents.get(taskFiles[taskIdx]!);
         if (taskContent) {
           const meaningfulLines = taskContent.split('\n').filter(l =>
             !l.startsWith('```') && !l.startsWith('# EXECUTE') && !l.startsWith('⚠️')
@@ -434,10 +438,29 @@ export async function fetchActivityDataWithContext(
       // `~/.panopticon/agents/<reviewer-id>/round-N.json`.
       if (ss.type === 'review') {
         if (i !== lastReviewIndex) continue;
+        // Emit the orchestrator parent node (type 'review') so the tree shows
+        // six nodes total: 1 orchestrator + 5 roles (blocker-1).
+        const orchestratorSessionName = getTmuxSessionName('review-agent', reviewerProjectKey);
+        const orchestratorPresence: SessionNodePresence = tmuxSessionNames.has(orchestratorSessionName)
+          ? (ss.status === 'running' ? 'active' : 'idle')
+          : 'ended';
+        sections.push({
+          type: 'review',
+          sessionId: orchestratorSessionName,
+          model: 'specialist',
+          startedAt: ss.startedAt,
+          endedAt: ss.endedAt,
+          duration: ss.startedAt && ss.endedAt
+            ? Math.floor((new Date(ss.endedAt).getTime() - new Date(ss.startedAt).getTime()) / 1000)
+            : null,
+          status: ss.status,
+          presence: orchestratorPresence,
+        });
         const reviewerNodes = await buildReviewerNodes({
           issueId,
           projectKey: reviewerProjectKey,
           workspacePath,
+          projectPath,
           tmuxSessionNames,
           startedAt: ss.startedAt,
           endedAt: ss.endedAt,
@@ -492,20 +515,27 @@ export async function fetchActivityDataWithContext(
   sections.sort((a, b) => {
     if (!a.startedAt) return 1;
     if (!b.startedAt) return -1;
-    return new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime();
+    return a.startedAt.localeCompare(b.startedAt);
   });
 
-  // Cost breakdown
+  // Cost breakdown — TTL-cached to avoid re-scanning cost events on every 5s poll (PAN-830 review high-4).
   let costByStage: Record<string, { cost: number; tokens: number }> = {};
   let totalCost = 0;
   try {
-    syncCache();
-    const issueData = getCostsForIssue(issueId.toUpperCase());
-    if (issueData) {
-      totalCost = issueData.totalCost;
-      costByStage = Object.fromEntries(
-        Object.entries(issueData.stages || {}).map(([stage, stats]) => [stage, { cost: stats.cost, tokens: stats.tokens }])
-      );
+    const cacheKey = issueId.toUpperCase();
+    if (costCache && costCache.timestamp > Date.now() - COST_CACHE_TTL_MS) {
+      totalCost = costCache.data.totalCost;
+      costByStage = costCache.data.costByStage;
+    } else {
+      syncCache();
+      const issueData = getCostsForIssue(cacheKey);
+      if (issueData) {
+        totalCost = issueData.totalCost;
+        costByStage = Object.fromEntries(
+          Object.entries(issueData.stages || {}).map(([stage, stats]) => [stage, { cost: stats.cost, tokens: stats.tokens }])
+        );
+      }
+      costCache = { timestamp: Date.now(), data: { totalCost, costByStage } };
     }
   } catch { /* cost data optional */ }
 
@@ -1142,6 +1172,32 @@ async function fetchProjectTree(): Promise<unknown[]> {
     }
   } catch { /* non-fatal */ }
 
+  // Pre-group issues by project / prefix so the per-project loop is O(P + I)
+  // instead of O(P × I) (PAN-830 review high-5).
+  const rallyIssuesByProject = new Map<string, Array<Record<string, unknown>>>();
+  const trackerIssuesByPrefix = new Map<string, Array<Record<string, unknown>>>();
+  const SHOW_ALWAYS_STATES = new Set(['in_progress', 'in_review']);
+  for (const issue of allIssues) {
+    const source = issue['source'] as string | undefined;
+    if (source === 'rally' && (issue['artifactType'] as string | undefined)?.includes('PortfolioItem')) {
+      const projectName = (issue['project'] as { name?: string } | undefined)?.name;
+      if (projectName) {
+        const list = rallyIssuesByProject.get(projectName);
+        if (list) list.push(issue);
+        else rallyIssuesByProject.set(projectName, [issue]);
+      }
+    } else if (source !== 'rally') {
+      const issueId = issue['identifier'] as string | undefined;
+      const state = issue['state'] as string | undefined;
+      const prefix = issueId ? extractPrefix(issueId) : null;
+      if (prefix && state && SHOW_ALWAYS_STATES.has(state)) {
+        const list = trackerIssuesByPrefix.get(prefix.toUpperCase());
+        if (list) list.push(issue);
+        else trackerIssuesByPrefix.set(prefix.toUpperCase(), [issue]);
+      }
+    }
+  }
+
   const tmuxResult = await listSessionNamesAsync().catch(() => [] as string[]);
   const tmuxSessions = new Set<string>();
   for (const line of tmuxResult) {
@@ -1286,10 +1342,8 @@ async function fetchProjectTree(): Promise<unknown[]> {
     const existingIds = new Set(features.map(f => f['issueId']));
     const projectName = (project.config as { name?: string }).name || projectPath.split('/').pop() || 'Unknown';
 
-    for (const issue of allIssues) {
-      if (issue['source'] !== 'rally') continue;
-      if (!(issue['artifactType'] as string | undefined)?.includes('PortfolioItem')) continue;
-      if ((issue['project'] as { name?: string } | undefined)?.name !== projectName) continue;
+    const rallyIssues = rallyIssuesByProject.get(projectName) ?? [];
+    for (const issue of rallyIssues) {
       if (existingIds.has(issue['identifier'])) continue;
 
       let stateLabel = (issue['rawTrackerState'] as string) || (issue['status'] as string) || 'Unknown';
@@ -1307,7 +1361,6 @@ async function fetchProjectTree(): Promise<unknown[]> {
     }
 
     // Add tracker issues without workspaces that are in active states
-    const SHOW_ALWAYS_STATES = new Set(['in_progress', 'in_review']);
     const projectPrefixes: string[] = [];
     if (project.config.issue_prefix) {
       projectPrefixes.push(project.config.issue_prefix.toUpperCase());
@@ -1322,28 +1375,26 @@ async function fetchProjectTree(): Promise<unknown[]> {
       projectPrefixes.push(project.key.toUpperCase().replace(/-/g, ''));
     }
 
-    for (const issue of allIssues) {
-      const issueId = issue['identifier'] as string | undefined;
-      if (!issueId || existingIds.has(issueId)) continue;
+    for (const prefix of projectPrefixes) {
+      const trackerIssues = trackerIssuesByPrefix.get(prefix);
+      if (!trackerIssues) continue;
+      for (const issue of trackerIssues) {
+        const issueId = issue['identifier'] as string | undefined;
+        if (!issueId || existingIds.has(issueId)) continue;
 
-      const prefix = extractPrefix(issueId);
-      if (!prefix || !projectPrefixes.includes(prefix.toUpperCase())) continue;
-
-      const state = issue['state'] as string | undefined;
-      if (!state || !SHOW_ALWAYS_STATES.has(state)) continue;
-
-      features.push({
-        issueId,
-        title: issue['title'] || issueTitleMap.get(issueId.toUpperCase()) || issueId,
-        branch: '',
-        status: 'idle',
-        stateLabel: issue['status'] || state,
-        agentStatus: null,
-        hasPlanning: false,
-        hasPrd: false,
-        hasState: false,
-        isShadow: false,
-      });
+        features.push({
+          issueId,
+          title: issue['title'] || issueTitleMap.get(issueId.toUpperCase()) || issueId,
+          branch: '',
+          status: 'idle',
+          stateLabel: issue['status'] || issue['state'],
+          agentStatus: null,
+          hasPlanning: false,
+          hasPrd: false,
+          hasState: false,
+          isShadow: false,
+        });
+      }
     }
 
     projectTree.push({ name: projectName, path: projectPath, features });

@@ -70,6 +70,9 @@ export interface BuildReviewerNodesOptions {
   issueId: string;
   projectKey: string;
   workspacePath: string;
+  /** Project root path — reviewer sessions are spawned from here, so JSONL
+   *  resolution should use this instead of the workspace path. */
+  projectPath?: string;
   tmuxSessionNames: ReadonlySet<string>;
   /** Parent review section start time, used as fallback if there are no rounds. */
   startedAt: string;
@@ -186,7 +189,10 @@ export async function buildReviewerNodes(
       const sessionId = getReviewerSessionName(role, opts.projectKey, opts.issueId);
       const isLive = opts.tmuxSessionNames.has(sessionId);
       const roundMetadata = await readReviewerRounds(sessionId, agentsRoot);
-      const jsonlPath = await resolveJsonlPath(sessionId, opts.workspacePath, {
+      // Reviewer sessions are spawned from the project root, not the workspace,
+      // so JSONL resolution must use the project path (PAN-830 review high-7).
+      const jsonlCwd = opts.projectPath ?? opts.workspacePath;
+      const jsonlPath = await resolveJsonlPath(sessionId, jsonlCwd, {
         agentsDirOverride: opts.agentsDirOverride,
       });
 

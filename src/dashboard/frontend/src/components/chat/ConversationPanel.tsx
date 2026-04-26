@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, CheckCircle2, AlertCircle } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
@@ -10,6 +10,7 @@ import { ModelPicker, saveStoredModel } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, WorkLogEntry } from './chat-types';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase } from '../../lib/workingPhase';
+import type { ReviewerRoundMetadata } from '@panopticon/contracts';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Phase icon map ───────────────────────────────────────────────────────────
@@ -39,6 +40,8 @@ interface ConversationPanelProps {
   onArchived?: () => void;
   /** Optional review-round dividers injected into the MessagesTimeline. */
   roundMarkers?: ReadonlyArray<RoundMarker>;
+  /** Reviewer round metadata to derive timeline dividers (PAN-830 high-8). */
+  roundMetadata?: ReviewerRoundMetadata;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -61,6 +64,7 @@ export function ConversationPanel({
   onViewModeChange,
   onArchived,
   roundMarkers,
+  roundMetadata,
 }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -300,6 +304,7 @@ export function ConversationPanel({
             onArchive={handleArchive}
             resumePending={resumeMutation.isPending}
             roundMarkers={roundMarkers}
+            roundMetadata={roundMetadata}
             modelPicker={
               <ModelPicker
                 value={selectedModel}
@@ -412,9 +417,11 @@ interface ConversationViewProps {
   modelPicker?: React.ReactNode;
   /** Optional round-divider markers forwarded to the MessagesTimeline. */
   roundMarkers?: ReadonlyArray<RoundMarker>;
+  /** Reviewer round metadata to derive timeline dividers (PAN-830 high-8). */
+  roundMetadata?: ReviewerRoundMetadata;
 }
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata }: ConversationViewProps) {
   const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
   // Track count so we know when the server caught up
   const prevServerCountRef = useRef(0);
@@ -470,6 +477,53 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
 
   const parentTitle = conversation.title?.replace(/^Summary Fork:\s*/, '') || undefined;
 
+  // Derive round markers from roundMetadata + messages for reviewer sessions (PAN-830 high-8).
+  const derivedRoundMarkers = useMemo(() => {
+    if (!roundMetadata?.history?.length || messages.length === 0) return roundMarkers ?? [];
+    const markers: RoundMarker[] = [];
+    for (const round of roundMetadata.history) {
+      if (!round.endedAt) continue;
+      const endTs = new Date(round.endedAt).getTime();
+      // Find the last message whose createdAt is <= round end time
+      let afterId = '';
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const msgTs = new Date(messages[i]!.createdAt).getTime();
+        if (msgTs <= endTs) {
+          afterId = messages[i]!.id;
+          break;
+        }
+      }
+      // If no message found before round end, anchor to last message
+      if (!afterId && messages.length > 0) {
+        afterId = messages[messages.length - 1]!.id;
+      }
+      let verdict: RoundMarker['verdict'];
+      switch (round.status) {
+        case 'passed':
+        case 'approved':
+          verdict = 'passed';
+          break;
+        case 'failed':
+        case 'blocked':
+          verdict = 'failed';
+          break;
+        case 'running':
+        case 'active':
+          verdict = 'running';
+          break;
+        default:
+          verdict = 'pending';
+      }
+      markers.push({
+        afterMessageId: afterId,
+        round: round.round,
+        verdict,
+        label: round.status,
+      });
+    }
+    return markers.length > 0 ? markers : (roundMarkers ?? []);
+  }, [roundMetadata, messages, roundMarkers]);
+
   return (
     <div className={styles.conversationView}>
       {isLoading ? (
@@ -513,7 +567,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           messages={messages}
           workLog={workLog}
           streaming={isWorking}
-          roundMarkers={roundMarkers}
+          roundMarkers={derivedRoundMarkers}
         />
       )}
       {isForking ? null : onResume ? (

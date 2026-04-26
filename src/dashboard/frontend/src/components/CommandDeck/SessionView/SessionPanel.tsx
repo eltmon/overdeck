@@ -122,6 +122,7 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
               conversation={synthesizedConversation}
               viewMode="conversation"
               roundMarkers={roundMarkers}
+              roundMetadata={session.roundMetadata}
             />
           ) : hasTranscript ? (
             <div className={styles.sessionPanelTranscript}>

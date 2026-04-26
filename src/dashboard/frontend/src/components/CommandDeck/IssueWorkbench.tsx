@@ -50,8 +50,19 @@ interface IssueWorkbenchProps {
   issue?: Issue;
 }
 
-function ComposerPlaceholder({ sessions }: { sessions: readonly SessionNodeType[] }) {
+function ComposerPlaceholder({ sessions, issueId }: { sessions: readonly SessionNodeType[]; issueId: string }) {
   const hasSessions = sessions.length > 0;
+  const allEnded = hasSessions && sessions.every((s) => s.presence === 'ended');
+
+  const handleSpawn = () => {
+    // Navigate to the start-agent endpoint for this issue
+    void fetch(`/api/agents/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ issueId }),
+    }).catch(() => { /* non-fatal */ });
+  };
+
   return (
     <div
       data-testid="composer-placeholder"
@@ -77,10 +88,29 @@ function ComposerPlaceholder({ sessions }: { sessions: readonly SessionNodeType[
           opacity: 0.7,
         }}
       >
-        {hasSessions
+        {hasSessions && !allEnded
           ? 'Select a session to chat'
-          : 'No sessions — start an agent to begin'}
+          : allEnded
+            ? 'All sessions ended — spawn work to continue'
+            : 'No sessions — start an agent to begin'}
       </div>
+      {(!hasSessions || allEnded) && (
+        <button
+          onClick={handleSpawn}
+          style={{
+            padding: '8px 14px',
+            borderRadius: 6,
+            border: 'none',
+            background: 'var(--mc-primary, var(--primary))',
+            color: 'var(--mc-primary-foreground, var(--primary-foreground))',
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: 'pointer',
+          }}
+        >
+          {allEnded ? 'Spawn Work & Send' : 'Spawn & Send'}
+        </button>
+      )}
     </div>
   );
 }
@@ -144,7 +174,7 @@ export function IssueWorkbench({
       ) : (
         <>
           <ZoneCOverview issueId={issueId} issues={issues} featureData={featureData} />
-          <ComposerPlaceholder sessions={sessions} />
+          <ComposerPlaceholder sessions={sessions} issueId={issueId} />
         </>
       )}
     </div>

@@ -291,4 +291,46 @@ describe('parity smoke (master coverage)', () => {
     const missing = ALL_ACTION_KEYS.filter((k) => !reached.has(k));
     expect(missing).toEqual([]);
   });
+
+  it('actions from existing surfaces (KanbanBoard, InspectorPanel) are present in Command Deck output', () => {
+    // Map of surface-exposed actions → the canonical ActionKey they correspond to.
+    // This ensures drift detection: if a surface adds a new action not wired into
+    // the Command Deck, the test fails.
+    const surfaceActions: Array<{ name: string; key: ActionKey; find(): ActionKey[] }> = [
+      { name: 'MergeButton', key: 'merge', find: () => flattenActions(getZoneAActions({ ...baseZoneA, reviewStatus: { issueId: 'PAN-830', reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'pending', readyForMerge: true, updatedAt: '2026-04-26T00:00:00Z' } })) },
+      { name: 'StopAgentButton', key: 'stopAgent', find: () => flattenActions(getZoneAActions({ ...baseZoneA, agent: { status: 'running' } })) },
+      { name: 'RecoverButton', key: 'recover', find: () => flattenActions(getZoneAActions({ ...baseZoneA, reviewStatus: { issueId: 'PAN-830', reviewStatus: 'failed', testStatus: 'pending', mergeStatus: 'pending', readyForMerge: false, updatedAt: '2026-04-26T00:00:00Z' } })) },
+      { name: 'StartAgent', key: 'startAgent', find: () => flattenActions(getZoneAActions({ ...baseZoneA, agent: { status: 'stopped' }, lifecycle: { canResumeSession: false }, workspace: { exists: false } })) },
+      { name: 'ResumeSession', key: 'resumeSession', find: () => flattenActions(getZoneAActions({ ...baseZoneA, agent: { status: 'stopped' }, lifecycle: { canResumeSession: true }, workspace: { exists: true } })) },
+      { name: 'ResetSession', key: 'resetSession', find: () => flattenActions(getZoneAActions({ ...baseZoneA, agent: { status: 'stopped' }, lifecycle: { canResumeSession: true }, workspace: { exists: true } })) },
+      { name: 'CreateWorkspace', key: 'createWorkspace', find: () => flattenActions(getZoneAActions({ ...baseZoneA, agent: { status: 'stopped' }, lifecycle: { canResumeSession: false }, workspace: { exists: false } })) },
+      { name: 'CopySettings', key: 'copySettings', find: () => flattenActions(getZoneAActions({ ...baseZoneA, agent: { status: 'stopped' }, lifecycle: { canResumeSession: true }, workspace: { exists: true } })) },
+      { name: 'ReviewTest', key: 'reviewTest', find: () => flattenActions(getZoneAActions({ ...baseZoneA, reviewStatus: { issueId: 'PAN-830', reviewStatus: 'failed', testStatus: 'pending', mergeStatus: 'pending', readyForMerge: false, updatedAt: '2026-04-26T00:00:00Z' } })) },
+      { name: 'Beads', key: 'beads', find: () => flattenActions(getZoneAActions({ ...baseZoneA, hasPlan: true, beadsCount: 3 })) },
+      { name: 'vBrief', key: 'vbrief', find: () => flattenActions(getZoneAActions({ ...baseZoneA, hasPlan: true })) },
+      { name: 'State', key: 'state', find: () => flattenActions(getZoneAActions(baseZoneA)) },
+      { name: 'PRD', key: 'prd', find: () => flattenActions(getZoneAActions(baseZoneA)) },
+      { name: 'Inference', key: 'inference', find: () => flattenActions(getZoneAActions({ ...baseZoneA, hasInference: true })) },
+      { name: 'Discussions', key: 'discussions', find: () => flattenActions(getZoneAActions({ ...baseZoneA, hasDiscussions: true })) },
+      { name: 'Transcripts', key: 'transcripts', find: () => flattenActions(getZoneAActions({ ...baseZoneA, hasTranscripts: true })) },
+      { name: 'Upload', key: 'upload', find: () => flattenActions(getZoneAActions(baseZoneA)) },
+      { name: 'SyncDiscussions', key: 'syncDiscussions', find: () => flattenActions(getZoneAActions(baseZoneA)) },
+      { name: 'StatusReview', key: 'statusReview', find: () => flattenActions(getZoneAActions(baseZoneA)) },
+      { name: 'Reopen', key: 'reopen', find: () => flattenActions(getZoneAActions({ ...baseZoneA, issueCanonicalState: 'done' })) },
+      { name: 'RestartFromPlan', key: 'restartFromPlan', find: () => flattenActions(getZoneAActions(baseZoneA)) },
+      { name: 'ResetIssue', key: 'resetIssue', find: () => flattenActions(getZoneAActions(baseZoneA)) },
+      { name: 'Cancel', key: 'cancel', find: () => flattenActions(getZoneAActions(baseZoneA)) },
+      { name: 'StopSession', key: 'stopSession', find: () => flattenActions(getZoneBActions({ presence: 'active', type: 'work' })) },
+      { name: 'ViewTerminal', key: 'viewTerminal', find: () => flattenActions(getZoneBActions({ presence: 'active', type: 'work', hasTerminal: true })) },
+    ];
+
+    const missing: string[] = [];
+    for (const surface of surfaceActions) {
+      const actions = surface.find();
+      if (!actions.includes(surface.key)) {
+        missing.push(`${surface.name} → ${surface.key}`);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
 });
