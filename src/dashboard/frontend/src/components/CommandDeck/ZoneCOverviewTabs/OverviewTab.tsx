@@ -372,7 +372,7 @@ export function OverviewTab({ issueId, onSwitchTab }: OverviewTabProps) {
               <button
                 type="button"
                 data-testid="overview-pr-link"
-                onClick={() => onSwitchTab?.('diff')}
+                onClick={() => onSwitchTab?.('prdiff')}
                 style={{
                   fontSize: 11,
                   padding: '2px 8px',

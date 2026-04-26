@@ -181,14 +181,6 @@ export function SessionNode({
     closeMenu();
   }, [issueId, onDeepWipe, closeMenu]);
 
-  const handleOpenStateDir = useCallback(() => {
-    const path = `~/.panopticon/agents/${session.sessionId}/`;
-    navigator.clipboard?.writeText(path).catch(() => {
-      // Fallback: no-op if clipboard unavailable
-    });
-    closeMenu();
-  }, [session.sessionId, closeMenu]);
-
   return (
     <>
       <button
