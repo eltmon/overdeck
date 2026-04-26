@@ -146,6 +146,8 @@ function DiscussionRow({ item }: { item: DiscussionItem }) {
         display: 'flex',
         flexDirection: 'column',
         gap: 6,
+        contentVisibility: 'auto',
+        containIntrinsicHeight: '60px',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>

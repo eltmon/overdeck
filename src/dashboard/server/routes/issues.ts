@@ -142,8 +142,16 @@ async function closeIssuePullRequest(issueId: string, reason = 'Canceled via Pan
 
   const branchName = `feature/${issueId.toLowerCase()}`;
   try {
-    const { stdout: prListRaw } = await execAsync(
-      `gh pr list --repo ${githubCheck.owner}/${githubCheck.repo} --head "${branchName}" --state open --json number --jq '.[0].number'`,
+    const { stdout: prListRaw } = await execFileAsync(
+      'gh',
+      [
+        'pr', 'list',
+        '--repo', `${githubCheck.owner}/${githubCheck.repo}`,
+        '--head', branchName,
+        '--state', 'open',
+        '--json', 'number',
+        '--jq', '.[0].number',
+      ],
       { encoding: 'utf-8', timeout: 15000 },
     );
     const prNumber = prListRaw.trim();
@@ -151,8 +159,13 @@ async function closeIssuePullRequest(issueId: string, reason = 'Canceled via Pan
       return ['No open PR found for branch'];
     }
 
-    await execAsync(
-      `gh pr close ${prNumber} --repo ${githubCheck.owner}/${githubCheck.repo} --comment "${reason}"`,
+    await execFileAsync(
+      'gh',
+      [
+        'pr', 'close', prNumber,
+        '--repo', `${githubCheck.owner}/${githubCheck.repo}`,
+        '--comment', reason,
+      ],
       { encoding: 'utf-8', timeout: 15000 },
     );
     try {
@@ -2526,31 +2539,36 @@ export async function fetchIssuePullRequest(issueId: string): Promise<IssuePrEnd
     return { issueId: upper, pr: null, diff: null };
   }
 
-  // Pull the rich fields via `gh pr view --json …`. List doesn't expose
-  // statusCheckRollup, reviewRequests, body, or files reliably.
+  // Pull the rich fields via `gh pr view --json …` and `gh pr diff` in
+  // parallel — they depend only on the PR number.
   let pr: IssuePullRequestData;
-  try {
-    const { stdout } = await execAsync(
-      `gh pr view ${prNumber} --repo ${repoArg} --json ${GH_PR_VIEW_FIELDS}`,
-      { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
-    );
-    pr = JSON.parse(stdout) as IssuePullRequestData;
-  } catch (err: any) {
-    return { issueId: upper, pr: null, diff: null, error: `gh pr view failed: ${err.message}` };
-  }
-
   let diff: string | null = null;
+  let diffError: string | undefined;
   try {
-    const { stdout } = await execAsync(
-      `gh pr diff ${prNumber} --repo ${repoArg} --patch`,
-      { encoding: 'utf-8', timeout: 30000, maxBuffer: 16 * 1024 * 1024 },
-    );
-    diff = stdout;
+    const [viewResult, diffResult] = await Promise.allSettled([
+      execAsync(
+        `gh pr view ${prNumber} --repo ${repoArg} --json ${GH_PR_VIEW_FIELDS}`,
+        { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
+      ),
+      execAsync(
+        `gh pr diff ${prNumber} --repo ${repoArg} --patch`,
+        { encoding: 'utf-8', timeout: 30000, maxBuffer: 16 * 1024 * 1024 },
+      ),
+    ]);
+    if (viewResult.status === 'rejected') {
+      return { issueId: upper, pr: null, diff: null, error: `gh pr view failed: ${viewResult.reason?.message ?? String(viewResult.reason)}` };
+    }
+    pr = JSON.parse(viewResult.value.stdout) as IssuePullRequestData;
+    if (diffResult.status === 'fulfilled') {
+      diff = diffResult.value.stdout;
+    } else {
+      diffError = `gh pr diff failed: ${diffResult.reason?.message ?? String(diffResult.reason)}`;
+    }
   } catch (err: any) {
-    return { issueId: upper, pr, diff: null, error: `gh pr diff failed: ${err.message}` };
+    return { issueId: upper, pr: null, diff: null, error: `gh pr fetch failed: ${err.message}` };
   }
 
-  return { issueId: upper, pr, diff };
+  return { issueId: upper, pr, diff, error: diffError };
 }
 
 const getIssuePrRoute = HttpRouter.add(

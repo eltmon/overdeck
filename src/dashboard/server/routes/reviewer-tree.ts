@@ -128,37 +128,38 @@ export async function readReviewerRounds(
 
   if (roundFiles.length === 0) return undefined;
 
-  const history: ReviewerRoundSummary[] = [];
-  for (const rf of roundFiles) {
-    const raw = await readFile(join(dir, rf.name), 'utf-8').catch(() => null);
-    if (!raw) continue;
-    try {
-      const parsed = JSON.parse(raw) as {
-        round?: number;
-        status?: string;
-        reviewResult?: string;
-        success?: boolean;
-        archivedAt?: string;
-        startedAt?: string;
-        endedAt?: string;
-        durationSec?: number | null;
-        findings?: number;
-        cost?: number;
-      };
-      history.push({
-        round: parsed.round ?? rf.round,
-        status: parsed.status ?? 'unknown',
-        reviewResult: parsed.reviewResult,
-        success: parsed.success,
-        archivedAt: parsed.archivedAt,
-        startedAt: parsed.startedAt,
-        endedAt: parsed.endedAt,
-        durationSec: parsed.durationSec,
-        findings: parsed.findings,
-        cost: parsed.cost,
-      });
-    } catch { /* skip malformed artifact */ }
-  }
+  const history = (await Promise.all(
+    roundFiles.map(async (rf) => {
+      const raw = await readFile(join(dir, rf.name), 'utf-8').catch(() => null);
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw) as {
+          round?: number;
+          status?: string;
+          reviewResult?: string;
+          success?: boolean;
+          archivedAt?: string;
+          startedAt?: string;
+          endedAt?: string;
+          durationSec?: number | null;
+          findings?: number;
+          cost?: number;
+        };
+        return {
+          round: parsed.round ?? rf.round,
+          status: parsed.status ?? 'unknown',
+          reviewResult: parsed.reviewResult,
+          success: parsed.success,
+          archivedAt: parsed.archivedAt,
+          startedAt: parsed.startedAt,
+          endedAt: parsed.endedAt,
+          durationSec: parsed.durationSec,
+          findings: parsed.findings,
+          cost: parsed.cost,
+        };
+      } catch { /* skip malformed artifact */ return null; }
+    }),
+  )).filter((x): x is ReviewerRoundSummary => x !== null);
 
   if (history.length === 0) return undefined;
 

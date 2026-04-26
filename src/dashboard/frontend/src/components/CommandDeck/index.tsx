@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient, useQueries } from '@tanstack/react-query';
 import { Compass, Plus } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
+import type { TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { BadgeBar } from './FeatureMetadata/BadgeBar';
 import { DeaconStatus } from './DeaconStatus';
 import { DetailPanelLayout } from '../DetailPanelLayout';
@@ -16,6 +17,7 @@ import type { Agent, Issue } from '../../types';
 import { useDashboardStore, selectAgentList } from '../../lib/store';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
+import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { WS_METHODS } from '@panopticon/contracts';
 import type { ProjectSessionTree, SessionTreeDelta, SessionNode } from '@panopticon/contracts';
 import styles from './styles/command-deck.module.css';
@@ -138,6 +140,7 @@ export function CommandDeck({
   const [isDraft, setIsDraft] = useState(false);
   const [showBeads, setShowBeads] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('conversations');
+  const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
 
   // Per-issue session selection (PAN-830 pan-11sr) — slice keyed by issueId.
@@ -356,6 +359,31 @@ export function CommandDeck({
     setIsDraft(false);
   }, [selectSession]);
 
+  const handleStopSession = useCallback(async (sessionId: string) => {
+    try {
+      const res = await fetch(`/api/agents/${sessionId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to stop session');
+      await refreshDashboardState(queryClient);
+    } catch {
+      // Silently ignore — the user can retry from Zone B if needed
+    }
+  }, [queryClient]);
+
+  const handleViewTerminal = useCallback((sessionId: string) => {
+    // Find which issue owns this session and select it
+    for (const project of projectsWithSessions) {
+      for (const feature of project.features) {
+        if (feature.sessions?.some(s => s.sessionId === sessionId)) {
+          setSelectedFeature(feature.issueId);
+          selectSession(feature.issueId, sessionId);
+          setSelectedConversation(null);
+          setIsDraft(false);
+          return;
+        }
+      }
+    }
+  }, [projectsWithSessions, selectSession]);
+
   const handleSelectConversation = useCallback((name: string | null) => {
     setDraftKey(0);
     setSelectedConversation(name);
@@ -505,6 +533,32 @@ export function CommandDeck({
                 </span>
               </button>
             </div>
+
+            {/* Tree session filter (blocker-4) */}
+            {sidebarTab === 'projects' && (
+              <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
+                {(['all', 'alive', 'failed'] as TreeSessionFilter[]).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setTreeFilter(f)}
+                    style={{
+                      flex: 1,
+                      padding: '2px 6px',
+                      fontSize: 10,
+                      fontWeight: treeFilter === f ? 600 : 400,
+                      border: '1px solid var(--mc-border)',
+                      borderRadius: 4,
+                      background: treeFilter === f ? 'var(--mc-bg-selected)' : 'transparent',
+                      color: treeFilter === f ? 'var(--mc-text-primary)' : 'var(--mc-text-muted)',
+                      cursor: 'pointer',
+                      textTransform: 'capitalize',
+                    }}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Tab content — each gets full height */}
@@ -535,6 +589,9 @@ export function CommandDeck({
                   onSelectSession={handleSelectSession}
                   issueTitles={issueTitles}
                   issueCosts={issueCosts}
+                  filter={treeFilter}
+                  onStopSession={handleStopSession}
+                  onViewTerminal={handleViewTerminal}
                 />
               ))
             )}

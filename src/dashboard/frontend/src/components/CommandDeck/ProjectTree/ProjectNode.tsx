@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { SessionNode } from '@panopticon/contracts';
-import { FeatureItem } from './FeatureItem';
+import { FeatureItem, type TreeSessionFilter } from './FeatureItem';
 import styles from '../styles/command-deck.module.css';
 
 export interface ProjectFeature {
@@ -34,9 +34,12 @@ interface ProjectNodeProps {
   onSelectSession?: (issueId: string, sessionId: string) => void;
   issueTitles?: Record<string, string>;
   issueCosts?: Record<string, number>;
+  filter?: TreeSessionFilter;
+  onStopSession?: (sessionId: string) => void;
+  onViewTerminal?: (sessionId: string) => void;
 }
 
-export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts }: ProjectNodeProps) {
+export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter, onStopSession, onViewTerminal }: ProjectNodeProps) {
   const [expanded, setExpanded] = useState(features.length > 0);
 
   return (
@@ -65,6 +68,9 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
               onSelectSession={onSelectSession}
               title={issueTitles?.[feature.issueId.toLowerCase()] || issueTitles?.[feature.issueId] || feature.title}
               cost={issueCosts?.[feature.issueId.toLowerCase()] || issueCosts?.[feature.issueId]}
+              filter={filter}
+              onStopSession={onStopSession}
+              onViewTerminal={onViewTerminal}
             />
           ))
         ) : (

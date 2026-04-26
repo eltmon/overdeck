@@ -11,6 +11,7 @@
  */
 
 import type { SessionNode as SessionNodeType, SessionNodePresence } from '@panopticon/contracts';
+import { useLiveFlash } from '../../lib/useLiveFlash';
 import { RoleBadge, type ReviewerRole } from './RoleBadge';
 import { StatusDot, type StatusDotStatus } from './StatusDot';
 import { ZoneBActionStrip } from './ZoneBActionStrip';
@@ -52,9 +53,14 @@ export function ZoneB({ session, onViewTerminal }: ZoneBProps) {
   const status = presenceToStatus(session.presence);
   const label = session.role ? `${session.type}:${session.role}` : session.type;
 
+  // Live flash when session presence or status changes (blocker-8)
+  const flashKey = `${session.sessionId}:${session.presence}:${session.status}`;
+  const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
+
   return (
     <div
       data-testid="zone-b"
+      className={flashClass}
       style={{
         display: 'flex',
         alignItems: 'center',

@@ -106,6 +106,18 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
     return Math.max(1, sorted[idx] ?? 1);
   }, [data]);
 
+  const diffRows = useMemo(() => {
+    if (!data?.diff) return null;
+    return data.diff.split('\n').map((line, idx) => {
+      const color = diffLineColor(line);
+      return (
+        <div key={idx} style={color ? { color } : undefined}>
+          {line || '\u00A0'}
+        </div>
+      );
+    });
+  }, [data?.diff]);
+
   if (isLoading) {
     return (
       <div
@@ -421,14 +433,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
               maxHeight: 480,
             }}
           >
-            {useMemo(() => data.diff?.split('\n').map((line, idx) => {
-              const color = diffLineColor(line);
-              return (
-                <div key={idx} style={color ? { color } : undefined}>
-                  {line || '\u00A0'}
-                </div>
-              );
-            }), [data.diff])}
+            {diffRows}
           </pre>
         </section>
       )}

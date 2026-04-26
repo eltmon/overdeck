@@ -2,156 +2,213 @@
 specialist: review-agent
 issueId: PAN-830
 outcome: changes-requested
-timestamp: 2026-04-26T11:25:06Z
+timestamp: 2026-04-26T12:22:12Z
 ---
 
 # Verdict: CHANGES_REQUESTED
 
 ## Summary
-PAN-830 delivers the Command Deck — a major three-zone UI with reviewer canonical naming, JSONL transcript resolution, liveness primitives, and 10-tab overview. The PR is substantial (65+ files, ~8,600 insertions). Three findings reach the Blocker bar: two command-injection vulnerabilities (RCE vectors on the dashboard server) and one regex ambiguity that silently breaks the reviewer tree for hyphenated project keys. All three must be fixed before merge. The Requirements reviewer's two `!`-prefix findings were correctly self-downgraded to `~` given scope and precedent; they are tracked as high-priority follow-up beads.
+
+PAN-830 implements the Unified Command Deck: three-zone shell (Zone A/B/C), canonical reviewer naming with session reuse across rounds, JSONL path resolution fix, liveness building blocks (RoleBadge, StatusDot, LiveCounter, ToolFlash, ActivitySparkline), and 10-tab overview panel. Core infrastructure is solid and the command injection hardening (added to `issues.ts` and `command-deck.ts`) is correct and necessary.
+
+However, this PR has **9 blockers** that must be addressed before merge:
+- 2 command-injection vectors (correctness, MUST fix before merge)
+- 1 React Rules-of-Hooks violation in `PrDiffTab` (both correctness and performance flagged this, MUST fix)
+- 6 missing PRD acceptance criteria (requirements, MUST fix before merge)
+
+Additionally, 3 high-priority performance issues and 4 nits are listed below. The work agent should address blockers first, then the high-priority performance items before signaling completion.
+
+---
 
 ## Blockers (MUST fix before merge)
 
-### 1. Command injection — `issueId` into `gh pr list` shell string — `issues.ts:2711` — `!`
-**Raised by**: security
-**Why it blocks**: `issueId` from the route param is interpolated directly into a double-quoted shell string passed to `execAsync`. An attacker who can hit the dashboard API can achieve remote code execution on the host.
+### 1. Command injection via `reason` parameter in `closeIssuePullRequest` — `src/dashboard/server/routes/issues.ts:155` — `!`
 
-<fix instruction>
-Replace `execAsync` shell interpolation with `execFileAsync` (argv array). Validate `issueId` against the expected `PREFIX-NUMBER` format before deriving `branchName`:
-
-```typescript
-// Before (vulnerable):
-const branchName = `feature/${issueId.toLowerCase()}`;
-await execAsync(
-  `gh pr list --repo ${prRepoArg} --head "${branchName}" --state all ...`,
-)
-
-// After (safe):
-if (!/^[A-Za-z]+-\d+$/i.test(issueId)) throw new Error('Invalid issue id');
-const branchName = `feature/${issueId.toLowerCase()}`;
-await execFileAsync('gh', [
-  'pr', 'list',
-  '--repo', prRepoArg,
-  '--head', branchName,
-  '--state', 'all',
-  '--json', 'number',
-  '--limit', '1',
-  '--jq', '.[0].number',
-]);
-```
-</fix instruction>
-
-### 2. Command injection — `issueId`/`issueNum`/`issueLower` into `gh issue/pr` shell strings — `command-deck.ts:947,960,966` — `!`
-**Raised by**: security
-**Why it blocks**: Three separate `execAsync` calls in the `POST /api/command-deck/planning/:issueId/sync-discussions` route embed route-controlled values (`issueNum`, `issueLower`) into shell strings. A crafted `issueId` achieves RCE on the dashboard host, same vector class as blocker #1.
-
-<fix instruction>
-Use `execFileAsync` with explicit argv for all three calls. Also apply the same `issueId` format validation at the route entry:
-
-```typescript
-// Validate once at route entry:
-if (!/^[A-Za-z]+-\d+$/i.test(issueId)) throw new Error('Invalid issue id');
-
-// Replace all three execAsync calls with execFileAsync:
-// gh issue view
-await execFileAsync('gh', ['issue', 'view', issueNum, '--repo', repo, '--json', 'comments', '--jq', jq]);
-// gh pr list
-await execFileAsync('gh', ['pr', 'list', '--repo', repo, '--head', `feature/${issueId.toLowerCase()}`, '--json', 'number,title', '--jq', '.[].number']);
-// gh pr view
-await execFileAsync('gh', ['pr', 'view', prNum, '--repo', repo, '--json', 'comments', '--jq', '.comments[].body']);
-```
-</fix instruction>
-
-### 3. Regex ambiguity in `parseReviewerSessionName` — `specialists.ts:721` — `!`
 **Raised by**: correctness
-**Why it blocks**: The regex uses lazy quantifiers `+?` for both capture groups. For any project key containing hyphens (e.g., `my-project`), the parser returns `null` silently, making all reviewer nodes for that project invisible to the reviewer tree and Command Deck.
 
-<fix instruction>
-Anchor the second capture group on the well-known `PREFIX-NUMBER` pattern for issue IDs. Replace the lazy quantifiers with a greedy match for group 1:
+**Why it blocks**: User-controlled `reason` string is interpolated directly into a shell command. A `reason` containing `"` or `$(...)` enables arbitrary command execution as the server process user. Same class of bug fixed in commit `e65a3c8c` for other locations but missed here.
+
+**Fix**: Use `execFileAsync` with an argument array (the discussions endpoint already does this for `gh pr list`):
 
 ```typescript
-// Before (vulnerable to misparse):
-const m = name.match(/^specialist-([\w.-]+?)-([\w.-]+?)-review-(correctness|security|performance|requirements|synthesis)$/);
-
-// After (anchored on issue ID pattern):
-const m = name.match(/^specialist-([\w.-]+)-([A-Za-z]+-\d+)-review-(correctness|security|performance|requirements|synthesis)$/);
+await execFileAsync('gh', [
+  'pr', 'close', prNumber,
+  '--repo', `${githubCheck.owner}/${githubCheck.repo}`,
+  '--comment', reason,
+], { encoding: 'utf-8', timeout: 15000 });
 ```
-</fix instruction>
 
-## High Priority (SHOULD fix; synthesis may still approve if justified)
+### 2. Shell injection via `providerEnvStr` in status-review — `src/dashboard/server/routes/command-deck.ts:807` — `!`
 
-### 1. PrDiffTab renders entire patch as un-memoized, un-virtualized DOM nodes — `PrDiffTab.tsx:424` — `~`
-**Raised by**: performance
-<fix instruction>
-Wrap the diff split + color derivation in `useMemo`. Add virtualization for large diffs (>2000 lines) using `react-virtual` already imported by `MessagesTimeline`:
+**Raised by**: correctness
+
+**Why it blocks**: `providerEnvStr` is built from API key values interpolated into a shell command string. If any API key contains `"` or `$()`, command injection occurs. Even without malicious intent, keys containing special characters break the `exec` call silently.
+
+**Fix**: Use `env` option of `execAsync` instead of shell interpolation:
+
+```typescript
+const env = { ...process.env, ...envVars };
+await execAsync(`${cliCmd} -p${modelFlag} --no-session-persistence`, {
+  encoding: 'utf-8', timeout: 120000, maxBuffer: 1024 * 1024,
+  env,
+  input: await readFile(promptFile, 'utf-8'),
+});
+```
+
+### 3. `useMemo` called inside JSX conditional render — `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/PrDiffTab.tsx:424-431` — `!`
+
+**Raised by**: correctness, performance
+
+**Why it blocks**: React hooks **must** be called at the top level of a component function, never inside conditionals or nested functions. The `useMemo` call inside a JSX conditional block violates Rules of Hooks and causes stale memoized values, incorrect hook ordering after conditional toggles, and unpredictable behavior during Fast Refresh or concurrent rendering. This is a correctness issue, not just a performance concern.
+
+**Fix**: Move the memo to the component top level:
 
 ```tsx
-const diffLines = useMemo(() => {
-  if (!data?.diff) return [];
-  return data.diff.split('\n').map((line) => ({
-    line: line || '\u00A0',
-    color: diffLineColor(line),
-  }));
-}, [data?.diff]);
-
-const VIRTUALIZE_THRESHOLD = 2000;
-const shouldVirtualize = diffLines.length > VIRTUALIZE_THRESHOLD;
+export function PrDiffTab({ issueId }: PrDiffTabProps) {
+  const { data, isLoading, isError } = usePrQuery(issueId);
+  const diffRows = useMemo(() => {
+    if (!data?.diff) return null;
+    return data.diff.split('\n').map((line, idx) => {
+      const color = diffLineColor(line);
+      return <div key={idx} style={color ? { color } : undefined}>{line || '\u00A0'}</div>;
+    });
+  }, [data?.diff]);
+  // ...
+  {data.diff && diffRows && (
+    <pre>{diffRows}</pre>
+  )}
+}
 ```
-</fix instruction>
 
-### 2. MessagesTimeline re-derives sorted timeline + grouped rows on every render — `MessagesTimeline.tsx:106-107` — `~`
+### 4. Tree status filter `[All] [Alive] [Failed]` not implemented — `!`
+
+**Raised by**: requirements
+
+**Why it blocks**: Explicitly stated in PRD tree behavior section as a required feature. Users cannot filter the session tree to focus on active or failed sessions.
+
+**Fix**: Add filter UI in `ProjectNode` or tree header with filter logic applied to `features.sessions` before rendering.
+
+### 5. Right-click context menu on session nodes not implemented — `!`
+
+**Raised by**: requirements
+
+**Why it blocks**: Explicitly stated in PRD tree behavior section. Users cannot access session actions directly from the tree; they must select the session first and use Zone B.
+
+**Fix**: Add `onContextMenu` handler on session rows in `FeatureItem` or tree rendering, mirroring Zone B contextual actions.
+
+### 6. Done-state collapse / in-flight expand defaults not implemented — `!`
+
+**Raised by**: requirements
+
+**Why it blocks**: Explicitly stated in PRD tree behavior section. Currently all project nodes default to the same expand state regardless of issue status, violating the PRD's density principle.
+
+**Fix**: `ProjectNode` or `FeatureItem` should read issue status and set `expanded` accordingly — done-state issues default to collapsed; in-flight issues default to expanded.
+
+### 7. Issue-row StatusDot dominant aggregation not implemented — `!`
+
+**Raised by**: requirements
+
+**Why it blocks**: Explicitly stated in PRD tree behavior section. The issue/feature row in the tree should show a `StatusDot` reflecting the dominant state of its child sessions.
+
+**Fix**: `FeatureItem` should compute dominant session state and render `StatusDot` on the issue row.
+
+### 8. Event-driven motion catalog not wired to domain events — `!`
+
+**Raised by**: requirements
+
+**Why it blocks**: The PRD acceptance criterion explicitly requires: "Every domain event in the catalog triggers its prescribed motion within 200ms." The liveness components (LiveCounter, ToolFlash, StatusDot, ActivitySparkline) exist and can animate, but they are not connected to domain events. Data updates only via `useQuery` polling — the core "north-star principle: liveness" is not realized.
+
+**Fix**: Add `subscribeDomainEvents` event listeners/hooks in `IssueWorkbench`, `ZoneA`, `ZoneB`, `ZoneCOverview` that subscribe to domain events and trigger matching animations within 200ms.
+
+### 9. `getZoneAActions` missing explicit branches for many pipeline states — `~` (High, blocking per requirements policy)
+
+**Raised by**: requirements
+
+**Why it blocks**: The PRD specifies a 16+ state-to-actions table. The current implementation uses a simpler 5-branch heuristic (merge, reviewTest, recover, stopAgent/startAgent/resumeSession, artifacts). Several explicit pipeline states from the PRD table are missing: `Planning` (active), `Planning Done · Awaiting Work`, `In Progress · work idle`, `Verification failing`, `In Review · reviewers running`, `In Review · CHANGES_REQUESTED`, `In Review · APPROVED`, `Testing · running`, `Testing · failures`, `Ready to Merge`, `Merging`, `Merged`, `Done`.
+
+**Fix**: Add explicit conditional branches in `getZoneAActions` matching the full PRD state-to-actions table.
+
+---
+
+## High Priority (SHOULD fix; may still approve if justified)
+
+### 1. Sequential file reads in `readReviewerRounds` — `src/dashboard/server/routes/reviewer-tree.ts:132-161` — `⊗`
+
 **Raised by**: performance
-<fix instruction>
-Wrap both derivation calls in `useMemo`:
 
-```tsx
-const timelineEntries = useMemo(
-  () => deriveTimelineEntries(messages, workLog),
-  [messages, workLog],
-);
-const rows = useMemo(
-  () => deriveMessagesTimelineRows(timelineEntries, streaming),
-  [timelineEntries, streaming],
-);
-```
-</fix instruction>
+`readReviewerRounds` calls `readFile` sequentially in a `for…of` loop. With 5 roles and 10+ rounds per role, this means 50+ sequential disk reads on every activity poll (every 10 s). Fix by parallelizing with `Promise.all`.
+
+### 2. Unvirtualized discussion list in `DiscussionsTab` — `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/DiscussionsTab.tsx:317-319` — `~`
+
+**Raised by**: performance
+
+Discussion feed renders all items without virtualization. On a busy PR with 200+ comments/reviews/threads, this creates a large React tree and heavy markdown parsing upfront, causing scroll jank and slow initial render.
+
+### 3. `existsSync` inside async server path in `getProjectPath` — `src/dashboard/server/routes/command-deck.ts:106` — `~`
+
+**Raised by**: performance
+
+`getProjectPath` uses dynamic `require('node:fs').existsSync` inside an async function. The dynamic `require` may break when bundled by `tsdown` for production. Replace `require('node:fs')` with a static import of `existsSync` at the top of the file.
+
+### 4. Sequential `gh` CLI calls in `fetchIssuePullRequest` — `src/dashboard/server/routes/issues.ts:2517-2551` — `~`
+
+**Raised by**: performance
+
+Three sequential `gh pr list` → `gh pr view` → `gh pr diff` calls. Steps 2 and 3 depend only on the PR number and can run in parallel. On slow GitHub API conditions, this exceeds 2 s latency.
+
+---
 
 ## Nits (advisory — safe to defer)
 
-- `command-deck.ts:291` — `?` — `isNaN` used where `Number.isFinite` is safer. Replace `isNaN(ms)` with `Number.isFinite(ms)` for consistency with `reviewer-tree.ts:217` and `review-agent.ts:1003`. (correctness)
-- `review-agent.ts:1016-1023` — `?` — Race condition in round-N numbering. Round number derived from file count could collide under concurrent writes. Use max existing N + 1 or `Date.now()`. (correctness)
-- `reviewer-tree.ts:214-218` — `?` — Duration calculation can produce negative values if clocks are skewed. Clamp to `Math.max(0, ...)`. (correctness)
-- `issues.ts:2731-2830` — `?` — Three `Promise.all` pushes into shared `collectedItems` array. Return local arrays and spread after `await Promise.all`. (correctness)
-- `OverviewTab.tsx:36-42` — `?` — `REVIEWER_ROLES` duplicated in three places (`OverviewTab.tsx`, `specialists.ts`, `RoleBadge.tsx`). Consider a shared frontend constants file. (correctness)
-- `command-deck.ts` — `?` — `gh pr diff` shell-out has 16MB `maxBuffer` but no response size limit enforced. Consider truncating or streaming for very large PRs. (performance)
-- `issues.ts:2515-2547` — `?` — `fetchIssuePullRequest` runs 3 sequential `gh` calls; view+diff could run in `Promise.all` after resolving PR number. (performance)
-- `issues.ts:2615-2678` — `?` — `fetchIssueDiscussions` sources #1+#2 (Linear + gh issue comments) run sequentially before the parallel block. Could fan out with `Promise.all`. (performance)
-- `command-deck.ts` — `?` — Activity endpoint polled every 5s does many FS+tmux reads per call. A 2-second in-process cache keyed by mtime would cut idle reads ~90%. (performance)
-- `issues.ts:2655,2737,2767,2800` — `?` — GitHub API calls hard-code `per_page=100` with no pagination. Silent truncation for >100 comments. (performance)
-- `reviewer-tree.ts` — `?` — `buildReviewerNodes` fans out per-role round artifact reads. An LRU cache keyed by `(reviewerId, latestRoundN)` would reduce file I/O on consecutive polls. (performance)
+- `src/dashboard/server/routes/reviewer-tree.ts:101` — `≉` — Legacy reviewer-role parser uses `dashIdx <= 0` instead of `dashIdx < 0`, accidentally rejecting position-0 dashes. Minor edge case, safe to defer.
+- `src/dashboard/server/routes/command-deck.ts:781-808` — `?` — status-review uses `cat | cliCmd` pipe; consider using `execAsync`'s `input` option instead.
+- `src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx:189-196` — `?` — `dedupedVirtualItems` IIFE runs every render; should be `useMemo`'d.
+- `src/dashboard/server/routes/issues.ts:2710-2712` — `?` — `fetchIssueDiscussions` throws on invalid issue ID; consider returning an error response object instead of throwing a rejected promise.
+
+---
 
 ## Cross-cutting groups
 
-**Command injection — fix together**: Both security blockers stem from interpolating unvalidated route params into `execAsync` shell strings. The fix pattern is identical: validate input format, replace `execAsync(str)` with `execFileAsync(cmd, [args])`.
-- [blocker-1] `issues.ts:2711` — `issueId` in `gh pr list`
-- [blocker-2] `command-deck.ts:947,960,966` — `issueId` in `gh issue/pr`
+**Command injection (fix together):**
+- [blocker-1] `issues.ts:155` — `reason` parameter interpolated into shell command
+- [blocker-2] `command-deck.ts:807` — `providerEnvStr` interpolated into shell command
 
-**Frontend re-render loop — PrDiffTab + MessagesTimeline**: Both performance warnings share the same root cause — expensive pure derivations running on every render without `useMemo`. Fix both to establish the pattern for the new Command Deck components.
-- [high-1] `PrDiffTab.tsx:424` — un-memoized diff split
-- [high-2] `MessagesTimeline.tsx:106-107` — un-memoized timeline derivation
+**React hooks violations (fix together):**
+- [blocker-3] `PrDiffTab.tsx:424-431` — `useMemo` called inside JSX conditional render
+
+**Tree behavior requirements (fix together — all relate to tree rendering):**
+- [blocker-4] Tree status filter `[All] [Alive] [Failed]` toggle missing
+- [blocker-5] Right-click session-action menu missing
+- [blocker-6] Done-state collapse / in-flight expand defaults missing
+- [blocker-7] Issue-row StatusDot dominant aggregation missing
+
+**Domain event wiring (all relate to connecting liveness components to event stream):**
+- [blocker-8] Event-driven motion catalog not wired
+- [high-4] `existsSync` dynamic require in dashboard route (can be part of the same cleanup pass)
+
+---
 
 ## What's good
-- Reviewer canonical naming is correctly implemented and tested; the round-trip `getReviewerSessionName` / `parseReviewerSessionName` pair is sound for non-hyphenated keys
-- JSONL resolver with 3-tier fallback is well-tested with thorough unit coverage
-- The three-zone `IssueWorkbench` shell with 10-tab overview and liveness primitives is a substantial, cohesive feature
-- Security review correctly identified the `javascript:` link sanitization in `ChatMarkdown.tsx` as already present — good defensive practice
-- The PR ships 6 well-tested liveness primitives (StatusDot, LiveCounter, RoleBadge, RoundCard, ToolFlash, ActivitySparkline) with 521 lines of test coverage
-- `prefers-reduced-motion` accessibility support is correctly implemented in CSS
+
+- Command injection hardening was correctly applied to both identified vectors (`issues.ts` and `command-deck.ts`) — same class of bug, same fix pattern.
+- Canonical reviewer naming + session reuse across rounds is correctly implemented with proper `sessionExistsAsync` check and `remain-on-exit on`.
+- JSONL path resolution fix (`jsonl-resolver.ts`) correctly handles all three fallback levels.
+- Three-zone shell structure (Zone A/B/C) is clean and properly gated on `isAgentSelected` vs issue-selected mode.
+- All 10 tabs are wired and render their respective data without leaving Command Deck.
+- TanStack Query polling cadence is appropriate (10 s for projects/costs/conversations, 30 s for discussions/PR/diff).
+- `applySessionTreeDelta` is O(F+S) as documented — correct and efficient.
+- Round dividers rendering in `MessagesTimeline` is correctly wired (even if the data derivation is deferred).
+- No refresh buttons in Command Deck UI — data updates via polling and domain events as specified.
+
+---
 
 ## Review stats
-- Blockers: 3   High: 2   Medium: 0   Nits: 11
-- By reviewer: correctness=1, security=2, performance=2, requirements=0
-- Files touched: 65+   Files with findings: 14
+
+- Blockers: 9   High: 4   Medium: 0   Nits: 4
+- By reviewer: correctness=5 (2 critical, 3 warnings), security=0, performance=8 (1 critical, 1 should-fix, 4 consider-fix, 2 noted), requirements=14 (6 missing, 8 partial)
+- Files touched: ~60   Files with findings: ~14
+
+---
 
 ## Appendix: individual reviews
 

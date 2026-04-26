@@ -104,12 +104,55 @@ export interface ZoneBInput {
 
 // ─── Pure mappers ─────────────────────────────────────────────────────────────
 
+type PipelineState =
+  | 'planning_active'
+  | 'planning_done_awaiting_work'
+  | 'in_progress_work_running'
+  | 'in_progress_work_idle'
+  | 'verification_failing'
+  | 'in_review_reviewers_running'
+  | 'in_review_changes_requested'
+  | 'in_review_approved'
+  | 'testing_running'
+  | 'testing_failures'
+  | 'ready_to_merge'
+  | 'merging'
+  | 'merged'
+  | 'done'
+  | 'canceled'
+  | 'generic';
+
+function derivePipelineState(input: ZoneAInput): PipelineState {
+  const { reviewStatus, agent, issueCanonicalState } = input;
+  const merged = input.isMerged === true || reviewStatus?.mergeStatus === 'merged';
+  const agentRunning = !!agent && agent.status !== 'stopped' && agent.status !== 'failed' && agent.status !== 'dead';
+
+  if (merged) return 'merged';
+  if (issueCanonicalState === 'done') return 'done';
+  if (issueCanonicalState === 'canceled') return 'canceled';
+  if (reviewStatus?.mergeStatus === 'merging' || reviewStatus?.mergeStatus === 'verifying') return 'merging';
+  if (reviewStatus?.readyForMerge) return 'ready_to_merge';
+  if (reviewStatus?.reviewStatus === 'reviewing') return 'in_review_reviewers_running';
+  if (reviewStatus?.reviewStatus === 'failed' || reviewStatus?.reviewStatus === 'blocked') return 'in_review_changes_requested';
+  if (reviewStatus?.reviewStatus === 'passed') return 'in_review_approved';
+  if (reviewStatus?.testStatus === 'testing') return 'testing_running';
+  if (reviewStatus?.testStatus === 'failed' || reviewStatus?.testStatus === 'dispatch_failed') return 'testing_failures';
+  if (reviewStatus?.verificationStatus === 'failed') return 'verification_failing';
+  if (agentRunning && agent?.agentPhase === 'planning') return 'planning_active';
+  if (!agentRunning && input.hasPlan && (issueCanonicalState === 'todo' || issueCanonicalState === 'backlog')) return 'planning_done_awaiting_work';
+  if (agentRunning && issueCanonicalState === 'in_progress') return 'in_progress_work_running';
+  if (!agentRunning && issueCanonicalState === 'in_progress') return 'in_progress_work_idle';
+  return 'generic';
+}
+
 /**
  * Compute the issue-scoped action surface for Zone A.
  *
  * The split between primary / secondary / overflow is deterministic and stable
  * — the renderer can apply density rules (REQ-D6) on top by collapsing more
  * keys into overflow without changing the inputs.
+ *
+ * Expanded with explicit PRD state-to-actions branches (blocker-9).
  */
 export function getZoneAActions(input: ZoneAInput): ActionLayout {
   const { reviewStatus, agent, lifecycle, workspace } = input;
@@ -120,49 +163,108 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
 
   const stuck = isReviewPipelineStuck(reviewStatus ?? undefined);
   const readyForMerge = !!reviewStatus?.readyForMerge && !merged;
+  const state = derivePipelineState(input);
 
   const primary: ActionKey[] = [];
   const secondary: ActionKey[] = [];
   const overflow: ActionKey[] = [];
 
-  // ── Workspace / pipeline ───────────────────────────────────────────────────
-  // Merge is the most-promoted action whenever it's available.
-  if (readyForMerge) {
-    primary.push('merge');
+  // ── Explicit PRD state branches ───────────────────────────────────────────
+  switch (state) {
+    case 'planning_active':
+      primary.push('stopAgent');
+      break;
+    case 'planning_done_awaiting_work':
+      primary.push(isResume ? 'resumeSession' : 'startAgent');
+      if (isResume) secondary.push('resetSession');
+      break;
+    case 'in_progress_work_running':
+      primary.push('stopAgent');
+      break;
+    case 'in_progress_work_idle':
+      primary.push(isResume ? 'resumeSession' : 'startAgent');
+      if (isResume) secondary.push('resetSession');
+      if (stuck) primary.push('recover');
+      if (noAgentOrStopped && !merged) {
+        if (workspace?.exists) {
+          secondary.push('copySettings');
+        } else {
+          secondary.push('createWorkspace');
+        }
+      }
+      break;
+    case 'verification_failing':
+      primary.push('reviewTest', 'recover');
+      if (agentRunning) primary.push('stopAgent');
+      break;
+    case 'in_review_reviewers_running':
+      if (agentRunning) primary.push('stopAgent');
+      break;
+    case 'in_review_changes_requested':
+      primary.push('reviewTest', 'recover');
+      if (agentRunning) primary.push('stopAgent');
+      break;
+    case 'in_review_approved':
+      primary.push('reviewTest');
+      if (readyForMerge) primary.push('merge');
+      if (agentRunning) primary.push('stopAgent');
+      break;
+    case 'testing_running':
+      if (agentRunning) primary.push('stopAgent');
+      break;
+    case 'testing_failures':
+      primary.push('reviewTest', 'recover');
+      if (agentRunning) primary.push('stopAgent');
+      break;
+    case 'ready_to_merge':
+      primary.push('merge', 'reviewTest');
+      if (agentRunning) primary.push('stopAgent');
+      break;
+    case 'merging':
+      if (agentRunning) primary.push('stopAgent');
+      break;
+    case 'merged':
+      break;
+    case 'done':
+      overflow.push('reopen');
+      break;
+    case 'canceled':
+      overflow.push('reopen');
+      break;
+    default:
+      // ── Fallback heuristic (preserves existing behaviour) ────────────────
+      if (readyForMerge) {
+        primary.push('merge');
+      }
+      const reviewTestPromoted = stuck || readyForMerge
+        || reviewStatus?.reviewStatus === 'failed'
+        || reviewStatus?.reviewStatus === 'blocked'
+        || reviewStatus?.testStatus === 'failed'
+        || reviewStatus?.testStatus === 'dispatch_failed'
+        || reviewStatus?.mergeStatus === 'failed';
+      if (reviewTestPromoted) {
+        primary.push('reviewTest');
+      } else if (reviewStatus) {
+        secondary.push('reviewTest');
+      }
+      if (stuck) {
+        primary.push('recover');
+      }
+      if (agentRunning) {
+        primary.push('stopAgent');
+      } else if (noAgentOrStopped && !merged) {
+        primary.push(isResume ? 'resumeSession' : 'startAgent');
+        if (isResume) secondary.push('resetSession');
+        if (workspace?.exists) {
+          secondary.push('copySettings');
+        } else {
+          secondary.push('createWorkspace');
+        }
+      }
+      break;
   }
 
-  // Review & Test is contextual: promote to primary when the pipeline is
-  // failed/blocked or ready for re-review; otherwise demote to secondary so the
-  // density rule can hide it in default state (REQ-D6).
-  const reviewTestPromoted = stuck || readyForMerge
-    || reviewStatus?.reviewStatus === 'failed'
-    || reviewStatus?.reviewStatus === 'blocked'
-    || reviewStatus?.testStatus === 'failed'
-    || reviewStatus?.testStatus === 'dispatch_failed'
-    || reviewStatus?.mergeStatus === 'failed';
-  if (reviewTestPromoted) {
-    primary.push('reviewTest');
-  } else if (reviewStatus) {
-    secondary.push('reviewTest');
-  }
-
-  if (stuck) {
-    primary.push('recover');
-  }
-
-  if (agentRunning) {
-    primary.push('stopAgent');
-  } else if (noAgentOrStopped && !merged) {
-    primary.push(isResume ? 'resumeSession' : 'startAgent');
-    if (isResume) secondary.push('resetSession');
-    if (workspace?.exists) {
-      secondary.push('copySettings');
-    } else {
-      secondary.push('createWorkspace');
-    }
-  }
-
-  // ── Artifacts / planning ──────────────────────────────────────────────────
+  // ── Artifacts / planning (always present, demoted to secondary) ───────────
   if (input.beadsCount > 0 || input.hasPlan) secondary.push('beads');
   if (input.hasPlan) secondary.push('vbrief');
   secondary.push('state', 'prd');
@@ -172,7 +274,7 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
   secondary.push('statusReview', 'syncDiscussions', 'upload');
 
   // ── Danger zone (always overflow — shown via "…" menu) ────────────────────
-  if (!merged) {
+  if (!merged && state !== 'merged' && state !== 'done' && state !== 'canceled') {
     if (input.issueCanonicalState === 'done' || input.issueCanonicalState === 'canceled') {
       overflow.push('reopen');
     }
