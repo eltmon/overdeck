@@ -8,7 +8,7 @@ vi.mock('../../../../../src/lib/tmux.js', () => ({
   listSessionNamesAsync: vi.fn(),
 }));
 
-vi.mock('../../../../../src/dashboard/server/routes/mission-control.js', () => ({
+vi.mock('../../../../../src/dashboard/server/routes/command-deck.js', () => ({
   fetchActivityDataWithContext: vi.fn(),
 }));
 
@@ -31,7 +31,7 @@ vi.mock('node:fs/promises', async () => {
 import { fetchProjectSessionTree } from '../../../../../src/dashboard/server/routes/projects.ts';
 import { listProjects } from '../../../../../src/lib/projects.js';
 import { listSessionNamesAsync } from '../../../../../src/lib/tmux.js';
-import { fetchActivityDataWithContext } from '../../../../../src/dashboard/server/routes/mission-control.js';
+import { fetchActivityDataWithContext } from '../../../../../src/dashboard/server/routes/command-deck.js';
 import { access, readdir, readFile } from 'node:fs/promises';
 
 function mockAccess(paths: Set<string>) {
