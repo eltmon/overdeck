@@ -421,7 +421,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
               maxHeight: 480,
             }}
           >
-            {useMemo(() => data.diff.split('\n').map((line, idx) => {
+            {useMemo(() => data.diff?.split('\n').map((line, idx) => {
               const color = diffLineColor(line);
               return (
                 <div key={idx} style={color ? { color } : undefined}>
