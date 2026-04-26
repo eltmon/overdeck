@@ -7,9 +7,9 @@ Bootstrapping planning artifacts. Implementing Phase 1 (server-side reviewer can
 
 ## Completed Work
 - pan-4r2w: Phase 1 — Added `getReviewerSessionName(role, projectKey, issueId)`, `parseReviewerSessionName`, `ReviewerRole` type, and `REVIEWER_ROLES` constant to `src/lib/cloister/specialists.ts`. Unit test added at `src/lib/cloister/__tests__/specialists-reviewer-name.test.ts` (9 tests, all passing).
+- pan-fard: Phase 1 — Replaced timestamp-based reviewer fan-out in `runParallelReview` (review-agent.ts) with canonical resume-or-spawn: tmux sessions are now `specialist-<projectKey>-<issueId>-review-<role>` and persist across rounds via `sendKeysAsync` follow-up + `remain-on-exit on`. Synthesis follows the same pattern. Renamed `cleanupReviewerStateDirs` → `archiveReviewerRound`, which writes `~/.panopticon/agents/<reviewer-id>/round-N.json` artifacts instead of deleting state dirs. 5 unit tests added at `src/lib/cloister/__tests__/archive-reviewer-round.test.ts` covering first-write, increment, no-deletion-of-state, missing-dir, and synthesis status mapping.
 
 ## Remaining Work
-- [ ] pan-fard: Phase 1 — Replace fan-out with resume-or-spawn; rename `cleanupReviewerStateDirs` → `archiveReviewerRound` writing `round-N.json`
 - [ ] pan-nk6b: Phase 1 — Rewrite `resolveJsonlPath` to use `claudeSessionId` from `state.json`
 - [ ] pan-lhh8: Phase 1 — Update `extractReviewerRole` + command-deck route to surface one canonical reviewer node per role
 - [ ] pan-d53s: Phase 3 — Liveness building blocks (StatusDot, LiveCounter, RoleBadge, RoundCard, ToolFlash, ActivitySparkline) + 5 keyframes
