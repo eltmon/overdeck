@@ -199,7 +199,7 @@ function AwaitingMergeRow({
   const isFailed = mergeStatus === 'failed';
 
   return (
-    <li className="border border-border rounded-lg bg-card p-4 flex items-start gap-4">
+    <li className="border border-border rounded-lg bg-card p-4 flex items-start gap-4" data-testid={`merge-row-${identifier}`}>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           {trackerUrl ? (
@@ -240,6 +240,7 @@ function AwaitingMergeRow({
             target="_blank"
             rel="noreferrer"
             className="text-[11px] text-muted-foreground hover:text-foreground hover:underline mt-1 inline-block"
+            data-testid={`merge-pr-link-${identifier}`}
           >
             View PR ↗
           </a>
@@ -271,6 +272,7 @@ function AwaitingMergeRow({
           onClick={() => mergeMutation.mutate()}
           disabled={isMerging}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+          data-testid={`merge-btn-${identifier}`}
         >
           {isMerging ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />

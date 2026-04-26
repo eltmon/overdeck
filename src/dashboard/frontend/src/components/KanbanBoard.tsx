@@ -828,6 +828,7 @@ export function ListIssueRow({
           onClick={(e) => e.stopPropagation()}
           className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer shrink-0"
           aria-label={`Select ${issue.identifier}`}
+          data-testid={`card-select-${issue.identifier}`}
         />
       )}
       {/* Status indicator */}
@@ -1711,7 +1712,11 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             const someSelected = selectedInColumn.length > 0 && selectedInColumn.length < columnIssueIds.length;
 
             return (
-              <div key={status} className="flex-1 min-w-0">
+              <div
+                key={status}
+                className="flex-1 min-w-0"
+                data-testid={`kanban-column-${status.replace(/_/g, '-')}`}
+              >
                 <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-card rounded-lg transition-colors`}>
                   <div className="px-4 py-3 border-b border-border bg-card">
                     <div className="flex items-center justify-between gap-2">
@@ -2450,6 +2455,7 @@ export function DeaconIgnoreButton({
           disabled={busy}
           className="flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold uppercase tracking-wide bg-purple-900/70 text-purple-100 border border-purple-400/60 hover:bg-purple-800/80 disabled:opacity-60"
           title={reason ? `Deacon paused: ${reason} — click to resume` : 'Deacon paused — click to resume patrol for this issue'}
+          data-testid={`card-pause-deacon-${issueIdentifier}`}
         >
           <Pause className="w-3 h-3" />
           Deacon Paused
@@ -2467,6 +2473,7 @@ export function DeaconIgnoreButton({
         disabled={busy}
         className="flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold bg-popover text-muted-foreground border border-white/10 hover:bg-purple-900/40 hover:text-purple-100 hover:border-purple-500/50 disabled:opacity-60"
         title="Tell Deacon to stop patrolling this issue (no re-dispatch, no pokes, no auto-completion)"
+        data-testid={`card-pause-deacon-${issueIdentifier}`}
       >
         <Pause className="w-3 h-3" />
         Pause Deacon
@@ -3012,6 +3019,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               <span
                 className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium badge-bg-warning text-warning-foreground border border-warning/40"
                 title={pipelineCallToAction.title}
+                data-testid={`card-review-test-${issue.identifier}`}
               >
                 <AlertCircle className="w-3 h-3" />
                 {pipelineCallToAction.label}
@@ -3150,6 +3158,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 onClick={(e) => { e.stopPropagation(); setShowCostModal(true); }}
                 className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold cursor-pointer transition-all hover:ring-1 hover:ring-white/20 ${getCostColor(cost.totalCost)}`}
                 title="Click for cost breakdown"
+                data-testid={`card-cost-${issue.identifier}`}
               >
                 <DollarSign className="w-3 h-3" />
                 {formatCost(cost.totalCost).slice(1)}
@@ -3168,12 +3177,18 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               showMessageInput ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
             }`}
             title="Tell"
+            data-testid={`card-tell-${issue.identifier}`}
           >
             <MessageCircle className="w-3.5 h-3.5" />
             Tell
           </button>
           {canonical === 'in_review' && !isTerminal && (
-            <RecoverButton issueId={issue.identifier} reviewStatus={reviewStatus} variant="card" />
+            <RecoverButton
+              issueId={issue.identifier}
+              reviewStatus={reviewStatus}
+              variant="card"
+              data-testid={`card-recover-${issue.identifier}`}
+            />
           )}
           <MergeButton issueId={issue.identifier} reviewStatus={reviewStatus} variant="card" />
           <ResetIssueButton issueId={issue.identifier} variant="card" issue={issue} />
@@ -3183,13 +3198,22 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               {getFriendlyModelName(activeAgent.model)}
             </span>
           )}
-          <StopAgentButton agentId={agent?.id} variant="card" />
+          <StopAgentButton
+            agentId={agent?.id}
+            variant="card"
+            data-testid={`card-stop-${issue.identifier}`}
+          />
         </div>
       )}
 
       {/* Message input for Tell */}
       {showMessageInput && agent && (
-        <form onSubmit={handleSendMessage} className="mt-2" onClick={(e) => e.stopPropagation()}>
+        <form
+          onSubmit={handleSendMessage}
+          className="mt-2"
+          onClick={(e) => e.stopPropagation()}
+          data-testid={`card-tell-form-${issue.identifier}`}
+        >
           <div className="flex gap-2">
             <input
               type="text"
@@ -3198,6 +3222,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               placeholder="Type a message..."
               className="flex-1 bg-card text-foreground text-sm px-3 py-1.5 rounded border border-border focus:border-primary focus:outline-none"
               autoFocus
+              data-testid={`card-tell-input-${issue.identifier}`}
             />
             <button
               type="submit"
@@ -3234,6 +3259,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 disabled={startAgentMutation.isPending || isStarting}
                 className="flex items-center gap-1 text-xs font-semibold bg-success hover:bg-success/90 text-foreground transition-colors rounded px-2 py-1 disabled:opacity-50"
                 title={(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}
+                data-testid={`card-start-agent-${issue.identifier}`}
               >
                 {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
                 <span>{(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}</span>
@@ -3270,6 +3296,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               disabled={resumeSessionMutation.isPending}
               className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
               title="Resume Session"
+              data-testid={`card-resume-session-${issue.identifier}`}
             >
               {(resumeSessionMutation.isPending || isResuming) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
               <span>{(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}</span>
@@ -3281,6 +3308,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               disabled={startAgentMutation.isPending || isStarting}
               className="flex items-center gap-1 text-xs font-semibold bg-success text-success-foreground hover:bg-emerald-500 transition-colors rounded px-2 py-1 disabled:opacity-50"
               title={(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}
+              data-testid={`card-start-agent-${issue.identifier}`}
             >
               {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
               <span>{(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}</span>
@@ -3307,12 +3335,18 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               disabled={resumeSessionMutation.isPending || isResuming}
               className="flex items-center gap-1 text-xs font-medium text-warning-foreground hover:opacity-80 transition-colors disabled:opacity-50"
               title="Resume Session"
+              data-testid={`card-resume-session-${issue.identifier}`}
             >
               {(resumeSessionMutation.isPending || isResuming) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
               <span>{(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}</span>
             </button>
           )}
-            <RecoverButton issueId={issue.identifier} reviewStatus={reviewStatus} variant="card" />
+            <RecoverButton
+              issueId={issue.identifier}
+              reviewStatus={reviewStatus}
+              variant="card"
+              data-testid={`card-recover-${issue.identifier}`}
+            />
             <ReopenSection issue={issue} inline />
             <ResetIssueButton issueId={issue.identifier} variant="card" issue={issue} />
           </div>
