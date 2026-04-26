@@ -103,8 +103,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   // Visible state for scroll-to-bottom button
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
-  const timelineEntries = deriveTimelineEntries(messages, workLog);
-  const rows = deriveMessagesTimelineRows(timelineEntries, streaming);
+  const timelineEntries = useMemo(() => deriveTimelineEntries(messages, workLog), [messages, workLog]);
+  const rows = useMemo(() => deriveMessagesTimelineRows(timelineEntries, streaming), [timelineEntries, streaming]);
 
   // Index round markers by the row they should follow. A single row can have
   // multiple markers (e.g. two consecutive rounds without any new messages

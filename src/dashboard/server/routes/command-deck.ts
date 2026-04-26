@@ -12,7 +12,7 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET  /api/command-deck/projects
  */
 
-import { exec } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
 import {
   access,
   readFile,
@@ -37,7 +37,7 @@ import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { SessionNodePresence } from '@panopticon/contracts';
 import { findPrdAtStatus, type PrdLocation } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
-import { extractPrefix } from '../../../lib/issue-id.js';
+import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
 import { getAgentCommand } from '../../../lib/settings.js';
@@ -50,6 +50,7 @@ import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, type ReviewerRoundMetadata } from './reviewer-tree.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
@@ -913,6 +914,9 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: 'Invalid issue id: ' + issueId }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const linear = yield* LinearClient;
 
@@ -944,8 +948,14 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
       yield* Effect.promise(async () => {
         try {
           const issueNum = issueId.replace(/^[A-Z]+-/, '');
-          const { stdout } = await execAsync(
-            `gh issue view ${issueNum} --repo ${ghConfig.owner}/${ghConfig.repos[0]} --json comments --jq '.comments[] | "## " + .author.login + " (" + .createdAt + ")\\n\\n" + .body + "\\n\\n---\\n"'`,
+          const { stdout } = await execFileAsync(
+            'gh',
+            [
+              'issue', 'view', issueNum,
+              '--repo', `${ghConfig.owner}/${ghConfig.repos[0]}`,
+              '--json', 'comments',
+              '--jq', '.comments[] | "## " + .author.login + " (" + .createdAt + ")\n\n" + .body + "\n\n---\n"',
+            ],
             { encoding: 'utf-8', timeout: 30000 }
           );
           if (stdout.trim()) {
@@ -956,14 +966,27 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
         } catch (err) { console.warn(`Failed to sync GitHub comments for ${issueId}:`, err); }
 
         try {
-          const { stdout: prList } = await execAsync(
-            `gh pr list --repo ${ghConfig.owner}/${ghConfig.repos[0]} --head feature/${issueLower} --json number,title --jq '.[].number'`,
+          const { stdout: prList } = await execFileAsync(
+            'gh',
+            [
+              'pr', 'list',
+              '--repo', `${ghConfig.owner}/${ghConfig.repos[0]}`,
+              '--head', `feature/${issueLower}`,
+              '--json', 'number,title',
+              '--jq', '.[].number',
+            ],
             { encoding: 'utf-8', timeout: 15000 }
           );
           for (const prNum of prList.trim().split('\n').filter(Boolean)) {
             try {
-              const { stdout: prComments } = await execAsync(
-                `gh pr view ${prNum} --repo ${ghConfig.owner}/${ghConfig.repos[0]} --json comments --jq '.comments[] | "## " + .author.login + " (" + .createdAt + ")\\n\\n" + .body + "\\n\\n---\\n"'`,
+              const { stdout: prComments } = await execFileAsync(
+                'gh',
+                [
+                  'pr', 'view', prNum,
+                  '--repo', `${ghConfig.owner}/${ghConfig.repos[0]}`,
+                  '--json', 'comments',
+                  '--jq', '.comments[] | "## " + .author.login + " (" + .createdAt + ")\n\n" + .body + "\n\n---\n"',
+                ],
                 { encoding: 'utf-8', timeout: 15000 }
               );
               if (prComments.trim()) {

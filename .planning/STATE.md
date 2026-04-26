@@ -41,6 +41,7 @@ Phase 1 server-side fixes + Phase 3 liveness building blocks + Phase 2 three-zon
 - **[2026-04-26T07:14Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
 - **[2026-04-26T07:30Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
 - **[2026-04-26T10:42Z] review-agent → COMMENTED** — `.planning/feedback/001-review-agent-commented.md`
+- **[2026-04-26T11:25Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
 
 ## Pre-existing Test Failures (not caused by this branch)
 - `tests/unit/dashboard/server/routes/projects.test.ts` — 2 failures in `fetchProjectSessionTree` ("aggregates sessions for active feature workspaces", "resolves feature title from PLANNING_PROMPT.md"). Verified failing on HEAD without pan-d53s changes (stashed-and-tested 2026-04-25). Likely fallout from PAN-821 workspace-resolution refactor; out of scope for PAN-830.

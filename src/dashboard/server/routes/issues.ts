@@ -23,7 +23,7 @@ import { httpHandler } from './http-handler.js';
  *   GET  /api/issues/:id/costs
  */
 
-import { exec, spawn } from 'node:child_process';
+import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { appendFile, copyFile, mkdir, readdir, readFile, rm, writeFile, access } from 'node:fs/promises';
 import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/spawn-planning-session.js';
@@ -35,7 +35,7 @@ import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue } from '../../../lib/projects.js';
-import { extractPrefix } from '../../../lib/issue-id.js';
+import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus } from '../review-status.js';
@@ -56,6 +56,7 @@ import type { LifecycleContext, StepResult } from '../../../lib/lifecycle/types.
 import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // ─── Shared IssueDataService singleton ───────────────────────────────────────
 // Started by main.ts on boot. Updates flow through the ReadModel via
@@ -2706,10 +2707,22 @@ export async function fetchIssueDiscussions(
   }
 
   if (prRepoArg) {
+    if (!parseIssueId(issueId)) {
+      throw new Error(`Invalid issue id: ${issueId}`);
+    }
     const branchName = `feature/${issueId.toLowerCase()}`;
     try {
-      const { stdout } = await execAsync(
-        `gh pr list --repo ${prRepoArg} --head "${branchName}" --state all --json number --limit 1 --jq '.[0].number'`,
+      const { stdout } = await execFileAsync(
+        'gh',
+        [
+          'pr', 'list',
+          '--repo', prRepoArg,
+          '--head', branchName,
+          '--state', 'all',
+          '--json', 'number',
+          '--limit', '1',
+          '--jq', '.[0].number',
+        ],
         { encoding: 'utf-8', timeout: 15000 },
       );
       const trimmed = stdout.trim();

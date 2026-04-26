@@ -42,6 +42,17 @@ vi.mock('node:child_process', async (importOriginal) => {
       );
       return { unref: vi.fn() };
     },
+    execFile: (file: string, args: unknown[], ...rest: unknown[]) => {
+      const cb = rest[rest.length - 1] as Function;
+      const opts = rest.slice(0, -1);
+      const cmdStr = [file, ...(Array.isArray(args) ? args : [])].join(' ');
+      const result = mockExec(cmdStr, ...opts);
+      Promise.resolve(result).then(
+        (val: any) => cb(null, val),
+        (err: Error) => cb(err),
+      );
+      return { unref: vi.fn() };
+    },
   };
 });
 

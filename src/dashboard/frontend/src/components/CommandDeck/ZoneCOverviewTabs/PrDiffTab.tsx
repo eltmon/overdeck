@@ -421,14 +421,14 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
               maxHeight: 480,
             }}
           >
-            {data.diff.split('\n').map((line, idx) => {
+            {useMemo(() => data.diff.split('\n').map((line, idx) => {
               const color = diffLineColor(line);
               return (
                 <div key={idx} style={color ? { color } : undefined}>
                   {line || '\u00A0'}
                 </div>
               );
-            })}
+            }), [data.diff])}
           </pre>
         </section>
       )}
