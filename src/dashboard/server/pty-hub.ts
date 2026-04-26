@@ -36,11 +36,18 @@ export const activePtyHubs = new Map<string, PtyHub>();
  * Broadcast data to all open clients in the hub. Clients that are still booting
  * buffer live PTY output until they acknowledge their snapshot.
  */
+// Cap per-client pending buffer to prevent unbounded growth when a client
+// reconnects in a background tab and its ready message is stalled.
+const MAX_PENDING_CHUNKS = 5000;
+
 export function broadcastToHub(hub: PtyHub, data: string): void {
   for (const client of hub.clients) {
     if (client.readyState !== WebSocket.OPEN) continue;
     const state = hub.clientStates.get(client);
     if (state && !state.ready) {
+      if (state.pending.length >= MAX_PENDING_CHUNKS) {
+        state.pending.splice(0, state.pending.length - MAX_PENDING_CHUNKS + 1);
+      }
       state.pending.push(data);
       continue;
     }
