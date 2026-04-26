@@ -4,7 +4,7 @@ import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { updateConversationTitle } from '../CommandDeck/ConversationList';
-import { MessagesTimeline } from './MessagesTimeline';
+import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
 import { ModelPicker, saveStoredModel } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
@@ -37,6 +37,8 @@ interface ConversationPanelProps {
   viewMode?: ViewMode;
   onViewModeChange?: (mode: ViewMode) => void;
   onArchived?: () => void;
+  /** Optional review-round dividers injected into the MessagesTimeline. */
+  roundMarkers?: ReadonlyArray<RoundMarker>;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -58,6 +60,7 @@ export function ConversationPanel({
   viewMode = 'conversation',
   onViewModeChange,
   onArchived,
+  roundMarkers,
 }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -296,6 +299,7 @@ export function ConversationPanel({
             onResume={!showTerminal ? handleResume : undefined}
             onArchive={handleArchive}
             resumePending={resumeMutation.isPending}
+            roundMarkers={roundMarkers}
             modelPicker={
               <ModelPicker
                 value={selectedModel}
@@ -406,9 +410,11 @@ interface ConversationViewProps {
   resumePending?: boolean;
   /** ModelPicker component to render next to the Resume button */
   modelPicker?: React.ReactNode;
+  /** Optional round-divider markers forwarded to the MessagesTimeline. */
+  roundMarkers?: ReadonlyArray<RoundMarker>;
 }
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers }: ConversationViewProps) {
   const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
   // Track count so we know when the server caught up
   const prevServerCountRef = useRef(0);
@@ -507,6 +513,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           messages={messages}
           workLog={workLog}
           streaming={isWorking}
+          roundMarkers={roundMarkers}
         />
       )}
       {isForking ? null : onResume ? (
