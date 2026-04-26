@@ -70,12 +70,12 @@ function detectStatus(output: string): { status: SessionInfo['status']; detail: 
     return { status: 'done', detail: 'Review complete' };
   }
 
-  const promptLine = lines.findLast(l => l.trim() === '>' || l.includes('❯'));
+  const promptLine = [...lines].reverse().find((l: string) => l.trim() === '>' || l.includes('❯'));
   if (promptLine) {
     return { status: 'idle', detail: 'At prompt — no active work' };
   }
 
-  const lastNonEmpty = lines.findLast(l => l.trim().length > 10);
+  const lastNonEmpty = [...lines].reverse().find((l: string) => l.trim().length > 10);
   return { status: 'running', detail: lastNonEmpty?.trim().slice(0, 80) || 'Active' };
 }
 

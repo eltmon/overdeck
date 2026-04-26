@@ -628,7 +628,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
       ON git_operations(operation, ts);
   `);
-	db.pragma(`user_version = 28`);
+	db.pragma(`user_version = 29`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -636,7 +636,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 28) return;
+	if (currentVersion === 29) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -924,14 +924,12 @@ function runMigrations(db) {
 			if (sessionId) db.prepare(`UPDATE conversations SET claude_session_id = ? WHERE id = ?`).run(sessionId, conv.id);
 		}
 	}
-	if (currentVersion < 29) {
-		try {
-			db.exec(`
+	if (currentVersion < 29) try {
+		db.exec(`
         CREATE INDEX IF NOT EXISTS idx_conversations_status_archived_created
           ON conversations(status, archived_at, created_at)
       `);
-		} catch {}
-	}
+	} catch {}
 	db.pragma(`user_version = 29`);
 }
 //#endregion

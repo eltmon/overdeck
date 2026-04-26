@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { buildTestAgentPromptContent } from '../specialists.js';
 
 /**
@@ -8,6 +8,25 @@ import { buildTestAgentPromptContent } from '../specialists.js';
  * null, exercising the default (single-suite, non-polyrepo) code path without
  * requiring filesystem setup or project config mocking.
  */
+
+const ENV_KEYS = ['API_PORT', 'PORT', 'DASHBOARD_URL'];
+let envSnapshot: Record<string, string | undefined>;
+
+beforeEach(() => {
+  envSnapshot = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
+  for (const k of ENV_KEYS) delete process.env[k];
+});
+
+afterEach(() => {
+  for (const k of ENV_KEYS) {
+    if (envSnapshot[k] === undefined) {
+      delete process.env[k];
+    } else {
+      process.env[k] = envSnapshot[k];
+    }
+  }
+});
+
 describe('buildTestAgentPromptContent', () => {
   it('returns a non-empty prompt string', async () => {
     const result = await buildTestAgentPromptContent({ issueId: 'TEST-1' });
@@ -26,15 +45,9 @@ describe('buildTestAgentPromptContent', () => {
   });
 
   it('uses DASHBOARD_URL env var when set', async () => {
-    const orig = process.env.DASHBOARD_URL;
     process.env.DASHBOARD_URL = 'http://custom-host:9999';
-    try {
-      const result = await buildTestAgentPromptContent({ issueId: 'TEST-3' });
-      expect(result).toContain('http://custom-host:9999');
-    } finally {
-      if (orig === undefined) delete process.env.DASHBOARD_URL;
-      else process.env.DASHBOARD_URL = orig;
-    }
+    const result = await buildTestAgentPromptContent({ issueId: 'TEST-3' });
+    expect(result).toContain('http://custom-host:9999');
   });
 
   it('uses default 300000ms timeout when no maven test configs', async () => {

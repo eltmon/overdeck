@@ -214,3 +214,48 @@ export const ResourceStats = Schema.Struct({
   })),
 })
 export type ResourceStats = typeof ResourceStats.Type
+
+// ─── Session Tree (PAN-821) ──────────────────────────────────────────────────
+
+export const SessionNodePresence = Schema.Literals(["active", "idle", "ended"])
+export type SessionNodePresence = typeof SessionNodePresence.Type
+
+export const SessionNodeType = Schema.Literals([
+  "planning",
+  "work",
+  "review",
+  "reviewer",
+  "test",
+  "merge",
+  "legacy",
+])
+export type SessionNodeType = typeof SessionNodeType.Type
+
+export const SessionNode = Schema.Struct({
+  type: SessionNodeType,
+  role: Schema.optional(Schema.String),
+  sessionId: Schema.String,
+  tmuxSession: Schema.optional(Schema.String),
+  model: Schema.String,
+  startedAt: Schema.String,
+  endedAt: Schema.optional(Schema.String),
+  duration: Schema.Number,
+  status: AgentStatus,
+  hasJsonl: Schema.optional(Schema.Boolean),
+  transcript: Schema.optional(Schema.String),
+  presence: SessionNodePresence,
+})
+export type SessionNode = typeof SessionNode.Type
+
+export const FeatureNode = Schema.Struct({
+  issueId: IssueId,
+  title: Schema.String,
+  sessions: Schema.Array(SessionNode),
+})
+export type FeatureNode = typeof FeatureNode.Type
+
+export const ProjectSessionTree = Schema.Struct({
+  projectKey: Schema.String,
+  features: Schema.Array(FeatureNode),
+})
+export type ProjectSessionTree = typeof ProjectSessionTree.Type
