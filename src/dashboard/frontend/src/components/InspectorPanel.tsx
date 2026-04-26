@@ -594,7 +594,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
   };
 
   return (
-    <>
+    <div className="contents" data-testid={`inspector-panel-${issueId}`}>
       <div
         className={`flex flex-col h-full overflow-y-auto bg-card border-border ${embedded ? '' : 'border-r'}`}
         data-testid="workspace-sidebar"
@@ -631,11 +631,12 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
                   onClick={onOpenTerminal}
                   className="p-1 rounded transition-colors hover:bg-popover text-muted-foreground"
                   title="Open terminal"
+                  data-testid={`inspector-open-terminal-${issueId}`}
                 >
                   <Terminal className="w-3.5 h-3.5" />
                 </button>
               )}
-              <button onClick={onClose} title="Close inspector" className="p-1 rounded transition-colors hover:bg-popover text-muted-foreground">
+              <button onClick={onClose} title="Close inspector" className="p-1 rounded transition-colors hover:bg-popover text-muted-foreground" data-testid="inspector-close">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -972,6 +973,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

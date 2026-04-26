@@ -218,6 +218,7 @@ export function ActionsSection({
                 agentId={agent?.id}
                 variant="inspector"
                 onSuccess={onKillSuccess}
+                data-testid="inspector-stop-agent"
               />
               <span title="Also shown on card">
                 <LayoutGrid className="w-3 h-3 text-muted-foreground opacity-40 self-center" />
@@ -228,7 +229,12 @@ export function ActionsSection({
           {/* Recover failed review/test/merge pipeline */}
           {reviewStatus && isPipelineStuck && (
             <div className="flex items-center gap-1">
-              <RecoverButton issueId={issueId} reviewStatus={reviewStatus} variant="inspector" />
+              <RecoverButton
+                issueId={issueId}
+                reviewStatus={reviewStatus}
+                variant="inspector"
+                data-testid="inspector-recover"
+              />
               <span title="Also shown on card">
                 <LayoutGrid className="w-3 h-3 text-muted-foreground opacity-40 self-center" />
               </span>
@@ -253,6 +259,7 @@ export function ActionsSection({
                     : 'text-primary hover:text-primary/80'
                 }`}
                 title={isLifecycleUnresolved ? 'Checking for resumable session…' : undefined}
+                data-testid={isResume ? 'inspector-resume-session' : 'inspector-start-agent'}
               >
                 {(isLaunching || isLifecycleUnresolved) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                 <span>{isLaunching ? launchLabel : isLifecycleUnresolved ? 'Checking…' : (isResume ? 'Resume Session' : 'Start Agent')}</span>
@@ -264,6 +271,7 @@ export function ActionsSection({
                   disabled={resetSessionMutation.isPending || resetSessionMutation.isSuccess}
                   className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent disabled:opacity-50"
                   title="Clear saved session so next start creates a fresh Claude session (preserves workspace)"
+                  data-testid="inspector-reset-session"
                 >
                   {resetSessionMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : resetSessionMutation.isSuccess ? <Check className="w-3 h-3" /> : <RotateCcw className="w-3 h-3" />}
                   {resetSessionMutation.isPending ? 'Resetting...' : resetSessionMutation.isSuccess ? 'Session Reset' : 'Reset Session'}
@@ -274,6 +282,7 @@ export function ActionsSection({
                    onClick={onCreateWorkspace}
                    disabled={createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess}
                    className="flex items-center gap-1 px-2 py-1 text-xs text-card-foreground rounded disabled:opacity-50 border bg-card border-border"
+                   data-testid="inspector-create-workspace"
                  >
                    {(createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess) ? <Loader2 className="w-3 h-3 animate-spin" /> : <FolderPlus className="w-3 h-3" />}
                    {createWorkspaceMutation.isPending ? 'Creating...' : 'Create Workspace'}
@@ -312,6 +321,7 @@ export function ActionsSection({
             className="w-full px-2 py-1.5 text-xs bg-card border border-border rounded resize-none text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
             rows={3}
             autoFocus
+            data-testid="inspector-resume-input"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                 onStartAgent(resumeMessage || undefined);
@@ -333,6 +343,7 @@ export function ActionsSection({
               }}
               disabled={startAgentMutation.isPending}
               className="flex items-center gap-1 px-2 py-1 text-xs text-primary-foreground rounded bg-primary hover:bg-primary/90 disabled:opacity-50 font-medium"
+              data-testid="inspector-resume-send"
             >
               {startAgentMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
               {startAgentMutation.isPending ? 'Resuming...' : 'Resume'}
@@ -403,7 +414,7 @@ export function ActionsSection({
 
         {/* Danger Zone — destructive actions (collapsed by default) */}
         {reviewStatus?.mergeStatus !== 'merged' && (
-          <details className="mt-4 rounded border border-destructive/30 group">
+          <details className="mt-4 rounded border border-destructive/30 group" data-testid="inspector-danger-zone">
             <summary className="px-3 py-2 bg-destructive/5 rounded cursor-pointer list-none select-none flex items-center gap-1.5 group-open:rounded-b-none group-open:border-b group-open:border-destructive/30">
               <ChevronRight className="w-3 h-3 text-destructive transition-transform group-open:rotate-90" />
               <span className="text-xs font-semibold uppercase tracking-wider text-destructive">Danger Zone</span>
@@ -421,6 +432,7 @@ export function ActionsSection({
                     disabled={reopenMutation?.isPending}
                     className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-warning/40 text-warning hover:bg-warning hover:text-warning-foreground transition-colors disabled:opacity-50"
                     title="Reopen: moves issue to In Progress, keeps workspace + branch + PR + STATE.md + beads"
+                    data-testid="inspector-reopen"
                   >
                     {reopenMutation?.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                     {reopenMutation?.isPending ? 'Reopening...' : 'Reopen'}
@@ -451,6 +463,7 @@ export function ActionsSection({
                   disabled={cancelMutation.isPending}
                   className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
                   title="Cancel Issue: permanent — stops agent, deletes workspace + branch + STATE.md, closes PR, moves to Canceled"
+                  data-testid="inspector-cancel-issue"
                 >
                   {cancelMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
                   {cancelMutation.isPending ? 'Canceling...' : 'Cancel Issue'}
