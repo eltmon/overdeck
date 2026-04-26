@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
+import type { SessionNode } from '@panopticon/contracts';
 import { FeatureItem } from './FeatureItem';
 import styles from '../styles/mission-control.module.css';
 
@@ -21,6 +22,7 @@ export interface ProjectFeature {
   inProgressCount?: number;
   rawTrackerState?: string;
   readyForMerge?: boolean;
+  sessions?: SessionNode[];
 }
 
 interface ProjectNodeProps {
@@ -28,11 +30,13 @@ interface ProjectNodeProps {
   features: ProjectFeature[];
   selectedFeature: string | null;
   onSelectFeature: (issueId: string) => void;
+  selectedSessionId?: string | null;
+  onSelectSession?: (issueId: string, sessionId: string) => void;
   issueTitles?: Record<string, string>;
   issueCosts?: Record<string, number>;
 }
 
-export function ProjectNode({ name, features, selectedFeature, onSelectFeature, issueTitles, issueCosts }: ProjectNodeProps) {
+export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts }: ProjectNodeProps) {
   const [expanded, setExpanded] = useState(features.length > 0);
 
   return (
@@ -57,6 +61,8 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
               feature={feature}
               isSelected={selectedFeature === feature.issueId}
               onSelect={() => onSelectFeature(feature.issueId)}
+              selectedSessionId={selectedSessionId}
+              onSelectSession={onSelectSession}
               title={issueTitles?.[feature.issueId.toLowerCase()] || issueTitles?.[feature.issueId] || feature.title}
               cost={issueCosts?.[feature.issueId.toLowerCase()] || issueCosts?.[feature.issueId]}
             />
