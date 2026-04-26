@@ -618,23 +618,12 @@ export function CommandDeck({
 
             {/* Tree session filter (blocker-4) */}
             {sidebarTab === 'projects' && (
-              <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
+              <div className={styles.treeFilterRow}>
                 {(['all', 'alive', 'failed'] as TreeSessionFilter[]).map((f) => (
                   <button
                     key={f}
                     onClick={() => setTreeFilter(f)}
-                    style={{
-                      flex: 1,
-                      padding: '2px 6px',
-                      fontSize: 10,
-                      fontWeight: treeFilter === f ? 600 : 400,
-                      border: '1px solid var(--mc-border)',
-                      borderRadius: 4,
-                      background: treeFilter === f ? 'var(--mc-bg-selected)' : 'transparent',
-                      color: treeFilter === f ? 'var(--mc-text-primary)' : 'var(--mc-text-muted)',
-                      cursor: 'pointer',
-                      textTransform: 'capitalize',
-                    }}
+                    className={`${styles.treeFilterButton} ${treeFilter === f ? styles.treeFilterButtonActive : ''}`}
                   >
                     {f}
                   </button>

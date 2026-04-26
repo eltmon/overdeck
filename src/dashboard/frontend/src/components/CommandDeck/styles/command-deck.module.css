@@ -330,6 +330,31 @@
   flex-direction: column;
 }
 
+.treeFilterRow {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.treeFilterButton {
+  flex: 1;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 400;
+  border: 1px solid var(--mc-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--mc-text-muted);
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.treeFilterButtonActive {
+  font-weight: 600;
+  background: var(--mc-bg-selected);
+  color: var(--mc-text-primary);
+}
+
 /* Issue Header (compact contextual header) */
 .issueHeader {
   display: flex;
@@ -584,7 +609,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: var(--mc-space-1) var(--mc-space-2) var(--mc-space-1) var(--mc-space-8);
+  padding: var(--mc-space-1) var(--mc-space-2) var(--mc-space-1) calc(var(--mc-space-3) + var(--mc-space-8));
   cursor: pointer;
   transition: background 0.1s;
   font-size: var(--mc-font-size-sm);
