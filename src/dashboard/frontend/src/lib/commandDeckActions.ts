@@ -79,7 +79,7 @@ export interface ActionLayout {
 
 export interface ZoneAInput {
   reviewStatus?: ReviewStatus | null;
-  agent?: Pick<Agent, 'status'> | null;
+  agent?: Pick<Agent, 'status' | 'agentPhase'> | null;
   lifecycle?: Pick<WorkAgentLifecycle, 'canResumeSession'> | null;
   workspace?: Pick<WorkspaceInfo, 'exists'> | null;
   hasPlan: boolean;

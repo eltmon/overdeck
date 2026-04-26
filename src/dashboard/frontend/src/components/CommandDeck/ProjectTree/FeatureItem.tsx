@@ -149,7 +149,6 @@ function sessionMatchesFilter(session: SessionNodeType, filter: TreeSessionFilte
 }
 
 export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal }: FeatureItemProps) {
-  const hasSessions = (feature.sessions?.length ?? 0) > 0;
   const [expanded, setExpanded] = useState(() => {
     const persisted = readExpanded(feature.issueId);
     return persisted ?? defaultExpandedFromState(feature.stateLabel);
