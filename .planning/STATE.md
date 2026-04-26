@@ -1,9 +1,9 @@
 # PAN-820: Add data-testid attributes to dashboard interactive elements
 
-## Status: In Progress
+## Status: Done — All 8 beads closed, awaiting full quality-gate run + push
 
 ## Current Phase
-pan-ld6t closed. Picking up pan-lnbq next (AwaitingMergePage.tsx).
+All 8 beads closed. Final wrap-up: typecheck + lint + tests + push branch + `pan done`.
 
 ## Completed Work
 - [x] pan-0hfc: Added optional `'data-testid'?: string` prop to StopAgentButton + RecoverButton, spread onto the rendered button in both card and inspector variants. (commit: adf2a419)
@@ -12,10 +12,11 @@ pan-ld6t closed. Picking up pan-lnbq next (AwaitingMergePage.tsx).
 - [x] pan-53xq: Added 12 card-* and `kanban-column-{key}` testids to KanbanBoard.tsx — `card-select-{id}` (per-card bulk checkbox), `kanban-column-{key}` (column wrapper, `_`→`-` for `in-progress`/`in-review`), `card-pause-deacon-{id}` (both DeaconIgnoreButton states), `card-review-test-{id}` (pipelineCallToAction badge), `card-cost-{id}`, `card-tell-{id}`, `card-recover-{id}` (RecoverButton prop, both running and in_review usages), `card-stop-{id}` (StopAgentButton prop), `card-tell-form-{id}`, `card-tell-input-{id}`, `card-start-agent-{id}` (both backlog/todo and in_progress usages), `card-resume-session-{id}` (both in_progress and in_review usages). (commit: 2b35f259)
 - [x] pan-i15e: Added 11 inspector-* testids to ActionsSection.tsx — `inspector-stop-agent` (StopAgentButton prop), `inspector-recover` (RecoverButton prop), `inspector-start-agent`/`inspector-resume-session` (conditional on `isResume` boolean — same button toggles modes), `inspector-reset-session`, `inspector-create-workspace`, `inspector-resume-input` (textarea), `inspector-resume-send` (Resume submit button), `inspector-danger-zone` (`<details>` element), `inspector-reopen` (Reopen onClick button), `inspector-cancel-issue` (Cancel Issue onClick button). (commit: 00c175e7)
 - [x] pan-g67r: Added 5 sidebar-* testid kinds to Sidebar.tsx — `sidebar-{id}` on each nav button (id from `NAV_GROUPS`, e.g. `sidebar-command-deck`, `sidebar-kanban`, `sidebar-agents`); `sidebar-collapse` on BOTH collapse/expand buttons (ChevronsLeft when expanded, ChevronsRight when collapsed); `sidebar-search`; `sidebar-theme` on BOTH theme toggles (expanded + collapsed footer); `sidebar-rebuild` on BOTH dev-mode rebuild buttons (expanded + collapsed footer). (commit: b9366124)
-- [x] pan-ld6t: Added 3 banner testids to StoppedAgentsBanner.tsx — `stopped-agents-banner` on BOTH banner roots (the dismissed-state mini "Show" bar and the full warning banner — so the banner is detectable in either state); `banner-restart-all` on the Restart All button; `banner-dismiss` on the X dismiss button.
+- [x] pan-ld6t: Added 3 banner testids to StoppedAgentsBanner.tsx — `stopped-agents-banner` on BOTH banner roots (the dismissed-state mini "Show" bar and the full warning banner — so the banner is detectable in either state); `banner-restart-all` on the Restart All button; `banner-dismiss` on the X dismiss button. (commit: d8aa1faa)
+- [x] pan-lnbq: Added 3 merge-* testids to AwaitingMergePage.tsx — `merge-row-{identifier}` on each `<li>` row (per `AwaitingMergeRow`), `merge-btn-{identifier}` on the Merge `<button>`, `merge-pr-link-{identifier}` on the View PR `<a>` link. All three use the row's `identifier` prop (e.g. `PAN-539`).
 
 ## Remaining Work
-- [ ] pan-lnbq: Step 8 — Add merge-* testids to AwaitingMergePage.tsx
+- [ ] Final wrap-up: full repo typecheck + lint + frontend tests + root tests, push branch, run `pan done PAN-820 -c "..."`
 
 ## Key Decisions
 - D1: One bead per file (or shared-component group). Per the Inspect Specialist contract, each bead must be a separate commit so the diff can be verified independently against the spec table in the issue body.
