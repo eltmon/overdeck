@@ -36,7 +36,6 @@ import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { SessionNodePresence } from '@panopticon/contracts';
 import { findPrdAtStatus, type PrdLocation } from '../../../lib/prd-locations.js';
-import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
@@ -47,6 +46,7 @@ import { getGitHubConfig } from '../services/tracker-config.js';
 import { LinearClient } from '../services/linear-client.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { httpHandler } from './http-handler.js';
+import { resolveJsonlPath } from './jsonl-resolver.js';
 
 const execAsync = promisify(exec);
 
@@ -220,16 +220,7 @@ async function derivePresence(
   return 'ended';
 }
 
-/**
- * Resolve JSONL path for a session. Returns the path if the file exists,
- * otherwise null. Uses encodeClaudeProjectDir for path encoding.
- */
-async function resolveJsonlPath(sessionId: string, workspacePath: string): Promise<string | null> {
-  const encodedDir = encodeClaudeProjectDir(workspacePath);
-  const jsonlPath = join(homedir(), '.claude', 'projects', encodedDir, `${sessionId}.jsonl`);
-  if (await pathExists(jsonlPath)) return jsonlPath;
-  return null;
-}
+// resolveJsonlPath is imported from ./jsonl-resolver (PAN-830).
 
 // Read the request body as unknown JSON
 const readJsonBody = Effect.gen(function* () {
