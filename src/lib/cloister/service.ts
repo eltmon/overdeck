@@ -705,30 +705,31 @@ export class CloisterService {
         console.log(`🔔 Cloister: Found completion marker for ${issueId}, triggering review...${retryCount > 0 ? ` (retry ${retryCount}/3)` : ''}`);
 
         try {
-          // Trigger review via dashboard API (same process, localhost)
-          const http = await import('http');
-          const result = await new Promise<{ success: boolean; error?: string; alreadyReviewed?: boolean; alreadyMerged?: boolean }>((resolve) => {
-            const postData = JSON.stringify({});
-            const req = http.request(
-              `${this.getDashboardApiUrl()}/api/review/${issueId}/trigger`,
-              { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeout: 5000 },
-              (res) => {
-                let data = '';
-                res.on('data', (chunk: string) => data += chunk);
-                res.on('end', () => {
-                  try {
-                    resolve(JSON.parse(data));
-                  } catch {
-                    resolve({ success: false, error: `Invalid response (HTTP ${res.statusCode})` });
-                  }
-                });
+          // Trigger review via dashboard API. Use fetch() so https:// URLs
+          // (e.g. https://pan.localhost via Traefik) work — Node's http.request
+          // rejects https URLs with "Protocol \"https:\" not supported".
+          const result = await (async (): Promise<{ success: boolean; error?: string; alreadyReviewed?: boolean; alreadyMerged?: boolean }> => {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 5000);
+            try {
+              const res = await fetch(`${this.getDashboardApiUrl()}/api/review/${issueId}/trigger`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}),
+                signal: controller.signal,
+              });
+              clearTimeout(timer);
+              try {
+                return (await res.json()) as { success: boolean; error?: string; alreadyReviewed?: boolean; alreadyMerged?: boolean };
+              } catch {
+                return { success: false, error: `Invalid response (HTTP ${res.status})` };
               }
-            );
-            req.on('error', (e: Error) => resolve({ success: false, error: e.message }));
-            req.on('timeout', () => { req.destroy(); resolve({ success: false, error: 'Timeout (5s)' }); });
-            req.write(postData);
-            req.end();
-          });
+            } catch (e: any) {
+              clearTimeout(timer);
+              if (e?.name === 'AbortError') return { success: false, error: 'Timeout (5s)' };
+              return { success: false, error: e?.message || String(e) };
+            }
+          })();
 
           if (result.success) {
             console.log(`  ✓ Review triggered for ${issueId}`);

@@ -456,47 +456,48 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       const { getDashboardApiUrl } = await import('../../lib/config.js');
       const dashboardUrl = getDashboardApiUrl();
 
-      // Check if dashboard is running
-      const http = await import('http');
-      const checkDashboard = () => new Promise<boolean>((resolve) => {
-        const req = http.request(`${dashboardUrl}/api/health`, { method: 'GET', timeout: 2000 }, (res) => {
-          resolve(res.statusCode === 200);
-        });
-        req.on('error', () => resolve(false));
-        req.on('timeout', () => { req.destroy(); resolve(false); });
-        req.end();
-      });
+      // Check if dashboard is running. Use fetch() so https:// URLs work
+      // (e.g. when DASHBOARD_URL points at https://pan.localhost via Traefik).
+      const checkDashboard = async (): Promise<boolean> => {
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 2000);
+          const res = await fetch(`${dashboardUrl}/api/health`, { method: 'GET', signal: controller.signal });
+          clearTimeout(timer);
+          return res.status === 200;
+        } catch {
+          return false;
+        }
+      };
 
       const dashboardRunning = await checkDashboard();
 
       if (dashboardRunning) {
         console.log(chalk.dim('Auto-triggering review & test...'));
 
-        // Trigger review endpoint
-        const reviewReq = () => new Promise<any>((resolve, reject) => {
-          const postData = JSON.stringify({});
-          const req = http.request(
-            `${dashboardUrl}/api/review/${issueId}/trigger`,
-            { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeout: 5000 },
-            (res) => {
-              let data = '';
-              res.on('data', (chunk) => data += chunk);
-              res.on('end', () => {
-                try {
-                  resolve(JSON.parse(data));
-                } catch {
-                  resolve({ success: false, error: 'Invalid response' });
-                }
-              });
+        const postJson = async (path: string): Promise<any> => {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 5000);
+          try {
+            const res = await fetch(`${dashboardUrl}${path}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({}),
+              signal: controller.signal,
+            });
+            clearTimeout(timer);
+            try {
+              return await res.json();
+            } catch {
+              return { success: false, error: 'Invalid response' };
             }
-          );
-          req.on('error', reject);
-          req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
-          req.write(postData);
-          req.end();
-        });
+          } catch (err: any) {
+            clearTimeout(timer);
+            throw err;
+          }
+        };
 
-        let result = await reviewReq();
+        let result = await postJson(`/api/review/${issueId}/trigger`);
 
         // Self-healing: if issue was previously reviewed (blocked/failed) or merged, auto-reset and retry.
         // This is the normal flow when a work agent fixes review issues and re-signals done.
@@ -504,34 +505,11 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
           const reason = result.alreadyMerged ? 'previously merged' : 'prior review blocked/failed';
           console.log(chalk.yellow(`  ⚠ Issue was ${reason}. Resetting specialist states for re-review...`));
 
-          const resetReq = () => new Promise<any>((resolve, reject) => {
-            const postData = JSON.stringify({});
-            const req = http.request(
-              `${dashboardUrl}/api/review/${issueId}/reset`,
-              { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeout: 5000 },
-              (res) => {
-                let data = '';
-                res.on('data', (chunk) => data += chunk);
-                res.on('end', () => {
-                  try {
-                    resolve(JSON.parse(data));
-                  } catch {
-                    resolve({ success: false, error: 'Invalid response' });
-                  }
-                });
-              }
-            );
-            req.on('error', reject);
-            req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
-            req.write(postData);
-            req.end();
-          });
-
-          const resetResult = await resetReq();
+          const resetResult = await postJson(`/api/review/${issueId}/reset`);
           if (resetResult.success) {
             console.log(chalk.green(`  ✓ Specialist states reset`));
             // Retry review
-            result = await reviewReq();
+            result = await postJson(`/api/review/${issueId}/trigger`);
           } else {
             console.log(chalk.red(`  ✗ Failed to reset: ${resetResult.error || resetResult.message || 'Unknown error'}`));
           }
