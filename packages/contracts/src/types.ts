@@ -217,7 +217,7 @@ export type ResourceStats = typeof ResourceStats.Type
 
 // ─── Session Tree (PAN-821) ──────────────────────────────────────────────────
 
-export const SessionNodePresence = Schema.Literals(["active", "idle", "ended"])
+export const SessionNodePresence = Schema.Literals(["active", "idle", "suspended", "ended"])
 export type SessionNodePresence = typeof SessionNodePresence.Type
 
 export const SessionNodeType = Schema.Literals([

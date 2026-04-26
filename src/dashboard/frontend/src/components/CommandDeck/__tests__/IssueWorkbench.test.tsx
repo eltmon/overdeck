@@ -44,6 +44,9 @@ vi.mock('../ZoneCOverviewTabs/queries', () => ({
   usePlanningQuery: () => ({ data: undefined, isLoading: false }),
   useActivityQuery: () => ({ data: { issueId: '', sections: [] }, isLoading: false }),
   useIssueCostsQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  useReviewStatusQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  usePrQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  useDiscussionsQuery: () => ({ data: undefined, isLoading: false, isError: false }),
 }));
 
 function makeSession(sessionId: string): SessionNodeType {

@@ -5,10 +5,17 @@ import styles from '../styles/command-deck.module.css';
 
 interface SessionNodeProps {
   session: SessionNodeType;
+  issueId?: string;
   isSelected?: boolean;
   onClick?: () => void;
   onStopSession?: (sessionId: string) => void;
   onViewTerminal?: (sessionId: string) => void;
+  onPauseSession?: (sessionId: string) => void;
+  onResumeSession?: (sessionId: string) => void;
+  onRestartSession?: (sessionId: string, issueId: string) => void;
+  onDeepWipe?: (issueId: string) => void;
+  onOpenStateDir?: (sessionId: string) => void;
+  onViewJsonl?: (sessionId: string) => void;
 }
 
 function PresenceDot({ presence }: { presence: SessionNodeType['presence'] }) {
@@ -61,7 +68,67 @@ interface ContextMenuState {
   open: boolean;
 }
 
-export function SessionNode({ session, isSelected, onClick, onStopSession, onViewTerminal }: SessionNodeProps) {
+function MenuItem({
+  label,
+  onClick,
+  variant = 'default',
+}: {
+  label: string;
+  onClick: () => void;
+  variant?: 'default' | 'danger';
+}) {
+  return (
+    <button
+      style={{
+        display: 'block',
+        width: '100%',
+        padding: '6px 12px',
+        border: 'none',
+        background: 'none',
+        textAlign: 'left',
+        cursor: 'pointer',
+        color: variant === 'danger' ? 'var(--mc-error, #ef4444)' : 'var(--foreground)',
+        fontSize: 12,
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLElement).style.background = 'var(--accent)';
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.background = 'transparent';
+      }}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  );
+}
+
+function MenuDivider() {
+  return (
+    <div
+      style={{
+        height: 1,
+        background: 'var(--mc-border, var(--border))',
+        margin: '4px 8px',
+      }}
+    />
+  );
+}
+
+export function SessionNode({
+  session,
+  issueId,
+  isSelected,
+  onClick,
+  onStopSession,
+  onViewTerminal,
+  onPauseSession,
+  onResumeSession,
+  onRestartSession,
+  onDeepWipe,
+  onOpenStateDir,
+  onViewJsonl,
+}: SessionNodeProps) {
   const [menu, setMenu] = useState<ContextMenuState>({ x: 0, y: 0, open: false });
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -76,7 +143,7 @@ export function SessionNode({ session, isSelected, onClick, onStopSession, onVie
   }, []);
 
   const closeMenu = useCallback(() => {
-    setMenu(m => ({ ...m, open: false }));
+    setMenu((m) => ({ ...m, open: false }));
   }, []);
 
   // Close menu on click outside or scroll
@@ -96,7 +163,23 @@ export function SessionNode({ session, isSelected, onClick, onStopSession, onVie
     };
   }, [menu.open, closeMenu]);
 
-  const canStop = session.presence === 'active' || session.presence === 'idle';
+  const canPause = session.presence === 'active' && onPauseSession;
+  const canResume = session.presence === 'suspended' && onResumeSession;
+  const canStop = (session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended') && onStopSession;
+  const canRestart = onRestartSession && issueId != null;
+  const canDeepWipe = onDeepWipe && issueId != null;
+  const hasLifecycleActions = canPause || canResume || canStop || canRestart;
+
+  const handleDeepWipe = useCallback(() => {
+    if (!issueId || !onDeepWipe) return;
+    const confirmed = window.confirm(
+      `Deep wipe will destroy all data for ${issueId} including workspace, state, and git branches. This cannot be undone.\n\nAre you absolutely sure?`,
+    );
+    if (confirmed) {
+      onDeepWipe(issueId);
+    }
+    closeMenu();
+  }, [issueId, onDeepWipe, closeMenu]);
 
   return (
     <>
@@ -130,55 +213,84 @@ export function SessionNode({ session, isSelected, onClick, onStopSession, onVie
             borderRadius: 6,
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             padding: '4px 0',
-            minWidth: 140,
+            minWidth: 160,
             fontSize: 12,
           }}
         >
-          {canStop && onStopSession && (
-            <button
-              style={{
-                display: 'block',
-                width: '100%',
-                padding: '6px 12px',
-                border: 'none',
-                background: 'none',
-                textAlign: 'left',
-                cursor: 'pointer',
-                color: 'var(--foreground)',
-                fontSize: 12,
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--accent)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+          {/* Lifecycle actions */}
+          {canPause && (
+            <MenuItem
+              label="Pause"
               onClick={() => {
-                onStopSession(session.sessionId);
+                onPauseSession!(session.sessionId);
                 closeMenu();
               }}
-            >
-              Stop session
-            </button>
+            />
+          )}
+          {canResume && (
+            <MenuItem
+              label="Resume"
+              onClick={() => {
+                onResumeSession!(session.sessionId);
+                closeMenu();
+              }}
+            />
+          )}
+          {canStop && (
+            <MenuItem
+              label="Stop"
+              onClick={() => {
+                onStopSession!(session.sessionId);
+                closeMenu();
+              }}
+            />
+          )}
+          {canRestart && (
+            <MenuItem
+              label="Restart"
+              onClick={() => {
+                onRestartSession!(session.sessionId, issueId!);
+                closeMenu();
+              }}
+            />
+          )}
+
+          {hasLifecycleActions && canDeepWipe && <MenuDivider />}
+
+          {/* Destructive */}
+          {canDeepWipe && (
+            <MenuItem label="Deep Wipe" variant="danger" onClick={handleDeepWipe} />
+          )}
+
+          {(hasLifecycleActions || canDeepWipe) && (onOpenStateDir || onViewJsonl) && <MenuDivider />}
+
+          {/* Utility */}
+          {onOpenStateDir && (
+            <MenuItem
+              label="Open State Dir"
+              onClick={() => {
+                onOpenStateDir(session.sessionId);
+                closeMenu();
+              }}
+            />
+          )}
+          {onViewJsonl && session.hasJsonl && (
+            <MenuItem
+              label="View JSONL"
+              onClick={() => {
+                onViewJsonl(session.sessionId);
+                closeMenu();
+              }}
+            />
           )}
           {onViewTerminal && (
-            <button
-              style={{
-                display: 'block',
-                width: '100%',
-                padding: '6px 12px',
-                border: 'none',
-                background: 'none',
-                textAlign: 'left',
-                cursor: 'pointer',
-                color: 'var(--foreground)',
-                fontSize: 12,
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--accent)'; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+            <MenuItem
+              label="View Terminal"
               onClick={() => {
                 onViewTerminal(session.sessionId);
                 closeMenu();
               }}
-            >
-              View terminal
-            </button>
+            />
           )}
         </div>
       )}

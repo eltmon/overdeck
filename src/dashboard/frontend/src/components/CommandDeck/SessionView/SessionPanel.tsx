@@ -5,6 +5,8 @@ import { ConversationPanel } from '../../chat/ConversationPanel';
 import type { RoundMarker } from '../../chat/MessagesTimeline';
 import { ChatMarkdown } from '../../chat/ChatMarkdown';
 import { XTerminal } from '../../XTerminal';
+import { RoundCard } from '../RoundCard';
+import type { RoundData, RoundVerdict } from '../RoundCard';
 import styles from '../styles/command-deck.module.css';
 
 interface SessionPanelProps {
@@ -18,16 +20,19 @@ function getViewKey(sessionId: string): string {
   return `mc-session-panel-view:${sessionId}`;
 }
 
-function readView(sessionId: string): 'conversation' | 'terminal' {
+type PanelView = 'conversation' | 'terminal' | 'findings';
+
+function readView(sessionId: string): PanelView {
   try {
     const stored = localStorage.getItem(getViewKey(sessionId));
-    return stored === 'terminal' ? 'terminal' : 'conversation';
+    if (stored === 'terminal' || stored === 'findings') return stored;
+    return 'conversation';
   } catch {
     return 'conversation';
   }
 }
 
-function writeView(sessionId: string, view: 'conversation' | 'terminal'): void {
+function writeView(sessionId: string, view: PanelView): void {
   try {
     localStorage.setItem(getViewKey(sessionId), view);
   } catch { /* ignore */ }
@@ -49,12 +54,39 @@ function PresenceDot({ presence }: { presence: SessionNodeType['presence'] }) {
   return <span className={styles.sessionPanelPresence} style={{ background: color }} />;
 }
 
+function toRoundVerdict(status?: string): RoundVerdict {
+  switch (status) {
+    case 'passed':
+    case 'approved':
+      return 'passed';
+    case 'failed':
+    case 'blocked':
+      return 'failed';
+    case 'running':
+    case 'active':
+      return 'running';
+    default:
+      return 'pending';
+  }
+}
+
+function deriveRoundData(metadata: SessionNodeType['roundMetadata']): RoundData[] {
+  if (!metadata || metadata.history.length === 0) return [];
+  return metadata.history.map((r) => ({
+    round: r.round,
+    verdict: toRoundVerdict(r.status),
+    findings: r.findings,
+    duration: r.durationSec ?? null,
+    cost: r.cost ?? null,
+  }));
+}
+
 export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelProps) {
-  const [view, setView] = useState<'conversation' | 'terminal'>(() =>
+  const [view, setView] = useState<PanelView>(() =>
     readView(session.sessionId),
   );
 
-  const handleSetView = (v: 'conversation' | 'terminal') => {
+  const handleSetView = (v: PanelView) => {
     setView(v);
     writeView(session.sessionId, v);
   };
@@ -84,6 +116,8 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
     session.presence === 'active';
   const hasTerminal = allowTerminal;
   const isEnded = session.presence === 'ended';
+  const roundData = useMemo(() => deriveRoundData(session.roundMetadata), [session.roundMetadata]);
+  const hasFindings = roundData.length > 0;
 
   return (
     <div className={styles.sessionPanel}>
@@ -105,6 +139,14 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
           >
             Conversation
           </button>
+          {hasFindings && (
+            <button
+              className={`${styles.sessionPanelToggleBtn} ${view === 'findings' ? styles.sessionPanelToggleBtnActive : ''}`}
+              onClick={() => handleSetView('findings')}
+            >
+              Findings
+            </button>
+          )}
           <button
             className={`${styles.sessionPanelToggleBtn} ${view === 'terminal' ? styles.sessionPanelToggleBtnActive : ''}`}
             onClick={() => handleSetView('terminal')}
@@ -116,7 +158,7 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
 
       {/* View content */}
       <div className={styles.sessionPanelContent}>
-        {view === 'conversation' ? (
+        {view === 'conversation' && (
           hasJsonl && synthesizedConversation ? (
             <ConversationPanel
               conversation={synthesizedConversation}
@@ -133,7 +175,28 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
               No conversation data available for this session.
             </div>
           )
-        ) : (
+        )}
+
+        {view === 'findings' && (
+          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {roundData.length === 0 ? (
+              <div className={styles.sessionPanelEmpty}>No review rounds recorded.</div>
+            ) : (
+              <>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--mc-text-muted, var(--muted-foreground))', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Review rounds
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                  {roundData.map((r) => (
+                    <RoundCard key={r.round} round={r} active={r.round === session.roundMetadata?.latestRound} />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {view === 'terminal' && (
           hasTerminal ? (
             <XTerminal sessionName={session.tmuxSession!} />
           ) : (
