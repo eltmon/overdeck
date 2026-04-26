@@ -231,7 +231,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: var(--mc-space-1) var(--mc-space-2) var(--mc-space-1) var(--mc-space-6);
+  padding: var(--mc-space-1) var(--mc-space-2) var(--mc-space-1) var(--mc-space-1);
   cursor: pointer;
   transition: background 0.1s;
   font-size: var(--mc-font-size-sm);
@@ -298,6 +298,7 @@
 .featureItemRow {
   display: flex;
   align-items: center;
+  padding-left: var(--mc-space-3);
 }
 
 .featureItemCaret {
