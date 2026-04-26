@@ -70,7 +70,7 @@ import { readWorkspacePlan } from '../../../lib/vbrief/io.js';
 import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
-import { createSessionAsync } from '../../../lib/tmux.js';
+import { createSessionAsync, killSessionAsync } from '../../../lib/tmux.js';
 
 const execAsync = promisify(exec);
 
@@ -342,6 +342,15 @@ const postSpecialistsDoneRoute = HttpRouter.add(
           lastActivity: new Date().toISOString(),
         });
         console.log(`[specialists/done] Set ${tmuxSession} to idle`);
+
+        // PAN-846: Kill the specialist tmux session so it doesn't leak RAM.
+        // The session has completed its work; next dispatch spawns fresh.
+        try {
+          await killSessionAsync(tmuxSession);
+          console.log(`[specialists/done] Killed specialist session ${tmuxSession}`);
+        } catch (err) {
+          console.log(`[specialists/done] Session ${tmuxSession} already gone or failed to kill: ${err instanceof Error ? err.message : String(err)}`);
+        }
 
         // Clear write-scope lock so the next specialist can claim the workspace
         if (projectKey) {
