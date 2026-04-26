@@ -77,7 +77,7 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
 export function listConversations(options?: { limit?: number; offset?: number }): Conversation[] {
   const db = getDatabase();
   let sql = `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at, session_file, title,
+              created_at, ended_at, last_attached_at, session_file, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error
        FROM conversations
