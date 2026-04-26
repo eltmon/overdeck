@@ -17,7 +17,7 @@ describe('generateLauncherScript', () => {
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       export CI=1
-      cd -- "/workspace/project"
+      cd -- '/workspace/project'
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6
       "
     `);
@@ -35,7 +35,7 @@ describe('generateLauncherScript', () => {
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       export CI=1
-      cd -- "/workspace/project"
+      cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       export ANTHROPIC_AUTH_TOKEN="tok"
       export CAVEMAN_DEFAULT_MODE="active"
@@ -58,9 +58,9 @@ describe('generateLauncherScript', () => {
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       export CI=1
-      cd -- "/workspace/project"
+      cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --resume "sess-123" --model gpt-5.4
+      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --resume 'sess-123' --model gpt-5.4
       "
     `);
   });
@@ -87,21 +87,21 @@ describe('generateLauncherScript', () => {
       export COLORTERM=truecolor
       export LANG=C.UTF-8
       export LC_ALL=C.UTF-8
-      export PANOPTICON_AGENT_ID="plan-abc"
-      export PANOPTICON_ISSUE_ID="PAN-824"
-      export PANOPTICON_SESSION_TYPE="planning"
-      cd -- "/workspace/project"
+      export PANOPTICON_AGENT_ID='plan-abc'
+      export PANOPTICON_ISSUE_ID='PAN-824'
+      export PANOPTICON_SESSION_TYPE='planning'
+      cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       trap '' HUP
-      prompt=$(cat "/tmp/init-prompt.txt")
-      echo "[launcher] Claude starting at $(date)" >> "/tmp/pan-launcher-debug.log"
+      prompt=$(cat '/tmp/init-prompt.txt')
+      echo "[launcher] Claude starting at $(date)" >> '/tmp/pan-launcher-debug.log'
       claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 "$prompt"
       CLAUDE_EXIT=$?
-      echo "[launcher] Claude exited with code $CLAUDE_EXIT at $(date)" >> "/tmp/pan-launcher-debug.log"
+      echo "[launcher] Claude exited with code $CLAUDE_EXIT at $(date)" >> '/tmp/pan-launcher-debug.log'
       echo ""
       echo "Planning agent has exited. Session kept alive for review."
       echo "Click 'Done' in the dashboard when ready to hand off to implementation."
-      echo "[launcher] Keep-alive loop starting at $(date)" >> "/tmp/pan-launcher-debug.log"
+      echo "[launcher] Keep-alive loop starting at $(date)" >> '/tmp/pan-launcher-debug.log'
       while true; do sleep 60; done
       "
     `);
@@ -128,10 +128,10 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       set -o pipefail
       export CI=1
-      export PANOPTICON_AGENT_ID="spec-123"
-      export PANOPTICON_ISSUE_ID="PAN-824"
-      export PANOPTICON_SESSION_TYPE="correctness-review"
-      cd -- "/workspace/project"
+      export PANOPTICON_AGENT_ID='spec-123'
+      export PANOPTICON_ISSUE_ID='PAN-824'
+      export PANOPTICON_SESSION_TYPE='correctness-review'
+      cd -- '/workspace/project'
       unset ANTHROPIC_BASE_URL
       unset ANTHROPIC_AUTH_TOKEN
       unset OPENAI_API_KEY
@@ -140,8 +140,8 @@ describe('generateLauncherScript', () => {
       unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS
       export ANTHROPIC_BASE_URL="http://proxy"
       export CAVEMAN_DEFAULT_MODE="active"
-      prompt=$(cat "/tmp/prompt.md")
-      claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id "sess-abc" --model claude-sonnet-4-6 "$prompt"
+      prompt=$(cat '/tmp/prompt.md')
+      claude --session-id 'sess-abc' --model claude-sonnet-4-6 --dangerously-skip-permissions --permission-mode bypassPermissions "$prompt"
       echo ""
       echo "## Specialist completed task"
       "
@@ -163,7 +163,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
-      cd -- "/workspace/project"
+      cd -- '/workspace/project'
       unset ANTHROPIC_BASE_URL
       unset ANTHROPIC_AUTH_TOKEN
       unset OPENAI_API_KEY
@@ -171,8 +171,8 @@ describe('generateLauncherScript', () => {
       unset API_TIMEOUT_MS
       unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS
       export ANTHROPIC_BASE_URL="http://proxy"
-      prompt=$(cat "/tmp/identity.md")
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id "sess-xyz" --model claude-sonnet-4-6 "$prompt"
+      prompt=$(cat '/tmp/identity.md')
+      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id 'sess-xyz' --model claude-sonnet-4-6 "$prompt"
       "
     `);
   });
@@ -190,7 +190,7 @@ describe('generateLauncherScript', () => {
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       set -o pipefail
-      cd -- "/workspace/project"
+      cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       unset PANOPTICON_AGENT_ID PANOPTICON_ISSUE_ID PANOPTICON_SESSION_TYPE
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6
@@ -218,11 +218,11 @@ describe('generateLauncherScript', () => {
       export COLORTERM=truecolor
       export LANG=C.UTF-8
       export LC_ALL=C.UTF-8
-      export PANOPTICON_ISSUE_ID="PAN-824"
+      export PANOPTICON_ISSUE_ID='PAN-824'
       export ANTHROPIC_BASE_URL="http://proxy"
-      cd -- "/workspace/project"
+      cd -- '/workspace/project'
       trap '' HUP
-      claude --session-id "sess-conv" --effort "high"
+      claude --session-id 'sess-conv' --effort "high"
       echo ""
       echo "Conversation session ended. Close this panel or click Resume to start a new session."
       while true; do sleep 60; done
@@ -247,9 +247,9 @@ describe('generateLauncherScript', () => {
       export COLORTERM=truecolor
       export LANG=C.UTF-8
       export LC_ALL=C.UTF-8
-      cd -- "/workspace/project"
+      cd -- '/workspace/project'
       trap '' HUP
-      claude --resume "sess-resume"
+      claude --resume 'sess-resume'
       echo ""
       echo "Conversation session ended. Close this panel or click Resume to start a new session."
       while true; do sleep 60; done
@@ -270,7 +270,7 @@ describe('generateLauncherScript', () => {
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       export PATH="/usr/local/bin:$PATH"
-      prompt=$(cat "/workspace/.pan/prompts/agent.md")
+      prompt=$(cat '/workspace/.pan/prompts/agent.md')
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 "$prompt"
       "
     `);
@@ -286,8 +286,8 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
-      cd -- "/workspace/project"
-      prompt=$(cat "/tmp/init-prompt.txt")
+      cd -- '/workspace/project'
+      prompt=$(cat '/tmp/init-prompt.txt')
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions "$prompt"
       "
     `);
@@ -303,8 +303,8 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
-      cd -- "/workspace/project"
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 "Please read the continuation prompt and continue."
+      cd -- '/workspace/project'
+      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 'Please read the continuation prompt and continue.'
       "
     `);
   });
@@ -371,7 +371,7 @@ describe('generateLauncherWrapper', () => {
     });
     expect(wrapper).toMatchInlineSnapshot(`
       "#!/bin/bash
-      exec script -qfaec "bash '/tmp/run-claude.sh'" "/tmp/log.txt"
+      exec script -qfaec "bash '/tmp/run-claude.sh'" '/tmp/log.txt'
       "
     `);
   });
@@ -384,7 +384,7 @@ describe('generateLauncherWrapper', () => {
     });
     expect(wrapper).toMatchInlineSnapshot(`
       "#!/bin/bash
-      exec script -qfaec "bash '/workspace/project/run-claude.sh'" "/tmp/log.txt"
+      exec script -qfaec "bash '/workspace/project/run-claude.sh'" '/tmp/log.txt'
       "
     `);
   });

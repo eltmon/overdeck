@@ -1098,15 +1098,19 @@ ${basePrompt}`;
     // via -a), so we get the same log capture as the old tee pipeline without the pipe.
     // -q quiet (no Script started/done banners), -f flush on every write, -a append,
     // -e propagate child exit code, -c run command.
+    const wrapper = generateLauncherWrapper({
+      agentType: 'specialist-dispatch',
+      workingDir: cwd,
+      useScriptWrapper: true,
+      scriptLogFile: logFilePath,
+      innerScriptPath: innerScript,
+    });
+    if (!wrapper) {
+      throw new Error('specialist wrapper requires useScriptWrapper + scriptLogFile');
+    }
     writeFileSync(
       launcherScript,
-      generateLauncherWrapper({
-        agentType: 'specialist-dispatch',
-        workingDir: cwd,
-        useScriptWrapper: true,
-        scriptLogFile: logFilePath,
-        innerScriptPath: innerScript,
-      })!,
+      wrapper,
       { mode: 0o755 },
     );
 

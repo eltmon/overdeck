@@ -59,6 +59,14 @@ export interface LauncherConfig {
 }
 
 /**
+ * Quote a string for safe use as a shell literal in single quotes.
+ * e.g. shellQuote("foo'bar") → "'foo'\\''bar'"
+ */
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\''`)}'`;
+}
+
+/**
  * Canonical launcher script generator.
  *
  * Takes a typed LauncherConfig and returns a bash script string.
@@ -95,16 +103,23 @@ export function generateLauncherScript(config: LauncherConfig): string {
     lines.push('export PATH="/usr/local/bin:$PATH"');
   }
 
+  // Track which Panopticon env vars are explicitly set so unsetPanopticonEnv
+  // can avoid clearing them (review agent pins agentId but clears issueId/type).
+  const explicitlySetPanopticonKeys = new Set<string>();
+
   // Panopticon env vars
   if (config.panopticonEnv) {
     if (config.panopticonEnv.agentId != null) {
-      lines.push(`export PANOPTICON_AGENT_ID="${config.panopticonEnv.agentId}"`);
+      lines.push(`export PANOPTICON_AGENT_ID=${shellQuote(config.panopticonEnv.agentId)}`);
+      explicitlySetPanopticonKeys.add('PANOPTICON_AGENT_ID');
     }
     if (config.panopticonEnv.issueId != null) {
-      lines.push(`export PANOPTICON_ISSUE_ID="${config.panopticonEnv.issueId}"`);
+      lines.push(`export PANOPTICON_ISSUE_ID=${shellQuote(config.panopticonEnv.issueId)}`);
+      explicitlySetPanopticonKeys.add('PANOPTICON_ISSUE_ID');
     }
     if (config.panopticonEnv.sessionType != null) {
-      lines.push(`export PANOPTICON_SESSION_TYPE="${config.panopticonEnv.sessionType}"`);
+      lines.push(`export PANOPTICON_SESSION_TYPE=${shellQuote(config.panopticonEnv.sessionType)}`);
+      explicitlySetPanopticonKeys.add('PANOPTICON_SESSION_TYPE');
     }
   }
 
@@ -117,7 +132,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
 
   // Change directory (after env setup, before command)
   if (config.changeDir !== false) {
-    lines.push(`cd -- "${config.workingDir}"`);
+    lines.push(`cd -- ${shellQuote(config.workingDir)}`);
   }
 
   // Unset provider env (must happen before re-exporting)
@@ -145,7 +160,11 @@ export function generateLauncherScript(config: LauncherConfig): string {
 
   // Unset Panopticon env (review agent — prevents parent attribution)
   if (config.unsetPanopticonEnv) {
-    lines.push('unset PANOPTICON_AGENT_ID PANOPTICON_ISSUE_ID PANOPTICON_SESSION_TYPE');
+    const keysToUnset = ['PANOPTICON_AGENT_ID', 'PANOPTICON_ISSUE_ID', 'PANOPTICON_SESSION_TYPE']
+      .filter(k => !explicitlySetPanopticonKeys.has(k));
+    if (keysToUnset.length > 0) {
+      lines.push(`unset ${keysToUnset.join(' ')}`);
+    }
   }
 
   // Trap HUP
@@ -155,12 +174,12 @@ export function generateLauncherScript(config: LauncherConfig): string {
 
   // Prompt file read
   if (config.promptFile) {
-    lines.push(`prompt=$(cat "${config.promptFile}")`);
+    lines.push(`prompt=$(cat ${shellQuote(config.promptFile)})`);
   }
 
   // Debug log — start
   if (config.debugLog) {
-    lines.push(`echo "[launcher] Claude starting at $(date)" >> "${config.debugLog}"`);
+    lines.push(`echo "[launcher] Claude starting at $(date)" >> ${shellQuote(config.debugLog)}`);
   }
 
   // Build the main command
@@ -172,7 +191,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
   // Debug log — exit
   if (config.debugLog) {
     lines.push('CLAUDE_EXIT=$?');
-    lines.push(`echo "[launcher] Claude exited with code $CLAUDE_EXIT at $(date)" >> "${config.debugLog}"`);
+    lines.push(`echo "[launcher] Claude exited with code $CLAUDE_EXIT at $(date)" >> ${shellQuote(config.debugLog)}`);
   }
 
   // Post-exit echo messages
@@ -181,7 +200,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
     lines.push('echo "Planning agent has exited. Session kept alive for review."');
     lines.push('echo "Click \'Done\' in the dashboard when ready to hand off to implementation."');
     if (config.debugLog) {
-      lines.push(`echo "[launcher] Keep-alive loop starting at $(date)" >> "${config.debugLog}"`);
+      lines.push(`echo "[launcher] Keep-alive loop starting at $(date)" >> ${shellQuote(config.debugLog)}`);
     }
   }
 
@@ -219,8 +238,8 @@ export function generateLauncherWrapper(config: LauncherConfig): string | null {
     return null;
   }
 
-  const inner = config.innerScriptPath ?? `${config.workingDir}/run-claude.sh`;
-  return `#!/bin/bash\nexec script -qfaec "bash '${inner}'" "${config.scriptLogFile}"\n`;
+  const inner = (config.innerScriptPath ?? `${config.workingDir}/run-claude.sh`).replace(/'/g, "'\\'");
+  return `#!/bin/bash\nexec script -qfaec "bash '${inner}'" ${shellQuote(config.scriptLogFile)}\n`;
 }
 
 /** Env vars that may leak from a parent tmux server and must be unset. */
@@ -241,9 +260,9 @@ function buildCommand(config: LauncherConfig): string[] {
     if (config.baseCommand) {
       const args: string[] = [];
       if (config.resumeSessionId) {
-        args.push(`--resume "${config.resumeSessionId}"`);
+        args.push(`--resume ${shellQuote(config.resumeSessionId)}`);
       } else if (config.sessionId) {
-        args.push(`--session-id "${config.sessionId}"`);
+        args.push(`--session-id ${shellQuote(config.sessionId)}`);
       }
       if (config.extraArgs) {
         args.push(config.extraArgs);
@@ -256,98 +275,82 @@ function buildCommand(config: LauncherConfig): string[] {
   if (config.agentType === 'specialist-dispatch') {
     // Inner script: no exec, runs claude directly then echoes completion
     if (config.baseCommand) {
-      const args: string[] = [];
+      let cmd = config.baseCommand;
+
       if (config.sessionId) {
-        args.push(`--session-id "${config.sessionId}"`);
+        cmd += ` --session-id ${shellQuote(config.sessionId)}`;
       }
       if (config.model) {
-        args.push(`--model ${config.model}`);
+        cmd += ` --model ${config.model}`;
       }
-      const permissionFlags = config.permissionFlags?.join(' ') ?? '';
-      const promptRef = config.promptFile ? '"$prompt"' : '';
-      const binary = config.baseCommand?.split(' ')[0] ?? 'claude';
-      parts.push(`${binary} ${permissionFlags} ${args.join(' ')} ${promptRef}`.trim().replace(/\s+/g, ' '));
+      if (config.permissionFlags && config.permissionFlags.length > 0) {
+        const cmdTokens = cmd.split(/\s+/);
+        for (const flag of config.permissionFlags) {
+          if (!cmdTokens.includes(flag)) {
+            cmd += ` ${flag}`;
+          }
+        }
+      }
+      if (config.promptFile) {
+        cmd += ' "$prompt"';
+      }
+
+      parts.push(cmd.trim().replace(/\s+/g, ' '));
     }
     return parts;
   }
 
   if (config.agentType === 'planning') {
-    // Planning agents must NOT use exec — the shell needs to survive
-    // to run the keep-alive loop after claude exits
-    if (config.baseCommand) {
-      let cmd = config.baseCommand;
-
-      // Append permission flags if not already present
-      if (config.permissionFlags && config.permissionFlags.length > 0) {
-        const flagsStr = config.permissionFlags.join(' ');
-        if (!cmd.includes(flagsStr)) {
-          cmd += ` ${flagsStr}`;
-        }
-      }
-
-      // Append session args
-      if (config.resumeSessionId) {
-        cmd += ` --resume "${config.resumeSessionId}"`;
-      }
-      if (config.sessionId) {
-        cmd += ` --session-id "${config.sessionId}"`;
-      }
-      if (config.model) {
-        cmd += ` --model ${config.model}`;
-      }
-      if (config.extraArgs) {
-        cmd += ` ${config.extraArgs}`;
-      }
-
-      // Append prompt reference
-      if (config.promptFile) {
-        cmd += ' "$prompt"';
-      }
-      if (config.promptInline) {
-        cmd += ` "${config.promptInline}"`;
-      }
-
-      parts.push(cmd.trim());
-    }
-    return parts;
+    return buildNonConversationCommand(config, false);
   }
 
   // All other types use exec
-  if (config.baseCommand) {
-    let cmd = config.baseCommand;
+  return buildNonConversationCommand(config, true);
+}
 
-    // Append permission flags if not already present
-    if (config.permissionFlags && config.permissionFlags.length > 0) {
-      const flagsStr = config.permissionFlags.join(' ');
-      if (!cmd.includes(flagsStr)) {
-        cmd += ` ${flagsStr}`;
+/**
+ * Shared command builder for planning and exec-based agent types.
+ * Appends permission flags (with token-level dedup), session args,
+ * extra args, and prompt references.
+ */
+function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): string[] {
+  const parts: string[] = [];
+  if (!config.baseCommand) return parts;
+
+  let cmd = config.baseCommand;
+
+  // Append permission flags if not already present (token-level check)
+  if (config.permissionFlags && config.permissionFlags.length > 0) {
+    const cmdTokens = cmd.split(/\s+/);
+    for (const flag of config.permissionFlags) {
+      if (!cmdTokens.includes(flag)) {
+        cmd += ` ${flag}`;
       }
     }
-
-    // Append session args
-    if (config.resumeSessionId) {
-      cmd += ` --resume "${config.resumeSessionId}"`;
-    }
-    if (config.sessionId) {
-      cmd += ` --session-id "${config.sessionId}"`;
-    }
-    if (config.model) {
-      cmd += ` --model ${config.model}`;
-    }
-    if (config.extraArgs) {
-      cmd += ` ${config.extraArgs}`;
-    }
-
-    // Append prompt reference
-    if (config.promptFile) {
-      cmd += ' "$prompt"';
-    }
-    if (config.promptInline) {
-      cmd += ` "${config.promptInline}"`;
-    }
-
-    parts.push(`exec ${cmd.trim()}`);
   }
 
+  // Append session args
+  if (config.resumeSessionId) {
+    cmd += ` --resume ${shellQuote(config.resumeSessionId)}`;
+  }
+  if (config.sessionId) {
+    cmd += ` --session-id ${shellQuote(config.sessionId)}`;
+  }
+  if (config.model) {
+    cmd += ` --model ${config.model}`;
+  }
+  if (config.extraArgs) {
+    cmd += ` ${config.extraArgs}`;
+  }
+
+  // Append prompt reference
+  if (config.promptFile) {
+    cmd += ' "$prompt"';
+  }
+  if (config.promptInline) {
+    cmd += ` ${shellQuote(config.promptInline)}`;
+  }
+
+  parts.push(useExec ? `exec ${cmd.trim()}` : cmd.trim());
   return parts;
 }
