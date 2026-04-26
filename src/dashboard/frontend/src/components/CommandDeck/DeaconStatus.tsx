@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Shield, ScrollText } from 'lucide-react';
-import styles from './styles/mission-control.module.css';
+import styles from './styles/command-deck.module.css';
 
 interface SpecialistHealthState {
   specialistName: string;

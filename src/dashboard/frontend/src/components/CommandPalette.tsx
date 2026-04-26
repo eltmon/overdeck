@@ -239,27 +239,27 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
 
       {/* Palette */}
       <div
-        className="relative w-full max-w-xl bg-surface border border-divider-strong rounded-xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-xl bg-card border border-border rounded-xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <Command shouldFilter={false} className="[&_[cmdk-input-wrapper]]:border-b [&_[cmdk-input-wrapper]]:border-divider">
+        <Command shouldFilter={false} className="[&_[cmdk-input-wrapper]]:border-b [&_[cmdk-input-wrapper]]:border-border">
           {/* Search input */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-divider">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
             <Zap className="w-4 h-4 text-primary shrink-0" />
             <Command.Input
               value={query}
               onValueChange={setQuery}
               placeholder="Search actions, workspaces, agents…"
-              className="flex-1 bg-transparent text-sm text-content-body placeholder:text-content-muted outline-none"
+              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
               autoFocus
             />
-            <kbd className="text-[10px] text-content-muted bg-surface-emphasis px-1.5 py-0.5 rounded border border-divider">ESC</kbd>
+            <kbd className="text-[10px] text-muted-foreground bg-card px-1.5 py-0.5 rounded border border-border">ESC</kbd>
           </div>
 
           {/* Results */}
           <Command.List className="max-h-[400px] overflow-y-auto py-2">
             {filtered.length === 0 ? (
-              <Command.Empty className="py-6 text-center text-sm text-content-muted">
+              <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
                 No results for "{query}"
               </Command.Empty>
             ) : (
@@ -267,7 +267,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
                 <Command.Group
                   key={group}
                   heading={group}
-                  className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-content-muted"
+                  className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-muted-foreground"
                 >
                   {filtered
                     .filter((a) => a.group === group)
@@ -276,23 +276,23 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
                         key={action.id}
                         value={action.id}
                         onSelect={() => handleSelect(action.onSelect)}
-                        className="flex items-center gap-3 px-3 py-2 mx-1 rounded-lg cursor-pointer data-[selected=true]:bg-surface-overlay transition-colors group"
+                        className="flex items-center gap-3 px-3 py-2 mx-1 rounded-lg cursor-pointer data-[selected=true]:bg-popover transition-colors group"
                       >
                         <div className={`size-7 rounded-md flex items-center justify-center shrink-0 ${
                           action.destructive
                             ? 'bg-destructive/10 text-destructive'
-                            : 'bg-surface-emphasis text-content-subtle group-data-[selected=true]:text-primary'
+                            : 'bg-card text-muted-foreground group-data-[selected=true]:text-primary'
                         }`}>
                           <action.icon className="w-3.5 h-3.5" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className={`text-sm font-medium truncate ${
-                            action.destructive ? 'text-destructive' : 'text-content-body'
+                            action.destructive ? 'text-destructive' : 'text-foreground'
                           }`}>
                             {action.label}
                           </p>
                           {action.description && (
-                            <p className="text-xs text-content-muted truncate">{action.description}</p>
+                            <p className="text-xs text-muted-foreground truncate">{action.description}</p>
                           )}
                         </div>
                       </Command.Item>
@@ -303,17 +303,17 @@ export function CommandPalette({ isOpen, onClose, onNavigate }: CommandPalettePr
           </Command.List>
 
           {/* Footer */}
-          <div className="flex items-center gap-4 px-4 py-2 border-t border-divider bg-surface-raised">
-            <span className="text-[10px] text-content-muted flex items-center gap-1">
-              <kbd className="px-1 py-0.5 bg-surface-emphasis border border-divider rounded text-[9px]">↑↓</kbd>
+          <div className="flex items-center gap-4 px-4 py-2 border-t border-border bg-card">
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <kbd className="px-1 py-0.5 bg-card border border-border rounded text-[9px]">↑↓</kbd>
               navigate
             </span>
-            <span className="text-[10px] text-content-muted flex items-center gap-1">
-              <kbd className="px-1 py-0.5 bg-surface-emphasis border border-divider rounded text-[9px]">↵</kbd>
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <kbd className="px-1 py-0.5 bg-card border border-border rounded text-[9px]">↵</kbd>
               select
             </span>
-            <span className="text-[10px] text-content-muted flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-surface-emphasis border border-divider rounded text-[9px]">Esc</kbd>
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-card border border-border rounded text-[9px]">Esc</kbd>
               close
             </span>
           </div>

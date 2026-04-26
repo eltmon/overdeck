@@ -42,6 +42,69 @@ export function useAlert() {
   return ctx.alert;
 }
 
+// --- Nested dialog depth tracking ---
+
+let dialogDepth = 0;
+
+function useDialogDepth() {
+  const [depth, setDepth] = useState(0);
+
+  useEffect(() => {
+    dialogDepth += 1;
+    setDepth(dialogDepth);
+    return () => {
+      dialogDepth -= 1;
+    };
+  }, []);
+
+  return depth;
+}
+
+// --- Dialog Shell ---
+
+function DialogShell({
+  children,
+  onDismiss,
+}: {
+  children: React.ReactNode;
+  onDismiss: () => void;
+}) {
+  const depth = useDialogDepth();
+  const [entered, setEntered] = useState(false);
+
+  useEffect(() => {
+    requestAnimationFrame(() => setEntered(true));
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onDismiss();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onDismiss]);
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/32 backdrop-blur-sm flex items-center justify-center z-[100]"
+      onClick={onDismiss}
+      style={{ '--nested-dialogs': depth } as React.CSSProperties}
+    >
+      <div
+        className={`bg-popover text-popover-foreground rounded-2xl border border-border shadow-lg w-full max-w-md mx-4 transition-all duration-200 ease-in-out ${
+          entered ? 'scale-100 opacity-100' : 'scale-[0.98] opacity-0'
+        }`}
+        style={{ transform: `scale(${entered ? `calc(1 - 0.1 * ${depth})` : '0.98'})` }}
+        onClick={(e) => e.stopPropagation()}
+        role="alertdialog"
+        aria-modal="true"
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 // --- Dialog Components ---
 
 function ConfirmDialogContent({
@@ -65,62 +128,45 @@ function ConfirmDialogContent({
     }
   }, [isDestructive]);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onCancel]);
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" onClick={onCancel}>
-      <div
-        className="bg-surface-raised border border-divider rounded-lg shadow-2xl w-full max-w-md mx-4 animate-fade-in"
-        onClick={(e) => e.stopPropagation()}
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="dialog-title"
-        aria-describedby="dialog-message"
-      >
-        {/* Header */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-divider">
-          {isDestructive ? (
-            <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
-          ) : (
-            <Info className="w-5 h-5 text-info shrink-0" />
-          )}
-          <h3 id="dialog-title" className="text-lg font-semibold text-content">{options.title}</h3>
-        </div>
-
-        {/* Body */}
-        <div className="px-4 py-4">
-          <p id="dialog-message" className="text-sm text-content-body whitespace-pre-line">{options.message}</p>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-divider">
-          <button
-            ref={cancelRef}
-            onClick={onCancel}
-            className="px-4 py-2 rounded text-sm bg-surface-overlay text-content-body hover:bg-surface-emphasis transition-colors"
-          >
-            {options.cancelLabel || 'Cancel'}
-          </button>
-          <button
-            ref={confirmRef}
-            onClick={onConfirm}
-            className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-              isDestructive
-                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-                : 'bg-primary text-primary-foreground hover:bg-primary/90'
-            }`}
-          >
-            {options.confirmLabel || 'Confirm'}
-          </button>
-        </div>
+    <DialogShell onDismiss={onCancel}>
+      {/* Header */}
+      <div className="flex items-center gap-2 px-6 py-4 border-b border-border">
+        {isDestructive ? (
+          <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
+        ) : (
+          <Info className="w-5 h-5 text-info shrink-0" />
+        )}
+        <h3 id="dialog-title" className="text-lg font-semibold text-foreground">{options.title}</h3>
       </div>
-    </div>
+
+      {/* Body */}
+      <div className="px-6 py-5">
+        <p id="dialog-message" className="text-sm text-foreground whitespace-pre-line">{options.message}</p>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border">
+        <button
+          ref={cancelRef}
+          onClick={onCancel}
+          className="px-4 py-2 rounded-lg text-sm bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+        >
+          {options.cancelLabel || 'Cancel'}
+        </button>
+        <button
+          ref={confirmRef}
+          onClick={onConfirm}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            isDestructive
+              ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+              : 'bg-primary text-primary-foreground hover:bg-primary/90'
+          }`}
+        >
+          {options.confirmLabel || 'Confirm'}
+        </button>
+      </div>
+    </DialogShell>
   );
 }
 
@@ -137,14 +183,6 @@ function AlertDialogContent({
     closeRef.current?.focus();
   }, []);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' || e.key === 'Enter') onClose();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
-
   const iconMap = {
     info: <Info className="w-5 h-5 text-info shrink-0" />,
     error: <XCircle className="w-5 h-5 text-destructive shrink-0" />,
@@ -154,45 +192,36 @@ function AlertDialogContent({
   const variant = options.variant || 'info';
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" onClick={onClose}>
-      <div
-        className="bg-surface-raised border border-divider rounded-lg shadow-2xl w-full max-w-md mx-4 animate-fade-in"
-        onClick={(e) => e.stopPropagation()}
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="alert-title"
-        aria-describedby="alert-message"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-divider">
-          <div className="flex items-center gap-2">
-            {iconMap[variant]}
-            <h3 id="alert-title" className="text-lg font-semibold text-content">
-              {options.title || (variant === 'error' ? 'Error' : variant === 'success' ? 'Success' : 'Notice')}
-            </h3>
-          </div>
-          <button onClick={onClose} className="text-content-subtle hover:text-content-body transition-colors">
-            <X className="w-5 h-5" />
-          </button>
+    <DialogShell onDismiss={onClose}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+        <div className="flex items-center gap-2">
+          {iconMap[variant]}
+          <h3 id="alert-title" className="text-lg font-semibold text-foreground">
+            {options.title || (variant === 'error' ? 'Error' : variant === 'success' ? 'Success' : 'Notice')}
+          </h3>
         </div>
-
-        {/* Body */}
-        <div className="px-4 py-4">
-          <p id="alert-message" className="text-sm text-content-body whitespace-pre-line">{options.message}</p>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end px-4 py-3 border-t border-divider">
-          <button
-            ref={closeRef}
-            onClick={onClose}
-            className="px-4 py-2 rounded text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium"
-          >
-            OK
-          </button>
-        </div>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+          <X className="w-5 h-5" />
+        </button>
       </div>
-    </div>
+
+      {/* Body */}
+      <div className="px-6 py-5">
+        <p id="alert-message" className="text-sm text-foreground whitespace-pre-line">{options.message}</p>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-end px-6 py-4 border-t border-border">
+        <button
+          ref={closeRef}
+          onClick={onClose}
+          className="px-4 py-2 rounded-lg text-sm bg-primary text-primary-foreground hover:bg-primary/90 transition-colors font-medium"
+        >
+          OK
+        </button>
+      </div>
+    </DialogShell>
   );
 }
 

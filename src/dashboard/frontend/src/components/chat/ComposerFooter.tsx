@@ -20,8 +20,8 @@ import { ComposerPromptEditor } from './ComposerPromptEditor';
 import { ModelPicker, MODEL_EFFORT_SUPPORT, saveStoredModel } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
-import type { Conversation } from '../MissionControl/ConversationList';
-import styles from '../MissionControl/styles/mission-control.module.css';
+import type { Conversation } from '../CommandDeck/ConversationList';
+import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── API ──────────────────────────────────────────────────────────────────────
 

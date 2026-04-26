@@ -109,7 +109,7 @@ export function ResourcesPanel({ onNavigateToAgents }: ResourcesPanelProps) {
 
   if (isLoading) {
     return (
-      <div className="p-6 text-content-subtle text-sm">Loading resources…</div>
+      <div className="p-6 text-muted-foreground text-sm">Loading resources…</div>
     );
   }
 
@@ -132,20 +132,20 @@ export function ResourcesPanel({ onNavigateToAgents }: ResourcesPanelProps) {
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="flex items-center gap-3 px-6 py-3 border-b border-divider shrink-0">
-        <h2 className="text-sm font-semibold text-content">Resources</h2>
-        <span className="text-xs text-content-subtle">{total} items</span>
+      <div className="flex items-center gap-3 px-6 py-3 border-b border-border shrink-0">
+        <h2 className="text-sm font-semibold text-foreground">Resources</h2>
+        <span className="text-xs text-muted-foreground">{total} items</span>
 
         <div className="flex items-center gap-1 ml-4">
-          <span className="text-xs text-content-subtle mr-1">Group by:</span>
+          <span className="text-xs text-muted-foreground mr-1">Group by:</span>
           {(['issue', 'type', 'status'] as ResourceGroupBy[]).map(g => (
             <button
               key={g}
               onClick={() => setGroupBy(g)}
               className={`px-2 py-0.5 rounded text-xs transition-colors ${
                 groupBy === g
-                  ? 'bg-primary text-white'
-                  : 'text-content-subtle hover:text-content hover:bg-surface-overlay'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-popover'
               }`}
             >
               {g.charAt(0).toUpperCase() + g.slice(1)}
@@ -160,8 +160,8 @@ export function ResourcesPanel({ onNavigateToAgents }: ResourcesPanelProps) {
               onClick={() => setFilter(f)}
               className={`px-2 py-0.5 rounded text-xs transition-colors ${
                 filter === f
-                  ? 'bg-surface-overlay text-content'
-                  : 'text-content-subtle hover:text-content hover:bg-surface-overlay'
+                  ? 'bg-popover text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-popover'
               }`}
             >
               {f === 'all' ? 'All' : 'Running only'}
@@ -170,7 +170,7 @@ export function ResourcesPanel({ onNavigateToAgents }: ResourcesPanelProps) {
         </div>
 
         {data?.updatedAt && (
-          <span className="ml-auto text-xs text-content-subtle">
+          <span className="ml-auto text-xs text-muted-foreground">
             Updated {new Date(data.updatedAt).toLocaleTimeString()}
           </span>
         )}
@@ -179,7 +179,7 @@ export function ResourcesPanel({ onNavigateToAgents }: ResourcesPanelProps) {
       {/* Grid */}
       <div className="flex-1 overflow-auto p-6">
         {total === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-content-subtle">
+          <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
             <div className="text-4xl mb-3">📦</div>
             <div className="text-sm">No containers or agents found</div>
             <div className="text-xs mt-1">Docker may not be running or no workspaces are active</div>
@@ -188,9 +188,9 @@ export function ResourcesPanel({ onNavigateToAgents }: ResourcesPanelProps) {
           <div className="space-y-6">
             {groups.map(group => (
               <div key={group.key}>
-                <h3 className="text-xs font-semibold text-content-subtle uppercase tracking-wider mb-3">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                   {group.label}
-                  <span className="ml-2 font-normal text-content-subtle/60">
+                  <span className="ml-2 font-normal text-muted-foreground/60">
                     ({group.containers.length + group.agents.length})
                   </span>
                 </h3>

@@ -42,25 +42,25 @@ function StepRow({ stepNum, event }: { stepNum: number; event?: DeepWipeProgress
         isComplete ? 'badge-bg-destructive' :
         isActive ? 'badge-bg-warning' :
         isError ? 'bg-destructive/20' :
-        'border border-divider'
+        'border border-border'
       }`}>
         {isComplete && <CheckCircle2 className="w-4 h-4 text-destructive" />}
         {isActive && <Loader2 className="w-4 h-4 text-warning animate-spin" />}
         {isError && <AlertCircle className="w-4 h-4 text-destructive" />}
-        {isPending && <Circle className="w-4 h-4 text-content-muted" />}
+        {isPending && <Circle className="w-4 h-4 text-muted-foreground" />}
       </div>
       <div className="flex-1 py-1">
         <p className={`text-sm font-medium transition-colors duration-300 ${
           isComplete ? 'text-destructive' :
-          isActive ? 'text-content' :
+          isActive ? 'text-foreground' :
           isError ? 'text-destructive' :
-          'text-content-muted'
+          'text-muted-foreground'
         }`}>
           {event?.label || defaultLabel}
         </p>
         {event?.detail && (
           <p className={`text-xs mt-0.5 font-mono ${
-            isError ? 'text-destructive/80' : 'text-content-muted'
+            isError ? 'text-destructive/80' : 'text-muted-foreground'
           }`}>
             {event.detail}
           </p>
@@ -71,7 +71,7 @@ function StepRow({ stepNum, event }: { stepNum: number; event?: DeepWipeProgress
           isComplete ? 'text-destructive/50' :
           isActive ? 'text-warning/50' :
           isError ? 'text-destructive/50' :
-          'text-content-muted/30'
+          'text-muted-foreground/30'
         }`} />
       </div>
     </div>
@@ -185,22 +185,22 @@ export function DeepWipeDialog({ issue, isOpen, onClose }: DeepWipeDialogProps) 
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={state === 'wiping' ? undefined : handleClose} />
 
-      <div className="relative w-full max-w-lg bg-surface-raised rounded-xl shadow-2xl border border-divider overflow-hidden">
+      <div className="relative w-full max-w-lg bg-card rounded-xl shadow-2xl border border-border overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-divider">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-500/30 to-orange-500/30 flex items-center justify-center">
               <Trash2 className="w-5 h-5 text-destructive" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-content">Reset Issue: {issue.identifier}</h2>
-              <p className="text-sm text-content-subtle line-clamp-1">{issue.title}</p>
+              <h2 className="text-lg font-semibold text-foreground">Reset Issue: {issue.identifier}</h2>
+              <p className="text-sm text-muted-foreground line-clamp-1">{issue.title}</p>
             </div>
           </div>
           {state !== 'wiping' && (
             <button
               onClick={handleClose}
-              className="p-2 text-content-subtle hover:text-content hover:bg-surface-overlay rounded-lg transition-colors"
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-popover rounded-lg transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -214,8 +214,8 @@ export function DeepWipeDialog({ issue, isOpen, onClose }: DeepWipeDialogProps) 
               <div className="w-16 h-16 rounded-full badge-bg-destructive flex items-center justify-center mx-auto mb-4">
                 <AlertCircle className="w-8 h-8 text-destructive" />
               </div>
-              <p className="text-sm text-content-body mb-2">This will <span className="text-destructive font-medium">permanently destroy</span>:</p>
-              <ul className="text-sm text-content-subtle space-y-1 mb-6">
+              <p className="text-sm text-foreground mb-2">This will <span className="text-destructive font-medium">permanently destroy</span>:</p>
+              <ul className="text-sm text-muted-foreground space-y-1 mb-6">
                 <li>All running agents for this issue</li>
                 <li>Workspace directory and all files</li>
                 <li>Local and remote feature branches</li>
@@ -224,13 +224,13 @@ export function DeepWipeDialog({ issue, isOpen, onClose }: DeepWipeDialogProps) 
               <div className="flex justify-center gap-3">
                 <button
                   onClick={handleClose}
-                  className="px-4 py-2 bg-surface-overlay hover:bg-surface-emphasis text-content rounded-lg transition-colors"
+                  className="px-4 py-2 bg-popover hover:bg-card text-foreground rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleWipe}
-                  className="flex items-center gap-2 px-4 py-2 bg-destructive hover:bg-destructive/90 text-white rounded-lg transition-colors font-medium"
+                  className="flex items-center gap-2 px-4 py-2 bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-lg transition-colors font-medium"
                 >
                   <Trash2 className="w-4 h-4" />
                   Reset Issue
@@ -254,11 +254,11 @@ export function DeepWipeDialog({ issue, isOpen, onClose }: DeepWipeDialogProps) 
 
               {/* Progress bar */}
               <div className="mb-4">
-                <div className="flex justify-between text-xs text-content-muted mb-2">
+                <div className="flex justify-between text-xs text-muted-foreground mb-2">
                   <span>{state === 'complete' ? 'Complete' : `Step ${Math.min(completedCount + 1, totalSteps)} of ${totalSteps}`}</span>
                   <span>{progressPct}%</span>
                 </div>
-                <div className="w-full h-1.5 bg-surface-overlay rounded-full overflow-hidden">
+                <div className="w-full h-1.5 bg-popover rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ease-out ${
                       state === 'complete' ? 'bg-destructive' : 'bg-gradient-to-r from-destructive to-warning'
@@ -283,7 +283,7 @@ export function DeepWipeDialog({ issue, isOpen, onClose }: DeepWipeDialogProps) 
                   </p>
                   <button
                     onClick={handleClose}
-                    className="px-4 py-2 bg-surface-overlay hover:bg-surface-emphasis text-content rounded-lg transition-colors"
+                    className="px-4 py-2 bg-popover hover:bg-card text-foreground rounded-lg transition-colors"
                   >
                     Close
                   </button>

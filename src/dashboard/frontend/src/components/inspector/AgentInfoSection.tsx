@@ -15,8 +15,8 @@ export function AgentInfoSection({ agent, duration, workspace, syncMainPending, 
   return (
     <>
       {/* Agent info */}
-      <div className="px-3 py-2 border-b border-divider text-xs">
-        <div className="uppercase tracking-wider text-[10px] mb-2 font-semibold text-content-subtle">Agent</div>
+      <div className="px-3 py-2 border-b border-border text-xs">
+        <div className="uppercase tracking-wider text-[10px] mb-2 font-semibold text-muted-foreground">Agent</div>
         <div className="space-y-1.5">
           {[
             { label: 'Model', value: getFriendlyModelName(agent.model) },
@@ -24,30 +24,30 @@ export function AgentInfoSection({ agent, duration, workspace, syncMainPending, 
             { label: 'Uptime', value: duration },
           ].map(({ label, value }) => (
             <div key={label} className="flex items-center justify-between">
-              <span className="text-content-subtle">{label}</span>
-              <span className="text-content">{value}</span>
+              <span className="text-muted-foreground">{label}</span>
+              <span className="text-foreground">{value}</span>
             </div>
           ))}
           <div className="flex items-center justify-between">
-            <span className="text-content-subtle">Session</span>
-            <span className="text-content font-mono text-[10px]">{agent.id}</span>
+            <span className="text-muted-foreground">Session</span>
+            <span className="text-foreground font-mono text-[10px]">{agent.id}</span>
           </div>
         </div>
       </div>
 
       {/* Git Status */}
       {agent.git && (
-        <div className="px-3 py-2 border-b border-divider text-xs" data-testid="git-status">
-          <div className="uppercase tracking-wider text-[10px] mb-2 font-semibold text-content-subtle">Git Status</div>
+        <div className="px-3 py-2 border-b border-border text-xs" data-testid="git-status">
+          <div className="uppercase tracking-wider text-[10px] mb-2 font-semibold text-muted-foreground">Git Status</div>
           <div className="space-y-1.5">
-            <div className="flex items-center gap-1.5 text-content">
-              <GitBranch className="w-3 h-3 shrink-0 text-content-subtle" />
+            <div className="flex items-center gap-1.5 text-foreground">
+              <GitBranch className="w-3 h-3 shrink-0 text-muted-foreground" />
               <span className="font-mono flex-1 truncate">{agent.git.branch}</span>
               <button
                 onClick={onSyncMain}
                 disabled={syncMainPending}
                 title="Sync with main"
-                className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded transition-colors disabled:opacity-40 bg-surface-emphasis text-content-subtle"
+                className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded transition-colors disabled:opacity-40 bg-card text-muted-foreground"
               >
                 {syncMainPending ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <GitMerge className="w-2.5 h-2.5" />}
                 Sync
@@ -56,7 +56,7 @@ export function AgentInfoSection({ agent, duration, workspace, syncMainPending, 
             {agent.git.uncommittedFiles > 0 && (
               <div className="text-warning text-[10px] ml-4">{agent.git.uncommittedFiles} uncommitted files</div>
             )}
-            <div className="text-[10px] mt-1 truncate text-content-subtle" title={agent.git.latestCommit}>
+            <div className="text-[10px] mt-1 truncate text-muted-foreground" title={agent.git.latestCommit}>
               {agent.git.latestCommit}
             </div>
           </div>
@@ -65,8 +65,8 @@ export function AgentInfoSection({ agent, duration, workspace, syncMainPending, 
 
       {/* Workspace path (agent view) */}
       {agent.workspace && (
-        <div className="px-3 py-2 border-b border-divider text-xs">
-          <div className="flex items-center gap-1.5 text-content-subtle">
+        <div className="px-3 py-2 border-b border-border text-xs">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
             <Folder className="w-3 h-3 shrink-0" />
             <span className="font-mono truncate text-[10px]" title={agent.workspace}>
               {agent.workspace}
@@ -77,8 +77,8 @@ export function AgentInfoSection({ agent, duration, workspace, syncMainPending, 
 
       {/* Workspace path (no-agent view with location badge) */}
       {!agent.workspace && workspace?.exists && workspace.path && (
-        <div className="px-3 py-2 border-b border-divider text-xs">
-          <div className="flex items-center gap-1.5 text-content-subtle">
+        <div className="px-3 py-2 border-b border-border text-xs">
+          <div className="flex items-center gap-1.5 text-muted-foreground">
             <Folder className="w-3 h-3 shrink-0" />
             <span className="font-mono truncate text-[10px]" title={workspace.path}>
               {workspace.path}
@@ -89,7 +89,7 @@ export function AgentInfoSection({ agent, duration, workspace, syncMainPending, 
               className={`mt-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded ${
                 workspace.location === 'remote'
                   ? 'bg-cyan-500/20 text-cyan-400'
-                  : 'bg-surface-emphasis text-content-subtle'
+                  : 'bg-card text-muted-foreground'
               }`}
             >
               {workspace.location === 'remote' ? <Cloud className="w-3 h-3" /> : <Monitor className="w-3 h-3" />}

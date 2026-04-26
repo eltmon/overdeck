@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { FileText, ListTodo, Brain, Upload, RefreshCw, ClipboardCheck } from 'lucide-react';
 import { MarkdownModal } from './MarkdownModal';
 import { TranscriptUpload } from './TranscriptUpload';
-import styles from '../styles/mission-control.module.css';
+import styles from '../styles/command-deck.module.css';
 
 interface PlanningData {
   prd?: string;

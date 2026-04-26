@@ -62,7 +62,7 @@ export function HealthHistoryTimeline({
 }: HealthHistoryTimelineProps) {
   if (events.length === 0) {
     return (
-      <div className="flex items-center justify-center py-8 text-content-muted">
+      <div className="flex items-center justify-center py-8 text-muted-foreground">
         <Activity className="w-5 h-5 mr-2" />
         <span>No health events in this time range</span>
       </div>
@@ -88,7 +88,7 @@ export function HealthHistoryTimeline({
       {/* Timeline visualization */}
       <div className="relative">
         {/* Background track */}
-        <div className="h-3 bg-surface-raised rounded-full relative overflow-hidden">
+        <div className="h-3 bg-card rounded-full relative overflow-hidden">
           {/* State duration bars */}
           {eventPositions.map((event, index) => {
             const nextEvent = eventPositions[index + 1];
@@ -123,7 +123,7 @@ export function HealthHistoryTimeline({
         </div>
 
         {/* Time labels */}
-        <div className="flex justify-between mt-2 text-xs text-content-muted">
+        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
           <span>{formatTime(startTime)}</span>
           <span>{formatTime(endTime)}</span>
         </div>
@@ -140,27 +140,27 @@ export function HealthHistoryTimeline({
           return (
             <div
               key={event.id}
-              className="flex items-center justify-between text-sm py-2 px-3 bg-surface-raised rounded hover:bg-surface-emphasis transition-colors"
+              className="flex items-center justify-between text-sm py-2 px-3 bg-card rounded hover:bg-card transition-colors"
             >
               <div className="flex items-center gap-3">
                 <span className="text-lg">{STATE_EMOJI[event.state]}</span>
                 <div>
-                  <div className="text-content font-medium">{STATE_LABELS[event.state]}</div>
+                  <div className="text-foreground font-medium">{STATE_LABELS[event.state]}</div>
                   {event.previousState && (
-                    <div className="text-xs text-content-muted">
+                    <div className="text-xs text-muted-foreground">
                       Transitioned from {event.previousState}
                     </div>
                   )}
                   {event.source && (
-                    <div className="text-xs text-content-muted font-mono">{event.source}</div>
+                    <div className="text-xs text-muted-foreground font-mono">{event.source}</div>
                   )}
                 </div>
               </div>
 
               <div className="text-right">
-                <div className="text-content-subtle">{formatTime(event.timestamp)}</div>
+                <div className="text-muted-foreground">{formatTime(event.timestamp)}</div>
                 {duration !== null && (
-                  <div className="text-xs text-content-muted">
+                  <div className="text-xs text-muted-foreground">
                     Duration: {formatDuration(duration)}
                   </div>
                 )}
@@ -175,7 +175,7 @@ export function HealthHistoryTimeline({
         {Object.entries(STATE_LABELS).map(([state, label]) => (
           <div key={state} className="flex items-center gap-1.5">
             <div className={`w-3 h-3 rounded-full ${STATE_COLORS[state as keyof typeof STATE_COLORS]}`} />
-            <span className="text-content-subtle">{label}</span>
+            <span className="text-muted-foreground">{label}</span>
           </div>
         ))}
       </div>

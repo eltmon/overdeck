@@ -1,14 +1,14 @@
 import type { VBriefDocument } from './types';
 
 const STATUS_BADGE: Record<string, string> = {
-  draft: 'badge-bg-muted text-text-secondary',
+  draft: 'badge-bg-muted text-muted-foreground',
   proposed: 'badge-bg-primary text-primary',
   approved: 'badge-bg-success text-success',
   pending: 'badge-bg-warning text-warning',
   running: 'badge-bg-primary text-primary',
   completed: 'badge-bg-success text-success',
   blocked: 'badge-bg-destructive text-destructive',
-  cancelled: 'badge-bg-muted text-text-muted',
+  cancelled: 'badge-bg-muted text-muted-foreground',
 };
 
 function fmt(ts?: string): string {
@@ -26,7 +26,7 @@ interface VBriefHeaderProps {
 
 export function VBriefHeader({ doc }: VBriefHeaderProps) {
   const { plan, vBRIEFInfo } = doc;
-  const badgeCls = STATUS_BADGE[plan.status] ?? 'badge-bg-muted text-text-secondary';
+  const badgeCls = STATUS_BADGE[plan.status] ?? 'badge-bg-muted text-muted-foreground';
 
   return (
     <div className="p-4 border-b border-border">
@@ -37,41 +37,41 @@ export function VBriefHeader({ doc }: VBriefHeaderProps) {
         </span>
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-text-muted">
+      <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-muted-foreground">
         {plan.uid && (
           <div className="col-span-2">
-            <span className="text-content-muted">uid </span>
-            <span className="font-mono text-text-secondary">{plan.uid}</span>
+            <span className="text-muted-foreground">uid </span>
+            <span className="font-mono text-muted-foreground">{plan.uid}</span>
           </div>
         )}
         {plan.author && (
           <div>
-            <span className="text-content-muted">author </span>
-            <span className="text-text-secondary">{plan.author}</span>
+            <span className="text-muted-foreground">author </span>
+            <span className="text-muted-foreground">{plan.author}</span>
           </div>
         )}
         {vBRIEFInfo.author && (
           <div>
-            <span className="text-content-muted">tool </span>
-            <span className="text-text-secondary">{vBRIEFInfo.author}</span>
+            <span className="text-muted-foreground">tool </span>
+            <span className="text-muted-foreground">{vBRIEFInfo.author}</span>
           </div>
         )}
         {plan.created && (
           <div>
-            <span className="text-content-muted">created </span>
-            <span className="text-text-secondary">{fmt(plan.created)}</span>
+            <span className="text-muted-foreground">created </span>
+            <span className="text-muted-foreground">{fmt(plan.created)}</span>
           </div>
         )}
         {plan.updated && (
           <div>
-            <span className="text-content-muted">updated </span>
-            <span className="text-text-secondary">{fmt(plan.updated)}</span>
+            <span className="text-muted-foreground">updated </span>
+            <span className="text-muted-foreground">{fmt(plan.updated)}</span>
           </div>
         )}
         {plan.sequence !== undefined && (
           <div>
-            <span className="text-content-muted">seq </span>
-            <span className="text-text-secondary">{plan.sequence}</span>
+            <span className="text-muted-foreground">seq </span>
+            <span className="text-muted-foreground">{plan.sequence}</span>
           </div>
         )}
       </div>

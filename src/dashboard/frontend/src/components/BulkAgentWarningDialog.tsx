@@ -32,35 +32,35 @@ export function BulkAgentWarningDialog({ isOpen, onClose, onProceed, issues, age
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-surface-raised rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+      <div className="relative bg-card rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex items-start gap-4">
           <div className="p-2 badge-bg-warning rounded-lg">
             <AlertTriangle className="w-6 h-6 text-warning-foreground" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-content mb-2">
+            <h3 className="text-lg font-semibold text-foreground mb-2">
               Active Agents Warning
             </h3>
-            <p className="text-content-body text-sm mb-4">
+            <p className="text-foreground text-sm mb-4">
               {issuesWithAgents.length} selected {issuesWithAgents.length === 1 ? 'issue has' : 'issues have'} active agents:
             </p>
             <ul className="space-y-2 mb-6 max-h-48 overflow-y-auto">
               {issuesWithAgents.map(({ issue, runningAgents }) => (
-                <li key={issue.identifier} className="flex items-center justify-between rounded-lg border border-divider/70 bg-surface px-3 py-2">
-                  <span className="text-sm font-medium text-content">{issue.identifier}</span>
-                  <span className="text-xs text-content-subtle">
+                <li key={issue.identifier} className="flex items-center justify-between rounded-lg border border-border/70 bg-card px-3 py-2">
+                  <span className="text-sm font-medium text-foreground">{issue.identifier}</span>
+                  <span className="text-xs text-muted-foreground">
                     {runningAgents.map(a => a.id).join(', ')}
                   </span>
                 </li>
               ))}
             </ul>
-            <p className="text-content-subtle text-xs mb-6">
+            <p className="text-muted-foreground text-xs mb-6">
               Proceeding will skip these issues. Only issues without active agents will be closed out.
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-content-subtle hover:text-content transition-colors text-sm"
+                className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors text-sm"
               >
                 Cancel
               </button>

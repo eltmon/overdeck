@@ -7,20 +7,20 @@ const STATUS_COLORS: Record<string, string> = {
   running: 'text-primary border-primary/50',
   in_progress: 'text-primary border-primary/50',
   blocked: 'text-destructive border-destructive/50',
-  cancelled: 'text-text-muted border-divider',
-  pending: 'text-text-muted border-divider',
-  draft: 'text-text-muted border-divider',
+  cancelled: 'text-muted-foreground border-border',
+  pending: 'text-muted-foreground border-border',
+  draft: 'text-muted-foreground border-border',
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
   critical: 'badge-bg-destructive text-destructive',
   high: 'badge-bg-warning text-warning-foreground',
   medium: 'badge-bg-warning text-warning',
-  low: 'badge-bg-muted text-text-secondary',
+  low: 'badge-bg-muted text-muted-foreground',
 };
 
 const DIFFICULTY_COLORS: Record<string, string> = {
-  trivial: 'badge-bg-muted text-text-secondary',
+  trivial: 'badge-bg-muted text-muted-foreground',
   simple: 'badge-bg-success text-success',
   medium: 'badge-bg-warning text-warning',
   complex: 'badge-bg-warning text-warning-foreground',
@@ -31,7 +31,7 @@ function ACIcon({ sub }: { sub: VBriefSubItem }) {
   if (sub.status === 'completed') return <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />;
   if (sub.status === 'blocked') return <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />;
   if (sub.status === 'running' || sub.status === 'in_progress') return <Clock className="w-3.5 h-3.5 text-primary shrink-0" />;
-  return <Circle className="w-3.5 h-3.5 text-text-muted shrink-0" />;
+  return <Circle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />;
 }
 
 interface VBriefItemCardProps {
@@ -68,10 +68,10 @@ export function VBriefItemCard({ item }: VBriefItemCardProps) {
                 {difficulty}
               </span>
             )}
-            <span className="text-xs text-text-muted">{item.status}</span>
+            <span className="text-xs text-muted-foreground">{item.status}</span>
           </div>
           {acItems.length > 0 && !expanded && (
-            <div className="text-xs text-content-muted mt-0.5">
+            <div className="text-xs text-muted-foreground mt-0.5">
               {acItems.filter(s => s.status === 'completed').length}/{acItems.length} AC
             </div>
           )}
@@ -81,16 +81,16 @@ export function VBriefItemCard({ item }: VBriefItemCardProps) {
       {expanded && (
         <div className="px-3 pb-3 space-y-2">
           {item.narrative?.Action && (
-            <p className="text-sm text-text-secondary leading-relaxed">{item.narrative.Action}</p>
+            <p className="text-sm text-muted-foreground leading-relaxed">{item.narrative.Action}</p>
           )}
           {acItems.length > 0 && (
             <div>
-              <div className="text-xs font-semibold text-text-muted mb-1">Acceptance Criteria</div>
+              <div className="text-xs font-semibold text-muted-foreground mb-1">Acceptance Criteria</div>
               <ul className="space-y-1">
                 {acItems.map(sub => (
                   <li key={sub.id} className="flex items-start gap-1.5 text-sm">
                     <ACIcon sub={sub} />
-                    <span className={sub.status === 'completed' ? 'text-success line-through' : 'text-text-secondary'}>
+                    <span className={sub.status === 'completed' ? 'text-success line-through' : 'text-muted-foreground'}>
                       {sub.title}
                     </span>
                   </li>

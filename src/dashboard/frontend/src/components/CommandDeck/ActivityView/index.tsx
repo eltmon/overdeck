@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ExternalLink } from 'lucide-react';
 import type { Issue } from '../../../types';
 import type { ProjectFeature } from '../ProjectTree/ProjectNode';
-import styles from '../styles/mission-control.module.css';
+import styles from '../styles/command-deck.module.css';
 
 interface ActivitySection {
   type: string;

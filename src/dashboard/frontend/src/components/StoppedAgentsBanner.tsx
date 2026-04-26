@@ -112,8 +112,8 @@ export function StoppedAgentsBanner() {
     // Show a subtle "show again" button if dismissed and stopped agents exist
     if (dismissed && stoppedAgents.length > 0) {
       return (
-        <div className="bg-surface-emphasis/40 border-b border-divider px-4 py-1 flex items-center gap-2 shrink-0">
-          <span className="text-xs text-content-subtle">
+        <div className="bg-card/40 border-b border-border px-4 py-1 flex items-center gap-2 shrink-0">
+          <span className="text-xs text-muted-foreground">
             {stoppedAgents.length} agent{stoppedAgents.length > 1 ? 's' : ''} stopped
           </span>
           <button

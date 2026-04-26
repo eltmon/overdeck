@@ -14,7 +14,7 @@ const THINKING_LEVEL_LABELS: Record<number, string> = {
 export function ThinkingLevelSlider({ value, onChange }: ThinkingLevelSliderProps) {
   return (
     <div className="space-y-3">
-      <div className="flex justify-between text-xs font-semibold text-content-subtle uppercase tracking-wider">
+      <div className="flex justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
         <span>Gemini Thinking Level</span>
         <span className="text-[#a078f7]">{THINKING_LEVEL_LABELS[value]}</span>
       </div>
@@ -24,9 +24,9 @@ export function ThinkingLevelSlider({ value, onChange }: ThinkingLevelSliderProp
         max="4"
         value={value}
         onChange={(e) => onChange(parseInt(e.target.value))}
-        className="w-full h-1.5 bg-surface-emphasis rounded-lg appearance-none cursor-pointer accent-[#a078f7]"
+        className="w-full h-1.5 bg-card rounded-lg appearance-none cursor-pointer accent-[#a078f7]"
       />
-      <div className="flex justify-between text-[10px] text-content-muted font-bold uppercase">
+      <div className="flex justify-between text-[10px] text-muted-foreground font-bold uppercase">
         {THINKING_LEVELS.map((label) => (
           <span key={label}>{label}</span>
         ))}

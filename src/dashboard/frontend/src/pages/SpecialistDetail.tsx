@@ -74,14 +74,14 @@ const STATUS_ICONS = {
   passed: <CheckCircle className="w-4 h-4 text-success" />,
   failed: <XCircle className="w-4 h-4 text-destructive" />,
   blocked: <AlertCircle className="w-4 h-4 text-warning" />,
-  incomplete: <Clock className="w-4 h-4 text-content-subtle" />,
+  incomplete: <Clock className="w-4 h-4 text-muted-foreground" />,
 };
 
 const STATUS_COLORS = {
   passed: 'badge-bg-success text-success border-success/40',
   failed: 'badge-bg-destructive text-destructive border-destructive/40',
   blocked: 'badge-bg-warning text-warning border-warning/40',
-  incomplete: 'bg-surface bg-opacity-20 text-content-subtle border-divider-strong',
+  incomplete: 'bg-card bg-opacity-20 text-muted-foreground border-border',
 };
 
 function formatDuration(ms: number): string {
@@ -138,7 +138,7 @@ export function SpecialistDetail() {
   if (runsLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-8 h-8 text-content-subtle animate-spin" />
+        <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
       </div>
     );
   }
@@ -159,7 +159,7 @@ export function SpecialistDetail() {
       <div className="mb-6">
         <Link
           to="/specialists"
-          className="flex items-center gap-2 text-content-subtle hover:text-content mb-4"
+          className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Specialists
@@ -168,10 +168,10 @@ export function SpecialistDetail() {
         <div className="flex items-center gap-3">
           <Brain className="w-8 h-8 text-signal-review" />
           <div>
-            <h1 className="text-2xl font-bold text-content">
+            <h1 className="text-2xl font-bold text-foreground">
               {project} / {type}
             </h1>
-            <div className="text-content-subtle">{runs?.length || 0} total runs</div>
+            <div className="text-muted-foreground">{runs?.length || 0} total runs</div>
           </div>
         </div>
       </div>
@@ -200,37 +200,37 @@ export function SpecialistDetail() {
       </div>
 
       {/* Context digest */}
-      <div className="mb-6 p-4 bg-surface-raised rounded-lg">
+      <div className="mb-6 p-4 bg-card rounded-lg">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-medium text-content">Context Digest</h2>
+          <h2 className="text-lg font-medium text-foreground">Context Digest</h2>
           <button
             onClick={() => regenerateMutation.mutate()}
             disabled={regenerateMutation.isPending}
-            className="flex items-center gap-2 px-3 py-1 text-sm text-primary hover:text-primary/80 hover:bg-surface-overlay rounded disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-1 text-sm text-primary hover:text-primary/80 hover:bg-popover rounded disabled:opacity-50"
           >
             <RefreshCw className={`w-4 h-4 ${regenerateMutation.isPending ? 'animate-spin' : ''}`} />
             Regenerate
           </button>
         </div>
         {contextDigest ? (
-          <pre className="text-sm text-content-body whitespace-pre-wrap max-h-64 overflow-auto">
+          <pre className="text-sm text-foreground whitespace-pre-wrap max-h-64 overflow-auto">
             {contextDigest}
           </pre>
         ) : (
-          <div className="text-content-muted">No context digest available yet</div>
+          <div className="text-muted-foreground">No context digest available yet</div>
         )}
       </div>
 
       {/* Run history */}
       <div>
-        <h2 className="text-lg font-medium text-content mb-3">Run History</h2>
+        <h2 className="text-lg font-medium text-foreground mb-3">Run History</h2>
         {runs && runs.length > 0 ? (
           <div className="space-y-2">
             {runs.map((run) => (
               <div
                 key={run.runId}
                 className={`p-4 rounded-lg border ${
-                  run.metadata.status ? STATUS_COLORS[run.metadata.status] : 'bg-surface-raised border-divider'
+                  run.metadata.status ? STATUS_COLORS[run.metadata.status] : 'bg-card border-border'
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -238,24 +238,24 @@ export function SpecialistDetail() {
                     {run.metadata.status && STATUS_ICONS[run.metadata.status]}
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-content">{run.metadata.issueId}</span>
-                        <span className={run.metadata.status ? STATUS_COLORS[run.metadata.status].split(' ')[2] : 'text-content-subtle'}>
+                        <span className="font-mono text-foreground">{run.metadata.issueId}</span>
+                        <span className={run.metadata.status ? STATUS_COLORS[run.metadata.status].split(' ')[2] : 'text-muted-foreground'}>
                           {run.metadata.status || 'incomplete'}
                         </span>
                       </div>
-                      <div className="text-sm text-content-subtle">
+                      <div className="text-sm text-muted-foreground">
                         {formatDate(run.metadata.startedAt)}
                         {run.metadata.duration && ` • ${formatDuration(run.metadata.duration)}`}
                       </div>
                       {run.metadata.notes && (
-                        <div className="text-sm text-content-body mt-1">{run.metadata.notes}</div>
+                        <div className="text-sm text-foreground mt-1">{run.metadata.notes}</div>
                       )}
                     </div>
                   </div>
 
                   <Link
                     to={`/specialists/${project}/${type}/runs/${run.runId}`}
-                    className="flex items-center gap-2 px-3 py-2 text-sm text-primary hover:text-primary/80 hover:bg-surface-overlay rounded"
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-primary hover:text-primary/80 hover:bg-popover rounded"
                   >
                     <Eye className="w-4 h-4" />
                     View Log
@@ -265,7 +265,7 @@ export function SpecialistDetail() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-8 text-content-muted">
+          <div className="text-center py-8 text-muted-foreground">
             No runs yet for this specialist
           </div>
         )}

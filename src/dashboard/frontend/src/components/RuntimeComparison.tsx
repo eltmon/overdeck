@@ -134,8 +134,8 @@ export function RuntimeComparison() {
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-surface-overlay rounded w-1/4"></div>
-          <div className="h-64 bg-surface-overlay rounded"></div>
+          <div className="h-8 bg-popover rounded w-1/4"></div>
+          <div className="h-64 bg-popover rounded"></div>
         </div>
       </div>
     );
@@ -161,10 +161,10 @@ export function RuntimeComparison() {
           <BarChart3 className="w-5 h-5" />
           Runtime Comparison
         </h2>
-        <div className="bg-surface-raised rounded-lg p-8 text-center">
-          <Cpu className="w-12 h-12 mx-auto mb-4 text-content-muted" />
-          <p className="text-content-subtle">No runtime metrics recorded yet.</p>
-          <p className="text-content-muted text-sm mt-2">
+        <div className="bg-card rounded-lg p-8 text-center">
+          <Cpu className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+          <p className="text-muted-foreground">No runtime metrics recorded yet.</p>
+          <p className="text-muted-foreground text-sm mt-2">
             Metrics will appear here as tasks are completed by different runtimes.
           </p>
         </div>
@@ -181,7 +181,7 @@ export function RuntimeComparison() {
           Runtime Comparison
         </h2>
         {aggregated && (
-          <div className="text-sm text-content-subtle">
+          <div className="text-sm text-muted-foreground">
             {aggregated.totalTasks} total tasks • {formatCost(aggregated.totalCost)} total cost
           </div>
         )}
@@ -190,15 +190,15 @@ export function RuntimeComparison() {
       {/* Summary Cards */}
       {aggregated && (
         <div className="grid grid-cols-4 gap-4">
-          <div className="bg-surface-raised rounded-lg p-4">
-            <div className="flex items-center gap-2 text-content-subtle text-sm mb-1">
+          <div className="bg-card rounded-lg p-4">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
               <CheckCircle className="w-4 h-4" />
               Total Tasks
             </div>
             <div className="text-2xl font-bold">{aggregated.totalTasks}</div>
           </div>
-          <div className="bg-surface-raised rounded-lg p-4">
-            <div className="flex items-center gap-2 text-content-subtle text-sm mb-1">
+          <div className="bg-card rounded-lg p-4">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
               <TrendingUp className="w-4 h-4" />
               Avg Success Rate
             </div>
@@ -206,15 +206,15 @@ export function RuntimeComparison() {
               {formatPercent(aggregated.avgSuccessRate)}
             </div>
           </div>
-          <div className="bg-surface-raised rounded-lg p-4">
-            <div className="flex items-center gap-2 text-content-subtle text-sm mb-1">
+          <div className="bg-card rounded-lg p-4">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
               <Clock className="w-4 h-4" />
               Avg Duration
             </div>
             <div className="text-2xl font-bold">{formatDuration(aggregated.avgDuration)}</div>
           </div>
-          <div className="bg-surface-raised rounded-lg p-4">
-            <div className="flex items-center gap-2 text-content-subtle text-sm mb-1">
+          <div className="bg-card rounded-lg p-4">
+            <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
               <DollarSign className="w-4 h-4" />
               Total Cost
             </div>
@@ -224,24 +224,24 @@ export function RuntimeComparison() {
       )}
 
       {/* Runtime Comparison Table */}
-      <div className="bg-surface-raised rounded-lg overflow-hidden">
+      <div className="bg-card rounded-lg overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-divider">
-              <th className="text-left p-4 text-content-subtle font-medium">Runtime</th>
-              <th className="text-right p-4 text-content-subtle font-medium">Tasks</th>
-              <th className="text-right p-4 text-content-subtle font-medium">Success Rate</th>
-              <th className="text-right p-4 text-content-subtle font-medium">Avg Duration</th>
-              <th className="text-right p-4 text-content-subtle font-medium">Avg Cost</th>
-              <th className="text-right p-4 text-content-subtle font-medium">Total Cost</th>
-              <th className="text-right p-4 text-content-subtle font-medium">Tokens</th>
+            <tr className="border-b border-border">
+              <th className="text-left p-4 text-muted-foreground font-medium">Runtime</th>
+              <th className="text-right p-4 text-muted-foreground font-medium">Tasks</th>
+              <th className="text-right p-4 text-muted-foreground font-medium">Success Rate</th>
+              <th className="text-right p-4 text-muted-foreground font-medium">Avg Duration</th>
+              <th className="text-right p-4 text-muted-foreground font-medium">Avg Cost</th>
+              <th className="text-right p-4 text-muted-foreground font-medium">Total Cost</th>
+              <th className="text-right p-4 text-muted-foreground font-medium">Tokens</th>
             </tr>
           </thead>
           <tbody>
             {runtimes.map((runtime) => (
               <tr
                 key={runtime.runtime}
-                className="border-b border-divider/50 hover:bg-surface-overlay/30 transition-colors"
+                className="border-b border-border/50 hover:bg-popover/30 transition-colors"
               >
                 <td className="p-4">
                   <div className="flex items-center gap-2">
@@ -254,7 +254,7 @@ export function RuntimeComparison() {
                     <span className="text-success" title="Successful">
                       {runtime.successfulTasks}
                     </span>
-                    <span className="text-content-muted">/</span>
+                    <span className="text-muted-foreground">/</span>
                     <span>{runtime.totalTasks}</span>
                     {runtime.failedTasks > 0 && (
                       <span className="text-destructive text-sm" title="Failed">
@@ -268,16 +268,16 @@ export function RuntimeComparison() {
                     {formatPercent(runtime.successRate)}
                   </span>
                 </td>
-                <td className="text-right p-4 text-content-body">
+                <td className="text-right p-4 text-foreground">
                   {formatDuration(runtime.avgDurationMinutes)}
                 </td>
-                <td className="text-right p-4 text-content-body">
+                <td className="text-right p-4 text-foreground">
                   {formatCost(runtime.avgCost)}
                 </td>
                 <td className="text-right p-4 font-medium text-success">
                   {formatCost(runtime.totalCost)}
                 </td>
-                <td className="text-right p-4 text-content-body">
+                <td className="text-right p-4 text-foreground">
                   {formatTokens(runtime.totalTokens)}
                 </td>
               </tr>
@@ -289,15 +289,15 @@ export function RuntimeComparison() {
       {/* By Capability Breakdown */}
       <div className="grid grid-cols-2 gap-6">
         {runtimes.map((runtime) => (
-          <div key={runtime.runtime} className="bg-surface-raised rounded-lg p-4">
+          <div key={runtime.runtime} className="bg-card rounded-lg p-4">
             <h3 className="font-medium mb-3 flex items-center gap-2">
               <span>{getRuntimeIcon(runtime.runtime)}</span>
               <span className="capitalize">{runtime.runtime}</span>
-              <span className="text-content-muted text-sm">by Capability</span>
+              <span className="text-muted-foreground text-sm">by Capability</span>
             </h3>
 
             {Object.keys(runtime.byCapability).length === 0 ? (
-              <p className="text-content-muted text-sm">No capability data</p>
+              <p className="text-muted-foreground text-sm">No capability data</p>
             ) : (
               <div className="space-y-2">
                 {Object.entries(runtime.byCapability).map(([capability, stats]) => (
@@ -305,9 +305,9 @@ export function RuntimeComparison() {
                     key={capability}
                     className="flex items-center justify-between text-sm"
                   >
-                    <span className="capitalize text-content-body">{capability}</span>
+                    <span className="capitalize text-foreground">{capability}</span>
                     <div className="flex items-center gap-4">
-                      <span className="text-content-muted">{stats.tasks} tasks</span>
+                      <span className="text-muted-foreground">{stats.tasks} tasks</span>
                       <span className={getSuccessColor(stats.successRate)}>
                         {formatPercent(stats.successRate)}
                       </span>
@@ -324,7 +324,7 @@ export function RuntimeComparison() {
       </div>
 
       {/* By Model Breakdown */}
-      <div className="bg-surface-raised rounded-lg p-4">
+      <div className="bg-card rounded-lg p-4">
         <h3 className="font-medium mb-3 flex items-center gap-2">
           <Cpu className="w-4 h-4" />
           By Model
@@ -333,19 +333,19 @@ export function RuntimeComparison() {
         <div className="grid grid-cols-3 gap-4">
           {runtimes.map((runtime) => (
             <div key={runtime.runtime} className="space-y-2">
-              <h4 className="text-sm text-content-subtle capitalize">{runtime.runtime}</h4>
+              <h4 className="text-sm text-muted-foreground capitalize">{runtime.runtime}</h4>
               {Object.keys(runtime.byModel).length === 0 ? (
-                <p className="text-content-muted text-xs">No model data</p>
+                <p className="text-muted-foreground text-xs">No model data</p>
               ) : (
                 Object.entries(runtime.byModel).map(([model, stats]) => (
                   <div
                     key={model}
-                    className="bg-surface-overlay/50 rounded p-2 text-sm"
+                    className="bg-popover/50 rounded p-2 text-sm"
                   >
-                    <div className="font-medium text-content truncate" title={model}>
+                    <div className="font-medium text-foreground truncate" title={model}>
                       {model}
                     </div>
-                    <div className="flex items-center justify-between text-xs text-content-subtle mt-1">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
                       <span>{stats.tasks} tasks</span>
                       <span className={getSuccessColor(stats.successRate)}>
                         {formatPercent(stats.successRate)}
@@ -362,7 +362,7 @@ export function RuntimeComparison() {
 
       {/* Daily Stats Chart (simplified text version) */}
       {runtimes.some(r => r.dailyStats.length > 0) && (
-        <div className="bg-surface-raised rounded-lg p-4">
+        <div className="bg-card rounded-lg p-4">
           <h3 className="font-medium mb-3 flex items-center gap-2">
             <TrendingUp className="w-4 h-4" />
             Daily Activity (Last 30 Days)
@@ -408,7 +408,7 @@ export function RuntimeComparison() {
                           style={{ height: `${height}px` }}
                         />
                       </div>
-                      <div className="text-[10px] text-content-muted mt-1 rotate-45 origin-left w-8">
+                      <div className="text-[10px] text-muted-foreground mt-1 rotate-45 origin-left w-8">
                         {date.slice(5)}
                       </div>
                     </div>

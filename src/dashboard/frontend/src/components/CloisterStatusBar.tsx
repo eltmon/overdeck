@@ -170,7 +170,7 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
         {status.running ? (
           <Bell className="w-3.5 h-3.5 text-success" />
         ) : (
-          <BellOff className="w-3.5 h-3.5 text-content-muted" />
+          <BellOff className="w-3.5 h-3.5 text-muted-foreground" />
         )}
       </div>
 
@@ -215,10 +215,10 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
           disabled={isToggling}
           className={`px-2 py-0.5 rounded text-xs transition-colors ${
             isToggling
-              ? 'bg-surface-emphasis text-content-subtle cursor-wait'
+              ? 'bg-card text-muted-foreground cursor-wait'
               : status.running
-              ? 'bg-surface-overlay text-content-body hover:bg-surface-emphasis'
-              : 'bg-primary text-white hover:bg-primary/90'
+              ? 'bg-popover text-foreground hover:bg-card'
+              : 'bg-primary text-primary-foreground hover:bg-primary/90'
           }`}
         >
           {isToggling
@@ -230,7 +230,7 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
         <button
           ref={buttonRef}
           onClick={() => showRestartPopover ? setShowRestartPopover(false) : openPopover()}
-          className="p-1 rounded text-xs bg-surface-overlay text-content-body border border-border hover:bg-surface-emphasis transition-colors"
+          className="p-1 rounded text-xs bg-popover text-foreground border border-border hover:bg-card transition-colors"
           title="Restart sessions"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${restartMutation.isPending ? 'animate-spin' : ''}`} />
@@ -275,7 +275,7 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
                 <button
                   onClick={handleRestart}
                   disabled={restartMutation.isPending || (!restartConversations && !restartAgents)}
-                  className="px-2 py-1 rounded text-xs text-white bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-2 py-1 rounded text-xs text-primary-foreground bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {restartMutation.isPending ? 'Restarting...' : 'Restart'}
                 </button>
@@ -303,13 +303,13 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
             <span className="text-xs text-destructive">Kill all?</span>
             <button
               onClick={handleEmergencyStop}
-              className="px-1.5 py-0.5 rounded text-xs bg-destructive text-white hover:bg-destructive/90"
+              className="px-1.5 py-0.5 rounded text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Yes
             </button>
             <button
               onClick={() => setShowEmergencyConfirm(false)}
-              className="px-1.5 py-0.5 rounded text-xs bg-surface-overlay text-content-body hover:bg-surface-emphasis"
+              className="px-1.5 py-0.5 rounded text-xs bg-popover text-foreground hover:bg-card"
             >
               No
             </button>
@@ -319,7 +319,7 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
         {/* Settings — navigates to Settings page */}
         <button
           onClick={onOpenSettings}
-          className="p-1 rounded text-xs bg-surface-overlay text-content-body hover:bg-surface-emphasis transition-colors"
+          className="p-1 rounded text-xs bg-popover text-foreground hover:bg-card transition-colors"
           title="Open Settings"
         >
           <Settings className="w-3.5 h-3.5" />

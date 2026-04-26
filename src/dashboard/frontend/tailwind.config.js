@@ -63,36 +63,6 @@ export default {
           DEFAULT: 'var(--signal-cost)',
           foreground: 'var(--signal-cost-foreground)',
         },
-        // ─── Extended surface tokens ───
-        surface: 'var(--surface)',
-        'surface-raised': 'var(--surface-raised)',
-        'surface-2': 'var(--surface-2)',
-        'surface-active': 'var(--surface-active)',
-        'surface-hover': 'var(--surface-hover)',
-        'surface-overlay': 'var(--surface-overlay)',
-        'surface-emphasis': 'var(--surface-emphasis)',
-        // ─── Extended border tokens ───
-        divider: 'var(--divider)',
-        'divider-strong': 'var(--divider-strong)',
-        'divider-focus': 'var(--divider-focus)',
-        // ─── Extended input token ───
-        'input-bg': 'var(--input-bg)',
-        // ─── Extended text tokens ───
-        'text-primary': 'var(--text-primary)',
-        'text-secondary': 'var(--text-secondary)',
-        'text-muted': 'var(--text-muted)',
-        // ─── Content text hierarchy ───
-        content: 'var(--content)',
-        'content-body': 'var(--content-body)',
-        'content-muted': 'var(--content-muted)',
-        'content-subtle': 'var(--content-subtle)',
-        // ─── Muted accent ───
-        'accent-muted': 'var(--accent-muted)',
-        // ─── Legacy pan-* aliases (until bead 6kg migration) ───
-        'pan-panel-left': 'var(--pan-panel-left)',
-        'pan-panel-right': 'var(--pan-panel-right)',
-        'pan-border': 'var(--pan-border)',
-        'pan-text-secondary': 'var(--pan-text-secondary)',
       },
       fontFamily: {
         display: ['"Space Grotesk"', 'system-ui', 'sans-serif'],

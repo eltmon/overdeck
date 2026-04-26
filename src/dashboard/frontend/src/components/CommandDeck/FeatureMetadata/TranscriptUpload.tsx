@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { Upload, FileText, X } from 'lucide-react';
-import styles from '../styles/mission-control.module.css';
+import styles from '../styles/command-deck.module.css';
 
 interface TranscriptUploadProps {
   issueId: string;

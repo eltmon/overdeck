@@ -36,7 +36,7 @@ vi.mock('./SessionNode', () => ({
   ),
 }));
 
-vi.mock('../styles/mission-control.module.css', () => ({
+vi.mock('../styles/command-deck.module.css', () => ({
   default: {
     spinning: 'spinning',
     featureItemWrapper: 'featureItemWrapper',

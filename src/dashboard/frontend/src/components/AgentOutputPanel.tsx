@@ -11,11 +11,11 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { XTerminal } from './XTerminal';
-import { ActivityView } from './MissionControl/ActivityView';
+import { ActivityView } from './CommandDeck/ActivityView';
 import { ConversationPanel } from './chat/ConversationPanel';
-import type { Conversation } from './MissionControl/ConversationList';
+import type { Conversation } from './CommandDeck/ConversationList';
 import { useDashboardStore, selectAgentById } from '../lib/store';
-import styles from './MissionControl/styles/mission-control.module.css';
+import styles from './CommandDeck/styles/command-deck.module.css';
 
 interface AgentOutputPanelProps {
   agentId: string;
@@ -93,10 +93,10 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
     : agentId;
 
   return (
-    <div className="bg-surface-raised rounded-lg h-full flex flex-col">
+    <div className="bg-card rounded-lg h-full flex flex-col">
       {/* Header */}
-      <div className="px-4 py-2 border-b border-divider flex items-center gap-2 flex-shrink-0">
-        <span className="font-medium text-content text-sm flex-1 truncate">{label}</span>
+      <div className="px-4 py-2 border-b border-border flex items-center gap-2 flex-shrink-0">
+        <span className="font-medium text-foreground text-sm flex-1 truncate">{label}</span>
         <div className={styles.viewToggle}>
           <button
             className={`${styles.viewToggleBtn} ${viewMode === 'activity' ? styles.viewToggleBtnActive : ''}`}
@@ -133,7 +133,7 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
             // Planning agent with non-derivable issueId → fall back to raw terminal
             <XTerminal sessionName={agentId} onDisconnect={() => setTerminalFailed(true)} />
           ) : (
-            <div className="flex items-center justify-center h-full text-xs text-content-muted">
+            <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
               No issue associated with this session
             </div>
           )}

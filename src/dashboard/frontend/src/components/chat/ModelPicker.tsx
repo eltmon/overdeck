@@ -15,7 +15,7 @@ import {
   ensureDefaultConversationModel,
 } from './defaultConversationModel';
 import { usePickerPosition } from './usePickerPosition';
-import styles from '../MissionControl/styles/mission-control.module.css';
+import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

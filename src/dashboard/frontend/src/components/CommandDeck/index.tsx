@@ -18,7 +18,7 @@ import { useDashboardStore, selectAgentList } from '../../lib/store';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { WS_METHODS } from '@panopticon/contracts';
 import type { ProjectSessionTree, SessionTreeDelta } from '@panopticon/contracts';
-import styles from './styles/mission-control.module.css';
+import styles from './styles/command-deck.module.css';
 
 async function fetchConversations(): Promise<Conversation[]> {
   const res = await fetch('/api/conversations');
@@ -103,7 +103,7 @@ function applySessionTreeDelta(tree: ProjectSessionTree, delta: SessionTreeDelta
   }
 }
 
-interface MissionControlProps {
+interface CommandDeckProps {
   issues?: Issue[];
   /** Deep-link conversation ID — selects this conversation on mount */
   convId?: string | null;
@@ -115,13 +115,13 @@ interface MissionControlProps {
 
 type SidebarTab = 'conversations' | 'projects';
 
-export function MissionControl({
+export function CommandDeck({
   issues = [],
   convId,
   conversationViewMode = 'conversation',
   onConvIdChange,
   onConversationViewModeChange,
-}: MissionControlProps) {
+}: CommandDeckProps) {
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
@@ -441,7 +441,7 @@ export function MissionControl({
     : null;
 
   return (
-    <div className={styles.missionControl}>
+    <div className={styles.commandDeck}>
       <div className={styles.layout}>
         {/* Sidebar: Project Tree */}
         <div className={styles.sidebar} style={{ width: sidebarWidth, minWidth: sidebarWidth }}>

@@ -164,7 +164,7 @@ export function OpenRouterPage({
               Router
             </span>
           </div>
-          <p className="text-sm text-text-muted mt-0.5">
+          <p className="text-sm text-muted-foreground mt-0.5">
             Access 200+ models (Qwen, DeepSeek, Llama, Mistral, and more) including free models
           </p>
         </div>
@@ -173,7 +173,7 @@ export function OpenRouterPage({
           title={enabled ? 'Disable OpenRouter' : 'Enable OpenRouter'}
           className={cn(
             'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none',
-            enabled ? 'bg-primary' : 'bg-surface-emphasis'
+            enabled ? 'bg-primary' : 'bg-card'
           )}
         >
           <span
@@ -186,8 +186,8 @@ export function OpenRouterPage({
       </div>
 
       {/* API Key Section */}
-      <div className="bg-surface-raised rounded-lg p-4 border border-divider space-y-3">
-        <label className="text-sm font-medium text-text-secondary">API Key</label>
+      <div className="bg-card rounded-lg p-4 border border-border space-y-3">
+        <label className="text-sm font-medium text-muted-foreground">API Key</label>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <input
@@ -196,15 +196,15 @@ export function OpenRouterPage({
               onChange={(e) => handleKeyChange(e.target.value)}
               placeholder="sk-or-..."
               className={cn(
-                'w-full bg-surface border rounded-md px-3 py-2 pr-10 text-sm font-mono text-text-primary placeholder:text-text-muted focus:outline-none transition-colors',
+                'w-full bg-card border rounded-md px-3 py-2 pr-10 text-sm font-mono text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors',
                 keyStatus === 'valid' ? 'border-success/50' :
                 keyStatus === 'invalid' ? 'border-destructive/50' :
-                'border-divider focus:border-accent-muted'
+                'border-border focus:border-accent-muted'
               )}
             />
             <button
               onClick={() => setShowKey(!showKey)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-muted-foreground"
             >
               {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
@@ -212,7 +212,7 @@ export function OpenRouterPage({
           <button
             onClick={handleTestKey}
             disabled={!keyInput.trim() || keyStatus === 'testing'}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium bg-surface-active hover:bg-surface-hover border border-divider text-text-secondary disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium bg-accent hover:bg-accent border border-border text-muted-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
           >
             {keyStatus === 'testing' ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -226,7 +226,7 @@ export function OpenRouterPage({
           <button
             onClick={handleSaveKey}
             disabled={!keyInput.trim() || saveKeyMutation.isPending}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium bg-primary hover:opacity-90 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium bg-primary hover:opacity-90 text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
           >
             {saveKeyMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
             Save Key
@@ -242,12 +242,12 @@ export function OpenRouterPage({
             <XCircle className="size-3" /> {keyError}
           </p>
         )}
-        <p className="text-xs text-text-muted">
+        <p className="text-xs text-muted-foreground">
           Get your API key at{' '}
           <span className="text-primary font-mono">openrouter.ai/settings/keys</span>
           {' '}— free tier available, no credit card required
         </p>
-        <p className="text-xs text-text-muted">
+        <p className="text-xs text-muted-foreground">
           Saving here updates the key immediately for new OpenRouter conversations. Already running OpenRouter sessions must be resumed or restarted to pick up the new key.
         </p>
       </div>
@@ -255,8 +255,8 @@ export function OpenRouterPage({
       {/* Model Browser */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h4 className="font-semibold text-sm text-text-primary">Model Catalog</h4>
-          <span className="text-xs text-text-muted">
+          <h4 className="font-semibold text-sm text-foreground">Model Catalog</h4>
+          <span className="text-xs text-muted-foreground">
             Star models to add them to Command Deck's model picker
           </span>
         </div>

@@ -146,9 +146,9 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
   return (
     <div className="space-y-4">
       {/* Cloister Deacon Section */}
-      <div className="bg-surface-raised rounded-lg">
-        <div className="px-4 py-3 border-b border-divider flex items-center justify-between">
-          <h2 className="font-semibold text-content flex items-center gap-2">
+      <div className="bg-card rounded-lg">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <h2 className="font-semibold text-foreground flex items-center gap-2">
             <Clock className="w-5 h-5 text-primary" />
             Cloister Deacon
           </h2>
@@ -156,7 +156,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
             <span className={`text-xs px-2 py-1 rounded ${
               anySpecialistActive
                 ? 'badge-bg-success text-success'
-                : 'bg-surface-overlay text-content-subtle'
+                : 'bg-popover text-muted-foreground'
             }`}>
               {anySpecialistActive ? '● Specialists Active' : '○ Specialists Idle'}
             </span>
@@ -164,7 +164,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
               <button
                 onClick={() => stopCloisterMutation.mutate()}
                 disabled={stopCloisterMutation.isPending}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-destructive hover:bg-surface-overlay rounded transition-colors disabled:opacity-50"
+                className="flex items-center gap-1 px-2 py-1 text-xs text-destructive hover:bg-popover rounded transition-colors disabled:opacity-50"
                 title="Stop patrol loop"
               >
                 <Square className="w-3 h-3" />
@@ -174,7 +174,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
               <button
                 onClick={() => startCloisterMutation.mutate()}
                 disabled={startCloisterMutation.isPending}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-success hover:bg-surface-overlay rounded transition-colors disabled:opacity-50"
+                className="flex items-center gap-1 px-2 py-1 text-xs text-success hover:bg-popover rounded transition-colors disabled:opacity-50"
                 title="Start patrol loop (health monitoring)"
               >
                 <Play className="w-3 h-3" />
@@ -186,14 +186,14 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
         <div className="p-4">
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <span className="text-content-subtle">Patrol Status:</span>{' '}
-              <span className={patrolRunning ? 'text-success' : 'text-content-muted'}>
+              <span className="text-muted-foreground">Patrol Status:</span>{' '}
+              <span className={patrolRunning ? 'text-success' : 'text-muted-foreground'}>
                 {patrolRunning ? '● Running' : '○ Stopped'}
               </span>
             </div>
             <div>
-              <span className="text-content-subtle">Last Check:</span>{' '}
-              <span className="text-content-body">
+              <span className="text-muted-foreground">Last Check:</span>{' '}
+              <span className="text-foreground">
                 {formatTimeAgo(cloisterStatus?.lastCheck || null)}
               </span>
             </div>
@@ -201,15 +201,15 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
               <>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-success" />
-                  <span className="text-content-body">{cloisterStatus.summary.active} active</span>
+                  <span className="text-foreground">{cloisterStatus.summary.active} active</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {cloisterStatus.summary.stuck > 0 ? (
                     <AlertCircle className="w-4 h-4 text-destructive" />
                   ) : (
-                    <AlertCircle className="w-4 h-4 text-content-muted" />
+                    <AlertCircle className="w-4 h-4 text-muted-foreground" />
                   )}
-                  <span className={cloisterStatus.summary.stuck > 0 ? 'text-destructive' : 'text-content-subtle'}>
+                  <span className={cloisterStatus.summary.stuck > 0 ? 'text-destructive' : 'text-muted-foreground'}>
                     {cloisterStatus.summary.stuck} stuck
                   </span>
                 </div>
@@ -221,9 +221,9 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
 
       {/* Recent Activity Section */}
       {recentActivity.length > 0 && (
-        <div className="bg-surface-raised rounded-lg">
-          <div className="px-4 py-3 border-b border-divider">
-            <h2 className="font-semibold text-content flex items-center gap-2">
+        <div className="bg-card rounded-lg">
+          <div className="px-4 py-3 border-b border-border">
+            <h2 className="font-semibold text-foreground flex items-center gap-2">
               <Activity className="w-5 h-5 text-cyan-400" />
               Recent Activity
             </h2>
@@ -231,7 +231,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
           <div className="divide-y divide-gray-700">
             {recentActivity.map((entry) => (
               <div key={entry.id} className="px-4 py-2 flex items-center gap-3 text-sm">
-                <span className="text-content-muted text-xs w-16">
+                <span className="text-muted-foreground text-xs w-16">
                   {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
                 <span className={`px-1.5 py-0.5 rounded text-xs ${
@@ -239,11 +239,11 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
                   entry.type === 'complete' ? 'badge-bg-primary text-primary' :
                   entry.type === 'error' ? 'badge-bg-destructive text-destructive' :
                   entry.type === 'deacon' ? 'badge-bg-secondary text-signal-review' :
-                  'bg-surface-overlay text-content-body'
+                  'bg-popover text-foreground'
                 }`}>
                   {entry.type}
                 </span>
-                <span className="text-content-body truncate flex-1">
+                <span className="text-foreground truncate flex-1">
                   {entry.type === 'deacon' ? entry.command : entry.source}
                   {entry.issueId && entry.type !== 'deacon' && (
                     <span className="text-cyan-400 ml-1">({entry.issueId})</span>
@@ -257,9 +257,9 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
 
       {/* Per-Project Specialists Section (PAN-378: replaced global specialist pool) */}
       {runningProjectSpecialists && runningProjectSpecialists.length > 0 && (
-        <div className="bg-surface-raised rounded-lg">
-          <div className="px-4 py-3 border-b border-divider">
-            <h2 className="font-semibold text-content flex items-center gap-2">
+        <div className="bg-card rounded-lg">
+          <div className="px-4 py-3 border-b border-border">
+            <h2 className="font-semibold text-foreground flex items-center gap-2">
               <Brain className="w-5 h-5 text-success" />
               Per-Project Specialists ({runningProjectSpecialists.length})
             </h2>
@@ -270,39 +270,39 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
                 key={ps.tmuxSession}
                 onClick={() => onSelectAgent(ps.tmuxSession === selectedAgent ? null : ps.tmuxSession)}
                 className={`p-4 cursor-pointer transition-colors flex items-center justify-between ${
-                  ps.tmuxSession === selectedAgent ? 'bg-surface-overlay' : 'hover:bg-surface-emphasis'
+                  ps.tmuxSession === selectedAgent ? 'bg-popover' : 'hover:bg-card'
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <Brain className="w-5 h-5 text-success flex-shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <div className="font-medium text-content flex items-center gap-2 flex-wrap">
+                    <div className="font-medium text-foreground flex items-center gap-2 flex-wrap">
                       <span className="badge-bg-secondary text-signal-review px-1.5 py-0.5 rounded text-xs font-mono">
                         {ps.projectKey.toUpperCase()}
                       </span>
                       {ps.issueId && (
-                        <span className="text-xs font-mono text-content-muted">{ps.issueId}</span>
+                        <span className="text-xs font-mono text-muted-foreground">{ps.issueId}</span>
                       )}
                       {ps.specialistType.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase())}
                       {ps.role && (
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-surface-emphasis text-content-muted font-mono">
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-card text-muted-foreground font-mono">
                           :{ps.role}
                         </span>
                       )}
                       {ps.isRunning ? (
                         <span className="w-2 h-2 rounded-full bg-success animate-pulse flex-shrink-0" title="Running" />
                       ) : (
-                        <span className="w-2 h-2 rounded-full bg-content-muted flex-shrink-0" title="Completed" />
+                        <span className="w-2 h-2 rounded-full bg-muted-foreground flex-shrink-0" title="Completed" />
                       )}
                     </div>
                     {ps.metadata?.currentActivity && ps.isRunning && (
-                      <div className="text-xs text-content-muted mt-0.5 truncate" title={ps.metadata.currentActivity}>
+                      <div className="text-xs text-muted-foreground mt-0.5 truncate" title={ps.metadata.currentActivity}>
                         {ps.metadata.currentActivity}
                       </div>
                     )}
-                    <div className="text-xs text-content-subtle font-mono mt-0.5 flex items-center gap-2">
+                    <div className="text-xs text-muted-foreground font-mono mt-0.5 flex items-center gap-2">
                       {ps.metadata?.model && (
-                        <span className="text-content-muted">{ps.metadata.model.split('/').pop()?.replace('claude-', '')}</span>
+                        <span className="text-muted-foreground">{ps.metadata.model.split('/').pop()?.replace('claude-', '')}</span>
                       )}
                       {ps.metadata?.currentRun && (
                         <span>{ps.metadata.currentRun.split('-').slice(-1)[0] || ps.metadata.currentRun}</span>
@@ -311,12 +311,12 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
-                  <div className="text-right text-xs text-content-subtle">
-                    <div className={ps.isRunning ? 'text-success' : 'text-content-muted'}>
+                  <div className="text-right text-xs text-muted-foreground">
+                    <div className={ps.isRunning ? 'text-success' : 'text-muted-foreground'}>
                       {ps.isRunning ? '● Running' : '○ Completed'}
                     </div>
                     {ps.metadata?.lastRunAt && (
-                      <div className="text-content-muted">{formatTimeAgo(ps.metadata.lastRunAt)}</div>
+                      <div className="text-muted-foreground">{formatTimeAgo(ps.metadata.lastRunAt)}</div>
                     )}
                   </div>
                   <button
@@ -325,7 +325,7 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
                       fetch(`/api/specialists/${ps.projectKey}/${ps.issueId}/${ps.specialistType}/kill`, { method: 'POST' })
                         .then(() => queryClient.invalidateQueries({ queryKey: ['project-specialists-running'] }));
                     }}
-                    className="p-2 text-content-subtle hover:text-destructive hover:bg-surface-emphasis rounded"
+                    className="p-2 text-muted-foreground hover:text-destructive hover:bg-card rounded"
                     title={`Kill ${ps.specialistType} (${ps.projectKey}/${ps.issueId ?? 'unknown'})`}
                   >
                     <XCircle className="w-4 h-4" />

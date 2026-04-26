@@ -10,12 +10,12 @@ export function VBriefReferences({ references }: VBriefReferencesProps) {
 
   return (
     <div className="p-4 border-b border-border">
-      <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">References</h3>
+      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">References</h3>
       <ul className="space-y-1">
         {references.map((ref, i) => (
           <li key={i} className="flex items-center gap-1.5 text-sm">
             {ref.type && (
-              <span className="text-xs text-content-muted shrink-0">[{ref.type}]</span>
+              <span className="text-xs text-muted-foreground shrink-0">[{ref.type}]</span>
             )}
             <a
               href={ref.uri}

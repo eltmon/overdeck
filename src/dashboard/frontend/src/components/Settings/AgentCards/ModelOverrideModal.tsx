@@ -363,18 +363,18 @@ export function ModelOverrideModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="w-full max-w-[680px] bg-surface border border-divider rounded-xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="w-full max-w-[680px] bg-card border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden">
         {/* Modal Header */}
-        <div className="p-6 border-b border-divider">
+        <div className="p-6 border-b border-border">
           <div className="flex justify-between items-start gap-3">
             <div className="flex flex-col gap-2">
-              <h1 className="text-content tracking-tight text-2xl font-bold">Select Model</h1>
+              <h1 className="text-foreground tracking-tight text-2xl font-bold">Select Model</h1>
               <div className="flex items-center gap-3">
-                <span className="text-content-muted text-sm">Task:</span>
+                <span className="text-muted-foreground text-sm">Task:</span>
                 <span className="text-primary font-medium">{workTypeName}</span>
               </div>
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-content-muted text-xs">Needs:</span>
+                <span className="text-muted-foreground text-xs">Needs:</span>
                 {requiredCapabilities.map(cap => (
                   <span key={cap} className="text-[10px] px-2 py-0.5 rounded badge-bg-primary text-primary font-medium">
                     {CAPABILITY_INFO[cap].name}
@@ -382,7 +382,7 @@ export function ModelOverrideModal({
                 ))}
               </div>
             </div>
-            <button onClick={onClose} className="text-content-muted hover:text-content transition-colors p-1">
+            <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors p-1">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -393,7 +393,7 @@ export function ModelOverrideModal({
           {displayProviders.map((provider, providerIndex) => (
             <div key={provider.key} className="flex flex-col">
               {providerIndex > 0 && <div className="h-px bg-divider mx-6 my-2" />}
-              <h3 className="text-content-muted text-xs font-bold uppercase tracking-widest px-6 pb-2 pt-5">
+              <h3 className="text-muted-foreground text-xs font-bold uppercase tracking-widest px-6 pb-2 pt-5">
                 {provider.name}
               </h3>
 
@@ -414,18 +414,18 @@ export function ModelOverrideModal({
                         ? 'badge-bg-primary border-primary shadow-[0_0_15px_var(--primary)]'
                         : isRecommended
                           ? 'badge-bg-primary border-primary/50 hover:bg-primary/10'
-                          : 'border-transparent hover:bg-surface-overlay'
+                          : 'border-transparent hover:bg-popover'
                     }`}
                   >
                     <div className={`flex items-center justify-center rounded-lg shrink-0 size-10 transition-colors ${
-                      isSelected || isRecommended ? 'badge-bg-primary' : 'bg-surface-emphasis group-hover:bg-divider'
+                      isSelected || isRecommended ? 'badge-bg-primary' : 'bg-card group-hover:bg-divider'
                     }`}>
-                      <model.icon className={`w-5 h-5 ${isSelected || isRecommended ? 'text-primary' : 'text-content-muted'}`} />
+                      <model.icon className={`w-5 h-5 ${isSelected || isRecommended ? 'text-primary' : 'text-muted-foreground'}`} />
                     </div>
 
                     <div className="flex flex-1 flex-col justify-center min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className={`text-content text-sm ${isSelected ? 'font-bold' : 'font-medium'} truncate`}>
+                        <p className={`text-foreground text-sm ${isSelected ? 'font-bold' : 'font-medium'} truncate`}>
                           {model.name}
                         </p>
                         {isFavorite && !isRecommended && (
@@ -435,7 +435,7 @@ export function ModelOverrideModal({
                           </span>
                         )}
                         {isRecommended && (
-                          <span className="px-2 py-0.5 rounded-full bg-primary text-[9px] text-white font-bold uppercase tracking-tight shrink-0">
+                          <span className="px-2 py-0.5 rounded-full bg-primary text-[9px] text-primary-foreground font-bold uppercase tracking-tight shrink-0">
                             Best Fit
                           </span>
                         )}
@@ -461,7 +461,7 @@ export function ModelOverrideModal({
                               className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                                 isMatching
                                   ? 'badge-bg-primary text-primary'
-                                  : 'bg-surface-emphasis text-content-subtle border border-divider'
+                                  : 'bg-card text-muted-foreground border border-border'
                               }`}
                             >
                               {CAPABILITY_INFO[cap].name}
@@ -478,7 +478,7 @@ export function ModelOverrideModal({
                       ) : matchScore >= 0.5 ? (
                         <span className="text-warning text-xs font-bold">{Math.round(matchScore * 100)}%</span>
                       ) : (
-                        <span className="text-content-muted text-xs font-bold">{Math.round(matchScore * 100)}%</span>
+                        <span className="text-muted-foreground text-xs font-bold">{Math.round(matchScore * 100)}%</span>
                       )}
                       {isSelected && (
                         <CheckCircle2 className="w-5 h-5 text-primary" />
@@ -492,7 +492,7 @@ export function ModelOverrideModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-5 border-t border-divider bg-surface flex justify-between items-center">
+        <div className="p-5 border-t border-border bg-card flex justify-between items-center">
           <div>
             {isOverride && (
               <button
@@ -506,14 +506,14 @@ export function ModelOverrideModal({
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="px-5 py-2 rounded-lg text-content-muted font-medium hover:text-content hover:bg-surface-overlay transition-all text-sm"
+              className="px-5 py-2 rounded-lg text-muted-foreground font-medium hover:text-foreground hover:bg-popover transition-all text-sm"
             >
               Cancel
             </button>
             <button
               onClick={handleApply}
               disabled={!hasChanges && isOverride}
-              className="px-6 py-2 rounded-lg bg-primary text-white font-bold hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className="px-6 py-2 rounded-lg bg-primary text-primary-foreground font-bold hover:bg-primary/90 active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
               Apply Selection
             </button>

@@ -5,7 +5,7 @@ import {
   ensureDefaultConversationModel,
   FALLBACK_DEFAULT_CONVERSATION_MODEL,
 } from '../chat/defaultConversationModel';
-import styles from './styles/mission-control.module.css';
+import styles from './styles/command-deck.module.css';
 
 const FALLBACK_COMPACTION_MODEL = 'claude-haiku-4-5-20251001';
 import type { Conversation } from './ConversationList';

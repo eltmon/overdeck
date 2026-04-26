@@ -49,18 +49,18 @@
   /* Interactive */
   --primary: oklch(0.488 0.217 264);
   --primary-foreground: #ffffff;
-  --secondary: rgba(0, 0, 0, 0.04);
+  --secondary: color-mix(in srgb, black 4%, transparent);
   --secondary-foreground: #1f2937;
-  --accent: rgba(0, 0, 0, 0.04);
+  --accent: color-mix(in srgb, black 4%, transparent);
   --accent-foreground: #1f2937;
 
   /* Muted */
-  --muted: rgba(0, 0, 0, 0.04);
+  --muted: color-mix(in srgb, black 4%, transparent);
   --muted-foreground: #6b7280;
 
   /* Borders & inputs */
-  --border: rgba(0, 0, 0, 0.08);
-  --input: rgba(0, 0, 0, 0.10);
+  --border: color-mix(in srgb, black 8%, transparent);
+  --input: color-mix(in srgb, black 10%, transparent);
   --ring: oklch(0.488 0.217 264);
 
   /* Semantic signal colors */
@@ -76,44 +76,6 @@
   --signal-review-foreground: #7e22ce;
   --signal-cost: #06b6d4;
   --signal-cost-foreground: #0e7490;
-
-  /* ─── Extended surface tokens ─────────────────────────────────── */
-  /* Surface hierarchy (lightest to most elevated) */
-  --surface: #ffffff;
-  --surface-raised: #f9fafb;
-  --surface-2: #f5f6f8;
-  --surface-active: #f3f4f6;
-  --surface-hover: #f3f4f6;
-  --surface-overlay: #ffffff;
-  --surface-emphasis: #eff1f4;
-
-  /* Extended border tokens */
-  --divider: rgba(0, 0, 0, 0.08);
-  --divider-strong: rgba(0, 0, 0, 0.14);
-  --divider-focus: oklch(0.488 0.217 264);
-
-  /* Extended input token */
-  --input-bg: #f9fafb;
-
-  /* Extended text tokens (for components using explicit text-* naming) */
-  --text-primary: #1f2937;
-  --text-secondary: #4b5563;
-  --text-muted: #9ca3af;
-
-  /* Content text hierarchy (for components using content-* naming) */
-  --content: #1f2937;
-  --content-body: #374151;
-  --content-muted: #6b7280;
-  --content-subtle: #9ca3af;
-
-  /* Muted accent (tinted interactive highlight) */
-  --accent-muted: rgba(99, 102, 241, 0.08);
-
-  /* Legacy pan-* aliases — map to new system until bead 6kg migration */
-  --pan-panel-left: #f9fafb;
-  --pan-panel-right: #ffffff;
-  --pan-border: rgba(0, 0, 0, 0.08);
-  --pan-text-secondary: #4b5563;
 }
 
 /* ─── Dark mode ─── */
@@ -131,18 +93,18 @@
   /* Interactive */
   --primary: oklch(0.588 0.217 264);
   --primary-foreground: #ffffff;
-  --secondary: rgba(255, 255, 255, 0.04);
+  --secondary: color-mix(in srgb, white 4%, transparent);
   --secondary-foreground: #f3f4f6;
-  --accent: rgba(255, 255, 255, 0.04);
+  --accent: color-mix(in srgb, white 4%, transparent);
   --accent-foreground: #f3f4f6;
 
   /* Muted */
-  --muted: rgba(255, 255, 255, 0.04);
+  --muted: color-mix(in srgb, white 4%, transparent);
   --muted-foreground: #9ca3af;
 
   /* Borders & inputs */
-  --border: rgba(255, 255, 255, 0.06);
-  --input: rgba(255, 255, 255, 0.08);
+  --border: color-mix(in srgb, white 6%, transparent);
+  --input: color-mix(in srgb, white 8%, transparent);
   --ring: oklch(0.588 0.217 264);
 
   /* Semantic signal colors — foreground lightens for dark mode */
@@ -158,37 +120,6 @@
   --signal-review-foreground: #c084fc;
   --signal-cost: #06b6d4;
   --signal-cost-foreground: #22d3ee;
-
-  /* ─── Extended surface tokens (dark) ─────────────────────────── */
-  --surface: #0c1018;
-  --surface-raised: #111520;
-  --surface-2: #0e1320;
-  --surface-active: #1a2132;
-  --surface-hover: #161d2b;
-  --surface-overlay: #13192a;
-  --surface-emphasis: #1e2640;
-
-  --divider: rgba(255, 255, 255, 0.06);
-  --divider-strong: rgba(255, 255, 255, 0.12);
-  --divider-focus: oklch(0.588 0.217 264);
-
-  --input-bg: rgba(255, 255, 255, 0.06);
-
-  --text-primary: #f3f4f6;
-  --text-secondary: #c9d1e0;
-  --text-muted: #8899aa;
-
-  --content: #f3f4f6;
-  --content-body: #e5e7eb;
-  --content-muted: #9ca3af;
-  --content-subtle: #6b7280;
-
-  --accent-muted: rgba(139, 92, 246, 0.15);
-
-  --pan-panel-left: #111520;
-  --pan-panel-right: #0c1018;
-  --pan-border: rgba(255, 255, 255, 0.06);
-  --pan-text-secondary: #c9d1e0;
 }
 
 @layer base {

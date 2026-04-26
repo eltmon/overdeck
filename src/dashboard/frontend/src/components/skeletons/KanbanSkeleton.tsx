@@ -12,25 +12,25 @@ export function KanbanSkeleton() {
       {columns.map((col) => (
         <div
           key={col.title}
-          className={`border-t-4 ${col.color} bg-surface-raised rounded-lg min-w-[280px] flex-1`}
+          className={`border-t-4 ${col.color} bg-card rounded-lg min-w-[280px] flex-1`}
         >
           {/* Column header */}
-          <div className="px-4 py-3 border-b border-divider">
+          <div className="px-4 py-3 border-b border-border">
             <div className="flex items-center justify-between">
-              <div className="h-4 w-24 animate-pulse bg-surface-2 rounded" />
-              <div className="h-4 w-6 animate-pulse bg-surface-2 rounded" />
+              <div className="h-4 w-24 animate-pulse bg-muted rounded" />
+              <div className="h-4 w-6 animate-pulse bg-muted rounded" />
             </div>
           </div>
 
           {/* Card placeholders */}
           <div className="p-3 space-y-2">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="bg-surface-raised rounded-lg p-3 space-y-2">
-                <div className="h-3 w-3/4 animate-pulse bg-surface-2 rounded" />
-                <div className="h-3 w-1/2 animate-pulse bg-surface-2 rounded" />
+              <div key={i} className="bg-card rounded-lg p-3 space-y-2">
+                <div className="h-3 w-3/4 animate-pulse bg-muted rounded" />
+                <div className="h-3 w-1/2 animate-pulse bg-muted rounded" />
                 <div className="flex gap-2 mt-2">
-                  <div className="h-5 w-16 animate-pulse bg-surface-2 rounded" />
-                  <div className="h-5 w-10 animate-pulse bg-surface-2 rounded" />
+                  <div className="h-5 w-16 animate-pulse bg-muted rounded" />
+                  <div className="h-5 w-10 animate-pulse bg-muted rounded" />
                 </div>
               </div>
             ))}

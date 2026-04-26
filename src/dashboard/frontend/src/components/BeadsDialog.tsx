@@ -46,16 +46,16 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-surface-raised rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[70vh] overflow-hidden flex flex-col">
+      <div className="relative bg-card rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[70vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-divider">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
             <List className="w-5 h-5 text-success" />
-            <h2 className="font-semibold text-content">Tasks: {issueId}</h2>
+            <h2 className="font-semibold text-foreground">Tasks: {issueId}</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-content-subtle hover:text-content hover:bg-surface-overlay rounded transition-colors"
+            className="p-1 text-muted-foreground hover:text-foreground hover:bg-popover rounded transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -67,15 +67,15 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
             <div className="space-y-2">
               {/* Skeleton loading */}
               {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-start gap-3 p-3 rounded-lg border border-divider bg-surface-overlay/30 animate-pulse">
-                  <div className="w-4 h-4 bg-surface-emphasis rounded-full mt-0.5" />
+                <div key={i} className="flex items-start gap-3 p-3 rounded-lg border border-border bg-popover/30 animate-pulse">
+                  <div className="w-4 h-4 bg-card rounded-full mt-0.5" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-surface-emphasis rounded w-3/4" />
-                    <div className="h-3 bg-surface-overlay rounded w-1/4" />
+                    <div className="h-4 bg-card rounded w-3/4" />
+                    <div className="h-3 bg-popover rounded w-1/4" />
                   </div>
                 </div>
               ))}
-              <div className="flex items-center justify-center py-2 text-content-muted text-sm">
+              <div className="flex items-center justify-center py-2 text-muted-foreground text-sm">
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 Loading tasks from workspace...
               </div>
@@ -89,7 +89,7 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
           )}
 
           {data && data.tasks?.length === 0 && !isFetching && (
-            <div className="text-content-muted text-center py-8">
+            <div className="text-muted-foreground text-center py-8">
               <List className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p>No tasks created yet</p>
               <p className="text-xs mt-2">Tasks will appear here once created using beads.</p>
@@ -99,7 +99,7 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
           {data && data.tasks?.length > 0 && (
             <div className="space-y-2">
               {/* Summary stats */}
-              <div className="flex items-center gap-4 text-xs text-content-subtle mb-3 pb-3 border-b border-divider">
+              <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3 pb-3 border-b border-border">
                 <span className="flex items-center gap-1">
                   <div className="w-2 h-2 bg-primary rounded-full" />
                   {openTasks.length} open
@@ -117,7 +117,7 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
 
               {/* Then closed tasks */}
               {closedTasks.length > 0 && openTasks.length > 0 && (
-                <div className="text-xs text-content-muted mt-4 mb-2">Completed</div>
+                <div className="text-xs text-muted-foreground mt-4 mb-2">Completed</div>
               )}
               {closedTasks.map((task) => (
                 <TaskItem key={task.id} task={task} />
@@ -127,9 +127,9 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-divider text-xs text-content-muted flex items-center justify-between">
+        <div className="px-4 py-3 border-t border-border text-xs text-muted-foreground flex items-center justify-between">
           <span>{data?.count || 0} task{data?.count !== 1 ? 's' : ''}</span>
-          <span className="text-content-subtle">Beads</span>
+          <span className="text-muted-foreground">Beads</span>
         </div>
       </div>
     </div>
@@ -138,7 +138,7 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
 
 function TaskItem({ task }: { task: BeadTask }) {
   const statusColors = {
-    open: 'bg-surface-overlay/50 border-divider-strong',
+    open: 'bg-popover/50 border-border',
     in_progress: 'badge-bg-primary border-primary/40',
     closed: 'badge-bg-success border-success/30 opacity-60',
   };
@@ -155,9 +155,9 @@ function TaskItem({ task }: { task: BeadTask }) {
         {statusIcons[task.status]}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm text-content">{task.title}</div>
+        <div className="text-sm text-foreground">{task.title}</div>
         <div className="flex items-center gap-2 mt-1 flex-wrap">
-          <span className="text-xs text-content-muted">{task.id}</span>
+          <span className="text-xs text-muted-foreground">{task.id}</span>
           {task.blockedBy.length > 0 && (
             <span className="flex items-center gap-1 text-xs text-warning">
               <Clock className="w-3 h-3" />
@@ -171,7 +171,7 @@ function TaskItem({ task }: { task: BeadTask }) {
                 label.includes('simple') || label.includes('trivial') ? 'badge-bg-success text-success' :
                 label.includes('medium') ? 'badge-bg-warning text-warning' :
                 label.includes('complex') || label.includes('hard') ? 'badge-bg-destructive text-destructive' :
-                'bg-surface-overlay text-content-body'
+                'bg-popover text-foreground'
               }`}
             >
               {label.replace('difficulty:', '')}

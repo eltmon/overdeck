@@ -652,7 +652,7 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       <div className="absolute top-2 right-2 z-10 flex gap-2">
         <button
           onClick={() => setShowSettings(!showSettings)}
-          className="p-1.5 rounded bg-surface-raised/80 hover:bg-surface-active/80 text-text-secondary transition-colors"
+          className="p-1.5 rounded bg-card/80 hover:bg-accent/80 text-muted-foreground transition-colors"
           title="Terminal settings"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -673,9 +673,9 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
               onChange={(e) => setAutoCopyOnSelect(e.target.checked)}
               className="w-4 h-4 rounded border-border bg-input text-primary focus:ring-primary"
             />
-            <span className="text-sm text-text-secondary">Auto-copy on selection</span>
+            <span className="text-sm text-muted-foreground">Auto-copy on selection</span>
           </label>
-          <p className="text-xs text-text-muted mt-2">
+          <p className="text-xs text-muted-foreground mt-2">
             Automatically copy selected text to clipboard
           </p>
         </div>
@@ -708,26 +708,26 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
           {contextMenu.canCopy && (
             <button
               onClick={handleContextCopy}
-              className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-surface-raised transition-colors flex items-center gap-2"
+              className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-card transition-colors flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
               Copy
-              <span className="ml-auto text-xs text-text-muted">
+              <span className="ml-auto text-xs text-muted-foreground">
                 {isMac ? '⌘C' : 'Ctrl+C'}
               </span>
             </button>
           )}
           <button
             onClick={handleContextPaste}
-            className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-surface-raised transition-colors flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-card transition-colors flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
             Paste
-            <span className="ml-auto text-xs text-text-muted">
+            <span className="ml-auto text-xs text-muted-foreground">
               {isMac ? '⌘V' : 'Ctrl+V'}
             </span>
           </button>

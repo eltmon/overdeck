@@ -53,7 +53,7 @@ function ModelCard({
         'flex items-start gap-3 p-3 rounded-lg border transition-colors',
         isFavorite
           ? 'badge-bg-warning border-warning/30'
-          : 'bg-surface-raised border-divider hover:border-divider-focus'
+          : 'bg-card border-border hover:border-ring'
       )}
     >
       {/* Star button */}
@@ -62,7 +62,7 @@ function ModelCard({
         title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
         className={cn(
           'mt-0.5 flex-shrink-0 transition-colors',
-          isFavorite ? 'text-warning hover:text-warning/80' : 'text-text-muted hover:text-warning'
+          isFavorite ? 'text-warning hover:text-warning/80' : 'text-muted-foreground hover:text-warning'
         )}
       >
         {isFavorite ? <Star className="size-4 fill-current" /> : <StarOff className="size-4" />}
@@ -71,14 +71,14 @@ function ModelCard({
       {/* Model info */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-sm text-text-primary truncate">{model.name}</span>
+          <span className="font-medium text-sm text-foreground truncate">{model.name}</span>
           {model.supportsThinking && (
             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider badge-bg-signal-review text-signal-review-foreground border badge-border-signal-review flex-shrink-0">
               Thinking
             </span>
           )}
         </div>
-        <div className="text-xs text-text-muted mt-0.5 truncate font-mono">{model.id}</div>
+        <div className="text-xs text-muted-foreground mt-0.5 truncate font-mono">{model.id}</div>
 
         {/* Metrics row */}
         <div className="flex items-center gap-3 mt-1.5 flex-wrap">
@@ -87,15 +87,15 @@ function ModelCard({
               FREE
             </span>
           ) : (
-            <span className="text-xs text-text-muted">
-              <span className="text-text-secondary">{formatCost(avgCost)}</span> avg/1M tokens
+            <span className="text-xs text-muted-foreground">
+              <span className="text-muted-foreground">{formatCost(avgCost)}</span> avg/1M tokens
             </span>
           )}
-          <span className="text-xs text-text-muted">
-            <span className="text-text-secondary">{formatContextLength(model.contextLength)}</span> ctx
+          <span className="text-xs text-muted-foreground">
+            <span className="text-muted-foreground">{formatContextLength(model.contextLength)}</span> ctx
           </span>
           {model.topProvider && (
-            <span className="text-xs text-text-muted">{model.topProvider}</span>
+            <span className="text-xs text-muted-foreground">{model.topProvider}</span>
           )}
         </div>
       </div>
@@ -150,7 +150,7 @@ export function OpenRouterModelBrowser({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12 text-text-muted gap-2">
+      <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
         <Loader2 className="size-4 animate-spin" />
         <span className="text-sm">Loading model catalog...</span>
       </div>
@@ -159,7 +159,7 @@ export function OpenRouterModelBrowser({
 
   if (models.length === 0) {
     return (
-      <div className="py-8 text-center text-text-muted text-sm">
+      <div className="py-8 text-center text-muted-foreground text-sm">
         No models available. Add your OpenRouter API key to browse the model catalog.
       </div>
     );
@@ -170,7 +170,7 @@ export function OpenRouterModelBrowser({
       {/* Favorites section */}
       {favoriteModels.length > 0 && (
         <div>
-          <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <Star className="size-3 fill-warning text-warning" />
             Favorites ({favoriteModels.length})
           </h4>
@@ -190,13 +190,13 @@ export function OpenRouterModelBrowser({
       {/* Search + filters */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-text-muted pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             placeholder="Search models..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-surface-raised border border-divider rounded-md pl-8 pr-3 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-muted"
+            className="w-full bg-card border border-border rounded-md pl-8 pr-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-accent-muted"
           />
         </div>
         <div className="flex gap-1">
@@ -207,8 +207,8 @@ export function OpenRouterModelBrowser({
               className={cn(
                 'px-3 py-1.5 rounded text-xs font-medium transition-colors',
                 categoryFilter === cat.id
-                  ? 'bg-accent-muted text-accent border border-accent/40'
-                  : 'bg-surface-raised text-text-muted border border-divider hover:border-divider-focus hover:text-text-secondary'
+                  ? 'bg-primary/10 text-accent border border-accent/40'
+                  : 'bg-card text-muted-foreground border border-border hover:border-ring hover:text-muted-foreground'
               )}
             >
               {cat.label}
@@ -219,11 +219,11 @@ export function OpenRouterModelBrowser({
 
       {/* All models list */}
       <div>
-        <h4 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">
+        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
           All Models ({filteredModels.length})
         </h4>
         {filteredModels.length === 0 ? (
-          <div className="py-6 text-center text-text-muted text-sm">
+          <div className="py-6 text-center text-muted-foreground text-sm">
             No models match your search.
           </div>
         ) : (

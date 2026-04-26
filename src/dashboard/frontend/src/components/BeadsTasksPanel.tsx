@@ -71,7 +71,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
 
   if (isLoading) {
     return (
-      <div className="py-3 text-center text-content-muted text-xs">
+      <div className="py-3 text-center text-muted-foreground text-xs">
         <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1" />
         Loading tasks...
       </div>
@@ -81,7 +81,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
   return (
     <div className="space-y-2 p-4">
       {/* Header with counts and view toggle */}
-      <div className="flex items-center justify-between text-xs text-content-subtle">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
             <Circle className="w-3 h-3 text-primary" />
@@ -94,17 +94,17 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
         </div>
         <div className="flex items-center gap-1">
           {planHasItems && (
-            <div className="flex items-center rounded border border-divider overflow-hidden mr-1">
+            <div className="flex items-center rounded border border-border overflow-hidden mr-1">
               <button
                 onClick={() => toggleView('list')}
-                className={`p-1 transition-colors ${view === 'list' ? 'bg-surface-overlay text-content' : 'hover:bg-surface-overlay/50 text-content-muted'}`}
+                className={`p-1 transition-colors ${view === 'list' ? 'bg-popover text-foreground' : 'hover:bg-popover/50 text-muted-foreground'}`}
                 title="List view"
               >
                 <List className="w-3 h-3" />
               </button>
               <button
                 onClick={() => toggleView('graph')}
-                className={`p-1 transition-colors ${view === 'graph' ? 'bg-surface-overlay text-content' : 'hover:bg-surface-overlay/50 text-content-muted'}`}
+                className={`p-1 transition-colors ${view === 'graph' ? 'bg-popover text-foreground' : 'hover:bg-popover/50 text-muted-foreground'}`}
                 title="DAG graph view"
               >
                 <GitFork className="w-3 h-3" />
@@ -126,7 +126,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
                     URL.revokeObjectURL(url);
                   });
               }}
-              className="p-1 hover:bg-surface-overlay rounded transition-colors"
+              className="p-1 hover:bg-popover rounded transition-colors"
               title="Download vBRIEF plan (for vBRIEF Studio)"
             >
               <Download className="w-3 h-3" />
@@ -135,7 +135,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
           <button
             onClick={() => refetch()}
             disabled={isRefetching}
-            className="p-1 hover:bg-surface-overlay rounded transition-colors"
+            className="p-1 hover:bg-popover rounded transition-colors"
             title="Refresh"
           >
             <RefreshCw className={`w-3 h-3 ${isRefetching ? 'animate-spin' : ''}`} />
@@ -150,7 +150,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
             <PlanDAGViewer
               issueId={issueId}
               onNodeClick={item => setSelectedItem(prev => prev?.id === item.id ? null : item)}
-              className="rounded border border-divider overflow-hidden"
+              className="rounded border border-border overflow-hidden"
             />
           </div>
           {selectedItem && planDoc && (
@@ -176,7 +176,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
               ))}
             </div>
           ) : (
-            <div className="text-center py-4 text-content-muted text-xs">
+            <div className="text-center py-4 text-muted-foreground text-xs">
               <ListTodo className="w-5 h-5 mx-auto mb-1 opacity-50" />
               <p>No tasks yet</p>
             </div>
@@ -212,8 +212,8 @@ function TaskItem({ task, planDoc }: { task: BeadTask; planDoc: VBriefDocument |
     <div
       className={`rounded border text-xs ${
         task.status === 'open'
-          ? 'border-divider bg-surface-raised/50'
-          : 'border-divider bg-surface/50 opacity-60'
+          ? 'border-border bg-card/50'
+          : 'border-border bg-card/50 opacity-60'
       }`}
     >
       <div className="flex items-start gap-2 p-2">
@@ -223,7 +223,7 @@ function TaskItem({ task, planDoc }: { task: BeadTask; planDoc: VBriefDocument |
           <CheckCircle2 className="w-3.5 h-3.5 text-success mt-0.5 shrink-0" />
         )}
         <div className="flex-1 min-w-0">
-          <div className="text-content break-words leading-tight">
+          <div className="text-foreground break-words leading-tight">
             {task.title || task.name || task.id}
           </div>
           <div className="flex flex-wrap items-center gap-1 mt-1">
@@ -235,8 +235,8 @@ function TaskItem({ task, planDoc }: { task: BeadTask; planDoc: VBriefDocument |
                     ? label.includes('easy') ? 'badge-bg-success text-success' :
                       label.includes('medium') ? 'badge-bg-warning text-warning' :
                       label.includes('hard') ? 'badge-bg-destructive text-destructive' :
-                      'bg-surface-overlay text-content-body'
-                    : 'bg-surface-overlay text-content-body'
+                      'bg-popover text-foreground'
+                    : 'bg-popover text-foreground'
                 }`}
               >
                 {label}
@@ -260,7 +260,7 @@ function TaskItem({ task, planDoc }: { task: BeadTask; planDoc: VBriefDocument |
         {hasACs && (
           <button
             onClick={() => setExpanded(prev => !prev)}
-            className="shrink-0 text-content-muted hover:text-content transition-colors mt-0.5"
+            className="shrink-0 text-muted-foreground hover:text-foreground transition-colors mt-0.5"
             title={expanded ? 'Collapse acceptance criteria' : 'Expand acceptance criteria'}
           >
             {expanded
@@ -271,11 +271,11 @@ function TaskItem({ task, planDoc }: { task: BeadTask; planDoc: VBriefDocument |
       </div>
       {/* Expandable AC section */}
       {hasACs && expanded && (
-        <div className="px-2 pb-2 space-y-1 border-t border-divider/50 pt-1.5">
+        <div className="px-2 pb-2 space-y-1 border-t border-border/50 pt-1.5">
           {acs.map(ac => {
             const icon = AC_STATUS_ICONS[ac.status] ?? AC_STATUS_ICONS.pending;
             return (
-              <div key={ac.id} className="flex items-start gap-1.5 text-[10px] text-content-subtle">
+              <div key={ac.id} className="flex items-start gap-1.5 text-[10px] text-muted-foreground">
                 <span style={{ color: icon.color, fontSize: 7, marginTop: 2, flexShrink: 0 }}>{icon.symbol}</span>
                 <span className="leading-tight break-words">{ac.title}</span>
               </div>
@@ -314,18 +314,18 @@ function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
   const narrativeEntries = item.narrative ? Object.entries(item.narrative) : [];
 
   return (
-    <div className="p-2 rounded border border-divider bg-surface-raised/50 text-xs space-y-2">
+    <div className="p-2 rounded border border-border bg-card/50 text-xs space-y-2">
       {/* Title + meta row */}
       <div className="flex items-start justify-between gap-2">
-        <div className="font-medium text-content leading-snug">{item.title}</div>
+        <div className="font-medium text-foreground leading-snug">{item.title}</div>
         <div className="flex items-center gap-1 shrink-0">
           {item.metadata?.difficulty && (
-            <span className="bg-surface-overlay text-content-muted px-1 py-0.5 rounded text-[9px] uppercase">
+            <span className="bg-popover text-muted-foreground px-1 py-0.5 rounded text-[9px] uppercase">
               {item.metadata.difficulty}
             </span>
           )}
           {item.priority && (
-            <span className="bg-surface-overlay text-content-muted px-1 py-0.5 rounded text-[9px] uppercase">
+            <span className="bg-popover text-muted-foreground px-1 py-0.5 rounded text-[9px] uppercase">
               {item.priority}
             </span>
           )}
@@ -338,7 +338,7 @@ function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
           {matchedBead.status === 'closed'
             ? <CheckCircle2 className="w-3 h-3 text-success shrink-0" />
             : <Circle className="w-3 h-3 text-primary shrink-0" />}
-          <span className="text-content-subtle">
+          <span className="text-muted-foreground">
             Bead: {matchedBead.status === 'closed' ? 'completed' : 'open'} ({matchedBead.id})
           </span>
         </div>
@@ -347,22 +347,22 @@ function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
       {/* Narrative fields */}
       {narrativeEntries.map(([key, value]) => value ? (
         <div key={key} className="space-y-0.5">
-          <div className="text-[9px] font-medium uppercase tracking-wide text-content-subtle">{key}</div>
-          <div className="text-content-muted leading-relaxed">{value}</div>
+          <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">{key}</div>
+          <div className="text-muted-foreground leading-relaxed">{value}</div>
         </div>
       ) : null)}
 
       {/* Acceptance criteria with progress counter */}
       {acs.length > 0 && (
         <div className="space-y-0.5">
-          <div className="text-[9px] font-medium uppercase tracking-wide text-content-subtle">
+          <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
             Criteria ({completedAcs}/{acs.length} met)
           </div>
           {acs.map(s => (
-            <div key={s.id} className="flex items-start gap-1 text-[10px] text-content-subtle">
+            <div key={s.id} className="flex items-start gap-1 text-[10px] text-muted-foreground">
               {s.status === 'completed'
                 ? <CheckCircle2 className="w-3 h-3 text-success shrink-0 mt-0.5" />
-                : <Circle className="w-3 h-3 text-content-muted shrink-0 mt-0.5" />}
+                : <Circle className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" />}
               {s.title}
             </div>
           ))}
@@ -372,11 +372,11 @@ function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
       {/* Edge context — all incoming/outgoing edges */}
       {(incomingEdges.length > 0 || outgoingEdges.length > 0) && (
         <div className="space-y-0.5">
-          <div className="text-[9px] font-medium uppercase tracking-wide text-content-subtle">Dependencies</div>
+          <div className="text-[9px] font-medium uppercase tracking-wide text-muted-foreground">Dependencies</div>
           {incomingEdges.map((e, i) => {
             const source = itemById(e.from);
             return source ? (
-              <div key={`in-${i}`} className="text-[10px] text-content-subtle">
+              <div key={`in-${i}`} className="text-[10px] text-muted-foreground">
                 <span className="text-primary/80">← {e.type}</span>
                 {' '}{source.title}
               </div>
@@ -385,7 +385,7 @@ function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
           {outgoingEdges.map((e, i) => {
             const target = itemById(e.to);
             return target ? (
-              <div key={`out-${i}`} className="text-[10px] text-content-subtle">
+              <div key={`out-${i}`} className="text-[10px] text-muted-foreground">
                 <span className="text-warning/80">→ {e.type}</span>
                 {' '}{target.title}
               </div>

@@ -17,8 +17,8 @@ export function BulkActionBar({ count, onCloseOut, onCancel }: BulkActionBarProp
           : 'translate-y-8 opacity-0 pointer-events-none'
       }`}
     >
-      <div className="flex items-center gap-4 rounded-2xl border border-divider/70 bg-surface/95 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.2)] px-5 py-3">
-        <span className="text-sm font-medium text-content whitespace-nowrap">
+      <div className="flex items-center gap-4 rounded-2xl border border-border/70 bg-card/95 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.2)] px-5 py-3">
+        <span className="text-sm font-medium text-foreground whitespace-nowrap">
           {count} {count === 1 ? 'issue' : 'issues'} selected
         </span>
         <div className="w-px h-5 bg-divider" />
@@ -31,7 +31,7 @@ export function BulkActionBar({ count, onCloseOut, onCancel }: BulkActionBarProp
         </button>
         <button
           onClick={onCancel}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-divider bg-surface px-3.5 py-2 text-sm font-medium text-content hover:bg-surface-hover transition-colors"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
         >
           <X className="w-4 h-4" />
           Cancel

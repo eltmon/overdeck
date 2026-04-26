@@ -72,12 +72,12 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
         ? 'border-destructive/30 bg-destructive/5'
         : allPassed
         ? 'border-success/30 bg-success/5'
-        : 'border-divider bg-surface-emphasis/30'
+        : 'border-border bg-card/30'
     }`}>
       {/* Header */}
       <div className="px-3 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-content-subtle">Pipeline</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Pipeline</span>
           {reviewStatus.updatedAt && isStale(reviewStatus.updatedAt) && (
             <span className="flex items-center gap-1 text-[10px] text-amber-400" title={`Last updated ${formatRelativeTime(reviewStatus.updatedAt)}`}>
               <AlertTriangle className="w-3 h-3" />
@@ -90,7 +90,7 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
             <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
               autoRequeueCount >= DEFAULT_AUTO_REQUEUE_MAX
                 ? 'bg-destructive/20 text-destructive'
-                : 'bg-surface text-content-subtle'
+                : 'bg-card text-muted-foreground'
             }`}>
               <RotateCcw className="w-2.5 h-2.5 inline mr-1" />
               {autoRequeueCount}/{DEFAULT_AUTO_REQUEUE_MAX}
@@ -117,11 +117,11 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
                   ? 'bg-success/10'
                   : step.isRunning
                   ? 'bg-warning/10'
-                  : 'bg-surface/50'
+                  : 'bg-card/50'
               }`}>
                 <StepIcon step={step} />
                 <div className="flex flex-col min-w-0">
-                  <span className="text-[10px] text-content-subtle leading-tight">{step.label}</span>
+                  <span className="text-[10px] text-muted-foreground leading-tight">{step.label}</span>
                   <StatusLabel step={step} />
                 </div>
               </div>
@@ -138,12 +138,12 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
         {/* Verification attempt counter */}
         {(reviewStatus.verificationCycleCount ?? 0) > 0 && (
           <div className="mt-1.5 flex items-center gap-1.5 text-[10px]">
-            <Info className="w-3 h-3 text-content-subtle" />
-            <span className="text-content-subtle">Verification attempt</span>
+            <Info className="w-3 h-3 text-muted-foreground" />
+            <span className="text-muted-foreground">Verification attempt</span>
             <span className={`font-medium ${
               (reviewStatus.verificationCycleCount ?? 0) >= verificationMaxCycles
                 ? 'text-destructive'
-                : 'text-content'
+                : 'text-foreground'
             }`}>
               {reviewStatus.verificationCycleCount}/{verificationMaxCycles}
             </span>
@@ -156,7 +156,7 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
         <>
           <button
             onClick={() => setShowDetails(!showDetails)}
-            className="w-full px-3 py-1.5 border-t border-divider flex items-center justify-between text-[10px] text-content-subtle hover:text-content hover:bg-surface/50 transition-colors"
+            className="w-full px-3 py-1.5 border-t border-border flex items-center justify-between text-[10px] text-muted-foreground hover:text-foreground hover:bg-card/50 transition-colors"
           >
             <span className="flex items-center gap-1">
               {hasFailure && <AlertTriangle className="w-3 h-3 text-destructive" />}
@@ -165,12 +165,12 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
             {showDetails ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </button>
           {showDetails && (
-            <div className="px-3 py-2 border-t border-divider bg-surface/30 space-y-2 max-h-48 overflow-y-auto">
+            <div className="px-3 py-2 border-t border-border bg-card/30 space-y-2 max-h-48 overflow-y-auto">
               {steps.map(step =>
                 step.notes ? (
                   <div key={step.key}>
-                    <div className="text-[10px] font-medium text-content-subtle mb-0.5">{step.label}</div>
-                    <div className="text-[11px] text-content prose-notes">
+                    <div className="text-[10px] font-medium text-muted-foreground mb-0.5">{step.label}</div>
+                    <div className="text-[11px] text-foreground prose-notes">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{step.notes}</ReactMarkdown>
                     </div>
                   </div>
@@ -183,7 +183,7 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
 
       {/* History — skip the latest entry since it's current state */}
       {reviewStatus.history && reviewStatus.history.length > 1 && (
-        <div className="border-t border-divider">
+        <div className="border-t border-border">
           <StatusHistory history={reviewStatus.history.slice(0, -1)} />
         </div>
       )}
@@ -202,11 +202,11 @@ function StepIcon({ step }: { step: PipelineStep }) {
     return <Loader2 className="w-4 h-4 text-warning shrink-0 animate-spin" />;
   }
   if (step.isSkipped) {
-    return <span className="w-4 h-4 rounded-full border border-content-muted flex items-center justify-center shrink-0">
-      <span className="text-[8px] text-content-muted">—</span>
+    return <span className="w-4 h-4 rounded-full border border-muted-foreground flex items-center justify-center shrink-0">
+      <span className="text-[8px] text-muted-foreground">—</span>
     </span>;
   }
-  return <span className="w-4 h-4 rounded-full border border-content-muted/40 shrink-0" />;
+  return <span className="w-4 h-4 rounded-full border border-muted-foreground/40 shrink-0" />;
 }
 
 function StatusLabel({ step }: { step: PipelineStep }) {
@@ -229,8 +229,8 @@ function StatusLabel({ step }: { step: PipelineStep }) {
       step.isPassed ? 'text-success' :
       step.isFailed ? 'text-destructive' :
       step.isRunning ? 'text-warning' :
-      step.isSkipped ? 'text-content-muted' :
-      'text-content-muted'
+      step.isSkipped ? 'text-muted-foreground' :
+      'text-muted-foreground'
     }`}>
       {label}
     </span>

@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import { Loader2, ChevronRight, ChevronDown, GripHorizontal, Terminal, FileText, MessageSquare } from 'lucide-react';
-import styles from '../styles/mission-control.module.css';
+import styles from '../styles/command-deck.module.css';
 import { XTerminal } from '../../XTerminal';
 import { ConversationPanel } from '../../chat/ConversationPanel';
 import { ChatMarkdown } from '../../chat/ChatMarkdown';

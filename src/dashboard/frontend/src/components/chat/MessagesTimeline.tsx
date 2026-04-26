@@ -30,7 +30,7 @@ import {
   type MessagesTimelineRow,
 } from './session-logic';
 import type { ChatMessage } from './chat-types';
-import styles from '../MissionControl/styles/mission-control.module.css';
+import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

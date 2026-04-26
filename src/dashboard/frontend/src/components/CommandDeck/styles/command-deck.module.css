@@ -1,22 +1,21 @@
-/* Codex-inspired design tokens for Command Deck */
-/* Isolated to Command Deck only - does not affect existing components */
+/* Command Deck layout utilities — theme via global semantic tokens */
 
-.missionControl {
-  --mc-bg-main: #FFFFFF;
-  --mc-bg-sidebar: #FAF9F7;
-  --mc-bg-secondary: #F7F6F3;
-  --mc-bg-hover: #F3F2EF;
-  --mc-bg-selected: #EDE9E3;
-  --mc-text-primary: #1A1A1A;
-  --mc-text-secondary: #6B7280;
-  --mc-text-muted: #9CA3AF;
-  --mc-border: #E5E7EB;
-  --mc-border-strong: #D1D5DB;
-  --mc-accent: #2563EB;
-  --mc-accent-hover: #1D4ED8;
-  --mc-success: #059669;
-  --mc-warning: #D97706;
-  --mc-error: #DC2626;
+.commandDeck {
+  --mc-bg-main: var(--background);
+  --mc-bg-sidebar: var(--card);
+  --mc-bg-secondary: var(--muted);
+  --mc-bg-hover: var(--accent);
+  --mc-bg-selected: color-mix(in srgb, var(--primary) 8%, transparent);
+  --mc-text-primary: var(--foreground);
+  --mc-text-secondary: var(--muted-foreground);
+  --mc-text-muted: var(--muted-foreground);
+  --mc-border: var(--border);
+  --mc-border-strong: var(--input);
+  --mc-accent: var(--primary);
+  --mc-accent-hover: var(--primary);
+  --mc-success: var(--success);
+  --mc-warning: var(--warning);
+  --mc-error: var(--destructive);
 
   --mc-font-family: "DM Sans", system-ui, sans-serif;
   --mc-font-mono: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
@@ -46,20 +45,6 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   height: 100%;
-}
-
-/* Dark mode overrides — mirrors the dashboard's .dark token values */
-:global(.dark) .missionControl {
-  --mc-bg-main:     #0c1018;
-  --mc-bg-sidebar:  #111520;
-  --mc-bg-secondary:#0e1320;
-  --mc-bg-hover:    #161d2b;
-  --mc-bg-selected: #1a2438;
-  --mc-text-primary:   #f3f4f6;
-  --mc-text-secondary: #9ca3af;
-  --mc-text-muted:     #6b7280;
-  --mc-border:         #1e2a3a;
-  --mc-border-strong:  #2a3a50;
 }
 
 /* Layout */
@@ -562,12 +547,12 @@
 
 .sessionPanelToggleBtnActive {
   background: var(--mc-accent);
-  color: #fff;
+  color: var(--primary-foreground);
 }
 
 .sessionPanelToggleBtnActive:hover {
   background: var(--mc-accent-hover);
-  color: #fff;
+  color: var(--primary-foreground);
 }
 
 .sessionPanelContent {
@@ -1328,7 +1313,7 @@
 .deaconActionCount {
   font-size: 10px;
   background: var(--mc-accent);
-  color: #fff;
+  color: var(--primary-foreground);
   border-radius: 8px;
   padding: 0 5px;
   min-width: 16px;
@@ -1582,7 +1567,7 @@
   padding: 0 3px;
   border-radius: 7px;
   background: var(--mc-accent);
-  color: #fff;
+  color: var(--primary-foreground);
   font-size: 9px;
   font-weight: 600;
   line-height: 1;
@@ -2127,7 +2112,7 @@
 .conversationResumeBtn {
   padding: var(--mc-space-2) var(--mc-space-4);
   background: var(--mc-accent);
-  color: #fff;
+  color: var(--primary-foreground);
   border: none;
   border-radius: var(--mc-radius);
   font-size: var(--mc-font-size-sm);
@@ -2731,7 +2716,7 @@
   width: 32px;
   height: 32px;
   background: var(--mc-accent);
-  color: #fff;
+  color: var(--primary-foreground);
   border: none;
   border-radius: var(--mc-radius);
   cursor: pointer;
@@ -3086,7 +3071,7 @@
   padding: 3px 10px;
   border-radius: 4px;
   font-size: var(--mc-font-size-xs);
-  color: white;
+  color: var(--primary-foreground);
   background: var(--mc-accent);
   border: none;
   cursor: pointer;
@@ -3560,7 +3545,7 @@
   border: none;
   border-radius: var(--mc-radius-sm);
   background: var(--mc-accent);
-  color: white;
+  color: var(--primary-foreground);
   font-size: var(--mc-font-size-sm);
   font-weight: 500;
   cursor: pointer;

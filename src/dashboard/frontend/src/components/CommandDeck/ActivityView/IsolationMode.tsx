@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react';
-import styles from '../styles/mission-control.module.css';
+import styles from '../styles/command-deck.module.css';
 import { ChatMarkdown } from '../../chat/ChatMarkdown';
 
 interface ActivitySection {

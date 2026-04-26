@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ListTodo, FileText, RefreshCw, ExternalLink } from 'lucide-react';
 import type { ReviewStatus } from '../../inspector/types';
-import styles from '../styles/mission-control.module.css';
+import styles from '../styles/command-deck.module.css';
 
 interface PlanningData {
   prd?: string;

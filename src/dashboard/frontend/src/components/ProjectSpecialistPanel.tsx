@@ -60,14 +60,14 @@ const STATUS_ICONS = {
   passed: <CheckCircle className="w-4 h-4 text-success" />,
   failed: <XCircle className="w-4 h-4 text-destructive" />,
   blocked: <AlertCircle className="w-4 h-4 text-warning" />,
-  incomplete: <Clock className="w-4 h-4 text-content-subtle" />,
+  incomplete: <Clock className="w-4 h-4 text-muted-foreground" />,
 };
 
 const STATUS_COLORS = {
   passed: 'text-success',
   failed: 'text-destructive',
   blocked: 'text-warning',
-  incomplete: 'text-content-subtle',
+  incomplete: 'text-muted-foreground',
 };
 
 function formatDuration(ms: number): string {
@@ -129,20 +129,20 @@ function ProjectSpecialistCard({ specialist }: ProjectSpecialistCardProps) {
   };
 
   return (
-    <div className="p-4 bg-surface-raised rounded-lg">
+    <div className="p-4 bg-card rounded-lg">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Brain className="w-5 h-5 text-signal-review" />
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-medium text-content">
+              <span className="font-medium text-foreground">
                 {specialist.projectKey}/{specialist.specialistType}
               </span>
               {specialist.isRunning && (
                 <Loader2 className="w-4 h-4 text-success animate-spin" />
               )}
             </div>
-            <div className="text-sm text-content-subtle">
+            <div className="text-sm text-muted-foreground">
               {specialist.metadata.runCount} runs
               {specialist.metadata.lastRunAt && (
                 <span className="ml-2">
@@ -167,7 +167,7 @@ function ProjectSpecialistCard({ specialist }: ProjectSpecialistCardProps) {
             <button
               onClick={handleTerminate}
               disabled={terminateMutation.isPending}
-              className="p-2 text-content-subtle hover:text-destructive hover:bg-surface-overlay rounded"
+              className="p-2 text-muted-foreground hover:text-destructive hover:bg-popover rounded"
               title="Terminate"
             >
               <XCircle className="w-4 h-4" />
@@ -176,7 +176,7 @@ function ProjectSpecialistCard({ specialist }: ProjectSpecialistCardProps) {
 
           <button
             onClick={() => setExpanded(!expanded)}
-            className="p-2 text-content-subtle hover:text-primary hover:bg-surface-overlay rounded"
+            className="p-2 text-muted-foreground hover:text-primary hover:bg-popover rounded"
           >
             {expanded ? '−' : '+'}
           </button>
@@ -185,23 +185,23 @@ function ProjectSpecialistCard({ specialist }: ProjectSpecialistCardProps) {
 
       {expanded && (
         <div className="mt-4 space-y-2">
-          <div className="text-sm text-content-subtle font-medium mb-2">Recent Runs</div>
+          <div className="text-sm text-muted-foreground font-medium mb-2">Recent Runs</div>
           {runs && runs.length > 0 ? (
             <div className="space-y-1">
               {runs.map((run) => (
                 <Link
                   key={run.runId}
                   to={`/specialists/${specialist.projectKey}/${specialist.specialistType}/runs/${run.runId}`}
-                  className="flex items-center justify-between p-2 bg-surface-emphasis hover:bg-surface-overlay rounded text-xs transition-colors"
+                  className="flex items-center justify-between p-2 bg-card hover:bg-popover rounded text-xs transition-colors"
                 >
                   <div className="flex items-center gap-2">
                     {run.metadata.status && STATUS_ICONS[run.metadata.status]}
-                    <span className="text-content font-mono">{run.metadata.issueId}</span>
-                    <span className="text-content-muted">{formatDate(run.metadata.startedAt)}</span>
+                    <span className="text-foreground font-mono">{run.metadata.issueId}</span>
+                    <span className="text-muted-foreground">{formatDate(run.metadata.startedAt)}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     {run.metadata.duration && (
-                      <span className="text-content-subtle">{formatDuration(run.metadata.duration)}</span>
+                      <span className="text-muted-foreground">{formatDuration(run.metadata.duration)}</span>
                     )}
                     {run.metadata.status && (
                       <span className={STATUS_COLORS[run.metadata.status]}>
@@ -213,7 +213,7 @@ function ProjectSpecialistCard({ specialist }: ProjectSpecialistCardProps) {
               ))}
             </div>
           ) : (
-            <div className="text-sm text-content-muted py-2">No runs yet</div>
+            <div className="text-sm text-muted-foreground py-2">No runs yet</div>
           )}
 
           <Link
@@ -240,7 +240,7 @@ export function ProjectSpecialistPanel() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-6 h-6 text-content-subtle animate-spin" />
+        <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
       </div>
     );
   }
@@ -248,9 +248,9 @@ export function ProjectSpecialistPanel() {
   if (!specialists || specialists.length === 0) {
     return (
       <div className="text-center py-8">
-        <Brain className="w-12 h-12 text-content-muted mx-auto mb-3" />
-        <div className="text-content-subtle">No per-project specialists configured yet</div>
-        <div className="text-sm text-content-muted mt-1">
+        <Brain className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+        <div className="text-muted-foreground">No per-project specialists configured yet</div>
+        <div className="text-sm text-muted-foreground mt-1">
           Specialists will appear here when they run for the first time
         </div>
       </div>
@@ -267,11 +267,11 @@ export function ProjectSpecialistPanel() {
     <div className="space-y-4">
       {/* Project selector */}
       <div className="flex items-center gap-2">
-        <label className="text-sm text-content-subtle">Project:</label>
+        <label className="text-sm text-muted-foreground">Project:</label>
         <select
           value={selectedProject}
           onChange={(e) => setSelectedProject(e.target.value)}
-          className="px-3 py-1 bg-surface-overlay text-content rounded border border-divider-strong focus:border-primary focus:outline-none"
+          className="px-3 py-1 bg-popover text-foreground rounded border border-border focus:border-primary focus:outline-none"
         >
           <option value="all">All Projects</option>
           {projects.map((project) => (
@@ -280,7 +280,7 @@ export function ProjectSpecialistPanel() {
             </option>
           ))}
         </select>
-        <div className="text-sm text-content-muted ml-auto">
+        <div className="text-sm text-muted-foreground ml-auto">
           {filteredSpecialists.length} specialist{filteredSpecialists.length !== 1 ? 's' : ''}
         </div>
       </div>
