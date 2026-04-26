@@ -14,9 +14,9 @@ Frontend enrichment and structural features after completing backend perf beads.
 - [x] pan-mc22: Zone B enrichment: output buffer, idle/thinking/waiting states, cost rate, summary line (commit: 71377465)
 - [x] pan-0h5k: Round marker derivation from roundMetadata (commit: 0ea49ad4)
 - [x] pan-35kn: Density rule: suppress default-value badges in Zone A (commit: 58c14a6b)
+- [x] pan-sjj5: Overview tab: real test summary and PR summary cards (commit: 538edb8e)
 
 ## Remaining Work
-- [ ] pan-sjj5: Overview tab: real test summary and PR summary cards
 - [ ] pan-rtf5: Session-tab strip: Conversation/Terminal/Findings tabs
 - [ ] pan-m1iu: Tree right-click menu: Pause, Resume, Stop, Restart, Deep Wipe, Open State Dir, View JSONL
 - [ ] pan-0bms: Missing Zone B overflow actions
