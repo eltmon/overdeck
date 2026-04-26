@@ -62,9 +62,10 @@ interface ReviewHistoryEntry {
 }
 
 /**
- * Timeout for review agent in milliseconds (20 minutes)
+ * Timeout for review agent in milliseconds (30 minutes).
+ * Performance reviewers of large PRs can need 20+ minutes of analysis time.
  */
-const REVIEW_TIMEOUT_MS = 20 * 60 * 1000;
+const REVIEW_TIMEOUT_MS = 30 * 60 * 1000;
 
 /**
  * Default reviewer agents used when specialists.review_agents is not configured.
@@ -88,6 +89,11 @@ export function getActiveParallelReviewIssues(sessionNames: string[]): Set<strin
     const match = name.match(/^review-([A-Z0-9]+-\d+)-\d+-/);
     if (match) {
       active.add(match[1].toUpperCase());
+    }
+    // Coordinator sessions are also active review work (PAN-830)
+    const coordMatch = name.match(/^review-coordinator-([A-Z0-9]+-\d+)-\d+/);
+    if (coordMatch) {
+      active.add(coordMatch[1].toUpperCase());
     }
   }
   return active;
@@ -690,11 +696,19 @@ export async function runParallelReview(
   // Clean up any stale review sessions for this issue before starting a new review run.
   // Review sessions are named review-<issueId>-<timestamp>-<role>; a new timestamp
   // is generated on every retry, so old sessions accumulate and leak.
+  // Only kill sessions whose coordinator is gone — never kill reviewers belonging
+  // to an active coordinator (PAN-830).
   try {
     const allSessions = await listSessionNamesAsync();
     const reviewRegex = new RegExp(`^review-${context.issueId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+`);
     const staleSessions = allSessions.filter(s => reviewRegex.test(s));
     for (const session of staleSessions) {
+      // Derive coordinator name: review-PAN-830-12345-correctness -> review-coordinator-PAN-830-12345
+      const coordName = session.replace(/^review-/, 'review-coordinator-').replace(/-[^-]+$/, '');
+      if (allSessions.includes(coordName)) {
+        console.log(`[review-agent] Skipping stale cleanup for ${session} — coordinator ${coordName} is active`);
+        continue;
+      }
       try {
         await killSessionAsync(session);
         console.log(`[review-agent] Killed stale review session: ${session}`);
@@ -793,15 +807,18 @@ export async function runParallelReview(
     console.warn(`[review-agent] Aborting synthesis — reviewer(s) failed or timed out: ${failed.join(', ')}`);
     emitActivityEntry({ source: 'review-specialist', level: 'error', message: `${context.issueId} — review aborted: ${failed.join(', ')} failed`, issueId: context.issueId });
     emitActivityTts({ utterance: `${context.issueId} review aborted, ${failed.join(', ')} failed`, priority: 0, issueId: context.issueId });
-    return {
-      result: {
-        success: false,
-        reviewResult: 'COMMENTED',
-        notes: `Review aborted: reviewer(s) failed or timed out (${failed.join(', ')}). Resubmit to retry.`,
-        output: `Review ${reviewId}`,
-      },
-      reviewId,
+    const abortResult: ReviewResult = {
+      success: false,
+      reviewResult: 'COMMENTED',
+      notes: `Review aborted: reviewer(s) failed or timed out (${failed.join(', ')}). Resubmit to retry.`,
+      output: `Review ${reviewId}`,
     };
+    try {
+      await sendFeedbackToWorkAgent(context, abortResult);
+    } catch (err) {
+      console.error(`[review-agent] Failed to send abort feedback to work agent for ${context.issueId} (non-fatal):`, err);
+    }
+    return { result: abortResult, reviewId };
   }
 
   const synthTemplatePath = resolvePromptTemplateFn('code-review-synthesis', context.projectPath);
