@@ -44,7 +44,9 @@ These four surfaces describe the same underlying object — an issue with agents
 
 ## Goal
 
-Make Command Deck the **single, complete surface for an issue and its agents**. Subsume the kanban-card control surface, the inspector panel, the status-flow controls, and the per-agent action layer into one cohesive three-zone layout — so that anything you can do from kanban, inspector, or workspace pane can be done here, with strictly less clicking and strictly more context.
+Make Command Deck the **single, complete surface for an issue and its agents** — the be-all-and-end-all of everything you could ever need to see or do for an issue, with zero gaps versus the existing surfaces. Anything reachable from the kanban card, inspector panel, status-flow control, badge bar, or workspace pane is also reachable here, in a cohesive three-zone layout that's strictly less clicking and strictly more context.
+
+This is **additive**: the kanban / inspector / badge bar / status-flow stay exactly as they are today. They're slated for their own future revamp; this PRD does not touch them. Command Deck reaches feature-parity by mirroring every action, not by replacing those surfaces.
 
 Keep the conversation as the primary content. Make the controls contextual to the current pipeline state. Make reviewers single canonical nodes that resume across rounds and carry the round history inline.
 
@@ -231,12 +233,11 @@ The single addition is a **round divider** in the timeline for reviewers/test se
 
 Composer addresses the selected session: messages from the user are sent via existing `POST /api/conversations/:name/message` to whatever session ID is in Zone B.
 
-### Surfaces being deleted or slimmed
+### Surfaces left untouched (for now)
 
-- **`IssueCard` agent surface** (the per-agent operation buttons inside the kanban card): **deleted**. Kanban cards return to being lightweight status indicators. All agent operations move to Command Deck.
-- **`InspectorPanel`**: **slimmed to a hover-peek** on kanban cards (read-only summary, no actions). Click-through opens Command Deck for that issue.
-- **`BadgeBar` modal pattern** (the click-a-badge-to-open-a-modal interaction): **deleted**. Every badge is either elevated into Zone A (because it's contextual state) or moved to the overflow `…` menu.
-- **`StatusFlowControl`**: **embedded in Zone A** as the contextual primary/secondary actions. The kanban-drag-to-column gesture stays as a shortcut; the buttons unify in Command Deck.
+The kanban-side surfaces — `IssueCard`, `InspectorPanel`, `BadgeBar` modal pattern, `StatusFlowControl`, `WorkspacePane` — are **not modified by this PRD**. They keep their current behavior. The kanban itself is slated for a separate revamp later; this PRD is scoped to making Command Deck reach feature-parity with all of them.
+
+In practice that means the same action lives in two places during the parity window: e.g. "Approve & Test" exists on the kanban card *and* in Zone A of Command Deck. That duplication is intentional and temporary. When the kanban revamp lands, the kanban will be free to drop or reshape any of these affordances knowing Command Deck is already the canonical surface.
 
 ### Tree node behavior
 
@@ -280,12 +281,14 @@ New component: `src/dashboard/frontend/src/components/CommandDeck/IssueWorkbench
 
 Replaces the current `<ActivityView />` / `<AgentSection />` rendered in `Sidebar.tsx` for project-selected mode.
 
-### Phase 3 — Action surface migration
+### Phase 3 — Action surface parity (additive only)
 
-- `KanbanBoard.tsx:2486` (`IssueCard`): delete agent surface, retain only status badges
-- `InspectorPanel.tsx`: slim to read-only peek; remove all action buttons
-- `BadgeBar.tsx`: delete (badges either elevated to Zone A or moved to overflow)
-- `StatusFlowControl.tsx`: refactored into Zone A contextual action map; kanban drag preserved as alternate trigger
+Goal: every action reachable on `IssueCard` / `InspectorPanel` / `BadgeBar` / `StatusFlowControl` / `WorkspacePane` is also reachable from Command Deck. Nothing on those surfaces is removed or modified.
+
+- Audit the action lists on each existing surface (kanban-card menu, inspector sections, badge modals, status-flow buttons, workspace-pane buttons).
+- For each action: confirm it has a contextual home in Zone A (issue-level), Zone B (session-level), or the overflow `…` menu. File a small follow-up if any action has no good home.
+- Reuse the same backend RPCs / endpoints those surfaces already call — no new APIs needed for parity.
+- Drag-to-column kanban gesture is **not** mirrored; column transitions in Command Deck happen via Zone A primary/secondary buttons.
 
 ### Phase 4 — Round divider + tree polish
 
@@ -298,10 +301,9 @@ Replaces the current `<ActivityView />` / `<AgentSection />` rendered in `Sideba
 - [ ] Reviewers reuse the same tmux session and same JSONL across rounds. Round 2 of `review-correctness` does not spawn a new tmux session.
 - [ ] Session tree shows exactly 6 reviewer nodes for an issue with N review rounds (1 orchestrator + 5 roles), regardless of N.
 - [ ] Clicking any session node opens `ConversationPanel` with the conversation timeline. Sessions without JSONL still get the terminal fallback (read-only).
-- [ ] All actions previously on `IssueCard`, `InspectorPanel`, `BadgeBar`, `StatusFlowControl`, `WorkspacePane` are reachable from the three Command Deck zones — and only when contextual to the current pipeline state.
+- [ ] Every action reachable on `IssueCard` / `InspectorPanel` / `BadgeBar` / `StatusFlowControl` / `WorkspacePane` is also reachable from the three Command Deck zones — and only when contextual to the current pipeline state.
 - [ ] No state badge in Zone A is shown when its value is the default for the current stage.
-- [ ] Kanban `IssueCard` no longer carries per-agent action buttons. `InspectorPanel` is read-only.
-- [ ] `BadgeBar` and `StatusFlowControl` are deleted as separate components.
+- [ ] Kanban / inspector / badge bar / status-flow surfaces are unchanged by this PR (their own revamp lands separately).
 - [ ] Merge button is human-only — no automated path triggers it.
 - [ ] `resolveJsonlPath()` correctly returns the JSONL file for any session that has a `claudeSessionId` in its state.
 - [ ] Composer in Zone C sends messages to the selected session (any of: work, review-orchestrator, review-correctness, …, test, merge).
@@ -315,7 +317,7 @@ Replaces the current `<ActivityView />` / `<AgentSection />` rendered in `Sideba
 | Reviewer session resumption corrupts the JSONL if Claude Code's resume protocol changes | Pin to the same `--resume` flow already used by `pan tell`. Add an integration test that opens a JSONL, runs two synthetic rounds, and validates message count. |
 | Density triage hides actions a user wants | Every contextual-only action is also reachable from a stable overflow `…` menu. The triage is about default visibility, not access. |
 | Round divider hurts scroll virtualization | Inject as a non-virtualized row outside the virtualizer (existing pattern: timeline already mixes virtualized + non-virtualized for the last 8 rows). |
-| Kanban card slimming surprises users mid-flight | Ship behind a settings toggle for one minor; default-on for the next. |
+| Action parity drifts as kanban / inspector evolve | Add a parity smoke test that walks the kanban-card menu + inspector action list and asserts each label is reachable somewhere in Command Deck. Cheap to keep current, catches drift before the future kanban revamp. |
 | Removing `cleanupReviewerStateDirs` accumulates JSONL | Reviewer state dirs are bounded by the issue lifecycle. On `merge` complete, archive the issue's reviewer state dirs to `~/.panopticon/agents/.archive/<issue-id>/`. |
 
 ## References
@@ -325,7 +327,7 @@ Replaces the current `<ActivityView />` / `<AgentSection />` rendered in `Sideba
 - `src/lib/cloister/specialists.ts:660` — `getTmuxSessionName` (canonical pattern to extend)
 - `src/dashboard/server/routes/mission-control.ts:227` — `resolveJsonlPath` (JSONL bug)
 - `src/dashboard/frontend/src/components/chat/ConversationPanel.tsx` — reused as-is in Zone C
-- `src/dashboard/frontend/src/components/KanbanBoard.tsx:2486` — `IssueCard` (slimmed)
-- `src/dashboard/frontend/src/components/InspectorPanel.tsx` — slimmed to peek
+- `src/dashboard/frontend/src/components/KanbanBoard.tsx:2486` — `IssueCard` (parity reference; not modified)
+- `src/dashboard/frontend/src/components/InspectorPanel.tsx` — parity reference; not modified
 - `CLAUDE.md` "Session lifecycle rules" — `remain-on-exit on` precedent
 - Mock: `docs/design/mockups/PAN-830-unified-command-deck.html`
