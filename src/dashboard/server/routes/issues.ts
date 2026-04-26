@@ -2431,6 +2431,138 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/issues/:id/pr ───────────────────────────────────────────
+//
+// Shells out to `gh pr view --head feature/<id-lower> --repo <owner>/<repo>`
+// and `gh pr diff <number> --repo <owner>/<repo> --patch` to assemble a
+// structured response for the Command Deck PR/Diff tab. Returns
+// `{ pr: null, diff: null }` when the issue is not a GitHub-tracked issue or
+// no PR exists for the feature branch yet.
+
+const GH_PR_VIEW_FIELDS = [
+  'number',
+  'title',
+  'url',
+  'state',
+  'isDraft',
+  'baseRefName',
+  'headRefName',
+  'author',
+  'createdAt',
+  'updatedAt',
+  'reviewDecision',
+  'reviewRequests',
+  'statusCheckRollup',
+  'additions',
+  'deletions',
+  'changedFiles',
+  'files',
+  'labels',
+  'mergeable',
+  'body',
+].join(',');
+
+export interface IssuePullRequestData {
+  number: number;
+  title: string;
+  url: string;
+  state: string;
+  isDraft: boolean;
+  baseRefName: string;
+  headRefName: string;
+  author: { login?: string; name?: string } | null;
+  createdAt: string;
+  updatedAt: string;
+  reviewDecision: string | null;
+  reviewRequests: Array<{ login?: string; name?: string; __typename?: string }>;
+  statusCheckRollup: Array<{
+    name?: string;
+    state?: string;
+    conclusion?: string;
+    status?: string;
+    detailsUrl?: string;
+    workflowName?: string;
+    __typename?: string;
+  }>;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  files: Array<{ path: string; additions: number; deletions: number }>;
+  labels: Array<{ name?: string; color?: string }>;
+  mergeable: string | null;
+  body: string;
+}
+
+export interface IssuePrEndpointResponse {
+  issueId: string;
+  pr: IssuePullRequestData | null;
+  diff: string | null;
+  error?: string;
+}
+
+export async function fetchIssuePullRequest(issueId: string): Promise<IssuePrEndpointResponse> {
+  const upper = issueId.toUpperCase();
+  const githubCheck = isGitHubIssue(issueId);
+  if (!githubCheck.isGitHub || !githubCheck.owner || !githubCheck.repo) {
+    return { issueId: upper, pr: null, diff: null };
+  }
+
+  const branchName = `feature/${issueId.toLowerCase()}`;
+  const repoArg = `${githubCheck.owner}/${githubCheck.repo}`;
+
+  // Find the PR number for the feature branch (open or closed/merged).
+  let prNumber: string;
+  try {
+    const { stdout } = await execAsync(
+      `gh pr list --repo ${repoArg} --head "${branchName}" --state all --json number --limit 1 --jq '.[0].number'`,
+      { encoding: 'utf-8', timeout: 15000 },
+    );
+    prNumber = stdout.trim();
+  } catch (err: any) {
+    return { issueId: upper, pr: null, diff: null, error: `gh pr list failed: ${err.message}` };
+  }
+  if (!prNumber) {
+    return { issueId: upper, pr: null, diff: null };
+  }
+
+  // Pull the rich fields via `gh pr view --json …`. List doesn't expose
+  // statusCheckRollup, reviewRequests, body, or files reliably.
+  let pr: IssuePullRequestData;
+  try {
+    const { stdout } = await execAsync(
+      `gh pr view ${prNumber} --repo ${repoArg} --json ${GH_PR_VIEW_FIELDS}`,
+      { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
+    );
+    pr = JSON.parse(stdout) as IssuePullRequestData;
+  } catch (err: any) {
+    return { issueId: upper, pr: null, diff: null, error: `gh pr view failed: ${err.message}` };
+  }
+
+  let diff: string | null = null;
+  try {
+    const { stdout } = await execAsync(
+      `gh pr diff ${prNumber} --repo ${repoArg} --patch`,
+      { encoding: 'utf-8', timeout: 30000, maxBuffer: 16 * 1024 * 1024 },
+    );
+    diff = stdout;
+  } catch (err: any) {
+    return { issueId: upper, pr, diff: null, error: `gh pr diff failed: ${err.message}` };
+  }
+
+  return { issueId: upper, pr, diff };
+}
+
+const getIssuePrRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/:id/pr',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const result = yield* Effect.promise(() => fetchIssuePullRequest(id));
+    return jsonResponse(result);
+  })),
+);
+
 // ─── Route: GET /api/issues/:id/costs ────────────────────────────────────────
 
 const getIssueCostsRoute = HttpRouter.add(
@@ -2514,6 +2646,7 @@ export const issuesRouteLayer = Layer.mergeAll(
   getIssuePlanningStateRoute,
   postIssueGenerateTasksRoute,
   getIssueCostsRoute,
+  getIssuePrRoute,
 );
 
 export default issuesRouteLayer;

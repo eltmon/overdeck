@@ -115,3 +115,51 @@ export function useIssueCostsQuery(issueId: string): UseQueryResult<IssueCostDat
     refetchInterval: 30_000,
   });
 }
+
+// ─── PR/Diff (pan-9yn5) ─────────────────────────────────────────────────────
+
+export interface PullRequestData {
+  number: number;
+  title: string;
+  url: string;
+  state: string;
+  isDraft: boolean;
+  baseRefName: string;
+  headRefName: string;
+  author: { login?: string; name?: string } | null;
+  createdAt: string;
+  updatedAt: string;
+  reviewDecision: string | null;
+  reviewRequests: Array<{ login?: string; name?: string; __typename?: string }>;
+  statusCheckRollup: Array<{
+    name?: string;
+    state?: string;
+    conclusion?: string;
+    status?: string;
+    detailsUrl?: string;
+    workflowName?: string;
+    __typename?: string;
+  }>;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  files: Array<{ path: string; additions: number; deletions: number }>;
+  labels: Array<{ name?: string; color?: string }>;
+  mergeable: string | null;
+  body: string;
+}
+
+export interface PrEndpointResponse {
+  issueId: string;
+  pr: PullRequestData | null;
+  diff: string | null;
+  error?: string;
+}
+
+export function usePrQuery(issueId: string): UseQueryResult<PrEndpointResponse> {
+  return useQuery({
+    queryKey: ['issuePr', issueId],
+    queryFn: () => fetchJson<PrEndpointResponse>(`/api/issues/${issueId}/pr`),
+    refetchInterval: 30_000,
+  });
+}

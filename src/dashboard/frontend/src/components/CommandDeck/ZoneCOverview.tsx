@@ -23,6 +23,7 @@ import { CostsTab } from './ZoneCOverviewTabs/CostsTab';
 import { MarkdownTab } from './ZoneCOverviewTabs/MarkdownTab';
 import { VBriefTab } from './ZoneCOverviewTabs/VBriefTab';
 import { BeadsTab } from './ZoneCOverviewTabs/BeadsTab';
+import { PrDiffTab } from './ZoneCOverviewTabs/PrDiffTab';
 import { DeferredTab } from './ZoneCOverviewTabs/DeferredTab';
 import { usePlanningQuery } from './ZoneCOverviewTabs/queries';
 
@@ -179,13 +180,7 @@ export function ZoneCOverview({
         )}
         {tab === 'vbrief' && <VBriefTab issueId={issueId} />}
         {tab === 'beads' && <BeadsTab issueId={issueId} />}
-        {tab === 'prdiff' && (
-          <DeferredTab
-            testId="prdiff-tab"
-            title="PR / Diff"
-            bead="pan-9yn5"
-          />
-        )}
+        {tab === 'prdiff' && <PrDiffTab issueId={issueId} />}
         {tab === 'discussions' && (
           <DeferredTab
             testId="discussions-tab"

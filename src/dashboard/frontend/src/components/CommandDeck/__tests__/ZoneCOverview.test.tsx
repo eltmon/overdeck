@@ -28,11 +28,17 @@ const costsResult = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
 }));
+const prResult = vi.hoisted(() => ({
+  data: undefined as undefined | Record<string, unknown>,
+  isLoading: false,
+  isError: false,
+}));
 
 vi.mock('../ZoneCOverviewTabs/queries', () => ({
   usePlanningQuery: () => planningResult,
   useActivityQuery: () => activityResult,
   useIssueCostsQuery: () => costsResult,
+  usePrQuery: () => prResult,
 }));
 
 // Beads + ActivityTab + VBriefTab embed components that hit other code paths;
@@ -64,6 +70,9 @@ describe('ZoneCOverview', () => {
     costsResult.data = undefined;
     costsResult.isLoading = false;
     costsResult.isError = false;
+    prResult.data = { issueId: ISSUE, pr: null, diff: null };
+    prResult.isLoading = false;
+    prResult.isError = false;
   });
 
   it('renders the Overview tab body by default', () => {
@@ -121,11 +130,16 @@ describe('ZoneCOverview', () => {
     expect(screen.getByTestId('costs-by-model-row-claude-sonnet-4-6')).toBeInTheDocument();
   });
 
-  it('renders the deferred placeholder for PR/Diff and Discussions tabs', () => {
+  it('renders the PR/Diff tab via PrDiffTab', () => {
     render(<ZoneCOverview issueId={ISSUE} />);
     fireEvent.click(screen.getByTestId('zone-c-overview-tab-prdiff'));
-    expect(screen.getByTestId('prdiff-tab')).toBeInTheDocument();
-    expect(screen.getByTestId('prdiff-tab').textContent).toContain('pan-9yn5');
+    // No PR yet → empty state body
+    expect(screen.getByTestId('prdiff-tab-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('prdiff-tab-empty').textContent).toContain('feature/pan-830');
+  });
+
+  it('renders the deferred placeholder for the Discussions tab', () => {
+    render(<ZoneCOverview issueId={ISSUE} />);
     fireEvent.click(screen.getByTestId('zone-c-overview-tab-discussions'));
     expect(screen.getByTestId('discussions-tab')).toBeInTheDocument();
     expect(screen.getByTestId('discussions-tab').textContent).toContain('pan-1r7j');
