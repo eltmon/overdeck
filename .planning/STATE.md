@@ -3,17 +3,16 @@
 ## Status: In Progress
 
 ## Current Phase
-Starting implementation. Beads created and linked. Working through one bead at a time per workspace contract.
+pan-miz5 closed. Picking up pan-yr25 next (TerminalTabs.tsx).
 
 ## Completed Work
-- (none yet)
+- [x] pan-0hfc: Added optional `'data-testid'?: string` prop to StopAgentButton + RecoverButton, spread onto the rendered button in both card and inspector variants. (commit: adf2a419)
+- [x] pan-miz5: Added `inspector-panel-{issueId}` (on a `display:contents` wrapper to preserve layout while keeping `workspace-sidebar` on the scrollable element), `inspector-open-terminal-{issueId}`, and `inspector-close` to InspectorPanel.tsx.
 
 ## Remaining Work
-- [ ] pan-0hfc: Step 1 — Add `data-testid` prop to StopAgentButton + RecoverButton (unblocks Steps 2 & 5)
-- [ ] pan-53xq: Step 2 — Add card-* testids to KanbanBoard.tsx (blocked by pan-0hfc)
-- [ ] pan-miz5: Step 3 — Add inspector-* testids to InspectorPanel.tsx
+- [ ] pan-53xq: Step 2 — Add card-* testids to KanbanBoard.tsx
 - [ ] pan-yr25: Step 4 — Add inspector-* testids to TerminalTabs.tsx
-- [ ] pan-i15e: Step 5 — Add inspector-* testids to ActionsSection.tsx (blocked by pan-0hfc)
+- [ ] pan-i15e: Step 5 — Add inspector-* testids to ActionsSection.tsx
 - [ ] pan-g67r: Step 6 — Add sidebar-* testids to Sidebar.tsx
 - [ ] pan-ld6t: Step 7 — Add testids to StoppedAgentsBanner.tsx
 - [ ] pan-lnbq: Step 8 — Add merge-* testids to AwaitingMergePage.tsx
