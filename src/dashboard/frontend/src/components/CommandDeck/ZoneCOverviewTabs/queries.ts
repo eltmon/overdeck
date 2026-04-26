@@ -163,3 +163,43 @@ export function usePrQuery(issueId: string): UseQueryResult<PrEndpointResponse> 
     refetchInterval: 30_000,
   });
 }
+
+// ─── Discussions (pan-1r7j) ─────────────────────────────────────────────────
+
+export type DiscussionSource =
+  | 'linear'
+  | 'github-issue'
+  | 'github-pr-conversation'
+  | 'github-pr-review'
+  | 'github-pr-review-comment';
+
+export interface DiscussionItem {
+  id: string;
+  source: DiscussionSource;
+  author: string;
+  body: string;
+  createdAt: string;
+  url?: string;
+  prNumber?: number;
+  reviewState?: string;
+  filePath?: string;
+  line?: number;
+}
+
+export interface DiscussionsResponse {
+  issueId: string;
+  items: DiscussionItem[];
+  prNumber: number | null;
+  errors?: string[];
+}
+
+export function useDiscussionsQuery(
+  issueId: string,
+): UseQueryResult<DiscussionsResponse> {
+  return useQuery({
+    queryKey: ['issueDiscussions', issueId],
+    queryFn: () =>
+      fetchJson<DiscussionsResponse>(`/api/issues/${issueId}/discussions`),
+    refetchInterval: 30_000,
+  });
+}

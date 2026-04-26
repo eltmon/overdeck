@@ -9,9 +9,8 @@
  * INFERENCE tab is hidden when no inference content exists for the issue (the
  * planning endpoint returns it null/empty if no inference.md was generated).
  *
- * PR/Diff and Discussions tabs land their backend endpoints in follow-up
- * beads (pan-9yn5 + pan-1r7j). They render a `DeferredTab` placeholder so the
- * navigation surface is complete and discoverable today.
+ * The PR/Diff tab pulls from `/api/issues/:issueId/pr` (pan-9yn5) and the
+ * Discussions tab pulls from `/api/issues/:issueId/discussions` (pan-1r7j).
  */
 
 import { useState } from 'react';
@@ -24,7 +23,7 @@ import { MarkdownTab } from './ZoneCOverviewTabs/MarkdownTab';
 import { VBriefTab } from './ZoneCOverviewTabs/VBriefTab';
 import { BeadsTab } from './ZoneCOverviewTabs/BeadsTab';
 import { PrDiffTab } from './ZoneCOverviewTabs/PrDiffTab';
-import { DeferredTab } from './ZoneCOverviewTabs/DeferredTab';
+import { DiscussionsTab } from './ZoneCOverviewTabs/DiscussionsTab';
 import { usePlanningQuery } from './ZoneCOverviewTabs/queries';
 
 export type OverviewTab =
@@ -181,13 +180,7 @@ export function ZoneCOverview({
         {tab === 'vbrief' && <VBriefTab issueId={issueId} />}
         {tab === 'beads' && <BeadsTab issueId={issueId} />}
         {tab === 'prdiff' && <PrDiffTab issueId={issueId} />}
-        {tab === 'discussions' && (
-          <DeferredTab
-            testId="discussions-tab"
-            title="Discussions"
-            bead="pan-1r7j"
-          />
-        )}
+        {tab === 'discussions' && <DiscussionsTab issueId={issueId} />}
       </div>
     </div>
   );

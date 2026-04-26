@@ -8,7 +8,8 @@
  *   - INFERENCE tab is hidden when planning has no inference content
  *   - Clicking a quick link switches the active tab
  *   - Costs tab renders byStage / byModel rows
- *   - PR/Diff and Discussions render the deferred placeholder
+ *   - PR/Diff tab renders via PrDiffTab (empty state)
+ *   - Discussions tab renders via DiscussionsTab (empty state)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -33,12 +34,18 @@ const prResult = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
 }));
+const discussionsResult = vi.hoisted(() => ({
+  data: undefined as undefined | Record<string, unknown>,
+  isLoading: false,
+  isError: false,
+}));
 
 vi.mock('../ZoneCOverviewTabs/queries', () => ({
   usePlanningQuery: () => planningResult,
   useActivityQuery: () => activityResult,
   useIssueCostsQuery: () => costsResult,
   usePrQuery: () => prResult,
+  useDiscussionsQuery: () => discussionsResult,
 }));
 
 // Beads + ActivityTab + VBriefTab embed components that hit other code paths;
@@ -73,6 +80,9 @@ describe('ZoneCOverview', () => {
     prResult.data = { issueId: ISSUE, pr: null, diff: null };
     prResult.isLoading = false;
     prResult.isError = false;
+    discussionsResult.data = { issueId: ISSUE, items: [], prNumber: null };
+    discussionsResult.isLoading = false;
+    discussionsResult.isError = false;
   });
 
   it('renders the Overview tab body by default', () => {
@@ -138,11 +148,11 @@ describe('ZoneCOverview', () => {
     expect(screen.getByTestId('prdiff-tab-empty').textContent).toContain('feature/pan-830');
   });
 
-  it('renders the deferred placeholder for the Discussions tab', () => {
+  it('renders the Discussions tab via DiscussionsTab', () => {
     render(<ZoneCOverview issueId={ISSUE} />);
     fireEvent.click(screen.getByTestId('zone-c-overview-tab-discussions'));
     expect(screen.getByTestId('discussions-tab')).toBeInTheDocument();
-    expect(screen.getByTestId('discussions-tab').textContent).toContain('pan-1r7j');
+    expect(screen.getByTestId('discussions-tab-empty')).toBeInTheDocument();
   });
 
   it('quick-link buttons in Overview switch tabs', () => {
