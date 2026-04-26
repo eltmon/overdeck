@@ -8,12 +8,27 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockExecFileFn = vi.fn();
+const mockExecFn = vi.fn();
+
+// execFile mock delegates to mockExecFn so tests that only set up exec
+// implementations also cover the bd list calls done-preflight makes via execFile.
+const mockExecFileFn = vi.fn((...args: any[]) => {
+  const lastArg = args[args.length - 1];
+  const callback = typeof lastArg === 'function' ? lastArg : undefined;
+  const file = args[0];
+  const cmdArgs = Array.isArray(args[1]) ? args[1] : [];
+  const cmd = [file, ...cmdArgs].join(' ');
+  if (callback) {
+    return mockExecFn(cmd, {}, callback);
+  }
+  return Promise.resolve({ stdout: '', stderr: '' });
+});
 
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
   return {
     ...actual,
+    exec: mockExecFn,
     execFile: mockExecFileFn,
   };
 });
