@@ -2,59 +2,45 @@
 specialist: review-agent
 issueId: PAN-847
 outcome: changes-requested
-timestamp: 2026-04-26T16:53:25Z
+timestamp: 2026-04-26T17:18:18Z
 ---
 
 # Verdict: CHANGES_REQUESTED
 
 ## Summary
-PAN-847 adds Zone A/B enrichment (sparklines, ribbons, cost ticker), a motion catalog, parallelized network fan-out, PrDiffTab virtualization, and proper multi-repo cache keying — all worthwhile improvements. However, 2 critical logic bugs in `ZoneBActionStrip` will cause wrong-agent spawns and guaranteed runtime errors on Resume clicks, and 3 acceptance criteria from the issue body are only partially implemented (AC-6, AC-7, AC-9). The PR cannot merge until these are resolved: the code does not yet do what was asked.
+PAN-847 round 2 resolves all 5 blockers from round 1 (wrong issueId derivation, canResume on dead sessions, missing tree menus, unbounded cache growth, serial gh fetch). The codebase is now correct on its core invariants and all 11 acceptance criteria have corresponding code. However, 1 functional gap remains: "Export JSONL" exports a 2-field JSON metadata stub, not actual JSONL content — users who click the button expecting their session transcript get useless data. Additionally, `handleReplay` is a no-op that only closes the menu, and the `restartMutation` still derives issueId instead of using the authoritative prop despite it being available. These must be addressed before merge.
 
 ## Blockers (MUST fix before merge)
 
-### 1. Wrong issueId derivation in `restartMutation` — `src/dashboard/frontend/src/components/CommandDeck/ZoneBActionStrip.tsx:87` — `!`
+### 1. "Export JSONL" exports a metadata stub, not actual JSONL — `src/dashboard/frontend/src/components/CommandDeck/ZoneBActionStrip.tsx:172-184` — `~`
 **Raised by**: correctness
-**Why it blocks**: The `sessionId.replace(/^agent-/, '').toUpperCase()` pattern only works for work sessions following `agent-pan-XXX`. Reviewer/specialist sessions named `specialist-panopticon-PAN-847-review-correctness` produce invalid garbage issueIds, causing the POST to `/api/agents` to fail or spawn the wrong agent.
+**Why it blocks**: The feature is advertised as exporting JSONL but delivers a 2-field JSON object (`{ sessionId, exportedAt }`) with a `.jsonl` extension. Users expecting their conversation transcript receive a useless metadata stub. This is worse than a missing feature — it silently delivers wrong output.
 
 ```typescript
-// Fix: gate Restart to work sessions only, or derive issueId from the parent feature
-if (session.type !== 'work') throw new Error('Cannot restart non-work sessions');
+// Fix: either wire to the actual endpoint, or rename + disable until wired
+// Option A: rename to "Export Session Metadata" with .json extension
+// Option B: add // TODO with a note that this requires a server endpoint
+// Option C: fetch actual JSONL from the session data endpoint and export that
 ```
-Alternatively, pass `issueId` down from `ZoneB` which has access to the session's parent feature.
-
-### 2. `canResume` triggers for ended/crashed sessions — `src/dashboard/frontend/src/components/CommandDeck/ZoneBActionStrip.tsx:145` — `!`
-**Raised by**: correctness
-**Why it blocks**: `session.presence !== 'active'` is true for `ended`, `crashed`, `idle`, and `error` states as well as `paused`/`suspended`. Clicking Resume on a dead session sends a request to `/api/agents/:id/resume` that will fail, producing a guaranteed error toast.
-
-```typescript
-// Fix: only allow Resume for genuinely paused/suspended sessions
-const canResume = session.presence === 'paused' || session.presence === 'suspended';
-```
-If `suspended` is not yet represented in the presence enum, that enum must be extended first.
-
-### 3. AC-7 — Zone B overflow actions severely incomplete — `src/dashboard/frontend/src/components/CommandDeck/ZoneBActionStrip.tsx` — `~ (bordering on !)`
-**Raised by**: requirements
-**Why it blocks**: The overflow menu is the primary action surface for session management. Only "Open State Dir" is present; the other 6 required actions (Restart, View JSONL, Deep Wipe, Replay, Export JSONL, Export round history JSON) are entirely absent. This is the most significant functional gap — the feature as specified is not delivered.
-
-Fix: Add all 6 missing actions to the overflow menu in `ZoneBActionStrip.tsx`. Deep Wipe must include a confirmation dialog (consistent with `SessionNode.tsx`).
-
-### 4. AC-6 — Tree right-click menus limited to SessionNode only — `src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx`, `src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx` — `~`
-**Raised by**: requirements
-**Why it blocks**: The acceptance criterion specifies "all tree nodes" but `ProjectNode` and `FeatureItem` have no `onContextMenu` handler at all. Users right-clicking those nodes get the browser default menu, not Panopticon actions.
-
-Fix: Add context menu handlers to `ProjectNode` and `FeatureItem` with at minimum the project-level applicable actions (e.g., Open State Dir). If session-centric actions are genuinely not applicable to non-session nodes, update the AC text to reflect the intended scope — but that is a separate conversation, not a unilateral code change.
-
-### 5. AC-9 — Missing 5k-line diff smoke test — `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/PrDiffTab.tsx` — `~`
-**Raised by**: requirements
-**Why it blocks**: The acceptance criterion explicitly calls for a smoke test verifying 5k-line diff renders under 100ms. The virtualization is correctly implemented, but without the test a regression in overscan configuration or row measurement would go undetected.
-
-Fix: Add a performance smoke test in `PrDiffTab.test.tsx` that renders 5000 lines and asserts the `performance.now()` delta is under 100ms.
 
 ## High Priority (SHOULD fix; synthesis may still approve if justified)
 
-### 1. Serial `gh issue list` loop across repos — `src/dashboard/server/routes/command-deck.ts:1244-1262` — `~`
+### 1. `restartMutation` still derives issueId instead of using the available `issueId` prop — `src/dashboard/frontend/src/components/CommandDeck/ZoneBActionStrip.tsx:92` — `~`
+**Raised by**: correctness
+**Why it matters**: The `issueId` prop was added in the fix commit specifically to be used by these mutations, but `restartMutation` still uses `session.sessionId.replace(/^agent-/, '').toUpperCase()` instead. The `session.type !== 'work'` guard prevents specialist sessions from hitting this path, but the code is fragile and inconsistent — if work session naming ever changes, derivation breaks while the authoritative prop would still work. Use the prop.
+
+```typescript
+// Fix: use the issueId prop
+body: JSON.stringify({ issueId }),  // not derivedIssueId
+```
+
+### 2. `handleReplay` is a no-op — `src/dashboard/frontend/src/components/CommandDeck/ZoneBActionStrip.tsx:200-204` — `~`
+**Raised by**: correctness
+**Why it matters**: The "Replay" button closes the overflow menu and does nothing else. The comment says "navigates to the JSONL transcript" but there is no navigation, no state update, no event dispatch. User clicks "Replay" → menu closes → nothing happens. Wire to actual navigation (e.g., switch to conversation view) or disable the button with a "coming soon" indicator.
+
+### 3. Serial `gh issue list` loop across repos — `src/dashboard/server/routes/command-deck.ts:1244-1262` — `~`
 **Raised by**: performance, correctness
-**Why it matters**: The PR uses `Promise.all` consistently for `fetchIssueDiscussions`, `archiveReviewerRound`, and workspace scans — but the closed-issues multi-repo loop still uses sequential `for...of` + `await`. With 3+ repos this adds 200–800ms per repo serially. The fix is mechanical and consistent with the rest of the PR.
+**Why it matters**: The PR uses `Promise.all` consistently for `fetchIssueDiscussions`, `archiveReviewerRound`, and workspace scans, but the closed-issues multi-repo loop still uses `for...of` + `await`. With 3+ repos this adds 200–800ms serially. The fix is mechanical and consistent with the rest of the parallelization theme.
 
 ```typescript
 await Promise.all(repos.map(async (repo) => {
@@ -64,63 +50,37 @@ await Promise.all(repos.map(async (repo) => {
 }));
 ```
 
-### 2. `closedIssuesCache` and `costCache` Maps grow without bound — `src/dashboard/server/routes/command-deck.ts:80-85` — `~`
-**Raised by**: correctness
-**Why it matters**: Entries are overwritten on TTL expiry but never deleted. In a long-running server, `costCache` accumulates one entry per polled issue indefinitely. Each entry holds a small JSON blob, so absolute memory impact is low — but it violates the TTL contract: stale entries should be evicted, not just overwritten.
-
-Fix: Add eviction in the set path — before writing a new entry, delete any expired entries for the same key, or do a periodic sweep.
-
-### 3. `gh issue list` with unescaped repo interpolation in shell command — `src/dashboard/server/routes/command-deck.ts:1253` — `~`
-**Raised by**: correctness
-**Why it matters**: Repo is interpolated directly into a shell command string. While config-driven (low injection risk), this is a shell injection surface if config files are ever tampered with. The existing pattern in `issues.ts:2771` uses `execFileAsync` with an explicit argument array — follow that pattern.
-
-```typescript
-// Fix: use execFileAsync (already imported) with array args
-const { stdout } = await execFileAsync('gh', [
-  'issue', 'list', '--repo', repo, '--state', 'closed',
-  '--limit', '200', '--json', 'number,title'
-], { encoding: 'utf-8', timeout: 15000 });
-```
-
 ## Nits (advisory — safe to defer)
 
-- `src/dashboard/frontend/src/lib/deriveRoundMarkers.ts:36` — `?` — Anchor fallback to last message when all messages are after round end. Consider returning an empty marker instead (skip the round). MAY, already tested and intentional.
-- `src/dashboard/frontend/src/components/CommandDeck/ZoneB.tsx:127` — `?` — Cost rate division by zero guard. Consider `session.duration < 1` threshold to avoid astronomically high rates in the first second.
-- `src/dashboard/frontend/src/components/CommandDeck/ZoneB.tsx:94` — `?` — `errorShakeKey` uses `session.status` not the local `status` variable. Intentional but inconsistent with `flashKey` — add a clarifying comment.
-- `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/PrDiffTab.tsx:102` — `?` — `fileMax` memo depends on whole `data` object. Replace dep with `[data?.pr?.files]` for tighter recomputation trigger.
+- `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/PrDiffTab.tsx:102` — `?` — `fileMax` memo depends on whole `data` object. Replace dep with `[data?.pr?.files]` for tighter recomputation.
 - `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/PrDiffTab.tsx:434` — `?` — Non-virtualized fallback renders all lines if virtualizer never attaches. Cap fallback to `diffLines.slice(0, 1000)` with a "diff truncated" notice.
 - `src/dashboard/server/routes/command-deck.ts:535` — `?` — `syncCache()` called on every cost-cache miss. Confirm it is cheap/self-debounced; if so, informational only.
 - `src/dashboard/frontend/src/components/CommandDeck/SessionView/IssueHeader.tsx:418` — `?` — `alert()` with concatenated discussion content is a UX smell for large strings; pre-existing pattern, not a regression.
+- `src/dashboard/frontend/src/components/CommandDeck/ZoneB.tsx:49` — `?` — `suspended` presence maps to `idle` StatusDot, visually identical. Consider a distinct visual treatment (e.g., amber/yellow) so users can see their explicit pause action took effect.
+- `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/__tests__/PrDiffTab.test.tsx:192-209` — `?` — Smoke test asserts `elapsed < 500` in jsdom but notes real-world target is 100ms. CI jsdom is often 5-10x slower than local; consider verifying only a subset of DOM nodes exist (virtualizer active) rather than relying on timing.
 
 ## Cross-cutting Groups
 
-**ZoneBActionStrip lifecycle bugs** (same file, same component, fix together):
-- [blocker-1] Wrong issueId derivation for specialist/reviewer sessions
-- [blocker-2] `canResume` triggers for ended/crashed sessions
-- [blocker-3] AC-7 overflow actions severely incomplete (same component)
+**ZoneBActionStrip overflow menu actions** (same component, fix together):
+- [blocker-1] Export JSONL stub (non-functional feature)
+- [high-1] `restartMutation` ignores issueId prop
+- [high-2] `handleReplay` is a no-op
 
-**Cache hygiene** (same file, same pattern):
-- [high-1] Serial gh issue list loop across repos (also impacts performance)
-- [high-2] Unbounded Map growth in closedIssuesCache and costCache
-- [high-3] Shell injection surface with unescaped repo interpolation
-
-**Acceptance criteria gaps** (all from requirements reviewer):
-- [blocker-4] AC-6 tree menus limited to SessionNode only
-- [blocker-3] AC-7 Zone B overflow actions severely incomplete
-- [blocker-5] AC-9 missing 5k-line diff smoke test
+**Parallelization consistency** (same file, same fix pattern):
+- [high-3] Serial gh issue list loop (should be `Promise.all` like everywhere else in this PR)
 
 ## What's good
-- Multi-repo cache keying by `issueId.toUpperCase()` and repo string correctly fixes the cache poisoning bugs
-- Parallel fan-out via `Promise.all` for `fetchIssueDiscussions`, `archiveReviewerRound`, and workspace scans is consistently applied
-- PrDiffTab virtualization with `@tanstack/react-virtual` is correctly implemented with proper overscan and test fallback
-- Motion catalog wiring to Zustand store subscriptions is clean and follows the 200ms animation timing
-- `deriveRoundMarkers` extraction as a pure testable unit with 6 test cases is a model implementation
-- Security review found no new injection surfaces, no unsafe HTML sinks, and proper `rel="noopener noreferrer"` on external links
+- All 5 blockers from round 1 are resolved: issueId derivation guarded, canResume correctly scoped to `suspended`, context menus added to all tree node types, cache eviction added, gh commands switched to `execFileAsync`
+- Multi-repo cache keying correctly fixes the cache poisoning bugs from the issue-selected cache
+- `deriveRoundMarkers` as a pure function with 6 test cases is a model extraction
+- Security review found no new attack surface; all GitHub lookups use `execFileAsync` with explicit argv arrays
+- Requirements coverage is 10/11 fully implemented; the single partial (AC-6) is minor — all node types have menus and all actions are reachable on SessionNode
+- `suspended` presence added to `SessionNodePresence` enum with proper store, zone, and StatusDot wiring
 
 ## Review stats
-- Blockers: 5   High: 3   Medium: 0   Nits: 6
-- By reviewer: correctness=2!, 3~, 3? | security=0 | performance=1~, 5? | requirements=3~ (bordering on !)
-- Files touched: 26   Files with findings: 14
+- Blockers: 1   High: 3   Medium: 0   Nits: 6
+- By reviewer: correctness=1~, 3? | security=0 | performance=1~, 6? | requirements=1~ (partial AC-6)
+- Files touched: 29   Files with findings: 9
 
 ## Appendix: individual reviews
 

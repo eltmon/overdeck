@@ -88,13 +88,13 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
       if (session.type !== 'work') throw new Error('Cannot restart non-work sessions');
       // Stop current agent
       await fetch(`/api/agents/${session.sessionId}`, { method: 'DELETE' });
-      // Extract issueId from sessionId: agent-pan-821 -> PAN-821
-      const derivedIssueId = session.sessionId.replace(/^agent-/, '').toUpperCase();
+      // Use the authoritative issueId prop; fall back to derivation only when unavailable
+      const targetIssueId = issueId ?? session.sessionId.replace(/^agent-/, '').toUpperCase();
       // Start new agent
       const res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId: derivedIssueId }),
+        body: JSON.stringify({ issueId: targetIssueId }),
       });
       if (!res.ok) throw new Error('Failed to restart agent');
       return res.json();
@@ -169,7 +169,7 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
     setOverflowOpen(false);
   }, [issueId, confirm, queryClient]);
 
-  const handleExportJsonl = useCallback(() => {
+  const handleExportSessionMetadata = useCallback(() => {
     const blob = new Blob(
       [JSON.stringify({ sessionId: session.sessionId, exportedAt: new Date().toISOString() }, null, 2)],
       { type: 'application/json' },
@@ -177,7 +177,7 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${session.sessionId}.jsonl`;
+    a.download = `${session.sessionId}.json`;
     a.click();
     URL.revokeObjectURL(url);
     setOverflowOpen(false);
@@ -198,10 +198,12 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
   }, [session.sessionId, session.roundMetadata]);
 
   const handleReplay = useCallback(() => {
-    // Replay navigates to the JSONL transcript in the conversation panel.
-    // If a raw-JSONL replay endpoint is added later, swap this for a fetch.
+    // Replay opens the live terminal view, which is the closest thing to
+    // replaying an active session from the dashboard. Falls back to a no-op
+    // when terminal viewing is unavailable.
+    onViewTerminal?.();
     setOverflowOpen(false);
-  }, []);
+  }, [onViewTerminal]);
 
   const canStop = session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended';
   const canPause = session.presence === 'active';
@@ -305,11 +307,13 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
               icon={<RotateCcw className="w-3 h-3" />}
               onClick={handleRestart}
             />
-            <OverflowItem
-              label="Replay"
-              icon={<RotateCcw className="w-3 h-3" />}
-              onClick={handleReplay}
-            />
+            {onViewTerminal && (
+              <OverflowItem
+                label="Replay"
+                icon={<RotateCcw className="w-3 h-3" />}
+                onClick={handleReplay}
+              />
+            )}
             <OverflowItem
               label="Open State Dir"
               icon={<FolderOpen className="w-3 h-3" />}
@@ -323,9 +327,9 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
                   onClick={handleViewJsonl}
                 />
                 <OverflowItem
-                  label="Export JSONL"
+                  label="Export session metadata"
                   icon={<Download className="w-3 h-3" />}
-                  onClick={handleExportJsonl}
+                  onClick={handleExportSessionMetadata}
                 />
               </>
             )}
