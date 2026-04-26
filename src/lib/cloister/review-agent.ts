@@ -3,19 +3,22 @@
  */
 
 import { existsSync } from 'fs';
-import { readFile, writeFile, unlink, mkdir, appendFile, readdir, rm } from 'fs/promises';
+import { readFile, writeFile, unlink, mkdir, appendFile, readdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { tmpdir } from 'os';
+import { randomUUID } from 'crypto';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
-import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync } from '../tmux.js';
+import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync } from '../tmux.js';
 import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agents.js';
 import { getModelId, hasOverride } from '../work-type-router.js';
 import { AGENTS_DIR, CACHE_AGENTS_DIR, CACHE_REVIEW_PROMPTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
+import { resolveProjectFromIssue } from '../projects.js';
+import { getReviewerSessionName, type ReviewerRole } from './specialists.js';
 
 const execAsync = promisify(exec);
 
@@ -491,6 +494,25 @@ async function spawnReviewer(
   const claudeCmd = getAgentRuntimeBaseCommand(model);
   const providerExports = getProviderExportsForModel(model);
 
+  // Pre-generate the Claude session UUID and persist it to the canonical reviewer
+  // agent directory BEFORE Claude starts. Without this, jsonl-resolver has nothing
+  // to look up: session.id is missing, sessions.json hasn't been written yet (the
+  // heartbeat hook only fires after a tool use), and the runtime-state mirror is
+  // empty. The Conversation/Activity tabs would render no transcript.
+  //
+  // The resolver lookup order in jsonl-resolver.ts is:
+  //   1. ~/.panopticon/agents/<sessionName>/session.id
+  //   2. sessions.json (heartbeat hook output)
+  //   3. runtime-state mirror
+  //
+  // Pre-writing session.id wins on the first lookup, and the heartbeat hook will
+  // later append the same UUID to sessions.json (because PANOPTICON_AGENT_ID is
+  // pinned to the canonical session name below).
+  const claudeSessionId = randomUUID();
+  const reviewerAgentDir = join(AGENTS_DIR, sessionName);
+  await mkdir(reviewerAgentDir, { recursive: true });
+  await writeFile(join(reviewerAgentDir, 'session.id'), claudeSessionId, 'utf-8');
+
   // Write a launcher script that unsets all stale provider env vars and re-exports
   // the correct ones for the target model before exec-ing the agent runtime.
   // Using a script (rather than tmux -e flags) ensures that stale ANTHROPIC_BASE_URL
@@ -502,21 +524,30 @@ async function spawnReviewer(
     '#!/bin/bash',
     'set -o pipefail',
     `cd "${packageRoot}"`,
-    // Prevent inherited Panopticon env from attributing review sub-agent heartbeats
-    // and session IDs to the parent work agent (PAN-XXX).
-    'unset PANOPTICON_AGENT_ID PANOPTICON_ISSUE_ID PANOPTICON_SESSION_TYPE',
+    // Pin PANOPTICON_AGENT_ID to the canonical reviewer session name so the
+    // heartbeat hook attributes events under ~/.panopticon/agents/<sessionName>/
+    // (NOT the parent work agent's directory). Clear the other inherited vars
+    // so review sub-agents don't masquerade as the parent issue's session.
+    `export PANOPTICON_AGENT_ID="${sessionName}"`,
+    'unset PANOPTICON_ISSUE_ID PANOPTICON_SESSION_TYPE',
     providerExports.trimEnd(),
-    `exec ${claudeCmd}`,
+    // Pass --session-id so Claude Code writes its JSONL transcript under the
+    // UUID we already persisted to session.id above. claudish passes unknown
+    // flags through to claude, so this works for both direct and routed providers.
+    `exec ${claudeCmd} --session-id "${claudeSessionId}"`,
     '',
   ].join('\n');
   await writeFile(launcherPath, launcherContent, { mode: 0o755 });
 
-  console.log(`[review-agent] Spawning reviewer ${sessionName}: model=${model}, launcher=${launcherPath}`);
+  console.log(`[review-agent] Spawning reviewer ${sessionName}: model=${model}, claudeSessionId=${claudeSessionId}, launcher=${launcherPath}`);
   console.log(`[review-agent] Launcher content:\n${launcherContent}`);
 
   await createSessionAsync(sessionName, packageRoot, `bash ${launcherPath}`, {
     env: {
-      PANOPTICON_AGENT_ID: '',
+      // Mirror the launcher's PANOPTICON_AGENT_ID into the tmux session env so
+      // the value is visible to processes that inspect the env-from-tmux path
+      // (not just the launcher exec chain).
+      PANOPTICON_AGENT_ID: sessionName,
       PANOPTICON_ISSUE_ID: '',
       PANOPTICON_SESSION_TYPE: '',
     },
@@ -693,15 +724,19 @@ export async function runParallelReview(
     resolvePromptTemplateFn = resolvePromptTemplatePath,
   }: RunParallelReviewDeps = {},
 ): Promise<{ result: ReviewResult; reviewId: string }> {
-  // Clean up any stale review sessions for this issue before starting a new review run.
-  // Review sessions are named review-<issueId>-<timestamp>-<role>; a new timestamp
-  // is generated on every retry, so old sessions accumulate and leak.
-  // Only kill sessions whose coordinator is gone — never kill reviewers belonging
-  // to an active coordinator (PAN-830).
+  // PAN-830: Reviewer sessions now use canonical naming
+  // (specialist-<projectKey>-<issueId>-review-<role>) and persist across all
+  // review rounds for an issue. Round 2+ resumes the existing pane with a
+  // follow-up prompt; legacy timestamp-based sessions from PAN-821 are killed
+  // here so they don't pile up alongside the canonical ones.
+  // Only kill legacy sessions whose coordinator is gone — never kill reviewers
+  // belonging to an active coordinator.
+  const resolvedProject = resolveProjectFromIssue(context.issueId);
+  const projectKey = resolvedProject?.projectKey ?? 'unknown';
   try {
     const allSessions = await listSessionNamesAsync();
-    const reviewRegex = new RegExp(`^review-${context.issueId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+`);
-    const staleSessions = allSessions.filter(s => reviewRegex.test(s));
+    const legacyRegex = new RegExp(`^review-${context.issueId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+`);
+    const staleSessions = allSessions.filter(s => legacyRegex.test(s));
     for (const session of staleSessions) {
       // Derive coordinator name: review-PAN-830-12345-correctness -> review-coordinator-PAN-830-12345
       const coordName = session.replace(/^review-/, 'review-coordinator-').replace(/-[^-]+$/, '');
@@ -711,16 +746,21 @@ export async function runParallelReview(
       }
       try {
         await killSessionAsync(session);
-        console.log(`[review-agent] Killed stale review session: ${session}`);
+        console.log(`[review-agent] Killed legacy timestamp-based review session: ${session}`);
       } catch (err) {
-        console.error(`[review-agent] Failed to kill stale review session ${session}:`, err);
+        console.error(`[review-agent] Failed to kill legacy review session ${session}:`, err);
       }
     }
   } catch (err) {
-    console.error(`[review-agent] Failed to list sessions during stale review cleanup:`, err);
+    console.error(`[review-agent] Failed to list sessions during legacy review cleanup:`, err);
   }
 
+  // `reviewId` is used for output dirs (.pan/review/<reviewId>/) and history
+  // records only. The tmux sessions stay canonical and are reused across rounds.
   const reviewId = `review-${context.issueId}-${Date.now()}`;
+  // Capture wall-clock start so we can persist accurate per-round timing into
+  // round-N.json artifacts (consumed by Command Deck round dividers).
+  const roundStartedAt = new Date().toISOString();
 
   // Guard: fail fast if no reviewers are enabled
   if (agents.length === 0) {
@@ -770,6 +810,8 @@ export async function runParallelReview(
   ].filter(Boolean).join('\n');
 
   const reviewerSessions: Array<{ sessionName: string; outputFile: string; role: string }> = [];
+  let resumedCount = 0;
+  let spawnedCount = 0;
 
   await Promise.all(agents.map(async agent => {
     const promptName = `code-review-${agent.name}`;
@@ -777,7 +819,11 @@ export async function runParallelReview(
     const template = await parseReviewerTemplate(promptTemplatePath);
     const model = resolveReviewerModel(agent, template.model);
     const outputFile = join(outputDir, `${agent.name}.md`);
-    const sessionName = `${reviewId}-${agent.name}`;
+    const sessionName = getReviewerSessionName(
+      agent.name as ReviewerRole,
+      projectKey,
+      context.issueId,
+    );
 
     const contextHeader = `# Review Context\n\n${reviewerContext}\n**Output file**: ${outputFile}\n\n---\n\n`;
     const prompt = contextHeader + template.content;
@@ -786,11 +832,28 @@ export async function runParallelReview(
     await writeFile(promptFile, prompt);
 
     reviewerSessions.push({ sessionName, outputFile, role: agent.name });
-    await spawnFn(sessionName, model, promptFile, context.projectPath);
+
+    // Resume-or-spawn (PAN-830). If the canonical session is alive from a
+    // previous round, inject the new round's prompt directly. Otherwise
+    // spawn fresh and pin `remain-on-exit on` so the pane survives across
+    // rounds for Command Deck history.
+    if (await sessionExistsAsync(sessionName)) {
+      console.log(`[review-agent] Resuming reviewer ${sessionName} for new round`);
+      await sendKeysAsync(sessionName, prompt, 'runParallelReview-resume');
+      resumedCount++;
+    } else {
+      await spawnFn(sessionName, model, promptFile, context.projectPath);
+      try {
+        await setOptionAsync(sessionName, 'remain-on-exit', 'on');
+      } catch (err) {
+        console.warn(`[review-agent] Failed to set remain-on-exit on ${sessionName}: ${err instanceof Error ? err.message : err}`);
+      }
+      spawnedCount++;
+    }
   }));
 
-  console.log(`[review-agent] Spawned ${reviewerSessions.length} reviewer sessions for review ${reviewId}`);
-  emitActivityEntry({ source: 'review-specialist', level: 'info', message: `${context.issueId} — ${reviewerSessions.length} reviewer(s) spawned`, issueId: context.issueId });
+  console.log(`[review-agent] Reviewer sessions ready for review ${reviewId} (spawned=${spawnedCount}, resumed=${resumedCount})`);
+  emitActivityEntry({ source: 'review-specialist', level: 'info', message: `${context.issueId} — ${reviewerSessions.length} reviewer(s) ready (spawned=${spawnedCount}, resumed=${resumedCount})`, issueId: context.issueId });
 
   // ── Phase 2: Wait for all reviewers ───────────────────────────────────────
   const reviewerResults = await Promise.all(
@@ -825,7 +888,7 @@ export async function runParallelReview(
   const synthTemplate = await parseReviewerTemplate(synthTemplatePath);
   const synthModel = resolveReviewerModel({ name: 'synthesis' }, synthTemplate.model);
   const synthOutputFile = join(outputDir, 'synthesis.md');
-  const synthSessionName = `${reviewId}-synthesis`;
+  const synthSessionName = getReviewerSessionName('synthesis', projectKey, context.issueId);
 
   // Build synthesis context with paths to all reviewer outputs
   const reviewerOutputsList = completedReviewers
@@ -844,7 +907,19 @@ export async function runParallelReview(
   const synthPromptFile = join(outputDir, 'synthesis-prompt.md');
   await writeFile(synthPromptFile, synthPrompt);
 
-  await spawnFn(synthSessionName, synthModel, synthPromptFile, context.projectPath);
+  // Resume-or-spawn for synthesis (PAN-830). Same canonical-session lifetime
+  // as the role reviewers above.
+  if (await sessionExistsAsync(synthSessionName)) {
+    console.log(`[review-agent] Resuming synthesis ${synthSessionName} for new round`);
+    await sendKeysAsync(synthSessionName, synthPrompt, 'runParallelReview-synthesis-resume');
+  } else {
+    await spawnFn(synthSessionName, synthModel, synthPromptFile, context.projectPath);
+    try {
+      await setOptionAsync(synthSessionName, 'remain-on-exit', 'on');
+    } catch (err) {
+      console.warn(`[review-agent] Failed to set remain-on-exit on ${synthSessionName}: ${err instanceof Error ? err.message : err}`);
+    }
+  }
   emitActivityEntry({ source: 'review-specialist', level: 'info', message: `${context.issueId} — synthesis started`, issueId: context.issueId });
   await waitSynthesisFn(synthSessionName, synthOutputFile, REVIEW_TIMEOUT_MS);
 
@@ -870,44 +945,163 @@ export async function runParallelReview(
     console.error(`[review-agent] sendFeedbackToWorkAgent failed for ${context.issueId} (non-fatal):`, err);
   }
 
-  // ── Phase 6: Clean up reviewer state dirs ─────────────────────────────────
-  // Reviewer/synthesis state is pure ephemeral — the orchestration is over,
-  // history is logged, feedback is delivered. These dirs exist in
-  // ~/.panopticon/agents/ as artifacts of the per-session agent runtime and
-  // have zero value past this point. Event-driven cleanup replaces retention.
+  // ── Phase 6: Archive the round (PAN-830) ──────────────────────────────────
+  // Reviewer panes survive across rounds (see PAN-830). At the end of every
+  // round we write a `round-N.json` artifact inside each canonical reviewer's
+  // state directory describing the round (result, output file, timestamps).
+  // The dashboard reads these to render the per-round timeline in Command
+  // Deck. State directories themselves are never deleted while the issue is
+  // alive; deep-wipe handles final teardown.
   try {
-    await cleanupReviewerStateDirs(reviewId, agents);
+    await archiveReviewerRound({
+      projectKey,
+      issueId: context.issueId,
+      agents,
+      reviewId,
+      outputDir,
+      reviewerResults,
+      result,
+      startedAt: roundStartedAt,
+    });
   } catch (err) {
-    console.error(`[review-agent] cleanupReviewerStateDirs failed for ${reviewId} (non-fatal):`, err);
+    console.error(`[review-agent] archiveReviewerRound failed for ${reviewId} (non-fatal):`, err);
   }
 
   return { result, reviewId };
 }
 
 /**
- * Delete ~/.panopticon/agents/review-<issueId>-<ts>-<role>/ for each reviewer
- * plus the synthesis session. Called once the review has posted and the
- * state serves no purpose. Non-fatal: logs errors but never throws.
+ * Round metadata persisted to `~/.panopticon/agents/<canonical-session>/round-N.json`
+ * for each canonical reviewer pane (correctness, security, performance,
+ * requirements, synthesis). Replaces the old destructive
+ * `cleanupReviewerStateDirs` from PAN-821 — state dirs now persist across
+ * the issue's full lifetime so Command Deck can show every round's history
+ * (PAN-830).
  */
-async function cleanupReviewerStateDirs(
-  reviewId: string,
-  agents: ReviewAgentConfig[],
-): Promise<void> {
-  const roles = [...agents.map(a => a.name), 'synthesis'];
-  let purged = 0;
+export interface ReviewerRoundArtifact {
+  round: number;
+  role: string;
+  issueId: string;
+  projectKey: string;
+  reviewId: string;
+  outputDir: string;
+  outputFile: string;
+  status: 'completed' | 'failed' | 'unknown';
+  reviewResult: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED';
+  success: boolean;
+  archivedAt: string;
+  /** Wall-clock start of the round (set by runParallelReview before spawning reviewers). */
+  startedAt: string;
+  /** Wall-clock end of the round (= archivedAt; kept distinct so the frontend can render
+   *  duration without coupling to "archived" semantics). */
+  endedAt: string;
+  /** Round duration in seconds, or null when timestamps are missing/invalid. */
+  durationSec: number | null;
+  /** Count of findings reported by this round's synthesis (security + performance issues).
+   *  Per-role artifacts inherit the synthesis count so the frontend has a non-null number
+   *  to render on every reviewer card; cost is omitted intentionally — accurate per-round
+   *  cost tracking requires session-level cost attribution which is not yet wired through. */
+  findings?: number;
+  /** Round cost in USD (omitted when not yet tracked — see findings comment above). */
+  cost?: number;
+}
+
+/**
+ * Append a round-N.json artifact inside each canonical reviewer's state dir.
+ * The N is derived from the count of existing round-*.json files. Non-fatal:
+ * any individual write failure is logged but does not throw.
+ *
+ * Exported so unit tests can exercise the archive path against a temporary
+ * agents dir without spinning up a full review.
+ */
+export async function archiveReviewerRound(opts: {
+  projectKey: string;
+  issueId: string;
+  agents: ReviewAgentConfig[];
+  reviewId: string;
+  outputDir: string;
+  reviewerResults: Array<{ role: string; status: 'completed' | 'failed'; outputFile: string }>;
+  result: ReviewResult;
+  /** Wall-clock start of this round (captured at runParallelReview entry). */
+  startedAt: string;
+  /** Override the agents dir root. Defaults to AGENTS_DIR — only tests should pass this. */
+  agentsDirOverride?: string;
+}): Promise<void> {
+  const { projectKey, issueId, agents, reviewId, outputDir, reviewerResults, result, startedAt } = opts;
+  const agentsDir = opts.agentsDirOverride ?? AGENTS_DIR;
+  const roles: ReviewerRole[] = [
+    ...agents.map(a => a.name as ReviewerRole),
+    'synthesis',
+  ];
+  const archivedAt = new Date().toISOString();
+  // endedAt is the moment we archive (= synthesis completed). Kept distinct from
+  // archivedAt so the frontend can render durations without coupling to "archived".
+  const endedAt = archivedAt;
+  // Compute duration; guard NaN from invalid timestamps the same way reviewer-tree.ts does.
+  let durationSec: number | null = null;
+  if (startedAt) {
+    const ms = new Date(endedAt).getTime() - new Date(startedAt).getTime();
+    if (Number.isFinite(ms)) durationSec = Math.floor(ms / 1000);
+  }
+  // Findings count = parsed-synthesis security + performance issues. This is a
+  // floor (the synthesis emits richer counts in its appendix prose), but it's a
+  // non-null number we can actually trust without re-parsing markdown here.
+  const findings =
+    (result.securityIssues?.length ?? 0) + (result.performanceIssues?.length ?? 0);
+  let archived = 0;
   for (const role of roles) {
-    const dirName = `${reviewId}-${role}`;
-    const dirPath = join(AGENTS_DIR, dirName);
+    const sessionName = getReviewerSessionName(role, projectKey, issueId);
+    const dirPath = join(agentsDir, sessionName);
     if (!existsSync(dirPath)) continue;
+
+    let nextN = 1;
     try {
-      await rm(dirPath, { recursive: true, force: true });
-      purged++;
+      const entries = await readdir(dirPath);
+      const roundFiles = entries.filter(f => /^round-\d+\.json$/.test(f));
+      nextN = roundFiles.length + 1;
+    } catch {
+      // dir unreadable — fall back to 1; the write will surface any real error.
+    }
+
+    const reviewerStatus =
+      role === 'synthesis'
+        ? (result.success ? 'completed' : 'failed')
+        : (reviewerResults.find(r => r.role === role)?.status ?? 'unknown');
+    const outputFile =
+      role === 'synthesis'
+        ? join(outputDir, 'synthesis.md')
+        : join(outputDir, `${role}.md`);
+
+    const artifact: ReviewerRoundArtifact = {
+      round: nextN,
+      role,
+      issueId,
+      projectKey,
+      reviewId,
+      outputDir,
+      outputFile,
+      status: reviewerStatus,
+      reviewResult: result.reviewResult,
+      success: result.success,
+      archivedAt,
+      startedAt,
+      endedAt,
+      durationSec,
+      findings,
+    };
+
+    try {
+      await writeFile(
+        join(dirPath, `round-${nextN}.json`),
+        JSON.stringify(artifact, null, 2),
+      );
+      archived++;
     } catch (err) {
-      console.error(`[review-agent] Failed to remove ${dirPath}:`, err instanceof Error ? err.message : err);
+      console.error(`[review-agent] Failed to write round-${nextN}.json for ${sessionName}:`, err instanceof Error ? err.message : err);
     }
   }
-  if (purged > 0) {
-    console.log(`[review-agent] Cleaned up ${purged} reviewer state dir(s) for ${reviewId}`);
+  if (archived > 0) {
+    console.log(`[review-agent] Archived round artifacts for ${archived} reviewer pane(s) (review ${reviewId})`);
   }
 }
 

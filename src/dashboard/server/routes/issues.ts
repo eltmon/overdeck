@@ -23,7 +23,7 @@ import { httpHandler } from './http-handler.js';
  *   GET  /api/issues/:id/costs
  */
 
-import { exec, spawn } from 'node:child_process';
+import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { appendFile, copyFile, mkdir, readdir, readFile, rm, writeFile, access } from 'node:fs/promises';
 import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/spawn-planning-session.js';
@@ -35,7 +35,7 @@ import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue } from '../../../lib/projects.js';
-import { extractPrefix } from '../../../lib/issue-id.js';
+import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus } from '../review-status.js';
@@ -56,6 +56,7 @@ import type { LifecycleContext, StepResult } from '../../../lib/lifecycle/types.
 import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // ─── Shared IssueDataService singleton ───────────────────────────────────────
 // Started by main.ts on boot. Updates flow through the ReadModel via
@@ -141,8 +142,16 @@ async function closeIssuePullRequest(issueId: string, reason = 'Canceled via Pan
 
   const branchName = `feature/${issueId.toLowerCase()}`;
   try {
-    const { stdout: prListRaw } = await execAsync(
-      `gh pr list --repo ${githubCheck.owner}/${githubCheck.repo} --head "${branchName}" --state open --json number --jq '.[0].number'`,
+    const { stdout: prListRaw } = await execFileAsync(
+      'gh',
+      [
+        'pr', 'list',
+        '--repo', `${githubCheck.owner}/${githubCheck.repo}`,
+        '--head', branchName,
+        '--state', 'open',
+        '--json', 'number',
+        '--jq', '.[0].number',
+      ],
       { encoding: 'utf-8', timeout: 15000 },
     );
     const prNumber = prListRaw.trim();
@@ -150,8 +159,13 @@ async function closeIssuePullRequest(issueId: string, reason = 'Canceled via Pan
       return ['No open PR found for branch'];
     }
 
-    await execAsync(
-      `gh pr close ${prNumber} --repo ${githubCheck.owner}/${githubCheck.repo} --comment "${reason}"`,
+    await execFileAsync(
+      'gh',
+      [
+        'pr', 'close', prNumber,
+        '--repo', `${githubCheck.owner}/${githubCheck.repo}`,
+        '--comment', reason,
+      ],
       { encoding: 'utf-8', timeout: 15000 },
     );
     try {
@@ -2431,6 +2445,494 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/issues/:id/pr ───────────────────────────────────────────
+//
+// Shells out to `gh pr view --head feature/<id-lower> --repo <owner>/<repo>`
+// and `gh pr diff <number> --repo <owner>/<repo> --patch` to assemble a
+// structured response for the Command Deck PR/Diff tab. Returns
+// `{ pr: null, diff: null }` when the issue is not a GitHub-tracked issue or
+// no PR exists for the feature branch yet.
+
+const GH_PR_VIEW_FIELDS = [
+  'number',
+  'title',
+  'url',
+  'state',
+  'isDraft',
+  'baseRefName',
+  'headRefName',
+  'author',
+  'createdAt',
+  'updatedAt',
+  'reviewDecision',
+  'reviewRequests',
+  'statusCheckRollup',
+  'additions',
+  'deletions',
+  'changedFiles',
+  'files',
+  'labels',
+  'mergeable',
+  'body',
+].join(',');
+
+export interface IssuePullRequestData {
+  number: number;
+  title: string;
+  url: string;
+  state: string;
+  isDraft: boolean;
+  baseRefName: string;
+  headRefName: string;
+  author: { login?: string; name?: string } | null;
+  createdAt: string;
+  updatedAt: string;
+  reviewDecision: string | null;
+  reviewRequests: Array<{ login?: string; name?: string; __typename?: string }>;
+  statusCheckRollup: Array<{
+    name?: string;
+    state?: string;
+    conclusion?: string;
+    status?: string;
+    detailsUrl?: string;
+    workflowName?: string;
+    __typename?: string;
+  }>;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  files: Array<{ path: string; additions: number; deletions: number }>;
+  labels: Array<{ name?: string; color?: string }>;
+  mergeable: string | null;
+  body: string;
+}
+
+export interface IssuePrEndpointResponse {
+  issueId: string;
+  pr: IssuePullRequestData | null;
+  diff: string | null;
+  error?: string;
+}
+
+export async function fetchIssuePullRequest(issueId: string): Promise<IssuePrEndpointResponse> {
+  const upper = issueId.toUpperCase();
+  const githubCheck = isGitHubIssue(issueId);
+  if (!githubCheck.isGitHub || !githubCheck.owner || !githubCheck.repo) {
+    return { issueId: upper, pr: null, diff: null };
+  }
+
+  const branchName = `feature/${issueId.toLowerCase()}`;
+  const repoArg = `${githubCheck.owner}/${githubCheck.repo}`;
+
+  // Find the PR number for the feature branch (open or closed/merged).
+  let prNumber: string;
+  try {
+    const { stdout } = await execFileAsync(
+      'gh',
+      [
+        'pr', 'list',
+        '--repo', repoArg,
+        '--head', branchName,
+        '--state', 'all',
+        '--json', 'number',
+        '--limit', '1',
+        '--jq', '.[0].number',
+      ],
+      { encoding: 'utf-8', timeout: 15000 },
+    );
+    prNumber = stdout.trim();
+  } catch (err: any) {
+    return { issueId: upper, pr: null, diff: null, error: `gh pr list failed: ${err.message}` };
+  }
+  if (!prNumber) {
+    return { issueId: upper, pr: null, diff: null };
+  }
+
+  // Pull the rich fields via `gh pr view --json …` and `gh pr diff` in
+  // parallel — they depend only on the PR number.
+  let pr: IssuePullRequestData;
+  let diff: string | null = null;
+  let diffError: string | undefined;
+  try {
+    const [viewResult, diffResult] = await Promise.allSettled([
+      execFileAsync(
+        'gh',
+        [
+          'pr', 'view', prNumber,
+          '--repo', repoArg,
+          '--json', GH_PR_VIEW_FIELDS,
+        ],
+        { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
+      ),
+      execFileAsync(
+        'gh',
+        [
+          'pr', 'diff', prNumber,
+          '--repo', repoArg,
+          '--patch',
+        ],
+        { encoding: 'utf-8', timeout: 30000, maxBuffer: 16 * 1024 * 1024 },
+      ),
+    ]);
+    if (viewResult.status === 'rejected') {
+      return { issueId: upper, pr: null, diff: null, error: `gh pr view failed: ${viewResult.reason?.message ?? String(viewResult.reason)}` };
+    }
+    pr = JSON.parse(viewResult.value.stdout) as IssuePullRequestData;
+    if (diffResult.status === 'fulfilled') {
+      diff = diffResult.value.stdout;
+    } else {
+      diffError = `gh pr diff failed: ${diffResult.reason?.message ?? String(diffResult.reason)}`;
+    }
+  } catch (err: any) {
+    return { issueId: upper, pr: null, diff: null, error: `gh pr fetch failed: ${err.message}` };
+  }
+
+  return { issueId: upper, pr, diff, error: diffError };
+}
+
+const getIssuePrRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/:id/pr',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const result = yield* Effect.promise(() => fetchIssuePullRequest(id));
+    return jsonResponse(result);
+  })),
+);
+
+// ─── Route: GET /api/issues/:id/discussions ──────────────────────────────────
+// Combined Linear + GitHub timeline. Sources merged into a single chronological
+// list:
+//   - Linear issue comments (when tracker resolves to Linear)
+//   - GitHub issue comments (when tracker resolves to GitHub)
+//   - GitHub PR conversation comments (when a feature/<id> PR exists)
+//   - GitHub PR review submissions (approve / changes-requested / commented)
+//   - GitHub PR inline review comments (review-thread replies on diff lines)
+//
+// Linear comments are fetched via the LinearClient service so we reuse the
+// existing API key / retry plumbing. GitHub data is shelled out via `gh api`
+// (consistent with the PR endpoint — same rationale as D13).
+
+export type DiscussionSource =
+  | 'linear'
+  | 'github-issue'
+  | 'github-pr-conversation'
+  | 'github-pr-review'
+  | 'github-pr-review-comment';
+
+export interface DiscussionItem {
+  id: string;
+  source: DiscussionSource;
+  author: string;
+  body: string;
+  createdAt: string;
+  url?: string;
+  prNumber?: number;
+  reviewState?: string;
+  filePath?: string;
+  line?: number;
+}
+
+export interface IssueDiscussionsResponse {
+  issueId: string;
+  items: DiscussionItem[];
+  prNumber: number | null;
+  errors?: string[];
+}
+
+interface FetchDiscussionsDeps {
+  /** Resolve a Linear issue ref ("MIN-449") to its UUID. */
+  linearGetIssueId?: (ref: string) => Promise<string | null>;
+  /** Fetch comments for a Linear issue UUID. */
+  linearGetComments?: (
+    uuid: string,
+  ) => Promise<readonly { author: string; body: string; createdAt: string }[]>;
+}
+
+export async function fetchIssueDiscussions(
+  issueId: string,
+  deps: FetchDiscussionsDeps = {},
+): Promise<IssueDiscussionsResponse> {
+  const upper = issueId.toUpperCase();
+  const items: DiscussionItem[] = [];
+  const errors: string[] = [];
+  let prNumber: number | null = null;
+
+  const trackerType = resolveTrackerType(issueId);
+  const githubCheck = isGitHubIssue(issueId);
+
+  // 1. Linear issue comments — only when tracker is Linear and deps provided.
+  if (trackerType === 'linear' && deps.linearGetIssueId && deps.linearGetComments) {
+    try {
+      const uuid = await deps.linearGetIssueId(issueId);
+      if (uuid) {
+        const linearComments = await deps.linearGetComments(uuid);
+        for (let i = 0; i < linearComments.length; i++) {
+          const c = linearComments[i]!;
+          items.push({
+            id: `linear-${uuid}-${i}`,
+            source: 'linear',
+            author: c.author,
+            body: c.body,
+            createdAt: c.createdAt,
+          });
+        }
+      }
+    } catch (err: any) {
+      errors.push(`linear comments failed: ${err?.message ?? String(err)}`);
+    }
+  }
+
+  // 2. GitHub issue comments — only when the tracker resolves the issue to
+  //    GitHub (not when we're in Linear and a PR happens to exist).
+  if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
+    const { owner, repo, number } = githubCheck as { owner: string; repo: string; number: number };
+    try {
+      const { stdout } = await execAsync(
+        `gh api "repos/${owner}/${repo}/issues/${number}/comments?per_page=100"`,
+        { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
+      );
+      const arr = JSON.parse(stdout) as Array<{
+        id: number;
+        user?: { login?: string } | null;
+        body?: string | null;
+        created_at?: string;
+        html_url?: string;
+      }>;
+      for (const c of arr) {
+        items.push({
+          id: `gh-issue-${c.id}`,
+          source: 'github-issue',
+          author: c.user?.login ?? 'unknown',
+          body: c.body ?? '',
+          createdAt: c.created_at ?? '',
+          url: c.html_url,
+        });
+      }
+    } catch (err: any) {
+      errors.push(`gh issue comments failed: ${err?.message ?? String(err)}`);
+    }
+  }
+
+  // 3. Resolve PR number for the feature branch (if a GitHub repo is mapped
+  //    via tracker config). This is independent of the issue tracker — even
+  //    Linear-tracked issues end up with feature/<id-lower> branches in a
+  //    GitHub repo, so PR comments belong on the timeline.
+  let prRepoArg: string | null = null;
+  let prOwner: string | null = null;
+  let prRepo: string | null = null;
+  if (githubCheck.isGitHub && githubCheck.owner && githubCheck.repo) {
+    prRepoArg = `${githubCheck.owner}/${githubCheck.repo}`;
+    prOwner = githubCheck.owner;
+    prRepo = githubCheck.repo;
+  } else {
+    // Try the project-resolved repo (Linear-tracked issues whose project maps
+    // to a GitHub repo — common for Panopticon).
+    const issuePrefix = extractPrefix(issueId);
+    const projectKey = issuePrefix ?? issueId.split('-')[0] ?? '';
+    const ghConfig = getGitHubConfig();
+    const repoConfig = ghConfig?.repos.find((r) => {
+      const prefix = (r.prefix ?? r.repo).toUpperCase().replace(/-/g, '');
+      return prefix === projectKey.toUpperCase();
+    });
+    if (repoConfig) {
+      prRepoArg = `${repoConfig.owner}/${repoConfig.repo}`;
+      prOwner = repoConfig.owner;
+      prRepo = repoConfig.repo;
+    }
+  }
+
+  if (prRepoArg) {
+    if (!parseIssueId(issueId)) {
+      throw new Error(`Invalid issue id: ${issueId}`);
+    }
+    const branchName = `feature/${issueId.toLowerCase()}`;
+    try {
+      const { stdout } = await execFileAsync(
+        'gh',
+        [
+          'pr', 'list',
+          '--repo', prRepoArg,
+          '--head', branchName,
+          '--state', 'all',
+          '--json', 'number',
+          '--limit', '1',
+          '--jq', '.[0].number',
+        ],
+        { encoding: 'utf-8', timeout: 15000 },
+      );
+      const trimmed = stdout.trim();
+      if (trimmed) {
+        const parsed = parseInt(trimmed, 10);
+        if (Number.isFinite(parsed)) prNumber = parsed;
+      }
+    } catch (err: any) {
+      errors.push(`gh pr list failed: ${err?.message ?? String(err)}`);
+    }
+  }
+
+  if (prNumber !== null && prRepoArg && prOwner && prRepo) {
+    // Three independent gh API calls. Each takes 200–800ms; running them
+    // sequentially compounded latency on every 30s poll. Fan out with
+    // Promise.all (each block catches its own error so the outer await never
+    // rejects) and the slowest call now governs total wall-clock instead of
+    // the sum of all three.
+    const collectedItems: DiscussionItem[] = [];
+
+    // 4. PR conversation comments (issue-comments endpoint against the PR).
+    const prConversation = (async () => {
+      try {
+        const { stdout } = await execAsync(
+          `gh api "repos/${prOwner}/${prRepo}/issues/${prNumber}/comments?per_page=100"`,
+          { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
+        );
+        const arr = JSON.parse(stdout) as Array<{
+          id: number;
+          user?: { login?: string } | null;
+          body?: string | null;
+          created_at?: string;
+          html_url?: string;
+        }>;
+        for (const c of arr) {
+          collectedItems.push({
+            id: `gh-pr-conv-${c.id}`,
+            source: 'github-pr-conversation',
+            author: c.user?.login ?? 'unknown',
+            body: c.body ?? '',
+            createdAt: c.created_at ?? '',
+            url: c.html_url,
+            prNumber,
+          });
+        }
+      } catch (err: any) {
+        errors.push(`gh pr conversation failed: ${err?.message ?? String(err)}`);
+      }
+    })();
+
+    // 5. PR review submissions (approve / changes-requested / commented).
+    const prReviews = (async () => {
+      try {
+        const { stdout } = await execAsync(
+          `gh api "repos/${prOwner}/${prRepo}/pulls/${prNumber}/reviews?per_page=100"`,
+          { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
+        );
+        const arr = JSON.parse(stdout) as Array<{
+          id: number;
+          user?: { login?: string } | null;
+          body?: string | null;
+          state?: string;
+          submitted_at?: string;
+          html_url?: string;
+        }>;
+        for (const r of arr) {
+          if (!r.body && r.state === 'COMMENTED') continue; // empty comment-only reviews are noise
+          collectedItems.push({
+            id: `gh-pr-review-${r.id}`,
+            source: 'github-pr-review',
+            author: r.user?.login ?? 'unknown',
+            body: r.body ?? '',
+            createdAt: r.submitted_at ?? '',
+            url: r.html_url,
+            prNumber,
+            reviewState: r.state,
+          });
+        }
+      } catch (err: any) {
+        errors.push(`gh pr reviews failed: ${err?.message ?? String(err)}`);
+      }
+    })();
+
+    // 6. Inline PR review comments (review-thread replies on diff lines).
+    const prInlineComments = (async () => {
+      try {
+        const { stdout } = await execAsync(
+          `gh api "repos/${prOwner}/${prRepo}/pulls/${prNumber}/comments?per_page=100"`,
+          { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
+        );
+        const arr = JSON.parse(stdout) as Array<{
+          id: number;
+          user?: { login?: string } | null;
+          body?: string | null;
+          created_at?: string;
+          html_url?: string;
+          path?: string;
+          line?: number | null;
+        }>;
+        for (const c of arr) {
+          collectedItems.push({
+            id: `gh-pr-rc-${c.id}`,
+            source: 'github-pr-review-comment',
+            author: c.user?.login ?? 'unknown',
+            body: c.body ?? '',
+            createdAt: c.created_at ?? '',
+            url: c.html_url,
+            prNumber,
+            filePath: c.path,
+            line: typeof c.line === 'number' ? c.line : undefined,
+          });
+        }
+      } catch (err: any) {
+        errors.push(`gh pr review comments failed: ${err?.message ?? String(err)}`);
+      }
+    })();
+
+    await Promise.all([prConversation, prReviews, prInlineComments]);
+    items.push(...collectedItems);
+  }
+
+  // Sort chronologically (oldest first). Items with no createdAt sink to the bottom.
+  items.sort((a, b) => {
+    if (!a.createdAt && !b.createdAt) return 0;
+    if (!a.createdAt) return 1;
+    if (!b.createdAt) return -1;
+    return a.createdAt.localeCompare(b.createdAt);
+  });
+
+  return {
+    issueId: upper,
+    items,
+    prNumber,
+    ...(errors.length > 0 ? { errors } : {}),
+  };
+}
+
+const getIssueDiscussionsRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/:id/discussions',
+  httpHandler(Effect.gen(function* () {
+    const linear = yield* LinearClient;
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+
+    const linearGetIssueId = async (ref: string): Promise<string | null> => {
+      try {
+        const issue = await Effect.runPromise(linear.getIssue(ref));
+        return issue.id;
+      } catch {
+        return null;
+      }
+    };
+    const linearGetComments = async (uuid: string) => {
+      try {
+        const comments = await Effect.runPromise(linear.getComments(uuid));
+        return comments.map((c) => ({
+          author: c.author,
+          body: c.body,
+          createdAt: c.createdAt,
+        }));
+      } catch {
+        return [];
+      }
+    };
+
+    const result = yield* Effect.promise(() =>
+      fetchIssueDiscussions(id, { linearGetIssueId, linearGetComments }),
+    );
+    return jsonResponse(result);
+  })),
+);
+
 // ─── Route: GET /api/issues/:id/costs ────────────────────────────────────────
 
 const getIssueCostsRoute = HttpRouter.add(
@@ -2514,6 +3016,8 @@ export const issuesRouteLayer = Layer.mergeAll(
   getIssuePlanningStateRoute,
   postIssueGenerateTasksRoute,
   getIssueCostsRoute,
+  getIssuePrRoute,
+  getIssueDiscussionsRoute,
 );
 
 export default issuesRouteLayer;

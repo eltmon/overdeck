@@ -4,6 +4,18 @@ import { Terminal } from '@xterm/xterm';
 // jsdom doesn't implement scrollIntoView — mock it globally
 Element.prototype.scrollIntoView = () => {};
 
+// jsdom doesn't ship ResizeObserver. Several components rely on it
+// (MessagesTimeline, XTerminal, GodView) so we install a no-op global mock.
+class ResizeObserverMock implements ResizeObserver {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+}
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (globalThis as any).ResizeObserver = ResizeObserverMock;
+}
+
 // Mock matchMedia globally — xterm.js calls window.matchMedia(...).addListener()
 // in a setTimeout that can fire after per-test mocks are cleaned up.
 Object.defineProperty(window, 'matchMedia', {

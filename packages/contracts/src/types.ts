@@ -231,6 +231,25 @@ export const SessionNodeType = Schema.Literals([
 ])
 export type SessionNodeType = typeof SessionNodeType.Type
 
+export const ReviewerRoundSummary = Schema.Struct({
+  round: Schema.Number,
+  status: Schema.optional(Schema.String),
+  startedAt: Schema.optional(Schema.String),
+  endedAt: Schema.optional(Schema.String),
+  durationSec: Schema.optional(Schema.Number),
+  cost: Schema.optional(Schema.Number),
+  findings: Schema.optional(Schema.Number),
+})
+export type ReviewerRoundSummary = typeof ReviewerRoundSummary.Type
+
+export const ReviewerRoundMetadata = Schema.Struct({
+  roundCount: Schema.Number,
+  latestRound: Schema.Number,
+  latestStatus: Schema.optional(Schema.String),
+  history: Schema.Array(ReviewerRoundSummary),
+})
+export type ReviewerRoundMetadata = typeof ReviewerRoundMetadata.Type
+
 export const SessionNode = Schema.Struct({
   type: SessionNodeType,
   role: Schema.optional(Schema.String),
@@ -244,6 +263,7 @@ export const SessionNode = Schema.Struct({
   hasJsonl: Schema.optional(Schema.Boolean),
   transcript: Schema.optional(Schema.String),
   presence: SessionNodePresence,
+  roundMetadata: Schema.optional(ReviewerRoundMetadata),
 })
 export type SessionNode = typeof SessionNode.Type
 

@@ -155,7 +155,7 @@ describe('FeatureItem', () => {
   it('shows caret when sessions are present', () => {
     render(
       <FeatureItem
-        feature={makeFeature({ sessions: [makeSession()] })}
+        feature={makeFeature({ sessions: [makeSession()], stateLabel: 'Done' })}
         isSelected={false}
         onSelect={() => {}}
       />,
@@ -166,7 +166,7 @@ describe('FeatureItem', () => {
   it('toggles expansion when caret is clicked', () => {
     render(
       <FeatureItem
-        feature={makeFeature({ sessions: [makeSession()] })}
+        feature={makeFeature({ sessions: [makeSession()], stateLabel: 'Done' })}
         isSelected={false}
         onSelect={() => {}}
       />,
@@ -180,7 +180,7 @@ describe('FeatureItem', () => {
   it('collapses when caret is clicked again', () => {
     render(
       <FeatureItem
-        feature={makeFeature({ sessions: [makeSession()] })}
+        feature={makeFeature({ sessions: [makeSession()], stateLabel: 'Done' })}
         isSelected={false}
         onSelect={() => {}}
       />,
@@ -247,7 +247,7 @@ describe('FeatureItem', () => {
     ];
     render(
       <FeatureItem
-        feature={makeFeature({ sessions })}
+        feature={makeFeature({ sessions, stateLabel: 'Done' })}
         isSelected={false}
         onSelect={() => {}}
         onSelectSession={onSelectSession}
@@ -261,7 +261,7 @@ describe('FeatureItem', () => {
   it('persists expansion state to localStorage', () => {
     render(
       <FeatureItem
-        feature={makeFeature({ sessions: [makeSession()] })}
+        feature={makeFeature({ sessions: [makeSession()], stateLabel: 'Done' })}
         isSelected={false}
         onSelect={() => {}}
       />,
@@ -276,7 +276,7 @@ describe('FeatureItem', () => {
     localStorage.setItem('mc-feature-expanded:PAN-821', 'true');
     render(
       <FeatureItem
-        feature={makeFeature({ sessions: [makeSession()] })}
+        feature={makeFeature({ sessions: [makeSession()], stateLabel: 'Done' })}
         isSelected={false}
         onSelect={() => {}}
       />,
@@ -285,10 +285,10 @@ describe('FeatureItem', () => {
     expect(screen.getByTestId('session-agent-pan-821')).toBeInTheDocument();
   });
 
-  it('does not auto-expand on mount when localStorage has no entry', () => {
+  it('does not auto-expand on mount when localStorage has no entry for terminal states', () => {
     render(
       <FeatureItem
-        feature={makeFeature({ sessions: [makeSession()] })}
+        feature={makeFeature({ sessions: [makeSession()], stateLabel: 'Done' })}
         isSelected={false}
         onSelect={() => {}}
       />,
@@ -304,7 +304,7 @@ describe('FeatureItem', () => {
     ];
     render(
       <FeatureItem
-        feature={makeFeature({ sessions })}
+        feature={makeFeature({ sessions, stateLabel: 'Done' })}
         isSelected={false}
         onSelect={() => {}}
         selectedSessionId="sess-b"

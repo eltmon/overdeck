@@ -12,7 +12,8 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET  /api/command-deck/projects
  */
 
-import { exec } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import {
   access,
   readFile,
@@ -36,9 +37,8 @@ import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { SessionNodePresence } from '@panopticon/contracts';
 import { findPrdAtStatus, type PrdLocation } from '../../../lib/prd-locations.js';
-import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
-import { extractPrefix } from '../../../lib/issue-id.js';
+import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
 import { getAgentCommand } from '../../../lib/settings.js';
@@ -47,8 +47,11 @@ import { getGitHubConfig } from '../services/tracker-config.js';
 import { LinearClient } from '../services/linear-client.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { httpHandler } from './http-handler.js';
+import { resolveJsonlPath } from './jsonl-resolver.js';
+import { buildReviewerNodes, type ReviewerRoundMetadata } from './reviewer-tree.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
@@ -78,6 +81,10 @@ const projectPathCache = new Map<string, string>();
 let closedIssuesCache: { timestamp: number; data: Array<{ number: number; title: string }> } | null = null;
 const CLOSED_ISSUES_TTL_MS = 120_000; // 2 minutes
 
+/** TTL cache for cost data to avoid re-scanning cost events on every 5s poll (PAN-830 review high-4). */
+let costCache: { timestamp: number; data: { totalCost: number; costByStage: Record<string, { cost: number; tokens: number }> } } | null = null;
+const COST_CACHE_TTL_MS = 30_000; // 30 seconds
+
 function getProjectPath(issuePrefix?: string): string {
   if (!issuePrefix) return join(homedir(), 'Projects');
 
@@ -101,7 +108,6 @@ function getProjectPath(issuePrefix?: string): string {
           join(homedir(), 'Projects', owner, repo),
         ]) {
           // Sync existsSync is acceptable per CLAUDE.md for fast stat checks
-          const { existsSync } = require('node:fs');
           if (existsSync(path)) {
             projectPathCache.set(issuePrefix, path);
             return path;
@@ -117,74 +123,12 @@ function getProjectPath(issuePrefix?: string): string {
 }
 
 /**
- * Extract reviewer role from tmux session name.
- * Format: review-<issueId>-<timestamp>-<role>
- * Returns the role string or null if the name doesn't match the expected pattern.
+ * Extract reviewer role from tmux session name (PAN-830).
+ * Re-exported from reviewer-tree.ts; supports both the canonical
+ * `specialist-<projectKey>-<issueId>-review-<role>` pattern AND the legacy
+ * `review-<issueId>-<timestamp>-<role>` pattern.
  */
-export function extractReviewerRole(tmuxName: string, issueId: string): string | null {
-  const prefix = `review-${issueId}-`;
-  // Case-insensitive prefix match but case-sensitive slice — the prefix length
-  // is the same in both cases so slice works correctly.
-  if (!tmuxName.toLowerCase().startsWith(prefix.toLowerCase())) return null;
-  const rest = tmuxName.slice(prefix.length);
-  const dashIdx = rest.indexOf('-');
-  if (dashIdx <= 0) return null;
-  const role = rest.slice(dashIdx + 1);
-  return role || null;
-}
-
-/**
- * Scan the workspace .pan/review/ directory for persisted reviewer roles
- * from the most recent review round. Returns objects with sessionId (reconstructed
- * from the review directory name + role) and role name. Empty array if no review
- * directory found.
- */
-async function scanPersistedReviewerRoles(
-  workspacePath: string,
-  issueId: string,
-): Promise<Array<{ sessionId: string; role: string }>> {
-  const reviewDir = join(workspacePath, '.pan', 'review');
-  if (!await pathExists(reviewDir)) return [];
-
-  let entries: string[] = [];
-  try {
-    entries = await readdir(reviewDir);
-  } catch { return []; }
-
-  const prefix = `review-${issueId}-`;
-  const rounds = entries
-    .filter(e => e.toLowerCase().startsWith(prefix.toLowerCase()))
-    .map(e => ({ name: e, path: join(reviewDir, e) }));
-
-  if (rounds.length === 0) return [];
-
-  // Sort by mtime descending to pick the most recent review round
-  const roundsWithStat = await Promise.all(
-    rounds.map(async (r) => {
-      const s = await stat(r.path).catch(() => null);
-      return { ...r, mtime: s?.mtime?.getTime() ?? 0 };
-    })
-  );
-  roundsWithStat.sort((a, b) => b.mtime - a.mtime);
-  const mostRecent = roundsWithStat[0];
-  if (!mostRecent) return [];
-
-  let files: string[] = [];
-  try {
-    files = await readdir(mostRecent.path);
-  } catch { return []; }
-
-  // Extract roles from {role}.md files (exclude prompt and claude log files)
-  const roles = files
-    .filter(f => f.endsWith('.md') && !f.endsWith('-prompt.md'))
-    .map(f => f.replace(/\.md$/, ''))
-    .filter(r => !r.endsWith('-claude')); // {role}-claude.log companion files
-
-  return roles.map(role => ({
-    sessionId: `${mostRecent.name}-${role}`,
-    role,
-  }));
-}
+export { extractReviewerRole } from './reviewer-tree.js';
 
 /**
  * Derive session presence from runtime state, tmux session existence, and heartbeat.
@@ -220,16 +164,7 @@ async function derivePresence(
   return 'ended';
 }
 
-/**
- * Resolve JSONL path for a session. Returns the path if the file exists,
- * otherwise null. Uses encodeClaudeProjectDir for path encoding.
- */
-async function resolveJsonlPath(sessionId: string, workspacePath: string): Promise<string | null> {
-  const encodedDir = encodeClaudeProjectDir(workspacePath);
-  const jsonlPath = join(homedir(), '.claude', 'projects', encodedDir, `${sessionId}.jsonl`);
-  if (await pathExists(jsonlPath)) return jsonlPath;
-  return null;
-}
+// resolveJsonlPath is imported from ./jsonl-resolver (PAN-830).
 
 // Read the request body as unknown JSON
 const readJsonBody = Effect.gen(function* () {
@@ -299,6 +234,7 @@ export async function fetchActivityDataWithContext(
     transcript?: string;
     presence: SessionNodePresence;
     hasJsonl?: boolean;
+    roundMetadata?: ReviewerRoundMetadata;
   }> = [];
 
   // Shared workspace path for JSONL resolution (PAN-821)
@@ -448,41 +384,19 @@ export async function fetchActivityDataWithContext(
 
     const taskFileIndex: Record<string, number> = { review: 0, test: 0, merge: 0 };
 
-    // Discover parallel review sessions for this issue (review-<issueId>-<timestamp>-<role>)
-    // Reuse the already-fetched tmuxSessionNames instead of calling listSessionNamesAsync again.
-    let reviewSessions: string[] = [];
-    try {
-      reviewSessions = Array.from(tmuxSessionNames).filter(s => s.startsWith(`review-${issueId}-`));
-      // Keep only the most recent review round (highest timestamp) to avoid
-      // stale tabs from previous review rounds showing "Connection lost".
-      if (reviewSessions.length > 0) {
-        const timestamps = new Set<number>();
-        for (const s of reviewSessions) {
-          const prefix = `review-${issueId}-`;
-          const rest = s.slice(prefix.length);
-          const dashIdx = rest.indexOf('-');
-          if (dashIdx > 0) {
-            const ts = Number(rest.slice(0, dashIdx));
-            if (!isNaN(ts)) timestamps.add(ts);
-          }
-        }
-        if (timestamps.size > 1) {
-          const maxTs = Math.max(...timestamps);
-          reviewSessions = reviewSessions.filter(s => {
-            const prefix = `review-${issueId}-`;
-            const rest = s.slice(prefix.length);
-            const dashIdx = rest.indexOf('-');
-            if (dashIdx > 0) {
-              const ts = Number(rest.slice(0, dashIdx));
-              return !isNaN(ts) && ts === maxTs;
-            }
-            return false;
-          });
-        }
-      }
-    } catch { /* tmux may not be available */ }
+    // PAN-830: Reviewer panes are canonical (`specialist-<projectKey>-<issueId>-review-<role>`)
+    // and persist across review rounds, so we emit exactly five reviewer nodes
+    // (one per role) anchored to the *most recent* review section in history.
+    // Earlier review sections are skipped to avoid duplicate role nodes.
+    const lastReviewIndex = specialistSections.reduce(
+      (idx, s, i) => (s.type === 'review' ? i : idx),
+      -1,
+    );
+    const resolvedProject = resolveProjectFromIssue(issueId);
+    const reviewerProjectKey = resolvedProject?.projectKey ?? issuePrefix.toLowerCase();
 
-    for (const ss of specialistSections) {
+    for (let i = 0; i < specialistSections.length; i++) {
+      const ss = specialistSections[i]!;
       const duration = ss.startedAt && ss.endedAt
         ? Math.floor((new Date(ss.endedAt).getTime() - new Date(ss.startedAt).getTime()) / 1000)
         : null;
@@ -494,7 +408,7 @@ export async function fetchActivityDataWithContext(
       const taskFiles = taskFilesByType[ss.type] || [];
       const taskIdx = taskFileIndex[ss.type] || 0;
       if (taskIdx < taskFiles.length) {
-        const taskContent = await readOptional(join(tasksDir, taskFiles[taskIdx]!));
+        const taskContent = taskFileContents.get(taskFiles[taskIdx]!);
         if (taskContent) {
           const meaningfulLines = taskContent.split('\n').filter(l =>
             !l.startsWith('```') && !l.startsWith('# EXECUTE') && !l.startsWith('⚠️')
@@ -518,83 +432,41 @@ export async function fetchActivityDataWithContext(
         transcriptParts.push(`\n--- Results ---\n${ss.notes}`);
       }
 
-      // Split parallel review sessions into individual reviewer sections (PAN-821)
+      // PAN-830: For review sections, emit the five canonical reviewer nodes
+      // exactly once (anchored to the latest review section in history). Earlier
+      // review sections are absorbed into the round metadata read from
+      // `~/.panopticon/agents/<reviewer-id>/round-N.json`.
       if (ss.type === 'review') {
-        if (reviewSessions.length > 0) {
-          for (const tmuxName of reviewSessions) {
-            const role = extractReviewerRole(tmuxName, issueId);
-            const reviewerParts = [...transcriptParts];
-
-            if (ss.status === 'running') {
-              try {
-                const output = (await capturePaneAsync(tmuxName, 100)).trim();
-                if (output) {
-                  reviewerParts.push(`\n--- Live Output ---\n${output}`);
-                }
-              } catch { /* session may not be running */ }
-            }
-
-            const reviewerPresence: SessionNodePresence = tmuxSessionNames.has(tmuxName)
-              ? (ss.status === 'running' ? 'active' : 'idle')
-              : 'ended';
-            const reviewerJsonlPath = await resolveJsonlPath(tmuxName, workspacePath);
-
-            // Do NOT expose tmuxSession for reviewer sessions — they are autonomous
-            // specialists and should not be interactively attached (PAN-821 review)
-            sections.push({
-              type: role ? 'reviewer' : 'review',
-              role: role || undefined,
-              sessionId: tmuxName,
-              model: 'specialist',
-              startedAt: ss.startedAt,
-              endedAt: ss.endedAt,
-              duration,
-              status: ss.status,
-              transcript: reviewerJsonlPath ? undefined : reviewerParts.join('\n'),
-              presence: reviewerPresence,
-              hasJsonl: !!reviewerJsonlPath,
-            });
-          }
-        } else {
-          // No live tmux sessions — reconstruct individual reviewer nodes from
-          // persisted review output so ended reviewers remain visible (REQ-8).
-          const persisted = await scanPersistedReviewerRoles(workspacePath, issueId);
-          if (persisted.length > 0) {
-            for (const { sessionId, role } of persisted) {
-              const reviewerParts = [...transcriptParts];
-              const reviewerJsonlPath = await resolveJsonlPath(sessionId, workspacePath);
-              sections.push({
-                type: 'reviewer',
-                role,
-                sessionId,
-                model: 'specialist',
-                startedAt: ss.startedAt,
-                endedAt: ss.endedAt,
-                duration,
-                status: ss.status,
-                transcript: reviewerJsonlPath ? undefined : reviewerParts.join('\n'),
-                presence: 'ended',
-                hasJsonl: !!reviewerJsonlPath,
-              });
-            }
-          } else {
-            // No persisted reviewers either — fall back to single review node
-            const specialistSessionId = `specialist-${ss.type}-${ss.startedAt}`;
-            const specialistJsonlPath = await resolveJsonlPath(specialistSessionId, workspacePath);
-            sections.push({
-              type: ss.type,
-              sessionId: specialistSessionId,
-              model: 'specialist',
-              startedAt: ss.startedAt,
-              endedAt: ss.endedAt,
-              duration,
-              status: ss.status,
-              transcript: specialistJsonlPath ? undefined : transcriptParts.join('\n'),
-              presence: 'ended',
-              hasJsonl: !!specialistJsonlPath,
-            });
-          }
-        }
+        if (i !== lastReviewIndex) continue;
+        // Emit the orchestrator parent node (type 'review') so the tree shows
+        // six nodes total: 1 orchestrator + 5 roles (blocker-1).
+        const orchestratorSessionName = getTmuxSessionName('review-agent', reviewerProjectKey);
+        const orchestratorPresence: SessionNodePresence = tmuxSessionNames.has(orchestratorSessionName)
+          ? (ss.status === 'running' ? 'active' : 'idle')
+          : 'ended';
+        sections.push({
+          type: 'review',
+          sessionId: orchestratorSessionName,
+          model: 'specialist',
+          startedAt: ss.startedAt,
+          endedAt: ss.endedAt,
+          duration: ss.startedAt && ss.endedAt
+            ? Math.floor((new Date(ss.endedAt).getTime() - new Date(ss.startedAt).getTime()) / 1000)
+            : null,
+          status: ss.status,
+          presence: orchestratorPresence,
+        });
+        const reviewerNodes = await buildReviewerNodes({
+          issueId,
+          projectKey: reviewerProjectKey,
+          workspacePath,
+          projectPath,
+          tmuxSessionNames,
+          startedAt: ss.startedAt,
+          endedAt: ss.endedAt,
+          status: ss.status,
+        });
+        for (const node of reviewerNodes) sections.push(node);
         continue;
       }
 
@@ -643,20 +515,27 @@ export async function fetchActivityDataWithContext(
   sections.sort((a, b) => {
     if (!a.startedAt) return 1;
     if (!b.startedAt) return -1;
-    return new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime();
+    return a.startedAt.localeCompare(b.startedAt);
   });
 
-  // Cost breakdown
+  // Cost breakdown — TTL-cached to avoid re-scanning cost events on every 5s poll (PAN-830 review high-4).
   let costByStage: Record<string, { cost: number; tokens: number }> = {};
   let totalCost = 0;
   try {
-    syncCache();
-    const issueData = getCostsForIssue(issueId.toUpperCase());
-    if (issueData) {
-      totalCost = issueData.totalCost;
-      costByStage = Object.fromEntries(
-        Object.entries(issueData.stages || {}).map(([stage, stats]) => [stage, { cost: stats.cost, tokens: stats.tokens }])
-      );
+    const cacheKey = issueId.toUpperCase();
+    if (costCache && costCache.timestamp > Date.now() - COST_CACHE_TTL_MS) {
+      totalCost = costCache.data.totalCost;
+      costByStage = costCache.data.costByStage;
+    } else {
+      syncCache();
+      const issueData = getCostsForIssue(cacheKey);
+      if (issueData) {
+        totalCost = issueData.totalCost;
+        costByStage = Object.fromEntries(
+          Object.entries(issueData.stages || {}).map(([stage, stats]) => [stage, { cost: stats.cost, tokens: stats.tokens }])
+        );
+      }
+      costCache = { timestamp: Date.now(), data: { totalCost, costByStage } };
     }
   } catch { /* cost data optional */ }
 
@@ -940,13 +819,14 @@ Be specific: reference actual file names, function names, requirement text, disc
   const { getProviderForModel, getProviderEnv } = await import('../../../lib/providers.js');
   const { loadConfig: loadYamlConfig } = await import('../../../lib/config-yaml.js');
   let providerEnvStr = '';
+  let providerEnv: Record<string, string> = {};
   const statusProvider = getProviderForModel(statusModelId);
   if (statusProvider.name !== 'anthropic') {
     const { config } = loadYamlConfig();
     const apiKey = config.apiKeys[statusProvider.name as keyof typeof config.apiKeys];
     if (apiKey) {
-      const envVars = getProviderEnv(statusProvider, apiKey);
-      providerEnvStr = Object.entries(envVars).map(([k, v]) => `${k}="${v}"`).join(' ') + ' ';
+      providerEnv = getProviderEnv(statusProvider, apiKey);
+      providerEnvStr = Object.entries(providerEnv).map(([k, v]) => `${k}="${v}"`).join(' ') + ' ';
     }
   }
 
@@ -954,9 +834,11 @@ Be specific: reference actual file names, function names, requirement text, disc
   console.log(`[status-review] ${issueId}: generating with ${providerEnvStr}${cliCmd}${modelFlag}`);
 
   try {
+    const env = { ...process.env, ...providerEnv };
+    const promptContent = await readFile(promptFile, 'utf-8');
     const { stdout: aiReview } = await execAsync(
-      `${providerEnvStr}cat "${promptFile}" | ${cliCmd} -p${modelFlag} --no-session-persistence`,
-      { encoding: 'utf-8', timeout: 120000, maxBuffer: 1024 * 1024 }
+      `${cliCmd} -p${modelFlag} --no-session-persistence`,
+      { encoding: 'utf-8', timeout: 120000, maxBuffer: 1024 * 1024, env, input: promptContent }
     );
     review = `# Status Review - ${issueId}\n\n*AI-Generated: ${now}*\n\n${aiReview.trim()}\n\n---\n*Generated by Panopticon Command Deck AI*`;
   } catch (llmError: unknown) {
@@ -1065,6 +947,9 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: 'Invalid issue id: ' + issueId }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const linear = yield* LinearClient;
 
@@ -1096,8 +981,14 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
       yield* Effect.promise(async () => {
         try {
           const issueNum = issueId.replace(/^[A-Z]+-/, '');
-          const { stdout } = await execAsync(
-            `gh issue view ${issueNum} --repo ${ghConfig.owner}/${ghConfig.repos[0]} --json comments --jq '.comments[] | "## " + .author.login + " (" + .createdAt + ")\\n\\n" + .body + "\\n\\n---\\n"'`,
+          const { stdout } = await execFileAsync(
+            'gh',
+            [
+              'issue', 'view', issueNum,
+              '--repo', `${ghConfig.owner}/${ghConfig.repos[0]}`,
+              '--json', 'comments',
+              '--jq', '.comments[] | "## " + .author.login + " (" + .createdAt + ")\n\n" + .body + "\n\n---\n"',
+            ],
             { encoding: 'utf-8', timeout: 30000 }
           );
           if (stdout.trim()) {
@@ -1108,14 +999,27 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
         } catch (err) { console.warn(`Failed to sync GitHub comments for ${issueId}:`, err); }
 
         try {
-          const { stdout: prList } = await execAsync(
-            `gh pr list --repo ${ghConfig.owner}/${ghConfig.repos[0]} --head feature/${issueLower} --json number,title --jq '.[].number'`,
+          const { stdout: prList } = await execFileAsync(
+            'gh',
+            [
+              'pr', 'list',
+              '--repo', `${ghConfig.owner}/${ghConfig.repos[0]}`,
+              '--head', `feature/${issueLower}`,
+              '--json', 'number,title',
+              '--jq', '.[].number',
+            ],
             { encoding: 'utf-8', timeout: 15000 }
           );
           for (const prNum of prList.trim().split('\n').filter(Boolean)) {
             try {
-              const { stdout: prComments } = await execAsync(
-                `gh pr view ${prNum} --repo ${ghConfig.owner}/${ghConfig.repos[0]} --json comments --jq '.comments[] | "## " + .author.login + " (" + .createdAt + ")\\n\\n" + .body + "\\n\\n---\\n"'`,
+              const { stdout: prComments } = await execFileAsync(
+                'gh',
+                [
+                  'pr', 'view', prNum,
+                  '--repo', `${ghConfig.owner}/${ghConfig.repos[0]}`,
+                  '--json', 'comments',
+                  '--jq', '.comments[] | "## " + .author.login + " (" + .createdAt + ")\n\n" + .body + "\n\n---\n"',
+                ],
                 { encoding: 'utf-8', timeout: 15000 }
               );
               if (prComments.trim()) {
@@ -1268,6 +1172,32 @@ async function fetchProjectTree(): Promise<unknown[]> {
     }
   } catch { /* non-fatal */ }
 
+  // Pre-group issues by project / prefix so the per-project loop is O(P + I)
+  // instead of O(P × I) (PAN-830 review high-5).
+  const rallyIssuesByProject = new Map<string, Array<Record<string, unknown>>>();
+  const trackerIssuesByPrefix = new Map<string, Array<Record<string, unknown>>>();
+  const SHOW_ALWAYS_STATES = new Set(['in_progress', 'in_review']);
+  for (const issue of allIssues) {
+    const source = issue['source'] as string | undefined;
+    if (source === 'rally' && (issue['artifactType'] as string | undefined)?.includes('PortfolioItem')) {
+      const projectName = (issue['project'] as { name?: string } | undefined)?.name;
+      if (projectName) {
+        const list = rallyIssuesByProject.get(projectName);
+        if (list) list.push(issue);
+        else rallyIssuesByProject.set(projectName, [issue]);
+      }
+    } else if (source !== 'rally') {
+      const issueId = issue['identifier'] as string | undefined;
+      const state = issue['state'] as string | undefined;
+      const prefix = issueId ? extractPrefix(issueId) : null;
+      if (prefix && state && SHOW_ALWAYS_STATES.has(state)) {
+        const list = trackerIssuesByPrefix.get(prefix.toUpperCase());
+        if (list) list.push(issue);
+        else trackerIssuesByPrefix.set(prefix.toUpperCase(), [issue]);
+      }
+    }
+  }
+
   const tmuxResult = await listSessionNamesAsync().catch(() => [] as string[]);
   const tmuxSessions = new Set<string>();
   for (const line of tmuxResult) {
@@ -1412,10 +1342,8 @@ async function fetchProjectTree(): Promise<unknown[]> {
     const existingIds = new Set(features.map(f => f['issueId']));
     const projectName = (project.config as { name?: string }).name || projectPath.split('/').pop() || 'Unknown';
 
-    for (const issue of allIssues) {
-      if (issue['source'] !== 'rally') continue;
-      if (!(issue['artifactType'] as string | undefined)?.includes('PortfolioItem')) continue;
-      if ((issue['project'] as { name?: string } | undefined)?.name !== projectName) continue;
+    const rallyIssues = rallyIssuesByProject.get(projectName) ?? [];
+    for (const issue of rallyIssues) {
       if (existingIds.has(issue['identifier'])) continue;
 
       let stateLabel = (issue['rawTrackerState'] as string) || (issue['status'] as string) || 'Unknown';
@@ -1433,7 +1361,6 @@ async function fetchProjectTree(): Promise<unknown[]> {
     }
 
     // Add tracker issues without workspaces that are in active states
-    const SHOW_ALWAYS_STATES = new Set(['in_progress', 'in_review']);
     const projectPrefixes: string[] = [];
     if (project.config.issue_prefix) {
       projectPrefixes.push(project.config.issue_prefix.toUpperCase());
@@ -1448,28 +1375,26 @@ async function fetchProjectTree(): Promise<unknown[]> {
       projectPrefixes.push(project.key.toUpperCase().replace(/-/g, ''));
     }
 
-    for (const issue of allIssues) {
-      const issueId = issue['identifier'] as string | undefined;
-      if (!issueId || existingIds.has(issueId)) continue;
+    for (const prefix of projectPrefixes) {
+      const trackerIssues = trackerIssuesByPrefix.get(prefix);
+      if (!trackerIssues) continue;
+      for (const issue of trackerIssues) {
+        const issueId = issue['identifier'] as string | undefined;
+        if (!issueId || existingIds.has(issueId)) continue;
 
-      const prefix = extractPrefix(issueId);
-      if (!prefix || !projectPrefixes.includes(prefix.toUpperCase())) continue;
-
-      const state = issue['state'] as string | undefined;
-      if (!state || !SHOW_ALWAYS_STATES.has(state)) continue;
-
-      features.push({
-        issueId,
-        title: issue['title'] || issueTitleMap.get(issueId.toUpperCase()) || issueId,
-        branch: '',
-        status: 'idle',
-        stateLabel: issue['status'] || state,
-        agentStatus: null,
-        hasPlanning: false,
-        hasPrd: false,
-        hasState: false,
-        isShadow: false,
-      });
+        features.push({
+          issueId,
+          title: issue['title'] || issueTitleMap.get(issueId.toUpperCase()) || issueId,
+          branch: '',
+          status: 'idle',
+          stateLabel: issue['status'] || issue['state'],
+          agentStatus: null,
+          hasPlanning: false,
+          hasPrd: false,
+          hasState: false,
+          isShadow: false,
+        });
+      }
     }
 
     projectTree.push({ name: projectName, path: projectPath, features });
