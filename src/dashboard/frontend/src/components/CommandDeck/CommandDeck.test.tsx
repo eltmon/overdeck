@@ -257,7 +257,7 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     expect(screen.queryByTestId('detail-panel')).not.toBeInTheDocument();
   });
 
-  it('shows empty state when feature selected but no session in projects tab', async () => {
+  it('renders IssueWorkbench in issue-selected mode when feature is selected without a session', async () => {
     renderCommandDeck();
 
     // Switch to Projects tab
@@ -269,12 +269,15 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     // Click feature row (not session)
     fireEvent.click(screen.getByTestId('feature-PAN-821'));
 
-    // Verify empty state
-    expect(screen.getByText('Select an issue to view agent activity')).toBeInTheDocument();
-
-    // Verify IssueHeader and SessionPanel are NOT rendered
-    expect(screen.queryByTestId('issue-header')).not.toBeInTheDocument();
+    // Verify IssueWorkbench renders in issue-selected mode with the tab strip
+    const workbench = screen.getByTestId('issue-workbench');
+    expect(workbench).toBeInTheDocument();
+    expect(workbench).toHaveAttribute('data-mode', 'issue-selected');
+    expect(screen.getByTestId('zone-c-overview')).toBeInTheDocument();
+    // ZoneA still renders IssueHeader, but the agent-selected SessionPanel is NOT rendered
+    expect(screen.getByTestId('issue-header')).toBeInTheDocument();
     expect(screen.queryByTestId('session-panel')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('zone-b')).not.toBeInTheDocument();
   });
 
   it('clears session view when switching to a conversation', async () => {

@@ -5,8 +5,7 @@ import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { BadgeBar } from './FeatureMetadata/BadgeBar';
 import { DeaconStatus } from './DeaconStatus';
 import { DetailPanelLayout } from '../DetailPanelLayout';
-import { IssueHeader } from './SessionView/IssueHeader';
-import { SessionPanel } from './SessionView/SessionPanel';
+import { IssueWorkbench } from './IssueWorkbench';
 import { BeadsDialog } from '../BeadsDialog';
 import { ConversationList, type Conversation } from './ConversationList';
 import { ConversationPanel, type ViewMode } from '../chat/ConversationPanel';
@@ -15,6 +14,7 @@ import { DraftConversationPanel } from '../chat/DraftConversationPanel';
 import type { ChatMessage } from '../chat/chat-types';
 import type { Agent, Issue } from '../../types';
 import { useDashboardStore, selectAgentList } from '../../lib/store';
+import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { WS_METHODS } from '@panopticon/contracts';
 import type { ProjectSessionTree, SessionTreeDelta } from '@panopticon/contracts';
@@ -123,12 +123,18 @@ export function CommandDeck({
   onConversationViewModeChange,
 }: CommandDeckProps) {
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [isDraft, setIsDraft] = useState(false);
   const [showBeads, setShowBeads] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('conversations');
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
+
+  // Per-issue session selection (PAN-830 pan-11sr) — slice keyed by issueId.
+  // The tree highlight uses the value for whichever feature is currently active.
+  const selectSession = useCommandDeckSelection((s) => s.selectSession);
+  const selectedSessionId = useCommandDeckSelection((s) =>
+    selectedFeature ? s.selectedSessionByIssue[selectedFeature] ?? null : null,
+  );
   // Increments each time + is clicked, forcing DraftConversationPanel to remount and re-read localStorage
   const [draftKey, setDraftKey] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -316,27 +322,29 @@ export function CommandDeck({
 
   const handleSelectFeature = useCallback((issueId: string) => {
     setSelectedFeature(issueId);
-    setSelectedSessionId(null);
+    selectSession(issueId, null);
     setSelectedConversation(null);
     setIsDraft(false);
-  }, []);
+  }, [selectSession]);
 
   const handleSelectSession = useCallback((issueId: string, sessionId: string) => {
     setSelectedFeature(issueId);
-    setSelectedSessionId(sessionId);
+    selectSession(issueId, sessionId);
     setSelectedConversation(null);
     setIsDraft(false);
-  }, []);
+  }, [selectSession]);
 
   const handleSelectConversation = useCallback((name: string | null) => {
     setDraftKey(0);
     setSelectedConversation(name);
-    setSelectedSessionId(null);
+    if (selectedFeature) {
+      selectSession(selectedFeature, null);
+    }
     setIsDraft(false);
     if (name !== null) {
       setSelectedFeature(null);
     }
-  }, []);
+  }, [selectSession, selectedFeature]);
 
   const handleDraftCreated = useCallback(() => {
     setDraftKey(k => k + 1);
@@ -422,19 +430,6 @@ export function CommandDeck({
   const selectedIssueTitle = selectedFeature
     ? issueTitles[selectedFeature.toLowerCase()] || issueTitles[selectedFeature] || selectedFeature
     : '';
-
-  // Find the selected session object from merged project data
-  const selectedSession = useMemo(() => {
-    if (!selectedSessionId || !selectedFeature) return null;
-    for (const project of projectsWithSessions) {
-      const feature = project.features.find(f => f.issueId === selectedFeature);
-      if (feature?.sessions) {
-        const session = feature.sessions.find(s => s.sessionId === selectedSessionId);
-        if (session) return session;
-      }
-    }
-    return null;
-  }, [projectsWithSessions, selectedFeature, selectedSessionId]);
 
   const selectedIssue = selectedFeature
     ? issues.find(i => i.identifier === selectedFeature)
@@ -566,24 +561,16 @@ export function CommandDeck({
                 </div>
               );
             })()
-          ) : selectedFeature && selectedSessionId && selectedSession ? (
-            <>
-              <IssueHeader
-                issueId={selectedFeature}
-                title={selectedIssueTitle}
-                cost={issueCosts[selectedFeature.toLowerCase()]}
-                source={selectedIssue?.source}
-                url={selectedIssue?.url}
-                onOpenBeads={() => setShowBeads(true)}
-              />
-              <SessionPanel session={selectedSession} issueId={selectedFeature} />
-            </>
           ) : selectedFeature && sidebarTab === 'projects' ? (
-            <div className={styles.contentEmpty}>
-              <div style={{ textAlign: 'center' }}>
-                <p>Select an issue to view agent activity</p>
-              </div>
-            </div>
+            <IssueWorkbench
+              issueId={selectedFeature}
+              title={selectedIssueTitle}
+              sessions={selectedFeatureData?.sessions ?? []}
+              cost={issueCosts[selectedFeature.toLowerCase()] ?? issueCosts[selectedFeature]}
+              source={selectedIssue?.source}
+              url={selectedIssue?.url}
+              onOpenBeads={() => setShowBeads(true)}
+            />
           ) : selectedFeature ? (
             <>
               {/* Feature Header */}
