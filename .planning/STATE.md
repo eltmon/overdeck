@@ -16,9 +16,9 @@ Frontend enrichment and structural features after completing backend perf beads.
 - [x] pan-35kn: Density rule: suppress default-value badges in Zone A (commit: 58c14a6b)
 - [x] pan-sjj5: Overview tab: real test summary and PR summary cards (commit: 538edb8e)
 - [x] pan-rtf5: Session-tab strip: Conversation/Terminal/Findings tabs (commit: 73e09b02)
+- [x] pan-m1iu: Tree right-click menu: Pause, Resume, Stop, Restart, Deep Wipe, Open State Dir, View JSONL (commit: b04aeb7e)
 
 ## Remaining Work
-- [ ] pan-m1iu: Tree right-click menu: Pause, Resume, Stop, Restart, Deep Wipe, Open State Dir, View JSONL
 - [ ] pan-0bms: Missing Zone B overflow actions
 - [ ] pan-xvyz: PrDiffTab virtualization for large diffs
 
