@@ -77,12 +77,14 @@ async function readOptional(p: string): Promise<string | null> {
 /** Cache for resolved project paths to avoid repeated sync FS calls. */
 const projectPathCache = new Map<string, string>();
 
-/** TTL cache for closed issues to avoid hammering gh CLI on every poll (~10s). */
-let closedIssuesCache: { timestamp: number; data: Array<{ number: number; title: string }> } | null = null;
+/** TTL cache for closed issues to avoid hammering gh CLI on every poll (~10s).
+ *  Keyed by repo string (owner/repo) so multi-repo setups don't cross-pollute. */
+const closedIssuesCache = new Map<string, { timestamp: number; data: Array<{ number: number; title: string }> }>();
 const CLOSED_ISSUES_TTL_MS = 120_000; // 2 minutes
 
-/** TTL cache for cost data to avoid re-scanning cost events on every 5s poll (PAN-830 review high-4). */
-let costCache: { timestamp: number; data: { totalCost: number; costByStage: Record<string, { cost: number; tokens: number }> } } | null = null;
+/** TTL cache for cost data to avoid re-scanning cost events on every 5s poll (PAN-830 review high-4).
+ *  Keyed by upper-cased issueId so concurrent issues don't share stale data. */
+const costCache = new Map<string, { timestamp: number; data: { totalCost: number; costByStage: Record<string, { cost: number; tokens: number }> } }>();
 const COST_CACHE_TTL_MS = 30_000; // 30 seconds
 
 function getProjectPath(issuePrefix?: string): string {
@@ -523,9 +525,10 @@ export async function fetchActivityDataWithContext(
   let totalCost = 0;
   try {
     const cacheKey = issueId.toUpperCase();
-    if (costCache && costCache.timestamp > Date.now() - COST_CACHE_TTL_MS) {
-      totalCost = costCache.data.totalCost;
-      costByStage = costCache.data.costByStage;
+    const cached = costCache.get(cacheKey);
+    if (cached && cached.timestamp > Date.now() - COST_CACHE_TTL_MS) {
+      totalCost = cached.data.totalCost;
+      costByStage = cached.data.costByStage;
     } else {
       syncCache();
       const issueData = getCostsForIssue(cacheKey);
@@ -535,7 +538,7 @@ export async function fetchActivityDataWithContext(
           Object.entries(issueData.stages || {}).map(([stage, stats]) => [stage, { cost: stats.cost, tokens: stats.tokens }])
         );
       }
-      costCache = { timestamp: Date.now(), data: { totalCost, costByStage } };
+      costCache.set(cacheKey, { timestamp: Date.now(), data: { totalCost, costByStage } });
     }
   } catch { /* cost data optional */ }
 
@@ -1207,20 +1210,31 @@ async function fetchProjectTree(): Promise<unknown[]> {
 
   // Closed issues change at human cadence — cache for 2 min to avoid ~8,600
   // gh CLI invocations per day while the projects tab is open.
-  let closedIssues: Array<{ number: number; title: string }> = [];
-  if (closedIssuesCache && (Date.now() - closedIssuesCache.timestamp) < CLOSED_ISSUES_TTL_MS) {
-    closedIssues = closedIssuesCache.data;
-  } else {
-    try {
-      const { stdout } = await execAsync(
-        'gh issue list --repo eltmon/panopticon-cli --state closed --limit 200 --json number,title 2>/dev/null || echo "[]"'
-      );
-      closedIssues = JSON.parse(stdout.trim()) as Array<{ number: number; title: string }>;
-      closedIssuesCache = { timestamp: Date.now(), data: closedIssues };
-    } catch {
-      closedIssuesCache = { timestamp: Date.now(), data: [] };
+  // Fetch from ALL configured repos so multi-repo setups get correct titles (PAN-847).
+  const closedIssues: Array<{ number: number; title: string }> = [];
+  const ghConfig = getGitHubConfig();
+  const repos = ghConfig?.repos?.length
+    ? ghConfig.repos.map((r) => `${r.owner}/${r.repo}`)
+    : ['eltmon/panopticon-cli'];
+
+  for (const repo of repos) {
+    const cached = closedIssuesCache.get(repo);
+    if (cached && (Date.now() - cached.timestamp) < CLOSED_ISSUES_TTL_MS) {
+      closedIssues.push(...cached.data);
+    } else {
+      try {
+        const { stdout } = await execAsync(
+          `gh issue list --repo ${repo} --state closed --limit 200 --json number,title 2>/dev/null || echo "[]"`
+        );
+        const parsed = JSON.parse(stdout.trim()) as Array<{ number: number; title: string }>;
+        closedIssuesCache.set(repo, { timestamp: Date.now(), data: parsed });
+        closedIssues.push(...parsed);
+      } catch {
+        closedIssuesCache.set(repo, { timestamp: Date.now(), data: [] });
+      }
     }
   }
+
   for (const ci of closedIssues) {
     const key = `PAN-${ci.number}`;
     if (!issueTitleMap.has(key) && ci.title) {
