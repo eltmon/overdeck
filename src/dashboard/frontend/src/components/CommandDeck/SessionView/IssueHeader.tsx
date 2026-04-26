@@ -389,23 +389,28 @@ export function IssueHeader({ issueId, title, cost, url, onOpenBeads }: IssueHea
           Tasks
         </button>
 
-        <button
-          className={`${styles.issueHeaderBtn} ${!planning?.state ? styles.issueHeaderBtnDisabled : ''}`}
-          onClick={() => planning?.state && alert('STATE.md\n\n' + planning.state)}
-          title={planning?.state ? 'View STATE.md' : 'No STATE.md'}
-        >
-          <FileText size={11} />
-          STATE
-        </button>
+        {/* Density rule: suppress default-value badges (PAN-847 pan-35kn) */}
+        {planning?.state && (
+          <button
+            className={styles.issueHeaderBtn}
+            onClick={() => alert('STATE.md\n\n' + planning.state)}
+            title="View STATE.md"
+          >
+            <FileText size={11} />
+            STATE
+          </button>
+        )}
 
-        <button
-          className={`${styles.issueHeaderBtn} ${!planning?.prd ? styles.issueHeaderBtnDisabled : ''}`}
-          onClick={() => planning?.prd && alert('PRD\n\n' + planning.prd)}
-          title={planning?.prd ? 'View PRD' : 'No PRD'}
-        >
-          <FileText size={11} />
-          PRD
-        </button>
+        {planning?.prd && (
+          <button
+            className={styles.issueHeaderBtn}
+            onClick={() => alert('PRD\n\n' + planning.prd)}
+            title="View PRD"
+          >
+            <FileText size={11} />
+            PRD
+          </button>
+        )}
 
         {(planning?.discussions?.length ?? 0) > 0 && (
           <button
