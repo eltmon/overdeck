@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
   listProjects: vi.fn(),
@@ -81,7 +82,7 @@ describe('fetchProjectSessionTree', () => {
     mockAccess(new Set([
       '/tmp/panopticon-cli/workspaces',
       '/tmp/panopticon-cli/workspaces/feature-pan-821/.planning',
-      `${homedir()}/.panopticon/agents/agent-pan-539`,
+      join(homedir(), '.panopticon', 'agents', 'agent-pan-539'),
     ]));
     (readdir as any).mockResolvedValue([
       { name: 'feature-pan-821', isDirectory: () => true },

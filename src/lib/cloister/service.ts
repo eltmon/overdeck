@@ -58,7 +58,7 @@ import {
   type DeaconLogEntry,
 } from './deacon.js';
 import { PANOPTICON_HOME } from '../paths.js';
-import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync, renameSync } from 'fs';
+import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync, renameSync, statSync } from 'fs';
 import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
 import { loadReviewStatuses, setReviewStatus } from '../review-status.js';
@@ -253,8 +253,13 @@ export class CloisterService {
   }
 
   private getDashboardApiUrl(): string {
-    if (process.env.DASHBOARD_URL) return process.env.DASHBOARD_URL;
-    return `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
+    // Cloister always runs in-process with the dashboard, so it must talk to
+    // its own loopback — never to a public DASHBOARD_URL like https://pan.localhost,
+    // which would round-trip through Traefik+TLS and fail validation from inside
+    // Node (PAN-845). Use 127.0.0.1 explicitly to avoid the IPv6-first /etc/hosts
+    // trap (PAN-841): undici-based fetch connects to [::1] and hangs because the
+    // dashboard listens on the IPv4 wildcard.
+    return `http://127.0.0.1:${process.env.API_PORT || process.env.PORT || '3011'}`;
   }
 
   /**
@@ -666,8 +671,30 @@ export class CloisterService {
         const completedFile = join(AGENTS_DIR, dir.name, 'completed');
         const processedFile = join(AGENTS_DIR, dir.name, 'completed.processed');
 
-        // Skip if no completion marker or already processed on disk
-        if (!existsSync(completedFile) || existsSync(processedFile)) continue;
+        // Skip if no completion marker.
+        if (!existsSync(completedFile)) continue;
+
+        // If a stale `completed.processed` exists from a prior round, it must
+        // not block a NEW completion. `pan done` for a feedback round writes
+        // a fresh `completed` and unlinks `.processed`, but if the unlink
+        // didn't happen (older client, races, manual recovery), fall back to
+        // an mtime comparison: if `completed` is newer than `.processed`,
+        // treat it as a new event and remove the stale processed marker.
+        if (existsSync(processedFile)) {
+          try {
+            const completedMtime = statSync(completedFile).mtimeMs;
+            const processedMtime = statSync(processedFile).mtimeMs;
+            if (completedMtime > processedMtime) {
+              try { unlinkSync(processedFile); } catch {}
+              this.processedCompletions.delete(dir.name);
+              console.log(`🔔 Cloister: Detected re-completion for ${dir.name} (completed newer than .processed) — clearing stale marker`);
+            } else {
+              continue;
+            }
+          } catch {
+            continue;
+          }
+        }
 
         // Skip stale completion markers (older than 24h) — just mark as processed
         try {
@@ -684,9 +711,15 @@ export class CloisterService {
           continue;
         }
 
-        // Check retry count — give up after 3 failed attempts
+        // Check retry count — give up after 3 failed attempts.
+        // If `.processed` was unlinked (e.g. by a re-run of `pan done` after a
+        // review feedback round), the on-disk state says "fresh completion" —
+        // reset any stale in-memory counter from the previous round so the
+        // trigger fires again.
         const retryCount = this.processedCompletions.get(dir.name) || 0;
-        if (retryCount >= 3) continue;
+        if (retryCount === Infinity) {
+          this.processedCompletions.delete(dir.name);
+        } else if (retryCount >= 3) continue;
 
         // Extract issue ID from agent dir name (e.g. "agent-pan-123" → "PAN-123")
         const issueId = dir.name.replace('agent-', '').toUpperCase();
@@ -705,30 +738,31 @@ export class CloisterService {
         console.log(`🔔 Cloister: Found completion marker for ${issueId}, triggering review...${retryCount > 0 ? ` (retry ${retryCount}/3)` : ''}`);
 
         try {
-          // Trigger review via dashboard API (same process, localhost)
-          const http = await import('http');
-          const result = await new Promise<{ success: boolean; error?: string; alreadyReviewed?: boolean; alreadyMerged?: boolean }>((resolve) => {
-            const postData = JSON.stringify({});
-            const req = http.request(
-              `${this.getDashboardApiUrl()}/api/review/${issueId}/trigger`,
-              { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeout: 5000 },
-              (res) => {
-                let data = '';
-                res.on('data', (chunk: string) => data += chunk);
-                res.on('end', () => {
-                  try {
-                    resolve(JSON.parse(data));
-                  } catch {
-                    resolve({ success: false, error: `Invalid response (HTTP ${res.statusCode})` });
-                  }
-                });
+          // Trigger review via dashboard API. Use fetch() so https:// URLs
+          // (e.g. https://pan.localhost via Traefik) work — Node's http.request
+          // rejects https URLs with "Protocol \"https:\" not supported".
+          const result = await (async (): Promise<{ success: boolean; error?: string; alreadyReviewed?: boolean; alreadyMerged?: boolean }> => {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 5000);
+            try {
+              const res = await fetch(`${this.getDashboardApiUrl()}/api/review/${issueId}/trigger`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}),
+                signal: controller.signal,
+              });
+              clearTimeout(timer);
+              try {
+                return (await res.json()) as { success: boolean; error?: string; alreadyReviewed?: boolean; alreadyMerged?: boolean };
+              } catch {
+                return { success: false, error: `Invalid response (HTTP ${res.status})` };
               }
-            );
-            req.on('error', (e: Error) => resolve({ success: false, error: e.message }));
-            req.on('timeout', () => { req.destroy(); resolve({ success: false, error: 'Timeout (5s)' }); });
-            req.write(postData);
-            req.end();
-          });
+            } catch (e: any) {
+              clearTimeout(timer);
+              if (e?.name === 'AbortError') return { success: false, error: 'Timeout (5s)' };
+              return { success: false, error: e?.message || String(e) };
+            }
+          })();
 
           if (result.success) {
             console.log(`  ✓ Review triggered for ${issueId}`);

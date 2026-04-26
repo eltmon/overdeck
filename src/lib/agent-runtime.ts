@@ -11,7 +11,11 @@
 
 import type { AgentRuntimeSnapshot, Activity, AgentResolution, WaitingReason } from '@panopticon/contracts'
 
-const DASHBOARD_URL = process.env['PANOPTICON_DASHBOARD_URL'] || 'http://localhost:3011'
+// Use 127.0.0.1 explicitly: when /etc/hosts resolves `localhost` to ::1
+// (IPv6 first), Node's undici-based fetch() connects to [::1]:3011 and
+// fails because the dashboard listens on the IPv4 wildcard 0.0.0.0.
+// curl falls back to IPv4; Node's fetch in this version does not.
+const DASHBOARD_URL = process.env['PANOPTICON_DASHBOARD_URL'] || 'http://127.0.0.1:3011'
 const DEFAULT_TIMEOUT_MS = 1500
 
 function abortSignal(ms: number): AbortSignal {
