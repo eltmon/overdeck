@@ -213,7 +213,9 @@ export function SessionNode({
         <span className={styles.sessionLabel} title={session.sessionId}>
           {deriveSessionLabel(session)}
         </span>
-        <span className={styles.sessionStatus}>{session.status}</span>
+        <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${session.status}`] ?? ''}`}>
+          {session.status}
+        </span>
         <span className={styles.sessionDuration}>{formatDuration(session.duration)}</span>
       </button>
 

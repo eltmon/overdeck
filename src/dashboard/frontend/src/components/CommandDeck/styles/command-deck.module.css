@@ -648,10 +648,35 @@
 }
 
 .sessionStatus {
-  font-size: var(--mc-font-size-xs);
+  font-size: 10px;
   color: var(--mc-text-muted);
   flex-shrink: 0;
   text-transform: lowercase;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--mc-bg-hover);
+  white-space: nowrap;
+}
+
+.sessionStatus_running {
+  color: var(--mc-success);
+  background: color-mix(in srgb, var(--mc-success) 12%, transparent);
+}
+
+.sessionStatus_error {
+  color: var(--mc-error);
+  background: color-mix(in srgb, var(--mc-error) 12%, transparent);
+}
+
+.sessionStatus_starting {
+  color: var(--mc-warning);
+  background: color-mix(in srgb, var(--mc-warning) 12%, transparent);
+}
+
+.sessionStatus_stopped,
+.sessionStatus_unknown {
+  color: var(--mc-text-muted);
+  background: var(--mc-bg-hover);
 }
 
 .sessionDuration {
