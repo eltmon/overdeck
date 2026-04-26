@@ -19,7 +19,7 @@ Frontend enrichment and structural features after completing backend perf beads.
 - [x] pan-m1iu: Tree right-click menu: Pause, Resume, Stop, Restart, Deep Wipe, Open State Dir, View JSONL (commit: b04aeb7e)
 
 ## Remaining Work
-- [ ] pan-0bms: Missing Zone B overflow actions
+- [x] pan-0bms: Missing Zone B overflow actions (commit: 41159ead)
 - [ ] pan-xvyz: PrDiffTab virtualization for large diffs
 
 ## Key Decisions

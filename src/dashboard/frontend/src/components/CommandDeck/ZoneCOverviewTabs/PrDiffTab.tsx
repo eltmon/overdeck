@@ -13,8 +13,11 @@
  * Backend lands in pan-9yn5 (this bead). Polls every 30s — same cadence as costs.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { usePrQuery, type PullRequestData } from './queries';
+
+const DIFF_LINE_HEIGHT = 17; // font-size 11 × line-height 1.5, rounded up
 
 interface PrDiffTabProps {
   issueId: string;
@@ -106,17 +109,14 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
     return Math.max(1, sorted[idx] ?? 1);
   }, [data]);
 
-  const diffRows = useMemo(() => {
-    if (!data?.diff) return null;
-    return data.diff.split('\n').map((line, idx) => {
-      const color = diffLineColor(line);
-      return (
-        <div key={idx} style={color ? { color } : undefined}>
-          {line || '\u00A0'}
-        </div>
-      );
-    });
-  }, [data?.diff]);
+  const diffLines = useMemo(() => data?.diff?.split('\n') ?? [], [data?.diff]);
+  const diffScrollRef = useRef<HTMLDivElement>(null);
+  const diffVirtualizer = useVirtualizer({
+    count: diffLines.length,
+    getScrollElement: () => diffScrollRef.current,
+    estimateSize: () => DIFF_LINE_HEIGHT,
+    overscan: 12,
+  });
 
   if (isLoading) {
     return (
@@ -418,23 +418,54 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
               borderBottom: '1px solid var(--mc-border, var(--border))',
             }}
           >
-            Patch
+            Patch ({diffLines.length} line{diffLines.length === 1 ? '' : 's'})
           </header>
-          <pre
+          <div
+            ref={diffScrollRef}
             data-testid="prdiff-tab-diff-body"
             style={{
-              margin: 0,
-              padding: 12,
               fontSize: 11,
               fontFamily: 'var(--font-mono, monospace)',
               lineHeight: 1.5,
-              whiteSpace: 'pre',
               overflowX: 'auto',
               maxHeight: 480,
             }}
           >
-            {diffRows}
-          </pre>
+            {diffVirtualizer.getVirtualItems().length === 0 ? (
+              /* Fallback for test environments where container has no size */
+              <div style={{ padding: '0 12px' }}>
+                {diffLines.map((line, idx) => (
+                  <div key={idx} style={{ color: diffLineColor(line) }}>
+                    {line || '\u00A0'}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ height: diffVirtualizer.getTotalSize(), position: 'relative' }}>
+                {diffVirtualizer.getVirtualItems().map((virtualItem) => {
+                  const line = diffLines[virtualItem.index]!;
+                  const color = diffLineColor(line);
+                  return (
+                    <div
+                      key={virtualItem.key}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        padding: '0 12px',
+                        transform: `translateY(${virtualItem.start}px)`,
+                        color,
+                        whiteSpace: 'pre',
+                      }}
+                    >
+                      {line || '\u00A0'}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </section>
       )}
     </div>
