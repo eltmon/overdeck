@@ -60,6 +60,7 @@ import {
   getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
 } from '../../../lib/agents.js';
+import { generateLauncherScript } from '../../../lib/launcher-generator.js';
 import {
   parseConversationMessages,
   parseFromLastCompactBoundary,
@@ -698,33 +699,24 @@ async function spawnConversationSession(
     throw new Error('Invalid effort level');
   }
 
-  const envExports = [
-    `export TERM=xterm-256color`,
-    `export COLORTERM=truecolor`,
-    `export LANG=C.UTF-8`,
-    `export LC_ALL=C.UTF-8`,
-    ...(issueId ? [`export PANOPTICON_ISSUE_ID=${shellQuote(issueId)}`] : []),
-    ...providerEnvExports,
-  ].join('\n');
-
-  const sessionArgs = [
-    resume ? `--resume ${shellQuote(claudeSessionId)}` : `--session-id ${shellQuote(claudeSessionId)}`,
-    ...(effort ? [`--effort ${shellQuote(effort)}`] : []),
-  ].join(' ');
-
-  // Quote each token of the runtime command so paths with spaces are handled
-  // safely while preserving the individual arguments.
-  const quotedRuntimeCommand = runtimeCommand.split(' ').map(shellQuote).join(' ');
-
-  await writeFile(launcherScript, `#!/bin/bash
-${envExports}
-cd -- ${shellQuote(cwd)}
-trap '' HUP
-${quotedRuntimeCommand} ${sessionArgs}
-echo ""
-echo "Conversation session ended. Close this panel or click Resume to start a new session."
-while true; do sleep 60; done
-`, { mode: 0o700 });
+  await writeFile(
+    launcherScript,
+    generateLauncherScript({
+      agentType: 'conversation',
+      workingDir: cwd,
+      setTerminalEnv: true,
+      panopticonEnv: issueId ? { issueId } : undefined,
+      extraEnvExports: providerEnvExports,
+      trapHup: true,
+      baseCommand: runtimeCommand,
+      resumeSessionId: resume ? claudeSessionId : undefined,
+      sessionId: resume ? undefined : claudeSessionId,
+      extraArgs: effort ? `--effort "${effort}"` : undefined,
+      keepAlive: true,
+      fileMode: 0o700,
+    }),
+    { mode: 0o700 },
+  );
 
   // Kill any stale session with the same name
   try {

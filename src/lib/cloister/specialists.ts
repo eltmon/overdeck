@@ -23,6 +23,7 @@ import { readCavemanVariant } from '../caveman/workspace.js';
 import { getModelId, WorkTypeId } from '../work-type-router.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { getProviderEnvForModel } from '../agents.js';
+import { generateLauncherScript, generateLauncherWrapper } from '../launcher-generator.js';
 import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery, createSessionAsync, killSessionAsync, buildTmuxCommandString, listPaneValuesAsync, listSessionNamesAsync, sessionExistsAsync } from '../tmux.js';
 import { notifyPipeline } from '../pipeline-notifier.js';
 import { isTaskReady } from './task-readiness.js';
@@ -94,13 +95,12 @@ const PROVIDER_ENV_UNSETS = [
   'API_TIMEOUT_MS',
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
 ];
-const PROVIDER_UNSET_LINES = PROVIDER_ENV_UNSETS.map(k => `unset ${k}`).join('\n');
 const PROVIDER_UNSET_CMD = `unset ${PROVIDER_ENV_UNSETS.join(' ')}`;
 
 /**
- * Convert a providerEnv dict to bash export lines (re-export after PROVIDER_UNSET_LINES).
+ * Convert a providerEnv dict to bash export lines.
  * Non-Anthropic models (e.g. gpt-5.4 via cliproxy) need ANTHROPIC_BASE_URL set in the
- * script body — tmux -e flags are wiped by PROVIDER_UNSET_LINES before claude runs.
+ * script body after provider env vars are unset.
  */
 function buildProviderExportLines(providerEnv: Record<string, string>): string {
   const entries = Object.entries(providerEnv);
@@ -1069,23 +1069,25 @@ ${basePrompt}`;
     );
 
     const providerExportLines = buildProviderExportLines(providerEnv);
-    writeFileSync(innerScript, `#!/bin/bash
-set -o pipefail
-cd "${cwd}"
-${PROVIDER_UNSET_LINES}
-${providerExportLines}export CI=1
-export PANOPTICON_AGENT_ID="${tmuxSession}"
-export PANOPTICON_ISSUE_ID="${task.issueId}"
-export PANOPTICON_SESSION_TYPE="${sessionTypeLabel}"
-${specialistCavemanExports}prompt=$(cat "${promptFile}")
-
-# Fresh session every dispatch — no --resume (PAN-612: thinking signature corruption)
-claude ${permissionFlags} --session-id "${sessionId}" --model ${model} "$prompt"
-
-# Signal completion
-echo ""
-echo "## Specialist completed task"
-`, { mode: 0o755 });
+    writeFileSync(
+      innerScript,
+      generateLauncherScript({
+        agentType: 'specialist-dispatch',
+        workingDir: cwd,
+        setPipefail: true,
+        unsetProviderEnv: true,
+        providerExports: providerExportLines,
+        setCi: true,
+        panopticonEnv: { agentId: tmuxSession, issueId: task.issueId, sessionType: sessionTypeLabel },
+        cavemanExports: specialistCavemanExports,
+        promptFile,
+        baseCommand: 'claude',
+        permissionFlags: permissionFlags.split(' '),
+        sessionId,
+        model,
+      }),
+      { mode: 0o755 },
+    );
 
     // Outer launcher: exec into script(1) so the tmux pane's main process IS script.
     // CRITICAL: must use `exec` (not a pipeline) so tmux kill-session SIGHUP propagates
@@ -1096,9 +1098,21 @@ echo "## Specialist completed task"
     // via -a), so we get the same log capture as the old tee pipeline without the pipe.
     // -q quiet (no Script started/done banners), -f flush on every write, -a append,
     // -e propagate child exit code, -c run command.
-    writeFileSync(launcherScript, `#!/bin/bash
-exec script -qfaec "bash '${innerScript}'" "${logFilePath}"
-`, { mode: 0o755 });
+    const wrapper = generateLauncherWrapper({
+      agentType: 'specialist-dispatch',
+      workingDir: cwd,
+      useScriptWrapper: true,
+      scriptLogFile: logFilePath,
+      innerScriptPath: innerScript,
+    });
+    if (!wrapper) {
+      throw new Error('specialist wrapper requires useScriptWrapper + scriptLogFile');
+    }
+    writeFileSync(
+      launcherScript,
+      wrapper,
+      { mode: 0o755 },
+    );
 
     // Spawn Claude Code via launcher script (with provider env vars)
     // -c sets tmux session working directory to project path (prevents trust prompt — PAN-384)
@@ -2272,12 +2286,21 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
     writeFileSync(promptFile, identityPrompt);
     const newSessionId = randomUUID();
     const initProviderExportLines = buildProviderExportLines(providerEnv);
-    writeFileSync(launcherScript, `#!/bin/bash
-cd "${cwd}"
-${PROVIDER_UNSET_LINES}
-${initProviderExportLines}prompt=$(cat "${promptFile}")
-exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id "${newSessionId}" --model ${model} "$prompt"
-`, { mode: 0o755 });
+    writeFileSync(
+      launcherScript,
+      generateLauncherScript({
+        agentType: 'specialist-init',
+        workingDir: cwd,
+        unsetProviderEnv: true,
+        providerExports: initProviderExportLines,
+        promptFile,
+        baseCommand: 'claude',
+        permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
+        sessionId: newSessionId,
+        model,
+      }),
+      { mode: 0o755 },
+    );
     setSessionId(name, newSessionId);
 
     // Pre-trust cwd so specialists don't hit the trust prompt (same as spawnSpecialist)

@@ -26,6 +26,7 @@ import {
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
 import { getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../agents.js';
+import { generateLauncherScript } from '../launcher-generator.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -427,31 +428,23 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const promptFile = join(agentStateDir, 'init-prompt.txt');
     const launcherScript = join(agentStateDir, 'launcher.sh');
     writeFileSync(promptFile, initMessage);
-    writeFileSync(launcherScript, `#!/bin/bash
-# Set terminal environment for proper rendering (match remote launcher)
-export CI=1
-export TERM=xterm-256color
-export COLORTERM=truecolor
-export LANG=C.UTF-8
-export LC_ALL=C.UTF-8
-export PANOPTICON_AGENT_ID="${sessionName}"
-export PANOPTICON_ISSUE_ID="${issue.identifier}"
-export PANOPTICON_SESSION_TYPE="planning"
-${providerExports}
-cd "${workspacePath}"
-prompt=$(cat "${promptFile}")
-trap '' HUP
-echo "[launcher] Claude starting at $(date)" >> /tmp/pan-launcher-debug.log
-${cmdWithArgs} "$prompt"
-CLAUDE_EXIT=$?
-echo "[launcher] Claude exited with code $CLAUDE_EXIT at $(date)" >> /tmp/pan-launcher-debug.log
-# Keep session alive after Claude exits so user can review and click Done
-echo ""
-echo "Planning agent has exited. Session kept alive for review."
-echo "Click 'Done' in the dashboard when ready to hand off to implementation."
-echo "[launcher] Keep-alive loop starting at $(date)" >> /tmp/pan-launcher-debug.log
-while true; do sleep 60; done
-`, { mode: 0o755 });
+    writeFileSync(
+      launcherScript,
+      generateLauncherScript({
+        agentType: 'planning',
+        workingDir: workspacePath,
+        setCi: true,
+        setTerminalEnv: true,
+        panopticonEnv: { agentId: sessionName, issueId: issue.identifier, sessionType: 'planning' },
+        providerExports,
+        promptFile,
+        baseCommand: cmdWithArgs,
+        trapHup: true,
+        debugLog: '/tmp/pan-launcher-debug.log',
+        keepAlive: true,
+      }),
+      { mode: 0o755 },
+    );
 
     progress(4, 'Configuring agent', `${planningModel} — prompt & launcher ready`, 'complete');
 

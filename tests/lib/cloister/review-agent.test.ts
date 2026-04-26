@@ -242,7 +242,7 @@ describe('buildReviewFeedbackBody', () => {
 describe('waitForReviewer', () => {
   it('returns completed when output file appears while session still running', async () => {
     // This is the normal case: Claude writes the file but does not exit.
-    // waitForReviewer must detect the file and kill the session.
+    // Session is kept alive so the dashboard can show reviewer tabs after completion.
     const sessionExists = vi.fn().mockResolvedValue(true); // session still running
     const fileExists = vi.fn().mockReturnValue(true);       // output file written
     const killSession = vi.fn().mockResolvedValue(undefined);
@@ -253,8 +253,6 @@ describe('waitForReviewer', () => {
 
     expect(result).toBe('completed');
     expect(fileExists).toHaveBeenCalledWith('/tmp/out.md');
-    // Session is NOT killed when output file is found — kept alive so dashboard
-    // can show reviewer tabs after completion.
     expect(killSession).not.toHaveBeenCalled();
   });
 
@@ -269,8 +267,7 @@ describe('waitForReviewer', () => {
 
     expect(result).toBe('completed');
     expect(fileExists).toHaveBeenCalledWith('/tmp/out.md');
-    // Session is NOT killed when output file is found — kept alive so dashboard
-    // can show reviewer tabs after completion.
+    // Session is kept alive post-completion for dashboard visibility; no killSession call
     expect(killSession).not.toHaveBeenCalled();
   });
 

@@ -23,6 +23,7 @@ import { getCliproxyClientEnv } from './cliproxy.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix } from './projects.js';
+import { generateLauncherScript } from './launcher-generator.js';
 import { logAgentLifecycle } from './persistent-logger.js';
 
 const execAsync = promisify(exec);
@@ -1027,10 +1028,15 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   );
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
-  const launcherContent = `#!/bin/bash
-export CI=1
-${providerExports}${cavemanExports}${getAgentRuntimeBaseCommand(state.model)}
-`;
+  const launcherContent = generateLauncherScript({
+    agentType: 'work',
+    workingDir: options.workspace,
+    changeDir: false,
+    setCi: true,
+    providerExports,
+    cavemanExports,
+    baseCommand: getAgentRuntimeBaseCommand(state.model),
+  });
   writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
   const claudeCmd = `bash ${launcherScript}`;
 
@@ -1391,10 +1397,14 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
 
     const providerExports = getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
     const fallbackLauncher = join(getAgentDir(normalizedId), 'launcher.sh');
-    const fallbackContent = `#!/bin/bash
-export CI=1
-${providerExports}${getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6')}
-`;
+    const fallbackContent = generateLauncherScript({
+      agentType: 'work',
+      workingDir: agentState.workspace,
+      changeDir: false,
+      setCi: true,
+      providerExports,
+      baseCommand: getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6'),
+    });
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
     await createSessionAsync(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
       env: {
@@ -1581,12 +1591,18 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     // --model flag, Claude Code defaults to claude-sonnet-4-6 on resume, sending claude
     // requests through the proxy → "unknown provider" 502. Always include --model when
     // providerExports sets ANTHROPIC_BASE_URL so the resumed session uses the correct model.
-    const resumeModelFlag = providerExports.includes('ANTHROPIC_BASE_URL') ? ` --model ${model}` : '';
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
-    const launcherContent = `#!/bin/bash
-export CI=1
-${providerExports}exec claude --resume "${sessionId}"${resumeModelFlag} --dangerously-skip-permissions --permission-mode bypassPermissions
-`;
+    const launcherContent = generateLauncherScript({
+      agentType: 'resume',
+      workingDir: agentState.workspace,
+      changeDir: false,
+      setCi: true,
+      providerExports,
+      baseCommand: 'claude',
+      permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
+      resumeSessionId: sessionId,
+      model: providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
+    });
     writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
     const claudeCmd = `bash ${launcherScript}`;
     await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {

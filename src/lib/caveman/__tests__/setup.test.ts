@@ -35,7 +35,7 @@ function createFakeVendoredFiles() {
   for (const f of ['caveman-activate.js', 'caveman-mode-tracker.js', 'caveman-config.js', 'panopticon-caveman-activate.js']) {
     writeFileSync(join(fakeVendoredDir, f), `// ${f}`);
   }
-  writeFileSync(join(fakeVendoredDir, 'caveman-statusline.sh'), '#!/bin/bash\necho caveman');
+  writeFileSync(join(fakeVendoredDir, 'caveman-statusline.sh'), 'echo caveman');
   writeFileSync(join(fakeVendoredDir, 'skills', 'caveman', 'SKILL.md'), '# Caveman SKILL');
   writeFileSync(join(fakeVendoredDir, 'skills', 'caveman-review', 'SKILL.md'), '# Caveman Review SKILL');
 }

@@ -16,6 +16,7 @@ import type {
   AgentMessage,
 } from './interface.js';
 import { CLAUDE_FEATURES } from './interface.js';
+import { generateLauncherScript } from '../launcher-generator.js';
 
 const CLAUDE_DIR = join(homedir(), '.claude');
 
@@ -90,12 +91,17 @@ export function createClaudeAdapter(): RuntimeAdapter {
 
         // Create launcher script
         const launcherScript = join(agentDir, 'launcher.sh');
-        const argsStr = args.length > 0 ? ` ${args.join(' ')}` : '';
-        writeFileSync(launcherScript, `#!/bin/bash
-cd "${options.workingDir}"
-prompt=$(cat "${promptFile}")
-exec claude${argsStr} "$prompt"
-`, { mode: 0o755 });
+        writeFileSync(
+          launcherScript,
+          generateLauncherScript({
+            agentType: 'runtime',
+            workingDir: options.workingDir,
+            promptFile,
+            baseCommand: 'claude',
+            extraArgs: args.length > 0 ? args.join(' ') : undefined,
+          }),
+          { mode: 0o755 },
+        );
 
         await execa('tmux', [
           'new-session',
