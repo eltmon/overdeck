@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import ora from 'ora';
 import { saveAgentRuntimeState } from '../../lib/agents.js';
-import { existsSync, writeFileSync, readFileSync, mkdirSync } from 'fs';
+import { existsSync, writeFileSync, readFileSync, mkdirSync, unlinkSync } from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 const execAsync = promisify(exec);
@@ -381,6 +381,13 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     // Step 4: Write completion marker
     mkdirSync(join(AGENTS_DIR, agentId), { recursive: true });
     const completedFile = join(AGENTS_DIR, agentId, 'completed');
+    // Re-runs of `pan done` (e.g. after a review feedback round) must reset the
+    // cloister's processed-marker, otherwise checkCompletionMarkers() at
+    // service.ts:670 sees `completed.processed` exist and skips the new trigger.
+    const processedMarker = join(AGENTS_DIR, agentId, 'completed.processed');
+    if (existsSync(processedMarker)) {
+      try { unlinkSync(processedMarker); } catch {}
+    }
     writeFileSync(completedFile, JSON.stringify({
       timestamp: new Date().toISOString(),
       trackerUpdated,

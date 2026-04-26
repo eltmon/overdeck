@@ -58,7 +58,7 @@ import {
   type DeaconLogEntry,
 } from './deacon.js';
 import { PANOPTICON_HOME } from '../paths.js';
-import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync, renameSync } from 'fs';
+import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync, renameSync, statSync } from 'fs';
 import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
 import { loadReviewStatuses, setReviewStatus } from '../review-status.js';
@@ -666,8 +666,30 @@ export class CloisterService {
         const completedFile = join(AGENTS_DIR, dir.name, 'completed');
         const processedFile = join(AGENTS_DIR, dir.name, 'completed.processed');
 
-        // Skip if no completion marker or already processed on disk
-        if (!existsSync(completedFile) || existsSync(processedFile)) continue;
+        // Skip if no completion marker.
+        if (!existsSync(completedFile)) continue;
+
+        // If a stale `completed.processed` exists from a prior round, it must
+        // not block a NEW completion. `pan done` for a feedback round writes
+        // a fresh `completed` and unlinks `.processed`, but if the unlink
+        // didn't happen (older client, races, manual recovery), fall back to
+        // an mtime comparison: if `completed` is newer than `.processed`,
+        // treat it as a new event and remove the stale processed marker.
+        if (existsSync(processedFile)) {
+          try {
+            const completedMtime = statSync(completedFile).mtimeMs;
+            const processedMtime = statSync(processedFile).mtimeMs;
+            if (completedMtime > processedMtime) {
+              try { unlinkSync(processedFile); } catch {}
+              this.processedCompletions.delete(dir.name);
+              console.log(`🔔 Cloister: Detected re-completion for ${dir.name} (completed newer than .processed) — clearing stale marker`);
+            } else {
+              continue;
+            }
+          } catch {
+            continue;
+          }
+        }
 
         // Skip stale completion markers (older than 24h) — just mark as processed
         try {
@@ -684,9 +706,15 @@ export class CloisterService {
           continue;
         }
 
-        // Check retry count — give up after 3 failed attempts
+        // Check retry count — give up after 3 failed attempts.
+        // If `.processed` was unlinked (e.g. by a re-run of `pan done` after a
+        // review feedback round), the on-disk state says "fresh completion" —
+        // reset any stale in-memory counter from the previous round so the
+        // trigger fires again.
         const retryCount = this.processedCompletions.get(dir.name) || 0;
-        if (retryCount >= 3) continue;
+        if (retryCount === Infinity) {
+          this.processedCompletions.delete(dir.name);
+        } else if (retryCount >= 3) continue;
 
         // Extract issue ID from agent dir name (e.g. "agent-pan-123" → "PAN-123")
         const issueId = dir.name.replace('agent-', '').toUpperCase();
