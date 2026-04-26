@@ -2930,12 +2930,12 @@ export async function sendFeedbackToAgent(
     return false;
   }
 
-  // Send short reference pointing to the file
+  // Send a short, explicit message with the ABSOLUTE path.
   try {
     const { messageAgent } = await import('../agents.js');
-    const msg = `SPECIALIST FEEDBACK: ${fromSpecialist} reported ${feedback.feedbackType.toUpperCase()} for ${toIssueId}.\n\nRead ${fileResult.relativePath}, then immediately address the feedback and continue working. Do NOT stop at the prompt.`;
+    const msg = `SPECIALIST FEEDBACK: ${fromSpecialist} reported ${feedback.feedbackType.toUpperCase()} for ${toIssueId}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then address the feedback and continue working. Do NOT stop at the prompt.`;
     await messageAgent(agentSession, msg);
-    console.log(`[specialist] Sent feedback from ${fromSpecialist} to ${agentSession} (file: ${fileResult.relativePath})`);
+    console.log(`[specialist] Sent feedback from ${fromSpecialist} to ${agentSession} (file: ${fileResult.filePath})`);
     return true;
   } catch (err) {
     // Agent may be gone — feedback file is still in the workspace for crash recovery
