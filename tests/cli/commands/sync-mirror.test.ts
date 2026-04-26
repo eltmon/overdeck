@@ -84,9 +84,13 @@ vi.mock('ora', () => ({
   }),
 }));
 
-vi.mock('child_process', () => ({
-  execSync: vi.fn(),
-}));
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    execSync: vi.fn(),
+  };
+});
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 

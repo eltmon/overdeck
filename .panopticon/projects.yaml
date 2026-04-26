@@ -1,0 +1,344 @@
+projects:
+  panopticon-cli:
+    name: panopticon-cli
+    path: /home/eltmon/Projects/panopticon-cli
+    issue_prefix: PAN
+    github_repo: eltmon/panopticon-cli
+    package_manager: bun
+    workspace_packages:
+      - path: packages/contracts
+        build_command: npm run build
+    workspace:
+      type: monorepo
+      workspaces_dir: workspaces
+      default_branch: main
+      dns:
+        domain: pan.localhost
+        entries:
+          - "{{FEATURE_FOLDER}}.{{DOMAIN}}"
+          - api-{{FEATURE_FOLDER}}.{{DOMAIN}}
+        sync_method: hosts_file
+      docker:
+        traefik: templates/traefik
+        compose_template: infra/.devcontainer-template
+      agent:
+        template_dir: infra/.devcontainer-template
+        copy_dirs:
+          - .claude/commands
+          - .claude/skills
+      services:
+        - name: frontend
+          path: src/dashboard/frontend
+          start_command: npm run dev -- --host 0.0.0.0
+          docker_command: npm run dev -- --host 0.0.0.0
+          health_url: https://{{FEATURE_FOLDER}}.pan.localhost
+          port: 3010
+        - name: server
+          path: src/dashboard/server
+          start_command: npm run dev
+          docker_command: npm run dev
+          health_url: https://api-{{FEATURE_FOLDER}}.pan.localhost/api/health
+          port: 3011
+      env:
+        secrets_file: ~/.panopticon.env
+    tests:
+      unit:
+        type: vitest
+        path: .
+        command: npx vitest run --no-file-parallelism && cd src/dashboard/frontend && npm test
+      e2e:
+        type: vitest
+        path: .
+        command: npx vitest run tests/e2e/
+      dashboard:
+        type: vitest
+        path: .
+        command: npx vitest run tests/dashboard/
+      playwright:
+        type: playwright
+        path: src/dashboard/frontend
+        command: npx playwright test
+        container: true
+        container_name: panopticon-{{FEATURE_FOLDER}}-frontend
+    quality_gates:
+      install:
+        command: bun install --frozen-lockfile
+        required: true
+      typecheck:
+        command: npm run typecheck
+        required: true
+      frontend-typecheck:
+        command: npx tsc --noEmit
+        path: src/dashboard/frontend
+        required: true
+      lint:
+        command: npm run lint
+        required: true
+      build:
+        command: npm run build
+        required: true
+      test:
+        command: npm test -- --run
+        required: true
+  mind-your-now:
+    name: mind-your-now
+    path: /home/eltmon/Projects/myn
+    issue_prefix: MIN
+    linear_project: Mind Your Now
+    gitlab_repo: eltmon/mind-your-now
+    workspace:
+      type: polyrepo
+      workspaces_dir: workspaces
+      default_branch: main
+      repos:
+        - name: fe
+          path: frontend
+          branch_prefix: feature/
+        - name: api
+          path: api
+          branch_prefix: feature/
+        - name: infra
+          path: infra
+          branch_prefix: feature/
+        - name: docs
+          path: docs
+          branch_prefix: feature/
+        - name: myn-skills
+          path: myn-skills
+          branch_prefix: feature/
+          remote: github
+        - name: openclaw-plugin
+          path: openclaw-plugin
+          branch_prefix: feature/
+          remote: github
+      dns:
+        domain: myn.localhost
+        entries:
+          - "{{FEATURE_FOLDER}}.{{DOMAIN}}"
+          - api-{{FEATURE_FOLDER}}.{{DOMAIN}}
+        sync_method: hosts_file
+      docker:
+        traefik: infra/docker-compose.traefik.yml
+        compose_template: infra/.devcontainer-template
+      database:
+        seed_file: infra/seed/seed-cleaned.sql
+        container_name: myn-{{FEATURE_FOLDER}}-postgres
+        migrations:
+          type: flyway
+          path: api/src/main/resources/db/migration
+      agent:
+        template_dir: infra/.agent-template
+        copy_dirs:
+          - .claude/commands
+          - .claude/skills
+          - .claude/agents
+      tunnel:
+        provider: cloudflare
+        tunnel_id: 41ee46e5-575f-4ace-8a5d-58fb33447b34
+        account_id: a054309c69a06eca29daf374781bc614
+        zone_id: fc5c4fd86ff710d1de37190e057004d1
+        credentials_file: ~/.cloudflared/cert.pem
+        service_target: https://localhost
+        hostnames:
+          - pattern: api-{{FEATURE_FOLDER}}.mindyournow.com
+            http_host_header: api-{{FEATURE_FOLDER}}.myn.localhost
+            no_tls_verify: true
+      hume:
+        template_config_id: aff795b7-b430-4200-9cb2-bcde50256378
+        name_pattern: kaia-{{FEATURE_FOLDER}}
+        byollm_url_pattern: https://api-{{FEATURE_FOLDER}}.mindyournow.com/api/v1/ai/hume/chat/completions
+      env:
+        secrets_file: ~/.myn/.env
+      services:
+        - name: api
+          path: api
+          start_command: ./run-dev.sh
+          health_url: https://api-{{FEATURE_FOLDER}}.myn.localhost/actuator/health
+          port: 7000
+        - name: frontend
+          path: fe
+          start_command: pnpm start
+          health_url: https://{{FEATURE_FOLDER}}.myn.localhost
+          port: 5173
+    tests:
+      backend:
+        type: maven
+        path: api
+        command: ./mvnw test -Pfast-test
+        container: true
+        container_name: myn-{{FEATURE_FOLDER}}-api
+      migration-validation:
+        type: maven
+        path: api
+        command: ./mvnw test -Dtest=FlywayMigrationValidationTest -Dtestcontainers.reuse.enable=true
+      frontend-unit:
+        type: vitest
+        path: fe
+        command: pnpm test -- --run
+      frontend-lint:
+        type: custom
+        path: fe
+        command: pnpm lint && pnpm typecheck
+      frontend-e2e:
+        type: playwright
+        path: fe
+        command: pnpm exec playwright test
+    quality_gates:
+      frontend-lint:
+        command: pnpm lint
+        path: fe
+        required: true
+        container: true
+        container_name: myn-{{FEATURE_FOLDER}}-fe-1
+      frontend-typecheck:
+        command: pnpm typecheck
+        path: fe
+        required: true
+        container: true
+        container_name: myn-{{FEATURE_FOLDER}}-fe-1
+      frontend-build:
+        command: pnpm build:ci
+        path: fe
+        required: true
+        container: true
+        container_name: myn-{{FEATURE_FOLDER}}-fe-1
+      api-build:
+        command: ./mvnw compile
+        path: api
+        required: true
+        container: true
+        container_name: myn-{{FEATURE_FOLDER}}-api-1
+  auricle:
+    name: auricle
+    path: /home/eltmon/Projects/auricle
+    issue_prefix: AUR
+    linear_project: Auricle
+    gitlab_repo: eltmon/auricle
+    workspace:
+      type: polyrepo
+      workspaces_dir: workspaces
+      default_branch: main
+      repos:
+        - name: frontend
+          path: frontend
+          branch_prefix: feature/
+        - name: backend
+          path: backend
+          branch_prefix: feature/
+        - name: infra
+          path: infra
+          branch_prefix: feature/
+      dns:
+        domain: auricle.localhost
+        entries:
+          - "{{FEATURE_FOLDER}}.{{DOMAIN}}"
+          - api-{{FEATURE_FOLDER}}.{{DOMAIN}}
+        sync_method: hosts_file
+      docker:
+        traefik: infra/traefik-dynamic.yml
+        compose_template: infra/.devcontainer-template
+      database:
+        container_name: auricle-{{FEATURE_FOLDER}}-postgres
+        migrations:
+          type: flyway
+          path: backend/src/main/resources/db/migration
+      agent:
+        template_dir: infra/.agent-template
+        copy_dirs:
+          - .claude/commands
+          - .claude/skills
+          - .claude/agents
+      tunnel:
+        provider: cloudflare
+        notes: Production runs via Cloudflare tunnel to k3s cluster (currently disabled)
+      env:
+        secrets_file: ~/.auricle.env
+      services:
+        - name: backend
+          path: backend
+          start_command: ./gradlew bootRun
+          health_url: https://api-{{FEATURE_FOLDER}}.auricle.localhost/actuator/health
+          port: 9000
+        - name: frontend
+          path: frontend
+          start_command: pnpm dev
+          health_url: https://{{FEATURE_FOLDER}}.auricle.localhost
+          port: 5173
+    tests:
+      backend:
+        type: gradle
+        path: backend
+        command: ./gradlew test
+      frontend:
+        type: vitest
+        path: frontend
+        command: pnpm test
+  myn-cli:
+    name: myn-cli
+    path: /home/eltmon/Projects/myn-cli
+    issue_prefix: CLI
+    github_repo: mindyournow/myn-cli
+    workspace:
+      type: standalone
+      workspaces_dir: workspaces
+      default_branch: main
+    tests:
+      unit:
+        type: go
+        path: .
+        command: make test
+  papers-please:
+    name: papers-please
+    path: /home/eltmon/Projects/papers-please
+  lexerra:
+    name: lexerra
+    path: /home/eltmon/Projects/lexerra
+    issue_prefix: LEX
+    linear_project: Lexerra
+    github_repo: eltmon/lexerra
+    workspace:
+      type: monorepo
+      workspaces_dir: workspaces
+      default_branch: main
+    tests:
+      e2e:
+        type: playwright
+        path: .
+        command: npx playwright test
+    quality_gates:
+      build:
+        command: npm run build
+        required: true
+  krux:
+    name: krux
+    path: /home/eltmon/Projects/krux
+    github_repo: eltmon/krux
+    workspace:
+      type: standalone
+      workspaces_dir: workspaces
+      default_branch: main
+    tests:
+      unit:
+        type: vitest
+        path: .
+        command: npm test -- --run
+  pan-tts:
+    name: pan-tts
+    path: /home/eltmon/Projects/pan-tts
+    issue_prefix: TTS
+    package_manager: uv
+    workspace:
+      type: standalone
+      workspaces_dir: workspaces
+      default_branch: main
+      env:
+        secrets_file: ~/.panopticon.env
+    tests:
+      unit:
+        type: custom
+        path: .
+        command: uv run python -m compileall src
+    quality_gates:
+      compile:
+        command: uv run python -m compileall src
+        required: true
