@@ -1,9 +1,9 @@
 # PAN-847: Command Deck polish, enrichment, motion catalog, and perf hardening
 
-## Status: In Progress
+## Status: Completed
 
 ## Current Phase
-Frontend enrichment and structural features after completing backend perf beads.
+All PAN-847 beads implemented. Ready for verification and merge.
 
 ## Completed Work
 - [x] Planning: Created 12 beads for PAN-847 follow-up work
@@ -20,7 +20,7 @@ Frontend enrichment and structural features after completing backend perf beads.
 
 ## Remaining Work
 - [x] pan-0bms: Missing Zone B overflow actions (commit: 41159ead)
-- [ ] pan-xvyz: PrDiffTab virtualization for large diffs
+- [x] pan-xvyz: PrDiffTab virtualization for large diffs (commit: adb798c9)
 
 ## Key Decisions
 - Backend beads (cache keying, async fan-out) go first since they're self-contained and testable
@@ -28,3 +28,8 @@ Frontend enrichment and structural features after completing backend perf beads.
 
 ## Specialist Feedback
 - None yet
+
+## Quality Gates
+- `npm run typecheck` — passed
+- `npm run lint` — passed
+- `npm test` (frontend) — 160 tests passed across 15 files
