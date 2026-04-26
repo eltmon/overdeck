@@ -7,9 +7,9 @@ Implementing backend perf beads (cache keying + async fan-out) before moving to 
 
 ## Completed Work
 - [x] Planning: Created 12 beads for PAN-847 follow-up work
+- [x] pan-atj7: Keyed costCache by issueId and closedIssuesCache by repo; added invariant tests (commit: ffffe192)
 
 ## Remaining Work
-- [ ] pan-atj7: Cache keying: costCache and closedIssuesCache isolation
 - [ ] pan-3h57: Async fan-out: fetchIssueDiscussions and archiveReviewerRound
 - [ ] pan-6zyx: Zone A enrichment: activity sparkline, quality-gates, stash warning, acceptance progress
 - [ ] pan-mc22: Zone B enrichment: output buffer, idle/thinking/waiting states, cost rate, summary line
