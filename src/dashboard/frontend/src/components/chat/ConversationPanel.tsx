@@ -10,6 +10,7 @@ import { ModelPicker, saveStoredModel } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, WorkLogEntry } from './chat-types';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase } from '../../lib/workingPhase';
+import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import type { ReviewerRoundMetadata } from '@panopticon/contracts';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
@@ -477,51 +478,10 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
 
   const parentTitle = conversation.title?.replace(/^Summary Fork:\s*/, '') || undefined;
 
-  // Derive round markers from roundMetadata + messages for reviewer sessions (PAN-830 high-8).
+  // Derive round markers from roundMetadata + messages for reviewer sessions (PAN-830 high-8, PAN-847 pan-0h5k).
   const derivedRoundMarkers = useMemo(() => {
-    if (!roundMetadata?.history?.length || messages.length === 0) return roundMarkers ?? [];
-    const markers: RoundMarker[] = [];
-    for (const round of roundMetadata.history) {
-      if (!round.endedAt) continue;
-      const endTs = new Date(round.endedAt).getTime();
-      // Find the last message whose createdAt is <= round end time
-      let afterId = '';
-      for (let i = messages.length - 1; i >= 0; i--) {
-        const msgTs = new Date(messages[i]!.createdAt).getTime();
-        if (msgTs <= endTs) {
-          afterId = messages[i]!.id;
-          break;
-        }
-      }
-      // If no message found before round end, anchor to last message
-      if (!afterId && messages.length > 0) {
-        afterId = messages[messages.length - 1]!.id;
-      }
-      let verdict: RoundMarker['verdict'];
-      switch (round.status) {
-        case 'passed':
-        case 'approved':
-          verdict = 'passed';
-          break;
-        case 'failed':
-        case 'blocked':
-          verdict = 'failed';
-          break;
-        case 'running':
-        case 'active':
-          verdict = 'running';
-          break;
-        default:
-          verdict = 'pending';
-      }
-      markers.push({
-        afterMessageId: afterId,
-        round: round.round,
-        verdict,
-        label: round.status,
-      });
-    }
-    return markers.length > 0 ? markers : (roundMarkers ?? []);
+    const derived = deriveRoundMarkers(roundMetadata, messages);
+    return derived.length > 0 ? derived : (roundMarkers ?? []);
   }, [roundMetadata, messages, roundMarkers]);
 
   return (

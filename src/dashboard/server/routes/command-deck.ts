@@ -77,13 +77,25 @@ async function readOptional(p: string): Promise<string | null> {
 /** Cache for resolved project paths to avoid repeated sync FS calls. */
 const projectPathCache = new Map<string, string>();
 
-/** TTL cache for closed issues to avoid hammering gh CLI on every poll (~10s). */
-let closedIssuesCache: { timestamp: number; data: Array<{ number: number; title: string }> } | null = null;
+/** TTL cache for closed issues to avoid hammering gh CLI on every poll (~10s).
+ *  Keyed by repo string (owner/repo) so multi-repo setups don't cross-pollute. */
+const closedIssuesCache = new Map<string, { timestamp: number; data: Array<{ number: number; title: string }> }>();
 const CLOSED_ISSUES_TTL_MS = 120_000; // 2 minutes
 
-/** TTL cache for cost data to avoid re-scanning cost events on every 5s poll (PAN-830 review high-4). */
-let costCache: { timestamp: number; data: { totalCost: number; costByStage: Record<string, { cost: number; tokens: number }> } } | null = null;
+/** TTL cache for cost data to avoid re-scanning cost events on every 5s poll (PAN-830 review high-4).
+ *  Keyed by upper-cased issueId so concurrent issues don't share stale data. */
+const costCache = new Map<string, { timestamp: number; data: { totalCost: number; costByStage: Record<string, { cost: number; tokens: number }> } }>();
 const COST_CACHE_TTL_MS = 30_000; // 30 seconds
+
+/** Evict expired entries from a TTL cache Map to prevent unbounded growth. */
+function sweepExpired<T>(cache: Map<string, { timestamp: number; data: T }>, ttlMs: number): void {
+  const cutoff = Date.now() - ttlMs;
+  for (const [key, entry] of cache) {
+    if (entry.timestamp < cutoff) {
+      cache.delete(key);
+    }
+  }
+}
 
 function getProjectPath(issuePrefix?: string): string {
   if (!issuePrefix) return join(homedir(), 'Projects');
@@ -145,6 +157,7 @@ async function derivePresence(
   if (!rtState) return 'idle';
 
   if (rtState.state === 'active') return 'active';
+  if (rtState.state === 'suspended') return 'suspended';
   if (rtState.state === 'idle' || rtState.state === 'waiting-on-human') {
     // Supplemental checks: heartbeat or output.log mtime within 5s indicates
     // recent activity that may not yet be reflected in the in-process state mirror.
@@ -523,9 +536,10 @@ export async function fetchActivityDataWithContext(
   let totalCost = 0;
   try {
     const cacheKey = issueId.toUpperCase();
-    if (costCache && costCache.timestamp > Date.now() - COST_CACHE_TTL_MS) {
-      totalCost = costCache.data.totalCost;
-      costByStage = costCache.data.costByStage;
+    const cached = costCache.get(cacheKey);
+    if (cached && cached.timestamp > Date.now() - COST_CACHE_TTL_MS) {
+      totalCost = cached.data.totalCost;
+      costByStage = cached.data.costByStage;
     } else {
       syncCache();
       const issueData = getCostsForIssue(cacheKey);
@@ -535,7 +549,8 @@ export async function fetchActivityDataWithContext(
           Object.entries(issueData.stages || {}).map(([stage, stats]) => [stage, { cost: stats.cost, tokens: stats.tokens }])
         );
       }
-      costCache = { timestamp: Date.now(), data: { totalCost, costByStage } };
+      sweepExpired(costCache, COST_CACHE_TTL_MS);
+      costCache.set(cacheKey, { timestamp: Date.now(), data: { totalCost, costByStage } });
     }
   } catch { /* cost data optional */ }
 
@@ -576,6 +591,8 @@ async function fetchPlanningData(issueId: string): Promise<unknown> {
     transcripts: Array<{ filename: string; content: string; uploadedAt: string }>;
     discussions: Array<{ filename: string; content: string; syncedAt: string }>;
     notes: Array<{ filename: string; content: string; uploadedAt: string }>;
+    acceptanceProgress?: { completed: number; total: number; percent: number };
+    stashCount?: number;
   } = { transcripts: [], discussions: [], notes: [] };
 
   // Helper: read PRD content from a location, handling both flat and subdir formats.
@@ -635,6 +652,30 @@ async function fetchPlanningData(issueId: string): Promise<unknown> {
   result.transcripts = await readArtifactDir('transcripts', 'uploadedAt') as typeof result.transcripts;
   result.discussions = await readArtifactDir('discussions', 'syncedAt') as typeof result.discussions;
   result.notes = await readArtifactDir('notes', 'uploadedAt') as typeof result.notes;
+
+  // Acceptance criteria progress from vBRIEF plan (PAN-847)
+  try {
+    const planPath = join(planningDir, 'plan.vbrief.json');
+    if (await pathExists(planPath)) {
+      const raw = await readFile(planPath, 'utf-8');
+      const doc = JSON.parse(raw);
+      const items: Array<{ status?: string }> = doc?.plan?.items ?? [];
+      if (items.length > 0) {
+        const completed = items.filter((i) => i.status === 'completed').length;
+        result.acceptanceProgress = {
+          completed,
+          total: items.length,
+          percent: Math.round((completed / items.length) * 100),
+        };
+      }
+    }
+  } catch { /* no vBRIEF plan */ }
+
+  // Stash count for workspace hygiene warning (PAN-847)
+  try {
+    const { stdout: stashList } = await execAsync('git stash list', { cwd: workspacePath, encoding: 'utf-8' });
+    result.stashCount = stashList.trim() ? stashList.trim().split('\n').length : 0;
+  } catch { /* not a git repo or git unavailable */ }
 
   return result;
 }
@@ -1207,20 +1248,34 @@ async function fetchProjectTree(): Promise<unknown[]> {
 
   // Closed issues change at human cadence — cache for 2 min to avoid ~8,600
   // gh CLI invocations per day while the projects tab is open.
-  let closedIssues: Array<{ number: number; title: string }> = [];
-  if (closedIssuesCache && (Date.now() - closedIssuesCache.timestamp) < CLOSED_ISSUES_TTL_MS) {
-    closedIssues = closedIssuesCache.data;
-  } else {
-    try {
-      const { stdout } = await execAsync(
-        'gh issue list --repo eltmon/panopticon-cli --state closed --limit 200 --json number,title 2>/dev/null || echo "[]"'
-      );
-      closedIssues = JSON.parse(stdout.trim()) as Array<{ number: number; title: string }>;
-      closedIssuesCache = { timestamp: Date.now(), data: closedIssues };
-    } catch {
-      closedIssuesCache = { timestamp: Date.now(), data: [] };
+  // Fetch from ALL configured repos so multi-repo setups get correct titles (PAN-847).
+  const closedIssues: Array<{ number: number; title: string }> = [];
+  const ghConfig = getGitHubConfig();
+  const repos = ghConfig?.repos?.length
+    ? ghConfig.repos.map((r) => `${r.owner}/${r.repo}`)
+    : ['eltmon/panopticon-cli'];
+
+  await Promise.all(repos.map(async (repo) => {
+    const cached = closedIssuesCache.get(repo);
+    if (cached && (Date.now() - cached.timestamp) < CLOSED_ISSUES_TTL_MS) {
+      closedIssues.push(...cached.data);
+      return;
     }
-  }
+    try {
+      const { stdout } = await execFileAsync('gh', [
+        'issue', 'list', '--repo', repo, '--state', 'closed',
+        '--limit', '200', '--json', 'number,title',
+      ], { encoding: 'utf-8', timeout: 15000 });
+      const parsed = JSON.parse(stdout.trim()) as Array<{ number: number; title: string }>;
+      sweepExpired(closedIssuesCache, CLOSED_ISSUES_TTL_MS);
+      closedIssuesCache.set(repo, { timestamp: Date.now(), data: parsed });
+      closedIssues.push(...parsed);
+    } catch {
+      sweepExpired(closedIssuesCache, CLOSED_ISSUES_TTL_MS);
+      closedIssuesCache.set(repo, { timestamp: Date.now(), data: [] });
+    }
+  }));
+
   for (const ci of closedIssues) {
     const key = `PAN-${ci.number}`;
     if (!issueTitleMap.has(key) && ci.title) {

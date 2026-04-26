@@ -1048,11 +1048,12 @@ export async function archiveReviewerRound(opts: {
   // non-null number we can actually trust without re-parsing markdown here.
   const findings =
     (result.securityIssues?.length ?? 0) + (result.performanceIssues?.length ?? 0);
-  let archived = 0;
-  for (const role of roles) {
+  // Parallelize round artifact writes — each role targets a different directory
+  // so there is no contention (PAN-847).
+  const archiveTasks = roles.map(async (role) => {
     const sessionName = getReviewerSessionName(role, projectKey, issueId);
     const dirPath = join(agentsDir, sessionName);
-    if (!existsSync(dirPath)) continue;
+    if (!existsSync(dirPath)) return false;
 
     let nextN = 1;
     try {
@@ -1095,11 +1096,15 @@ export async function archiveReviewerRound(opts: {
         join(dirPath, `round-${nextN}.json`),
         JSON.stringify(artifact, null, 2),
       );
-      archived++;
+      return true;
     } catch (err) {
       console.error(`[review-agent] Failed to write round-${nextN}.json for ${sessionName}:`, err instanceof Error ? err.message : err);
+      return false;
     }
-  }
+  });
+
+  const archiveResults = await Promise.all(archiveTasks);
+  const archived = archiveResults.filter(Boolean).length;
   if (archived > 0) {
     console.log(`[review-agent] Archived round artifacts for ${archived} reviewer pane(s) (review ${reviewId})`);
   }

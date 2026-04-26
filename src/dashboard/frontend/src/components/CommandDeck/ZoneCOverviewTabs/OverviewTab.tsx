@@ -23,10 +23,13 @@ import {
   useActivityQuery,
   useIssueCostsQuery,
   usePlanningQuery,
+  useReviewStatusQuery,
+  usePrQuery,
   type ActivitySection,
   type ReviewerRoundMetadata,
 } from './queries';
 import type { OverviewTab as OverviewTabKey } from '../ZoneCOverview';
+import { GitPullRequest, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
 
 interface OverviewTabProps {
   issueId: string;
@@ -147,6 +150,8 @@ export function OverviewTab({ issueId, onSwitchTab }: OverviewTabProps) {
   const planning = usePlanningQuery(issueId);
   const activity = useActivityQuery(issueId);
   const costs = useIssueCostsQuery(issueId);
+  const reviewStatus = useReviewStatusQuery(issueId);
+  const pr = usePrQuery(issueId);
 
   const sections = activity.data?.sections ?? [];
   const stage = deriveStageFromSections(sections);
@@ -300,26 +305,94 @@ export function OverviewTab({ issueId, onSwitchTab }: OverviewTabProps) {
         </Section>
       )}
 
-      {/* 3. Test summary (placeholder — fed by verification gate later) */}
+      {/* 3. Test summary (PAN-847) */}
       <Section title="Tests">
-        <div
-          data-testid="overview-tests"
-          style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}
-        >
-          Verification gate output isn't surfaced yet. Run results land alongside
-          the verification gate in a follow-up.
-        </div>
+        {reviewStatus.isLoading ? (
+          <div style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>Loading…</div>
+        ) : (
+          <div data-testid="overview-tests" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+              {reviewStatus.data?.testStatus === 'passed' || reviewStatus.data?.verificationStatus === 'passed' ? (
+                <>
+                  <CheckCircle2 size={14} style={{ color: 'var(--mc-success, #22c55e)' }} />
+                  <span style={{ color: 'var(--mc-success, #22c55e)', fontWeight: 600 }}>Tests passed</span>
+                </>
+              ) : reviewStatus.data?.testStatus === 'failed' || reviewStatus.data?.verificationStatus === 'failed' ? (
+                <>
+                  <XCircle size={14} style={{ color: 'var(--mc-error, #ef4444)' }} />
+                  <span style={{ color: 'var(--mc-error, #ef4444)', fontWeight: 600 }}>Tests failed</span>
+                </>
+              ) : reviewStatus.data?.testStatus === 'testing' || reviewStatus.data?.verificationStatus === 'running' ? (
+                <>
+                  <Clock size={14} style={{ color: 'var(--mc-warning, #f97316)' }} />
+                  <span style={{ color: 'var(--mc-warning, #f97316)', fontWeight: 600 }}>Tests running…</span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle size={14} style={{ color: 'var(--mc-text-muted, var(--muted-foreground))' }} />
+                  <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No test results yet</span>
+                </>
+              )}
+              {reviewStatus.data?.verificationCycleCount !== undefined && reviewStatus.data?.verificationMaxCycles !== undefined && (
+                <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))', marginLeft: 'auto' }}>
+                  cycle {reviewStatus.data.verificationCycleCount}/{reviewStatus.data.verificationMaxCycles}
+                </span>
+              )}
+            </div>
+            {(reviewStatus.data?.testNotes || reviewStatus.data?.verificationNotes) && (
+              <div style={{ fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))', padding: '4px 8px', background: 'var(--mc-surface-2, color-mix(in srgb, var(--foreground) 3%, transparent))', borderRadius: 4 }}>
+                {reviewStatus.data.testNotes || reviewStatus.data.verificationNotes}
+              </div>
+            )}
+          </div>
+        )}
       </Section>
 
-      {/* 4. PR summary (placeholder — endpoint in pan-9yn5) */}
+      {/* 4. PR summary (PAN-847) */}
       <Section title="Pull request">
-        <div
-          data-testid="overview-pr"
-          style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}
-        >
-          PR metadata not wired in this iteration — see PR / Diff tab once the
-          backend endpoint lands.
-        </div>
+        {pr.isLoading ? (
+          <div style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>Loading…</div>
+        ) : pr.data?.pr ? (
+          <div data-testid="overview-pr" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+              <GitPullRequest size={14} style={{ color: 'var(--mc-primary, var(--primary))' }} />
+              <a href={pr.data.pr.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mc-primary, var(--primary))', fontWeight: 600 }}>
+                #{pr.data.pr.number} {pr.data.pr.title}
+              </a>
+              <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))', marginLeft: 'auto' }}>
+                {pr.data.pr.state}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+              <span>+{pr.data.pr.additions} -{pr.data.pr.deletions}</span>
+              <span>{pr.data.pr.changedFiles} file{pr.data.pr.changedFiles === 1 ? '' : 's'}</span>
+              {pr.data.pr.reviewDecision && (
+                <span style={{ textTransform: 'capitalize' }}>{pr.data.pr.reviewDecision.replace(/_/g, ' ')}</span>
+              )}
+              <button
+                type="button"
+                data-testid="overview-pr-link"
+                onClick={() => onSwitchTab?.('prdiff')}
+                style={{
+                  fontSize: 11,
+                  padding: '2px 8px',
+                  borderRadius: 6,
+                  border: '1px solid var(--mc-border, var(--border))',
+                  background: 'transparent',
+                  color: 'var(--mc-text-muted, var(--muted-foreground))',
+                  cursor: 'pointer',
+                  marginLeft: 'auto',
+                }}
+              >
+                View diff ↗
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div data-testid="overview-pr" style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+            No PR found for this issue.
+          </div>
+        )}
       </Section>
 
       {/* 5. Cost sparkline */}

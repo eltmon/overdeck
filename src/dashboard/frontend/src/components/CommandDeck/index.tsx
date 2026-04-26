@@ -384,6 +384,88 @@ export function CommandDeck({
     }
   }, [projectsWithSessions, selectSession]);
 
+  const handlePauseSession = useCallback(async (sessionId: string) => {
+    try {
+      const res = await fetch(`/api/agents/${sessionId}/suspend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      });
+      if (!res.ok) throw new Error('Failed to pause session');
+      await refreshDashboardState(queryClient);
+    } catch {
+      // Silently ignore — user can retry
+    }
+  }, [queryClient]);
+
+  const handleResumeSession = useCallback(async (sessionId: string) => {
+    try {
+      const res = await fetch(`/api/agents/${sessionId}/resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: 'Resumed from dashboard' }),
+      });
+      if (!res.ok) throw new Error('Failed to resume session');
+      await refreshDashboardState(queryClient);
+    } catch {
+      // Silently ignore — user can retry
+    }
+  }, [queryClient]);
+
+  const handleRestartSession = useCallback(async (sessionId: string, issueId: string) => {
+    try {
+      // Step 1: stop current agent
+      await fetch(`/api/agents/${sessionId}`, { method: 'DELETE' });
+      // Step 2: start a new agent for the same issue
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueId }),
+      });
+      if (!res.ok) throw new Error('Failed to restart agent');
+      await refreshDashboardState(queryClient);
+    } catch {
+      // Silently ignore — user can retry
+    }
+  }, [queryClient]);
+
+  const handleDeepWipe = useCallback(async (issueId: string) => {
+    try {
+      const res = await fetch(`/api/issues/${issueId}/deep-wipe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteWorkspace: true }),
+      });
+      if (!res.ok) throw new Error('Failed to deep wipe');
+      await refreshDashboardState(queryClient);
+      // Deselect the feature since its workspace is gone
+      setSelectedFeature(null);
+      selectSession(issueId, null);
+    } catch {
+      // Silently ignore — user can retry
+    }
+  }, [queryClient, selectSession]);
+
+  const handleOpenStateDir = useCallback((sessionId: string) => {
+    const path = `~/.panopticon/agents/${sessionId}/`;
+    navigator.clipboard?.writeText(path).catch(() => { /* ignore */ });
+  }, []);
+
+  const handleViewJsonl = useCallback((sessionId: string) => {
+    // Select the session so the conversation panel shows its JSONL transcript
+    for (const project of projectsWithSessions) {
+      for (const feature of project.features) {
+        if (feature.sessions?.some(s => s.sessionId === sessionId)) {
+          setSelectedFeature(feature.issueId);
+          selectSession(feature.issueId, sessionId);
+          setSelectedConversation(null);
+          setIsDraft(false);
+          return;
+        }
+      }
+    }
+  }, [projectsWithSessions, selectSession]);
+
   const handleSelectConversation = useCallback((name: string | null) => {
     setDraftKey(0);
     setSelectedConversation(name);
@@ -592,6 +674,12 @@ export function CommandDeck({
                   filter={treeFilter}
                   onStopSession={handleStopSession}
                   onViewTerminal={handleViewTerminal}
+                  onPauseSession={handlePauseSession}
+                  onResumeSession={handleResumeSession}
+                  onRestartSession={handleRestartSession}
+                  onDeepWipe={handleDeepWipe}
+                  onOpenStateDir={handleOpenStateDir}
+                  onViewJsonl={handleViewJsonl}
                 />
               ))
             )}

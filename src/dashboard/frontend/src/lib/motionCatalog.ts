@@ -11,9 +11,10 @@
  * │ agent.started               │ FeatureItem, ZoneB       │ StatusDot → active │
  * │ agent.stopped               │ FeatureItem, ZoneB       │ StatusDot → ended  │
  * │ agent.status_changed        │ ZoneB, FeatureItem       │ StatusDot class    │
+ * │ agent.status_changed (error)│ ZoneB                    │ Red shake (kf-error-shake) │
  * │ agent.activity_changed      │ ZoneB (ToolFlash)        │ ToolFlash crossfade│
- * │ agent.thinking_started      │ ZoneB                    │ StatusDot thinking │
- * │ agent.waiting_started       │ ZoneB                    │ StatusDot waiting  │
+ * │ agent.thinking_started      │ ZoneB                    │ StatusDot thinking + ribbon │
+ * │ agent.waiting_started       │ ZoneB                    │ StatusDot waiting + ribbon  │
  * │ pipeline.status_changed     │ ZoneA (pipeline dots)    │ Dot color change   │
  * │ merge.ready                 │ FeatureItem, KanbanBoard │ Ready-to-merge     │
  * │ specialist.started          │ FeatureItem, OverviewTab │ New row + spinner  │
@@ -28,6 +29,10 @@
  * Implementation: EventRouter subscribes to `subscribeDomainEvents` and applies
  * events to the Zustand store. Components consume the store via selectors.
  * React re-renders trigger CSS keyframe animations automatically.
+ *
+ * ZoneB reads `agentRuntimeById` from the store so runtime events
+ * (activity_changed, thinking_started, waiting_started) drive motion props
+ * within 200ms without intermediate event-bus wiring (PAN-847).
  *
  * The `useLiveFlash` hook (./useLiveFlash.ts) adds an explicit `anim-row-flash`
  * class for 600ms when a watched value changes, ensuring the motion is visible
@@ -62,9 +67,10 @@ export const MOTION_CATALOG: readonly MotionEntry[] = [
   { event: 'agent.started', component: 'FeatureItem / ZoneB', animation: 'StatusDot pulse active', cssClass: 'anim-alive-dot-active' },
   { event: 'agent.stopped', component: 'FeatureItem / ZoneB', animation: 'StatusDot dim to ended', cssClass: '' },
   { event: 'agent.status_changed', component: 'ZoneB / FeatureItem', animation: 'StatusDot class swap', cssClass: '' },
+  { event: 'agent.status_changed', component: 'ZoneB', animation: 'Red shake on error', cssClass: 'kf-error-shake' },
   { event: 'agent.activity_changed', component: 'ZoneB', animation: 'ToolFlash crossfade', cssClass: '' },
-  { event: 'agent.thinking_started', component: 'ZoneB', animation: 'StatusDot thinking glow', cssClass: 'anim-alive-dot-thinking' },
-  { event: 'agent.waiting_started', component: 'ZoneB', animation: 'StatusDot waiting glow', cssClass: 'anim-alive-dot-waiting' },
+  { event: 'agent.thinking_started', component: 'ZoneB', animation: 'StatusDot thinking glow + ribbon', cssClass: 'anim-alive-dot-thinking' },
+  { event: 'agent.waiting_started', component: 'ZoneB', animation: 'StatusDot waiting glow + ribbon', cssClass: 'anim-alive-dot-waiting' },
   { event: 'pipeline.status_changed', component: 'ZoneA', animation: 'Pipeline dot color shift', cssClass: '' },
   { event: 'merge.ready', component: 'FeatureItem / KanbanBoard', animation: 'Ready-to-merge shimmer', cssClass: 'badge-shimmer-rtm' },
   { event: 'specialist.started', component: 'FeatureItem / OverviewTab', animation: 'New row + spinner appear', cssClass: 'anim-alive-dot-active' },

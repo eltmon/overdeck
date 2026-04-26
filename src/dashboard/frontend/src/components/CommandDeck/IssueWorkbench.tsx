@@ -168,7 +168,7 @@ export function IssueWorkbench({
       />
       {isAgentSelected ? (
         <>
-          <ZoneB session={selectedSession} />
+          <ZoneB session={selectedSession} issueId={issueId} />
           <ZoneCConversation session={selectedSession} issueId={issueId} />
         </>
       ) : (
