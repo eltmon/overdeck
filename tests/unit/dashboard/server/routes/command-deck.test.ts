@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractReviewerRole } from '../../../../../src/dashboard/server/routes/mission-control.ts';
+import { extractReviewerRole } from '../../../../../src/dashboard/server/routes/command-deck.ts';
 
 describe('extractReviewerRole', () => {
   it('extracts role from standard review session name', () => {

@@ -23,6 +23,7 @@ import { exec } from 'child_process';
 import {
   runParallelReview,
   getReviewAgents,
+  reviewResultToReviewStatus,
   type ReviewContext,
 } from '../../lib/cloister/review-agent.js';
 import { setReviewStatus } from '../../lib/review-status.js';
@@ -129,10 +130,7 @@ export async function reviewRunCommand(
   // Persist the terminal review status. The dashboard reads this from the DB
   // on next observation — no server API needed.
   try {
-    const mapped =
-      exitCode === 0 ? ('passed' as const)
-      : exitCode === 1 ? ('failed' as const)
-      : ('failed' as const);
+    const mapped = reviewResultToReviewStatus(result.reviewResult);
     setReviewStatus(issueId, {
       reviewStatus: mapped,
       reviewNotes: result.notes,

@@ -1217,7 +1217,15 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
         const completedProcessedFile = join(AGENTS_DIR, agentIdForCheck, 'completed.processed');
         if (existsSync(completedProcessedFile)) {
           const agentState = getAgentState(agentIdForCheck);
-          if (agentState?.status === 'stopped' && agentState.stoppedByUser) {
+          // stoppedByUser is also set by `pan done` (work agent signaling completion),
+          // not just `pan kill`. For pan-done agents, phase==='review-response'.
+          // Re-dispatching the review fan-out doesn't require the work agent to be
+          // running — only a true user-kill (different phase) should block recovery.
+          if (
+            agentState?.status === 'stopped' &&
+            agentState.stoppedByUser &&
+            agentState.phase !== 'review-response'
+          ) {
             actions.push(`Skipped pending review for ${issueId}: work agent was explicitly stopped`);
             continue;
           }
@@ -3344,14 +3352,21 @@ async function autoResumeStoppedWorkAgents(): Promise<string[]> {
     const processedFile = join(getAgentDir(agentId), 'completed.processed');
     if (existsSync(completedFile) || existsSync(processedFile)) {
       const review = getReviewStatus(state.issueId);
-      if (
+      const needsFix =
         review?.reviewStatus === 'blocked' ||
         review?.reviewStatus === 'failed' ||
-        review?.testStatus === 'failed'
-      ) {
+        review?.testStatus === 'failed';
+      const trulyPassed =
+        review?.reviewStatus === 'passed' && review?.testStatus === 'passed';
+      if (needsFix) {
         logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} resuming despite completed marker — review/test needs fixing (review=${review?.reviewStatus}, test=${review?.testStatus})`);
-      } else {
+      } else if (trulyPassed) {
         logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — completed marker exists and review/test passed`);
+        continue;
+      } else {
+        // Pending state: pipeline mid-flight (review fan-out queued, test running, etc.).
+        // Don't resume the agent — they're waiting for downstream signals to deliver feedback.
+        logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — pipeline mid-flight (review=${review?.reviewStatus ?? 'none'}, test=${review?.testStatus ?? 'none'})`);
         continue;
       }
     }

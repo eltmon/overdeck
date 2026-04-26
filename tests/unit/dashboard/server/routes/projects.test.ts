@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
   listProjects: vi.fn(),
@@ -8,7 +10,7 @@ vi.mock('../../../../../src/lib/tmux.js', () => ({
   listSessionNamesAsync: vi.fn(),
 }));
 
-vi.mock('../../../../../src/dashboard/server/routes/mission-control.js', () => ({
+vi.mock('../../../../../src/dashboard/server/routes/command-deck.js', () => ({
   fetchActivityDataWithContext: vi.fn(),
 }));
 
@@ -31,7 +33,7 @@ vi.mock('node:fs/promises', async () => {
 import { fetchProjectSessionTree } from '../../../../../src/dashboard/server/routes/projects.ts';
 import { listProjects } from '../../../../../src/lib/projects.js';
 import { listSessionNamesAsync } from '../../../../../src/lib/tmux.js';
-import { fetchActivityDataWithContext } from '../../../../../src/dashboard/server/routes/mission-control.js';
+import { fetchActivityDataWithContext } from '../../../../../src/dashboard/server/routes/command-deck.js';
 import { access, readdir, readFile } from 'node:fs/promises';
 
 function mockAccess(paths: Set<string>) {
@@ -80,7 +82,7 @@ describe('fetchProjectSessionTree', () => {
     mockAccess(new Set([
       '/tmp/panopticon-cli/workspaces',
       '/tmp/panopticon-cli/workspaces/feature-pan-821/.planning',
-      '/home/eltmon/.panopticon/agents/agent-pan-539',
+      join(homedir(), '.panopticon', 'agents', 'agent-pan-539'),
     ]));
     (readdir as any).mockResolvedValue([
       { name: 'feature-pan-821', isDirectory: () => true },
