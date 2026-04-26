@@ -254,7 +254,13 @@ export class CloisterService {
 
   private getDashboardApiUrl(): string {
     if (process.env.DASHBOARD_URL) return process.env.DASHBOARD_URL;
-    return `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
+    // Use 127.0.0.1 explicitly: on systems where /etc/hosts resolves
+    // `localhost` to `::1` (IPv6 first), Node's undici-based `fetch` connects
+    // to [::1]:3011 and hangs/fails because the dashboard listens on the
+    // IPv4 wildcard 0.0.0.0. curl works because it tries IPv4 fallback;
+    // Node's fetch in this version does not. The cloister and dashboard
+    // run in the same process, so a loopback IPv4 address is the safe choice.
+    return `http://127.0.0.1:${process.env.API_PORT || process.env.PORT || '3011'}`;
   }
 
   /**
