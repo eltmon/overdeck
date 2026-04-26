@@ -162,8 +162,10 @@ export async function isBranchAlreadyRebased(
   targetBranch: string,
 ): Promise<{ alreadyRebased: boolean; currentHead?: string }> {
   try {
-    await execAsync(`git fetch origin ${targetBranch}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
-    await execAsync(`git fetch origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
+    await Promise.all([
+      execAsync(`git fetch origin ${targetBranch}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 }),
+      execAsync(`git fetch origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 }),
+    ]);
     await execAsync(
       `git merge-base --is-ancestor origin/${targetBranch} origin/${branchName}`,
       { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
