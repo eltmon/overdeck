@@ -107,7 +107,7 @@ export function IssueWorkbench({
 
   const isAgentSelected = !!selectedSession;
 
-  const handleSwitchTab = (tab: OverviewTab) => {
+  const handleSwitchTab = (_tab: OverviewTab) => {
     // TODO: propagate to ZoneCOverview via ref or state lift if needed
     // For now the action strip's tab-switch buttons are visual only;
     // full wiring can land in a follow-up bead.

@@ -12,13 +12,12 @@
 
 import { useState, useMemo } from 'react';
 import {
-  Play, Square, RefreshCw, RotateCcw, FolderPlus, Check, Loader2,
+  Play, RefreshCw, RotateCcw, FolderPlus, Check, Loader2,
   MoreHorizontal, FileText, ListTodo, ScrollText, Brain, MessageSquare,
-  Upload, Send, XCircle, ChevronRight,
+  Upload, Send, XCircle,
 } from 'lucide-react';
 import type { Agent, Issue } from '../../types';
 import { getZoneAActions, type ActionKey } from '../../lib/commandDeckActions';
-import { isReviewPipelineStuck } from '../../lib/pipeline-state';
 import { useZoneAActions } from './useZoneAActions';
 import { MergeButton } from '../MergeButton';
 import { StopAgentButton } from '../StopAgentButton';
@@ -102,7 +101,6 @@ export function ZoneActionStrip({
   const isLaunching = agentLaunchState === 'starting' || agentLaunchState === 'resuming';
   const launchLabel = agentLaunchState === 'resuming' ? 'Resuming...' : 'Starting...';
 
-  const isPipelineStuck = isReviewPipelineStuck(reviewStatus);
   const shouldPromoteReviewAction = !!reviewStatus?.readyForMerge
     || reviewStatus?.reviewStatus === 'failed'
     || reviewStatus?.reviewStatus === 'blocked'

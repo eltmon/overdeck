@@ -31,14 +31,14 @@ export interface ZoneAActionsState {
   agentLaunchState: 'starting' | 'resuming' | null;
   setAgentLaunchState: (s: 'starting' | 'resuming' | null) => void;
   // Mutations
-  startAgentMutation: ReturnType<typeof useMutation>;
-  reviewMutation: ReturnType<typeof useMutation>;
-  cancelMutation: ReturnType<typeof useMutation>;
-  resetSessionMutation: ReturnType<typeof useMutation>;
-  reopenMutation: ReturnType<typeof useMutation>;
-  createWorkspaceMutation: ReturnType<typeof useMutation>;
-  copySettingsMutation: ReturnType<typeof useMutation>;
-  syncMainMutation: ReturnType<typeof useMutation>;
+  startAgentMutation: ReturnType<typeof useMutation<any, Error, any, any>>;
+  reviewMutation: ReturnType<typeof useMutation<any, Error, any, any>>;
+  cancelMutation: ReturnType<typeof useMutation<any, Error, any, any>>;
+  resetSessionMutation: ReturnType<typeof useMutation<any, Error, any, any>>;
+  reopenMutation: ReturnType<typeof useMutation<any, Error, any, any>>;
+  createWorkspaceMutation: ReturnType<typeof useMutation<any, Error, any, any>>;
+  copySettingsMutation: ReturnType<typeof useMutation<any, Error, any, any>>;
+  syncMainMutation: ReturnType<typeof useMutation<any, Error, any, any>>;
   // Handlers (with confirmations baked in where appropriate)
   onStartAgent: (message?: string) => void;
   onReview: () => void;

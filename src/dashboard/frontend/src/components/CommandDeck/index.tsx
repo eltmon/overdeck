@@ -339,7 +339,7 @@ export function CommandDeck({
     for (const project of projectsWithSessions) {
       const feature = project.features.find(f => f.issueId === issueId);
       if (feature) {
-        sessions = feature.sessions;
+        sessions = feature.sessions ?? [];
         break;
       }
     }
