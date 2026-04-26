@@ -12,6 +12,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync, rmSync } from 'fs';
+import { readdir } from 'fs/promises';
 import { join } from 'path';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
@@ -25,6 +26,7 @@ import { setReviewStatus, loadReviewStatuses, getReviewStatus } from '../review-
 import { markWorkspaceStuck } from '../database/review-status-db.js';
 import { isDeaconGloballyPaused } from '../database/app-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
+import { resolveProjectFromIssue } from '../projects.js';
 import { logDeaconEvent, logAgentLifecycle } from '../persistent-logger.js';
 import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 
@@ -1877,18 +1879,23 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
             console.log(`[deacon] CI check failure for ${issueId} — retries exhausted, notifying work agent`);
             const ciNotes = status.mergeNotes || 'CI checks are failing on the PR';
             const { writeFeedbackFile } = await import('./feedback-writer.js');
-            await writeFeedbackFile({
+            const ciFileResult = await writeFeedbackFile({
               issueId,
               specialist: 'merge-agent',
               outcome: 'ci-failure',
               summary: 'CI checks still failing after 5 transient retries — merge blocked',
               markdownBody: `## CI Check Failure — Merge Blocked\n\n${ciNotes}\n\n### Action Required\n\nFix the failing CI checks, commit, and push. Panopticon will detect the new commits and re-run the review pipeline automatically.\n\nAlternatively:\n\n\`\`\`\npan done ${issueId}\n\`\`\``,
-            }).catch((err: Error) => console.error(`[deacon] Failed to write CI failure feedback for ${issueId}:`, err.message));
+            }).catch((err: Error) => {
+              console.error(`[deacon] Failed to write CI failure feedback for ${issueId}:`, err.message);
+              return { success: false, error: err.message };
+            });
             const agentSession = `agent-${issueId.toLowerCase()}`;
             if (sessionExists(agentSession)) {
-              await sendKeysAsync(agentSession,
-                `CI checks are failing on the PR after 5 retries. Read .planning/feedback/ for details, fix the failures, commit, then run: pan done ${issueId}`
-              );
+              const ciPath = (ciFileResult as any)?.filePath;
+              const ciMsg = ciPath
+                ? `CI checks are failing on the PR after 5 retries.\n\nMUST READ: ${ciPath}\n\nFix the failures, commit, then run: pan done ${issueId}`
+                : `CI checks are failing on the PR after 5 retries. Fix the failures, commit, then run: pan done ${issueId}`;
+              await sendKeysAsync(agentSession, ciMsg);
             }
             ciEntry.count++; // increment past 5 so this block only fires once
             ciRetryMap.set(issueId, ciEntry);
@@ -1912,18 +1919,23 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
         console.log(`[deacon] CI check failure for ${issueId} — notifying agent to re-submit (attempt ${ciEntry.count}/5)`);
         const ciNotes = status.mergeNotes || 'CI checks are failing on the PR';
         const { writeFeedbackFile } = await import('./feedback-writer.js');
-        await writeFeedbackFile({
+        const ciFileResult2 = await writeFeedbackFile({
           issueId,
           specialist: 'merge-agent',
           outcome: 'ci-failure',
           summary: 'CI checks failed at merge — re-submit to re-enter merge queue',
           markdownBody: `## CI Check Failure\n\n${ciNotes}\n\nCI checks failed at merge time. This may be transient (pending checks, GitHub status lag). Re-submit to re-enter the merge queue:\n\n\`\`\`\npan done ${issueId}\n\`\`\``,
-        }).catch((err: Error) => console.error(`[deacon] Failed to write CI failure feedback for ${issueId}:`, err.message));
+        }).catch((err: Error) => {
+          console.error(`[deacon] Failed to write CI failure feedback for ${issueId}:`, err.message);
+          return { success: false, error: err.message };
+        });
         const agentSessionCi = `agent-${issueId.toLowerCase()}`;
         if (sessionExists(agentSessionCi)) {
-          await sendKeysAsync(agentSessionCi,
-            `CI checks failed on the PR for ${issueId}. This may be transient. Read .planning/feedback/ for details, fix any failures, commit, then run: pan done ${issueId}`
-          );
+          const ciPath2 = (ciFileResult2 as any)?.filePath;
+          const ciMsg2 = ciPath2
+            ? `CI checks failed on the PR for ${issueId}. This may be transient.\n\nMUST READ: ${ciPath2}\n\nFix any failures, commit, then run: pan done ${issueId}`
+            : `CI checks failed on the PR for ${issueId}. This may be transient. Fix any failures, commit, then run: pan done ${issueId}`;
+          await sendKeysAsync(agentSessionCi, ciMsg2);
         }
         actions.push(`CI failure notification for ${issueId} (attempt ${ciEntry.count}/5)`);
         continue;
@@ -2166,13 +2178,36 @@ export async function checkDeadEndAgents(): Promise<string[]> {
         continue;
       }
 
+      // Resolve latest feedback file for targeted nudge
+      let latestFeedbackPath: string | undefined;
+      try {
+        const resolved = resolveProjectFromIssue(issueId);
+        if (resolved) {
+          const wsPath = findWorkspacePath(resolved.projectPath, issueId.toLowerCase());
+          if (wsPath) {
+            const feedbackDir = join(wsPath, '.planning', 'feedback');
+            if (existsSync(feedbackDir)) {
+              const files = (await readdir(feedbackDir)).filter(f => f.endsWith('.md')).sort();
+              if (files.length > 0) {
+                latestFeedbackPath = join(feedbackDir, files[files.length - 1]);
+              }
+            }
+          }
+        }
+      } catch {
+        // ignore resolution errors
+      }
+
       // Send the agent a nudge message with the correct resubmit command
       try {
+        const feedbackPart = latestFeedbackPath
+          ? `\n\nMUST READ: ${latestFeedbackPath}\n\nUse your Read tool to open this file, read every line, then fix the issues.`
+          : '';
         const nudgeMessage = status.reviewStatus === 'failed'
-          ? `Review verification failed for ${issueId}. Check .planning/feedback/ for details. Common cause: merge conflict markers in .planning/plan.vbrief.json — fix by resolving conflicts in that file, then run: pan review request ${issueId} -m "Fixed verification error"`
+          ? `Review verification failed for ${issueId}.${feedbackPart}\n\nCommon cause: merge conflict markers in .planning/plan.vbrief.json — fix by resolving conflicts in that file, then run: pan review request ${issueId} -m "Fixed verification error"`
           : isReviewBlocked
-            ? `The review agent found issues in your code. Read .planning/feedback/ for the latest blocked feedback, fix every issue listed, commit all changes, then run: pan review request ${issueId} -m "Fixed review issues". Do NOT stop until pan review request completes successfully.`
-            : `Tests failed for your changes. Read .planning/feedback/ for details, fix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". Do NOT stop until pan review request completes successfully.`;
+            ? `The review agent found issues in your code.${feedbackPart}\n\nFix every issue listed, commit all changes, then run: pan review request ${issueId} -m "Fixed review issues". Do NOT stop until pan review request completes successfully.`
+            : `Tests failed for your changes.${feedbackPart}\n\nFix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". Do NOT stop until pan review request completes successfully.`;
 
         await sendKeysAsync(agentSessionName, nudgeMessage);
         actions.push(`Dead-end recovery: nudged ${agentSessionName} (${statusType}, idle for ${Math.round((now - new Date(status.updatedAt || '').getTime()) / 60000)}m)`);

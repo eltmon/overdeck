@@ -278,10 +278,16 @@ async function sendFeedbackToWorkAgent(
     return;
   }
 
-  // Send short reference pointing to the file
+  // Send a short, explicit message with the ABSOLUTE path. Agents may have cd'd
+  // into subdirectories during their session — a relative path will not resolve.
   try {
     const { messageAgent } = await import('../agents.js');
-    const msg = `SPECIALIST FEEDBACK: review-agent reported ${result.reviewResult} for ${context.issueId}.\n\nRead ${fileResult.relativePath}, then immediately continue implementing all required fixes. Do NOT stop at the prompt — keep working until every blocking issue is resolved and you have invoked /rebase-and-submit.`;
+    const summary = result.reviewResult === 'CHANGES_REQUESTED'
+      ? `${result.notes || 'Issues found'}.`
+      : result.reviewResult === 'APPROVED'
+        ? 'Code approved — no action needed.'
+        : `Review result: ${result.reviewResult}.`;
+    const msg = `SPECIALIST FEEDBACK: review-agent reported ${result.reviewResult} for ${context.issueId}.\n${summary}\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix ALL issues. Do NOT stop at the prompt — keep working until every blocking issue is resolved and you have invoked /rebase-and-submit.`;
     await messageAgent(agentSession, msg);
     console.log(`[review-agent] Sent feedback to ${agentSession}`);
   } catch (error) {

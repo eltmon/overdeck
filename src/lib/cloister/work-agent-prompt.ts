@@ -78,19 +78,21 @@ function readPendingFeedback(workspacePath: string): string {
 
     // Show the latest feedback file path (agent will read it)
     const latest = files[files.length - 1];
+    const latestPath = join(feedbackDir, latest);
     const lines: string[] = [
-      `**${files.length} feedback file(s) in \`.planning/feedback/\`:**`,
+      `**${files.length} feedback file(s):**`,
       '',
     ];
 
     // List all files (most recent last)
     for (const file of files) {
+      const filePath = join(feedbackDir, file);
       const marker = file === latest ? ' ← **latest, read this first**' : '';
-      lines.push(`- \`.planning/feedback/${file}\`${marker}`);
+      lines.push(`- \`${filePath}\`${marker}`);
     }
 
     lines.push('');
-    lines.push('Read the latest feedback file and address any issues before continuing other work.');
+    lines.push(`Use your Read tool to open \`${latestPath}\`, read every line, then address any issues before continuing other work.`);
 
     return lines.join('\n');
   } catch {
