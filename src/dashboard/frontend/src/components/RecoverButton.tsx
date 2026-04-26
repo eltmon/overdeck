@@ -11,9 +11,16 @@ interface RecoverButtonProps {
   reviewStatus?: Pick<ReviewStatusSnapshot, 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus'>;
   variant: 'card' | 'inspector';
   onClick?: (e: React.MouseEvent) => void;
+  'data-testid'?: string;
 }
 
-export function RecoverButton({ issueId, reviewStatus, variant, onClick }: RecoverButtonProps) {
+export function RecoverButton({
+  issueId,
+  reviewStatus,
+  variant,
+  onClick,
+  'data-testid': dataTestId,
+}: RecoverButtonProps) {
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [isPending, setIsPending] = useState(false);
@@ -62,6 +69,7 @@ export function RecoverButton({ issueId, reviewStatus, variant, onClick }: Recov
         disabled={isPending}
         className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent disabled:opacity-50"
         title={tooltip}
+        data-testid={dataTestId}
       >
         {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
         {isPending ? 'Recovering...' : 'Recover'}
@@ -76,6 +84,7 @@ export function RecoverButton({ issueId, reviewStatus, variant, onClick }: Recov
       disabled={isPending}
       className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
       title={tooltip}
+      data-testid={dataTestId}
     >
       {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
       {isPending ? 'Recovering...' : 'Recover'}
