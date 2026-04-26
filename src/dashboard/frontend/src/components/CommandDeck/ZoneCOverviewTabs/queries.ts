@@ -111,6 +111,29 @@ export function useActivityQuery(issueId: string): UseQueryResult<ActivityRespon
   });
 }
 
+export interface ReviewStatusData {
+  issueId: string;
+  reviewStatus: string;
+  testStatus: string;
+  mergeStatus?: string;
+  verificationStatus?: string;
+  verificationNotes?: string;
+  verificationCycleCount?: number;
+  verificationMaxCycles?: number;
+  testNotes?: string;
+  reviewNotes?: string;
+  readyForMerge: boolean;
+  updatedAt: string;
+}
+
+export function useReviewStatusQuery(issueId: string): UseQueryResult<ReviewStatusData> {
+  return useQuery({
+    queryKey: ['review-status', issueId],
+    queryFn: () => fetchJson<ReviewStatusData>(`/api/review/${issueId}/status`),
+    refetchInterval: 10_000,
+  });
+}
+
 export function useIssueCostsQuery(issueId: string): UseQueryResult<IssueCostData> {
   return useQuery({
     queryKey: ['issueCosts', issueId],
