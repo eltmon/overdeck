@@ -47,6 +47,7 @@ import { LinearClient } from '../services/linear-client.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { httpHandler } from './http-handler.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
+import { buildReviewerNodes, type ReviewerRoundMetadata } from './reviewer-tree.js';
 
 const execAsync = promisify(exec);
 
@@ -117,74 +118,12 @@ function getProjectPath(issuePrefix?: string): string {
 }
 
 /**
- * Extract reviewer role from tmux session name.
- * Format: review-<issueId>-<timestamp>-<role>
- * Returns the role string or null if the name doesn't match the expected pattern.
+ * Extract reviewer role from tmux session name (PAN-830).
+ * Re-exported from reviewer-tree.ts; supports both the canonical
+ * `specialist-<projectKey>-<issueId>-review-<role>` pattern AND the legacy
+ * `review-<issueId>-<timestamp>-<role>` pattern.
  */
-export function extractReviewerRole(tmuxName: string, issueId: string): string | null {
-  const prefix = `review-${issueId}-`;
-  // Case-insensitive prefix match but case-sensitive slice — the prefix length
-  // is the same in both cases so slice works correctly.
-  if (!tmuxName.toLowerCase().startsWith(prefix.toLowerCase())) return null;
-  const rest = tmuxName.slice(prefix.length);
-  const dashIdx = rest.indexOf('-');
-  if (dashIdx <= 0) return null;
-  const role = rest.slice(dashIdx + 1);
-  return role || null;
-}
-
-/**
- * Scan the workspace .pan/review/ directory for persisted reviewer roles
- * from the most recent review round. Returns objects with sessionId (reconstructed
- * from the review directory name + role) and role name. Empty array if no review
- * directory found.
- */
-async function scanPersistedReviewerRoles(
-  workspacePath: string,
-  issueId: string,
-): Promise<Array<{ sessionId: string; role: string }>> {
-  const reviewDir = join(workspacePath, '.pan', 'review');
-  if (!await pathExists(reviewDir)) return [];
-
-  let entries: string[] = [];
-  try {
-    entries = await readdir(reviewDir);
-  } catch { return []; }
-
-  const prefix = `review-${issueId}-`;
-  const rounds = entries
-    .filter(e => e.toLowerCase().startsWith(prefix.toLowerCase()))
-    .map(e => ({ name: e, path: join(reviewDir, e) }));
-
-  if (rounds.length === 0) return [];
-
-  // Sort by mtime descending to pick the most recent review round
-  const roundsWithStat = await Promise.all(
-    rounds.map(async (r) => {
-      const s = await stat(r.path).catch(() => null);
-      return { ...r, mtime: s?.mtime?.getTime() ?? 0 };
-    })
-  );
-  roundsWithStat.sort((a, b) => b.mtime - a.mtime);
-  const mostRecent = roundsWithStat[0];
-  if (!mostRecent) return [];
-
-  let files: string[] = [];
-  try {
-    files = await readdir(mostRecent.path);
-  } catch { return []; }
-
-  // Extract roles from {role}.md files (exclude prompt and claude log files)
-  const roles = files
-    .filter(f => f.endsWith('.md') && !f.endsWith('-prompt.md'))
-    .map(f => f.replace(/\.md$/, ''))
-    .filter(r => !r.endsWith('-claude')); // {role}-claude.log companion files
-
-  return roles.map(role => ({
-    sessionId: `${mostRecent.name}-${role}`,
-    role,
-  }));
-}
+export { extractReviewerRole } from './reviewer-tree.js';
 
 /**
  * Derive session presence from runtime state, tmux session existence, and heartbeat.
@@ -290,6 +229,7 @@ export async function fetchActivityDataWithContext(
     transcript?: string;
     presence: SessionNodePresence;
     hasJsonl?: boolean;
+    roundMetadata?: ReviewerRoundMetadata;
   }> = [];
 
   // Shared workspace path for JSONL resolution (PAN-821)
@@ -439,41 +379,19 @@ export async function fetchActivityDataWithContext(
 
     const taskFileIndex: Record<string, number> = { review: 0, test: 0, merge: 0 };
 
-    // Discover parallel review sessions for this issue (review-<issueId>-<timestamp>-<role>)
-    // Reuse the already-fetched tmuxSessionNames instead of calling listSessionNamesAsync again.
-    let reviewSessions: string[] = [];
-    try {
-      reviewSessions = Array.from(tmuxSessionNames).filter(s => s.startsWith(`review-${issueId}-`));
-      // Keep only the most recent review round (highest timestamp) to avoid
-      // stale tabs from previous review rounds showing "Connection lost".
-      if (reviewSessions.length > 0) {
-        const timestamps = new Set<number>();
-        for (const s of reviewSessions) {
-          const prefix = `review-${issueId}-`;
-          const rest = s.slice(prefix.length);
-          const dashIdx = rest.indexOf('-');
-          if (dashIdx > 0) {
-            const ts = Number(rest.slice(0, dashIdx));
-            if (!isNaN(ts)) timestamps.add(ts);
-          }
-        }
-        if (timestamps.size > 1) {
-          const maxTs = Math.max(...timestamps);
-          reviewSessions = reviewSessions.filter(s => {
-            const prefix = `review-${issueId}-`;
-            const rest = s.slice(prefix.length);
-            const dashIdx = rest.indexOf('-');
-            if (dashIdx > 0) {
-              const ts = Number(rest.slice(0, dashIdx));
-              return !isNaN(ts) && ts === maxTs;
-            }
-            return false;
-          });
-        }
-      }
-    } catch { /* tmux may not be available */ }
+    // PAN-830: Reviewer panes are canonical (`specialist-<projectKey>-<issueId>-review-<role>`)
+    // and persist across review rounds, so we emit exactly five reviewer nodes
+    // (one per role) anchored to the *most recent* review section in history.
+    // Earlier review sections are skipped to avoid duplicate role nodes.
+    const lastReviewIndex = specialistSections.reduce(
+      (idx, s, i) => (s.type === 'review' ? i : idx),
+      -1,
+    );
+    const resolvedProject = resolveProjectFromIssue(issueId);
+    const reviewerProjectKey = resolvedProject?.projectKey ?? issuePrefix.toLowerCase();
 
-    for (const ss of specialistSections) {
+    for (let i = 0; i < specialistSections.length; i++) {
+      const ss = specialistSections[i]!;
       const duration = ss.startedAt && ss.endedAt
         ? Math.floor((new Date(ss.endedAt).getTime() - new Date(ss.startedAt).getTime()) / 1000)
         : null;
@@ -509,83 +427,22 @@ export async function fetchActivityDataWithContext(
         transcriptParts.push(`\n--- Results ---\n${ss.notes}`);
       }
 
-      // Split parallel review sessions into individual reviewer sections (PAN-821)
+      // PAN-830: For review sections, emit the five canonical reviewer nodes
+      // exactly once (anchored to the latest review section in history). Earlier
+      // review sections are absorbed into the round metadata read from
+      // `~/.panopticon/agents/<reviewer-id>/round-N.json`.
       if (ss.type === 'review') {
-        if (reviewSessions.length > 0) {
-          for (const tmuxName of reviewSessions) {
-            const role = extractReviewerRole(tmuxName, issueId);
-            const reviewerParts = [...transcriptParts];
-
-            if (ss.status === 'running') {
-              try {
-                const output = (await capturePaneAsync(tmuxName, 100)).trim();
-                if (output) {
-                  reviewerParts.push(`\n--- Live Output ---\n${output}`);
-                }
-              } catch { /* session may not be running */ }
-            }
-
-            const reviewerPresence: SessionNodePresence = tmuxSessionNames.has(tmuxName)
-              ? (ss.status === 'running' ? 'active' : 'idle')
-              : 'ended';
-            const reviewerJsonlPath = await resolveJsonlPath(tmuxName, workspacePath);
-
-            // Do NOT expose tmuxSession for reviewer sessions — they are autonomous
-            // specialists and should not be interactively attached (PAN-821 review)
-            sections.push({
-              type: role ? 'reviewer' : 'review',
-              role: role || undefined,
-              sessionId: tmuxName,
-              model: 'specialist',
-              startedAt: ss.startedAt,
-              endedAt: ss.endedAt,
-              duration,
-              status: ss.status,
-              transcript: reviewerJsonlPath ? undefined : reviewerParts.join('\n'),
-              presence: reviewerPresence,
-              hasJsonl: !!reviewerJsonlPath,
-            });
-          }
-        } else {
-          // No live tmux sessions — reconstruct individual reviewer nodes from
-          // persisted review output so ended reviewers remain visible (REQ-8).
-          const persisted = await scanPersistedReviewerRoles(workspacePath, issueId);
-          if (persisted.length > 0) {
-            for (const { sessionId, role } of persisted) {
-              const reviewerParts = [...transcriptParts];
-              const reviewerJsonlPath = await resolveJsonlPath(sessionId, workspacePath);
-              sections.push({
-                type: 'reviewer',
-                role,
-                sessionId,
-                model: 'specialist',
-                startedAt: ss.startedAt,
-                endedAt: ss.endedAt,
-                duration,
-                status: ss.status,
-                transcript: reviewerJsonlPath ? undefined : reviewerParts.join('\n'),
-                presence: 'ended',
-                hasJsonl: !!reviewerJsonlPath,
-              });
-            }
-          } else {
-            // No persisted reviewers either — fall back to single review node
-            const specialistSessionId = `specialist-${ss.type}-${ss.startedAt}`;
-            const specialistJsonlPath = await resolveJsonlPath(specialistSessionId, workspacePath);
-            sections.push({
-              type: ss.type,
-              sessionId: specialistSessionId,
-              model: 'specialist',
-              startedAt: ss.startedAt,
-              endedAt: ss.endedAt,
-              duration,
-              status: ss.status,
-              transcript: specialistJsonlPath ? undefined : transcriptParts.join('\n'),
-              presence: 'ended',
-              hasJsonl: !!specialistJsonlPath,
-            });
-          }
-        }
+        if (i !== lastReviewIndex) continue;
+        const reviewerNodes = await buildReviewerNodes({
+          issueId,
+          projectKey: reviewerProjectKey,
+          workspacePath,
+          tmuxSessionNames,
+          startedAt: ss.startedAt,
+          endedAt: ss.endedAt,
+          status: ss.status,
+        });
+        for (const node of reviewerNodes) sections.push(node);
         continue;
       }
 
