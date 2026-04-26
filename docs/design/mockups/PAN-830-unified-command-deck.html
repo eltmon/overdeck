@@ -1,0 +1,977 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Panopticon · Command Deck — PAN-540</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["DM Sans", "system-ui", "sans-serif"],
+              display: ["Space Grotesk", "system-ui", "sans-serif"],
+              mono: ["SF Mono", "SFMono-Regular", "Consolas", "monospace"],
+            },
+            colors: {
+              bg: "var(--background)",
+              fg: "var(--foreground)",
+              card: "var(--card)",
+              muted: "var(--muted-foreground)",
+              border: "var(--border)",
+              divider: "var(--divider)",
+              "divider-strong": "var(--divider-strong)",
+              surface: "var(--surface)",
+              "surface-raised": "var(--surface-raised)",
+              "surface-2": "var(--surface-2)",
+              "surface-active": "var(--surface-active)",
+              "surface-hover": "var(--surface-hover)",
+              "surface-emphasis": "var(--surface-emphasis)",
+              primary: "var(--primary)",
+              "primary-fg": "var(--primary-foreground)",
+              destructive: "var(--destructive)",
+              "destructive-fg": "var(--destructive-foreground)",
+              success: "var(--success)",
+              "success-fg": "var(--success-foreground)",
+              warning: "var(--warning)",
+              "warning-fg": "var(--warning-foreground)",
+              info: "var(--info)",
+              "info-fg": "var(--info-foreground)",
+              review: "var(--signal-review)",
+              "review-fg": "var(--signal-review-foreground)",
+              cost: "var(--signal-cost)",
+              "cost-fg": "var(--signal-cost-foreground)",
+              content: "var(--content)",
+              "content-body": "var(--content-body)",
+              "content-muted": "var(--content-muted)",
+              "content-subtle": "var(--content-subtle)",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      :root {
+        color-scheme: light;
+        --radius: 0.625rem;
+        --background: #ffffff;
+        --foreground: #1f2937;
+        --card: #ffffff;
+        --primary: oklch(0.488 0.217 264);
+        --primary-foreground: #ffffff;
+        --muted: rgba(0, 0, 0, 0.04);
+        --muted-foreground: #6b7280;
+        --border: rgba(0, 0, 0, 0.08);
+        --destructive: #ef4444;
+        --destructive-foreground: #b91c1c;
+        --info: #3b82f6;
+        --info-foreground: #1d4ed8;
+        --success: #10b981;
+        --success-foreground: #047857;
+        --warning: #f59e0b;
+        --warning-foreground: #b45309;
+        --signal-review: #a855f7;
+        --signal-review-foreground: #7e22ce;
+        --signal-cost: #06b6d4;
+        --signal-cost-foreground: #0e7490;
+        --surface: #ffffff;
+        --surface-raised: #f9fafb;
+        --surface-2: #f5f6f8;
+        --surface-active: #f3f4f6;
+        --surface-hover: #f3f4f6;
+        --surface-emphasis: #eff1f4;
+        --divider: rgba(0, 0, 0, 0.08);
+        --divider-strong: rgba(0, 0, 0, 0.14);
+        --content: #1f2937;
+        --content-body: #374151;
+        --content-muted: #6b7280;
+        --content-subtle: #9ca3af;
+      }
+      .dark {
+        color-scheme: dark;
+        --background: #080b10;
+        --foreground: #f3f4f6;
+        --card: #0c1018;
+        --primary: oklch(0.588 0.217 264);
+        --primary-foreground: #ffffff;
+        --muted: rgba(255, 255, 255, 0.04);
+        --muted-foreground: #9ca3af;
+        --border: rgba(255, 255, 255, 0.06);
+        --destructive: #f87171;
+        --destructive-foreground: #fca5a5;
+        --info: #3b82f6;
+        --info-foreground: #60a5fa;
+        --success: #10b981;
+        --success-foreground: #34d399;
+        --warning: #f59e0b;
+        --warning-foreground: #fbbf24;
+        --signal-review: #a855f7;
+        --signal-review-foreground: #c084fc;
+        --signal-cost: #06b6d4;
+        --signal-cost-foreground: #22d3ee;
+        --surface: #0c1018;
+        --surface-raised: #111520;
+        --surface-2: #0e1320;
+        --surface-active: #1a2132;
+        --surface-hover: #161d2b;
+        --surface-emphasis: #1e2640;
+        --divider: rgba(255, 255, 255, 0.06);
+        --divider-strong: rgba(255, 255, 255, 0.12);
+        --content: #f3f4f6;
+        --content-body: #e5e7eb;
+        --content-muted: #9ca3af;
+        --content-subtle: #6b7280;
+      }
+      body {
+        font-family: "DM Sans", system-ui, sans-serif;
+        background: var(--background);
+        color: var(--foreground);
+        margin: 0;
+        min-height: 100vh;
+      }
+      .font-display {
+        font-family: "Space Grotesk", system-ui, sans-serif;
+        letter-spacing: -0.01em;
+      }
+      .font-mono {
+        font-family: "SF Mono", "SFMono-Regular", Consolas, monospace;
+      }
+      /* Subtle fractal noise overlay (matches dashboard) */
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.025;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        background-size: 256px 256px;
+        z-index: 9999;
+      }
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+
+      /* Pulsing alive dot */
+      @keyframes pulse-dot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.55; transform: scale(0.85); }
+      }
+      .alive-dot {
+        animation: pulse-dot 1.6s ease-in-out infinite;
+      }
+      /* Ready-to-merge shimmer */
+      @keyframes badge-shimmer {
+        0% { background-position: 150% 50%; }
+        100% { background-position: -50% 50%; }
+      }
+      .badge-shimmer-rtm {
+        background: linear-gradient(
+          90deg,
+          color-mix(in srgb, var(--success) 8%, transparent) 0%,
+          color-mix(in srgb, var(--success) 22%, transparent) 50%,
+          color-mix(in srgb, var(--success) 8%, transparent) 100%
+        );
+        background-size: 250% 100%;
+        animation: badge-shimmer 2.8s ease-in-out infinite;
+      }
+
+      /* Badge utilities (mirroring index.css) */
+      .badge-bg-success { background: color-mix(in srgb, var(--success) 8%, transparent); }
+      .badge-border-success { border-color: color-mix(in srgb, var(--success) 32%, transparent); }
+      .badge-bg-warning { background: color-mix(in srgb, var(--warning) 8%, transparent); }
+      .badge-border-warning { border-color: color-mix(in srgb, var(--warning) 32%, transparent); }
+      .badge-bg-destructive { background: color-mix(in srgb, var(--destructive) 8%, transparent); }
+      .badge-border-destructive { border-color: color-mix(in srgb, var(--destructive) 32%, transparent); }
+      .badge-bg-review { background: color-mix(in srgb, var(--signal-review) 8%, transparent); }
+      .badge-border-review { border-color: color-mix(in srgb, var(--signal-review) 32%, transparent); }
+      .badge-bg-cost { background: color-mix(in srgb, var(--signal-cost) 8%, transparent); }
+      .badge-border-cost { border-color: color-mix(in srgb, var(--signal-cost) 32%, transparent); }
+      .badge-bg-info { background: color-mix(in srgb, var(--info) 8%, transparent); }
+      .badge-border-info { border-color: color-mix(in srgb, var(--info) 32%, transparent); }
+      .badge-bg-primary { background: color-mix(in srgb, var(--primary) 12%, transparent); }
+      .badge-border-primary { border-color: color-mix(in srgb, var(--primary) 38%, transparent); }
+      .badge-bg-muted { background: color-mix(in srgb, var(--foreground) 6%, transparent); }
+      .badge-border-muted { border-color: color-mix(in srgb, var(--foreground) 12%, transparent); }
+
+      /* Markdown prose */
+      .prose-chat p { margin: 0 0 0.6em; line-height: 1.6; }
+      .prose-chat p:last-child { margin-bottom: 0; }
+      .prose-chat ul { padding-left: 1.25em; margin: 0.4em 0; list-style: disc; }
+      .prose-chat ol { padding-left: 1.25em; margin: 0.4em 0; list-style: decimal; }
+      .prose-chat li { margin-bottom: 0.25em; line-height: 1.55; }
+      .prose-chat strong { font-weight: 600; color: var(--foreground); }
+      .prose-chat code {
+        font-family: "SF Mono", monospace;
+        font-size: 0.86em;
+        background: color-mix(in srgb, currentColor 12%, transparent);
+        padding: 0.1em 0.32em;
+        border-radius: 3px;
+      }
+      .prose-chat pre {
+        background: var(--surface-2);
+        border: 1px solid var(--divider);
+        border-radius: 8px;
+        padding: 0.85em 1em;
+        overflow-x: auto;
+        font-size: 12.5px;
+        line-height: 1.55;
+        margin: 0.6em 0;
+      }
+      .prose-chat pre code {
+        background: transparent;
+        padding: 0;
+        font-size: 12.5px;
+      }
+      .prose-chat h3 { font-size: 0.95rem; font-weight: 600; margin: 0.6em 0 0.3em; font-family: "Space Grotesk", sans-serif; }
+
+      /* Stage dots connectors */
+      .stage-line {
+        position: absolute;
+        top: 50%;
+        height: 1px;
+        background: var(--divider-strong);
+        transform: translateY(-50%);
+      }
+    </style>
+  </head>
+
+  <body class="text-content">
+    <!-- =========================================================== -->
+    <!-- App shell: top bar + 3-column layout                       -->
+    <!-- =========================================================== -->
+    <div class="flex h-screen flex-col">
+      <!-- Top bar -->
+      <header
+        class="flex h-12 shrink-0 items-center justify-between border-b border-divider bg-surface-raised px-4"
+      >
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-2">
+            <!-- Eye glyph (Panopticon) -->
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="text-primary">
+              <path
+                d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"
+                stroke="currentColor"
+                stroke-width="1.6"
+              />
+              <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.6" />
+            </svg>
+            <span class="font-display text-sm font-semibold tracking-tight">PANOPTICON</span>
+          </div>
+          <nav class="flex items-center gap-1 text-xs text-content-muted">
+            <button class="rounded px-2 py-1 hover:bg-surface-hover">Kanban</button>
+            <button
+              class="rounded bg-surface-active px-2 py-1 text-content"
+              aria-current="page"
+            >
+              Command Deck
+            </button>
+            <button class="rounded px-2 py-1 hover:bg-surface-hover">Workspaces</button>
+            <button class="rounded px-2 py-1 hover:bg-surface-hover">Costs</button>
+            <button class="rounded px-2 py-1 hover:bg-surface-hover">Settings</button>
+          </nav>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="font-mono text-[11px] text-content-subtle">
+            connected · 3 alive · $12.40 today
+          </span>
+          <button
+            class="rounded p-1.5 text-content-muted hover:bg-surface-hover hover:text-content"
+            title="Toggle theme"
+            onclick="document.documentElement.classList.toggle('dark')"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Main 3-column layout -->
+      <div class="grid min-h-0 flex-1 grid-cols-[280px_1fr] xl:grid-cols-[300px_1fr]">
+        <!-- ======================== LEFT RAIL: Project + Session Tree ======================== -->
+        <aside
+          class="flex min-h-0 flex-col border-r border-divider bg-surface-raised"
+        >
+          <!-- Project header -->
+          <div
+            class="flex shrink-0 items-center justify-between border-b border-divider px-3 py-2.5"
+          >
+            <div class="flex items-center gap-2">
+              <div
+                class="flex h-6 w-6 items-center justify-center rounded bg-primary/10 text-primary"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                </svg>
+              </div>
+              <div>
+                <div class="font-display text-sm font-semibold leading-none">panopticon</div>
+                <div class="text-[10.5px] text-content-subtle">3 issues · 8 sessions</div>
+              </div>
+            </div>
+            <button class="text-content-muted hover:text-content">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="1" />
+                <circle cx="19" cy="12" r="1" />
+                <circle cx="5" cy="12" r="1" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Filter chips -->
+          <div class="flex shrink-0 items-center gap-1 border-b border-divider px-3 py-1.5">
+            <button class="rounded bg-surface-active px-2 py-0.5 text-[10.5px] font-medium text-content">
+              All
+            </button>
+            <button class="rounded px-2 py-0.5 text-[10.5px] text-content-muted hover:bg-surface-hover">
+              Alive
+            </button>
+            <button class="rounded px-2 py-0.5 text-[10.5px] text-content-muted hover:bg-surface-hover">
+              Failed
+            </button>
+            <div class="ml-auto text-[10.5px] text-content-subtle">▾ sort</div>
+          </div>
+
+          <!-- Tree -->
+          <div class="min-h-0 flex-1 overflow-y-auto px-1.5 py-2 text-[12.5px]">
+            <!-- Issue 1: PAN-540 (selected, expanded) -->
+            <div class="mb-1.5">
+              <div
+                class="flex cursor-pointer items-center gap-1.5 rounded px-1.5 py-1 hover:bg-surface-hover"
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="text-content-muted">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+                <span class="font-mono text-[11px] font-semibold text-content">PAN-540</span>
+                <span class="truncate text-content-body">Remove convoy abstraction</span>
+                <span class="ml-auto inline-flex items-center gap-1 font-mono text-[10px] text-cost-fg">
+                  $4.32
+                </span>
+              </div>
+              <div
+                class="ml-3 inline-flex items-center gap-1 rounded border badge-bg-review badge-border-review px-1.5 py-0 text-[10px] font-medium text-review-fg"
+              >
+                In Review · Round 2
+              </div>
+
+              <!-- Sessions for PAN-540 -->
+              <div class="mt-1 ml-2.5 space-y-0.5 border-l border-divider pl-2.5">
+                <!-- planning -->
+                <div class="group flex items-center gap-1.5 rounded px-1.5 py-1 hover:bg-surface-hover">
+                  <span class="h-1.5 w-1.5 rounded-full bg-content-subtle"></span>
+                  <span class="text-content-muted">planning</span>
+                  <span class="ml-auto font-mono text-[10px] text-content-subtle">$0.42</span>
+                </div>
+                <!-- work -->
+                <div class="group flex items-center gap-1.5 rounded px-1.5 py-1 hover:bg-surface-hover">
+                  <span class="h-1.5 w-1.5 rounded-full bg-content-subtle"></span>
+                  <span class="text-content-muted">work</span>
+                  <span class="ml-auto font-mono text-[10px] text-content-subtle">$1.85</span>
+                </div>
+                <!-- review-orchestrator -->
+                <div class="group flex items-center gap-1.5 rounded px-1.5 py-1 hover:bg-surface-hover">
+                  <span class="h-1.5 w-1.5 rounded-full bg-content-subtle"></span>
+                  <span class="text-content-muted">review-orchestrator</span>
+                  <span class="ml-auto font-mono text-[10px] text-content-subtle">$0.04</span>
+                </div>
+                <!-- review-correctness (SELECTED, ALIVE) -->
+                <div
+                  class="group flex items-center gap-1.5 rounded bg-primary/10 px-1.5 py-1 ring-1 ring-primary/30"
+                  aria-selected="true"
+                >
+                  <span class="alive-dot h-1.5 w-1.5 rounded-full bg-success"></span>
+                  <span class="font-medium text-content">review-correctness</span>
+                  <span class="rounded bg-warning/15 px-1 py-px text-[9.5px] font-medium text-warning-fg">R2</span>
+                  <span class="ml-auto font-mono text-[10px] text-cost-fg">$0.31</span>
+                </div>
+                <!-- review-security (passed) -->
+                <div class="group flex items-center gap-1.5 rounded px-1.5 py-1 hover:bg-surface-hover">
+                  <span class="h-1.5 w-1.5 rounded-full bg-success/70"></span>
+                  <span class="text-content-body">review-security</span>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="text-success-fg">
+                    <path d="m20 6-11 11-5-5" />
+                  </svg>
+                  <span class="ml-auto font-mono text-[10px] text-content-subtle">$0.28</span>
+                </div>
+                <!-- review-performance -->
+                <div class="group flex items-center gap-1.5 rounded px-1.5 py-1 hover:bg-surface-hover">
+                  <span class="h-1.5 w-1.5 rounded-full bg-success/70"></span>
+                  <span class="text-content-body">review-performance</span>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="text-success-fg">
+                    <path d="m20 6-11 11-5-5" />
+                  </svg>
+                  <span class="ml-auto font-mono text-[10px] text-content-subtle">$0.35</span>
+                </div>
+                <!-- review-requirements -->
+                <div class="group flex items-center gap-1.5 rounded px-1.5 py-1 hover:bg-surface-hover">
+                  <span class="h-1.5 w-1.5 rounded-full bg-success/70"></span>
+                  <span class="text-content-body">review-requirements</span>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="text-success-fg">
+                    <path d="m20 6-11 11-5-5" />
+                  </svg>
+                  <span class="ml-auto font-mono text-[10px] text-content-subtle">$0.22</span>
+                </div>
+                <!-- review-synthesis -->
+                <div class="group flex items-center gap-1.5 rounded px-1.5 py-1 hover:bg-surface-hover">
+                  <span class="h-1.5 w-1.5 rounded-full bg-success/70"></span>
+                  <span class="text-content-body">review-synthesis</span>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="text-success-fg">
+                    <path d="m20 6-11 11-5-5" />
+                  </svg>
+                  <span class="ml-auto font-mono text-[10px] text-content-subtle">$0.18</span>
+                </div>
+                <!-- test (pending) -->
+                <div class="group flex items-center gap-1.5 rounded px-1.5 py-1 opacity-60 hover:bg-surface-hover">
+                  <span class="h-1.5 w-1.5 rounded-full border border-content-subtle"></span>
+                  <span class="text-content-subtle">test</span>
+                  <span class="ml-auto font-mono text-[10px] text-content-subtle">—</span>
+                </div>
+                <!-- merge (pending) -->
+                <div class="group flex items-center gap-1.5 rounded px-1.5 py-1 opacity-60 hover:bg-surface-hover">
+                  <span class="h-1.5 w-1.5 rounded-full border border-content-subtle"></span>
+                  <span class="text-content-subtle">merge</span>
+                  <span class="ml-auto font-mono text-[10px] text-content-subtle">—</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Issue 2: PAN-732 (collapsed) -->
+            <div class="mb-1.5">
+              <div class="flex cursor-pointer items-center gap-1.5 rounded px-1.5 py-1 hover:bg-surface-hover">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="text-content-muted">
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+                <span class="font-mono text-[11px] font-semibold text-content">PAN-732</span>
+                <span class="truncate text-content-body">Hierarchical planning UI</span>
+                <span class="alive-dot ml-1 h-1.5 w-1.5 rounded-full bg-info"></span>
+                <span class="ml-auto font-mono text-[10px] text-cost-fg">$1.84</span>
+              </div>
+              <div
+                class="ml-3 inline-flex items-center gap-1 rounded border badge-bg-info badge-border-info px-1.5 py-0 text-[10px] font-medium text-info-fg"
+              >
+                Working
+              </div>
+            </div>
+
+            <!-- Issue 3: PAN-794 (collapsed, ready to merge) -->
+            <div class="mb-1.5">
+              <div class="flex cursor-pointer items-center gap-1.5 rounded px-1.5 py-1 hover:bg-surface-hover">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="text-content-muted">
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+                <span class="font-mono text-[11px] font-semibold text-content">PAN-794</span>
+                <span class="truncate text-content-body">Stuck-review detection</span>
+                <span class="ml-auto font-mono text-[10px] text-cost-fg">$3.15</span>
+              </div>
+              <div
+                class="ml-3 inline-flex items-center gap-1 rounded border badge-shimmer-rtm badge-border-success px-1.5 py-0 text-[10px] font-medium text-success-fg"
+              >
+                Ready to merge
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer status -->
+          <div
+            class="flex shrink-0 items-center justify-between border-t border-divider px-3 py-1.5 text-[10px] text-content-subtle"
+          >
+            <span class="font-mono">8 sessions · 3 alive</span>
+            <button class="rounded p-1 hover:bg-surface-hover hover:text-content">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12a9 9 0 1 1-3.13-6.86L21 8" />
+                <path d="M21 3v5h-5" />
+              </svg>
+            </button>
+          </div>
+        </aside>
+
+        <!-- ============================ RIGHT WORKBENCH ========================== -->
+        <main class="flex min-h-0 flex-col bg-surface">
+          <!-- ZONE A: Issue header (always visible) -->
+          <section
+            class="shrink-0 border-b border-divider bg-surface-raised"
+          >
+            <div class="px-5 pt-4 pb-3">
+              <!-- Identity row -->
+              <div class="flex items-start gap-3">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <a
+                      href="#"
+                      class="font-mono text-[11px] font-semibold text-primary hover:underline"
+                    >
+                      PAN-540 ↗
+                    </a>
+                    <span class="text-[11px] text-content-subtle">·</span>
+                    <span class="text-[11px] text-content-muted">
+                      panopticon · feature/PAN-540
+                    </span>
+                    <span class="text-[11px] text-content-subtle">·</span>
+                    <span
+                      class="rounded border badge-bg-review badge-border-review px-1.5 py-px text-[10px] font-medium text-review-fg"
+                    >
+                      In Review · Round 2
+                    </span>
+                  </div>
+                  <h1
+                    class="font-display mt-1 text-[20px] font-semibold leading-tight tracking-tight text-content"
+                  >
+                    Remove convoy abstraction, inline parallel review directly into review-agent
+                  </h1>
+                  <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-content-muted">
+                    <span class="inline-flex items-center gap-1">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7v5l3 2" />
+                      </svg>
+                      started 3 days ago
+                    </span>
+                    <span class="inline-flex items-center gap-1">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                      </svg>
+                      <span class="font-mono text-cost-fg">$4.32</span>
+                    </span>
+                    <span class="inline-flex items-center gap-1 font-mono">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M5 7h14M5 12h14M5 17h14" />
+                      </svg>
+                      6 / 9 acceptance
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Contextual actions cluster -->
+                <div class="flex shrink-0 items-center gap-1.5">
+                  <!-- Primary (contextual to In Review · CHANGES_REQUESTED) -->
+                  <button
+                    class="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[12px] font-semibold text-primary-fg shadow-sm hover:opacity-90"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <path d="M21 7 9 19l-5.5-5.5" />
+                    </svg>
+                    Approve & Test
+                  </button>
+                  <button
+                    class="inline-flex items-center gap-1.5 rounded-md border border-divider-strong bg-surface px-2.5 py-1.5 text-[12px] font-medium text-content hover:bg-surface-hover"
+                  >
+                    Send to Work
+                  </button>
+                  <button
+                    class="inline-flex items-center gap-1.5 rounded-md border border-divider-strong bg-surface px-2.5 py-1.5 text-[12px] font-medium text-content hover:bg-surface-hover"
+                  >
+                    View PR
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M7 7h10v10" />
+                      <path d="M7 17 17 7" />
+                    </svg>
+                  </button>
+                  <button
+                    class="rounded-md border border-divider-strong bg-surface p-1.5 text-content-muted hover:bg-surface-hover hover:text-content"
+                    title="More actions"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="1" />
+                      <circle cx="19" cy="12" r="1" />
+                      <circle cx="5" cy="12" r="1" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Stage dots -->
+              <div class="mt-3 flex items-center gap-0">
+                <!-- planning ✓ -->
+                <div class="flex items-center gap-2">
+                  <div class="flex flex-col items-center">
+                    <div
+                      class="flex h-6 w-6 items-center justify-center rounded-full border border-success/40 bg-success/10"
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="text-success-fg">
+                        <path d="m20 6-11 11-5-5" />
+                      </svg>
+                    </div>
+                    <span class="mt-1 font-mono text-[9.5px] text-content-muted">planning</span>
+                  </div>
+                  <div class="h-px w-7 bg-divider-strong"></div>
+                </div>
+                <!-- work ✓ -->
+                <div class="flex items-center gap-2">
+                  <div class="flex flex-col items-center">
+                    <div
+                      class="flex h-6 w-6 items-center justify-center rounded-full border border-success/40 bg-success/10"
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="text-success-fg">
+                        <path d="m20 6-11 11-5-5" />
+                      </svg>
+                    </div>
+                    <span class="mt-1 font-mono text-[9.5px] text-content-muted">work</span>
+                  </div>
+                  <div class="h-px w-7 bg-divider-strong"></div>
+                </div>
+                <!-- verify ✓ -->
+                <div class="flex items-center gap-2">
+                  <div class="flex flex-col items-center">
+                    <div
+                      class="flex h-6 w-6 items-center justify-center rounded-full border border-success/40 bg-success/10"
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="text-success-fg">
+                        <path d="m20 6-11 11-5-5" />
+                      </svg>
+                    </div>
+                    <span class="mt-1 font-mono text-[9.5px] text-content-muted">verify</span>
+                  </div>
+                  <div class="h-px w-7 bg-divider-strong"></div>
+                </div>
+                <!-- review (current, glowing) -->
+                <div class="flex items-center gap-2">
+                  <div class="flex flex-col items-center">
+                    <div
+                      class="relative flex h-6 w-6 items-center justify-center rounded-full bg-review/15 ring-2 ring-review/40"
+                    >
+                      <div class="alive-dot h-2 w-2 rounded-full bg-review"></div>
+                    </div>
+                    <span class="mt-1 font-mono text-[9.5px] font-semibold text-review-fg">review</span>
+                  </div>
+                  <div class="h-px w-7 bg-divider"></div>
+                </div>
+                <!-- test (pending) -->
+                <div class="flex items-center gap-2">
+                  <div class="flex flex-col items-center">
+                    <div class="flex h-6 w-6 items-center justify-center rounded-full border border-divider-strong"></div>
+                    <span class="mt-1 font-mono text-[9.5px] text-content-subtle">test</span>
+                  </div>
+                  <div class="h-px w-7 bg-divider"></div>
+                </div>
+                <!-- merge (pending) -->
+                <div class="flex items-center gap-2">
+                  <div class="flex flex-col items-center">
+                    <div class="flex h-6 w-6 items-center justify-center rounded-full border border-divider-strong"></div>
+                    <span class="mt-1 font-mono text-[9.5px] text-content-subtle">merge</span>
+                  </div>
+                </div>
+
+                <!-- Right-side meta -->
+                <div class="ml-auto flex items-center gap-3 text-[11px] text-content-muted">
+                  <span class="inline-flex items-center gap-1.5 rounded border badge-bg-success badge-border-success px-1.5 py-0.5 text-success-fg">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m20 6-11 11-5-5"/></svg>
+                    typecheck
+                  </span>
+                  <span class="inline-flex items-center gap-1.5 rounded border badge-bg-success badge-border-success px-1.5 py-0.5 text-success-fg">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m20 6-11 11-5-5"/></svg>
+                    lint
+                  </span>
+                  <span class="inline-flex items-center gap-1.5 rounded border badge-bg-success badge-border-success px-1.5 py-0.5 text-success-fg">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m20 6-11 11-5-5"/></svg>
+                    tests · 184
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ZONE B: Agent context (selected session) -->
+          <section
+            class="shrink-0 border-b border-divider bg-surface px-5 py-3"
+          >
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <div class="flex items-center gap-2">
+                <span
+                  class="inline-flex items-center gap-1.5 rounded-md border badge-bg-review badge-border-review px-2 py-0.5 text-[11px] font-semibold text-review-fg"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                  review-correctness
+                </span>
+                <span class="alive-dot h-2 w-2 rounded-full bg-success"></span>
+                <span class="text-[12px] font-medium text-content">alive · active</span>
+              </div>
+              <div class="flex items-center gap-1 text-[11px] text-content-muted">
+                <span class="font-mono">round</span>
+                <span class="rounded bg-warning/15 px-1.5 py-px text-[10.5px] font-semibold text-warning-fg">2 / 2</span>
+              </div>
+              <div class="flex items-center gap-1 text-[11px] text-content-muted">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                4m 12s elapsed
+              </div>
+              <div class="flex items-center gap-1 font-mono text-[11px] text-cost-fg">
+                $0.31
+              </div>
+              <div class="flex items-center gap-1 text-[11px] text-content-muted">
+                <span class="text-content-subtle">model:</span>
+                <span class="font-mono text-content">claude-opus-4-7</span>
+              </div>
+              <div class="flex items-center gap-1 text-[11px] text-content-muted">
+                <span class="text-content-subtle">pid:</span>
+                <span class="font-mono text-content-subtle">11442</span>
+              </div>
+              <div class="flex items-center gap-1 text-[11px] text-content-muted">
+                <span class="text-content-subtle">session:</span>
+                <span class="font-mono text-content-subtle">specialist-panopticon-540-review-correctness</span>
+              </div>
+
+              <!-- Session actions -->
+              <div class="ml-auto flex items-center gap-1.5">
+                <button
+                  class="inline-flex items-center gap-1.5 rounded border border-divider-strong bg-surface-raised px-2 py-1 text-[11px] font-medium text-content hover:bg-surface-hover"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                  Stop
+                </button>
+                <button
+                  class="inline-flex items-center gap-1.5 rounded border border-divider-strong bg-surface-raised px-2 py-1 text-[11px] font-medium text-content hover:bg-surface-hover"
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  Show terminal
+                </button>
+                <button
+                  class="inline-flex items-center gap-1.5 rounded border border-divider-strong bg-surface-raised px-2 py-1 text-[11px] font-medium text-content hover:bg-surface-hover"
+                >
+                  Open in tmux
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Round history accordion -->
+            <div class="mt-2.5 flex items-center gap-2 text-[11px]">
+              <span class="text-content-muted">Rounds:</span>
+              <button
+                class="inline-flex items-center gap-1.5 rounded border border-divider bg-surface-raised px-2 py-0.5 text-content-muted hover:bg-surface-hover"
+              >
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="text-success-fg"><path d="m20 6-11 11-5-5"/></svg>
+                Round 1 · passed · 8 findings · 3m 41s · $0.18
+              </button>
+              <button
+                class="inline-flex items-center gap-1.5 rounded border badge-bg-warning badge-border-warning px-2 py-0.5 font-semibold text-warning-fg"
+              >
+                <span class="alive-dot h-1.5 w-1.5 rounded-full bg-warning"></span>
+                Round 2 · in progress · 4m 12s · $0.13
+              </button>
+            </div>
+          </section>
+
+          <!-- ZONE C: Conversation + composer (primary content) -->
+          <section class="flex min-h-0 flex-1 flex-col">
+            <!-- Conversation tabs / view toggle -->
+            <div
+              class="flex shrink-0 items-center gap-1 border-b border-divider bg-surface-raised px-4 py-1.5"
+            >
+              <button
+                class="inline-flex items-center gap-1.5 rounded-md bg-surface-active px-2.5 py-1 text-[11.5px] font-semibold text-content"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Conversation
+              </button>
+              <button
+                class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11.5px] text-content-muted hover:bg-surface-hover hover:text-content"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                Terminal
+              </button>
+              <button
+                class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11.5px] text-content-muted hover:bg-surface-hover hover:text-content"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+                Findings
+                <span class="rounded badge-bg-warning badge-border-warning border px-1 text-[9.5px] font-semibold text-warning-fg">3</span>
+              </button>
+
+              <div class="ml-auto flex items-center gap-3 text-[10.5px] text-content-subtle">
+                <span class="inline-flex items-center gap-1">
+                  <span class="alive-dot h-1.5 w-1.5 rounded-full bg-success"></span>
+                  streaming · 2s poll
+                </span>
+                <span class="font-mono">147 messages</span>
+              </div>
+            </div>
+
+            <!-- Messages timeline (scrollable) -->
+            <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+              <div class="mx-auto max-w-3xl space-y-4">
+                <!-- Round 1 divider -->
+                <div class="flex items-center gap-3 py-1">
+                  <div class="h-px flex-1 bg-divider"></div>
+                  <span class="font-mono text-[10.5px] text-content-subtle">
+                    Round 1 · started Apr 23, 14:02 · ended 14:06 · passed
+                  </span>
+                  <div class="h-px flex-1 bg-divider"></div>
+                </div>
+
+                <!-- User bubble -->
+                <div class="flex justify-end">
+                  <div class="max-w-[80%] rounded-2xl rounded-br-md bg-primary/10 px-4 py-2.5 ring-1 ring-primary/20">
+                    <div class="prose-chat text-[13px] text-content">
+                      <p>You are correctness-reviewer for PAN-540. Review the diff against acceptance criteria. Branch: <code>feature/PAN-540</code>.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Assistant message (assistant-style markdown) -->
+                <div class="flex flex-col gap-1">
+                  <div class="flex items-center gap-1.5 text-[10.5px] text-content-subtle">
+                    <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-review/20 text-[8.5px] font-bold text-review-fg">RC</span>
+                    review-correctness · 14:02:18
+                  </div>
+                  <div class="prose-chat text-[13px] leading-relaxed text-content-body">
+                    <p>I'll start by reading the diff and the acceptance criteria from the issue.</p>
+                  </div>
+                </div>
+
+                <!-- Tool call group (collapsed work log style) -->
+                <div class="flex flex-col gap-1">
+                  <div class="rounded-lg border border-divider bg-surface-raised px-3 py-2 text-[12px] text-content-muted">
+                    <div class="flex items-center gap-2 text-[10.5px] font-mono text-content-subtle">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18 22 12 16 6"/><path d="M8 6 2 12 8 18"/></svg>
+                      <span>read 6 files · 12.4k tokens</span>
+                      <span class="ml-auto text-content-subtle">▾ show</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Assistant verdict -->
+                <div class="flex flex-col gap-1">
+                  <div class="flex items-center gap-1.5 text-[10.5px] text-content-subtle">
+                    <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-review/20 text-[8.5px] font-bold text-review-fg">RC</span>
+                    review-correctness · 14:05:42
+                  </div>
+                  <div class="prose-chat text-[13px] leading-relaxed text-content-body">
+                    <h3>Round 1 verdict: <strong class="text-success-fg">CHANGES_REQUESTED</strong></h3>
+                    <p>The convoy abstraction is removed cleanly, but I found 3 correctness gaps:</p>
+                    <ol>
+                      <li><strong>Synthesis duplicate-finding collapse is missing.</strong> <code>parseConvoySynthesis</code> in <code>review-agent.ts:412</code> no longer dedupes findings keyed by <code>{file, concern}</code> — both reviewers can now report the same lint twice.</li>
+                      <li><strong>Backward-compat fallback is wired backwards.</strong> When <code>review_agents</code> is absent, <code>resolveReviewAgents()</code> returns an empty array instead of the default 3.</li>
+                      <li><strong>Configurable focus areas not passed to the agent prompt.</strong> The <code>focus</code> field on <code>ReviewAgentConfig</code> is read but never injected into the reviewer's system prompt template.</li>
+                    </ol>
+                  </div>
+                </div>
+
+                <!-- Round 2 divider (current) -->
+                <div class="flex items-center gap-3 py-1">
+                  <div class="h-px flex-1 badge-bg-warning"></div>
+                  <span class="rounded-full border badge-bg-warning badge-border-warning px-2 py-0.5 font-mono text-[10.5px] font-semibold text-warning-fg">
+                    Round 2 · started Apr 23, 14:32
+                  </span>
+                  <div class="h-px flex-1 badge-bg-warning"></div>
+                </div>
+
+                <!-- User followup (round 2 prompt) -->
+                <div class="flex justify-end">
+                  <div class="max-w-[80%] rounded-2xl rounded-br-md bg-primary/10 px-4 py-2.5 ring-1 ring-primary/20">
+                    <div class="prose-chat text-[13px] text-content">
+                      <p>Re-review. New diff since round 1: <code>review-agent.ts</code> +47 / -12, <code>convoy-templates.ts</code> deleted, <code>config.ts</code> +18.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Assistant streaming -->
+                <div class="flex flex-col gap-1">
+                  <div class="flex items-center gap-1.5 text-[10.5px] text-content-subtle">
+                    <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-review/20 text-[8.5px] font-bold text-review-fg">RC</span>
+                    review-correctness · 14:32:04
+                  </div>
+                  <div class="prose-chat text-[13px] leading-relaxed text-content-body">
+                    <p>Verifying the round 1 findings are addressed.</p>
+                  </div>
+                </div>
+
+                <!-- Tool call (active) -->
+                <div class="rounded-lg border badge-border-warning badge-bg-warning px-3 py-2 text-[12px] text-content-body">
+                  <div class="flex items-center gap-2 text-[10.5px] font-mono">
+                    <span class="alive-dot h-1.5 w-1.5 rounded-full bg-warning"></span>
+                    <span class="text-warning-fg">running · grep "parseConvoySynthesis" src/lib/cloister/</span>
+                  </div>
+                </div>
+
+                <!-- Assistant streaming text (pre-cursor) -->
+                <div class="flex flex-col gap-1">
+                  <div class="prose-chat text-[13px] leading-relaxed text-content-body">
+                    <p>
+                      Finding 1 fix verified: dedupe key restored at <code>review-agent.ts:438</code>. Finding 2 fix verified: default reviewers fall through correctly when <code>review_agents</code> is absent. Now checking finding 3
+                      <span class="ml-px inline-block h-3.5 w-1.5 -translate-y-px animate-pulse bg-content-body align-middle"></span>
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Working indicator -->
+                <div class="flex items-center gap-2 text-[11px] text-content-muted">
+                  <span class="alive-dot h-1.5 w-1.5 rounded-full bg-success"></span>
+                  <span class="font-mono">working · 4m 12s elapsed</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Composer footer -->
+            <div class="shrink-0 border-t border-divider bg-surface-raised px-4 py-3">
+              <div class="mx-auto max-w-3xl">
+                <div
+                  class="rounded-xl border border-divider-strong bg-surface px-3 pt-2.5 pb-2 shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20"
+                >
+                  <div
+                    contenteditable="true"
+                    class="min-h-[52px] text-[13px] leading-relaxed text-content outline-none"
+                    data-placeholder="Send a message to review-correctness…"
+                  >
+                    <span class="text-content-subtle"
+                      >Send a message to review-correctness…</span
+                    >
+                  </div>
+                  <div class="mt-2 flex items-center gap-1.5 border-t border-divider pt-2">
+                    <button
+                      class="inline-flex items-center gap-1 rounded px-1.5 py-1 text-[11px] text-content-muted hover:bg-surface-hover hover:text-content"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                      Attach
+                    </button>
+                    <button
+                      class="inline-flex items-center gap-1 rounded px-1.5 py-1 text-[11px] text-content-muted hover:bg-surface-hover hover:text-content"
+                    >
+                      <span class="font-mono text-[11px]">/</span>
+                      Slash
+                      <span class="rounded badge-bg-muted badge-border-muted border px-1 text-[9.5px]">100+</span>
+                    </button>
+                    <span class="mx-1 h-4 w-px bg-divider"></span>
+                    <button
+                      class="inline-flex items-center gap-1 rounded px-1.5 py-1 text-[11px] text-content-muted hover:bg-surface-hover hover:text-content"
+                    >
+                      <span class="text-content-subtle">model:</span>
+                      <span class="font-mono text-content">opus-4-7</span>
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                    <button
+                      class="inline-flex items-center gap-1 rounded px-1.5 py-1 text-[11px] text-content-muted hover:bg-surface-hover hover:text-content"
+                    >
+                      <span class="text-content-subtle">effort:</span>
+                      <span class="font-mono text-content">max</span>
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+                    </button>
+                    <span class="ml-auto text-[10.5px] text-content-subtle">⏎ to send · ⇧⏎ for newline</span>
+                    <button
+                      class="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1 text-[11.5px] font-semibold text-primary-fg shadow-sm hover:opacity-90"
+                    >
+                      Send
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2 11 13"/><path d="m22 2-7 20-4-9-9-4 20-7z"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="mt-1.5 flex items-center justify-between text-[10.5px] text-content-subtle">
+                  <span class="font-mono">addressing: specialist-panopticon-540-review-correctness</span>
+                  <span class="font-mono">2 / 8000</span>
+                </div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>
