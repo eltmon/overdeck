@@ -261,6 +261,54 @@ body::after {
   }
 }
 
+/* ─── Command Deck liveness keyframes (PAN-830) ─── */
+@keyframes alive-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(0.85); }
+}
+
+@keyframes kf-stuck-shake {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-1px); }
+  75%      { transform: translateX(1px); }
+}
+
+@keyframes kf-error-shake {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-3px); }
+  75%      { transform: translateX(3px); }
+}
+
+@keyframes kf-row-flash {
+  0%   { background: color-mix(in srgb, var(--primary) 20%, transparent); }
+  100% { background: transparent; }
+}
+
+@keyframes kf-round-active {
+  0%   { background-position: 150% 50%; }
+  100% { background-position: -50% 50%; }
+}
+
+@layer utilities {
+  .anim-alive-dot-active   { animation: alive-dot 1.6s ease-in-out infinite; }
+  .anim-alive-dot-thinking { animation: alive-dot 2.0s ease-in-out infinite; }
+  .anim-alive-dot-waiting  { animation: alive-dot 1.5s ease-in-out infinite; }
+  .anim-alive-dot-idle     { animation: alive-dot 4.0s ease-in-out infinite; }
+  .anim-stuck-shake        { animation: kf-stuck-shake 1.5s ease-in-out infinite; }
+  .anim-error-shake        { animation: kf-error-shake 200ms ease-in-out 1; }
+  .anim-row-flash          { animation: kf-row-flash 600ms ease-out 1; }
+  .anim-round-active {
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--primary) 6%, transparent) 0%,
+      color-mix(in srgb, var(--primary) 22%, transparent) 50%,
+      color-mix(in srgb, var(--primary) 6%, transparent) 100%
+    );
+    background-size: 250% 100%;
+    animation: kf-round-active 2.4s ease-in-out infinite;
+  }
+}
+
 /* ─── Prose notes (review/test notes in inspector) ─────────────────────────── */
 .prose-notes p          { margin: 0 0 0.4em; line-height: 1.5; }
 .prose-notes p:last-child { margin-bottom: 0; }
