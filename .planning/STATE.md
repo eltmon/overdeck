@@ -22,3 +22,4 @@ All beads implemented, tested, and pushed. Ready for merge.
 
 ## Specialist Feedback
 (None yet)
+- **[2026-04-26T19:01Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
