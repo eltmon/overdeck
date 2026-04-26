@@ -885,6 +885,7 @@ describe('runParallelReview', () => {
   it('happy path: all reviewers succeed → synthesis runs → result returned', async () => {
     const spawnFn = vi.fn().mockResolvedValue(undefined);
     const waitFn = vi.fn().mockResolvedValue('completed');
+    const waitSynthesisFn = vi.fn().mockResolvedValue('completed');
     const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
     const parseSynthesisFn = vi.fn().mockResolvedValue(approvedResult);
     const postReviewFn = vi.fn().mockResolvedValue(undefined);
@@ -894,11 +895,12 @@ describe('runParallelReview', () => {
       baseContext(),
       ['src/foo.ts'],
       [{ name: 'correctness', focus: ['logic'] }],
-      { spawnFn, waitFn, parseSynthesisFn, postReviewFn, resolvePromptTemplateFn },
+      { spawnFn, waitFn, waitSynthesisFn, parseSynthesisFn, postReviewFn, resolvePromptTemplateFn },
     );
 
     expect(spawnFn).toHaveBeenCalledTimes(2); // 1 reviewer + 1 synthesis
-    expect(waitFn).toHaveBeenCalledTimes(2);
+    expect(waitFn).toHaveBeenCalledOnce(); // reviewer only
+    expect(waitSynthesisFn).toHaveBeenCalledOnce(); // synthesis (separate fn, requires REVIEW_RESULT marker)
     expect(parseSynthesisFn).toHaveBeenCalledOnce();
     expect(postReviewFn).toHaveBeenCalledOnce();
     expect(result.reviewResult).toBe('APPROVED');

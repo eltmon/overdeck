@@ -62,9 +62,10 @@ interface ReviewHistoryEntry {
 }
 
 /**
- * Timeout for review agent in milliseconds (20 minutes)
+ * Timeout for review agent in milliseconds (30 minutes).
+ * Performance reviewers of large PRs can need 20+ minutes of analysis time.
  */
-const REVIEW_TIMEOUT_MS = 20 * 60 * 1000;
+const REVIEW_TIMEOUT_MS = 30 * 60 * 1000;
 
 /**
  * Default reviewer agents used when specialists.review_agents is not configured.
@@ -88,6 +89,11 @@ export function getActiveParallelReviewIssues(sessionNames: string[]): Set<strin
     const match = name.match(/^review-([A-Z0-9]+-\d+)-\d+-/);
     if (match) {
       active.add(match[1].toUpperCase());
+    }
+    // Coordinator sessions are also active review work (PAN-830)
+    const coordMatch = name.match(/^review-coordinator-([A-Z0-9]+-\d+)-\d+/);
+    if (coordMatch) {
+      active.add(coordMatch[1].toUpperCase());
     }
   }
   return active;
@@ -533,7 +539,14 @@ async function spawnReviewer(
   await sendKeysAsync(sessionName, prompt, 'spawnReviewer');
 }
 
-/** Poll until the output file is written (or the session exits), then kill the session */
+/**
+ * Poll until the output file is written (or the session exits), then kill the session.
+ *
+ * For synthesis sessions: a `requireMarker` predicate may be passed to defeat a race
+ * where the agent writes synthesis.md in two stages (body first, tail markers appended
+ * seconds later). Without the predicate, parser fires on the incomplete first write
+ * and rejects valid output as "did not report result in expected format".
+ */
 export async function waitForReviewer(
   sessionName: string,
   outputFile: string,
@@ -543,11 +556,13 @@ export async function waitForReviewer(
     fileExists = existsSync,
     killSession = killSessionAsync,
     capturePane = (name: string) => capturePaneAsync(name, 500),
+    requireMarker,
   }: {
     sessionExists?: (name: string) => Promise<boolean>;
     fileExists?: (path: string) => boolean;
     killSession?: (name: string) => Promise<void>;
     capturePane?: (sessionName: string) => Promise<string>;
+    requireMarker?: string;
   } = {},
 ): Promise<'completed' | 'failed'> {
   const outputDir = dirname(outputFile);
@@ -560,8 +575,21 @@ export async function waitForReviewer(
     // Output file is the primary completion signal — Claude sessions don't auto-exit.
     // Keep the session alive so the dashboard can show reviewer tabs after completion.
     if (fileExists(outputFile)) {
-      console.log(`[review-agent] Reviewer ${sessionName} completed in ${Date.now() - startedAt}ms`);
-      return 'completed';
+      if (requireMarker) {
+        try {
+          const content = await readFile(outputFile, 'utf-8');
+          if (content.includes(requireMarker)) {
+            console.log(`[review-agent] Reviewer ${sessionName} completed (marker '${requireMarker}' present) in ${Date.now() - startedAt}ms`);
+            return 'completed';
+          }
+          // File exists but marker not yet written — keep polling.
+        } catch (err) {
+          console.warn(`[review-agent] Failed to read ${outputFile} while checking marker:`, err);
+        }
+      } else {
+        console.log(`[review-agent] Reviewer ${sessionName} completed in ${Date.now() - startedAt}ms`);
+        return 'completed';
+      }
     }
     if (!await sessionExists(sessionName)) {
       // Session exited without writing output — capture pane for diagnosis
@@ -636,6 +664,7 @@ export const resolveTemplatePath = resolvePromptTemplatePath;
 type RunParallelReviewDeps = {
   spawnFn?: (session: string, model: string, promptFile: string, cwd: string) => Promise<void>;
   waitFn?: (session: string, outputFile: string, timeoutMs: number) => Promise<'completed' | 'failed'>;
+  waitSynthesisFn?: (session: string, outputFile: string, timeoutMs: number) => Promise<'completed' | 'failed'>;
   parseSynthesisFn?: typeof parseReviewSynthesis;
   postReviewFn?: typeof postGitHubPRReview;
   /** Injectable prompt-template resolver (see resolvePromptTemplatePath). */
@@ -658,6 +687,7 @@ export async function runParallelReview(
   {
     spawnFn = spawnReviewer,
     waitFn = (session, outputFile, timeoutMs) => waitForReviewer(session, outputFile, timeoutMs),
+    waitSynthesisFn = (session, outputFile, timeoutMs) => waitForReviewer(session, outputFile, timeoutMs, { requireMarker: 'REVIEW_RESULT:' }),
     parseSynthesisFn = parseReviewSynthesis,
     postReviewFn = postGitHubPRReview,
     resolvePromptTemplateFn = resolvePromptTemplatePath,
@@ -666,11 +696,19 @@ export async function runParallelReview(
   // Clean up any stale review sessions for this issue before starting a new review run.
   // Review sessions are named review-<issueId>-<timestamp>-<role>; a new timestamp
   // is generated on every retry, so old sessions accumulate and leak.
+  // Only kill sessions whose coordinator is gone — never kill reviewers belonging
+  // to an active coordinator (PAN-830).
   try {
     const allSessions = await listSessionNamesAsync();
     const reviewRegex = new RegExp(`^review-${context.issueId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+`);
     const staleSessions = allSessions.filter(s => reviewRegex.test(s));
     for (const session of staleSessions) {
+      // Derive coordinator name: review-PAN-830-12345-correctness -> review-coordinator-PAN-830-12345
+      const coordName = session.replace(/^review-/, 'review-coordinator-').replace(/-[^-]+$/, '');
+      if (allSessions.includes(coordName)) {
+        console.log(`[review-agent] Skipping stale cleanup for ${session} — coordinator ${coordName} is active`);
+        continue;
+      }
       try {
         await killSessionAsync(session);
         console.log(`[review-agent] Killed stale review session: ${session}`);
@@ -769,15 +807,18 @@ export async function runParallelReview(
     console.warn(`[review-agent] Aborting synthesis — reviewer(s) failed or timed out: ${failed.join(', ')}`);
     emitActivityEntry({ source: 'review-specialist', level: 'error', message: `${context.issueId} — review aborted: ${failed.join(', ')} failed`, issueId: context.issueId });
     emitActivityTts({ utterance: `${context.issueId} review aborted, ${failed.join(', ')} failed`, priority: 0, issueId: context.issueId });
-    return {
-      result: {
-        success: false,
-        reviewResult: 'COMMENTED',
-        notes: `Review aborted: reviewer(s) failed or timed out (${failed.join(', ')}). Resubmit to retry.`,
-        output: `Review ${reviewId}`,
-      },
-      reviewId,
+    const abortResult: ReviewResult = {
+      success: false,
+      reviewResult: 'COMMENTED',
+      notes: `Review aborted: reviewer(s) failed or timed out (${failed.join(', ')}). Resubmit to retry.`,
+      output: `Review ${reviewId}`,
     };
+    try {
+      await sendFeedbackToWorkAgent(context, abortResult);
+    } catch (err) {
+      console.error(`[review-agent] Failed to send abort feedback to work agent for ${context.issueId} (non-fatal):`, err);
+    }
+    return { result: abortResult, reviewId };
   }
 
   const synthTemplatePath = resolvePromptTemplateFn('code-review-synthesis', context.projectPath);
@@ -805,7 +846,7 @@ export async function runParallelReview(
 
   await spawnFn(synthSessionName, synthModel, synthPromptFile, context.projectPath);
   emitActivityEntry({ source: 'review-specialist', level: 'info', message: `${context.issueId} — synthesis started`, issueId: context.issueId });
-  await waitFn(synthSessionName, synthOutputFile, REVIEW_TIMEOUT_MS);
+  await waitSynthesisFn(synthSessionName, synthOutputFile, REVIEW_TIMEOUT_MS);
 
   // ── Phase 4: Parse result ─────────────────────────────────────────────────
   const result = await parseSynthesisFn(outputDir, agents);

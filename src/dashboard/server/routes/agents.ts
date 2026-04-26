@@ -2040,8 +2040,10 @@ const postAgentsRestartAllRoute = HttpRouter.add(
             // Stop the agent (captures output, kills tmux, marks stopped)
             await stopAgentAsync(agent.id);
 
-            // Re-start via internal API call — reuses all existing start-agent logic
-            const res = await fetch('http://localhost:3011/api/agents', {
+            // Re-start via internal API call — reuses all existing start-agent logic.
+            // Use 127.0.0.1 (not localhost): /etc/hosts may resolve localhost to ::1,
+            // and Node's fetch() does not auto-fall-back to IPv4 like curl does.
+            const res = await fetch('http://127.0.0.1:3011/api/agents', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ issueId: agent.issueId }),
