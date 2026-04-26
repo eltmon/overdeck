@@ -20,6 +20,12 @@ interface FeatureItemProps {
   filter?: TreeSessionFilter;
   onStopSession?: (sessionId: string) => void;
   onViewTerminal?: (sessionId: string) => void;
+  onPauseSession?: (sessionId: string) => void;
+  onResumeSession?: (sessionId: string) => void;
+  onRestartSession?: (sessionId: string, issueId: string) => void;
+  onDeepWipe?: (issueId: string) => void;
+  onOpenStateDir?: (sessionId: string) => void;
+  onViewJsonl?: (sessionId: string) => void;
 }
 
 function StatusIcon({ status, agentStatus, stateLabel, isRally, readyForMerge }: { status: string; agentStatus: string | null; stateLabel: string; isRally?: boolean; readyForMerge?: boolean }) {
@@ -148,7 +154,7 @@ function sessionMatchesFilter(session: SessionNodeType, filter: TreeSessionFilte
   return true;
 }
 
-export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal }: FeatureItemProps) {
+export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl }: FeatureItemProps) {
   const [expanded, setExpanded] = useState(() => {
     const persisted = readExpanded(feature.issueId);
     return persisted ?? defaultExpandedFromState(feature.stateLabel);
@@ -266,10 +272,17 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             <SessionNode
               key={session.sessionId}
               session={session}
+              issueId={feature.issueId}
               isSelected={selectedSessionId === session.sessionId}
               onClick={() => onSelectSession?.(feature.issueId, session.sessionId)}
               onStopSession={onStopSession}
               onViewTerminal={onViewTerminal}
+              onPauseSession={onPauseSession}
+              onResumeSession={onResumeSession}
+              onRestartSession={onRestartSession}
+              onDeepWipe={onDeepWipe}
+              onOpenStateDir={onOpenStateDir}
+              onViewJsonl={onViewJsonl}
             />
           ))}
         </div>

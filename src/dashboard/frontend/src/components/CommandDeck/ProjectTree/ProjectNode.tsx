@@ -37,9 +37,15 @@ interface ProjectNodeProps {
   filter?: TreeSessionFilter;
   onStopSession?: (sessionId: string) => void;
   onViewTerminal?: (sessionId: string) => void;
+  onPauseSession?: (sessionId: string) => void;
+  onResumeSession?: (sessionId: string) => void;
+  onRestartSession?: (sessionId: string, issueId: string) => void;
+  onDeepWipe?: (issueId: string) => void;
+  onOpenStateDir?: (sessionId: string) => void;
+  onViewJsonl?: (sessionId: string) => void;
 }
 
-export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter, onStopSession, onViewTerminal }: ProjectNodeProps) {
+export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter, onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl }: ProjectNodeProps) {
   const [expanded, setExpanded] = useState(features.length > 0);
 
   return (
@@ -71,6 +77,12 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
               filter={filter}
               onStopSession={onStopSession}
               onViewTerminal={onViewTerminal}
+              onPauseSession={onPauseSession}
+              onResumeSession={onResumeSession}
+              onRestartSession={onRestartSession}
+              onDeepWipe={onDeepWipe}
+              onOpenStateDir={onOpenStateDir}
+              onViewJsonl={onViewJsonl}
             />
           ))
         ) : (
