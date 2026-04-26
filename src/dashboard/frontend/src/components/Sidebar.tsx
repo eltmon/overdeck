@@ -162,6 +162,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
               onClick={toggleCollapsed}
               className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
               title="Collapse sidebar ([)"
+              data-testid="sidebar-collapse"
             >
               <ChevronsLeft className="w-4 h-4" />
             </button>
@@ -185,6 +186,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
                     key={id}
                     onClick={() => { onTabChange(id); setMobileOpen(false); }}
                     title={collapsed ? label : undefined}
+                    data-testid={`sidebar-${id}`}
                     className={`
                       w-full flex items-center gap-3 transition-colors duration-150 text-sm font-medium
                       ${collapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-1.5'}
@@ -218,6 +220,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
                   onClick={onSearchOpen}
                   className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                   title="Search (press /)"
+                  data-testid="sidebar-search"
                 >
                   <span>Search</span>
                   <kbd className="text-[10px] px-1 py-0.5 rounded bg-muted text-muted-foreground">
@@ -232,6 +235,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
                       disabled={rebuildMutation.isPending}
                       className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
                       title={rebuildMutation.isPending ? 'Building...' : 'Rebuild Panopticon (npm run build)'}
+                      data-testid="sidebar-rebuild"
                     >
                       {rebuildMutation.isPending
                         ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -242,6 +246,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
                     onClick={toggleTheme}
                     className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                     title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                    data-testid="sidebar-theme"
                   >
                     {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                   </button>
@@ -281,6 +286,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
                   disabled={rebuildMutation.isPending}
                   className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-50"
                   title={rebuildMutation.isPending ? 'Building...' : 'Rebuild'}
+                  data-testid="sidebar-rebuild"
                 >
                   {rebuildMutation.isPending
                     ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -292,6 +298,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
                 onClick={toggleCollapsed}
                 className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                 title="Expand sidebar ([)"
+                data-testid="sidebar-collapse"
               >
                 <ChevronsRight className="w-4 h-4" />
               </button>
@@ -299,6 +306,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
                 onClick={toggleTheme}
                 className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                 title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                data-testid="sidebar-theme"
               >
                 {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
               </button>
