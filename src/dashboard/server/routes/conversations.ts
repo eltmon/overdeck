@@ -713,8 +713,9 @@ async function spawnConversationSession(
       sessionId: resume ? undefined : claudeSessionId,
       extraArgs: effort ? `--effort "${effort}"` : undefined,
       keepAlive: true,
+      fileMode: 0o700,
     }),
-    { mode: 0o755 },
+    { mode: 0o700 },
   );
 
   // Kill any stale session with the same name

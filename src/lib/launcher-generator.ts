@@ -48,6 +48,9 @@ export interface LauncherConfig {
   // Remote
   setRemotePath?: boolean;
   escapeForBase64?: boolean;
+
+  // File permissions for the generated script (default: 0o755)
+  fileMode?: number;
 }
 
 /**
@@ -109,7 +112,7 @@ export function generateLauncherScript(config: LauncherConfig): string {
 
   // Change directory (after env setup, before command)
   if (config.changeDir !== false) {
-    lines.push(`cd "${config.workingDir}"`);
+    lines.push(`cd -- "${config.workingDir}"`);
   }
 
   // Unset provider env (must happen before re-exporting)
@@ -225,6 +228,11 @@ const PROVIDER_ENV_UNSETS = [
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
 ];
 
+/** Quote a string for safe use in a bash script using single-quote wrapping. */
+function shellQuote(str: string): string {
+  return "'" + str.replace(/'/g, "'\"'\"'") + "'";
+}
+
 function buildCommand(config: LauncherConfig): string[] {
   const parts: string[] = [];
 
@@ -240,7 +248,9 @@ function buildCommand(config: LauncherConfig): string[] {
       if (config.extraArgs) {
         args.push(config.extraArgs);
       }
-      parts.push(`${config.baseCommand} ${args.join(' ')}`.trim());
+      // Shell-quote each token of baseCommand so paths with spaces are safe
+      const quotedBase = config.baseCommand.split(' ').map(shellQuote).join(' ');
+      parts.push(`${quotedBase} ${args.join(' ')}`.trim());
     }
     return parts;
   }
@@ -258,6 +268,47 @@ function buildCommand(config: LauncherConfig): string[] {
       const permissionFlags = config.permissionFlags?.join(' ') ?? '';
       const promptRef = config.promptFile ? '"$prompt"' : '';
       parts.push(`claude ${permissionFlags} ${args.join(' ')} ${promptRef}`.trim().replace(/\s+/g, ' '));
+    }
+    return parts;
+  }
+
+  if (config.agentType === 'planning') {
+    // Planning agents must NOT use exec — the shell needs to survive
+    // to run the keep-alive loop after claude exits
+    if (config.baseCommand) {
+      let cmd = config.baseCommand;
+
+      // Append permission flags if not already present
+      if (config.permissionFlags && config.permissionFlags.length > 0) {
+        const flagsStr = config.permissionFlags.join(' ');
+        if (!cmd.includes(flagsStr)) {
+          cmd += ` ${flagsStr}`;
+        }
+      }
+
+      // Append session args
+      if (config.resumeSessionId) {
+        cmd += ` --resume "${config.resumeSessionId}"`;
+      }
+      if (config.sessionId) {
+        cmd += ` --session-id "${config.sessionId}"`;
+      }
+      if (config.model) {
+        cmd += ` --model ${config.model}`;
+      }
+      if (config.extraArgs) {
+        cmd += ` ${config.extraArgs}`;
+      }
+
+      // Append prompt reference
+      if (config.promptFile) {
+        cmd += ' "$prompt"';
+      }
+      if (config.promptInline) {
+        cmd += ` "${config.promptInline}"`;
+      }
+
+      parts.push(cmd.trim());
     }
     return parts;
   }

@@ -162,10 +162,14 @@ export function loadSettingsApi(): ApiSettingsConfig {
   const { config } = loadConfig();
 
   // Migrate convoy:* override keys to review:* equivalents (PAN-540)
-  const migratedOverrides: Record<string, string> = {};
-  for (const [key, value] of Object.entries(config.overrides)) {
-    const mappedKey = CONVOY_TO_REVIEW_MAP[key] ?? key;
-    migratedOverrides[mappedKey] = value as string;
+  // Iterate convoy map first so convoy values win when both old+new keys exist,
+  // matching original semantics.
+  const migratedOverrides: Record<string, string> = { ...config.overrides };
+  for (const [oldKey, newKey] of Object.entries(CONVOY_TO_REVIEW_MAP)) {
+    if (oldKey in migratedOverrides) {
+      migratedOverrides[newKey] = migratedOverrides[oldKey]!;
+      delete migratedOverrides[oldKey];
+    }
   }
 
   // Detect deprecated models in current overrides
