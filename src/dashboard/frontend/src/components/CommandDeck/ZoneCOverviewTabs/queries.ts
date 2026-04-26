@@ -23,6 +23,8 @@ export interface PlanningResponse {
     createdAt?: string;
   }>;
   notes?: Array<unknown>;
+  acceptanceProgress?: { completed: number; total: number; percent: number };
+  stashCount?: number;
 }
 
 export interface ReviewerRoundSummary {

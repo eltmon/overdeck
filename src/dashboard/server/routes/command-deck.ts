@@ -579,6 +579,8 @@ async function fetchPlanningData(issueId: string): Promise<unknown> {
     transcripts: Array<{ filename: string; content: string; uploadedAt: string }>;
     discussions: Array<{ filename: string; content: string; syncedAt: string }>;
     notes: Array<{ filename: string; content: string; uploadedAt: string }>;
+    acceptanceProgress?: { completed: number; total: number; percent: number };
+    stashCount?: number;
   } = { transcripts: [], discussions: [], notes: [] };
 
   // Helper: read PRD content from a location, handling both flat and subdir formats.
@@ -638,6 +640,30 @@ async function fetchPlanningData(issueId: string): Promise<unknown> {
   result.transcripts = await readArtifactDir('transcripts', 'uploadedAt') as typeof result.transcripts;
   result.discussions = await readArtifactDir('discussions', 'syncedAt') as typeof result.discussions;
   result.notes = await readArtifactDir('notes', 'uploadedAt') as typeof result.notes;
+
+  // Acceptance criteria progress from vBRIEF plan (PAN-847)
+  try {
+    const planPath = join(planningDir, 'plan.vbrief.json');
+    if (await pathExists(planPath)) {
+      const raw = await readFile(planPath, 'utf-8');
+      const doc = JSON.parse(raw);
+      const items: Array<{ status?: string }> = doc?.plan?.items ?? [];
+      if (items.length > 0) {
+        const completed = items.filter((i) => i.status === 'completed').length;
+        result.acceptanceProgress = {
+          completed,
+          total: items.length,
+          percent: Math.round((completed / items.length) * 100),
+        };
+      }
+    }
+  } catch { /* no vBRIEF plan */ }
+
+  // Stash count for workspace hygiene warning (PAN-847)
+  try {
+    const { stdout: stashList } = await execAsync('git stash list', { cwd: workspacePath, encoding: 'utf-8' });
+    result.stashCount = stashList.trim() ? stashList.trim().split('\n').length : 0;
+  } catch { /* not a git repo or git unavailable */ }
 
   return result;
 }
