@@ -1,17 +1,30 @@
 /**
- * ZoneCOverview — issue-selected Zone C: tab strip skeleton.
+ * ZoneCOverview — issue-selected Zone C: tab strip + per-tab body.
  *
- * The Phase-2 shell deliverable lands the tab strip and "tab body" container
- * only. Each tab's actual content (Overview billboard, PRD render, vBRIEF
- * embed, Beads list, PR/Diff, etc.) lands in pan-ofa3 (Phase 4) per the PRD —
- * keeping this bead structural means the layout can be reviewed without
- * blocking on tab content readiness.
+ * The tab strip is sticky at the top; the body switches based on the selected
+ * tab. Each tab is its own component under `./ZoneCOverviewTabs/` so the data
+ * dependencies stay clear and sibling tabs share a query cache via the hooks
+ * exported from `./ZoneCOverviewTabs/queries.ts`.
  *
- * The Activity tab in particular reuses the existing `<ActivityFeed>` once
- * Phase 4 wires it in; for now each tab body shows a placeholder.
+ * INFERENCE tab is hidden when no inference content exists for the issue (the
+ * planning endpoint returns it null/empty if no inference.md was generated).
+ *
+ * PR/Diff and Discussions tabs land their backend endpoints in follow-up
+ * beads (pan-9yn5 + pan-1r7j). They render a `DeferredTab` placeholder so the
+ * navigation surface is complete and discoverable today.
  */
 
 import { useState } from 'react';
+import type { Issue } from '../../types';
+import type { ProjectFeature } from './ProjectTree/ProjectNode';
+import { OverviewTab } from './ZoneCOverviewTabs/OverviewTab';
+import { ActivityTab } from './ZoneCOverviewTabs/ActivityTab';
+import { CostsTab } from './ZoneCOverviewTabs/CostsTab';
+import { MarkdownTab } from './ZoneCOverviewTabs/MarkdownTab';
+import { VBriefTab } from './ZoneCOverviewTabs/VBriefTab';
+import { BeadsTab } from './ZoneCOverviewTabs/BeadsTab';
+import { DeferredTab } from './ZoneCOverviewTabs/DeferredTab';
+import { usePlanningQuery } from './ZoneCOverviewTabs/queries';
 
 export type OverviewTab =
   | 'overview'
@@ -30,7 +43,7 @@ interface OverviewTabSpec {
   label: string;
 }
 
-const TABS: readonly OverviewTabSpec[] = [
+const ALL_TABS: readonly OverviewTabSpec[] = [
   { key: 'overview',    label: 'Overview' },
   { key: 'activity',    label: 'Activity' },
   { key: 'costs',       label: 'Costs' },
@@ -48,11 +61,25 @@ interface ZoneCOverviewProps {
   /** Optional controlled active tab; defaults to 'overview'. */
   activeTab?: OverviewTab;
   onTabChange?: (tab: OverviewTab) => void;
+  /** Forwarded to the Activity tab so the Rally / story rollup keeps working. */
+  issues?: readonly Issue[];
+  featureData?: ProjectFeature | null;
 }
 
-export function ZoneCOverview({ issueId, activeTab, onTabChange }: ZoneCOverviewProps) {
+export function ZoneCOverview({
+  issueId,
+  activeTab,
+  onTabChange,
+  issues,
+  featureData,
+}: ZoneCOverviewProps) {
   const [internalTab, setInternalTab] = useState<OverviewTab>('overview');
   const tab = activeTab ?? internalTab;
+
+  const planning = usePlanningQuery(issueId);
+  const hasInference = !!(planning.data?.inference && planning.data.inference.trim() !== '');
+
+  const visibleTabs = ALL_TABS.filter((spec) => spec.key !== 'inference' || hasInference);
 
   const handleTabClick = (next: OverviewTab) => {
     if (onTabChange) onTabChange(next);
@@ -82,7 +109,7 @@ export function ZoneCOverview({ issueId, activeTab, onTabChange }: ZoneCOverview
           flexShrink: 0,
         }}
       >
-        {TABS.map((spec) => {
+        {visibleTabs.map((spec) => {
           const active = spec.key === tab;
           return (
             <button
@@ -122,16 +149,50 @@ export function ZoneCOverview({ issueId, activeTab, onTabChange }: ZoneCOverview
           flex: 1,
           minHeight: 0,
           overflow: 'auto',
-          padding: 16,
-          color: 'var(--mc-text-muted, var(--muted-foreground))',
-          fontSize: 13,
-          lineHeight: 1.5,
         }}
       >
-        Overview content for <strong>{issueId}</strong> · tab: <em>{tab}</em>
-        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>
-          Tab content lands in pan-ofa3 (Phase 4).
-        </div>
+        {tab === 'overview' && <OverviewTab issueId={issueId} onSwitchTab={handleTabClick} />}
+        {tab === 'activity' && (
+          <ActivityTab issueId={issueId} issues={issues} featureData={featureData} />
+        )}
+        {tab === 'costs' && <CostsTab issueId={issueId} />}
+        {tab === 'prd' && (
+          <MarkdownTab
+            body={planning.data?.prd}
+            isLoading={planning.isLoading}
+            emptyLabel="No PRD recorded for this issue."
+          />
+        )}
+        {tab === 'state' && (
+          <MarkdownTab
+            body={planning.data?.state}
+            isLoading={planning.isLoading}
+            emptyLabel="No STATE.md recorded for this issue."
+          />
+        )}
+        {tab === 'inference' && (
+          <MarkdownTab
+            body={planning.data?.inference}
+            isLoading={planning.isLoading}
+            emptyLabel="No INFERENCE.md recorded for this issue."
+          />
+        )}
+        {tab === 'vbrief' && <VBriefTab issueId={issueId} />}
+        {tab === 'beads' && <BeadsTab issueId={issueId} />}
+        {tab === 'prdiff' && (
+          <DeferredTab
+            testId="prdiff-tab"
+            title="PR / Diff"
+            bead="pan-9yn5"
+          />
+        )}
+        {tab === 'discussions' && (
+          <DeferredTab
+            testId="discussions-tab"
+            title="Discussions"
+            bead="pan-1r7j"
+          />
+        )}
       </div>
     </div>
   );

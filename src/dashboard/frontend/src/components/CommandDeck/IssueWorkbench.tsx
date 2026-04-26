@@ -24,6 +24,8 @@ import {
   useCommandDeckSelection,
   selectSelectedSessionForIssue,
 } from '../../lib/commandDeckSelection';
+import type { Issue } from '../../types';
+import type { ProjectFeature } from './ProjectTree/ProjectNode';
 import { ZoneA } from './ZoneA';
 import { ZoneB } from './ZoneB';
 import { ZoneCConversation } from './ZoneCConversation';
@@ -37,6 +39,9 @@ interface IssueWorkbenchProps {
   source?: string;
   url?: string;
   onOpenBeads?: () => void;
+  /** Forwarded to ZoneCOverview → ActivityTab. */
+  issues?: readonly Issue[];
+  featureData?: ProjectFeature | null;
 }
 
 export function IssueWorkbench({
@@ -47,6 +52,8 @@ export function IssueWorkbench({
   source,
   url,
   onOpenBeads,
+  issues,
+  featureData,
 }: IssueWorkbenchProps) {
   const selectedSessionId = useCommandDeckSelection(selectSelectedSessionForIssue(issueId));
 
@@ -83,7 +90,7 @@ export function IssueWorkbench({
           <ZoneCConversation session={selectedSession} issueId={issueId} />
         </>
       ) : (
-        <ZoneCOverview issueId={issueId} />
+        <ZoneCOverview issueId={issueId} issues={issues} featureData={featureData} />
       )}
     </div>
   );

@@ -570,6 +570,8 @@ export function CommandDeck({
               source={selectedIssue?.source}
               url={selectedIssue?.url}
               onOpenBeads={() => setShowBeads(true)}
+              issues={issues}
+              featureData={selectedFeatureData}
             />
           ) : selectedFeature ? (
             <>

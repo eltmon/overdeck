@@ -10,6 +10,8 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
 import { IssueWorkbench } from '../IssueWorkbench';
 import { useCommandDeckSelection } from '../../../lib/commandDeckSelection';
@@ -26,6 +28,14 @@ vi.mock('../SessionView/IssueHeader', () => ({
   IssueHeader: (props: any) => (
     <div data-testid="issue-header" data-issue={props.issueId} />
   ),
+}));
+
+// ZoneCOverview's tabs depend on react-query hooks; stub them so the
+// IssueWorkbench test stays focused on selection arbitration.
+vi.mock('../ZoneCOverviewTabs/queries', () => ({
+  usePlanningQuery: () => ({ data: undefined, isLoading: false }),
+  useActivityQuery: () => ({ data: { issueId: '', sections: [] }, isLoading: false }),
+  useIssueCostsQuery: () => ({ data: undefined, isLoading: false, isError: false }),
 }));
 
 function makeSession(sessionId: string): SessionNodeType {
@@ -45,6 +55,19 @@ function makeSession(sessionId: string): SessionNodeType {
 const ISSUE = 'PAN-821';
 const SESSION_ID = 'agent-pan-821';
 
+function makeQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0, staleTime: 0 },
+    },
+  });
+}
+
+function Wrapper({ children }: { children: ReactNode }) {
+  const client = makeQueryClient();
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+}
+
 describe('IssueWorkbench', () => {
   beforeEach(() => {
     act(() => {
@@ -54,11 +77,13 @@ describe('IssueWorkbench', () => {
 
   it('renders issue-selected mode by default (no session selected)', () => {
     render(
-      <IssueWorkbench
-        issueId={ISSUE}
-        title="Test issue"
-        sessions={[makeSession(SESSION_ID)]}
-      />,
+      <Wrapper>
+        <IssueWorkbench
+          issueId={ISSUE}
+          title="Test issue"
+          sessions={[makeSession(SESSION_ID)]}
+        />
+      </Wrapper>,
     );
 
     const workbench = screen.getByTestId('issue-workbench');
@@ -75,11 +100,13 @@ describe('IssueWorkbench', () => {
     });
 
     render(
-      <IssueWorkbench
-        issueId={ISSUE}
-        title="Test issue"
-        sessions={[makeSession(SESSION_ID)]}
-      />,
+      <Wrapper>
+        <IssueWorkbench
+          issueId={ISSUE}
+          title="Test issue"
+          sessions={[makeSession(SESSION_ID)]}
+        />
+      </Wrapper>,
     );
 
     const workbench = screen.getByTestId('issue-workbench');
@@ -98,11 +125,13 @@ describe('IssueWorkbench', () => {
     });
 
     render(
-      <IssueWorkbench
-        issueId={ISSUE}
-        title="Test issue"
-        sessions={[makeSession(SESSION_ID)]}
-      />,
+      <Wrapper>
+        <IssueWorkbench
+          issueId={ISSUE}
+          title="Test issue"
+          sessions={[makeSession(SESSION_ID)]}
+        />
+      </Wrapper>,
     );
 
     const workbench = screen.getByTestId('issue-workbench');
