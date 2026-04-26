@@ -26,8 +26,10 @@ export interface Conversation {
   /** Tool name currently executing (e.g. "Bash", "Read"). Null when idle or not in a tool call. */
   currentTool?: string | null;
   isFavorited?: boolean;
-  /** Absolute path to the Claude Code JSONL session file. Null until discovered. */
+  /** Absolute path to the Claude Code JSONL session file. Null until discovered. Legacy fallback. */
   sessionFile?: string | null;
+  /** Claude Code session UUID. Immutable for the lifetime of the conversation. */
+  claudeSessionId?: string | null;
   /** Human-readable title, auto-set from first message. Null until first message sent. */
   title?: string | null;
   /** How the title was set: 'auto', 'ai', or 'manual'. */
@@ -581,7 +583,7 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                       <Star size={11} style={{ fill: 'none' }} />
                     </span>
                   )}
-                  {conv.sessionFile && !conv.forkStatus && (
+                  {(conv.sessionFile || conv.claudeSessionId) && !conv.forkStatus && (
                     <span
                       role="button"
                       tabIndex={0}
