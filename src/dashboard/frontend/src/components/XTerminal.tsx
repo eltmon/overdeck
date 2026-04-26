@@ -511,12 +511,16 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
           const resettable = term as Terminal & { reset?: () => void };
           resettable.reset?.();
           term!.resize(control.cols, control.rows);
+          // Kick off snapshot write; don't wait for xterm.js callback to send ready.
+          // In background tabs xterm.js's setTimeout-based parser stalls, which would
+          // let the server's pending buffer grow unbounded and then flood us on resume.
           term!.write(control.data, () => {
+            term!.scrollToBottom();
             readyForLiveData.current = true;
-            reconnectAttempts.current = 0;
-            ws.send(JSON.stringify({ type: 'ready' }));
-            sendResizeIfNeeded();
           });
+          reconnectAttempts.current = 0;
+          ws.send(JSON.stringify({ type: 'ready' }));
+          sendResizeIfNeeded();
           return;
         }
 
@@ -572,8 +576,20 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
     }, 200);
     window.addEventListener('resize', handleResize);
 
+    // If the tab was hidden while a snapshot was being written, xterm.js's
+    // setTimeout-driven parser stalls and the ready message never goes out.
+    // Force it through on visibility restore so the server flushes its buffer
+    // promptly instead of dumping hours of backlog at once.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !readyForLiveData.current && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ready' }));
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       window.removeEventListener('resize', handleResize);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       terminalRef.current?.removeEventListener('mousedown', handleForcedSelectionMouseDown, true);
       terminalRef.current?.removeEventListener('contextmenu', handleContextMenu);
       setShouldReconnect(false);
@@ -581,6 +597,10 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
       if (reconnectTimer.current) {
         clearTimeout(reconnectTimer.current);
       }
+      // Prevent the old ws.onclose handler (which closes over the stale
+      // shouldReconnect value) from scheduling an orphaned reconnect timer
+      // after the component has already remounted.
+      ws.onclose = null;
       ws.close();
       wsRef.current = null;
       term?.dispose();
