@@ -12,6 +12,8 @@
  */
 
 import {
+  Fragment,
+  useMemo,
   useRef,
   useState,
   useEffect,
@@ -30,6 +32,7 @@ import {
   type MessagesTimelineRow,
 } from './session-logic';
 import type { ChatMessage } from './chat-types';
+import type { RoundVerdict } from '../CommandDeck/RoundCard';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -60,10 +63,28 @@ function formatElapsed(startIso: string, endIso: string): string {
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
+/**
+ * Visual divider injected into the timeline between review rounds.
+ *
+ * The divider renders immediately after the row whose id matches
+ * `afterMessageId`. It is rendered inside the matching row's wrapper so
+ * `useVirtualizer.measureElement` accounts for its height automatically;
+ * no separate row index is needed and no row is hidden behind virtualization.
+ */
+export interface RoundMarker {
+  /** Insert the divider after the row with this id (any row.id, message or work). */
+  afterMessageId: string;
+  round: number;
+  verdict: RoundVerdict;
+  /** Optional extra label suffix (e.g. "synthesis", "round-2"). */
+  label?: string;
+}
+
 export interface MessagesTimelineProps {
   messages: ChatMessage[];
   workLog: WorkLogEntry[];
   streaming: boolean;
+  roundMarkers?: ReadonlyArray<RoundMarker>;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -72,6 +93,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   messages,
   workLog,
   streaming,
+  roundMarkers,
 }: MessagesTimelineProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -81,8 +103,22 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   // Visible state for scroll-to-bottom button
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
-  const timelineEntries = deriveTimelineEntries(messages, workLog);
-  const rows = deriveMessagesTimelineRows(timelineEntries, streaming);
+  const timelineEntries = useMemo(() => deriveTimelineEntries(messages, workLog), [messages, workLog]);
+  const rows = useMemo(() => deriveMessagesTimelineRows(timelineEntries, streaming), [timelineEntries, streaming]);
+
+  // Index round markers by the row they should follow. A single row can have
+  // multiple markers (e.g. two consecutive rounds without any new messages
+  // between them) so the lookup is row-id → marker[].
+  const markersByAfterId = useMemo(() => {
+    const map = new Map<string, RoundMarker[]>();
+    if (!roundMarkers || roundMarkers.length === 0) return map;
+    for (const marker of roundMarkers) {
+      const existing = map.get(marker.afterMessageId);
+      if (existing) existing.push(marker);
+      else map.set(marker.afterMessageId, [marker]);
+    }
+    return map;
+  }, [roundMarkers]);
 
   // Split: virtualize all but the last N rows
   const firstUnvirtIdx = Math.max(0, rows.length - ALWAYS_UNVIRTUALIZED_TAIL_ROWS);
@@ -175,6 +211,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
           >
             {dedupedVirtualItems.map((virtualItem) => {
               const row = virtualRows[virtualItem.index]!;
+              const markersForRow = markersByAfterId.get(row.id);
               return (
                 <div
                   key={row.id}
@@ -189,6 +226,12 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                   }}
                 >
                   <TimelineRowRenderer row={row} isStreaming={streaming} />
+                  {markersForRow?.map((marker) => (
+                    <RoundDivider
+                      key={`marker-${marker.round}-${marker.label ?? ''}`}
+                      marker={marker}
+                    />
+                  ))}
                 </div>
               );
             })}
@@ -196,9 +239,20 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         )}
 
         {/* Non-virtual tail rows — normal flow */}
-        {tailRows.map((row) => (
-          <TimelineRowRenderer key={row.id} row={row} isStreaming={streaming} />
-        ))}
+        {tailRows.map((row) => {
+          const markersForRow = markersByAfterId.get(row.id);
+          return (
+            <Fragment key={row.id}>
+              <TimelineRowRenderer row={row} isStreaming={streaming} />
+              {markersForRow?.map((marker) => (
+                <RoundDivider
+                  key={`marker-${marker.round}-${marker.label ?? ''}`}
+                  marker={marker}
+                />
+              ))}
+            </Fragment>
+          );
+        })}
       </div>
     </div>
 
@@ -493,6 +547,75 @@ function WorkingIndicator({ startedAt }: { startedAt: string | null }) {
       <span className={styles.workingLabel}>
         Working{elapsed > 0 ? ` for ${elapsed}s` : '…'}
       </span>
+    </div>
+  );
+}
+
+// ─── Round divider ────────────────────────────────────────────────────────────
+
+const ROUND_VERDICT_COLOR: Record<RoundVerdict, string> = {
+  pending: 'var(--mc-text-muted, var(--muted-foreground))',
+  passed: 'var(--mc-success, var(--success))',
+  failed: 'var(--mc-error, var(--destructive))',
+  running: 'var(--mc-accent, var(--primary))',
+};
+
+const ROUND_VERDICT_LABEL: Record<RoundVerdict, string> = {
+  pending: 'Pending',
+  passed: 'Passed',
+  failed: 'Failed',
+  running: 'Running',
+};
+
+function RoundDivider({ marker }: { marker: RoundMarker }) {
+  const color = ROUND_VERDICT_COLOR[marker.verdict];
+  const verdictLabel = ROUND_VERDICT_LABEL[marker.verdict];
+  return (
+    <div
+      data-testid={`round-divider-${marker.round}`}
+      data-round={marker.round}
+      data-verdict={marker.verdict}
+      role="separator"
+      aria-label={`Round ${marker.round} — ${verdictLabel}`}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        margin: '12px 0',
+        width: '100%',
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          height: 1,
+          background: 'var(--mc-border, var(--border))',
+        }}
+      />
+      <span
+        style={{
+          padding: '2px 10px',
+          borderRadius: 999,
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: '0.05em',
+          textTransform: 'uppercase',
+          color,
+          border: `1px solid ${color}`,
+          background: 'var(--card, var(--background))',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        Round {marker.round} · {verdictLabel}
+        {marker.label ? ` · ${marker.label}` : ''}
+      </span>
+      <div
+        style={{
+          flex: 1,
+          height: 1,
+          background: 'var(--mc-border, var(--border))',
+        }}
+      />
     </div>
   );
 }

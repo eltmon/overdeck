@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
 import type { Conversation } from '../ConversationList';
 import { ConversationPanel } from '../../chat/ConversationPanel';
+import type { RoundMarker } from '../../chat/MessagesTimeline';
 import { ChatMarkdown } from '../../chat/ChatMarkdown';
 import { XTerminal } from '../../XTerminal';
 import styles from '../styles/command-deck.module.css';
@@ -9,6 +10,8 @@ import styles from '../styles/command-deck.module.css';
 interface SessionPanelProps {
   session: SessionNodeType;
   issueId?: string;
+  /** Optional review-round dividers passed through to the conversation timeline. */
+  roundMarkers?: ReadonlyArray<RoundMarker>;
 }
 
 function getViewKey(sessionId: string): string {
@@ -46,7 +49,7 @@ function PresenceDot({ presence }: { presence: SessionNodeType['presence'] }) {
   return <span className={styles.sessionPanelPresence} style={{ background: color }} />;
 }
 
-export function SessionPanel({ session, issueId }: SessionPanelProps) {
+export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelProps) {
   const [view, setView] = useState<'conversation' | 'terminal'>(() =>
     readView(session.sessionId),
   );
@@ -118,6 +121,8 @@ export function SessionPanel({ session, issueId }: SessionPanelProps) {
             <ConversationPanel
               conversation={synthesizedConversation}
               viewMode="conversation"
+              roundMarkers={roundMarkers}
+              roundMetadata={session.roundMetadata}
             />
           ) : hasTranscript ? (
             <div className={styles.sessionPanelTranscript}>

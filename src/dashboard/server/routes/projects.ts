@@ -94,6 +94,7 @@ function mapSectionToSessionNode(section: ActivitySection): SessionNode {
     transcript: section.transcript,
     presence: section.presence,
     hasJsonl: section.hasJsonl,
+    roundMetadata: section.roundMetadata,
   };
 }
 

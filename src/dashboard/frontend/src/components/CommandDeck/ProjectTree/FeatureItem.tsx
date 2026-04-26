@@ -1,9 +1,13 @@
 import { useState, useCallback, useMemo } from 'react';
+import { useLiveFlash } from '../../../lib/useLiveFlash';
 import { Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge, ChevronRight, ChevronDown } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
 import type { ProjectFeature } from './ProjectNode';
 import { SessionNode } from './SessionNode';
+import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import styles from '../styles/command-deck.module.css';
+
+export type TreeSessionFilter = 'all' | 'alive' | 'failed';
 
 interface FeatureItemProps {
   feature: ProjectFeature;
@@ -13,6 +17,9 @@ interface FeatureItemProps {
   onSelectSession?: (issueId: string, sessionId: string) => void;
   title?: string;
   cost?: number;
+  filter?: TreeSessionFilter;
+  onStopSession?: (sessionId: string) => void;
+  onViewTerminal?: (sessionId: string) => void;
 }
 
 function StatusIcon({ status, agentStatus, stateLabel, isRally, readyForMerge }: { status: string; agentStatus: string | null; stateLabel: string; isRally?: boolean; readyForMerge?: boolean }) {
@@ -82,11 +89,15 @@ function getExpandedKey(issueId: string): string {
   return `mc-feature-expanded:${issueId}`;
 }
 
-function readExpanded(issueId: string): boolean {
+/** Read persisted expand state. Returns null when the user has never toggled
+ *  this feature, so the caller can apply a status-driven default. */
+function readExpanded(issueId: string): boolean | null {
   try {
-    return localStorage.getItem(getExpandedKey(issueId)) === 'true';
+    const raw = localStorage.getItem(getExpandedKey(issueId));
+    if (raw === null) return null;
+    return raw === 'true';
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -100,14 +111,65 @@ function writeExpanded(issueId: string, expanded: boolean): void {
   } catch { /* ignore */ }
 }
 
-export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost }: FeatureItemProps) {
-  const hasSessions = (feature.sessions?.length ?? 0) > 0;
-  const [expanded, setExpanded] = useState(() => readExpanded(feature.issueId));
+/** Compute the default expand state from the issue's pipeline status.
+ *  Done / terminal states default collapsed; everything in-flight defaults expanded. */
+function defaultExpandedFromState(stateLabel: string): boolean {
+  const terminal = ['done', 'canceled', 'closed', 'merged'];
+  return !terminal.includes(stateLabel.toLowerCase());
+}
+
+/** Compute the dominant session presence for the feature row StatusDot.
+ *  Priority: active > thinking > waiting > idle > ended. */
+function computeDominantStatus(sessions: SessionNodeType[]): StatusDotStatus {
+  let hasIdle = false;
+  let hasThinking = false;
+  let hasWaiting = false;
+  for (const s of sessions) {
+    if (s.presence === 'active') return 'active';
+    if (s.presence === 'idle') hasIdle = true;
+    const st = (s.status || '').toLowerCase();
+    if (st.includes('thinking')) hasThinking = true;
+    if (st.includes('waiting')) hasWaiting = true;
+  }
+  if (hasThinking) return 'thinking';
+  if (hasWaiting) return 'waiting';
+  if (hasIdle) return 'idle';
+  return 'ended';
+}
+
+/** Whether a session passes the tree filter. */
+function sessionMatchesFilter(session: SessionNodeType, filter: TreeSessionFilter): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'alive') return session.presence === 'active' || session.presence === 'idle';
+  if (filter === 'failed') {
+    const st = (session.status || '').toLowerCase();
+    return st.includes('fail') || st.includes('error') || st.includes('stuck');
+  }
+  return true;
+}
+
+export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal }: FeatureItemProps) {
+  const [expanded, setExpanded] = useState(() => {
+    const persisted = readExpanded(feature.issueId);
+    return persisted ?? defaultExpandedFromState(feature.stateLabel);
+  });
 
   // Derive best session once per data change instead of on every click (PAN-821 review)
+  // Respect the tree filter so auto-select picks a visible session.
+  const visibleSessions = feature.sessions?.filter(s => sessionMatchesFilter(s, filter)) ?? [];
+  const hasVisibleSessions = visibleSessions.length > 0;
   const bestSessionId = useMemo(() =>
-    feature.sessions ? pickBestSession(feature.sessions) : null,
-  [feature.sessions]);
+    visibleSessions.length > 0 ? pickBestSession(visibleSessions) : null,
+  [visibleSessions]);
+
+  // Dominant session state for the feature row StatusDot (blocker-7)
+  const dominantStatus = feature.sessions && feature.sessions.length > 0
+    ? computeDominantStatus(feature.sessions)
+    : null;
+
+  // Live flash when dominant status or visible session count changes (blocker-8)
+  const flashKey = `${feature.issueId}:${dominantStatus ?? 'none'}:${visibleSessions.length}`;
+  const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
 
   const handleToggleExpanded = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -132,9 +194,9 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     : null;
 
   return (
-    <div className={`${styles.featureItemWrapper} ${isSelected ? styles.featureItemWrapperSelected : ''}`}>
+    <div className={`${styles.featureItemWrapper} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}>
       <div className={styles.featureItemRow}>
-        {hasSessions ? (
+        {hasVisibleSessions ? (
           <button
             className={styles.featureItemCaret}
             onClick={handleToggleExpanded}
@@ -153,8 +215,12 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           <span className={styles.featureStatus}>
             {feature.isShadow ? (
               <Eye size={14} style={{ color: 'var(--mc-accent)' }} />
-            ) : (
+            ) : feature.isRally ? (
               <StatusIcon status={feature.status} agentStatus={feature.agentStatus} stateLabel={feature.stateLabel} isRally={feature.isRally} readyForMerge={feature.readyForMerge} />
+            ) : dominantStatus ? (
+              <StatusDot status={dominantStatus} />
+            ) : (
+              <StatusIcon status={feature.status} agentStatus={feature.agentStatus} stateLabel={feature.stateLabel} readyForMerge={feature.readyForMerge} />
             )}
           </span>
           <span className={styles.featureId_sidebar}>{feature.issueId}</span>
@@ -194,14 +260,16 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
         </button>
       </div>
 
-      {expanded && hasSessions && feature.sessions && (
+      {expanded && hasVisibleSessions && (
         <div className={styles.sessionList}>
-          {feature.sessions.map(session => (
+          {visibleSessions.map(session => (
             <SessionNode
               key={session.sessionId}
               session={session}
               isSelected={selectedSessionId === session.sessionId}
               onClick={() => onSelectSession?.(feature.issueId, session.sessionId)}
+              onStopSession={onStopSession}
+              onViewTerminal={onViewTerminal}
             />
           ))}
         </div>
