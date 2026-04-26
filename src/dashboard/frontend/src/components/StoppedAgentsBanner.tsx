@@ -112,7 +112,7 @@ export function StoppedAgentsBanner() {
     // Show a subtle "show again" button if dismissed and stopped agents exist
     if (dismissed && stoppedAgents.length > 0) {
       return (
-        <div className="bg-card/40 border-b border-border px-4 py-1 flex items-center gap-2 shrink-0">
+        <div className="bg-card/40 border-b border-border px-4 py-1 flex items-center gap-2 shrink-0" data-testid="stopped-agents-banner">
           <span className="text-xs text-muted-foreground">
             {stoppedAgents.length} agent{stoppedAgents.length > 1 ? 's' : ''} stopped
           </span>
@@ -132,7 +132,7 @@ export function StoppedAgentsBanner() {
   const failed = results?.filter((r) => !r.success).length ?? 0;
 
   return (
-    <div className="bg-warning/10 border-b-2 border-warning/40 px-4 py-3 flex items-start gap-3 shrink-0">
+    <div className="bg-warning/10 border-b-2 border-warning/40 px-4 py-3 flex items-start gap-3 shrink-0" data-testid="stopped-agents-banner">
       <AlertTriangle className="w-5 h-5 text-warning-foreground shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         <p className="text-warning-foreground text-sm font-semibold">
@@ -170,6 +170,7 @@ export function StoppedAgentsBanner() {
           onClick={handleRestartAll}
           disabled={restarting}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          data-testid="banner-restart-all"
         >
           {restarting ? (
             <Loader2 className="w-3 h-3 animate-spin" />
@@ -183,6 +184,7 @@ export function StoppedAgentsBanner() {
           disabled={restarting}
           className="text-warning-foreground/60 hover:text-warning-foreground shrink-0 disabled:opacity-50"
           title="Dismiss"
+          data-testid="banner-dismiss"
         >
           <X className="w-4 h-4" />
         </button>
