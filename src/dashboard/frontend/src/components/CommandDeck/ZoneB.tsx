@@ -91,6 +91,8 @@ export function ZoneB({ session, onViewTerminal }: ZoneBProps) {
 
   // Subscribe to runtime state so motion catalog events drive UI within 200ms (PAN-847)
   const runtime = useDashboardStore((s) => s.agentRuntimeById[session.sessionId]);
+  const agentSnapshot = useDashboardStore((s) => s.agentsById[session.sessionId]);
+  const outputBuffer = useDashboardStore((s) => s.agentOutputById[session.sessionId]);
 
   const status = deriveDotStatus(session.presence, runtime);
   const currentTool = runtime?.currentTool ?? session.status;
@@ -118,6 +120,19 @@ export function ZoneB({ session, onViewTerminal }: ZoneBProps) {
   const isIdle = session.presence === 'idle' && !runtime?.thinking && !runtime?.waiting;
   const isWaiting = !!runtime?.waiting;
   const isThinking = !!runtime?.thinking;
+
+  // Cost rate: $/hour from agent snapshot cost / duration (PAN-847)
+  const costSoFar = agentSnapshot?.costSoFar;
+  const costRate = useMemo(() => {
+    if (!costSoFar || !session.duration || session.duration <= 0) return undefined;
+    return costSoFar / (session.duration / 3600);
+  }, [costSoFar, session.duration]);
+
+  // Output buffer: last 3 lines of agent output (PAN-847)
+  const recentOutput = useMemo(() => {
+    if (!outputBuffer || outputBuffer.length === 0) return [];
+    return outputBuffer.slice(-3);
+  }, [outputBuffer]);
 
   return (
     <div
@@ -153,6 +168,39 @@ export function ZoneB({ session, onViewTerminal }: ZoneBProps) {
           {formatDuration(session.duration)}
         </span>
         <ZoneBActionStrip session={session} onViewTerminal={onViewTerminal} />
+      </div>
+
+      {/* Summary line — cost rate + rounds + output preview (PAN-847) */}
+      <div
+        data-testid="zone-b-summary"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          padding: '2px 12px',
+          fontSize: 11,
+          color: 'var(--mc-text-muted, var(--muted-foreground))',
+          borderTop: '1px dashed var(--mc-border, var(--border))',
+        }}
+      >
+        {costSoFar !== undefined && costSoFar > 0 && (
+          <span title="Cost so far">
+            ${costSoFar.toFixed(2)}
+            {costRate !== undefined && (
+              <span style={{ opacity: 0.7 }}> · ${costRate.toFixed(2)}/h</span>
+            )}
+          </span>
+        )}
+        {session.roundMetadata && session.roundMetadata.roundCount > 0 && (
+          <span title="Review rounds">
+            {session.roundMetadata.roundCount} round{session.roundMetadata.roundCount === 1 ? '' : 's'}
+          </span>
+        )}
+        {recentOutput.length > 0 && (
+          <span style={{ fontFamily: 'var(--font-mono, monospace)', opacity: 0.6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 400 }}>
+            {recentOutput[recentOutput.length - 1]}
+          </span>
+        )}
       </div>
 
       {/* Waiting ribbon (PAN-847 motion catalog) */}
