@@ -39,6 +39,12 @@ vi.mock('../../XTerminal', () => ({
   ),
 }));
 
+vi.mock('../RoundCard', () => ({
+  RoundCard: ({ round }: { round: { round: number; verdict: string } }) => (
+    <div data-testid="round-card" data-round={round.round} data-verdict={round.verdict} />
+  ),
+}));
+
 function makeSession(overrides?: Partial<SessionNodeType>): SessionNodeType {
   return {
     type: 'work',
@@ -139,5 +145,86 @@ describe('SessionPanel', () => {
     render(<SessionPanel session={makeSession({ tmuxSession: undefined })} />);
     fireEvent.click(screen.getByText('Terminal'));
     expect(screen.getByText('No terminal session available.')).toBeInTheDocument();
+  });
+
+  it('hides Findings tab when session has no roundMetadata', () => {
+    render(<SessionPanel session={makeSession({ type: 'work' })} />);
+    expect(screen.queryByText('Findings')).not.toBeInTheDocument();
+  });
+
+  it('shows Findings tab for reviewer sessions with roundMetadata', () => {
+    render(
+      <SessionPanel
+        session={makeSession({
+          type: 'reviewer',
+          role: 'correctness',
+          roundMetadata: {
+            roundCount: 1,
+            latestRound: 1,
+            history: [{ round: 1, status: 'passed', findings: 0, durationSec: 30, cost: 0.12 }],
+          },
+        })}
+      />,
+    );
+    expect(screen.getByText('Findings')).toBeInTheDocument();
+  });
+
+  it('switches to Findings view and renders round cards', () => {
+    render(
+      <SessionPanel
+        session={makeSession({
+          type: 'reviewer',
+          role: 'correctness',
+          roundMetadata: {
+            roundCount: 2,
+            latestRound: 2,
+            history: [
+              { round: 1, status: 'failed', findings: 3, durationSec: 45, cost: 0.25 },
+              { round: 2, status: 'passed', findings: 0, durationSec: 30, cost: 0.12 },
+            ],
+          },
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByText('Findings'));
+    expect(screen.getByText('Review rounds')).toBeInTheDocument();
+    const cards = screen.getAllByTestId('round-card');
+    expect(cards).toHaveLength(2);
+    expect(cards[0]).toHaveAttribute('data-round', '1');
+    expect(cards[0]).toHaveAttribute('data-verdict', 'failed');
+    expect(cards[1]).toHaveAttribute('data-round', '2');
+    expect(cards[1]).toHaveAttribute('data-verdict', 'passed');
+  });
+
+  it('persists findings view to localStorage', () => {
+    const { unmount } = render(
+      <SessionPanel
+        session={makeSession({
+          sessionId: 'sess-findings',
+          roundMetadata: {
+            roundCount: 1,
+            latestRound: 1,
+            history: [{ round: 1, status: 'passed' }],
+          },
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByText('Findings'));
+    expect(localStorage.getItem('mc-session-panel-view:sess-findings')).toBe('findings');
+    unmount();
+
+    render(
+      <SessionPanel
+        session={makeSession({
+          sessionId: 'sess-findings',
+          roundMetadata: {
+            roundCount: 1,
+            latestRound: 1,
+            history: [{ round: 1, status: 'passed' }],
+          },
+        })}
+      />,
+    );
+    expect(screen.getByText('Review rounds')).toBeInTheDocument();
   });
 });
