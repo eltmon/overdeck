@@ -3910,58 +3910,82 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
 
     let rebaseResult: { success: boolean; reason?: string; conflictFiles?: string[]; newHead?: string };
 
+    // Pre-check: if origin/<branch> already contains origin/<target>, the branch
+    // is already rebased — no rebase or push is needed.
+    let alreadyRebased = false;
     try {
-      const recovery = await ensureWorkAgentReadyForMerge(issueId, workspacePath, rebaseMsg);
-      console.log(`[merge] ${recovery.detail}`);
-
-      // Poll for the push: check if remote HEAD changed
-      const { stdout: headBefore } = await execAsync(
-        `git rev-parse origin/${branchName} 2>/dev/null || echo NONE`,
-        { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+      await execAsync(`git fetch origin ${targetBranch}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
+      await execAsync(`git fetch origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
+      await execAsync(
+        `git merge-base --is-ancestor origin/${targetBranch} origin/${branchName}`,
+        { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
       );
+      alreadyRebased = true;
+    } catch {
+      // is-ancestor exited non-zero → branch is behind target → real rebase needed
+    }
 
-      const REBASE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes — complex rebases with conflicts need time
-      const POLL_INTERVAL_MS = 5000;
-      const startTime = Date.now();
-      let newHead: string | null = null;
+    if (alreadyRebased) {
+      const { stdout: currentHead } = await execAsync(
+        `git rev-parse origin/${branchName}`,
+        { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
+      );
+      console.log(`[merge] ${branchName} already contains origin/${targetBranch} — skipping rebase request for ${issueId}`);
+      rebaseResult = { success: true, newHead: currentHead.trim() };
+    } else {
+      try {
+        const recovery = await ensureWorkAgentReadyForMerge(issueId, workspacePath, rebaseMsg);
+        console.log(`[merge] ${recovery.detail}`);
 
-      while (Date.now() - startTime < REBASE_TIMEOUT_MS) {
-        await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+        // Poll for the push: check if remote HEAD changed
+        const { stdout: headBefore } = await execAsync(
+          `git rev-parse origin/${branchName} 2>/dev/null || echo NONE`,
+          { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+        );
 
-        try {
-          await execAsync('git fetch origin', { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
-          const { stdout: headNow } = await execAsync(
-            `git rev-parse origin/${branchName}`,
-            { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
-          );
-          if (headNow.trim() !== headBefore.trim()) {
-            newHead = headNow.trim();
-            console.log(`[merge] Work agent pushed rebased branch for ${issueId} (new HEAD: ${newHead.slice(0, 8)})`);
+        const REBASE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes — complex rebases with conflicts need time
+        const POLL_INTERVAL_MS = 5000;
+        const startTime = Date.now();
+        let newHead: string | null = null;
+
+        while (Date.now() - startTime < REBASE_TIMEOUT_MS) {
+          await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+
+          try {
+            await execAsync('git fetch origin', { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
+            const { stdout: headNow } = await execAsync(
+              `git rev-parse origin/${branchName}`,
+              { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
+            );
+            if (headNow.trim() !== headBefore.trim()) {
+              newHead = headNow.trim();
+              console.log(`[merge] Work agent pushed rebased branch for ${issueId} (new HEAD: ${newHead.slice(0, 8)})`);
+              break;
+            }
+          } catch { /* fetch failed, retry */ }
+
+          if (!await sessionExistsAsync(agentId)) {
+            console.log(`[merge] Work agent ${agentId} stopped during rebase`);
             break;
           }
-        } catch { /* fetch failed, retry */ }
-
-        if (!await sessionExistsAsync(agentId)) {
-          console.log(`[merge] Work agent ${agentId} stopped during rebase`);
-          break;
         }
-      }
 
-      if (newHead) {
-        rebaseResult = { success: true, newHead };
-      } else if (!await sessionExistsAsync(agentId)) {
+        if (newHead) {
+          rebaseResult = { success: true, newHead };
+        } else if (!await sessionExistsAsync(agentId)) {
+          rebaseResult = {
+            success: false,
+            reason: `Work agent ${agentId} stopped before completing the rebase onto ${targetBranch}`,
+          };
+        } else {
+          rebaseResult = { success: false, reason: `Work agent did not push the rebased branch within ${REBASE_TIMEOUT_MS / 60000} minutes` };
+        }
+      } catch (recoveryErr: any) {
         rebaseResult = {
           success: false,
-          reason: `Work agent ${agentId} stopped before completing the rebase onto ${targetBranch}`,
+          reason: recoveryErr.message || `Work agent ${agentId} could not be prepared for merge`,
         };
-      } else {
-        rebaseResult = { success: false, reason: `Work agent did not push the rebased branch within ${REBASE_TIMEOUT_MS / 60000} minutes` };
       }
-    } catch (recoveryErr: any) {
-      rebaseResult = {
-        success: false,
-        reason: recoveryErr.message || `Work agent ${agentId} could not be prepared for merge`,
-      };
     }
 
     if (!rebaseResult.success) {
