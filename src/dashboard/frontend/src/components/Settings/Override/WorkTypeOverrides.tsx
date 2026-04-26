@@ -17,16 +17,16 @@ export function WorkTypeOverrides({ overrides, presetModels, onConfigureOverride
     <section>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full bg-surface-raised rounded-lg p-5 border border-divider flex items-center justify-between hover:bg-surface-overlay transition-colors shadow-sm"
+        className="w-full bg-card rounded-lg p-5 border border-border flex items-center justify-between hover:bg-popover transition-colors shadow-sm"
       >
         <div className="flex items-center gap-3">
-          <span className="material-symbols-outlined text-content-muted">tune</span>
+          <span className="material-symbols-outlined text-muted-foreground">tune</span>
           <div className="text-left">
             <span className="text-lg font-bold">Advanced: Work Type Overrides</span>
-            <p className="text-xs text-content-subtle">Define granular model mapping based on specific payload types</p>
+            <p className="text-xs text-muted-foreground">Define granular model mapping based on specific payload types</p>
           </div>
         </div>
-        {expanded ? <ChevronUp className="text-content-muted w-6 h-6" /> : <ChevronDown className="text-content-muted w-6 h-6" />}
+        {expanded ? <ChevronUp className="text-muted-foreground w-6 h-6" /> : <ChevronDown className="text-muted-foreground w-6 h-6" />}
       </button>
 
       {/* Expanded Content */}
@@ -35,7 +35,7 @@ export function WorkTypeOverrides({ overrides, presetModels, onConfigureOverride
           expanded ? 'max-h-[2000px] mt-4 opacity-100' : 'max-h-0 opacity-0'
         }`}
       >
-        <div className="bg-surface-raised rounded-lg border border-divider">
+        <div className="bg-card rounded-lg border border-border">
           <WorkTypeTable
             overrides={overrides}
             presetModels={presetModels}

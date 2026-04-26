@@ -7,7 +7,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { ComposerPromptEditor, SlashMenu, type SlashCommand } from '../ComposerPromptEditor';
 
 // Mock the CSS module — must match class names used in ComposerPromptEditor
-vi.mock('../../MissionControl/styles/mission-control.module.css', () => ({
+vi.mock('../../CommandDeck/styles/command-deck.module.css', () => ({
   default: {
     composerEditor: 'composerEditor',
     composerEditorDisabled: 'composerEditorDisabled',

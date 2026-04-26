@@ -3,7 +3,7 @@ import { Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge, Ch
 import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
 import type { ProjectFeature } from './ProjectNode';
 import { SessionNode } from './SessionNode';
-import styles from '../styles/mission-control.module.css';
+import styles from '../styles/command-deck.module.css';
 
 interface FeatureItemProps {
   feature: ProjectFeature;

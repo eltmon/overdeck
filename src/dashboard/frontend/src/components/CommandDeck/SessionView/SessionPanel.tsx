@@ -4,7 +4,7 @@ import type { Conversation } from '../ConversationList';
 import { ConversationPanel } from '../../chat/ConversationPanel';
 import { ChatMarkdown } from '../../chat/ChatMarkdown';
 import { XTerminal } from '../../XTerminal';
-import styles from '../styles/mission-control.module.css';
+import styles from '../styles/command-deck.module.css';
 
 interface SessionPanelProps {
   session: SessionNodeType;

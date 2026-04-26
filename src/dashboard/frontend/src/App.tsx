@@ -16,7 +16,7 @@ import { CostsPage } from './components/CostsPage';
 import { SettingsPage } from './components/Settings/SettingsPage';
 import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette } from './components/CommandPalette';
-import { MissionControl } from './components/MissionControl';
+import { CommandDeck } from './components/CommandDeck';
 import { ResourcesPanel } from './components/ResourcesPanel';
 import { GodViewPage } from './components/GodView';
 import { Tab } from './components/Header';
@@ -613,7 +613,7 @@ export default function App() {
         <main className="flex-1 flex overflow-hidden">
           {activeTab === 'command-deck' && (
             <div className="w-full h-full">
-              <MissionControl
+              <CommandDeck
                 issues={issues}
                 convId={selectedConvId}
                 conversationViewMode={conversationViewMode}
@@ -660,7 +660,7 @@ export default function App() {
                 />
               </div>
               {selectedAgent && (
-                <div className="flex-1 min-w-0 h-full flex flex-col border-l border-divider">
+                <div className="flex-1 min-w-0 h-full flex flex-col border-l border-border">
                   <AgentOutputPanel agentId={selectedAgent} />
                 </div>
               )}

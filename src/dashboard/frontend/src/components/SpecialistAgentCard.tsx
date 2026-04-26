@@ -48,7 +48,7 @@ const STATE_LABEL = {
 const STATE_COLOR = {
   sleeping: 'text-primary',
   active: 'text-success',
-  uninitialized: 'text-content-muted',
+  uninitialized: 'text-muted-foreground',
   suspended: 'text-warning',
 };
 
@@ -373,21 +373,21 @@ export function SpecialistAgentCard({
     urgent: 'text-destructive',
     high: 'text-warning-foreground',
     normal: 'text-primary',
-    low: 'text-content-subtle',
+    low: 'text-muted-foreground',
   };
 
   return (
     <div
       onClick={onSelect}
       className={`p-4 cursor-pointer transition-colors ${
-        isSelected ? 'bg-surface-overlay' : 'hover:bg-muted'
+        isSelected ? 'bg-popover' : 'hover:bg-muted'
       }`}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Brain className="w-5 h-5 text-signal-review" />
           <div>
-            <div className="font-medium text-content flex items-center gap-2">
+            <div className="font-medium text-foreground flex items-center gap-2">
               {specialist.displayName}
               {specialist.state === 'active' ? (
                 <Loader2 className="w-4 h-4 text-success animate-spin" />
@@ -411,21 +411,21 @@ export function SpecialistAgentCard({
                 </button>
               )}
             </div>
-            <div className="text-sm text-content-subtle">{specialist.description}</div>
+            <div className="text-sm text-muted-foreground">{specialist.description}</div>
             {/* Show current issue being worked on */}
             {specialist.currentIssue && (
               <div className="text-xs text-signal-cost mt-1 flex items-center gap-1">
-                <span className="text-content-muted">Working on:</span>
+                <span className="text-muted-foreground">Working on:</span>
                 <span className="font-mono">{specialist.currentIssue}</span>
                 {issueInfo && (
-                  <span className="text-content-subtle truncate max-w-[200px]" title={issueInfo.title}>
+                  <span className="text-muted-foreground truncate max-w-[200px]" title={issueInfo.title}>
                     - {issueInfo.title}
                   </span>
                 )}
               </div>
             )}
             {specialist.sessionId && !specialist.currentIssue && (
-              <div className="text-xs text-content-muted font-mono mt-1">
+              <div className="text-xs text-muted-foreground font-mono mt-1">
                 Session: {specialist.sessionId.slice(0, 8)}...
               </div>
             )}
@@ -434,7 +434,7 @@ export function SpecialistAgentCard({
 
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <div className="text-sm text-content-subtle">
+            <div className="text-sm text-muted-foreground">
               {STATE_LABEL[specialist.state]}
             </div>
             {costData && costData.cost > 0 && (
@@ -443,12 +443,12 @@ export function SpecialistAgentCard({
               </div>
             )}
             {specialist.contextTokens && (
-              <div className="text-xs text-content-muted">
+              <div className="text-xs text-muted-foreground">
                 {formatTokens(specialist.contextTokens)} tokens
               </div>
             )}
             {specialist.lastWake && (
-              <div className="text-xs text-content-muted">
+              <div className="text-xs text-muted-foreground">
                 Last wake: {formatLastWake(specialist.lastWake)}
               </div>
             )}
@@ -459,7 +459,7 @@ export function SpecialistAgentCard({
             {specialist.state !== 'uninitialized' && activityData && activityData.length > 0 && (
               <button
                 onClick={toggleActivityExpanded}
-                className="p-2 text-content-subtle hover:text-primary hover:bg-surface-emphasis rounded"
+                className="p-2 text-muted-foreground hover:text-primary hover:bg-card rounded"
                 title={`Show activity history (${activityData.length} entries)`}
               >
                 <Activity className="w-4 h-4" />
@@ -471,7 +471,7 @@ export function SpecialistAgentCard({
               <button
                 onClick={handleResume}
                 disabled={resumeMutation.isPending}
-                className="p-2 text-content-subtle hover:text-success hover:bg-surface-emphasis rounded disabled:opacity-50"
+                className="p-2 text-muted-foreground hover:text-success hover:bg-card rounded disabled:opacity-50"
                 title="Resume specialist"
               >
                 <Play className="w-4 h-4" />
@@ -483,7 +483,7 @@ export function SpecialistAgentCard({
               <button
                 onClick={handleWake}
                 disabled={wakeMutation.isPending || specialist.state === 'uninitialized'}
-                className="p-2 text-content-subtle hover:text-success hover:bg-surface-emphasis rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                className="p-2 text-muted-foreground hover:text-success hover:bg-card rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 title={
                   specialist.state === 'uninitialized'
                     ? 'Specialist not initialized - needs session ID'
@@ -499,7 +499,7 @@ export function SpecialistAgentCard({
               <button
                 onClick={handleKill}
                 disabled={killMutation.isPending}
-                className="p-2 text-content-subtle hover:text-destructive hover:bg-surface-emphasis rounded"
+                className="p-2 text-muted-foreground hover:text-destructive hover:bg-card rounded"
                 title="Kill specialist"
               >
                 <XCircle className="w-4 h-4" />
@@ -511,7 +511,7 @@ export function SpecialistAgentCard({
               <button
                 onClick={handleReset}
                 disabled={resetMutation.isPending}
-                className="p-2 text-content-subtle hover:text-warning hover:bg-surface-emphasis rounded"
+                className="p-2 text-muted-foreground hover:text-warning hover:bg-card rounded"
                 title="Reset specialist (clear session)"
               >
                 <RotateCcw className="w-4 h-4" />
@@ -523,8 +523,8 @@ export function SpecialistAgentCard({
 
       {/* Queue section (PAN-74) */}
       {queueExpanded && queueData && queueData.totalCount > 0 && (
-        <div className="mt-3 pl-8 border-l-2 border-divider-strong">
-          <div className="text-xs text-content-subtle font-medium mb-2">
+        <div className="mt-3 pl-8 border-l-2 border-border">
+          <div className="text-xs text-muted-foreground font-medium mb-2">
             Queued Tasks ({queueData.totalCount})
           </div>
           <div className="space-y-2">
@@ -534,19 +534,19 @@ export function SpecialistAgentCard({
                 className="flex items-center justify-between bg-muted px-3 py-2 rounded text-xs"
               >
                 <div className="flex items-center gap-2 flex-1">
-                  <span className="text-content-muted">{index + 1}.</span>
+                  <span className="text-muted-foreground">{index + 1}.</span>
                   {item.payload.issueId && (
                     <span className="badge-bg-signal-review text-signal-review-foreground px-1 rounded text-xs font-mono">
                       {item.payload.issueId.match(/^([A-Z]+)-/)?.[1] ?? '?'}
                     </span>
                   )}
-                  <span className="text-content font-mono">
+                  <span className="text-foreground font-mono">
                     {item.payload.issueId || item.payload.message || item.id.substring(0, 8)}
                   </span>
                   <span className={`${priorityColors[item.priority]} font-medium`}>
                     [{item.priority}]
                   </span>
-                  <span className="text-content-muted text-xs">
+                  <span className="text-muted-foreground text-xs">
                     {item.source}
                   </span>
                 </div>
@@ -554,7 +554,7 @@ export function SpecialistAgentCard({
                   <button
                     onClick={(e) => handleMoveUp(e, index)}
                     disabled={index === 0 || reorderQueueMutation.isPending}
-                    className="p-1 text-content-subtle hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="p-1 text-muted-foreground hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed"
                     title="Move up"
                   >
                     <MoveUp className="w-3 h-3" />
@@ -562,7 +562,7 @@ export function SpecialistAgentCard({
                   <button
                     onClick={(e) => handleMoveDown(e, index)}
                     disabled={index === queueData.items.length - 1 || reorderQueueMutation.isPending}
-                    className="p-1 text-content-subtle hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed"
+                    className="p-1 text-muted-foreground hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed"
                     title="Move down"
                   >
                     <MoveDown className="w-3 h-3" />
@@ -570,7 +570,7 @@ export function SpecialistAgentCard({
                   <button
                     onClick={(e) => handleRemoveQueueItem(e, item.id)}
                     disabled={removeQueueItemMutation.isPending}
-                    className="p-1 text-content-subtle hover:text-destructive disabled:opacity-50"
+                    className="p-1 text-muted-foreground hover:text-destructive disabled:opacity-50"
                     title="Remove from queue"
                   >
                     <Trash2 className="w-3 h-3" />
@@ -584,19 +584,19 @@ export function SpecialistAgentCard({
 
       {/* Activity history section (PAN-80) */}
       {activityExpanded && activityData && activityData.length > 0 && (
-        <div className="mt-3 pl-8 border-l-2 border-divider-strong">
-          <div className="text-xs text-content-subtle font-medium mb-2">
+        <div className="mt-3 pl-8 border-l-2 border-border">
+          <div className="text-xs text-muted-foreground font-medium mb-2">
             Recent Activity ({activityData.length})
           </div>
           <div className="space-y-1">
             {activityData.slice().reverse().map((entry, index) => (
               <div key={index} className="flex items-center gap-2 bg-muted px-3 py-1.5 rounded text-xs">
-                <span className="text-content-muted">
+                <span className="text-muted-foreground">
                   {new Date(entry.ts).toLocaleTimeString()}
                 </span>
                 <span className="text-primary font-mono">{entry.tool}</span>
                 {entry.action && (
-                  <span className="text-content-subtle truncate">
+                  <span className="text-muted-foreground truncate">
                     {entry.action.substring(0, 50)}
                   </span>
                 )}

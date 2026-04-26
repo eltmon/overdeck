@@ -46,8 +46,8 @@ vi.mock('./lib/store', () => ({
   selectIssues: vi.fn(),
   selectDashboardLifecycle: vi.fn(),
 }));
-vi.mock('./components/MissionControl', () => ({
-  MissionControl: ({ conversationViewMode, onConversationViewModeChange }: {
+vi.mock('./components/CommandDeck', () => ({
+  CommandDeck: ({ conversationViewMode, onConversationViewModeChange }: {
     conversationViewMode?: 'conversation' | 'terminal';
     onConversationViewModeChange?: (mode: 'conversation' | 'terminal') => void;
   }) => (

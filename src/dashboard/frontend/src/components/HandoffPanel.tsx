@@ -62,8 +62,8 @@ export function HandoffPanel({ agentId }: HandoffPanelProps) {
 
   if (isLoading) {
     return (
-      <div className="p-3 bg-surface-raised rounded border border-divider">
-        <div className="text-sm text-content-subtle">Loading handoff data...</div>
+      <div className="p-3 bg-card rounded border border-border">
+        <div className="text-sm text-muted-foreground">Loading handoff data...</div>
       </div>
     );
   }
@@ -71,14 +71,14 @@ export function HandoffPanel({ agentId }: HandoffPanelProps) {
   if (!suggestion) return null;
 
   return (
-    <div className="p-3 bg-surface-raised rounded border border-divider space-y-3">
+    <div className="p-3 bg-card rounded border border-border space-y-3">
       {/* Current Model Badge */}
       <div className="flex items-center gap-2">
-        <span className="text-xs text-content-subtle">Current Model:</span>
+        <span className="text-xs text-muted-foreground">Current Model:</span>
         <span
           className={`px-2 py-1 text-xs font-medium rounded border ${
             MODEL_COLORS[suggestion.currentModel as keyof typeof MODEL_COLORS] ||
-            'text-content-subtle bg-surface-overlay border-divider-strong'
+            'text-muted-foreground bg-popover border-border'
           }`}
         >
           {suggestion.currentModel}
@@ -93,11 +93,11 @@ export function HandoffPanel({ agentId }: HandoffPanelProps) {
             <div className="text-sm font-medium text-warning mb-1">
               Handoff Suggested
             </div>
-            <div className="text-xs text-content-body mb-2">{suggestion.reason}</div>
+            <div className="text-xs text-foreground mb-2">{suggestion.reason}</div>
             <button
               onClick={handleAutoHandoff}
               disabled={handoffMutation.isPending}
-              className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-content bg-warning hover:bg-warning/90 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-foreground bg-warning hover:bg-warning/90 rounded disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ArrowRight className="w-3 h-3" />
               Hand off to {suggestion.suggestedModel}
@@ -108,7 +108,7 @@ export function HandoffPanel({ agentId }: HandoffPanelProps) {
 
       {/* Manual Handoff Controls */}
       <div>
-        <div className="text-xs text-content-subtle mb-2">Manual Handoff:</div>
+        <div className="text-xs text-muted-foreground mb-2">Manual Handoff:</div>
         <div className="flex gap-2">
           <button
             onClick={() => handleHandoff('haiku')}

@@ -8,7 +8,7 @@ export interface StatusDotProps {
 export function StatusDot({ status, className }: StatusDotProps) {
   const colorStyles = {
     connected: 'bg-[#10b981]',
-    disconnected: 'bg-content-muted',
+    disconnected: 'bg-muted-foreground',
     testing: 'bg-[#fbbf24] animate-pulse',
   };
 

@@ -62,7 +62,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-vi.mock('../../MissionControl/styles/mission-control.module.css', () => ({
+vi.mock('../../CommandDeck/styles/command-deck.module.css', () => ({
   default: new Proxy({}, { get: (_target, prop) => String(prop) }),
 }));
 

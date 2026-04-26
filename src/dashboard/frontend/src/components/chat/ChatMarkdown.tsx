@@ -27,7 +27,7 @@ import remarkGfm from 'remark-gfm';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import type { Components } from 'react-markdown';
 import type { DiffsThemeNames } from '@pierre/diffs';
-import styles from '../MissionControl/styles/mission-control.module.css';
+import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── LRU Cache for syntax highlighting ───────────────────────────────────────
 

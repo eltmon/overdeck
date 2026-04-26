@@ -2,15 +2,15 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, CheckCircle2, AlertCircle } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
-import type { Conversation } from '../MissionControl/ConversationList';
-import { updateConversationTitle } from '../MissionControl/ConversationList';
+import type { Conversation } from '../CommandDeck/ConversationList';
+import { updateConversationTitle } from '../CommandDeck/ConversationList';
 import { MessagesTimeline } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
 import { ModelPicker, saveStoredModel } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, WorkLogEntry } from './chat-types';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase } from '../../lib/workingPhase';
-import styles from '../MissionControl/styles/mission-control.module.css';
+import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Phase icon map ───────────────────────────────────────────────────────────
 

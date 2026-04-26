@@ -557,11 +557,11 @@ export function SettingsPage() {
   return (
     <div>
       {/* Sticky action bar */}
-      <div className="sticky top-0 z-30 bg-surface/95 backdrop-blur-sm border-b border-divider shadow-sm">
+      <div className="sticky top-0 z-30 bg-card/95 backdrop-blur-sm border-b border-border shadow-sm">
         <div className="max-w-[1200px] mx-auto px-6 md:px-10 flex items-center justify-between py-3">
           <div className="flex items-center gap-2">
             <Settings className="w-5 h-5 text-primary" />
-            <h1 className="text-content text-lg font-black tracking-tight">Settings</h1>
+            <h1 className="text-foreground text-lg font-black tracking-tight">Settings</h1>
           </div>
           <div className="flex items-center gap-3">
             {saveMutation.isSuccess && (
@@ -595,7 +595,7 @@ export function SettingsPage() {
             <button
               onClick={handleReset}
               disabled={!hasChanges}
-              className="px-3 py-1.5 text-content-muted hover:text-content font-semibold text-sm transition-colors disabled:opacity-40"
+              className="px-3 py-1.5 text-muted-foreground hover:text-foreground font-semibold text-sm transition-colors disabled:opacity-40"
             >
               Undo
             </button>
@@ -616,9 +616,9 @@ export function SettingsPage() {
       <div className="flex flex-col gap-1 mb-8">
         <div className="flex items-center gap-2 mb-1">
           <Settings className="w-8 h-8 text-primary" />
-          <h1 className="text-content text-4xl font-black tracking-tight">Settings</h1>
+          <h1 className="text-foreground text-4xl font-black tracking-tight">Settings</h1>
         </div>
-        <p className="text-content-muted text-base">Configure AI model orchestration and agent permissions.</p>
+        <p className="text-muted-foreground text-base">Configure AI model orchestration and agent permissions.</p>
       </div>
 
       {/* Deprecation Warning Banner */}
@@ -656,26 +656,26 @@ export function SettingsPage() {
 
       {/* Smart Model Selection Hero */}
       <section className="mb-10">
-        <div className="bg-surface-raised border border-divider rounded-xl overflow-hidden">
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="flex flex-col lg:flex-row">
             {/* Visualization */}
-            <div className="lg:w-2/5 bg-surface p-8 flex flex-col justify-center items-center border-b lg:border-b-0 lg:border-r border-divider relative overflow-hidden">
+            <div className="lg:w-2/5 bg-card p-8 flex flex-col justify-center items-center border-b lg:border-b-0 lg:border-r border-border relative overflow-hidden">
               <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(circle_at_50%_50%,#3b82f6_0%,transparent_70%)]" />
               <div className="relative z-10 flex flex-col items-center gap-6 w-full max-w-xs">
                 <div className="flex items-center justify-between w-full">
-                  <div className="size-12 rounded-lg bg-surface-emphasis border border-divider-strong flex items-center justify-center shadow-sm">
-                    <Terminal className="w-5 h-5 text-content-subtle" />
+                  <div className="size-12 rounded-lg bg-card border border-border flex items-center justify-center shadow-sm">
+                    <Terminal className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <div className="flex-1 h-px bg-gradient-to-r from-divider-strong via-primary to-divider-strong mx-2" />
-                  <div className="size-12 rounded-lg bg-surface-emphasis border border-divider-strong flex items-center justify-center shadow-sm">
+                  <div className="size-12 rounded-lg bg-card border border-border flex items-center justify-center shadow-sm">
                     <User className="w-5 h-5 text-primary" />
                   </div>
                   <div className="flex-1 h-px bg-gradient-to-r from-divider via-primary to-divider mx-2" />
                   <div className="size-12 rounded-lg bg-primary flex items-center justify-center shadow-lg">
-                    <Zap className="w-5 h-5 text-content" />
+                    <Zap className="w-5 h-5 text-foreground" />
                   </div>
                 </div>
-                <div className="flex justify-between w-full px-2 text-[10px] uppercase tracking-widest font-bold text-content-muted">
+                <div className="flex justify-between w-full px-2 text-[10px] uppercase tracking-widest font-bold text-muted-foreground">
                   <span>Task</span>
                   <span>Capability</span>
                   <span>Model</span>
@@ -686,24 +686,24 @@ export function SettingsPage() {
             <div className="lg:w-3/5 p-8">
               <div className="flex items-center gap-2 mb-4">
                 <span className="px-2 py-0.5 badge-bg-primary text-primary text-[10px] font-bold uppercase tracking-wider rounded border badge-border-primary">Active</span>
-                <h3 className="text-content text-xl font-bold">Smart Model Selection</h3>
+                <h3 className="text-foreground text-xl font-bold">Smart Model Selection</h3>
               </div>
-              <p className="text-content-muted mb-6 leading-relaxed">
+              <p className="text-muted-foreground mb-6 leading-relaxed">
                 Panopticon automatically routes tasks to the optimal model based on capabilities, token budget, and latency requirements.
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex items-start gap-3">
                   <CheckCircle className="w-4 h-4 text-primary mt-1" />
                   <div>
-                    <p className="text-sm font-semibold text-content">Capability Matching</p>
-                    <p className="text-xs text-content-muted">Best model for each task type</p>
+                    <p className="text-sm font-semibold text-foreground">Capability Matching</p>
+                    <p className="text-xs text-muted-foreground">Best model for each task type</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <CheckCircle className="w-4 h-4 text-primary mt-1" />
                   <div>
-                    <p className="text-sm font-semibold text-content">Cost Optimization</p>
-                    <p className="text-xs text-content-muted">Balance performance vs spend</p>
+                    <p className="text-sm font-semibold text-foreground">Cost Optimization</p>
+                    <p className="text-xs text-muted-foreground">Balance performance vs spend</p>
                   </div>
                 </div>
               </div>
@@ -714,11 +714,11 @@ export function SettingsPage() {
 
       {/* Claude Code Authentication */}
       <section className="mb-12">
-        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+        <h2 className="text-foreground text-2xl font-bold mb-6 flex items-center gap-3">
           Claude Code
           <div className="h-px flex-1 bg-divider-strong" />
         </h2>
-        <div className="bg-surface-raised border border-divider rounded-xl p-6 flex flex-col gap-4">
+        <div className="bg-card border border-border rounded-xl p-6 flex flex-col gap-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-4">
               {/* Status dot */}
@@ -730,18 +730,18 @@ export function SettingsPage() {
               }`} />
               <div>
                 {claudeAuth === null ? (
-                  <p className="text-content-body text-sm">Checking authentication status…</p>
+                  <p className="text-foreground text-sm">Checking authentication status…</p>
                 ) : !claudeAuth.installed ? (
                   <>
-                    <p className="text-content font-semibold">Claude Code not detected</p>
-                    <p className="text-content-muted text-sm mt-1">
+                    <p className="text-foreground font-semibold">Claude Code not detected</p>
+                    <p className="text-muted-foreground text-sm mt-1">
                       Install Claude Code to use subscription-based authentication.
                     </p>
                   </>
                 ) : claudeAuth.loggedIn ? (
                   <>
                     <div className="flex items-center gap-2">
-                      <p className="text-content font-semibold">Logged in</p>
+                      <p className="text-foreground font-semibold">Logged in</p>
                       {claudeAuth.subscriptionType && (
                         <span className="text-[10px] font-black uppercase tracking-tighter px-2 py-0.5 rounded bg-primary/15 text-primary border border-primary/25">
                           {claudeAuth.subscriptionType.toUpperCase()}
@@ -749,8 +749,8 @@ export function SettingsPage() {
                       )}
                     </div>
                     {claudeAuth.rateLimitTier && (
-                      <p className="text-content-muted text-xs mt-1">
-                        Rate tier: <code className="font-mono text-content-subtle">{claudeAuth.rateLimitTier}</code>
+                      <p className="text-muted-foreground text-xs mt-1">
+                        Rate tier: <code className="font-mono text-muted-foreground">{claudeAuth.rateLimitTier}</code>
                       </p>
                     )}
                     {claudeAuth.hasAnthropicApiKey && (
@@ -764,19 +764,19 @@ export function SettingsPage() {
                   </>
                 ) : claudeAuth.expired ? (
                   <>
-                    <p className="text-content font-semibold text-warning">Session expired</p>
-                    <p className="text-content-muted text-sm mt-1">
-                      Your Claude Code session has expired. Run <code className="font-mono bg-surface-overlay px-1 rounded">claude</code> in the terminal and use <code className="font-mono bg-surface-overlay px-1 rounded">/login</code> to re-authenticate.
+                    <p className="text-foreground font-semibold text-warning">Session expired</p>
+                    <p className="text-muted-foreground text-sm mt-1">
+                      Your Claude Code session has expired. Run <code className="font-mono bg-popover px-1 rounded">claude</code> in the terminal and use <code className="font-mono bg-popover px-1 rounded">/login</code> to re-authenticate.
                     </p>
                   </>
                 ) : (
                   <>
-                    <p className="text-content font-semibold">Not logged in</p>
-                    <p className="text-content-muted text-sm mt-1">
-                      No active subscription session. To log in, type <code className="font-mono bg-surface-overlay px-1 rounded">! claude</code> in the command bar, then use <code className="font-mono bg-surface-overlay px-1 rounded">/login</code>.
+                    <p className="text-foreground font-semibold">Not logged in</p>
+                    <p className="text-muted-foreground text-sm mt-1">
+                      No active subscription session. To log in, type <code className="font-mono bg-popover px-1 rounded">! claude</code> in the command bar, then use <code className="font-mono bg-popover px-1 rounded">/login</code>.
                     </p>
                     {claudeAuth.hasAnthropicApiKey && (
-                      <p className="text-content-subtle text-xs mt-2">
+                      <p className="text-muted-foreground text-xs mt-2">
                         Falling back to <code className="font-mono">ANTHROPIC_API_KEY</code> for Anthropic models.
                       </p>
                     )}
@@ -787,7 +787,7 @@ export function SettingsPage() {
             <button
               onClick={() => void fetchClaudeAuth()}
               disabled={refreshingAuth}
-              className="shrink-0 p-2 rounded-lg border border-divider hover:border-divider-strong text-content-muted hover:text-content transition-colors disabled:opacity-50"
+              className="shrink-0 p-2 rounded-lg border border-border hover:border-border text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
               title="Refresh auth status"
             >
               <RefreshCw className={`w-4 h-4 ${refreshingAuth ? 'animate-spin' : ''}`} />
@@ -798,7 +798,7 @@ export function SettingsPage() {
 
       {/* Provider Configuration */}
       <section className="mb-12">
-        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+        <h2 className="text-foreground text-2xl font-bold mb-6 flex items-center gap-3">
           Provider Configuration
           <div className="h-px flex-1 bg-divider-strong" />
         </h2>
@@ -811,10 +811,10 @@ export function SettingsPage() {
             return (
               <div
                 key={provider.id}
-                className={`bg-surface-raised border rounded-xl p-5 relative transition-colors shadow-sm ${
+                className={`bg-card border rounded-xl p-5 relative transition-colors shadow-sm ${
                   isDefault
                     ? 'border-primary/50 shadow-lg shadow-primary/5'
-                    : 'border-divider hover:border-divider-strong'
+                    : 'border-border hover:border-border'
                 }`}
               >
                 {isDefault && (
@@ -825,10 +825,10 @@ export function SettingsPage() {
                   </div>
                 )}
                 <div className="flex items-center gap-3 mb-5">
-                  <div className="size-10 rounded-lg bg-surface-emphasis border border-divider flex items-center justify-center">
-                    <provider.icon className="w-5 h-5 text-content-subtle" />
+                  <div className="size-10 rounded-lg bg-card border border-border flex items-center justify-center">
+                    <provider.icon className="w-5 h-5 text-muted-foreground" />
                   </div>
-                  <span className="font-bold text-content">{provider.name}</span>
+                  <span className="font-bold text-foreground">{provider.name}</span>
                   {/* Subscription badge in the Anthropic card header */}
                   {isDefault && claudeAuth?.loggedIn && claudeAuth.subscriptionType && (
                     <span className="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/25">
@@ -839,7 +839,7 @@ export function SettingsPage() {
                     <button
                       onClick={() => handleProviderToggle(provider.id)}
                       className={`w-10 h-5 rounded-full relative transition-colors ${
-                        isEnabled ? 'bg-primary' : 'bg-surface-emphasis'
+                        isEnabled ? 'bg-primary' : 'bg-card'
                       } cursor-pointer`}
                     >
                       <div
@@ -855,7 +855,7 @@ export function SettingsPage() {
                     {/* Anthropic: show authentication method rather than raw API key field */}
                     {isDefault ? (
                       <div>
-                        <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">Authentication</label>
+                        <label className="text-[10px] uppercase font-bold text-muted-foreground mb-1 block">Authentication</label>
                         {claudeAuth?.loggedIn ? (
                           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
                             <div className="w-2 h-2 rounded-full bg-success shrink-0" />
@@ -883,13 +883,13 @@ export function SettingsPage() {
                       </div>
                     ) : (
                       <>
-                        <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">API Key</label>
+                        <label className="text-[10px] uppercase font-bold text-muted-foreground mb-1 block">API Key</label>
                         {/* Check if it's an unresolved env var reference */}
                         {apiKey.startsWith('$') ? (
                           <div className="badge-bg-warning border badge-border-warning rounded-lg px-3 py-2">
                             <div className="flex items-center gap-2 text-warning text-xs">
                               <AlertTriangle className="w-4 h-4" />
-                              <span>Configured via <code className="font-mono bg-surface-overlay px-1 rounded">{apiKey}</code></span>
+                              <span>Configured via <code className="font-mono bg-popover px-1 rounded">{apiKey}</code></span>
                             </div>
                             <p className="text-[10px] text-warning/70 mt-1">
                               Set this environment variable or enter the key directly below
@@ -899,7 +899,7 @@ export function SettingsPage() {
                               placeholder={provider.placeholder}
                               onChange={(e) => handleApiKeyChange(provider.id, e.target.value)}
                               autoComplete="off"
-                              className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-primary focus:border-primary text-content-body"
+                              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-primary focus:border-primary text-foreground"
                             />
                           </div>
                         ) : (
@@ -916,12 +916,12 @@ export function SettingsPage() {
                               data-lpignore="true"
                               data-1p-ignore="true"
                               data-form-type="other"
-                              className={`w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-content-body ${apiKey ? 'pr-16' : 'pr-8'}`}
+                              className={`w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-foreground ${apiKey ? 'pr-16' : 'pr-8'}`}
                             />
                             {apiKey && (
                               <button
                                 onClick={() => setShowApiKey({ ...showApiKey, [provider.id]: !showApiKey[provider.id] })}
-                                className="absolute right-8 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-body"
+                                className="absolute right-8 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                                 title={showApiKey[provider.id] ? 'Hide key' : 'Show key'}
                               >
                                 {showApiKey[provider.id] ? (
@@ -934,7 +934,7 @@ export function SettingsPage() {
                             {apiKey && (
                               <button
                                 onClick={() => handleApiKeyChange(provider.id, '')}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-content-muted hover:text-destructive transition-colors"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-destructive transition-colors"
                                 title="Delete API key"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -964,7 +964,7 @@ export function SettingsPage() {
                           <button
                             onClick={() => handleTestApiKey(provider.id)}
                             disabled={testingProvider === provider.id}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-emphasis hover:bg-divider-strong border border-divider-strong rounded-lg text-xs text-content-body transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-card hover:bg-divider-strong border border-border rounded-lg text-xs text-foreground transition-colors disabled:opacity-50"
                           >
                             {testingProvider === provider.id ? (
                               <Loader2 className="w-3 h-3 animate-spin" />
@@ -998,7 +998,7 @@ export function SettingsPage() {
 
       {/* OpenRouter */}
       <section className="mb-12">
-        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+        <h2 className="text-foreground text-2xl font-bold mb-6 flex items-center gap-3">
           OpenRouter
           <div className="h-px flex-1 bg-divider-strong" />
         </h2>
@@ -1019,26 +1019,26 @@ export function SettingsPage() {
 
       {/* Conversations */}
       <section id="conversations" className="mb-12 scroll-mt-4">
-        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+        <h2 className="text-foreground text-2xl font-bold mb-6 flex items-center gap-3">
           Conversations
           <div className="h-px flex-1 bg-divider-strong" />
         </h2>
-        <p className="text-content-muted text-sm mb-6">
+        <p className="text-muted-foreground text-sm mb-6">
           Control how Panopticon handles compaction for dashboard-owned resume flows and for typed <code>/compact</code> commands in the conversation composer.
         </p>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div className="bg-surface-raised border border-divider rounded-xl p-5 space-y-4">
+          <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div>
-              <h3 className="font-bold text-content">Compaction &amp; summary model</h3>
-              <p className="text-sm text-content-muted mt-1">
+              <h3 className="font-bold text-foreground">Compaction &amp; summary model</h3>
+              <p className="text-sm text-muted-foreground mt-1">
                 Used for native conversation compaction and as the default summary model when forking conversations. Does not affect Claude Code&apos;s built-in <code>/compact</code>.
               </p>
             </div>
             <select
               value={formData.conversations?.compaction_model || 'claude-haiku-4-5'}
               onChange={(e) => handleCompactionModelChange(e.target.value as ModelId)}
-              className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-sm text-content-body focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
             >
               {Object.entries(MODELS_BY_PROVIDER).flatMap(([, providerDef]) =>
                 providerDef.models.map((model) => (
@@ -1053,15 +1053,15 @@ export function SettingsPage() {
                 </option>
               ))}
             </select>
-            <p className="text-xs text-content-muted">
+            <p className="text-xs text-muted-foreground">
               Default: Claude Haiku 4.5 for fast, low-cost compaction.
             </p>
           </div>
 
-          <div className="bg-surface-raised border border-divider rounded-xl p-5 space-y-4">
+          <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div>
-              <h3 className="font-bold text-content">Typed /compact handling</h3>
-              <p className="text-sm text-content-muted mt-1">
+              <h3 className="font-bold text-foreground">Typed /compact handling</h3>
+              <p className="text-sm text-muted-foreground mt-1">
                 Choose whether a user-typed <code>/compact</code> is passed through to Claude Code or intercepted and handled by Panopticon-native compaction.
               </p>
             </div>
@@ -1072,19 +1072,19 @@ export function SettingsPage() {
                 className={`text-left rounded-xl border p-4 transition-colors ${
                   (formData.conversations?.manual_compact_mode || 'claude-code') === 'claude-code'
                     ? 'border-blue-500 bg-blue-500/10'
-                    : 'border-divider bg-surface-raised hover:border-divider-strong'
+                    : 'border-border bg-card hover:border-border'
                 }`}
               >
                 <div className="flex items-center justify-between gap-4 mb-2">
                   <div>
-                    <div className="font-bold text-content">Pass through to Claude Code</div>
-                    <div className="text-xs text-content-muted font-mono">Default</div>
+                    <div className="font-bold text-foreground">Pass through to Claude Code</div>
+                    <div className="text-xs text-muted-foreground font-mono">Default</div>
                   </div>
                   {(formData.conversations?.manual_compact_mode || 'claude-code') === 'claude-code' && (
                     <div className="text-blue-400 text-xs font-semibold">Selected</div>
                   )}
                 </div>
-                <p className="text-sm text-content-muted">
+                <p className="text-sm text-muted-foreground">
                   Preserve today&apos;s behavior: sending <code>/compact</code> directly to the Claude Code session.
                 </p>
               </button>
@@ -1095,38 +1095,38 @@ export function SettingsPage() {
                 className={`text-left rounded-xl border p-4 transition-colors ${
                   formData.conversations?.manual_compact_mode === 'panopticon-native'
                     ? 'border-emerald-500 bg-emerald-500/10'
-                    : 'border-divider bg-surface-raised hover:border-divider-strong'
+                    : 'border-border bg-card hover:border-border'
                 }`}
               >
                 <div className="flex items-center justify-between gap-4 mb-2">
                   <div>
-                    <div className="font-bold text-content">Use Panopticon-native compaction</div>
-                    <div className="text-xs text-content-muted font-mono">Opt-in override</div>
+                    <div className="font-bold text-foreground">Use Panopticon-native compaction</div>
+                    <div className="text-xs text-muted-foreground font-mono">Opt-in override</div>
                   </div>
                   {formData.conversations?.manual_compact_mode === 'panopticon-native' && (
                     <div className="text-emerald-400 text-xs font-semibold">Selected</div>
                   )}
                 </div>
-                <p className="text-sm text-content-muted">
+                <p className="text-sm text-muted-foreground">
                   Intercept typed <code>/compact</code> in the dashboard and run Panopticon&apos;s native compaction instead of Claude Code&apos;s built-in command.
                 </p>
               </button>
             </div>
           </div>
 
-          <div className="bg-surface-raised border border-divider rounded-xl p-5 space-y-4">
+          <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div>
-              <h3 className="font-bold text-content">Richer compaction / forking summaries</h3>
-              <p className="text-sm text-content-muted mt-1">
+              <h3 className="font-bold text-foreground">Richer compaction / forking summaries</h3>
+              <p className="text-sm text-muted-foreground mt-1">
                 Use a more verbose 9-section summary format instead of the default 6-section format. Includes all user messages and fuller code snippets.
               </p>
             </div>
             <div className="flex items-center justify-between gap-4">
-              <div className="text-sm text-content-body">
-                <span className={formData.conversations?.rich_compaction ? 'text-content' : 'text-content-muted'}>
+              <div className="text-sm text-foreground">
+                <span className={formData.conversations?.rich_compaction ? 'text-foreground' : 'text-muted-foreground'}>
                   {formData.conversations?.rich_compaction ? 'Enabled' : 'Disabled'}
                 </span>
-                <span className="text-xs text-content-muted ml-2">(default: on)</span>
+                <span className="text-xs text-muted-foreground ml-2">(default: on)</span>
               </div>
               <button
                 type="button"
@@ -1156,11 +1156,11 @@ export function SettingsPage() {
 
       {/* Terminal */}
       <section id="tmux" className="mb-12 scroll-mt-4">
-        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+        <h2 className="text-foreground text-2xl font-bold mb-6 flex items-center gap-3">
           Terminal
           <div className="h-px flex-1 bg-divider-strong" />
         </h2>
-        <p className="text-content-muted text-sm mb-6">
+        <p className="text-muted-foreground text-sm mb-6">
           Control whether Panopticon launches tmux in its own managed server with a Panopticon-owned config, or intentionally inherits your user tmux config.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1170,19 +1170,19 @@ export function SettingsPage() {
             className={`text-left rounded-xl border p-5 transition-colors ${
               (formData.tmux?.config_mode || 'managed') === 'managed'
                 ? 'border-blue-500 bg-blue-500/10'
-                : 'border-divider bg-surface-raised hover:border-divider-strong'
+                : 'border-border bg-card hover:border-border'
             }`}
           >
             <div className="flex items-center justify-between gap-4 mb-2">
               <div>
-                <div className="font-bold text-content">Managed tmux</div>
-                <div className="text-xs text-content-muted font-mono">Default</div>
+                <div className="font-bold text-foreground">Managed tmux</div>
+                <div className="text-xs text-muted-foreground font-mono">Default</div>
               </div>
               {(formData.tmux?.config_mode || 'managed') === 'managed' && (
                 <div className="text-blue-400 text-xs font-semibold">Selected</div>
               )}
             </div>
-            <p className="text-sm text-content-muted">
+            <p className="text-sm text-muted-foreground">
               Use Panopticon&apos;s own tmux socket and config file. This avoids depending on your dotfiles while preserving Panopticon&apos;s required mouse behavior.
             </p>
           </button>
@@ -1193,19 +1193,19 @@ export function SettingsPage() {
             className={`text-left rounded-xl border p-5 transition-colors ${
               formData.tmux?.config_mode === 'inherit-user'
                 ? 'border-amber-500 bg-amber-500/10'
-                : 'border-divider bg-surface-raised hover:border-divider-strong'
+                : 'border-border bg-card hover:border-border'
             }`}
           >
             <div className="flex items-center justify-between gap-4 mb-2">
               <div>
-                <div className="font-bold text-content">Inherit user tmux</div>
-                <div className="text-xs text-content-muted font-mono">Advanced opt-out</div>
+                <div className="font-bold text-foreground">Inherit user tmux</div>
+                <div className="text-xs text-muted-foreground font-mono">Advanced opt-out</div>
               </div>
               {formData.tmux?.config_mode === 'inherit-user' && (
                 <div className="text-amber-400 text-xs font-semibold">Selected</div>
               )}
             </div>
-            <p className="text-sm text-content-muted">
+            <p className="text-sm text-muted-foreground">
               Use your existing tmux server/config behavior instead of Panopticon-managed tmux. Choose this only if you specifically want Panopticon to follow your personal tmux setup.
             </p>
           </button>
@@ -1214,11 +1214,11 @@ export function SettingsPage() {
 
       {/* Tracker API Keys */}
       <section className="mb-12">
-        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+        <h2 className="text-foreground text-2xl font-bold mb-6 flex items-center gap-3">
           Tracker API Keys
           <div className="h-px flex-1 bg-divider-strong" />
         </h2>
-        <p className="text-content-muted text-sm mb-6">
+        <p className="text-muted-foreground text-sm mb-6">
           Configure API keys for your issue trackers. These override environment variables ({TRACKERS.map(t => t.envVar).join(', ')}).
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -1228,32 +1228,32 @@ export function SettingsPage() {
             return (
               <div
                 key={tracker.id}
-                className="bg-surface-raised border border-divider rounded-xl p-5 relative transition-colors shadow-sm hover:border-divider-strong"
+                className="bg-card border border-border rounded-xl p-5 relative transition-colors shadow-sm hover:border-border"
               >
                 <div className="flex items-center gap-3 mb-5">
-                  <div className="size-10 rounded-lg bg-surface-emphasis border border-divider flex items-center justify-center">
-                    <tracker.icon className="w-5 h-5 text-content-subtle" />
+                  <div className="size-10 rounded-lg bg-card border border-border flex items-center justify-center">
+                    <tracker.icon className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <div>
-                    <span className="font-bold text-content">{tracker.name}</span>
-                    <p className="text-[10px] text-content-muted font-mono">{tracker.envVar}</p>
+                    <span className="font-bold text-foreground">{tracker.name}</span>
+                    <p className="text-[10px] text-muted-foreground font-mono">{tracker.envVar}</p>
                   </div>
                 </div>
                 <div className="space-y-3">
                   <div className="relative">
-                    <label className="text-[10px] uppercase font-bold text-content-muted mb-1 block">API Key / Token</label>
+                    <label className="text-[10px] uppercase font-bold text-muted-foreground mb-1 block">API Key / Token</label>
                     {trackerKey.startsWith('$') ? (
                       <div className="badge-bg-warning border badge-border-warning rounded-lg px-3 py-2">
                         <div className="flex items-center gap-2 text-warning text-xs">
                           <AlertTriangle className="w-4 h-4" />
-                          <span>Configured via <code className="font-mono bg-surface-overlay px-1 rounded">{trackerKey}</code></span>
+                          <span>Configured via <code className="font-mono bg-popover px-1 rounded">{trackerKey}</code></span>
                         </div>
                         <input
                           type="text"
                           placeholder={tracker.placeholder}
                           onChange={(e) => handleTrackerKeyChange(tracker.id, e.target.value)}
                           autoComplete="off"
-                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-primary focus:border-primary text-content-body"
+                          className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono mt-2 focus:ring-1 focus:ring-primary focus:border-primary text-foreground"
                         />
                       </div>
                     ) : (
@@ -1270,11 +1270,11 @@ export function SettingsPage() {
                           data-lpignore="true"
                           data-1p-ignore="true"
                           data-form-type="other"
-                          className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-2 pr-10 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-content-body"
+                          className="w-full bg-background border border-border rounded-lg px-3 py-2 pr-10 text-xs font-mono focus:ring-1 focus:ring-primary focus:border-primary text-foreground"
                         />
                         <button
                           onClick={() => setShowTrackerKey({ ...showTrackerKey, [tracker.id]: !showTrackerKey[tracker.id] })}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-body"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                         >
                           {showTrackerKey[tracker.id] ? (
                             <Eye className="w-4 h-4" />
@@ -1294,20 +1294,20 @@ export function SettingsPage() {
 
       {/* Agent Configuration by Category */}
       <section id="model-assignments" className="mb-12 scroll-mt-4">
-        <h2 className="text-content text-2xl font-bold mb-2 flex items-center gap-3">
+        <h2 className="text-foreground text-2xl font-bold mb-2 flex items-center gap-3">
           Model Assignments
           <div className="h-px flex-1 bg-divider-strong" />
         </h2>
-        <p className="text-content-muted text-sm mb-5 leading-relaxed">
-          Assign models to specific <strong className="text-content-body">work types</strong> — the internal routing identifiers that Panopticon uses to resolve which model an agent or workflow step should use. Click any card to change its model.
+        <p className="text-muted-foreground text-sm mb-5 leading-relaxed">
+          Assign models to specific <strong className="text-foreground">work types</strong> — the internal routing identifiers that Panopticon uses to resolve which model an agent or workflow step should use. Click any card to change its model.
         </p>
 
         <div className="space-y-8">
           {AGENT_CATEGORIES.map((category) => (
             <div key={category.name}>
               <div className="flex items-center gap-2 mb-4">
-                <category.icon className="w-5 h-5 text-content-muted" />
-                <h3 className="text-content-body font-semibold text-sm uppercase tracking-wider">{category.name}</h3>
+                <category.icon className="w-5 h-5 text-muted-foreground" />
+                <h3 className="text-foreground font-semibold text-sm uppercase tracking-wider">{category.name}</h3>
                 <div className="h-px flex-1 bg-divider" />
               </div>
 
@@ -1345,7 +1345,7 @@ export function SettingsPage() {
                       title={hoverText}
                       className={`p-3 border rounded-lg transition-all group relative ${
                         !agent.implemented
-                          ? 'opacity-50 bg-surface-emphasis border-divider cursor-not-allowed'
+                          ? 'opacity-50 bg-card border-border cursor-not-allowed'
                           : `cursor-pointer ${
                             isDeprecated
                               ? 'badge-bg-warning border-warning/50 hover:border-warning/70 hover:bg-warning/15'
@@ -1383,8 +1383,8 @@ export function SettingsPage() {
                           </span>
                         )}
                       </div>
-                      <p className="text-xs font-semibold text-content truncate">{agent.name}</p>
-                      {agent.implemented && <p className="text-[10px] text-content-muted truncate mb-2">{modelDisplay}</p>}
+                      <p className="text-xs font-semibold text-foreground truncate">{agent.name}</p>
+                      {agent.implemented && <p className="text-[10px] text-muted-foreground truncate mb-2">{modelDisplay}</p>}
 
                       {/* Capability indicators */}
                       <div className="flex gap-1 flex-wrap">
@@ -1416,18 +1416,18 @@ export function SettingsPage() {
 
       {/* Appearance */}
       <section className="mb-12">
-        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+        <h2 className="text-foreground text-2xl font-bold mb-6 flex items-center gap-3">
           <Eye className="w-6 h-6 text-primary" />
           Appearance
         </h2>
-        <div className="bg-surface-raised border border-divider rounded-xl overflow-hidden">
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4">
             <div>
-              <h3 className="text-sm font-bold text-content flex items-center gap-2">
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
                 <GitMerge className="w-4 h-4 text-success" />
                 Ready to Merge shimmer
               </h3>
-              <p className="text-xs text-content-muted mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Animate the "READY TO MERGE" badge with a subtle shimmer to draw attention to cards awaiting your merge approval.
               </p>
             </div>
@@ -1447,15 +1447,15 @@ export function SettingsPage() {
 
       {/* Maintenance */}
       <section className="space-y-3 pb-20">
-        <h2 className="text-xl font-black text-content">Maintenance</h2>
-        <div className="bg-surface-emphasis rounded-xl border border-divider p-5">
+        <h2 className="text-xl font-black text-foreground">Maintenance</h2>
+        <div className="bg-card rounded-xl border border-border p-5">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold text-content flex items-center gap-2">
-                <Trash2 className="w-4 h-4 text-content-subtle" />
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-muted-foreground" />
                 Issue Cache
               </h3>
-              <p className="text-xs text-content-muted mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 Clear cached issue data and re-fetch from all trackers. Use this if issue identifiers or data appear stale.
               </p>
             </div>
@@ -1474,7 +1474,7 @@ export function SettingsPage() {
                 }
               }}
               disabled={clearingCache}
-              className="px-4 py-2 text-sm font-semibold rounded-lg border border-divider hover:border-warning/50 hover:bg-warning/10 text-content-muted hover:text-warning transition-all flex items-center gap-2 disabled:opacity-50"
+              className="px-4 py-2 text-sm font-semibold rounded-lg border border-border hover:border-warning/50 hover:bg-warning/10 text-muted-foreground hover:text-warning transition-all flex items-center gap-2 disabled:opacity-50"
             >
               {clearingCache ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               {clearingCache ? 'Clearing...' : 'Clear & Refresh'}
@@ -1505,21 +1505,21 @@ export function SettingsPage() {
       {/* Provider Models Modal */}
       {modelsModalProvider && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-surface-raised border border-divider-strong rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+          <div className="bg-card border border-border rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-divider">
+            <div className="flex items-center justify-between p-4 border-b border-border">
               <div className="flex items-center gap-3">
                 {(() => {
                   const Icon = PROVIDERS.find(p => p.id === modelsModalProvider)?.icon;
                   return Icon ? <Icon className="w-5 h-5 text-primary" /> : null;
                 })()}
-                <h3 className="text-content text-lg font-bold">
+                <h3 className="text-foreground text-lg font-bold">
                   {PROVIDERS.find(p => p.id === modelsModalProvider)?.name} Models
                 </h3>
               </div>
               <button
                 onClick={() => setModelsModalProvider(null)}
-                className="text-content-muted hover:text-content transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1534,8 +1534,8 @@ export function SettingsPage() {
                 if (!providerApiKey) {
                   return (
                     <div className="text-center py-8">
-                      <Key className="w-10 h-10 text-content-muted mb-2 mx-auto" />
-                      <p className="text-content-muted">Enter an API key to test models</p>
+                      <Key className="w-10 h-10 text-muted-foreground mb-2 mx-auto" />
+                      <p className="text-muted-foreground">Enter an API key to test models</p>
                     </div>
                   );
                 }
@@ -1545,10 +1545,10 @@ export function SettingsPage() {
                     <div className="text-center py-8">
                       <AlertTriangle className="w-10 h-10 text-warning mb-2 mx-auto" />
                       <p className="text-warning">API key configured via environment variable</p>
-                      <p className="text-content-muted text-sm mt-1">
-                        <code className="font-mono bg-surface-overlay px-1 rounded">{providerApiKey}</code> is not set
+                      <p className="text-muted-foreground text-sm mt-1">
+                        <code className="font-mono bg-popover px-1 rounded">{providerApiKey}</code> is not set
                       </p>
-                      <p className="text-content-muted text-xs mt-2">Set the environment variable or enter the key directly in Settings</p>
+                      <p className="text-muted-foreground text-xs mt-2">Set the environment variable or enter the key directly in Settings</p>
                     </div>
                   );
                 }
@@ -1563,16 +1563,16 @@ export function SettingsPage() {
                     return (
                       <div
                         key={model.id}
-                        className="bg-surface border border-divider rounded-lg p-4 hover:border-divider-strong transition-colors"
+                        className="bg-card border border-border rounded-lg p-4 hover:border-border transition-colors"
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               {/* Model icons are strings (Material Symbols names) - render as text fallback */}
-                              <div className="w-4 h-4 flex items-center justify-center text-content-muted text-[10px]">
+                              <div className="w-4 h-4 flex items-center justify-center text-muted-foreground text-[10px]">
                                 {typeof model.icon === 'string' ? model.icon[0] : '◆'}
                               </div>
-                              <h4 className="text-content font-semibold">{model.name}</h4>
+                              <h4 className="text-foreground font-semibold">{model.name}</h4>
                               {model.tier && (
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                                   model.tier === 'premium' ? 'badge-bg-signal-review text-signal-review-foreground' :
@@ -1584,13 +1584,13 @@ export function SettingsPage() {
                               )}
                             </div>
                             {model.description && (
-                              <p className="text-xs text-content-muted mb-2">{model.description}</p>
+                              <p className="text-xs text-muted-foreground mb-2">{model.description}</p>
                             )}
                             <div className="flex flex-wrap gap-1">
                               {model.capabilities.map((cap) => (
                                 <span
                                   key={cap}
-                                  className="text-[9px] px-1.5 py-0.5 bg-surface-emphasis text-content-subtle rounded border border-divider"
+                                  className="text-[9px] px-1.5 py-0.5 bg-card text-muted-foreground rounded border border-border"
                                 >
                                   {cap}
                                 </span>
@@ -1633,8 +1633,8 @@ export function SettingsPage() {
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-divider bg-surface">
-              <p className="text-xs text-content-muted text-center">
+            <div className="p-4 border-t border-border bg-card">
+              <p className="text-xs text-muted-foreground text-center">
                 Test verifies API key and model availability by asking "What is 2+3?"
               </p>
             </div>

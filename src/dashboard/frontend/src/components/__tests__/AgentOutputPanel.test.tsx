@@ -19,7 +19,7 @@ vi.mock('../XTerminal', () => ({
   ),
 }));
 
-vi.mock('../MissionControl/ActivityView', () => ({
+vi.mock('../CommandDeck/ActivityView', () => ({
   ActivityView: ({ issueId }: { issueId: string }) => (
     <div data-testid="activity-view" data-issue={issueId} />
   ),

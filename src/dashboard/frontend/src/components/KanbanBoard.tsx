@@ -136,7 +136,7 @@ function getLabelStyle(_label: string): string {
 }
 
 function getCostColor(_cost: number): string {
-  return 'bg-surface-overlay text-content-subtle';
+  return 'bg-popover text-muted-foreground';
 }
 
 export function applyReviewStateToIssue(
@@ -603,7 +603,7 @@ function TrackerShadowBadges({ issue, compact = false }: { issue: Issue; compact
         <ExternalLink className="w-2.5 h-2.5" />
         {trackerState}
       </span>
-      <span className="text-content-muted">→</span>
+      <span className="text-muted-foreground">→</span>
       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded badge-bg-signal-review text-signal-review-foreground">
         <Eye className="w-2.5 h-2.5" />
         {shadowLabel}
@@ -638,7 +638,7 @@ function FeatureCard({
      (feature.derivedStatus === 'closed' && feature.rawTrackerState !== 'Done'));
 
   return (
-    <div className="bg-surface-overlay rounded-lg border-l-4 border-l-primary overflow-hidden">
+    <div className="bg-popover rounded-lg border-l-4 border-l-primary overflow-hidden">
       <div
         onClick={onToggle}
         className="flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-primary/10 transition-colors"
@@ -680,7 +680,7 @@ function FeatureCard({
             )}
             <TrackerShadowBadges issue={feature} />
           </div>
-          <p className="text-sm text-content-body mt-1 line-clamp-2">{feature.title}</p>
+          <p className="text-sm text-foreground mt-1 line-clamp-2">{feature.title}</p>
 
           {/* Progress bar and summary */}
           {total > 0 && (
@@ -691,7 +691,7 @@ function FeatureCard({
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
-              <span className="text-[11px] text-content-muted mt-0.5 block">
+              <span className="text-[11px] text-muted-foreground mt-0.5 block">
                 {completed}/{total} done{inProgress > 0 ? `, ${inProgress} active` : ''}
               </span>
             </div>
@@ -700,7 +700,7 @@ function FeatureCard({
       </div>
       {/* Child stories rendered inside the card */}
       {isExpanded && children && (
-        <div className="border-t border-border/50 bg-surface-raised/50">
+        <div className="border-t border-border/50 bg-card/50">
           {children}
         </div>
       )}
@@ -728,7 +728,7 @@ function CompactChildCard({
   );
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-surface-overlay/50 transition-colors group">
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-popover/50 transition-colors group">
       <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
       <a
         href={issue.url}
@@ -739,7 +739,7 @@ function CompactChildCard({
       >
         {issue.identifier}
       </a>
-      <span className="text-xs text-content-body truncate flex-1">{issue.title}</span>
+      <span className="text-xs text-foreground truncate flex-1">{issue.title}</span>
       <TrackerShadowBadges issue={issue} compact />
       {hasAgent && (
         <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" title="Agent running" />
@@ -812,8 +812,8 @@ export function ListIssueRow({
     <div
       ref={rowRef}
       onClick={() => onSelectIssue(isSelected ? null : issue.identifier)}
-      className={`flex items-center gap-3 px-4 py-3 hover:bg-surface-overlay/50 transition-colors cursor-pointer ${
-        isSelected ? 'bg-surface-overlay' : isBulkSelected ? 'bg-primary/[0.03]' : ''
+      className={`flex items-center gap-3 px-4 py-3 hover:bg-popover/50 transition-colors cursor-pointer ${
+        isSelected ? 'bg-popover' : isBulkSelected ? 'bg-primary/[0.03]' : ''
       }`}
     >
       {/* Bulk selection checkbox */}
@@ -826,7 +826,7 @@ export function ListIssueRow({
             onBulkToggle();
           }}
           onClick={(e) => e.stopPropagation()}
-          className="w-4 h-4 rounded border-divider text-primary focus:ring-primary cursor-pointer shrink-0"
+          className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer shrink-0"
           aria-label={`Select ${issue.identifier}`}
         />
       )}
@@ -834,15 +834,15 @@ export function ListIssueRow({
       <span className={`w-2 h-2 rounded-full shrink-0 ${statusColor}`} title={canonical} />
 
       {/* Issue identifier — clicking selects the card, use ExternalLink icon to open in tracker */}
-      <span className="text-xs text-content-subtle shrink-0 font-mono">
+      <span className="text-xs text-muted-foreground shrink-0 font-mono">
         {issue.identifier}
       </span>
 
       {/* Title - dimmed/strikethrough for canceled issues */}
       <span className={`text-sm truncate flex-1 min-w-0 ${
         canonical === 'canceled'
-          ? 'text-content-muted line-through'
-          : 'text-content-body'
+          ? 'text-muted-foreground line-through'
+          : 'text-foreground'
       }`}>{issue.title}</span>
 
       {/* Priority indicator */}
@@ -856,7 +856,7 @@ export function ListIssueRow({
 
       {/* Cost */}
       {costsLoading && !cost && (
-        <span className="w-10 h-4 bg-surface-overlay rounded animate-pulse shrink-0" />
+        <span className="w-10 h-4 bg-popover rounded animate-pulse shrink-0" />
       )}
       {cost && cost.totalCost > 0 && (
         <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${getCostColor(cost.totalCost)}`}>
@@ -866,7 +866,7 @@ export function ListIssueRow({
 
       {/* Assignee */}
       {issue.assignee && (
-        <span className="text-xs text-content-subtle flex items-center gap-1 shrink-0">
+        <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0">
           <User className="w-3 h-3" />
           {issue.assignee.name.split(' ')[0]}
         </span>
@@ -893,7 +893,7 @@ export function ListIssueRow({
               e.stopPropagation();
               onPlan(issue);
             }}
-            className="p-1 text-content-subtle hover:text-primary transition-colors"
+            className="p-1 text-muted-foreground hover:text-primary transition-colors"
             title="Plan issue"
           >
             <Play className="w-3.5 h-3.5" />
@@ -906,7 +906,7 @@ export function ListIssueRow({
             e.stopPropagation();
             onSelectIssue(issue.identifier);
           }}
-          className="p-1 text-content-subtle hover:text-content transition-colors"
+          className="p-1 text-muted-foreground hover:text-foreground transition-colors"
           title="View details"
         >
           <Eye className="w-3.5 h-3.5" />
@@ -918,7 +918,7 @@ export function ListIssueRow({
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="p-1 text-content-subtle hover:text-content transition-colors"
+          className="p-1 text-muted-foreground hover:text-foreground transition-colors"
           title="Open in tracker"
         >
           <ExternalLink className="w-3.5 h-3.5" />
@@ -929,8 +929,8 @@ export function ListIssueRow({
 }
 
 const COLUMN_COLORS: Record<string, string> = {
-  backlog: 'border-divider-strong',
-  todo: 'border-divider-strong',
+  backlog: 'border-border',
+  todo: 'border-border',
   in_progress: 'border-primary',
   in_review: 'border-warning',
   done: 'border-success',
@@ -1567,8 +1567,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     isExplicitlySelected
                       ? 'bg-accent text-foreground border-foreground/20'
                       : selectedProjects.size === 0
-                        ? 'bg-surface-raised text-foreground/70 border-foreground/15 hover:bg-accent hover:text-foreground hover:border-foreground/25'
-                        : 'bg-surface-raised text-muted-foreground border-foreground/10 hover:border-foreground/20 hover:text-foreground opacity-50'
+                        ? 'bg-card text-foreground/70 border-foreground/15 hover:bg-accent hover:text-foreground hover:border-foreground/25'
+                        : 'bg-card text-muted-foreground border-foreground/10 hover:border-foreground/20 hover:text-foreground opacity-50'
                   }`}
                   title={isExplicitlySelected ? `Remove ${project.name} filter` : `Filter to ${project.name}`}
                 >
@@ -1596,12 +1596,12 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
       {cycleFilter === 'all' ? (
         <div className="space-y-6 overflow-y-auto pb-4">
           {Object.entries(groupedByLabels).map(([label, labelIssues]) => (
-            <div key={label} className="bg-surface-raised rounded-lg">
-              <div className="px-4 py-3 border-b border-divider">
+            <div key={label} className="bg-card rounded-lg">
+              <div className="px-4 py-3 border-b border-border">
                 <div className="flex items-center gap-2">
                   <Tag className="w-4 h-4 text-primary" />
-                  <h3 className="font-semibold text-content">{label}</h3>
-                  <span className="text-sm text-content-subtle">({labelIssues.length})</span>
+                  <h3 className="font-semibold text-foreground">{label}</h3>
+                  <span className="text-sm text-muted-foreground">({labelIssues.length})</span>
                 </div>
               </div>
               <div className="divide-y divide-divider">
@@ -1628,15 +1628,15 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         /* Backlog - List View (grouped by project) */
         <div className="space-y-6 overflow-y-auto pb-4">
           {groupedByProject.map((group) => (
-            <div key={group.name} className="bg-surface-raised rounded-lg">
-              <div className="px-4 py-3 border-b border-divider">
+            <div key={group.name} className="bg-card rounded-lg">
+              <div className="px-4 py-3 border-b border-border">
                 <div className="flex items-center gap-2">
                   <span
                     className="w-3 h-3 rounded-full shrink-0"
                     style={{ backgroundColor: group.color || '#6b7280' }}
                   />
-                  <h3 className="font-semibold text-content">{group.name}</h3>
-                  <span className="text-sm text-content-subtle">({group.issues.length})</span>
+                  <h3 className="font-semibold text-foreground">{group.name}</h3>
+                  <span className="text-sm text-muted-foreground">({group.issues.length})</span>
                 </div>
               </div>
               <div className="divide-y divide-divider">
@@ -1659,7 +1659,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             </div>
           ))}
           {groupedByProject.length === 0 && (
-            <div className="text-center py-12 text-content-subtle">
+            <div className="text-center py-12 text-muted-foreground">
               No backlog items
             </div>
           )}
@@ -1668,12 +1668,12 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         /* Canceled - List View (grouped by cancellation type) */
         <div className="space-y-6 overflow-y-auto pb-4">
           {groupedByCanceledType.map((group) => (
-            <div key={group.name} className="bg-surface-raised rounded-lg">
-              <div className="px-4 py-3 border-b border-divider">
+            <div key={group.name} className="bg-card rounded-lg">
+              <div className="px-4 py-3 border-b border-border">
                 <div className="flex items-center gap-2">
                   <X className="w-4 h-4 text-destructive-foreground" />
-                  <h3 className="font-semibold text-content">{group.name}</h3>
-                  <span className="text-sm text-content-subtle">({group.issues.length})</span>
+                  <h3 className="font-semibold text-foreground">{group.name}</h3>
+                  <span className="text-sm text-muted-foreground">({group.issues.length})</span>
                 </div>
               </div>
               <div className="divide-y divide-divider">
@@ -1696,7 +1696,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             </div>
           ))}
           {groupedByCanceledType.length === 0 && (
-            <div className="text-center py-12 text-content-subtle">
+            <div className="text-center py-12 text-muted-foreground">
               No canceled issues
             </div>
           )}
@@ -1712,8 +1712,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
             return (
               <div key={status} className="flex-1 min-w-0">
-                <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-surface-raised rounded-lg transition-colors`}>
-                  <div className="px-4 py-3 border-b border-divider bg-surface-raised">
+                <div className={`border-t-4 ${COLUMN_COLORS[status]} bg-card rounded-lg transition-colors`}>
+                  <div className="px-4 py-3 border-b border-border bg-card">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <input
@@ -1729,12 +1729,12 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                               bulkSelection.selectAll(columnIssueIds);
                             }
                           }}
-                          className="w-4 h-4 rounded border-divider text-primary focus:ring-primary cursor-pointer shrink-0"
+                          className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer shrink-0"
                           aria-label={`Select all ${COLUMN_TITLES[status]}`}
                         />
-                        <h3 className="font-semibold text-content">{COLUMN_TITLES[status]}</h3>
+                        <h3 className="font-semibold text-foreground">{COLUMN_TITLES[status]}</h3>
                       </div>
-                      <span className="text-sm text-content-subtle">{sortedGrouped[status].length}</span>
+                      <span className="text-sm text-muted-foreground">{sortedGrouped[status].length}</span>
                     </div>
                   </div>
                   <ColumnContent
@@ -1916,7 +1916,7 @@ function ColumnContent({
   if (issues.length === 0) {
     return (
       <div className="p-2 space-y-2 max-h-[calc(100vh-220px)] overflow-y-auto">
-        <div className="text-center text-content-muted py-8 text-sm">
+        <div className="text-center text-muted-foreground py-8 text-sm">
           No issues
         </div>
       </div>
@@ -2021,11 +2021,11 @@ interface DragOverlayCardProps {
 
 function DragOverlayCard({ issue }: DragOverlayCardProps) {
   return (
-    <div className="bg-surface-overlay rounded-lg p-3 border-l-4 border-l-blue-500 shadow-2xl rotate-2 scale-105 opacity-90">
+    <div className="bg-popover rounded-lg p-3 border-l-4 border-l-blue-500 shadow-2xl rotate-2 scale-105 opacity-90">
       <div className="flex items-center gap-2">
-        <span className="text-content-subtle text-sm">{issue.identifier}</span>
+        <span className="text-muted-foreground text-sm">{issue.identifier}</span>
       </div>
-      <p className="text-sm text-content mt-1 line-clamp-2">{issue.title}</p>
+      <p className="text-sm text-foreground mt-1 line-clamp-2">{issue.title}</p>
     </div>
   );
 }
@@ -2045,26 +2045,26 @@ function AgentWarningDialog({ isOpen, onClose, onConfirm, issue }: AgentWarningD
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-surface-raised rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+      <div className="relative bg-card rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex items-start gap-4">
           <div className="p-2 badge-bg-warning rounded-lg">
             <AlertTriangle className="w-6 h-6 text-warning-foreground" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-content mb-2">
+            <h3 className="text-lg font-semibold text-foreground mb-2">
               Active Agent Warning
             </h3>
-            <p className="text-content-body text-sm mb-4">
+            <p className="text-foreground text-sm mb-4">
               <strong>{issue.identifier}</strong> has an active agent working on it.
               Moving this issue may disrupt the agent's work.
             </p>
-            <p className="text-content-subtle text-xs mb-6">
+            <p className="text-muted-foreground text-xs mb-6">
               Are you sure you want to proceed?
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-content-subtle hover:text-content transition-colors text-sm"
+                className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors text-sm"
               >
                 Cancel
               </button>
@@ -2102,48 +2102,48 @@ function SyncPromptDialog({ isOpen, onClose, onSync, issue }: SyncPromptDialogPr
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-surface-raised rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+      <div className="relative bg-card rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
         <div className="flex items-start gap-4">
           <div className="p-2 badge-bg-success rounded-lg">
             <Check className="w-6 h-6 text-success-foreground" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-content mb-2">
+            <h3 className="text-lg font-semibold text-foreground mb-2">
               Move to Done
             </h3>
-            <p className="text-content-body text-sm mb-4">
+            <p className="text-foreground text-sm mb-4">
               You're moving <strong>{issue.identifier}</strong> to Done.
             </p>
 
             {/* Cleanup options */}
-            <div className="space-y-2 mb-4 p-3 bg-surface-overlay/50 rounded-lg">
-              <label className="flex items-center gap-2 text-sm text-content-body cursor-pointer">
+            <div className="space-y-2 mb-4 p-3 bg-popover/50 rounded-lg">
+              <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
                 <input
                   type="checkbox"
                   checked={cleanupWorkspace}
                   onChange={(e) => setCleanupWorkspace(e.target.checked)}
-                  className="rounded border-divider-strong bg-surface-overlay text-success focus:ring-ring"
+                  className="rounded border-border bg-popover text-success focus:ring-ring"
                 />
                 Clean up workspace
               </label>
-              <label className="flex items-center gap-2 text-sm text-content-body cursor-pointer">
+              <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
                 <input
                   type="checkbox"
                   checked={stopAgents}
                   onChange={(e) => setStopAgents(e.target.checked)}
-                  className="rounded border-divider-strong bg-surface-overlay text-success focus:ring-ring"
+                  className="rounded border-border bg-popover text-success focus:ring-ring"
                 />
                 Stop running agents
               </label>
             </div>
 
-            <p className="text-content-subtle text-xs mb-4">
+            <p className="text-muted-foreground text-xs mb-4">
               Sync status change to {trackerName}?
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => onSync(false, { cleanupWorkspace, stopAgents })}
-                className="px-4 py-2 text-content-subtle hover:text-content transition-colors text-sm"
+                className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors text-sm"
               >
                 Shadow Only
               </button>
@@ -2173,8 +2173,8 @@ function UndoToast({ isVisible, onUndo, onClose }: UndoToastProps) {
 
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-      <div className="bg-surface-raised border border-divider rounded-lg shadow-xl px-4 py-3 flex items-center gap-4">
-        <span className="text-sm text-content-body">Issue moved</span>
+      <div className="bg-card border border-border rounded-lg shadow-xl px-4 py-3 flex items-center gap-4">
+        <span className="text-sm text-foreground">Issue moved</span>
         <button
           onClick={onUndo}
           className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 transition-colors"
@@ -2184,7 +2184,7 @@ function UndoToast({ isVisible, onUndo, onClose }: UndoToastProps) {
         </button>
         <button
           onClick={onClose}
-          className="text-content-muted hover:text-content-subtle"
+          className="text-muted-foreground hover:text-muted-foreground"
         >
           <X className="w-4 h-4" />
         </button>
@@ -2198,16 +2198,16 @@ function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-surface-raised rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+      <div className="relative bg-card rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-divider">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
             <List className="w-5 h-5 text-success-foreground" />
-            <h2 className="font-semibold text-content">Tasks: {issue.identifier}</h2>
+            <h2 className="font-semibold text-foreground">Tasks: {issue.identifier}</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-1 text-content-subtle hover:text-content hover:bg-surface-overlay rounded transition-colors"
+            className="p-1 text-muted-foreground hover:text-foreground hover:bg-popover rounded transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -2251,7 +2251,7 @@ export function DivergedBadge({ issueIdentifier, stuckReason, stuckDetails }: { 
         <XCircle className="w-3 h-3" />
         Diverged
         <button
-          className="ml-1 underline text-red-200 hover:text-white text-xs leading-none"
+          className="ml-1 underline text-red-200 hover:text-foreground text-xs leading-none"
           onClick={async (e) => {
             e.stopPropagation();
             setUnstickError(null);
@@ -2331,7 +2331,7 @@ export function ReviewInfraStuckBadge({ issueIdentifier, retries }: { issueIdent
         <XCircle className="w-3 h-3" />
         Review stuck
         <button
-          className="ml-1 underline text-amber-100 hover:text-white text-xs leading-none"
+          className="ml-1 underline text-amber-100 hover:text-foreground text-xs leading-none"
           onClick={async (e) => {
             e.stopPropagation();
             setUnstickError(null);
@@ -2465,7 +2465,7 @@ export function DeaconIgnoreButton({
       <button
         onClick={toggle}
         disabled={busy}
-        className="flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold bg-surface-overlay text-muted-foreground border border-white/10 hover:bg-purple-900/40 hover:text-purple-100 hover:border-purple-500/50 disabled:opacity-60"
+        className="flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold bg-popover text-muted-foreground border border-white/10 hover:bg-purple-900/40 hover:text-purple-100 hover:border-purple-500/50 disabled:opacity-60"
         title="Tell Deacon to stop patrolling this issue (no re-dispatch, no pokes, no auto-completion)"
       >
         <Pause className="w-3 h-3" />
@@ -2560,7 +2560,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       : isRunning
         ? 'from-primary/16 via-primary/6 to-transparent'
         : 'from-surface-overlay/60 via-surface/40 to-transparent';
-  const actionBarClass = 'mt-3 flex items-center gap-2 flex-wrap rounded-xl border border-divider/70 bg-surface/80 px-2.5 py-2';
+  const actionBarClass = 'mt-3 flex items-center gap-2 flex-wrap rounded-xl border border-border/70 bg-card/80 px-2.5 py-2';
 
   const priorityAccentColors: Record<number, string> = {
     0: 'bg-border',
@@ -2778,7 +2778,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           ? 'ring-2 ring-warning/70 shadow-[0_12px_30px_rgba(245,158,11,0.18)]'
           : isBulkSelected
             ? 'border-primary/50 bg-primary/[0.03] shadow-[0_6px_22px_rgba(0,0,0,0.08)]'
-            : 'hover:-translate-y-0.5 border-divider/70 hover:border-divider-strong hover:shadow-[0_12px_28px_rgba(0,0,0,0.12)]'
+            : 'hover:-translate-y-0.5 border-border/70 hover:border-border hover:shadow-[0_12px_28px_rgba(0,0,0,0.12)]'
       } bg-[linear-gradient(145deg,var(--color-surface)_0%,rgba(255,255,255,0.03)_100%)]`}
     >
       <div className={`pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-br ${cardTone}`} />
@@ -2790,7 +2790,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               ? 'bg-warning'
               : isRunning
                 ? 'bg-primary'
-                : (priorityAccentColors[issue.priority] || 'bg-content-muted')
+                : (priorityAccentColors[issue.priority] || 'bg-muted-foreground')
         }`}
       />
 
@@ -2807,7 +2807,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                     onBulkToggle();
                   }}
                   onClick={(e) => e.stopPropagation()}
-                  className="w-4 h-4 rounded border-divider text-primary focus:ring-primary cursor-pointer shrink-0"
+                  className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer shrink-0"
                   aria-label={`Select ${issue.identifier}`}
                 />
               )}
@@ -2818,12 +2818,12 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                   title={issue.project.name}
                 />
               )}
-              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-content-subtle">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 {phaseLabel}
               </span>
               {issue.source === 'github' && (
                 <span title="GitHub Issue" className="inline-flex items-center">
-                  <Github className="w-3 h-3 text-content-subtle" />
+                  <Github className="w-3 h-3 text-muted-foreground" />
                 </span>
               )}
               <a
@@ -2831,14 +2831,14 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 text-sm font-semibold text-content hover:text-primary"
+                className="inline-flex items-center gap-1 text-sm font-semibold text-foreground hover:text-primary"
               >
                 <span>{issue.identifier}</span>
                 <ExternalLink className="w-3 h-3 opacity-50" />
               </a>
             </div>
 
-            <p className="mt-2 text-[15px] font-medium leading-5 text-content line-clamp-2">
+            <p className="mt-2 text-[15px] font-medium leading-5 text-foreground line-clamp-2">
               {issue.title}
             </p>
 
@@ -2855,7 +2855,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                   </span>
                 ))}
               {issue.assignee && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-divider/70 bg-surface/80 px-2.5 py-1 text-[11px] text-content-subtle">
+                <span className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-card/80 px-2.5 py-1 text-[11px] text-muted-foreground">
                   <User className="w-3 h-3" />
                   {issue.assignee.name.split(' ')[0]}
                 </span>
@@ -2865,7 +2865,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                   className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${
                     (workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote'
                       ? 'badge-bg-signal-cost text-signal-cost-foreground'
-                      : 'border border-divider/70 bg-surface/80 text-content-subtle'
+                      : 'border border-border/70 bg-card/80 text-muted-foreground'
                   }`}
                   title={(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Running on remote VM (Fly.io)' : 'Running locally'}
                 >
@@ -2963,7 +2963,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${
                   (workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote'
                     ? 'badge-bg-signal-cost text-signal-cost-foreground'
-                    : 'bg-surface-raised text-muted-foreground border border-border'
+                    : 'bg-card text-muted-foreground border border-border'
                 }`}
                 title={(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Running on remote VM (Fly.io)' : 'Running locally'}
               >
@@ -3143,7 +3143,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
           <div className="shrink-0">
             {costsLoading && !cost && (
-              <span className="inline-block h-7 w-16 rounded-full bg-surface-overlay animate-pulse" />
+              <span className="inline-block h-7 w-16 rounded-full bg-popover animate-pulse" />
             )}
             {cost && cost.totalCost > 0 && (
               <button
@@ -3165,7 +3165,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           <button
             onClick={handleTell}
             className={`flex items-center gap-1 text-xs transition-colors ${
-              showMessageInput ? 'text-primary' : 'text-content-subtle hover:text-content'
+              showMessageInput ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
             }`}
             title="Tell"
           >
@@ -3179,7 +3179,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
           <ResetIssueButton issueId={issue.identifier} variant="card" issue={issue} />
           {/* Model badge */}
           {activeAgent && activeAgent.model && (
-            <span className="flex-1 text-center text-[10px] text-content-body font-medium">
+            <span className="flex-1 text-center text-[10px] text-foreground font-medium">
               {getFriendlyModelName(activeAgent.model)}
             </span>
           )}
@@ -3196,7 +3196,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
               placeholder="Type a message..."
-              className="flex-1 bg-surface-raised text-content text-sm px-3 py-1.5 rounded border border-divider-strong focus:border-primary focus:outline-none"
+              className="flex-1 bg-card text-foreground text-sm px-3 py-1.5 rounded border border-border focus:border-primary focus:outline-none"
               autoFocus
             />
             <button
@@ -3279,7 +3279,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               ref={startButtonRef}
               onClick={handleStartAgent}
               disabled={startAgentMutation.isPending || isStarting}
-              className="flex items-center gap-1 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 transition-colors rounded px-2 py-1 disabled:opacity-50"
+              className="flex items-center gap-1 text-xs font-semibold bg-success text-success-foreground hover:bg-emerald-500 transition-colors rounded px-2 py-1 disabled:opacity-50"
               title={(startAgentMutation.isPending || isStarting) ? 'Starting...' : 'Start Agent'}
             >
               {(startAgentMutation.isPending || isStarting) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
@@ -3376,7 +3376,7 @@ function BacklogButton({ issue }: { issue: Issue }) {
         }
       }}
       disabled={isPending}
-      className="flex items-center gap-1 text-xs text-content-muted hover:text-content-subtle transition-colors disabled:opacity-50"
+      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-muted-foreground transition-colors disabled:opacity-50"
       title="Move to Backlog"
     >
       {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -3409,7 +3409,7 @@ function TodoButton({ issue }: { issue: Issue }) {
         }
       }}
       disabled={isPending}
-      className="flex items-center gap-1 text-xs text-content-muted hover:text-content-subtle transition-colors disabled:opacity-50"
+      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-muted-foreground transition-colors disabled:opacity-50"
       title="Move to Todo"
     >
       {isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronRight className="w-3.5 h-3.5" />}
@@ -3471,7 +3471,7 @@ function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
   if (inline) return content;
 
   return (
-    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-divider-strong">
+    <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border">
       {content}
     </div>
   );

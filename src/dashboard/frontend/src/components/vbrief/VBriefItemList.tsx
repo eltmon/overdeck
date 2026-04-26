@@ -7,7 +7,7 @@ interface VBriefItemListProps {
 
 export function VBriefItemList({ items }: VBriefItemListProps) {
   if (items.length === 0) {
-    return <p className="text-content-muted text-sm p-4">No items in this plan.</p>;
+    return <p className="text-muted-foreground text-sm p-4">No items in this plan.</p>;
   }
 
   return (

@@ -130,20 +130,20 @@ export function ActionsSection({
 
   if (reviewStatusLoading) {
     return (
-      <div className="px-3 py-2 border-b border-divider" data-testid="workspace-actions">
-        <div className="text-xs uppercase tracking-wider mb-2 font-semibold text-content-subtle">Actions</div>
+      <div className="px-3 py-2 border-b border-border" data-testid="workspace-actions">
+        <div className="text-xs uppercase tracking-wider mb-2 font-semibold text-muted-foreground">Actions</div>
         <div className="flex flex-wrap gap-1.5">
-          <div className="h-6 w-24 rounded bg-surface-emphasis/50 animate-pulse" />
-          <div className="h-6 w-16 rounded bg-surface-emphasis/50 animate-pulse" />
-          <div className="h-6 w-20 rounded bg-surface-emphasis/50 animate-pulse" />
+          <div className="h-6 w-24 rounded bg-card/50 animate-pulse" />
+          <div className="h-6 w-16 rounded bg-card/50 animate-pulse" />
+          <div className="h-6 w-20 rounded bg-card/50 animate-pulse" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="px-3 py-2 border-b border-divider" data-testid="workspace-actions">
-      <div className="text-xs uppercase tracking-wider mb-2 font-semibold text-content-subtle">Actions</div>
+    <div className="px-3 py-2 border-b border-border" data-testid="workspace-actions">
+      <div className="text-xs uppercase tracking-wider mb-2 font-semibold text-muted-foreground">Actions</div>
 
       {/* Pending operation status */}
       {workspace?.pendingOperation?.type === 'approve' && workspace.pendingOperation.status === 'running' && (
@@ -155,11 +155,11 @@ export function ActionsSection({
         <div className="text-xs text-destructive badge-bg-destructive px-2 py-1.5 rounded mb-2">
           <div className="flex items-center justify-between">
             <span className="font-medium">Operation failed</span>
-            <button onClick={onDismissPending} className="text-content-subtle hover:text-content">
+            <button onClick={onDismissPending} className="text-muted-foreground hover:text-foreground">
               <X className="w-3 h-3" />
             </button>
           </div>
-          <div className="mt-1 text-content-subtle">{workspace.pendingOperation.error}</div>
+          <div className="mt-1 text-muted-foreground">{workspace.pendingOperation.error}</div>
         </div>
       )}
 
@@ -178,7 +178,7 @@ export function ActionsSection({
 
       {/* Workspace Actions */}
       <div className="mt-4">
-        <div className="text-xs uppercase tracking-wider mb-2 font-semibold text-content-subtle flex items-center gap-1.5">
+        <div className="text-xs uppercase tracking-wider mb-2 font-semibold text-muted-foreground flex items-center gap-1.5">
           <Box className="w-3 h-3" /> Workspace
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -186,7 +186,7 @@ export function ActionsSection({
           <div className="flex items-center gap-1">
             <MergeButton issueId={issueId} reviewStatus={reviewStatus} variant="inspector" />
             <span title="Also shown on card">
-              <LayoutGrid className="w-3 h-3 text-content-subtle opacity-40 self-center" />
+              <LayoutGrid className="w-3 h-3 text-muted-foreground opacity-40 self-center" />
             </span>
           </div>
           {reviewStatus?.mergeStatus === 'merged' && (
@@ -220,7 +220,7 @@ export function ActionsSection({
                 onSuccess={onKillSuccess}
               />
               <span title="Also shown on card">
-                <LayoutGrid className="w-3 h-3 text-content-subtle opacity-40 self-center" />
+                <LayoutGrid className="w-3 h-3 text-muted-foreground opacity-40 self-center" />
               </span>
             </div>
           )}
@@ -230,7 +230,7 @@ export function ActionsSection({
             <div className="flex items-center gap-1">
               <RecoverButton issueId={issueId} reviewStatus={reviewStatus} variant="inspector" />
               <span title="Also shown on card">
-                <LayoutGrid className="w-3 h-3 text-content-subtle opacity-40 self-center" />
+                <LayoutGrid className="w-3 h-3 text-muted-foreground opacity-40 self-center" />
               </span>
             </div>
           )}
@@ -273,7 +273,7 @@ export function ActionsSection({
                  <button
                    onClick={onCreateWorkspace}
                    disabled={createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess}
-                   className="flex items-center gap-1 px-2 py-1 text-xs text-white rounded disabled:opacity-50 border bg-surface-emphasis border-divider"
+                   className="flex items-center gap-1 px-2 py-1 text-xs text-card-foreground rounded disabled:opacity-50 border bg-card border-border"
                  >
                    {(createWorkspaceMutation.isPending || createWorkspaceMutation.isSuccess) ? <Loader2 className="w-3 h-3 animate-spin" /> : <FolderPlus className="w-3 h-3" />}
                    {createWorkspaceMutation.isPending ? 'Creating...' : 'Create Workspace'}
@@ -296,7 +296,7 @@ export function ActionsSection({
       </div>
 
       {!!agent && agent.status === 'stopped' && lifecycle?.reason && (
-        <div className="text-xs text-content-subtle mt-2 px-2 py-1 rounded bg-surface-emphasis/40 border border-divider">
+        <div className="text-xs text-muted-foreground mt-2 px-2 py-1 rounded bg-card/40 border border-border">
           {lifecycle.reason}
         </div>
       )}
@@ -304,12 +304,12 @@ export function ActionsSection({
       {/* Resume message input */}
       {showResumeInput && (
         <div className="mt-2 flex flex-col gap-1.5">
-          <label className="text-xs text-content-subtle">Message for agent (optional):</label>
+          <label className="text-xs text-muted-foreground">Message for agent (optional):</label>
           <textarea
             value={resumeMessage}
             onChange={(e) => setResumeMessage(e.target.value)}
             placeholder="Tell the agent what to do, e.g. 'Address the PR feedback about error handling' or leave empty to let it pick up from STATE.md"
-            className="w-full px-2 py-1.5 text-xs bg-surface border border-divider rounded resize-none text-content placeholder:text-content-muted focus:outline-none focus:border-primary"
+            className="w-full px-2 py-1.5 text-xs bg-card border border-border rounded resize-none text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
             rows={3}
             autoFocus
             onKeyDown={(e) => {
@@ -332,18 +332,18 @@ export function ActionsSection({
                 setResumeMessage('');
               }}
               disabled={startAgentMutation.isPending}
-              className="flex items-center gap-1 px-2 py-1 text-xs text-white rounded bg-primary hover:bg-primary/90 disabled:opacity-50 font-medium"
+              className="flex items-center gap-1 px-2 py-1 text-xs text-primary-foreground rounded bg-primary hover:bg-primary/90 disabled:opacity-50 font-medium"
             >
               {startAgentMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
               {startAgentMutation.isPending ? 'Resuming...' : 'Resume'}
             </button>
             <button
               onClick={() => { setShowResumeInput(false); setResumeMessage(''); }}
-              className="flex items-center gap-1 px-2 py-1 text-xs text-content-subtle rounded hover:bg-surface-emphasis"
+              className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:bg-card"
             >
               Cancel
             </button>
-            <span className="text-xs text-content-subtle ml-auto">Ctrl+Enter to send</span>
+            <span className="text-xs text-muted-foreground ml-auto">Ctrl+Enter to send</span>
           </div>
         </div>
       )}
@@ -382,7 +382,7 @@ export function ActionsSection({
 
       {/* Issue Actions */}
       <div className="mt-4">
-        <div className="text-xs uppercase tracking-wider mb-2 font-semibold text-content-subtle flex items-center gap-1.5">
+        <div className="text-xs uppercase tracking-wider mb-2 font-semibold text-muted-foreground flex items-center gap-1.5">
           <Tag className="w-3 h-3" /> Issue
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -396,7 +396,7 @@ export function ActionsSection({
               variant="inspector"
             />
             <span title="Also shown on card">
-              <LayoutGrid className="w-3 h-3 text-content-subtle opacity-40 self-center" />
+              <LayoutGrid className="w-3 h-3 text-muted-foreground opacity-40 self-center" />
             </span>
           </div>
         </div>
@@ -412,14 +412,14 @@ export function ActionsSection({
               {/* Reopen */}
               {onReopen && (
                 <div className="min-w-0">
-                  <div className="text-xs font-medium text-content">Reopen for more work</div>
-                  <div className="text-[11px] text-content-subtle mt-0.5" title="Moves the issue back to In Progress so the work agent can continue. Keeps the workspace, branch, PR, STATE.md, and all planning artifacts intact.">
+                  <div className="text-xs font-medium text-foreground">Reopen for more work</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5" title="Moves the issue back to In Progress so the work agent can continue. Keeps the workspace, branch, PR, STATE.md, and all planning artifacts intact.">
                     Moves the issue back to In Progress. The workspace, branch, PR, STATE.md, and all planning artifacts are preserved.
                   </div>
                   <button
                     onClick={onReopen}
                     disabled={reopenMutation?.isPending}
-                    className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-warning/40 text-warning hover:bg-warning hover:text-white transition-colors disabled:opacity-50"
+                    className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-warning/40 text-warning hover:bg-warning hover:text-warning-foreground transition-colors disabled:opacity-50"
                     title="Reopen: moves issue to In Progress, keeps workspace + branch + PR + STATE.md + beads"
                   >
                     {reopenMutation?.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
@@ -430,8 +430,8 @@ export function ActionsSection({
 
               {/* Restart from Plan */}
               <div className="min-w-0">
-                <div className="text-xs font-medium text-content">Restart from Plan</div>
-                <div className="text-[11px] text-content-subtle mt-0.5" title="Stops any running agent, resets the feature branch to the post-planning commit, clears session state. Keeps vBRIEF, beads, STATE.md, and PRD. Moves to In Progress.">
+                <div className="text-xs font-medium text-foreground">Restart from Plan</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5" title="Stops any running agent, resets the feature branch to the post-planning commit, clears session state. Keeps vBRIEF, beads, STATE.md, and PRD. Moves to In Progress.">
                   Stops agent, resets branch to post-planning commit, clears session state. Keeps vBRIEF, beads, STATE.md, and PRD. Moves to In Progress.
                 </div>
                 <RestartFromPlanButton issueId={issueId} />
@@ -442,14 +442,14 @@ export function ActionsSection({
 
               {/* Cancel Issue */}
               <div className="min-w-0">
-                <div className="text-xs font-medium text-content">Cancel this issue</div>
-                <div className="text-[11px] text-content-subtle mt-0.5" title="Permanently stops the agent, deletes the workspace and branch (including STATE.md), closes the PR, removes beads, and moves the issue to Canceled. This cannot be undone.">
+                <div className="text-xs font-medium text-foreground">Cancel this issue</div>
+                <div className="text-[11px] text-muted-foreground mt-0.5" title="Permanently stops the agent, deletes the workspace and branch (including STATE.md), closes the PR, removes beads, and moves the issue to Canceled. This cannot be undone.">
                   Permanently stops the agent, deletes the workspace and branch (including STATE.md), closes the PR, and moves the issue to Canceled. This cannot be undone.
                 </div>
                 <button
                   onClick={onCancel}
                   disabled={cancelMutation.isPending}
-                  className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-destructive/40 text-destructive hover:bg-destructive hover:text-white transition-colors disabled:opacity-50"
+                  className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
                   title="Cancel Issue: permanent — stops agent, deletes workspace + branch + STATE.md, closes PR, moves to Canceled"
                 >
                   {cancelMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}

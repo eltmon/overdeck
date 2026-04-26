@@ -34,7 +34,7 @@ function getModelStyle(model: ModelId) {
   if (provider.includes('claude') || provider.includes('sonnet') || provider.includes('opus')) return MODEL_COLORS['claude'];
   if (provider.includes('gpt') || provider.includes('o1') || provider.includes('o3')) return MODEL_COLORS['gpt'];
   if (provider.includes('gemini')) return MODEL_COLORS['gemini'];
-  return { bg: 'bg-surface-raised', text: 'text-content-body', border: 'border-divider' };
+  return { bg: 'bg-card', text: 'text-foreground', border: 'border-border' };
 }
 
 function ModelBadge({ model, isOverride, size = 'md' }: { model: ModelId; isOverride: boolean; size?: 'sm' | 'md' }) {
@@ -65,12 +65,12 @@ export function AgentCard({
 
   if (variant === 'compact') {
     return (
-      <div className="flex items-center justify-between p-3 bg-surface-raised rounded-lg border border-divider hover:border-divider-strong transition-colors shadow-sm">
+      <div className="flex items-center justify-between p-3 bg-card rounded-lg border border-border hover:border-border transition-colors shadow-sm">
         <div className="flex items-center gap-3">
           <span className="material-symbols-outlined text-xl text-[#a078f7]">{icon}</span>
           <div>
-            <div className="font-medium text-content">{name}</div>
-            <div className="text-xs text-content-muted">{description}</div>
+            <div className="font-medium text-foreground">{name}</div>
+            <div className="text-xs text-muted-foreground">{description}</div>
           </div>
         </div>
         <ModelBadge model={primaryModel} isOverride={isOverride} size="sm" />
@@ -79,7 +79,7 @@ export function AgentCard({
   }
 
   return (
-    <div className="bg-surface-raised rounded-xl border border-divider overflow-hidden hover:border-divider-strong transition-colors shadow-sm">
+    <div className="bg-card rounded-xl border border-border overflow-hidden hover:border-border transition-colors shadow-sm">
       {/* Card Header */}
       <div
         className={`p-4 ${hasPhases ? 'cursor-pointer' : ''}`}
@@ -87,26 +87,26 @@ export function AgentCard({
       >
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-lg bg-surface-emphasis border border-divider flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-card border border-border flex items-center justify-center">
               <span className="material-symbols-outlined text-2xl text-[#a078f7]">{icon}</span>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-content">{name}</h3>
+                <h3 className="font-semibold text-foreground">{name}</h3>
                 {hasPhases && (
-                  <span className="text-xs text-content-muted bg-surface-emphasis px-2 py-0.5 rounded-full">
+                  <span className="text-xs text-muted-foreground bg-card px-2 py-0.5 rounded-full">
                     {phases.length} phases
                   </span>
                 )}
               </div>
-              <p className="text-sm text-content-muted mt-0.5">{description}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">{description}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <ModelBadge model={primaryModel} isOverride={isOverride} />
             {hasPhases && (
-              <button className="p-1 text-content-muted hover:text-content transition-colors">
+              <button className="p-1 text-muted-foreground hover:text-foreground transition-colors">
                 {isExpanded ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
               </button>
             )}
@@ -116,16 +116,16 @@ export function AgentCard({
 
       {/* Expanded Phases */}
       {hasPhases && isExpanded && (
-        <div className="border-t border-divider bg-surface">
+        <div className="border-t border-border bg-card">
           <div className="p-3 space-y-2">
             {phases.map((phase) => (
               <div
                 key={phase.id}
-                className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-surface-raised transition-colors group"
+                className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-card transition-colors group"
               >
                 <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-content-muted" />
-                  <span className="text-sm text-content-body">{phase.name}</span>
+                  <Zap className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm text-foreground">{phase.name}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <ModelBadge model={phase.model} isOverride={phase.isOverride} size="sm" />
@@ -135,7 +135,7 @@ export function AgentCard({
                         e.stopPropagation();
                         onRemoveOverride(phase.id);
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-content-muted hover:text-destructive transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-all"
                       title="Remove override"
                     >
                       <span className="material-symbols-outlined text-sm">close</span>
@@ -147,7 +147,7 @@ export function AgentCard({
                         e.stopPropagation();
                         onConfigureOverride(phase.id);
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-content-muted hover:text-[#a078f7] transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-[#a078f7] transition-all"
                       title="Configure override"
                     >
                       <span className="material-symbols-outlined text-sm">edit</span>

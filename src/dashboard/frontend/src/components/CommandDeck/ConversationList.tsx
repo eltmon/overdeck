@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { useNow } from '../../hooks/useNow';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
-import styles from './styles/mission-control.module.css';
+import styles from './styles/command-deck.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

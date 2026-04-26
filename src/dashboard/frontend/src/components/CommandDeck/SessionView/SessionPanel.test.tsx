@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
 import { SessionPanel } from './SessionPanel';
 
-vi.mock('../styles/mission-control.module.css', () => ({
+vi.mock('../styles/command-deck.module.css', () => ({
   default: {
     sessionPanel: 'sessionPanel',
     sessionPanelHeader: 'sessionPanelHeader',

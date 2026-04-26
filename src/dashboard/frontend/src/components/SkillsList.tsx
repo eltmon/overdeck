@@ -29,7 +29,7 @@ export function SkillsList() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-6 h-6 text-content-subtle animate-spin" />
+        <RefreshCw className="w-6 h-6 text-muted-foreground animate-spin" />
       </div>
     );
   }
@@ -50,10 +50,10 @@ export function SkillsList() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-content">Skills</h2>
+        <h2 className="text-lg font-semibold text-foreground">Skills</h2>
         <button
           onClick={fetchSkills}
-          className="flex items-center gap-2 px-3 py-1.5 text-sm text-content-subtle hover:text-content hover:bg-surface-overlay rounded-lg transition-colors"
+          className="flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-popover rounded-lg transition-colors"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
@@ -61,7 +61,7 @@ export function SkillsList() {
       </div>
 
       {skills.length === 0 ? (
-        <div className="bg-surface-raised rounded-lg p-8 text-center text-content-subtle">
+        <div className="bg-card rounded-lg p-8 text-center text-muted-foreground">
           <Folder className="w-12 h-12 mx-auto mb-3 opacity-50" />
           <p>No skills found</p>
           <p className="text-sm mt-2">
@@ -71,10 +71,10 @@ export function SkillsList() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2">
           {/* Panopticon Skills */}
-          <div className="bg-surface-raised rounded-lg p-4">
+          <div className="bg-card rounded-lg p-4">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-2 h-2 rounded-full bg-primary" />
-              <h3 className="font-medium text-content">
+              <h3 className="font-medium text-foreground">
                 Panopticon ({panopticonSkills.length})
               </h3>
             </div>
@@ -83,16 +83,16 @@ export function SkillsList() {
                 <SkillCard key={skill.path} skill={skill} />
               ))}
               {panopticonSkills.length === 0 && (
-                <p className="text-content-muted text-sm">No Panopticon skills</p>
+                <p className="text-muted-foreground text-sm">No Panopticon skills</p>
               )}
             </div>
           </div>
 
           {/* Claude Skills */}
-          <div className="bg-surface-raised rounded-lg p-4">
+          <div className="bg-card rounded-lg p-4">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-2 h-2 rounded-full bg-signal-review" />
-              <h3 className="font-medium text-content">
+              <h3 className="font-medium text-foreground">
                 Claude ({claudeSkills.length})
               </h3>
             </div>
@@ -101,16 +101,16 @@ export function SkillsList() {
                 <SkillCard key={skill.path} skill={skill} />
               ))}
               {claudeSkills.length === 0 && (
-                <p className="text-content-muted text-sm">No Claude skills</p>
+                <p className="text-muted-foreground text-sm">No Claude skills</p>
               )}
             </div>
           </div>
         </div>
       )}
 
-      <div className="bg-surface-raised rounded-lg p-4">
-        <h3 className="font-medium text-content mb-2">Skill Locations</h3>
-        <div className="text-sm text-content-subtle space-y-1">
+      <div className="bg-card rounded-lg p-4">
+        <h3 className="font-medium text-foreground mb-2">Skill Locations</h3>
+        <div className="text-sm text-muted-foreground space-y-1">
           <p>
             <span className="text-primary">Panopticon:</span>{' '}
             ~/.panopticon/skills/
@@ -126,11 +126,11 @@ export function SkillsList() {
 
 function SkillCard({ skill }: { skill: Skill }) {
   return (
-    <div className="bg-surface-overlay/50 rounded-lg p-3 hover:bg-surface-overlay transition-colors">
+    <div className="bg-popover/50 rounded-lg p-3 hover:bg-popover transition-colors">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2">
-          <BookOpen className="w-4 h-4 text-content-subtle" />
-          <span className="font-medium text-content">{skill.name}</span>
+          <BookOpen className="w-4 h-4 text-muted-foreground" />
+          <span className="font-medium text-foreground">{skill.name}</span>
         </div>
         {skill.hasSkillMd ? (
           <span className="flex items-center gap-1 text-xs text-success">
@@ -145,11 +145,11 @@ function SkillCard({ skill }: { skill: Skill }) {
         )}
       </div>
       {skill.description && (
-        <p className="mt-2 text-sm text-content-subtle line-clamp-2">
+        <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
           {skill.description}
         </p>
       )}
-      <p className="mt-2 text-xs text-content-muted truncate">{skill.path}</p>
+      <p className="mt-2 text-xs text-muted-foreground truncate">{skill.path}</p>
     </div>
   );
 }

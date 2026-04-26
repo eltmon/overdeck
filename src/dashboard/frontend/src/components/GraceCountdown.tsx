@@ -122,11 +122,11 @@ export function GraceCountdown({ project, type, gracePeriod }: GraceCountdownPro
           <span className="text-sm font-medium text-warning">
             {gracePeriod.paused ? 'Paused' : 'Finishing in'}
           </span>
-          <span className="text-lg font-mono text-content">{formatTime(remainingSeconds)}</span>
+          <span className="text-lg font-mono text-foreground">{formatTime(remainingSeconds)}</span>
         </div>
 
         {!gracePeriod.paused && (
-          <div className="w-full bg-surface-overlay rounded-full h-2">
+          <div className="w-full bg-popover rounded-full h-2">
             <div
               className="bg-warning h-2 rounded-full transition-all duration-1000"
               style={{ width: `${progressPercent}%` }}

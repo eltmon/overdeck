@@ -22,11 +22,11 @@ vi.mock('../ModelPicker', () => ({
 }));
 
 // Mock updateConversationTitle — we only want to assert calls, not hit the network
-vi.mock('../../MissionControl/ConversationList', () => ({
+vi.mock('../../CommandDeck/ConversationList', () => ({
   updateConversationTitle: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../MissionControl/styles/mission-control.module.css', () => ({
+vi.mock('../../CommandDeck/styles/command-deck.module.css', () => ({
   default: {
     conversationTerminal: 'conversationTerminal',
     conversationTerminalHeader: 'conversationTerminalHeader',
@@ -44,7 +44,7 @@ vi.mock('../../MissionControl/styles/mission-control.module.css', () => ({
 }));
 
 // Import the mock so we can assert on it
-import { updateConversationTitle } from '../../MissionControl/ConversationList';
+import { updateConversationTitle } from '../../CommandDeck/ConversationList';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { SessionNode } from '@panopticon/contracts';
 import { FeatureItem } from './FeatureItem';
-import styles from '../styles/mission-control.module.css';
+import styles from '../styles/command-deck.module.css';
 
 export interface ProjectFeature {
   issueId: string;

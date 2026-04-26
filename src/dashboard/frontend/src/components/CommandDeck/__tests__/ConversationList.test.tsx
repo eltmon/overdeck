@@ -22,7 +22,7 @@ vi.mock('lucide-react', async (importOriginal) => {
   };
 });
 
-vi.mock('../styles/mission-control.module.css', () => ({
+vi.mock('../styles/command-deck.module.css', () => ({
   default: {
     conversationList: 'conversationList',
     conversationItem: 'conversationItem',

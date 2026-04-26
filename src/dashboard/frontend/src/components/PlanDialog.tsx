@@ -526,7 +526,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   if (minimized) {
     return (
       <div
-        className="fixed bottom-4 right-4 z-50 bg-surface-raised rounded-lg shadow-2xl border border-divider px-4 py-2 flex items-center gap-3 cursor-pointer hover:bg-surface-overlay transition-colors"
+        className="fixed bottom-4 right-4 z-50 bg-card rounded-lg shadow-2xl border border-border px-4 py-2 flex items-center gap-3 cursor-pointer hover:bg-popover transition-colors"
         onClick={async () => {
           // Recheck session status when unminimizing — recover to planning
           // if session is still active but step was prematurely set to 'complete'
@@ -544,9 +544,9 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
         }}
       >
         <div className="w-6 h-6 rounded bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
-          <Sparkles className="w-3 h-3 text-content" />
+          <Sparkles className="w-3 h-3 text-foreground" />
         </div>
-        <span className="text-sm text-content font-medium">Plan: {issue.identifier}</span>
+        <span className="text-sm text-foreground font-medium">Plan: {issue.identifier}</span>
         {step === 'setting-up' && (
           <>
             <Loader2 className="w-3 h-3 text-signal-review animate-spin" />
@@ -559,7 +559,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
             {statusQuery.data?.isRemote ? (
               <span className="px-1.5 py-0.5 badge-bg-primary text-primary text-xs rounded">Remote</span>
             ) : (
-              <span className="px-1.5 py-0.5 bg-muted text-content-subtle text-xs rounded">Local</span>
+              <span className="px-1.5 py-0.5 bg-muted text-muted-foreground text-xs rounded">Local</span>
             )}
           </>
         )}
@@ -599,16 +599,16 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
             topLeft: true,
           }}
         >
-          <div className="w-full h-full bg-surface-raised rounded-xl shadow-2xl border border-divider overflow-hidden flex flex-col">
+          <div className="w-full h-full bg-card rounded-xl shadow-2xl border border-border overflow-hidden flex flex-col">
             {/* Header - drag handle */}
-            <div className="drag-handle flex items-center justify-between px-6 py-4 border-b border-divider cursor-move">
+            <div className="drag-handle flex items-center justify-between px-6 py-4 border-b border-border cursor-move">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-content" />
+                  <Sparkles className="w-5 h-5 text-foreground" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-content">Plan: {issue.identifier}</h2>
-                  <p className="text-sm text-content-subtle line-clamp-1">{issue.title}</p>
+                  <h2 className="text-lg font-semibold text-foreground">Plan: {issue.identifier}</h2>
+                  <p className="text-sm text-muted-foreground line-clamp-1">{issue.title}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -623,7 +623,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                         Remote
                       </span>
                     ) : (
-                      <span className="px-2 py-1 bg-muted text-content-subtle text-xs rounded-full">
+                      <span className="px-2 py-1 bg-muted text-muted-foreground text-xs rounded-full">
                         Local
                       </span>
                     )}
@@ -640,7 +640,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                 )}
                 <button
                   onClick={onClose}
-                  className="p-2 text-content-subtle hover:text-content hover:bg-surface-overlay rounded-lg transition-colors"
+                  className="p-2 text-muted-foreground hover:text-foreground hover:bg-popover rounded-lg transition-colors"
                   title="Close (planning continues in background)"
                 >
                   <X className="w-5 h-5" />
@@ -654,12 +654,12 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
               {step === 'checking' && (
                 <div className="flex-1 flex flex-col items-center justify-center p-8">
                   <Loader2 className="w-12 h-12 text-signal-review animate-spin mb-4" />
-                  <p className="text-content-body">
+                  <p className="text-foreground">
                     {['In Planning', 'Planning', 'Discovery'].includes(issue.status)
                       ? 'Reconnecting to active planning session...'
                       : 'Checking session status...'}
                   </p>
-                  <p className="text-content-muted text-sm mt-2">
+                  <p className="text-muted-foreground text-sm mt-2">
                     {['In Planning', 'Planning', 'Discovery'].includes(issue.status)
                       ? 'Loading terminal for your planning agent'
                       : 'Looking for an existing session'}
@@ -676,15 +676,15 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                   {/* Check if already in planning state */}
                   {(['In Planning', 'Planning', 'Planned', 'Discovery'].includes(issue.status) || issue.labels?.some(l => l.toLowerCase() === 'planning')) ? (
                     <>
-                      <h3 className="text-xl font-semibold text-content mb-2">Resume Planning Session</h3>
-                      <p className="text-content-subtle text-center max-w-md mb-6">
+                      <h3 className="text-xl font-semibold text-foreground mb-2">Resume Planning Session</h3>
+                      <p className="text-muted-foreground text-center max-w-md mb-6">
                         This issue is in <span className="text-signal-review font-medium">"In Planning"</span> state.
                         You can resume planning or abort to return to Todo.
                       </p>
 
-                      <div className="bg-surface-overlay/50 rounded-lg p-4 mb-6 max-w-md w-full">
-                        <h4 className="text-sm font-medium text-content-body mb-2">Options:</h4>
-                        <ul className="space-y-2 text-sm text-content-subtle">
+                      <div className="bg-popover/50 rounded-lg p-4 mb-6 max-w-md w-full">
+                        <h4 className="text-sm font-medium text-foreground mb-2">Options:</h4>
+                        <ul className="space-y-2 text-sm text-muted-foreground">
                           <li className="flex items-center gap-2">
                             <Play className="w-4 h-4 text-signal-review" />
                             <span><strong className="text-signal-review">Resume</strong> - Start a new planning agent session</span>
@@ -702,11 +702,11 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                             type="checkbox"
                             checked={watchPlanning}
                             onChange={(e) => { setWatchPlanning(e.target.checked); watchPlanningRef.current = e.target.checked; }}
-                            className="w-4 h-4 rounded border-border bg-surface-overlay text-signal-review focus:ring-signal-review focus:ring-offset-background"
+                            className="w-4 h-4 rounded border-border bg-popover text-signal-review focus:ring-signal-review focus:ring-offset-background"
                           />
-                          <span className="text-sm text-content-body">
+                          <span className="text-sm text-foreground">
                             Stay and watch planning
-                            <span className="text-content-muted ml-1">(keep dialog open; you&apos;ll see INPUT when agent needs you)</span>
+                            <span className="text-muted-foreground ml-1">(keep dialog open; you&apos;ll see INPUT when agent needs you)</span>
                           </span>
                         </label>
                       </div>
@@ -722,7 +722,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                         </button>
                         <button
                           onClick={handleStartPlanning}
-                          className="flex items-center gap-2 px-6 py-3 bg-signal-review hover:bg-signal-review/90 text-white rounded-lg transition-colors font-medium"
+                          className="flex items-center gap-2 px-6 py-3 bg-signal-review hover:bg-signal-review/90 text-signal-review-foreground rounded-lg transition-colors font-medium"
                         >
                           <Play className="w-5 h-5" />
                           Resume Planning
@@ -731,15 +731,15 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                     </>
                   ) : (
                     <>
-                      <h3 className="text-xl font-semibold text-content mb-2">Start Planning Session</h3>
-                      <p className="text-content-subtle text-center max-w-md mb-6">
+                      <h3 className="text-xl font-semibold text-foreground mb-2">Start Planning Session</h3>
+                      <p className="text-muted-foreground text-center max-w-md mb-6">
                         This will move the issue to <span className="text-signal-review font-medium">"In Planning"</span>,
                         create a workspace, and start an AI discovery session to help define the implementation plan.
                       </p>
 
-                      <div className="bg-surface-overlay/50 rounded-lg p-4 mb-6 max-w-md w-full">
-                        <h4 className="text-sm font-medium text-content-body mb-2">What happens:</h4>
-                        <ul className="space-y-2 text-sm text-content-subtle">
+                      <div className="bg-popover/50 rounded-lg p-4 mb-6 max-w-md w-full">
+                        <h4 className="text-sm font-medium text-foreground mb-2">What happens:</h4>
+                        <ul className="space-y-2 text-sm text-muted-foreground">
                           <li className="flex items-center gap-2">
                             <CheckCircle2 className="w-4 h-4 text-success" />
                             Issue moves to "In Planning" in {issue.source === 'github' ? 'GitHub' : 'Linear'}
@@ -759,7 +759,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                       <div className="w-full max-w-md space-y-4 mb-6">
                         {/* Workspace location */}
                         <div>
-                          <label className="text-sm font-medium text-content-body mb-2 block">Workspace Location</label>
+                          <label className="text-sm font-medium text-foreground mb-2 block">Workspace Location</label>
                           <div className="flex gap-4">
                             <label className="flex items-center gap-2 cursor-pointer">
                               <input
@@ -771,9 +771,9 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                                   setWorkspaceLocation('local');
                                   localStorage.setItem('panopticon.planning.workspaceLocation', 'local');
                                 }}
-                                className="w-4 h-4 border-border bg-surface-overlay text-signal-review focus:ring-signal-review focus:ring-offset-background"
+                                className="w-4 h-4 border-border bg-popover text-signal-review focus:ring-signal-review focus:ring-offset-background"
                               />
-                              <span className="text-sm text-content-body">Local</span>
+                              <span className="text-sm text-foreground">Local</span>
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer">
                               <input
@@ -785,9 +785,9 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                                   setWorkspaceLocation('remote');
                                   localStorage.setItem('panopticon.planning.workspaceLocation', 'remote');
                                 }}
-                                className="w-4 h-4 border-border bg-surface-overlay text-signal-review focus:ring-signal-review focus:ring-offset-background"
+                                className="w-4 h-4 border-border bg-popover text-signal-review focus:ring-signal-review focus:ring-offset-background"
                               />
-                              <span className="text-sm text-content-body">Remote (Fly.io)</span>
+                              <span className="text-sm text-foreground">Remote (Fly.io)</span>
                             </label>
                           </div>
                         </div>
@@ -798,11 +798,11 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                             type="checkbox"
                             checked={watchPlanning}
                             onChange={(e) => { setWatchPlanning(e.target.checked); watchPlanningRef.current = e.target.checked; }}
-                            className="w-4 h-4 rounded border-border bg-surface-overlay text-signal-review focus:ring-signal-review focus:ring-offset-background"
+                            className="w-4 h-4 rounded border-border bg-popover text-signal-review focus:ring-signal-review focus:ring-offset-background"
                           />
-                          <span className="text-sm text-content-body">
+                          <span className="text-sm text-foreground">
                             Stay and watch planning
-                            <span className="text-content-muted ml-1">(keep dialog open; you&apos;ll see INPUT when agent needs you)</span>
+                            <span className="text-muted-foreground ml-1">(keep dialog open; you&apos;ll see INPUT when agent needs you)</span>
                           </span>
                         </label>
 
@@ -811,11 +811,11 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                             type="checkbox"
                             checked={shadowMode}
                             onChange={(e) => setShadowMode(e.target.checked)}
-                            className="w-4 h-4 rounded border-border bg-surface-overlay text-primary focus:ring-primary focus:ring-offset-background"
+                            className="w-4 h-4 rounded border-border bg-popover text-primary focus:ring-primary focus:ring-offset-background"
                           />
-                          <span className="text-sm text-content-body">
+                          <span className="text-sm text-foreground">
                             Shadow Engineering
-                            <span className="text-content-muted ml-1">(AI observes your workflow, doesn&apos;t modify code)</span>
+                            <span className="text-muted-foreground ml-1">(AI observes your workflow, doesn&apos;t modify code)</span>
                           </span>
                         </label>
 
@@ -827,21 +827,21 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                               setStartDocker(e.target.checked);
                               localStorage.setItem('panopticon.planning.startDocker', String(e.target.checked));
                             }}
-                            className="w-4 h-4 rounded border-border bg-surface-overlay text-signal-review focus:ring-signal-review focus:ring-offset-background"
+                            className="w-4 h-4 rounded border-border bg-popover text-signal-review focus:ring-signal-review focus:ring-offset-background"
                           />
-                          <span className="text-sm text-content-body">
+                          <span className="text-sm text-foreground">
                             Start Docker containers
-                            <span className="text-content-muted ml-1">(dev environment ready for testing)</span>
+                            <span className="text-muted-foreground ml-1">(dev environment ready for testing)</span>
                           </span>
                         </label>
 
                         {/* Model override */}
                         <div>
-                          <label className="text-sm font-medium text-content-body mb-1.5 block">Model</label>
+                          <label className="text-sm font-medium text-foreground mb-1.5 block">Model</label>
                           <select
                             value={modelOverride}
                             onChange={(e) => setModelOverride(e.target.value)}
-                            className="w-full px-3 py-2 bg-surface-overlay border border-border rounded-lg text-sm text-content-body focus:outline-none focus:ring-1 focus:ring-signal-review"
+                            className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-signal-review"
                           >
                             <option value="">Settings default ({defaultPlanningModel})</option>
                             {availableModelsQuery.data && Object.entries(availableModelsQuery.data)
@@ -860,7 +860,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
 
                         {/* Effort level */}
                         <div>
-                          <label className="text-sm font-medium text-content-body mb-1.5 block">Effort</label>
+                          <label className="text-sm font-medium text-foreground mb-1.5 block">Effort</label>
                           <div className="flex gap-2">
                             {(['low', 'medium', 'high'] as const).map((level) => (
                               <button
@@ -870,14 +870,14 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                                 className={`flex-1 py-1.5 text-sm rounded-lg border transition-colors capitalize ${
                                   effort === level
                                     ? 'bg-signal-review/20 border-signal-review text-signal-review font-medium'
-                                    : 'bg-surface-overlay border-border text-content-subtle hover:text-content-body hover:border-border/80'
+                                    : 'bg-popover border-border text-muted-foreground hover:text-foreground hover:border-border/80'
                                 }`}
                               >
                                 {level}
                               </button>
                             ))}
                           </div>
-                          <p className="text-xs text-content-muted mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             {effort === 'low' && 'Quick planning — concise tasks, minimal exploration'}
                             {effort === 'medium' && 'Balanced — standard planning depth (default)'}
                             {effort === 'high' && 'Deep analysis — thorough exploration, edge cases, tradeoffs'}
@@ -887,7 +887,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
 
                       <button
                         onClick={handleStartPlanning}
-                        className="flex items-center gap-2 px-6 py-3 bg-signal-review hover:bg-signal-review/90 text-white rounded-lg transition-colors font-medium"
+                        className="flex items-center gap-2 px-6 py-3 bg-signal-review hover:bg-signal-review/90 text-signal-review-foreground rounded-lg transition-colors font-medium"
                       >
                         <Play className="w-5 h-5" />
                         Start Planning
@@ -901,8 +901,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
               {step === 'starting' && (
                 <div className="flex-1 flex flex-col items-center justify-center p-8">
                   <Loader2 className="w-12 h-12 text-signal-review animate-spin mb-4" />
-                  <p className="text-content-body">Starting planning session...</p>
-                  <p className="text-sm text-content-muted mt-2">Moving to In Planning, creating workspace, spawning agent</p>
+                  <p className="text-foreground">Starting planning session...</p>
+                  <p className="text-sm text-muted-foreground mt-2">Moving to In Planning, creating workspace, spawning agent</p>
                 </div>
               )}
 
@@ -922,7 +922,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                   {/* Toggle between terminal and tasks panel */}
                   <div className="flex-1 bg-black relative overflow-hidden" style={{ minHeight: '400px' }}>
                     {showTasksPanel ? (
-                      <div className="h-full overflow-auto bg-surface">
+                      <div className="h-full overflow-auto bg-card">
                         <BeadsTasksPanel issueId={issue.identifier} />
                       </div>
                     ) : (
@@ -945,8 +945,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                         ) : (
                           <div className="flex flex-col items-center justify-center h-full gap-2">
                             <Loader2 className="w-5 h-5 animate-spin text-signal-review" />
-                            <p className="text-sm text-content-body">Attaching to planning session...</p>
-                            <p className="text-xs text-content-muted font-mono">planning-{issue.identifier.toLowerCase()}</p>
+                            <p className="text-sm text-foreground">Attaching to planning session...</p>
+                            <p className="text-xs text-muted-foreground font-mono">planning-{issue.identifier.toLowerCase()}</p>
                           </div>
                         )}
                       </>
@@ -962,7 +962,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                       <AlertCircle className="w-5 h-5 text-warning-foreground mt-0.5 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-warning-foreground">Tasks not yet generated</p>
-                        <p className="text-xs text-content-subtle mt-0.5">
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           A vBRIEF plan exists but no beads have been created. Generate tasks to finish planning so the Done button unlocks.
                         </p>
                       </div>
@@ -980,8 +980,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                   )}
 
                   {/* Footer with controls */}
-                  <div className="border-t border-divider px-4 py-2 flex items-center justify-between bg-surface-raised">
-                    <div className="flex items-center gap-2 text-sm text-content-subtle">
+                  <div className="border-t border-border px-4 py-2 flex items-center justify-between bg-card">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <Terminal className="w-4 h-4" />
                       Interactive planning session
                     </div>
@@ -991,7 +991,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                         className={`flex items-center gap-1 px-3 py-1 text-sm rounded transition-colors ${
                           showTasksPanel
                             ? 'badge-bg-signal-review text-signal-review-foreground hover:bg-signal-review/30'
-                            : 'bg-surface-overlay hover:bg-surface-emphasis text-content-body'
+                            : 'bg-popover hover:bg-card text-foreground'
                         }`}
                         title={showTasksPanel ? 'Back to terminal' : 'View vBRIEF tasks and dependency graph'}
                       >
@@ -1035,8 +1035,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                     <div className="w-16 h-16 rounded-full badge-bg-success flex items-center justify-center mb-4">
                       <CheckCircle2 className="w-10 h-10 text-success" />
                     </div>
-                    <h3 className="text-xl font-semibold text-content mb-2">Planning Complete</h3>
-                    <p className="text-content-subtle text-center max-w-md mb-6">
+                    <h3 className="text-xl font-semibold text-foreground mb-2">Planning Complete</h3>
+                    <p className="text-muted-foreground text-center max-w-md mb-6">
                       The planning session has ended. Review the plan and start the execution agent.
                     </p>
 
@@ -1056,12 +1056,12 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                         <div className="flex items-center gap-3">
                           <FileText className="w-8 h-8 text-signal-review" />
                           <div className="flex-1">
-                            <p className="text-sm text-content-body font-medium">Feature Plan</p>
-                            <p className="text-xs text-content-muted font-mono truncate">{getPrdPath()}</p>
+                            <p className="text-sm text-foreground font-medium">Feature Plan</p>
+                            <p className="text-xs text-muted-foreground font-mono truncate">{getPrdPath()}</p>
                           </div>
                           <a
                             href={`vscode://file${getPrdPath()}`}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-signal-review hover:bg-signal-review/90 text-white text-sm rounded-lg transition-colors"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-signal-review hover:bg-signal-review/90 text-signal-review-foreground text-sm rounded-lg transition-colors"
                             title="Open in VS Code"
                           >
                             <ExternalLink className="w-4 h-4" />
@@ -1072,18 +1072,18 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                     )}
 
                     {/* Tasks Panel - inline vBRIEF view */}
-                    <div className="w-full max-w-2xl mb-6 max-h-64 overflow-auto rounded-lg border border-divider">
+                    <div className="w-full max-w-2xl mb-6 max-h-64 overflow-auto rounded-lg border border-border">
                       <BeadsTasksPanel issueId={issue.identifier} />
                     </div>
 
                   </div>
 
                   {/* Pinned footer with action buttons */}
-                  <div className="border-t border-divider px-8 py-4 flex justify-center gap-3 bg-surface-raised">
+                  <div className="border-t border-border px-8 py-4 flex justify-center gap-3 bg-card">
                     <button
                       onClick={onClose}
                       disabled={startAgentMutation.isPending}
-                      className="px-4 py-2 bg-surface-overlay hover:bg-surface-emphasis text-content rounded-lg transition-colors disabled:opacity-50"
+                      className="px-4 py-2 bg-popover hover:bg-card text-foreground rounded-lg transition-colors disabled:opacity-50"
                     >
                       Close
                     </button>
@@ -1109,16 +1109,16 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                   <div className="w-16 h-16 rounded-full badge-bg-destructive flex items-center justify-center mb-4">
                     <AlertCircle className="w-10 h-10 text-destructive" />
                   </div>
-                  <h3 className="text-xl font-semibold text-content mb-2">Planning Failed</h3>
+                  <h3 className="text-xl font-semibold text-foreground mb-2">Planning Failed</h3>
                   <p className="text-destructive text-center max-w-md mb-2">{error}</p>
-                  <p className="text-sm text-content-muted text-center max-w-md mb-6">
+                  <p className="text-sm text-muted-foreground text-center max-w-md mb-6">
                     The planning agent could not start. You can retry or abort to return the issue to Todo.
                   </p>
 
                   <div className="flex gap-3">
                     <button
                       onClick={onClose}
-                      className="px-4 py-2 bg-surface-overlay hover:bg-surface-emphasis text-content rounded-lg transition-colors"
+                      className="px-4 py-2 bg-popover hover:bg-card text-foreground rounded-lg transition-colors"
                     >
                       Close
                     </button>
@@ -1137,7 +1137,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                         startPlanningMutation.mutate();
                       }}
                       disabled={startPlanningMutation.isPending}
-                      className="flex items-center gap-2 px-4 py-2 bg-signal-review hover:bg-signal-review/90 text-white rounded-lg transition-colors disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2 bg-signal-review hover:bg-signal-review/90 text-signal-review-foreground rounded-lg transition-colors disabled:opacity-50"
                     >
                       <RefreshCw className="w-4 h-4" />
                       {startPlanningMutation.isPending ? 'Retrying...' : 'Retry'}

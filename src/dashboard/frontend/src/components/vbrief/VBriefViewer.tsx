@@ -35,7 +35,7 @@ export function VBriefViewer({ doc, initialTab }: VBriefViewerProps) {
 
   if (!doc) {
     return (
-      <div className="flex items-center justify-center h-32 text-text-muted text-sm">
+      <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
         No plan available
       </div>
     );
@@ -54,7 +54,7 @@ export function VBriefViewer({ doc, initialTab }: VBriefViewerProps) {
             className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors ${
               tab === id
                 ? 'text-foreground border-b-2 border-primary'
-                : 'text-text-muted hover:text-text-secondary'
+                : 'text-muted-foreground hover:text-muted-foreground'
             }`}
           >
             <Icon className="w-4 h-4" />
@@ -104,7 +104,7 @@ function DAGPlaceholder({ issueId }: { issueId: string }) {
 
   if (!DAGViewer) {
     return (
-      <div className="flex items-center justify-center h-32 text-text-muted text-sm">
+      <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
         Loading DAG...
       </div>
     );

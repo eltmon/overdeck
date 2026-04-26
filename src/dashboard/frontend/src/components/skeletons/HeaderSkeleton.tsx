@@ -9,10 +9,10 @@ export function HeaderSkeleton() {
   return (
     <div className="flex items-center gap-3 px-4 h-[60px] animate-pulse">
       {/* Logo placeholder */}
-      <div className="h-5 w-28 bg-surface-2 rounded shrink-0" />
+      <div className="h-5 w-28 bg-muted rounded shrink-0" />
       {/* Nav items placeholder */}
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="h-6 w-16 bg-surface-2 rounded" />
+        <div key={i} className="h-6 w-16 bg-muted rounded" />
       ))}
     </div>
   );

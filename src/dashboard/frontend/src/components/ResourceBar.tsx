@@ -24,11 +24,11 @@ export function ResourceBar({ value, label, showValue = true, className = '' }: 
     <div className={`flex flex-col gap-0.5 ${className}`}>
       {(label || showValue) && (
         <div className="flex justify-between items-center">
-          {label && <span className="text-xs text-content-subtle">{label}</span>}
-          {showValue && <span className="text-xs text-content-subtle ml-auto">{clamped.toFixed(1)}%</span>}
+          {label && <span className="text-xs text-muted-foreground">{label}</span>}
+          {showValue && <span className="text-xs text-muted-foreground ml-auto">{clamped.toFixed(1)}%</span>}
         </div>
       )}
-      <div className="h-1.5 bg-surface-overlay rounded-full overflow-hidden">
+      <div className="h-1.5 bg-popover rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${color}`}
           style={{ width: `${clamped}%` }}

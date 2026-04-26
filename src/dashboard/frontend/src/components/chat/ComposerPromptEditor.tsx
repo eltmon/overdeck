@@ -24,7 +24,7 @@ import {
   KEY_ENTER_COMMAND,
   COMMAND_PRIORITY_HIGH,
 } from 'lexical';
-import styles from '../MissionControl/styles/mission-control.module.css';
+import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Draft persistence ────────────────────────────────────────────────────────
 

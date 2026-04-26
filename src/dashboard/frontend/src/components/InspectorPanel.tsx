@@ -596,11 +596,11 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
   return (
     <>
       <div
-        className={`flex flex-col h-full overflow-y-auto bg-surface-raised border-divider ${embedded ? '' : 'border-r'}`}
+        className={`flex flex-col h-full overflow-y-auto bg-card border-border ${embedded ? '' : 'border-r'}`}
         data-testid="workspace-sidebar"
       >
         {/* Header */}
-        <div className="px-3 py-2.5 border-b border-divider flex items-center justify-between gap-2">
+        <div className="px-3 py-2.5 border-b border-border flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             {agent ? (
               <div className="flex gap-0.5">
@@ -609,9 +609,9 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" style={{ animationDelay: '300ms' }} />
               </div>
             ) : (
-              <span className="w-1.5 h-1.5 rounded-full bg-content-muted shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground shrink-0" />
             )}
-            <span className="font-mono text-sm font-semibold text-content truncate">{issueId.toUpperCase()}</span>
+            <span className="font-mono text-sm font-semibold text-foreground truncate">{issueId.toUpperCase()}</span>
             {phase && PHASE_LABELS[phase] && (() => {
               const colors = PHASE_CHIP_COLORS[phase] ?? { bg: '#1e2d47', text: '#92a4c9' };
               return (
@@ -629,13 +629,13 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
               {onOpenTerminal && agent && (
                 <button
                   onClick={onOpenTerminal}
-                  className="p-1 rounded transition-colors hover:bg-surface-overlay text-content-subtle"
+                  className="p-1 rounded transition-colors hover:bg-popover text-muted-foreground"
                   title="Open terminal"
                 >
                   <Terminal className="w-3.5 h-3.5" />
                 </button>
               )}
-              <button onClick={onClose} title="Close inspector" className="p-1 rounded transition-colors hover:bg-surface-overlay text-content-subtle">
+              <button onClick={onClose} title="Close inspector" className="p-1 rounded transition-colors hover:bg-popover text-muted-foreground">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -644,10 +644,10 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
 
         {/* Issue title */}
         {issue && (
-          <div className="px-3 py-2 border-b border-divider">
-            <p className="text-xs text-content font-medium line-clamp-2" title={issue.title}>{issue.title}</p>
+          <div className="px-3 py-2 border-b border-border">
+            <p className="text-xs text-foreground font-medium line-clamp-2" title={issue.title}>{issue.title}</p>
             <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
-              <span className="px-1.5 py-0.5 rounded text-[10px] bg-surface-emphasis text-content-subtle">
+              <span className="px-1.5 py-0.5 rounded text-[10px] bg-card text-muted-foreground">
                 {issue.status}
               </span>
               {issue.priority > 0 && (
@@ -660,7 +660,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
                 </span>
               )}
               {issue.labels.slice(0, 2).map((label) => (
-                <span key={label} className="px-1.5 py-0.5 rounded text-[10px] bg-surface-emphasis text-content-subtle">
+                <span key={label} className="px-1.5 py-0.5 rounded text-[10px] bg-card text-muted-foreground">
                   {label}
                 </span>
               ))}
@@ -670,30 +670,30 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
 
         {/* Assignee */}
         {issue?.assignee && (
-          <div className="px-3 py-2 border-b border-divider flex items-center gap-2 text-xs">
-            <User className="w-3 h-3 shrink-0 text-content-subtle" />
-            <span className="text-content truncate">{issue.assignee.name}</span>
+          <div className="px-3 py-2 border-b border-border flex items-center gap-2 text-xs">
+            <User className="w-3 h-3 shrink-0 text-muted-foreground" />
+            <span className="text-foreground truncate">{issue.assignee.name}</span>
             {issue.assignee.email && (
-              <span className="text-[10px] truncate text-content-subtle">{issue.assignee.email}</span>
+              <span className="text-[10px] truncate text-muted-foreground">{issue.assignee.email}</span>
             )}
           </div>
         )}
 
         {/* Merged status banner for issues without workspaces */}
         {!agent && !workspace?.exists && issue?.labels?.some(l => l.toLowerCase() === 'merged') && (
-          <div className="px-3 py-3 border-b border-divider">
+          <div className="px-3 py-3 border-b border-border">
             <div className="flex items-center gap-2 mb-2">
               <GitMerge className="w-4 h-4 text-success" />
               <span className="text-xs font-medium text-success">Merged to Main</span>
             </div>
-            <p className="text-[10px] text-content-subtle">
+            <p className="text-[10px] text-muted-foreground">
               This issue was completed and merged outside of Panopticon's workspace pipeline.
               No workspace, agent, or pipeline state is available.
             </p>
             {costData && costData.totalCost > 0 && (
               <div className="mt-2 flex items-center gap-2 text-[10px]">
                 <DollarSign className="w-3 h-3 text-success" />
-                <span className="text-content-subtle">Total cost:</span>
+                <span className="text-muted-foreground">Total cost:</span>
                 <span className="text-success font-medium">{formatCost(costData.totalCost)}</span>
               </div>
             )}
@@ -702,8 +702,8 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
 
         {/* Not merged, no workspace, no agent — show status */}
         {!agent && !workspace?.exists && !issue?.labels?.some(l => l.toLowerCase() === 'merged') && issue && (
-          <div className="px-3 py-3 border-b border-divider">
-            <div className="text-[10px] text-content-subtle">
+          <div className="px-3 py-3 border-b border-border">
+            <div className="text-[10px] text-muted-foreground">
               No workspace created yet. Use <strong>Plan</strong> to create a workspace and plan this issue,
               or <strong>Create Workspace</strong> below.
             </div>
@@ -723,8 +723,8 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
 
         {/* Workspace path (no-agent) */}
         {!agent && workspace?.exists && workspace.path && (
-          <div className="px-3 py-2 border-b border-divider text-xs">
-            <div className="flex items-center gap-1.5 text-content-subtle">
+          <div className="px-3 py-2 border-b border-border text-xs">
+            <div className="flex items-center gap-1.5 text-muted-foreground">
               <span className="font-mono truncate text-[10px]" title={workspace.path}>
                 {workspace.path}
               </span>
@@ -733,8 +733,8 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
         )}
 
         {/* Links */}
-        <div className="px-3 py-2 border-b border-divider text-xs">
-          <div className="uppercase tracking-wider text-[10px] mb-2 font-semibold text-content-subtle">Links</div>
+        <div className="px-3 py-2 border-b border-border text-xs">
+          <div className="uppercase tracking-wider text-[10px] mb-2 font-semibold text-muted-foreground">Links</div>
           <div className="space-y-1.5">
             {issueUrl && (
               <a href={issueUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:text-primary/80">
@@ -753,21 +753,21 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
 
         {/* Cost summary */}
         {costData && costData.totalCost > 0 && (
-          <div className="px-3 py-2 border-b border-divider text-xs">
+          <div className="px-3 py-2 border-b border-border text-xs">
             <div className="flex items-center gap-1.5 mb-2">
               <DollarSign className="w-3 h-3 text-success" />
-              <span className="uppercase tracking-wider text-[10px] font-semibold text-content-subtle">Cost</span>
+              <span className="uppercase tracking-wider text-[10px] font-semibold text-muted-foreground">Cost</span>
               <span className="text-success font-medium ml-auto">{formatCost(costData.totalCost)}</span>
             </div>
             {costData.totalTokens > 0 && (
               <div className="space-y-0.5">
                 <div className="flex justify-between text-[10px]">
-                  <span className="text-content-subtle">Input tokens</span>
-                  <span className="text-content">{formatTokens(costData.inputTokens ?? 0)}</span>
+                  <span className="text-muted-foreground">Input tokens</span>
+                  <span className="text-foreground">{formatTokens(costData.inputTokens ?? 0)}</span>
                 </div>
                 <div className="flex justify-between text-[10px]">
-                  <span className="text-content-subtle">Output tokens</span>
-                  <span className="text-content">{formatTokens(costData.outputTokens ?? 0)}</span>
+                  <span className="text-muted-foreground">Output tokens</span>
+                  <span className="text-foreground">{formatTokens(costData.outputTokens ?? 0)}</span>
                 </div>
               </div>
             )}
@@ -775,19 +775,19 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
               <div className="mt-1.5 space-y-0.5">
                 {Object.entries(costData.byModel).sort(([, a], [, b]) => b.cost - a.cost).map(([model, info]) => (
                   <div key={model} className="flex justify-between text-[10px]">
-                    <span className="truncate text-content-subtle" title={model}>{getFriendlyModelName(model)}</span>
-                    <span className="text-content ml-2">{formatCost(info.cost)} ({formatTokens(info.tokens)})</span>
+                    <span className="truncate text-muted-foreground" title={model}>{getFriendlyModelName(model)}</span>
+                    <span className="text-foreground ml-2">{formatCost(info.cost)} ({formatTokens(info.tokens)})</span>
                   </div>
                 ))}
               </div>
             )}
             {costData.byStage && Object.keys(costData.byStage).length > 0 && (
-              <div className="mt-1.5 pt-1.5 border-t border-divider space-y-0.5">
-                <div className="text-[10px] uppercase tracking-wider mb-1 text-content-subtle">By Stage</div>
+              <div className="mt-1.5 pt-1.5 border-t border-border space-y-0.5">
+                <div className="text-[10px] uppercase tracking-wider mb-1 text-muted-foreground">By Stage</div>
                 {Object.entries(costData.byStage).sort(([, a], [, b]) => b.cost - a.cost).map(([stage, info]) => (
                   <div key={stage} className="flex justify-between text-[10px]">
-                    <span className="truncate text-content-subtle" title={stage}>{stage.charAt(0).toUpperCase() + stage.slice(1)}</span>
-                    <span className="text-content ml-2">{formatCost(info.cost)} ({formatTokens(info.tokens)})</span>
+                    <span className="truncate text-muted-foreground" title={stage}>{stage.charAt(0).toUpperCase() + stage.slice(1)}</span>
+                    <span className="text-foreground ml-2">{formatCost(info.cost)} ({formatTokens(info.tokens)})</span>
                   </div>
                 ))}
               </div>
@@ -797,16 +797,16 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
 
         {/* Corrupted workspace warning */}
         {workspace?.corrupted && (
-          <div className="px-3 py-2 border-b border-divider">
+          <div className="px-3 py-2 border-b border-border">
             <div className="flex items-center gap-2 text-warning mb-2">
               <AlertTriangle className="w-4 h-4" />
               <span className="text-xs font-medium">Workspace Corrupted</span>
             </div>
-            <p className="text-xs mb-2 text-content-subtle">{workspace.message || 'The workspace is not a valid git worktree.'}</p>
+            <p className="text-xs mb-2 text-muted-foreground">{workspace.message || 'The workspace is not a valid git worktree.'}</p>
             <button
               onClick={handleCleanWorkspace}
               disabled={cleanMutation.isPending}
-              className="flex items-center gap-1 px-2 py-1 bg-warning hover:bg-warning/90 disabled:opacity-50 text-white text-xs rounded w-full justify-center"
+              className="flex items-center gap-1 px-2 py-1 bg-warning hover:bg-warning/90 disabled:opacity-50 text-warning-foreground text-xs rounded w-full justify-center"
             >
               {cleanMutation.isPending ? <><Loader2 className="w-3 h-3 animate-spin" />Cleaning...</> : <><RefreshCw className="w-3 h-3" />Clean &amp; Recreate</>}
             </button>
@@ -815,8 +815,8 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
 
         {/* Service URLs */}
         {workspace?.hasDocker && (workspace?.frontendUrl || workspace?.apiUrl) && (
-          <div className="px-3 py-2 border-b border-divider text-xs">
-            <div className="uppercase tracking-wider text-[10px] mb-2 font-semibold text-content-subtle">Services</div>
+          <div className="px-3 py-2 border-b border-border text-xs">
+            <div className="uppercase tracking-wider text-[10px] mb-2 font-semibold text-muted-foreground">Services</div>
             <div className="space-y-1.5">
               {workspace.frontendUrl && (
                 <a href={workspace.frontendUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-primary hover:text-primary/80">
@@ -834,13 +834,13 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
 
         {/* Start containers button */}
         {workspace?.hasDocker && workspace.containers && (Object.keys(workspace.containers).length === 0 || Object.values(workspace.containers).some(c => !c.running)) && (
-          <div className="px-3 py-2 border-b border-divider">
+          <div className="px-3 py-2 border-b border-border">
             <div className="flex items-center gap-2">
               <span className="text-xs text-warning">{containersStarting ? 'Starting containers...' : Object.keys(workspace.containers).length === 0 ? 'Containers not started' : 'Some containers stopped'}</span>
               <button
                 onClick={() => startContainersMutation.mutate()}
                 disabled={startContainersMutation.isPending || containersStarting}
-                className="flex items-center gap-1 px-2 py-1 bg-success hover:bg-success/90 disabled:opacity-50 text-white text-xs rounded"
+                className="flex items-center gap-1 px-2 py-1 bg-success hover:bg-success/90 disabled:opacity-50 text-success-foreground text-xs rounded"
               >
                 {(startContainersMutation.isPending || containersStarting) ? <><Loader2 className="w-3 h-3 animate-spin" />Starting...</> : <><Play className="w-3 h-3" />Start Containers</>}
               </button>
@@ -850,13 +850,13 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
 
         {/* Git-only workspace / containerize */}
         {workspace?.exists && !workspace.hasDocker && workspace.canContainerize && (
-          <div className="px-3 py-2 border-b border-divider">
+          <div className="px-3 py-2 border-b border-border">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-content-subtle">Git-only workspace</span>
+              <span className="text-xs text-muted-foreground">Git-only workspace</span>
               <button
                 onClick={() => containerizeMutation.mutate()}
                 disabled={containerizeMutation.isPending}
-                className="flex items-center gap-1 px-2 py-1 bg-signal-review hover:bg-signal-review/90 disabled:opacity-50 text-white text-xs rounded"
+                className="flex items-center gap-1 px-2 py-1 bg-signal-review hover:bg-signal-review/90 disabled:opacity-50 text-signal-review-foreground text-xs rounded"
               >
                 {containerizeMutation.isPending ? <><Loader2 className="w-3 h-3 animate-spin" />Setting up...</> : <><Box className="w-3 h-3" />Containerize</>}
               </button>
@@ -884,16 +884,16 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
 
         {/* Tmux attach command */}
         {agent && (
-          <div className="px-3 py-2 border-b border-divider text-xs">
-            <div className="uppercase tracking-wider text-[10px] mb-2 font-semibold text-content-subtle">Attach</div>
+          <div className="px-3 py-2 border-b border-border text-xs">
+            <div className="uppercase tracking-wider text-[10px] mb-2 font-semibold text-muted-foreground">Attach</div>
             <div className="flex items-center gap-2">
-              <div className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded font-mono text-[11px] text-content overflow-hidden bg-surface">
+              <div className="flex-1 flex items-center gap-1.5 px-2 py-1.5 rounded font-mono text-[11px] text-foreground overflow-hidden bg-card">
                 <Terminal className="w-3 h-3 shrink-0 text-primary" />
                 <span className="truncate">{tmuxCommand}</span>
               </div>
               <button
                 onClick={handleCopy}
-                className={`p-1.5 rounded transition-colors ${copied ? 'badge-bg-success text-success' : 'bg-surface-emphasis text-content-subtle hover:text-content'}`}
+                className={`p-1.5 rounded transition-colors ${copied ? 'badge-bg-success text-success' : 'bg-card text-muted-foreground hover:text-foreground'}`}
                 title="Copy to clipboard"
               >
                 {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -936,10 +936,10 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
 
         {/* Issue labels/tags for no-agent view */}
         {!agent && issue && issue.labels.length > 3 && (
-          <div className="px-3 py-2 border-b border-divider text-xs">
+          <div className="px-3 py-2 border-b border-border text-xs">
             <div className="flex flex-wrap gap-1">
               {issue.labels.map((label) => (
-                <span key={label} className="px-2 py-0.5 rounded text-xs bg-surface-emphasis text-content-subtle">
+                <span key={label} className="px-2 py-0.5 rounded text-xs bg-card text-muted-foreground">
                   <Tag className="w-3 h-3 inline mr-1" />{label}
                 </span>
               ))}
@@ -959,10 +959,10 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       {/* PRD Modal */}
       {showPrdModal && prdContent && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50" onClick={() => setShowPrdModal(false)}>
-          <div className="border border-divider rounded-lg shadow-xl w-[700px] max-h-[80vh] flex flex-col bg-surface-raised" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-4 py-3 border-b border-divider">
-              <h2 className="text-sm font-medium text-content">PRD — {issueId.toUpperCase()}</h2>
-              <button onClick={() => setShowPrdModal(false)} className="text-content-subtle hover:text-content">
+          <div className="border border-border rounded-lg shadow-xl w-[700px] max-h-[80vh] flex flex-col bg-card" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <h2 className="text-sm font-medium text-foreground">PRD — {issueId.toUpperCase()}</h2>
+              <button onClick={() => setShowPrdModal(false)} className="text-muted-foreground hover:text-foreground">
                 <X size={18} />
               </button>
             </div>

@@ -123,9 +123,9 @@ export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-start justify-end">
-      <div className="bg-surface w-full max-w-4xl h-full shadow-xl flex flex-col animate-slide-in-right">
+      <div className="bg-card w-full max-w-4xl h-full shadow-xl flex flex-col animate-slide-in-right">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-divider flex items-center justify-between bg-surface-emphasis">
+        <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-card">
           <div className="flex items-center gap-3">
             {isSpecialist ? (
               <Brain className="w-6 h-6 text-signal-review" />
@@ -133,7 +133,7 @@ export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
               <Activity className="w-6 h-6 text-primary" />
             )}
             <div>
-              <h2 className="text-xl font-semibold text-content flex items-center gap-2">
+              <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
                 {agentId}
                 {latestEvent && (
                   <span className="text-xs">
@@ -142,7 +142,7 @@ export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
                 )}
               </h2>
               {isSpecialist && specialist && (
-                <div className="text-sm text-content-subtle mt-1">
+                <div className="text-sm text-muted-foreground mt-1">
                   {specialist.displayName}
                 </div>
               )}
@@ -154,7 +154,7 @@ export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
                   <span className="badge-bg-secondary text-primary px-1.5 py-0.5 rounded text-xs font-mono">
                     {ephemeralInfo.issueId}
                   </span>
-                  <span className="text-sm text-content-subtle">{ephemeralInfo.specialistType} (ephemeral)</span>
+                  <span className="text-sm text-muted-foreground">{ephemeralInfo.specialistType} (ephemeral)</span>
                 </div>
               )}
             </div>
@@ -162,9 +162,9 @@ export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
 
           <button
             onClick={onClose}
-            className="p-2 hover:bg-surface-raised rounded-lg transition-colors"
+            className="p-2 hover:bg-card rounded-lg transition-colors"
           >
-            <X className="w-5 h-5 text-content-subtle" />
+            <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
 
@@ -172,35 +172,35 @@ export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
         <div className="flex-1 overflow-y-auto">
           {/* Specialist Info Section */}
           {isSpecialist && specialist && (
-            <div className="px-6 py-4 border-b border-divider">
-              <h3 className="text-sm font-semibold text-content-subtle uppercase mb-3">
+            <div className="px-6 py-4 border-b border-border">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-3">
                 Specialist Info
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <div className="text-xs text-content-muted">State</div>
-                  <div className="text-sm text-content mt-1">{specialist.state}</div>
+                  <div className="text-xs text-muted-foreground">State</div>
+                  <div className="text-sm text-foreground mt-1">{specialist.state}</div>
                 </div>
                 {specialist.sessionId && (
                   <div>
-                    <div className="text-xs text-content-muted">Session ID</div>
-                    <div className="text-sm font-mono text-content mt-1">
+                    <div className="text-xs text-muted-foreground">Session ID</div>
+                    <div className="text-sm font-mono text-foreground mt-1">
                       {specialist.sessionId.slice(0, 12)}...
                     </div>
                   </div>
                 )}
                 {specialist.contextTokens && (
                   <div>
-                    <div className="text-xs text-content-muted">Context Size</div>
-                    <div className="text-sm text-content mt-1">
+                    <div className="text-xs text-muted-foreground">Context Size</div>
+                    <div className="text-sm text-foreground mt-1">
                       {formatTokens(specialist.contextTokens)} tokens
                     </div>
                   </div>
                 )}
                 {specialist.lastWake && (
                   <div>
-                    <div className="text-xs text-content-muted">Last Wake</div>
-                    <div className="text-sm text-content mt-1">
+                    <div className="text-xs text-muted-foreground">Last Wake</div>
+                    <div className="text-sm text-foreground mt-1">
                       {formatDuration(specialist.lastWake)}
                     </div>
                   </div>
@@ -210,9 +210,9 @@ export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
           )}
 
           {/* Health History Section */}
-          <div className="px-6 py-4 border-b border-divider">
+          <div className="px-6 py-4 border-b border-border">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-content-subtle uppercase flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase flex items-center gap-2">
                 <Activity className="w-4 h-4" />
                 Health History
               </h3>
@@ -220,7 +220,7 @@ export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
                 <button
                   onClick={() => setShowChart(!showChart)}
                   className={`p-2 rounded ${
-                    showChart ? 'bg-surface-overlay text-content' : 'text-content-subtle hover:bg-surface-raised'
+                    showChart ? 'bg-popover text-foreground' : 'text-muted-foreground hover:bg-card'
                   }`}
                   title={showChart ? 'Show timeline' : 'Show chart'}
                 >
@@ -229,7 +229,7 @@ export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
                 <select
                   value={historyHours}
                   onChange={(e) => setHistoryHours(Number(e.target.value))}
-                  className="text-sm bg-surface-raised text-content rounded px-2 py-1 border border-divider"
+                  className="text-sm bg-card text-foreground rounded px-2 py-1 border border-border"
                 >
                   <option value={1}>Last 1 hour</option>
                   <option value={6}>Last 6 hours</option>
@@ -241,10 +241,10 @@ export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
             </div>
 
             {historyLoading ? (
-              <div className="text-content-muted text-sm py-4">Loading health history...</div>
+              <div className="text-muted-foreground text-sm py-4">Loading health history...</div>
             ) : healthHistory && healthHistory.events.length > 0 ? (
               <div>
-                <div className="text-sm text-content-subtle mb-3">
+                <div className="text-sm text-muted-foreground mb-3">
                   {healthHistory.events.length} events from{' '}
                   {formatDuration(healthHistory.startTime)}
                 </div>
@@ -263,7 +263,7 @@ export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
                 )}
               </div>
             ) : (
-              <div className="text-content-muted text-sm py-4">
+              <div className="text-muted-foreground text-sm py-4">
                 No health history available
               </div>
             )}
@@ -271,10 +271,10 @@ export function AgentDetailView({ agentId, onClose }: AgentDetailViewProps) {
 
           {/* Terminal Output Section */}
           <div className="px-6 py-4">
-            <h3 className="text-sm font-semibold text-content-subtle uppercase mb-3">
+            <h3 className="text-sm font-semibold text-muted-foreground uppercase mb-3">
               Terminal Output
             </h3>
-            <div className="bg-surface rounded-lg overflow-hidden">
+            <div className="bg-card rounded-lg overflow-hidden">
               <TerminalView agentId={agentId} />
             </div>
           </div>

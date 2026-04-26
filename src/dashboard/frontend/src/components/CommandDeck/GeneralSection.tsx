@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Plus, MessageSquare, Loader2, Trash2, X } from 'lucide-react';
-import styles from './styles/mission-control.module.css';
+import styles from './styles/command-deck.module.css';
 
 interface GeneralConversation {
   id: string;

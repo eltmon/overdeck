@@ -54,12 +54,12 @@ export function BudgetWidget({ issueId, spent, budget, className = '' }: BudgetW
   const Icon = config.icon;
 
   return (
-    <div className={`bg-surface-raised border ${config.bgClass} rounded-lg p-4 ${className}`}>
+    <div className={`bg-card border ${config.bgClass} rounded-lg p-4 ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Icon className={`w-4 h-4 ${config.textClass}`} />
-          <span className="text-sm font-semibold text-content">{issueId} Budget</span>
+          <span className="text-sm font-semibold text-foreground">{issueId} Budget</span>
         </div>
         <span className={`text-xs font-semibold ${config.textClass}`}>
           {config.message}
@@ -68,7 +68,7 @@ export function BudgetWidget({ issueId, spent, budget, className = '' }: BudgetW
 
       {/* Progress Bar */}
       <div className="mb-3">
-        <div className="w-full bg-surface-overlay rounded-full h-3 overflow-hidden">
+        <div className="w-full bg-popover rounded-full h-3 overflow-hidden">
           <div
             className={`h-3 rounded-full transition-all duration-500 ${config.barClass}`}
             style={{ width: `${Math.min(percent, 100)}%` }}
@@ -79,15 +79,15 @@ export function BudgetWidget({ issueId, spent, budget, className = '' }: BudgetW
       {/* Stats */}
       <div className="flex items-center justify-between text-sm">
         <div>
-          <div className="text-content-subtle">Spent</div>
-          <div className="font-semibold text-content">${spent.toFixed(2)}</div>
+          <div className="text-muted-foreground">Spent</div>
+          <div className="font-semibold text-foreground">${spent.toFixed(2)}</div>
         </div>
         <div className="text-center">
-          <div className="text-content-subtle">Budget</div>
-          <div className="font-semibold text-content">${budget.toFixed(2)}</div>
+          <div className="text-muted-foreground">Budget</div>
+          <div className="font-semibold text-foreground">${budget.toFixed(2)}</div>
         </div>
         <div className="text-right">
-          <div className="text-content-subtle">Remaining</div>
+          <div className="text-muted-foreground">Remaining</div>
           <div className={`font-semibold ${remaining < 0 ? 'text-destructive' : config.textClass}`}>
             ${remaining < 0 ? '0.00' : remaining.toFixed(2)}
           </div>
@@ -99,7 +99,7 @@ export function BudgetWidget({ issueId, spent, budget, className = '' }: BudgetW
         <span className={`text-2xl font-bold ${config.textClass}`}>
           {percent.toFixed(1)}%
         </span>
-        <span className="text-sm text-content-subtle ml-2">of budget used</span>
+        <span className="text-sm text-muted-foreground ml-2">of budget used</span>
       </div>
     </div>
   );
@@ -126,12 +126,12 @@ export function BudgetBar({ spent, budget, className = '', showLabel = true }: B
   return (
     <div className={className}>
       {showLabel && (
-        <div className="flex items-center justify-between text-xs text-content-subtle mb-1">
+        <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
           <span>Budget: ${budget.toFixed(2)}</span>
           <span>{percent.toFixed(0)}%</span>
         </div>
       )}
-      <div className="w-full bg-surface-overlay rounded-full h-2">
+      <div className="w-full bg-popover rounded-full h-2">
         <div
           className={`h-2 rounded-full transition-all ${barClass}`}
           style={{ width: `${Math.min(percent, 100)}%` }}

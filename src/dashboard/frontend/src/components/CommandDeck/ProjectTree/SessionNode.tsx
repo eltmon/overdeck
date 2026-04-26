@@ -1,5 +1,5 @@
 import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
-import styles from '../styles/mission-control.module.css';
+import styles from '../styles/command-deck.module.css';
 
 interface SessionNodeProps {
   session: SessionNodeType;

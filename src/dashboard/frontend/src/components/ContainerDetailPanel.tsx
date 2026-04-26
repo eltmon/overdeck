@@ -73,33 +73,33 @@ export function ContainerDetailPanel({ container, history, onClose }: ContainerD
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
       {/* Panel */}
-      <div className="relative w-full max-w-lg bg-surface-raised border-l border-divider flex flex-col shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-lg bg-card border-l border-border flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-divider shrink-0">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
           <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
             container.status === 'running' ? 'bg-success' :
             container.status === 'unhealthy' ? 'bg-warning' :
             container.status === 'restarting' ? 'bg-warning' :
             'bg-destructive'
           }`} />
-          <h2 className="font-semibold text-content text-sm flex-1 truncate" title={container.name}>
+          <h2 className="font-semibold text-foreground text-sm flex-1 truncate" title={container.name}>
             {container.name}
           </h2>
           {details?.image && (
-            <span className="text-xs text-content-subtle truncate max-w-[160px]" title={details.image}>
+            <span className="text-xs text-muted-foreground truncate max-w-[160px]" title={details.image}>
               {details.image}
             </span>
           )}
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-surface-overlay text-content-subtle hover:text-content"
+            className="p-1 rounded hover:bg-popover text-muted-foreground hover:text-foreground"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-divider shrink-0">
+        <div className="flex border-b border-border shrink-0">
           {tabs.map(tab => (
             <button
               key={tab.id}
@@ -107,7 +107,7 @@ export function ContainerDetailPanel({ container, history, onClose }: ContainerD
               className={`px-4 py-2 text-xs transition-colors ${
                 activeTab === tab.id
                   ? 'text-primary border-b-2 border-primary -mb-px'
-                  : 'text-content-subtle hover:text-content'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               {tab.label}
@@ -121,14 +121,14 @@ export function ContainerDetailPanel({ container, history, onClose }: ContainerD
             <div className="space-y-4">
               {/* Current stats */}
               <div>
-                <h3 className="text-xs font-semibold text-content-subtle uppercase tracking-wider mb-2">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                   Current Usage
                 </h3>
                 <div className="space-y-2">
                   <ResourceBar value={container.cpuPercent} label="CPU" />
                   <ResourceBar value={container.memoryPercent} label="Memory" />
                   {container.memoryLimit > 0 && (
-                    <div className="text-xs text-content-subtle text-right">
+                    <div className="text-xs text-muted-foreground text-right">
                       {formatBytes(container.memoryUsage)} / {formatBytes(container.memoryLimit)}
                     </div>
                   )}
@@ -138,18 +138,18 @@ export function ContainerDetailPanel({ container, history, onClose }: ContainerD
               {/* Sparklines */}
               {history.cpuPercent.length > 1 && (
                 <div>
-                  <h3 className="text-xs font-semibold text-content-subtle uppercase tracking-wider mb-2">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                     5-Min History
                   </h3>
                   <div className="space-y-2">
                     <div>
-                      <div className="text-xs text-content-subtle mb-1">CPU %</div>
+                      <div className="text-xs text-muted-foreground mb-1">CPU %</div>
                       <div className="w-full">
                         <Sparkline data={history.cpuPercent} color="rgba(59,130,246,0.8)" height={40} />
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-content-subtle mb-1">Memory %</div>
+                      <div className="text-xs text-muted-foreground mb-1">Memory %</div>
                       <div className="w-full">
                         <Sparkline data={history.memoryPercent} color="rgba(168,85,247,0.8)" height={40} />
                       </div>
@@ -160,17 +160,17 @@ export function ContainerDetailPanel({ container, history, onClose }: ContainerD
 
               {/* Network I/O */}
               <div>
-                <h3 className="text-xs font-semibold text-content-subtle uppercase tracking-wider mb-2">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                   Network I/O
                 </h3>
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-surface p-2 rounded">
-                    <div className="text-xs text-content-subtle">In</div>
-                    <div className="text-sm font-medium text-content">{formatBytes(container.networkIn)}</div>
+                  <div className="bg-card p-2 rounded">
+                    <div className="text-xs text-muted-foreground">In</div>
+                    <div className="text-sm font-medium text-foreground">{formatBytes(container.networkIn)}</div>
                   </div>
-                  <div className="bg-surface p-2 rounded">
-                    <div className="text-xs text-content-subtle">Out</div>
-                    <div className="text-sm font-medium text-content">{formatBytes(container.networkOut)}</div>
+                  <div className="bg-card p-2 rounded">
+                    <div className="text-xs text-muted-foreground">Out</div>
+                    <div className="text-sm font-medium text-foreground">{formatBytes(container.networkOut)}</div>
                   </div>
                 </div>
               </div>
@@ -178,25 +178,25 @@ export function ContainerDetailPanel({ container, history, onClose }: ContainerD
               {/* Container info */}
               {details && (
                 <div>
-                  <h3 className="text-xs font-semibold text-content-subtle uppercase tracking-wider mb-2">
+                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                     Container Info
                   </h3>
                   <dl className="space-y-1 text-xs">
                     {details.uptime && (
                       <div className="flex justify-between">
-                        <dt className="text-content-subtle">Uptime</dt>
-                        <dd className="text-content">{details.uptime}</dd>
+                        <dt className="text-muted-foreground">Uptime</dt>
+                        <dd className="text-foreground">{details.uptime}</dd>
                       </div>
                     )}
                     {details.created && (
                       <div className="flex justify-between">
-                        <dt className="text-content-subtle">Created</dt>
-                        <dd className="text-content">{new Date(details.created).toLocaleString()}</dd>
+                        <dt className="text-muted-foreground">Created</dt>
+                        <dd className="text-foreground">{new Date(details.created).toLocaleString()}</dd>
                       </div>
                     )}
                     <div className="flex justify-between">
-                      <dt className="text-content-subtle">Status</dt>
-                      <dd className="text-content">{details.status}</dd>
+                      <dt className="text-muted-foreground">Status</dt>
+                      <dd className="text-foreground">{details.status}</dd>
                     </div>
                   </dl>
                 </div>
@@ -206,15 +206,15 @@ export function ContainerDetailPanel({ container, history, onClose }: ContainerD
 
           {activeTab === 'logs' && (
             <div>
-              <h3 className="text-xs font-semibold text-content-subtle uppercase tracking-wider mb-2">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                 Recent Logs (tail 100)
               </h3>
               {details?.logs ? (
-                <pre className="text-xs text-content bg-surface p-3 rounded overflow-auto max-h-[600px] font-mono whitespace-pre-wrap break-all">
+                <pre className="text-xs text-foreground bg-card p-3 rounded overflow-auto max-h-[600px] font-mono whitespace-pre-wrap break-all">
                   {details.logs}
                 </pre>
               ) : (
-                <div className="text-xs text-content-subtle text-center py-8">
+                <div className="text-xs text-muted-foreground text-center py-8">
                   Loading logs…
                 </div>
               )}
@@ -225,27 +225,27 @@ export function ContainerDetailPanel({ container, history, onClose }: ContainerD
             <div className="space-y-4">
               {/* Ports */}
               <div>
-                <h3 className="text-xs font-semibold text-content-subtle uppercase tracking-wider mb-2">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                   Port Mappings
                 </h3>
                 {details?.ports?.length ? (
                   <div className="space-y-1">
                     {details.ports.map((p, i) => (
                       <div key={i} className="flex items-center gap-2 text-xs">
-                        <span className="text-content font-mono">{p.host}</span>
-                        <span className="text-content-subtle">→</span>
-                        <span className="text-content font-mono">{p.container}/{p.protocol}</span>
+                        <span className="text-foreground font-mono">{p.host}</span>
+                        <span className="text-muted-foreground">→</span>
+                        <span className="text-foreground font-mono">{p.container}/{p.protocol}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-xs text-content-subtle">No port mappings</div>
+                  <div className="text-xs text-muted-foreground">No port mappings</div>
                 )}
               </div>
 
               {/* Env vars */}
               <div>
-                <h3 className="text-xs font-semibold text-content-subtle uppercase tracking-wider mb-2">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                   Environment Variables
                 </h3>
                 {details?.env?.length ? (
@@ -257,8 +257,8 @@ export function ContainerDetailPanel({ container, history, onClose }: ContainerD
                       return (
                         <div key={i} className="text-xs font-mono flex gap-1 flex-wrap">
                           <span className="text-primary">{key}</span>
-                          <span className="text-content-subtle">=</span>
-                          <span className="text-content break-all">
+                          <span className="text-muted-foreground">=</span>
+                          <span className="text-foreground break-all">
                             {isSensitive ? '***' : val}
                           </span>
                         </div>
@@ -266,7 +266,7 @@ export function ContainerDetailPanel({ container, history, onClose }: ContainerD
                     })}
                   </div>
                 ) : (
-                  <div className="text-xs text-content-subtle">No environment variables</div>
+                  <div className="text-xs text-muted-foreground">No environment variables</div>
                 )}
               </div>
             </div>

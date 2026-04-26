@@ -219,14 +219,14 @@ export function IssueAgentCard({
     <div
       onClick={onSelect}
       className={`p-4 cursor-pointer transition-colors ${
-        isSelected ? 'bg-surface-overlay' : 'hover:bg-muted'
+        isSelected ? 'bg-popover' : 'hover:bg-muted'
       }`}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className={`w-3 h-3 rounded-full ${STATUS_COLORS[agent.status]}`} />
           <div>
-            <div className="font-medium text-content flex items-center gap-2">
+            <div className="font-medium text-foreground flex items-center gap-2">
               {agent.id}
               {health && (
                 <span
@@ -237,7 +237,7 @@ export function IssueAgentCard({
                 </span>
               )}
             </div>
-            <div className="text-sm text-content-subtle flex items-center gap-2">
+            <div className="text-sm text-muted-foreground flex items-center gap-2">
               {agent.runtime} / {agent.model}
               {costData && costData.cost > 0 && (
                 <span
@@ -264,7 +264,7 @@ export function IssueAgentCard({
                   </span>
                   <span className={
                     agent.contextPercent > 80 ? 'text-destructive' :
-                    agent.contextPercent > 50 ? 'text-warning' : 'text-content-muted'
+                    agent.contextPercent > 50 ? 'text-warning' : 'text-muted-foreground'
                   }>
                     {agent.contextPercent}%
                   </span>
@@ -276,12 +276,12 @@ export function IssueAgentCard({
 
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <div className="flex items-center gap-1 text-sm text-content-subtle">
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <Clock className="w-4 h-4" />
               {formatDuration(agent.startedAt)}
             </div>
             {health && health.timeSinceActivity !== null && (
-              <div className="flex items-center gap-1 text-xs text-content-muted">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Activity className="w-3 h-3" />
                 {formatTimeSince(health.timeSinceActivity)}
               </div>
@@ -299,7 +299,7 @@ export function IssueAgentCard({
             {health && (health.isRunning || health.state === 'suspended') && activityData && activityData.length > 0 && (
               <button
                 onClick={toggleActivityExpanded}
-                className="p-2 text-content-subtle hover:text-primary hover:bg-surface-emphasis rounded"
+                className="p-2 text-muted-foreground hover:text-primary hover:bg-card rounded"
                 title={`Show activity history (${activityData.length} entries)`}
               >
                 <Activity className="w-4 h-4" />
@@ -310,8 +310,8 @@ export function IssueAgentCard({
             {agent.status !== 'stopped' && (
               <button
                 onClick={toggleHandoffPanel}
-                className={`p-2 hover:bg-surface-emphasis rounded ${
-                  showHandoffPanel ? 'text-primary' : 'text-content-subtle hover:text-primary'
+                className={`p-2 hover:bg-card rounded ${
+                  showHandoffPanel ? 'text-primary' : 'text-muted-foreground hover:text-primary'
                 }`}
                 title="Model handoff controls"
               >
@@ -324,7 +324,7 @@ export function IssueAgentCard({
               <button
                 onClick={handleResume}
                 disabled={resumeMutation.isPending}
-                className="p-2 text-content-subtle hover:text-success hover:bg-surface-emphasis rounded disabled:opacity-50"
+                className="p-2 text-muted-foreground hover:text-success hover:bg-card rounded disabled:opacity-50"
                 title="Resume agent"
               >
                 <Play className="w-4 h-4" />
@@ -336,7 +336,7 @@ export function IssueAgentCard({
               <button
                 onClick={handlePoke}
                 disabled={pokeMutation.isPending}
-                className="p-2 text-content-subtle hover:text-warning hover:bg-surface-emphasis rounded"
+                className="p-2 text-muted-foreground hover:text-warning hover:bg-card rounded"
                 title="Poke agent (send nudge message)"
               >
                 <Bell className="w-4 h-4" />
@@ -348,7 +348,7 @@ export function IssueAgentCard({
               <button
                 onClick={handleKill}
                 disabled={killMutation.isPending}
-                className="p-2 text-content-subtle hover:text-destructive hover:bg-surface-emphasis rounded"
+                className="p-2 text-muted-foreground hover:text-destructive hover:bg-card rounded"
                 title="Kill agent"
               >
                 <Square className="w-4 h-4" />
@@ -360,26 +360,26 @@ export function IssueAgentCard({
 
       {/* Handoff Panel */}
       {showHandoffPanel && (
-        <div className="mt-3 pt-3 border-t border-divider">
+        <div className="mt-3 pt-3 border-t border-border">
           <HandoffPanel agentId={agent.id} />
         </div>
       )}
 
       {/* Activity history section (PAN-80) */}
       {activityExpanded && activityData && activityData.length > 0 && (
-        <div className="mt-3 pl-8 border-l-2 border-divider-strong">
-          <div className="text-xs text-content-subtle font-medium mb-2">
+        <div className="mt-3 pl-8 border-l-2 border-border">
+          <div className="text-xs text-muted-foreground font-medium mb-2">
             Recent Activity ({activityData.length})
           </div>
           <div className="space-y-1">
             {activityData.slice().reverse().map((entry, index) => (
               <div key={index} className="flex items-center gap-2 bg-muted px-3 py-1.5 rounded text-xs">
-                <span className="text-content-muted">
+                <span className="text-muted-foreground">
                   {new Date(entry.ts).toLocaleTimeString()}
                 </span>
                 <span className="text-primary font-mono">{entry.tool}</span>
                 {entry.action && (
-                  <span className="text-content-subtle truncate">
+                  <span className="text-muted-foreground truncate">
                     {entry.action.substring(0, 50)}
                   </span>
                 )}

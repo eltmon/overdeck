@@ -41,18 +41,18 @@ export function MetricsSummary() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
       {/* Cost Today */}
-      <div className="bg-surface-raised border border-divider rounded-lg p-4">
+      <div className="bg-card border border-border rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-success" />
-            <span className="text-sm text-content-subtle">Cost Today (UTC)</span>
+            <span className="text-sm text-muted-foreground">Cost Today (UTC)</span>
           </div>
         </div>
-        <div className="text-2xl font-bold text-content">
+        <div className="text-2xl font-bold text-foreground">
           ${metrics.today.totalCost.toFixed(2)}
         </div>
         {metrics.topSpenders.agents.length > 0 && (
-          <div className="mt-2 text-xs text-content-muted">
+          <div className="mt-2 text-xs text-muted-foreground">
             Top: {metrics.topSpenders.agents[0].agentId} ($
             {metrics.topSpenders.agents[0].cost.toFixed(2)})
           </div>
@@ -60,32 +60,32 @@ export function MetricsSummary() {
       </div>
 
       {/* Active Agents */}
-      <div className="bg-surface-raised border border-divider rounded-lg p-4">
+      <div className="bg-card border border-border rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-primary" />
-            <span className="text-sm text-content-subtle">Agents</span>
+            <span className="text-sm text-muted-foreground">Agents</span>
           </div>
         </div>
-        <div className="text-2xl font-bold text-content">
+        <div className="text-2xl font-bold text-foreground">
           {metrics.today.activeCount} / {metrics.today.agentCount}
         </div>
-        <div className="mt-2 text-xs text-content-muted">
+        <div className="mt-2 text-xs text-muted-foreground">
           {metrics.today.activeCount} active, {metrics.today.agentCount - metrics.today.activeCount}{' '}
           idle
         </div>
       </div>
 
       {/* Stuck Agents */}
-      <div className="bg-surface-raised border border-divider rounded-lg p-4">
+      <div className="bg-card border border-border rounded-lg p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-destructive" />
-            <span className="text-sm text-content-subtle">Stuck Agents</span>
+            <span className="text-sm text-muted-foreground">Stuck Agents</span>
           </div>
         </div>
-        <div className="text-2xl font-bold text-content">{metrics.today.stuckCount}</div>
-        <div className="mt-2 text-xs text-content-muted">
+        <div className="text-2xl font-bold text-foreground">{metrics.today.stuckCount}</div>
+        <div className="mt-2 text-xs text-muted-foreground">
           {metrics.today.warningCount} warnings
         </div>
       </div>

@@ -13,7 +13,6 @@ import { join } from 'node:path';
 import { Effect, Layer } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 
-import { fetchActivityDataWithContext, type ActivityContext } from './mission-control.js';
 import { httpHandler } from './http-handler.js';
 import { listProjects } from '../../../lib/projects.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
@@ -59,6 +58,11 @@ function mapAgentStatus(status: string): AgentStatus {
     case 'suspended': return 'stopped';
     default: return 'unknown';
   }
+}
+
+interface ActivityContext {
+  tmuxSessionNames?: Set<string>;
+  taskFileContents?: Map<string, string>;
 }
 
 interface ActivitySection {
@@ -181,6 +185,11 @@ export async function fetchProjectSessionTree(projectKey: string): Promise<unkno
     tmuxSessionNames: sharedTmuxSessionNames,
     taskFileContents: sharedTaskFileContents,
   };
+
+  // Dynamic import breaks static dependency cycle with command-deck.ts (PAN-821)
+  // Without this, rolldown bundles projects.ts after server.ts, causing
+  // ReferenceError: projectsRouteLayer is not defined at startup.
+  const { fetchActivityDataWithContext } = await import('./command-deck.js');
 
   const features: Array<{
     issueId: string;

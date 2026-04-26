@@ -83,16 +83,16 @@ export function UpgradeAnnouncement() {
             <div className="mt-2 max-h-64 overflow-y-auto">
               <table className="w-full text-xs border-collapse">
                 <thead>
-                  <tr className="text-left text-content-muted">
+                  <tr className="text-left text-muted-foreground">
                     <th className="pb-1 pr-4 font-medium">Legacy</th>
                     <th className="pb-1 font-medium">New</th>
                   </tr>
                 </thead>
                 <tbody>
                   {MIGRATION_TABLE.map(({ legacy, current }) => (
-                    <tr key={legacy} className="border-t border-divider/50">
+                    <tr key={legacy} className="border-t border-border/50">
                       <td className="py-0.5 pr-4">
-                        <code className="font-mono text-content-subtle line-through">{legacy}</code>
+                        <code className="font-mono text-muted-foreground line-through">{legacy}</code>
                       </td>
                       <td className="py-0.5">
                         <span className="flex items-center gap-1">

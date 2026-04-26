@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MissionControl } from './index';
+import { CommandDeck } from './index';
 
-vi.mock('./styles/mission-control.module.css', () => ({
+vi.mock('./styles/command-deck.module.css', () => ({
   default: {
     missionControl: 'missionControl',
     layout: 'layout',
@@ -144,7 +144,7 @@ vi.mock('lucide-react', async () => {
   };
 });
 
-function renderMissionControl(props?: Partial<React.ComponentProps<typeof MissionControl>>) {
+function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDeck>>) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -223,19 +223,19 @@ function renderMissionControl(props?: Partial<React.ComponentProps<typeof Missio
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <MissionControl issues={[]} {...props} />
+      <CommandDeck issues={[]} {...props} />
     </QueryClientProvider>,
   );
 }
 
-describe('MissionControl — project-selected session view (PAN-821)', () => {
+describe('CommandDeck — project-selected session view (PAN-821)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
   });
 
   it('renders IssueHeader + SessionPanel when a session is selected', async () => {
-    renderMissionControl();
+    renderCommandDeck();
 
     // Switch to Projects tab
     const projectsTab = screen.getByText('Projects');
@@ -258,7 +258,7 @@ describe('MissionControl — project-selected session view (PAN-821)', () => {
   });
 
   it('shows empty state when feature selected but no session in projects tab', async () => {
-    renderMissionControl();
+    renderCommandDeck();
 
     // Switch to Projects tab
     const projectsTab = screen.getByText('Projects');
@@ -278,7 +278,7 @@ describe('MissionControl — project-selected session view (PAN-821)', () => {
   });
 
   it('clears session view when switching to a conversation', async () => {
-    renderMissionControl();
+    renderCommandDeck();
 
     // Switch to Projects tab and select a session
     fireEvent.click(screen.getByText('Projects'));

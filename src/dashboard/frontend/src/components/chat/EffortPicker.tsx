@@ -8,7 +8,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { usePickerPosition } from './usePickerPosition';
-import styles from '../MissionControl/styles/mission-control.module.css';
+import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Effort definitions ───────────────────────────────────────────────────────
 

@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Circle } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from './ConversationList';
-import styles from './styles/mission-control.module.css';
+import styles from './styles/command-deck.module.css';
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 

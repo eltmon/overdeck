@@ -36,15 +36,15 @@ function Toggle({ checked, onChange, label, description }: {
   return (
     <div className="flex items-center justify-between py-2">
       <div className="flex-1 min-w-0 mr-4">
-        <span className="text-sm font-medium text-content-body">{label}</span>
+        <span className="text-sm font-medium text-foreground">{label}</span>
         {description && (
-          <p className="text-xs text-content-muted mt-0.5">{description}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
         )}
       </div>
       <button
         type="button"
         onClick={() => onChange(!checked)}
-        className="shrink-0 text-content-subtle hover:text-primary transition-colors"
+        className="shrink-0 text-muted-foreground hover:text-primary transition-colors"
         aria-label={checked ? `Disable ${label}` : `Enable ${label}`}
       >
         {checked ? (
@@ -120,11 +120,11 @@ export function DesktopSettingsSection() {
   if (loading) {
     return (
       <section className="mb-12">
-        <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+        <h2 className="text-foreground text-2xl font-bold mb-6 flex items-center gap-3">
           Desktop App
           <div className="h-px flex-1 bg-divider-strong" />
         </h2>
-        <div className="flex items-center gap-2 text-content-muted">
+        <div className="flex items-center gap-2 text-muted-foreground">
           <Loader2 className="w-4 h-4 animate-spin" />
           <span className="text-sm">Loading desktop settings…</span>
         </div>
@@ -136,21 +136,21 @@ export function DesktopSettingsSection() {
 
   return (
     <section className="mb-12">
-      <h2 className="text-content text-2xl font-bold mb-6 flex items-center gap-3">
+      <h2 className="text-foreground text-2xl font-bold mb-6 flex items-center gap-3">
         Desktop App
         <div className="h-px flex-1 bg-divider-strong" />
-        {saving && <Loader2 className="w-4 h-4 animate-spin text-content-muted shrink-0" />}
+        {saving && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground shrink-0" />}
       </h2>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
         {/* Tray */}
-        <div className="bg-surface-raised border border-divider rounded-xl p-5 shadow-sm">
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
-            <div className="size-9 rounded-lg bg-surface-emphasis border border-divider flex items-center justify-center">
-              <Monitor className="w-4 h-4 text-content-subtle" />
+            <div className="size-9 rounded-lg bg-card border border-border flex items-center justify-center">
+              <Monitor className="w-4 h-4 text-muted-foreground" />
             </div>
-            <h3 className="font-bold text-content">System Tray</h3>
+            <h3 className="font-bold text-foreground">System Tray</h3>
           </div>
           <div className="divide-y divide-divider">
             <Toggle
@@ -160,11 +160,11 @@ export function DesktopSettingsSection() {
               description="Displays active agent count on dock/taskbar icon"
             />
             <div className="py-2">
-              <label className="text-sm font-medium text-content-body block mb-1">Tooltip detail</label>
+              <label className="text-sm font-medium text-foreground block mb-1">Tooltip detail</label>
               <select
                 value={settings.tray.tooltipDetail}
                 onChange={(e) => void updateSetting('tray.tooltipDetail', e.target.value)}
-                className="w-full bg-input-bg border border-divider-strong rounded-lg px-3 py-1.5 text-sm text-content-body focus:ring-1 focus:ring-primary focus:border-primary"
+                className="w-full bg-background border border-border rounded-lg px-3 py-1.5 text-sm text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
               >
                 <option value="minimal">Minimal — agent count only</option>
                 <option value="full">Full — count + attention + activity</option>
@@ -174,12 +174,12 @@ export function DesktopSettingsSection() {
         </div>
 
         {/* Notifications */}
-        <div className="bg-surface-raised border border-divider rounded-xl p-5 shadow-sm">
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
-            <div className="size-9 rounded-lg bg-surface-emphasis border border-divider flex items-center justify-center">
-              <Bell className="w-4 h-4 text-content-subtle" />
+            <div className="size-9 rounded-lg bg-card border border-border flex items-center justify-center">
+              <Bell className="w-4 h-4 text-muted-foreground" />
             </div>
-            <h3 className="font-bold text-content">Notifications</h3>
+            <h3 className="font-bold text-foreground">Notifications</h3>
           </div>
           <div className="divide-y divide-divider">
             {(Object.entries(NOTIFICATION_LABELS) as [NotificationEventType, typeof NOTIFICATION_LABELS[NotificationEventType]][]).map(
@@ -197,12 +197,12 @@ export function DesktopSettingsSection() {
         </div>
 
         {/* Auto-start */}
-        <div className="bg-surface-raised border border-divider rounded-xl p-5 shadow-sm">
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
-            <div className="size-9 rounded-lg bg-surface-emphasis border border-divider flex items-center justify-center">
-              <RefreshCw className="w-4 h-4 text-content-subtle" />
+            <div className="size-9 rounded-lg bg-card border border-border flex items-center justify-center">
+              <RefreshCw className="w-4 h-4 text-muted-foreground" />
             </div>
-            <h3 className="font-bold text-content">Auto-start</h3>
+            <h3 className="font-bold text-foreground">Auto-start</h3>
           </div>
           <div className="divide-y divide-divider">
             <Toggle
@@ -212,7 +212,7 @@ export function DesktopSettingsSection() {
               description="Start Panopticon automatically when you log in"
             />
             <div className="pt-3">
-              <p className="text-xs text-content-muted mb-3">
+              <p className="text-xs text-muted-foreground mb-3">
                 {settings.autoStart.nagDismissed
                   ? 'Auto-start reminders have been dismissed.'
                   : settings.autoStart.nagCount > 0
@@ -222,7 +222,7 @@ export function DesktopSettingsSection() {
               <button
                 type="button"
                 onClick={() => void resetNagCounter()}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-content-subtle hover:text-primary border border-divider rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-primary border border-border rounded-lg transition-colors"
               >
                 <RefreshCw className="w-3 h-3" />
                 Reset reminder

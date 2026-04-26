@@ -57,7 +57,7 @@ export function HealthDashboard() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-content-subtle">Loading health data...</div>
+        <div className="text-muted-foreground">Loading health data...</div>
       </div>
     );
   }
@@ -72,10 +72,10 @@ export function HealthDashboard() {
 
   if (!health || health.length === 0) {
     return (
-      <div className="bg-surface-raised rounded-lg p-8 text-center">
-        <Activity className="w-12 h-12 text-content-muted mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-content-subtle">No agents to monitor</h3>
-        <p className="text-sm text-content-muted mt-2">
+      <div className="bg-card rounded-lg p-8 text-center">
+        <Activity className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-muted-foreground">No agents to monitor</h3>
+        <p className="text-sm text-muted-foreground mt-2">
           Health data will appear here when agents are running
         </p>
       </div>
@@ -104,13 +104,13 @@ export function HealthDashboard() {
           return (
             <div
               key={status}
-              className={`${config.bg} rounded-lg p-4 border border-divider`}
+              className={`${config.bg} rounded-lg p-4 border border-border`}
             >
               <div className="flex items-center gap-3">
                 <Icon className={`w-8 h-8 ${config.color}`} />
                 <div>
-                  <div className="text-2xl font-bold text-content">{counts[status] || 0}</div>
-                  <div className="text-sm text-content-subtle capitalize">{status}</div>
+                  <div className="text-2xl font-bold text-foreground">{counts[status] || 0}</div>
+                  <div className="text-sm text-muted-foreground capitalize">{status}</div>
                 </div>
               </div>
             </div>
@@ -121,7 +121,7 @@ export function HealthDashboard() {
       {/* Per-Project Specialist Health */}
       {projectSpecialists && projectSpecialists.length > 0 && (
         <div>
-          <h2 className="text-sm font-semibold text-content-subtle uppercase mb-3 flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase mb-3 flex items-center gap-2">
             <Brain className="w-4 h-4 text-signal-review" />
             Per-Project Specialists
           </h2>
@@ -134,19 +134,19 @@ export function HealthDashboard() {
               return (
                 <div
                   key={`${ps.projectKey}/${ps.specialistType}`}
-                  className={`rounded-lg p-4 border border-divider ${
-                    ps.isRunning ? 'badge-bg-success' : 'bg-surface-raised'
+                  className={`rounded-lg p-4 border border-border ${
+                    ps.isRunning ? 'badge-bg-success' : 'bg-card'
                   }`}
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <div className="font-medium text-content flex items-center gap-2">
+                      <div className="font-medium text-foreground flex items-center gap-2">
                         <span className="badge-bg-secondary text-signal-review px-1.5 py-0.5 rounded text-xs font-mono">
                           {ps.projectKey.toUpperCase()}
                         </span>
                         {ps.specialistType}
                       </div>
-                      <div className={`flex items-center gap-1 text-sm mt-1 ${ps.isRunning ? 'text-success' : 'text-content-muted'}`}>
+                      <div className={`flex items-center gap-1 text-sm mt-1 ${ps.isRunning ? 'text-success' : 'text-muted-foreground'}`}>
                         {ps.isRunning ? (
                           <><span className="w-2 h-2 rounded-full bg-success animate-pulse" /> Running</>
                         ) : (
@@ -158,7 +158,7 @@ export function HealthDashboard() {
                       <StatusIcon className={`w-5 h-5 ${statusConfig.color}`} />
                     )}
                   </div>
-                  <div className="mt-3 space-y-1 text-xs text-content-subtle">
+                  <div className="mt-3 space-y-1 text-xs text-muted-foreground">
                     <div className="flex justify-between">
                       <span>Run count:</span>
                       <span>{ps.metadata.runCount}</span>
@@ -199,11 +199,11 @@ export function HealthDashboard() {
           return (
             <div
               key={agent.agentId}
-              className={`${config.bg} rounded-lg p-4 border border-divider`}
+              className={`${config.bg} rounded-lg p-4 border border-border`}
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="font-medium text-content flex items-center gap-2 flex-wrap">
+                  <div className="font-medium text-foreground flex items-center gap-2 flex-wrap">
                     {ephemeralMatch && (
                       <>
                         <span className="badge-bg-secondary text-signal-review px-1.5 py-0.5 rounded text-xs font-mono">
@@ -224,32 +224,32 @@ export function HealthDashboard() {
               </div>
 
               {agent.reason && (
-                <div className="mt-2 text-sm text-content-subtle italic">
+                <div className="mt-2 text-sm text-muted-foreground italic">
                   {agent.reason}
                 </div>
               )}
 
               <div className="mt-4 space-y-2 text-sm">
                 {agent.lastPing && (
-                  <div className="flex justify-between text-content-subtle">
+                  <div className="flex justify-between text-muted-foreground">
                     <span>Last ping:</span>
                     <span>{new Date(agent.lastPing).toLocaleTimeString()}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-content-subtle">
+                <div className="flex justify-between text-muted-foreground">
                   <span>Failures:</span>
                   <span className={agent.consecutiveFailures > 0 ? 'text-warning' : ''}>
                     {agent.consecutiveFailures}
                   </span>
                 </div>
-                <div className="flex justify-between text-content-subtle">
+                <div className="flex justify-between text-muted-foreground">
                   <span>Kill count:</span>
                   <span className={agent.killCount > 0 ? 'text-destructive' : ''}>
                     {agent.killCount}
                   </span>
                 </div>
                 {agent.contextPercent != null && (
-                  <div className="flex justify-between text-content-subtle">
+                  <div className="flex justify-between text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Brain className="w-3.5 h-3.5" />
                       Context:
