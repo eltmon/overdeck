@@ -661,16 +661,18 @@ async function killAllReviewerSessions(
     ...agents.map(a => a.name as ReviewerRole),
     'synthesis',
   ];
-  for (const role of roles) {
-    const sessionName = getReviewerSessionName(role, projectKey, issueId);
-    try {
-      await killSessionAsync(sessionName);
-      console.log(`[review-agent] Killed reviewer session ${sessionName}`);
-    } catch (err) {
-      // Session may not exist (e.g., never spawned, or already killed on timeout)
-      console.log(`[review-agent] Session ${sessionName} already gone or failed to kill: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
+  await Promise.all(
+    roles.map(async (role) => {
+      const sessionName = getReviewerSessionName(role, projectKey, issueId);
+      try {
+        await killSessionAsync(sessionName);
+        console.log(`[review-agent] Killed reviewer session ${sessionName}`);
+      } catch (err) {
+        // Session may not exist (e.g., never spawned, or already killed on timeout)
+        console.log(`[review-agent] Session ${sessionName} already gone or failed to kill: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }),
+  );
 }
 
 type ReviewerOutcome = { role: string; status: 'completed' | 'failed'; outputFile: string };

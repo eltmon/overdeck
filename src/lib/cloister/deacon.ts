@@ -1024,6 +1024,7 @@ export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
       if (parts.length >= 2) {
         const name = parts.slice(0, -1).join(' ');
         const created = parseInt(parts[parts.length - 1], 10);
+        if (!Number.isFinite(created)) continue;
         if (name) {
           sessions.push(name);
           creationTimes.set(name, created * 1000); // tmux returns seconds
@@ -1079,7 +1080,7 @@ export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
     try {
       await killSessionAsync(sessionName);
       const ageMin = Math.round((now - createdMs) / 60000);
-      const msg = `Killed orphan ${isReviewer ? 'reviewer' : isCoordinator ? 'coordinator' : 'specialist'} session ${sessionName} (${ageMin}m old)`;
+      const msg = `Killed orphan ${isReviewer ? 'reviewer' : 'coordinator'} session ${sessionName} (${ageMin}m old)`;
       actions.push(msg);
       console.log(`[deacon] ${msg}`);
     } catch (err) {
