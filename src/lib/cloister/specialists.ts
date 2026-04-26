@@ -669,6 +669,61 @@ export function getTmuxSessionName(name: SpecialistType, projectKey?: string, is
 }
 
 /**
+ * The five canonical reviewer roles plus synthesis. One tmux session per role
+ * per issue, alive for the lifetime of the issue across all review rounds.
+ */
+export type ReviewerRole =
+  | 'correctness'
+  | 'security'
+  | 'performance'
+  | 'requirements'
+  | 'synthesis';
+
+export const REVIEWER_ROLES: readonly ReviewerRole[] = [
+  'correctness',
+  'security',
+  'performance',
+  'requirements',
+  'synthesis',
+] as const;
+
+/**
+ * Get the canonical reviewer tmux session name (PAN-830).
+ *
+ * Pattern: `specialist-<projectKey>-<issueId>-review-<role>`. This is one
+ * tmux session per role per issue — sessions are reused across review
+ * rounds via `sendKeysAsync` resumption. Round 2 of `review-correctness`
+ * does NOT spawn a new session; it injects a follow-up prompt into the
+ * existing pane.
+ *
+ * @param role - One of the canonical reviewer roles
+ * @param projectKey - Project key (e.g. `panopticon`)
+ * @param issueId - Issue identifier (e.g. `pan-540`)
+ * @returns Canonical tmux session name
+ */
+export function getReviewerSessionName(
+  role: ReviewerRole,
+  projectKey: string,
+  issueId: string,
+): string {
+  return `specialist-${projectKey}-${issueId}-review-${role}`;
+}
+
+/**
+ * Parse a canonical reviewer session name back into role + project + issue.
+ * Returns null if the name does not match the canonical pattern.
+ */
+export function parseReviewerSessionName(name: string): {
+  role: ReviewerRole;
+  projectKey: string;
+  issueId: string;
+} | null {
+  const m = name.match(/^specialist-([\w.-]+?)-([\w.-]+?)-review-(correctness|security|performance|requirements|synthesis)$/);
+  if (!m || !m[1] || !m[2] || !m[3]) return null;
+  return { projectKey: m[1], issueId: m[2], role: m[3] as ReviewerRole };
+}
+
+/**
  * Construct the compound registry key for a per-issue specialist (PAN-754).
  * Format: `${specialistType}:${issueId}` or `${specialistType}:${issueId}:${role}` for convoy.
  */
