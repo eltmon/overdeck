@@ -637,21 +637,10 @@
   text-transform: lowercase;
 }
 
-.sessionId {
+.sessionLabel {
   font-size: var(--mc-font-size-xs);
   color: var(--mc-text-secondary);
-  font-family: var(--mc-font-mono);
-  flex-shrink: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sessionModel {
-  font-size: var(--mc-font-size-xs);
-  color: var(--mc-text-muted);
-  flex-shrink: 1;
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
