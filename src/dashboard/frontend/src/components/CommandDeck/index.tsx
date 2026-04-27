@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Compass, Plus } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
@@ -11,7 +12,7 @@ import { ConversationPanel, type ViewMode } from '../chat/ConversationPanel';
 import { ModelPicker, loadStoredModel, saveStoredModel } from '../chat/ModelPicker';
 import { DraftConversationPanel } from '../chat/DraftConversationPanel';
 import type { ChatMessage } from '../chat/chat-types';
-import type { Agent, Issue } from '../../types';
+import type { Agent, Issue, StartAgentResponse } from '../../types';
 import { useDashboardStore, selectAgentList } from '../../lib/store';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
@@ -448,15 +449,28 @@ export function CommandDeck({
 
   const handleRestartSession = useCallback(async (sessionId: string, issueId: string) => {
     try {
-      // Step 1: stop current agent
       await fetch(`/api/agents/${sessionId}`, { method: 'DELETE' });
-      // Step 2: start a new agent for the same issue
-      const res = await fetch('/api/agents', {
+      const requestBody = { issueId };
+      let res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId }),
+        body: JSON.stringify(requestBody),
       });
-      if (!res.ok) throw new Error('Failed to restart agent');
+      let data = await res.json().catch(() => ({})) as StartAgentResponse;
+      if (res.status === 409 && data.requiresAcknowledgement) {
+        const confirmed = window.confirm((data.guardrails?.warnings ?? []).map((warning) => `• ${warning.message}`).join('\n'));
+        if (!confirmed) throw new Error('Agent start canceled');
+        res = await fetch('/api/agents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...requestBody, guardrailAcknowledged: true }),
+        });
+        data = await res.json().catch(() => ({})) as StartAgentResponse;
+      }
+      if (!res.ok) throw new Error(data.error || data.hint || 'Failed to restart agent');
+      if (data.guardrails?.warnings?.length) {
+        toast.success('Agent started after acknowledging system health warnings.', { duration: 6000 });
+      }
       await refreshDashboardState(queryClient);
     } catch {
       // Silently ignore — user can retry

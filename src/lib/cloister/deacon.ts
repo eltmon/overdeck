@@ -2273,8 +2273,11 @@ export async function checkDeadEndAgents(): Promise<string[]> {
         continue;
       }
 
-      // Check if the work agent exists and is idle
-      const issueId = status.issueId || key;
+      // The review-status map key is the authoritative issue identifier.
+      // Persisted payloads can carry stale/mismatched status.issueId values after
+      // retries or manual edits; using the key keeps recovery actions targeted to
+      // the actual status entry being processed.
+      const issueId = key;
       const agentSessionName = `agent-${issueId.toLowerCase()}`;
 
       if (!sessionExists(agentSessionName)) {

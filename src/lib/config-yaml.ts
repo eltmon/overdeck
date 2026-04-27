@@ -79,6 +79,17 @@ export interface TtsSummarizerConfig {
   batch_window_seconds?: number;
 }
 
+export interface ResourcesConfig {
+  /** Available RAM threshold that triggers a warning state/guardrail (GiB) */
+  memory_warn_gb?: number;
+  /** Available RAM threshold that blocks spawns / marks critical state (GiB) */
+  memory_block_gb?: number;
+  /** Work-agent count threshold that triggers a warning */
+  agent_warn_count?: number;
+  /** Work-agent count threshold that blocks new spawns */
+  agent_block_count?: number;
+}
+
 /**
  * Complete configuration structure (YAML schema)
  */
@@ -159,6 +170,9 @@ export interface YamlConfig {
   tts?: {
     summarizer?: TtsSummarizerConfig;
   };
+
+  /** Resource thresholds for dashboard health + spawn guardrails */
+  resources?: ResourcesConfig;
 }
 
 /**
@@ -284,6 +298,14 @@ export interface NormalizedConfig {
     model: ModelId;
     batchWindowSeconds: number;
   };
+
+  /** Resource thresholds (normalised, never undefined) */
+  resources: {
+    memoryWarnGb: number;
+    memoryBlockGb: number;
+    agentWarnCount: number;
+    agentBlockCount: number;
+  };
 }
 
 /**
@@ -376,6 +398,12 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     enabled: false,
     model: 'gpt-5.4-nano',
     batchWindowSeconds: 15,
+  },
+  resources: {
+    memoryWarnGb: 4,
+    memoryBlockGb: 2,
+    agentWarnCount: 5,
+    agentBlockCount: 6,
   },
 };
 
@@ -573,6 +601,12 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       enabled: DEFAULT_CONFIG.ttsSummarizer.enabled,
       model: DEFAULT_CONFIG.ttsSummarizer.model,
       batchWindowSeconds: DEFAULT_CONFIG.ttsSummarizer.batchWindowSeconds,
+    },
+    resources: {
+      memoryWarnGb: DEFAULT_CONFIG.resources.memoryWarnGb,
+      memoryBlockGb: DEFAULT_CONFIG.resources.memoryBlockGb,
+      agentWarnCount: DEFAULT_CONFIG.resources.agentWarnCount,
+      agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount,
     },
   };
 
@@ -783,6 +817,21 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       }
       if (s.batch_window_seconds !== undefined) {
         result.ttsSummarizer.batchWindowSeconds = s.batch_window_seconds;
+      }
+    }
+
+    if (config.resources) {
+      if (typeof config.resources.memory_warn_gb === 'number') {
+        result.resources.memoryWarnGb = config.resources.memory_warn_gb;
+      }
+      if (typeof config.resources.memory_block_gb === 'number') {
+        result.resources.memoryBlockGb = config.resources.memory_block_gb;
+      }
+      if (typeof config.resources.agent_warn_count === 'number') {
+        result.resources.agentWarnCount = config.resources.agent_warn_count;
+      }
+      if (typeof config.resources.agent_block_count === 'number') {
+        result.resources.agentBlockCount = config.resources.agent_block_count;
       }
     }
   }
