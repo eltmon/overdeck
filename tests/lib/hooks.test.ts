@@ -8,7 +8,7 @@ import { existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { PANOPTICON_HOME } from '../../src/lib/paths.js';
 
-const TEST_AGENT_ID = 'test-agent-reorder';
+const TEST_AGENT_ID = `test-agent-reorder-${process.pid}`;
 const TEST_HOOK_FILE = join(PANOPTICON_HOME, 'hooks', `${TEST_AGENT_ID}.json`);
 
 describe('reorderHookItems', () => {
