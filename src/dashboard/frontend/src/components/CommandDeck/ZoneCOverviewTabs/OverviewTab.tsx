@@ -195,6 +195,15 @@ function Section({
   );
 }
 
+function formatRuntime(startedAt: string): string {
+  const ms = Date.now() - Date.parse(startedAt);
+  if (Number.isNaN(ms) || ms < 0) return '—';
+  const hours = Math.floor(ms / 3_600_000);
+  const mins = Math.floor((ms % 3_600_000) / 60_000);
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
+
 export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabProps) {
   const planning = usePlanningQuery(issueId);
   const activity = useActivityQuery(issueId);
@@ -207,6 +216,9 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
   const stage = deriveStageFromSections(sections);
   const totalCost = costs.data?.totalCost ?? activity.data?.totalCost ?? 0;
   const lastLabel = lastActivityLabel(sections);
+  const activeAgentCount = sections.filter(
+    (s) => s.status === 'running' || s.status === 'active',
+  ).length;
 
   const sparklineEvents = useMemo(
     () =>
@@ -264,50 +276,126 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
           gap: 10,
         }}
       >
+        {/* Title row */}
         <div
           style={{
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             justifyContent: 'space-between',
             gap: 12,
             flexWrap: 'wrap',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ fontSize: 16, fontWeight: 700 }} data-testid="overview-stage">
-              {stage}
-            </span>
-            <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
-              · {issueId}
-            </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
+            <h1
+              data-testid="overview-title"
+              style={{
+                fontSize: 18,
+                fontWeight: 700,
+                margin: 0,
+                lineHeight: 1.3,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+              title={issue?.title || issueId}
+            >
+              {issue?.title || issueId}
+            </h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {/* State pill */}
+              {issue?.status && (
+                <span
+                  data-testid="overview-status-pill"
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    background: 'color-mix(in srgb, var(--primary) 12%, transparent)',
+                    color: 'var(--primary)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.03em',
+                  }}
+                >
+                  {issue.status}
+                </span>
+              )}
+              {/* Stage pill */}
+              <span
+                data-testid="overview-stage"
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                  background: 'var(--mc-surface-2, color-mix(in srgb, var(--foreground) 5%, transparent))',
+                  color: 'var(--mc-text-muted, var(--muted-foreground))',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em',
+                }}
+              >
+                {stage}
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+                {issueId}
+              </span>
+            </div>
           </div>
+          {/* Cost metric */}
           <div
             data-testid="overview-cost"
-            style={{ fontSize: 14, fontWeight: 600 }}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-end',
+              gap: 2,
+              flexShrink: 0,
+            }}
           >
-            <LiveCounter value={totalCost} unit="$" precision={2} pulseOnIncrement />
-            <span
-              style={{
-                marginLeft: 8,
-                fontSize: 12,
-                color: 'var(--mc-text-muted, var(--muted-foreground))',
-                fontWeight: 500,
-              }}
-            >
-              spent
+            <span style={{ fontSize: 18, fontWeight: 700 }}>
+              <LiveCounter value={totalCost} unit="$" precision={2} pulseOnIncrement />
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+              cost to date
             </span>
           </div>
         </div>
+
+        {/* Metrics row */}
         <div
           style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16,
             fontSize: 12,
             color: 'var(--mc-text-muted, var(--muted-foreground))',
-            display: 'flex',
-            gap: 12,
+            flexWrap: 'wrap',
           }}
         >
+          {/* Runtime */}
+          {agent?.startedAt && (
+            <div data-testid="overview-runtime" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Clock size={12} />
+              <span>Runtime: {formatRuntime(agent.startedAt)}</span>
+            </div>
+          )}
+          {/* Agent count */}
+          <div data-testid="overview-agent-count" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Box size={12} />
+            <span>
+              {activeAgentCount} active agent{activeAgentCount === 1 ? '' : 's'}
+            </span>
+          </div>
+          {/* Session count */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Terminal size={12} />
+            <span>
+              {sections.length} session{sections.length === 1 ? '' : 's'}
+            </span>
+          </div>
+          {/* Last activity */}
           <span data-testid="overview-last-activity">{lastLabel}</span>
-          <span>· {sections.length} session{sections.length === 1 ? '' : 's'}</span>
         </div>
       </section>
 
