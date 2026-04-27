@@ -648,6 +648,33 @@ export async function waitForReviewer(
   return 'failed';
 }
 
+/**
+ * Kill all canonical reviewer and synthesis sessions for an issue.
+ * Called in a `finally` block so cleanup always runs regardless of outcome.
+ */
+async function killAllReviewerSessions(
+  projectKey: string,
+  issueId: string,
+  agents: ReviewAgentConfig[],
+): Promise<void> {
+  const roles: ReviewerRole[] = [
+    ...agents.map(a => a.name as ReviewerRole),
+    'synthesis',
+  ];
+  await Promise.all(
+    roles.map(async (role) => {
+      const sessionName = getReviewerSessionName(role, projectKey, issueId);
+      try {
+        await killSessionAsync(sessionName);
+        console.log(`[review-agent] Killed reviewer session ${sessionName}`);
+      } catch (err) {
+        // Session may not exist (e.g., never spawned, or already killed on timeout)
+        console.log(`[review-agent] Session ${sessionName} already gone or failed to kill: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }),
+  );
+}
+
 type ReviewerOutcome = { role: string; status: 'completed' | 'failed'; outputFile: string };
 
 /**
@@ -750,7 +777,9 @@ export async function runParallelReview(
   }
 
   // `reviewId` is used for output dirs (.pan/review/<reviewId>/) and history
-  // records only. The tmux sessions stay canonical and are reused across rounds.
+  // records only. Tmux sessions are canonical during the round but killed in
+  // the finally block when runParallelReview exits (PAN-846). Next round spawns
+  // fresh sessions.
   const reviewId = `review-${context.issueId}-${Date.now()}`;
   // Capture wall-clock start so we can persist accurate per-round timing into
   // round-N.json artifacts (consumed by Command Deck round dividers).
@@ -788,6 +817,11 @@ export async function runParallelReview(
 
   const outputDir = join(context.projectPath, '.pan', 'review', reviewId);
   await mkdir(outputDir, { recursive: true });
+
+  // PAN-846: Ensure reviewer/synthesis sessions are always killed when this
+  // round ends, regardless of outcome. Without this, canonical sessions with
+  // `remain-on-exit on` linger indefinitely, leaking ~500–700 MB RSS each.
+  try {
 
   // ── Phase 1: Spawn all reviewers in parallel ──────────────────────────────
   // Reviewers run from the main Panopticon codebase, so file paths must be
@@ -940,12 +974,12 @@ export async function runParallelReview(
   }
 
   // ── Phase 6: Archive the round (PAN-830) ──────────────────────────────────
-  // Reviewer panes survive across rounds (see PAN-830). At the end of every
-  // round we write a `round-N.json` artifact inside each canonical reviewer's
-  // state directory describing the round (result, output file, timestamps).
-  // The dashboard reads these to render the per-round timeline in Command
-  // Deck. State directories themselves are never deleted while the issue is
-  // alive; deep-wipe handles final teardown.
+  // At the end of every round we write a `round-N.json` artifact inside each
+  // canonical reviewer's state directory describing the round (result, output
+  // file, timestamps). The dashboard reads these to render the per-round
+  // timeline in Command Deck. State directories themselves are never deleted
+  // while the issue is alive; deep-wipe handles final teardown. Tmux sessions
+  // are killed in the finally block (PAN-846) so they don't leak RAM.
   try {
     await archiveReviewerRound({
       projectKey,
@@ -962,6 +996,9 @@ export async function runParallelReview(
   }
 
   return { result, reviewId };
+  } finally {
+    await killAllReviewerSessions(projectKey, context.issueId, agents);
+  }
 }
 
 /**

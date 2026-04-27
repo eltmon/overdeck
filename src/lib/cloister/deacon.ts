@@ -993,6 +993,109 @@ export async function cleanupAbandonedFeedback(): Promise<string[]> {
   return actions;
 }
 
+/**
+ * Clean up orphan reviewer and specialist tmux sessions (PAN-846).
+ *
+ * Sweeps for sessions whose naming pattern indicates they belong to a
+ * reviewer or specialist, checks whether the corresponding work agent is
+ * still alive or a review is in flight, and kills sessions that have been
+ * alive for more than one hour with no owner.
+ *
+ * This is a safety net for crashes where runParallelReview's finally block
+ * or /api/specialists/done cleanup did not run.
+ */
+export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
+  const actions: string[] = [];
+  const ORPHAN_AGE_MS = 60 * 60 * 1000; // 1 hour
+  const now = Date.now();
+
+  let sessions: string[];
+  let creationTimes: Map<string, number>;
+  try {
+    const { stdout } = await execAsync(
+      `tmux -L panopticon -f ${join(PANOPTICON_HOME, 'tmux', 'panopticon.tmux.conf')} list-sessions -F '#{session_name} #{session_created}'`,
+      { encoding: 'utf-8' },
+    );
+    const lines = stdout.split('\n').filter(l => l.trim());
+    sessions = [];
+    creationTimes = new Map();
+    for (const line of lines) {
+      const parts = line.split(' ');
+      if (parts.length >= 2) {
+        const name = parts.slice(0, -1).join(' ');
+        const created = parseInt(parts[parts.length - 1], 10);
+        if (!Number.isFinite(created)) continue;
+        if (name) {
+          sessions.push(name);
+          creationTimes.set(name, created * 1000); // tmux returns seconds
+        }
+      }
+    }
+  } catch {
+    // tmux server may not be running — nothing to clean
+    return actions;
+  }
+
+  const { getReviewStatus } = await import('../review-status.js');
+  const { parseReviewerSessionName } = await import('./specialists.js');
+
+  for (const sessionName of sessions) {
+    // Only consider reviewer/specialist sessions
+    const isReviewer = sessionName.includes('-review-');
+    const isCoordinator = sessionName.startsWith('review-coordinator-');
+    if (!isReviewer && !isCoordinator) continue;
+
+    // Check age
+    const createdMs = creationTimes.get(sessionName);
+    if (!createdMs || now - createdMs < ORPHAN_AGE_MS) continue;
+
+    // Extract issueId from session name
+    let issueId: string | null = null;
+
+    // Try canonical reviewer pattern first
+    const parsedReviewer = parseReviewerSessionName(sessionName);
+    if (parsedReviewer) {
+      issueId = parsedReviewer.issueId.toUpperCase();
+    } else {
+      // Fall back to generic issue-id regex extraction
+      const match = sessionName.match(/([A-Z0-9]+-\d+)/);
+      if (match) issueId = match[1].toUpperCase();
+    }
+
+    if (!issueId) continue;
+
+    // Gate 1: work agent running?
+    const agentSession = `agent-${issueId.toLowerCase()}`;
+    if (sessions.includes(agentSession)) continue;
+
+    // Gate 2: review in flight for this issue?
+    try {
+      const status = getReviewStatus(issueId);
+      if (status?.reviewStatus === 'reviewing') continue;
+    } catch {
+      // No status entry → safe to clean
+    }
+
+    // Both gates passed — session is an orphan, kill it
+    try {
+      await killSessionAsync(sessionName);
+      const ageMin = Math.round((now - createdMs) / 60000);
+      const msg = `Killed orphan ${isReviewer ? 'reviewer' : 'coordinator'} session ${sessionName} (${ageMin}m old)`;
+      actions.push(msg);
+      console.log(`[deacon] ${msg}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[deacon] Failed to kill orphan session ${sessionName}: ${msg}`);
+    }
+  }
+
+  if (actions.length > 0) {
+    console.log(`[deacon] Orphan session cleanup: killed ${actions.length} session(s)`);
+  }
+
+  return actions;
+}
+
 // ============================================================================
 // Orphaned Review Status Detection
 // ============================================================================
@@ -2961,6 +3064,15 @@ export async function runPatrol(): Promise<PatrolResult> {
     const feedbackActions = await cleanupAbandonedFeedback();
     actions.push(...feedbackActions);
     for (const a of feedbackActions) addLog('action', a, state.patrolCycle);
+  }
+
+  // Periodic orphan reviewer/specialist session sweep (PAN-846).
+  // Safety net for crashes where runParallelReview finally or
+  // /api/specialists/done cleanup did not run.
+  if (Math.random() < 0.01) {
+    const orphanActions = await cleanupOrphanReviewerSessions();
+    actions.push(...orphanActions);
+    for (const a of orphanActions) addLog('action', a, state.patrolCycle);
   }
 
   // Check for mass death (uses shared state)
