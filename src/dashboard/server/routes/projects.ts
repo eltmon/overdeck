@@ -80,6 +80,19 @@ interface ActivitySection {
   hasJsonl?: boolean;
 }
 
+const LEGACY_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/** Hide stopped legacy sessions older than 24h from the Command Deck tree.
+ *  These are typically synthetic STATE.md planning placeholders or stale
+ *  timestamp-named tmux sessions that no longer carry live context. */
+function isStaleLegacySession(s: SessionNode): boolean {
+  if (s.type !== 'legacy') return false;
+  if (s.presence !== 'ended' || s.status === 'running') return false;
+  const startedAtMs = Date.parse(s.startedAt);
+  if (Number.isNaN(startedAtMs)) return false;
+  return (Date.now() - startedAtMs) > LEGACY_SESSION_MAX_AGE_MS;
+}
+
 function mapSectionToSessionNode(section: ActivitySection): SessionNode {
   return {
     type: mapSessionType(section.type),
@@ -206,7 +219,8 @@ export async function fetchProjectSessionTree(projectKey: string): Promise<unkno
         name: e.name,
         issueLower: e.name.replace('feature-', ''),
         issueId: e.name.replace('feature-', '').toUpperCase(),
-      }));
+      }))
+      .filter(c => /^[a-z]+-\d+$/.test(c.issueLower));
 
     const results = await withConcurrencyLimit(
       featureCandidates.map((c) => async () => {
@@ -224,7 +238,8 @@ export async function fetchProjectSessionTree(projectKey: string): Promise<unkno
           };
           if (!activityData.sections || activityData.sections.length === 0) return null;
           const title = await resolveFeatureTitle(c.issueId, c.issueLower, project);
-          const sessions = activityData.sections.map(mapSectionToSessionNode);
+          const allSessions = activityData.sections.map(mapSectionToSessionNode);
+          const sessions = allSessions.filter(s => !isStaleLegacySession(s));
           return { issueId: c.issueId, title, sessions };
         } catch (err) {
           console.warn(`[fetchProjectSessionTree] Failed to process feature ${c.issueId}:`, err);

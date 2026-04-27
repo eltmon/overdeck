@@ -231,7 +231,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: var(--mc-space-1) var(--mc-space-2) var(--mc-space-1) var(--mc-space-6);
+  padding: var(--mc-space-1) var(--mc-space-2) var(--mc-space-1) var(--mc-space-1);
   cursor: pointer;
   transition: background 0.1s;
   font-size: var(--mc-font-size-sm);
@@ -298,6 +298,7 @@
 .featureItemRow {
   display: flex;
   align-items: center;
+  padding-left: var(--mc-space-3);
 }
 
 .featureItemCaret {
@@ -327,6 +328,31 @@
 .sessionList {
   display: flex;
   flex-direction: column;
+}
+
+.treeFilterRow {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.treeFilterButton {
+  flex: 1;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 400;
+  border: 1px solid var(--mc-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--mc-text-muted);
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.treeFilterButtonActive {
+  font-weight: 600;
+  background: var(--mc-bg-selected);
+  color: var(--mc-text-primary);
 }
 
 /* Issue Header (compact contextual header) */
@@ -583,7 +609,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: var(--mc-space-1) var(--mc-space-2) var(--mc-space-1) var(--mc-space-8);
+  padding: var(--mc-space-1) var(--mc-space-2) var(--mc-space-1) calc(var(--mc-space-3) + var(--mc-space-8));
   cursor: pointer;
   transition: background 0.1s;
   font-size: var(--mc-font-size-sm);
@@ -636,21 +662,10 @@
   text-transform: lowercase;
 }
 
-.sessionId {
+.sessionLabel {
   font-size: var(--mc-font-size-xs);
   color: var(--mc-text-secondary);
-  font-family: var(--mc-font-mono);
-  flex-shrink: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sessionModel {
-  font-size: var(--mc-font-size-xs);
-  color: var(--mc-text-muted);
-  flex-shrink: 1;
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -658,10 +673,35 @@
 }
 
 .sessionStatus {
-  font-size: var(--mc-font-size-xs);
+  font-size: 10px;
   color: var(--mc-text-muted);
   flex-shrink: 0;
   text-transform: lowercase;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--mc-bg-hover);
+  white-space: nowrap;
+}
+
+.sessionStatus_running {
+  color: var(--mc-success);
+  background: color-mix(in srgb, var(--mc-success) 12%, transparent);
+}
+
+.sessionStatus_error {
+  color: var(--mc-error);
+  background: color-mix(in srgb, var(--mc-error) 12%, transparent);
+}
+
+.sessionStatus_starting {
+  color: var(--mc-warning);
+  background: color-mix(in srgb, var(--mc-warning) 12%, transparent);
+}
+
+.sessionStatus_stopped,
+.sessionStatus_unknown {
+  color: var(--mc-text-muted);
+  background: var(--mc-bg-hover);
 }
 
 .sessionDuration {

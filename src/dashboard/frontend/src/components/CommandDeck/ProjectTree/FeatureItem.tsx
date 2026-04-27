@@ -410,7 +410,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             )}
           </span>
           <span className={styles.featureId_sidebar}>{feature.issueId}</span>
-          <span className={styles.featureLabel}>
+          <span className={styles.featureLabel} title={title || feature.issueId}>
             {title || feature.issueId}
           </span>
           {feature.isRally && feature.childCount != null && feature.childCount > 0 ? (

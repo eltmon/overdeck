@@ -1307,6 +1307,7 @@ async function fetchProjectTree(): Promise<unknown[]> {
         featureEntries.map((entry) => async () => {
           const featurePath = join(workspacesDir, entry.name);
           const issueLower = entry.name.replace('feature-', '');
+          if (!/^[a-z]+-\d+$/.test(issueLower)) return null;
           const issueId = issueLower.toUpperCase();
           const planningDir = join(featurePath, '.planning');
 

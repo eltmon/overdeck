@@ -62,6 +62,26 @@ function formatDuration(seconds: number): string {
   return `${Math.round(seconds / 3600)}h`;
 }
 
+function capitalize(s: string): string {
+  return s.length === 0 ? s : s[0]!.toUpperCase() + s.slice(1);
+}
+
+function deriveSessionLabel(session: SessionNodeType): string {
+  const model = session.model && session.model !== 'unknown' && session.model !== 'specialist'
+    ? session.model
+    : '';
+  switch (session.type) {
+    case 'merge': return 'Merge agent';
+    case 'test': return 'Tests';
+    case 'review': return 'Review';
+    case 'reviewer': return session.role ? `${capitalize(session.role)} reviewer` : 'Reviewer';
+    case 'work': return model ? `Work agent (${model})` : 'Work agent';
+    case 'planning': return model ? `Planning (${model})` : 'Planning';
+    case 'legacy': return 'Planning state';
+    default: return session.type;
+  }
+}
+
 interface ContextMenuState {
   x: number;
   y: number;
@@ -190,13 +210,12 @@ export function SessionNode({
       >
         <PresenceDot presence={session.presence} />
         <TypeBadge type={session.type} role={session.role} />
-        <span className={styles.sessionId} title={session.sessionId}>
-          {session.sessionId}
+        <span className={styles.sessionLabel} title={session.sessionId}>
+          {deriveSessionLabel(session)}
         </span>
-        <span className={styles.sessionModel} title={session.model}>
-          {session.model}
+        <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${session.status}`] ?? ''}`}>
+          {session.status}
         </span>
-        <span className={styles.sessionStatus}>{session.status}</span>
         <span className={styles.sessionDuration}>{formatDuration(session.duration)}</span>
       </button>
 
