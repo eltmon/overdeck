@@ -1,7 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { access, readdir, readFile, stat } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -13,6 +11,7 @@ import { getGitHubConfig } from './tracker-config.js';
 
 const execFileAsync = promisify(execFile);
 const RESOURCE_DISCOVERY_TTL_MS = 30_000;
+const RECENT_ACTIVITY_WINDOW_MS = 5_000;
 
 export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker';
 
@@ -86,7 +85,6 @@ interface MutableResourceIssue {
   issueId: string;
   title: string;
   projectName: string;
-  projectPath: string;
   branch: string;
   trackerState: string | null;
   rawTrackerState?: string;
@@ -147,10 +145,6 @@ interface ResourceDiscoveryCacheEntry {
 let cachedResourceIssues: ResourceDiscoveryCacheEntry | null = null;
 let cachedDetailedResourceIssues: InternalDiscoveredIssue[] | null = null;
 let resourceIssuesRefreshPromise: Promise<ResourceAllocatedIssue[]> | null = null;
-
-function hasPath(path: string): Promise<boolean> {
-  return access(path).then(() => true, () => false);
-}
 
 function parseIssueIdFromText(value: string): string | null {
   const match = value.match(/\b([A-Za-z]+-\d+|F\d+|US\d+|DE\d+|TA\d+|TC\d+)\b/i);
@@ -223,10 +217,8 @@ function summarizeResourceDetailIdentifiers(details: InternalResourceDetails): R
   };
 }
 
-async function hasFreshHeartbeatFile(issueId: string): Promise<boolean> {
-  const heartbeatPath = join(homedir(), '.panopticon', 'heartbeats', `agent-${issueId.toLowerCase()}.json`);
-  const heartbeatStat = await stat(heartbeatPath).catch(() => null);
-  return heartbeatStat !== null && (Date.now() - heartbeatStat.mtime.getTime()) < 5000;
+function hasRecentActivity(lastActivity: number | null): boolean {
+  return lastActivity !== null && Number.isFinite(lastActivity) && (Date.now() - lastActivity) < RECENT_ACTIVITY_WINDOW_MS;
 }
 
 async function loadTrackerIssues(): Promise<Map<string, TrackerIssueRecord>> {
@@ -297,6 +289,10 @@ async function loadOpenPullRequests(): Promise<Map<string, GhPullRequest[]>> {
     }
   }));
 
+  for (const [issueId, prs] of pullRequests) {
+    pullRequests.set(issueId, sortPullRequests(prs));
+  }
+
   return pullRequests;
 }
 
@@ -322,6 +318,35 @@ async function loadProjectBranches(projectPath: string): Promise<{ local: string
   } catch {
     return { local: [], remote: [] };
   }
+}
+
+interface WorkspaceScanResult {
+  workspacePath: string;
+  hasPlanning: boolean;
+  hasPrd: boolean;
+  hasState: boolean;
+  hasVbrief: boolean;
+  hasBeads: boolean;
+}
+
+async function scanWorkspace(workspacesDir: string, workspaceName: string): Promise<WorkspaceScanResult> {
+  const workspacePath = join(workspacesDir, workspaceName);
+  const workspaceEntries = new Set(await readdir(workspacePath).catch(() => [] as string[]));
+  const planningEntries = workspaceEntries.has('.planning')
+    ? new Set(await readdir(join(workspacePath, '.planning')).catch(() => [] as string[]))
+    : new Set<string>();
+  const beadsEntries = workspaceEntries.has('.beads')
+    ? new Set(await readdir(join(workspacePath, '.beads')).catch(() => [] as string[]))
+    : new Set<string>();
+
+  return {
+    workspacePath,
+    hasPlanning: workspaceEntries.has('.planning'),
+    hasPrd: planningEntries.has('PLANNING_PROMPT.md'),
+    hasState: planningEntries.has('STATE.md'),
+    hasVbrief: planningEntries.has('plan.vbrief.json'),
+    hasBeads: beadsEntries.has('issues.jsonl'),
+  };
 }
 
 async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue[]> {
@@ -370,7 +395,6 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       issueId: upper,
       title: tracker?.title?.trim() || upper,
       projectName: resolved.config.name ?? resolved.key,
-      projectPath: resolved.config.path,
       branch: `feature/${upper.toLowerCase()}`,
       trackerState: typeof tracker?.state === 'string' ? tracker.state : null,
       rawTrackerState: tracker?.rawTrackerState,
@@ -439,40 +463,30 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       loadProjectBranches(projectPath),
     ]);
 
-    for (const entry of workspaceEntries) {
-      if (!entry.isDirectory() || !entry.name.startsWith('feature-')) continue;
+    await Promise.all(workspaceEntries.map(async (entry) => {
+      if (!entry.isDirectory() || !entry.name.startsWith('feature-')) return;
       const issueId = entry.name.replace(/^feature-/, '').toUpperCase();
       const issue = ensureIssue(issueId, project);
-      if (!issue) continue;
-      const workspacePath = join(workspacesDir, entry.name);
-      const planningDir = join(workspacePath, '.planning');
+      if (!issue) return;
+      const workspace = await scanWorkspace(workspacesDir, entry.name);
+      const planningDir = join(workspace.workspacePath, '.planning');
       const planPath = join(planningDir, 'plan.vbrief.json');
-      const prdPath = join(planningDir, 'PLANNING_PROMPT.md');
-      const statePath = join(planningDir, 'STATE.md');
-      const beadsPath = join(workspacePath, '.beads', 'issues.jsonl');
-
-      const [hasPlanning, hasPrd, hasState, hasVbrief, hasBeads] = await Promise.all([
-        hasPath(planningDir),
-        hasPath(prdPath),
-        hasPath(statePath),
-        hasPath(planPath),
-        hasPath(beadsPath),
-      ]);
+      const beadsPath = join(workspace.workspacePath, '.beads', 'issues.jsonl');
 
       issue.resourceSources.add('workspace');
-      issue.resourceDetails.workspacePath = workspacePath;
-      issue.hasPlanning = hasPlanning;
-      issue.hasPrd = hasPrd;
-      issue.hasState = hasState;
-      if (hasVbrief) {
+      issue.resourceDetails.workspacePath = workspace.workspacePath;
+      issue.hasPlanning = workspace.hasPlanning;
+      issue.hasPrd = workspace.hasPrd;
+      issue.hasState = workspace.hasState;
+      if (workspace.hasVbrief) {
         issue.resourceSources.add('vbrief');
         issue.resourceDetails.vbriefPath = planPath;
       }
-      if (hasBeads) {
+      if (workspace.hasBeads) {
         issue.resourceSources.add('beads');
         issue.resourceDetails.beadsPath = beadsPath;
       }
-    }
+    }));
 
     for (const branch of branches.local) {
       const issueId = parseIssueIdFromText(branch);
@@ -501,49 +515,27 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
     const issue = ensureIssue(issueId);
     if (!issue) continue;
     issue.resourceSources.add('pr');
-    issue.resourceDetails.prs = sortPullRequests(prs);
-    const bestTitle = issue.resourceDetails.prs.find((pr) => !pr.isDraft)?.title ?? issue.resourceDetails.prs[0]?.title;
+    issue.resourceDetails.prs = prs;
+    const bestTitle = prs.find((pr) => !pr.isDraft)?.title ?? prs[0]?.title;
     issue.title = issue.title === issue.issueId && bestTitle ? bestTitle : issue.title;
   }
 
   await Promise.all([...issueMap.values()].map(async (issue) => {
     const issueLower = issue.issueId.toLowerCase();
     const agentId = `agent-${issueLower}`;
-    const planningId = `planning-${issueLower}`;
-    const stateFileCandidates = [
-      join(homedir(), '.panopticon', 'agents', agentId, 'state.json'),
-      join(homedir(), '.panopticon', 'agents', planningId, 'state.json'),
-    ];
-
-    for (const stateFile of stateFileCandidates) {
-      try {
-        if (!existsSync(stateFile)) continue;
-        const raw = await readFile(stateFile, 'utf-8');
-        const parsed = JSON.parse(raw) as { state?: string; lastActivity?: string };
-        issue.agentStatus = parsed.state ?? issue.agentStatus;
-        if (parsed.lastActivity) {
-          issue.lastActivity = new Date(parsed.lastActivity).getTime();
-        }
-        break;
-      } catch {
-        // ignore malformed state
-      }
-    }
-
     const runtimeState = await getAgentRuntimeStateAsync(agentId).catch(() => null);
-    if (runtimeState?.state) {
-      issue.agentStatus = runtimeState.state;
-    }
+    if (!runtimeState) return;
+    issue.agentStatus = runtimeState.state;
+    issue.lastActivity = Date.parse(runtimeState.lastActivity);
   }));
 
-  const discoveredIssues = await Promise.all(
-    [...issueMap.values()]
-      .filter((issue) => issue.resourceSources.size > 0)
-      .map(async (issue) => {
+  const discoveredIssues = [...issueMap.values()]
+    .filter((issue) => issue.resourceSources.size > 0)
+    .map((issue) => {
         const hasTmux = issue.resourceDetails.tmuxSessions.length > 0;
-        const hasFreshHeartbeat = await hasFreshHeartbeatFile(issue.issueId);
-        const stateLabel = deriveStateLabel(issue, hasTmux, hasFreshHeartbeat);
-        const status = hasTmux && (issue.agentStatus === 'active' || hasFreshHeartbeat)
+        const hasRecentHeartbeat = hasRecentActivity(issue.lastActivity);
+        const stateLabel = deriveStateLabel(issue, hasTmux, hasRecentHeartbeat);
+        const status = hasTmux && (issue.agentStatus === 'active' || hasRecentHeartbeat)
           ? 'running'
           : issue.hasState
             ? 'has_state'
@@ -570,8 +562,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
           resourceSources: new Set([...issue.resourceSources].sort()),
           resourceDetails: issue.resourceDetails,
         } satisfies InternalDiscoveredIssue;
-      }),
-  );
+      });
 
   return discoveredIssues.sort((a, b) => a.issueId.localeCompare(b.issueId));
 }
@@ -649,7 +640,7 @@ export function sanitizeResourceAllocatedIssues(issues: ResourceAllocatedIssue[]
   }));
 }
 
-export function sanitizeResourceDetailIdentifiers(details: InternalResourceDetails): ResourceDetailIdentifiers {
+export function toPublicResourceDetailIdentifiers(details: InternalResourceDetails): ResourceDetailIdentifiers {
   return summarizeResourceDetailIdentifiers(details);
 }
 
@@ -657,12 +648,12 @@ export async function getResourceDetailIdentifiers(issueId: string): Promise<Res
   const normalizedIssueId = issueId.toUpperCase();
   const cachedMatch = cachedDetailedResourceIssues?.find((entry) => entry.issueId === normalizedIssueId);
   if (cachedMatch) {
-    return sanitizeResourceDetailIdentifiers(cachedMatch.resourceDetails);
+    return toPublicResourceDetailIdentifiers(cachedMatch.resourceDetails);
   }
 
   await refreshResourceAllocatedIssues();
   const refreshedMatch = cachedDetailedResourceIssues?.find((entry) => entry.issueId === normalizedIssueId);
-  return refreshedMatch ? sanitizeResourceDetailIdentifiers(refreshedMatch.resourceDetails) : null;
+  return refreshedMatch ? toPublicResourceDetailIdentifiers(refreshedMatch.resourceDetails) : null;
 }
 
 export function groupResourceAllocatedIssuesByProject(issues: ResourceAllocatedIssue[]): Array<{

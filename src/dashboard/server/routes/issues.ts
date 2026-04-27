@@ -212,6 +212,37 @@ function buildLifecycleContext(id: string, issueSource: string | undefined) {
   return { ctx, projectConfig, githubCheck };
 }
 
+function isOrphanedIssue(issue: { status?: string; state?: string; rawTrackerState?: string; completedAt?: string | null }): boolean {
+  const status = issue.status?.toLowerCase() ?? '';
+  const state = issue.state?.toLowerCase() ?? '';
+  const rawTrackerState = issue.rawTrackerState?.toLowerCase() ?? '';
+  return Boolean(
+    issue.completedAt
+    || status.includes('closed')
+    || status.includes('done')
+    || status.includes('completed')
+    || state.includes('closed')
+    || state.includes('done')
+    || state.includes('completed')
+    || rawTrackerState.includes('closed')
+    || rawTrackerState.includes('done')
+    || rawTrackerState.includes('completed'),
+  );
+}
+
+function getIssueForCleanup(issueId: string) {
+  const issueDataService = getIssueDataService();
+  return issueDataService.getIssues({ includeCompleted: true }).find((issue: any) => {
+    const identifier = typeof issue?.identifier === 'string' ? issue.identifier : '';
+    return identifier.toUpperCase() === issueId.toUpperCase();
+  }) as {
+    status?: string;
+    state?: string;
+    rawTrackerState?: string;
+    completedAt?: string | null;
+  } | undefined;
+}
+
 async function runDestructiveIssueLifecycle(
   id: string,
   mode: 'reset' | 'cancel',
@@ -1743,7 +1774,16 @@ const postIssueCleanupWorkspaceRoute = HttpRouter.add(
   '/api/issues/:id/cleanup-workspace',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
+    const rawId = params['id'] ?? '';
+    const parsedIssueId = parseIssueId(rawId);
+    if (!parsedIssueId) {
+      return jsonResponse({ error: 'Invalid issue id: ' + rawId }, { status: 400 });
+    }
+    const id = parsedIssueId.raw.toUpperCase();
+    const issue = getIssueForCleanup(id);
+    if (!issue || !isOrphanedIssue(issue)) {
+      return jsonResponse({ error: 'Cleanup is only allowed for closed/orphaned issues' }, { status: 409 });
+    }
     const cleanupLog: string[] = [];
     const eventStore = yield* EventStoreService;
 
@@ -1818,6 +1858,9 @@ const postIssueDeepWipeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: 'Invalid issue id: ' + id }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
@@ -3036,10 +3079,12 @@ const getIssueResourceDetailsRoute = HttpRouter.add(
   '/api/issues/:id/resource-details',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
-    const id = (params['id'] ?? '').toUpperCase();
-    if (!id) {
-      return jsonResponse({ error: 'Issue ID is required' }, { status: 400 });
+    const rawId = params['id'] ?? '';
+    const parsedIssueId = parseIssueId(rawId);
+    if (!parsedIssueId) {
+      return jsonResponse({ error: 'Invalid issue id: ' + rawId }, { status: 400 });
     }
+    const id = parsedIssueId.raw.toUpperCase();
 
     const details = yield* Effect.tryPromise({
       try: () => getResourceDetailIdentifiers(id),

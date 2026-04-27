@@ -481,14 +481,14 @@ describe('FeatureItem', () => {
     expect(screen.getByTitle('workspace: allocated')).toBeInTheDocument();
     expect(screen.getByTitle('branch: local 1 · remote 1')).toBeInTheDocument();
     expect(screen.getByTitle('tmux: 1 session')).toBeInTheDocument();
-    expect(screen.getByTitle('PR: 1 open')).toBeInTheDocument();
+    expect(screen.getByTitle('PR: #123 (open)')).toBeInTheDocument();
     expect(await screen.findByText('workspace: /tmp/workspaces/feature-pan-821')).toBeInTheDocument();
     expect(screen.getByText('branch (local): feature/pan-821')).toBeInTheDocument();
     expect(screen.getByText('branch (remote): origin/feature/pan-821')).toBeInTheDocument();
     expect(screen.getByText('tmux: agent-pan-821')).toBeInTheDocument();
     expect(screen.getByText('vBRIEF present')).toBeInTheDocument();
     expect(screen.getByText('beads present')).toBeInTheDocument();
-    expect(screen.getByText('PR: #123 Test PR')).toBeInTheDocument();
+    expect(screen.getByText('PR: #123 Test PR (open)')).toBeInTheDocument();
     expect(screen.getByText('docker: pan-821-db')).toBeInTheDocument();
     expect(screen.getByText('docker: pan-821-cache')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-821/resource-details');

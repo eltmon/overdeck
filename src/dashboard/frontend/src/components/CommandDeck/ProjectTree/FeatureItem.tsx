@@ -46,6 +46,11 @@ function resourceColor(feature: ProjectFeature): string {
   return 'var(--mc-text-secondary)';
 }
 
+function formatPrState(pr: { number: number; title: string; state: string; isDraft: boolean }): string {
+  const normalizedState = pr.state.toLowerCase();
+  return pr.isDraft ? `${normalizedState}, draft` : normalizedState;
+}
+
 function resourceSummary(feature: ProjectFeature, source: ResourceSource): { label: string; detail: string } | null {
   const details = feature.resourceDetails;
   if (!details) return null;
@@ -65,7 +70,12 @@ function resourceSummary(feature: ProjectFeature, source: ResourceSource): { lab
     case 'beads':
       return details.hasBeads ? { label: 'beads', detail: 'present' } : null;
     case 'pr':
-      return details.prs.length > 0 ? { label: 'PR', detail: `${details.prs.length} open` } : null;
+      return details.prs.length > 0
+        ? {
+            label: 'PR',
+            detail: details.prs.map((pr) => `#${pr.number} (${formatPrState(pr)})`).join(' · '),
+          }
+        : null;
     case 'docker':
       return details.dockerContainerCount > 0 ? { label: 'docker', detail: `${details.dockerContainerCount} container${details.dockerContainerCount === 1 ? '' : 's'}` } : null;
     default:
@@ -120,7 +130,7 @@ function ResourceStrip({
     if (detailIdentifiers) return;
 
     let cancelled = false;
-    void fetch(`/api/issues/${feature.issueId}/resource-details`)
+    void fetch(`/api/issues/${encodeURIComponent(feature.issueId)}/resource-details`)
       .then(async (response) => {
         if (!response.ok) return null;
         return response.json() as Promise<ProjectFeatureResourceIdentifiers>;
@@ -174,7 +184,7 @@ function ResourceStrip({
     if (details.hasVbrief) rows.push({ key: 'vbrief', label: 'vBRIEF present' });
     if (details.hasBeads) rows.push({ key: 'beads', label: 'beads present' });
     for (const pr of identifiers?.prs ?? details.prs) {
-      rows.push({ key: `pr-${pr.number}`, label: `PR: #${pr.number} ${pr.title}` });
+      rows.push({ key: `pr-${pr.number}`, label: `PR: #${pr.number} ${pr.title} (${formatPrState(pr)})` });
     }
 
     if ((identifiers?.dockerContainerNames.length ?? 0) > 0) {
@@ -298,7 +308,7 @@ function formatSessionDuration(seconds: number): string {
   return `${Math.round(seconds / 3600)}h`;
 }
 
-function getAggregateActivityState(sessions: SessionNodeType[]): AggregateActivityState {
+function getAggregateActivityState(sessions: readonly SessionNodeType[]): AggregateActivityState {
   if (sessions.some(isErrorSession)) return 'error';
   if (sessions.some(isRunningSession)) return 'running';
   if (sessions.some(isQueuedSession)) return 'queued';
@@ -311,7 +321,7 @@ function getActivityDotStatus(state: AggregateActivityState): StatusDotStatus {
   return 'ended';
 }
 
-function buildActivitySummary(sessions: SessionNodeType[]): string {
+function buildActivitySummary(sessions: readonly SessionNodeType[]): string {
   if (sessions.length === 0) return 'No sessions';
 
   const runningWork = sessions.filter(session =>
@@ -360,7 +370,7 @@ function buildActivitySummary(sessions: SessionNodeType[]): string {
   return parts.join(', ');
 }
 
-function getAggregateBadges(sessions: SessionNodeType[]): AggregateBadge[] {
+function getAggregateBadges(sessions: readonly SessionNodeType[]): AggregateBadge[] {
   const workSessions = sessions.filter(session => session.type === 'work');
   const reviewerSessions = sessions.filter(session => session.type === 'reviewer' || session.type === 'review');
   const reviewerErrors = reviewerSessions.filter(isErrorSession);
@@ -423,7 +433,7 @@ const PRESENCE_PRIORITY: Record<string, number> = {
 };
 
 /** Pick the best session to auto-select: active > idle > suspended > ended; among active prefer work > review > test. */
-export function pickBestSession(sessions: SessionNodeType[]): string | null {
+export function pickBestSession(sessions: readonly SessionNodeType[]): string | null {
   if (sessions.length === 0) return null;
   const sorted = [...sessions].sort((a, b) => {
     const presenceDiff = PRESENCE_PRIORITY[a.presence] - PRESENCE_PRIORITY[b.presence];
@@ -470,7 +480,7 @@ function defaultExpandedFromState(): boolean {
 
 /** Compute the dominant session presence for the feature row StatusDot.
  *  Priority: active > thinking > waiting > idle > ended. */
-function computeDominantStatus(sessions: SessionNodeType[]): StatusDotStatus {
+function computeDominantStatus(sessions: readonly SessionNodeType[]): StatusDotStatus {
   let hasIdle = false;
   let hasThinking = false;
   let hasWaiting = false;

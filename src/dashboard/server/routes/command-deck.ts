@@ -427,7 +427,10 @@ export async function fetchActivityDataWithContext(
     for (let i = 0; i < specialistSections.length; i++) {
       const ss = specialistSections[i]!;
       const duration = ss.startedAt && ss.endedAt
-        ? Math.floor((new Date(ss.endedAt).getTime() - new Date(ss.startedAt).getTime()) / 1000)
+        ? (() => {
+            const ms = new Date(ss.endedAt).getTime() - new Date(ss.startedAt).getTime();
+            return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
+          })()
         : null;
 
       const transcriptParts: string[] = [];
@@ -480,7 +483,10 @@ export async function fetchActivityDataWithContext(
           startedAt: ss.startedAt,
           endedAt: ss.endedAt,
           duration: ss.startedAt && ss.endedAt
-            ? Math.floor((new Date(ss.endedAt).getTime() - new Date(ss.startedAt).getTime()) / 1000)
+            ? (() => {
+                const ms = new Date(ss.endedAt).getTime() - new Date(ss.startedAt).getTime();
+                return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
+              })()
             : null,
           status: ss.status,
           presence: orchestratorPresence,

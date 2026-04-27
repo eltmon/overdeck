@@ -302,9 +302,9 @@ export function CommandDeck({
       const tree = sessionTreeMap[project.name];
       if (!tree) return project;
 
-      const featureSessions = new Map<string, import('@panctl/contracts').SessionNode[]>();
+      const featureSessions = new Map<string, readonly import('@panctl/contracts').SessionNode[]>();
       for (const feature of tree.features) {
-        featureSessions.set(feature.issueId.toLowerCase(), [...feature.sessions]);
+        featureSessions.set(feature.issueId.toLowerCase(), feature.sessions);
       }
 
       let featuresChanged = false;
@@ -397,7 +397,7 @@ export function CommandDeck({
     setSelectedFeature(issueId);
     // Auto-select the best alive session so the user doesn't have to click twice
     // (feature → session). Falls back to issue-selected mode when no sessions exist.
-    let sessions: SessionNode[] = [];
+    let sessions: readonly SessionNode[] = [];
     for (const project of projectsWithSessions) {
       const feature = project.features.find(f => f.issueId === issueId);
       if (feature) {
@@ -429,8 +429,11 @@ export function CommandDeck({
   }, [queryClient]);
 
   const handleCleanupOrphanedResources = useCallback(async (issueId: string) => {
+    if (!window.confirm(`Clean up orphaned resources for ${issueId}? This removes leftover local workspace state for a closed issue.`)) {
+      return;
+    }
     try {
-      const res = await fetch(`/api/issues/${issueId}/cleanup-workspace`, { method: 'POST' });
+      const res = await fetch(`/api/issues/${encodeURIComponent(issueId)}/cleanup-workspace`, { method: 'POST' });
       if (!res.ok) throw new Error('Failed to clean up orphaned resources');
       bumpProjectQueryEpoch();
       await refreshDashboardState(queryClient);
@@ -501,7 +504,7 @@ export function CommandDeck({
 
   const handleDeepWipe = useCallback(async (issueId: string) => {
     try {
-      const res = await fetch(`/api/issues/${issueId}/deep-wipe`, {
+      const res = await fetch(`/api/issues/${encodeURIComponent(issueId)}/deep-wipe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deleteWorkspace: true }),

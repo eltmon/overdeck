@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:ui": "vitest --ui",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:playwright": "playwright test tests/command-deck-resource-strip.spec.ts"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.0.0",

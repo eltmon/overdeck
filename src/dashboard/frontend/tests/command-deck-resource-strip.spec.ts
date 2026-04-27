@@ -253,7 +253,7 @@ test.describe('Command Deck resource strip', () => {
     await expect(pan862Row.getByTitle('tmux: 2 sessions')).toBeVisible();
     await expect(pan862Row.getByTitle('vBRIEF: present')).toBeVisible();
     await expect(pan862Row.getByTitle('beads: present')).toBeVisible();
-    await expect(pan862Row.getByTitle('PR: 2 open')).toBeVisible();
+    await expect(pan862Row.getByTitle('PR: #862 (open) · #863 (open, draft)')).toBeVisible();
     await expect(pan862Row.getByTitle('docker: 1 container')).toBeVisible();
     await workspaceIcon.hover();
 
@@ -264,8 +264,8 @@ test.describe('Command Deck resource strip', () => {
     await expect(pan862Row.getByText('tmux: review-pan-862', { exact: true })).toBeVisible();
     await expect(pan862Row.getByText('vBRIEF present', { exact: true })).toBeVisible();
     await expect(pan862Row.getByText('beads present', { exact: true })).toBeVisible();
-    await expect(pan862Row.getByText('PR: #862 PAN-862 main PR', { exact: true })).toBeVisible();
-    await expect(pan862Row.getByText('PR: #863 PAN-862 draft PR', { exact: true })).toBeVisible();
+    await expect(pan862Row.getByText('PR: #862 PAN-862 main PR (open)', { exact: true })).toBeVisible();
+    await expect(pan862Row.getByText('PR: #863 PAN-862 draft PR (open, draft)', { exact: true })).toBeVisible();
     await expect(pan862Row.getByText('docker: pan-862-db', { exact: true })).toBeVisible();
 
     const closedWorkspaceIcon = pan777Row.getByTitle('workspace: allocated');

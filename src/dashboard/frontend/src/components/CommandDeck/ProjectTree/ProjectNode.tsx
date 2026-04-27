@@ -55,7 +55,7 @@ export interface ProjectFeature {
   inProgressCount?: number;
   rawTrackerState?: string;
   readyForMerge?: boolean;
-  sessions?: SessionNode[];
+  sessions?: readonly SessionNode[];
   resourceSources?: ResourceSource[];
   resourceDetails?: ProjectFeatureResourceDetails;
 }
