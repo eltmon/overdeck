@@ -1,4 +1,4 @@
-import type { AgentSnapshot } from '@panctl/contracts';
+import { AgentStatus, type AgentSnapshot } from '@panctl/contracts';
 
 interface ResolveIssueHeadlineCostOptions {
   issueId: string;
@@ -12,7 +12,7 @@ export interface ResolvedIssueHeadlineCost {
   resolvedTotalCost: number | null;
 }
 
-const LIVE_AGENT_STATUSES = new Set(['starting', 'running']);
+const LIVE_AGENT_STATUSES = new Set<AgentStatus>(['starting', 'running']);
 
 function normalizeIssueId(issueId: string): string {
   return issueId.trim().toUpperCase();
