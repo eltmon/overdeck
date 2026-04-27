@@ -2,76 +2,75 @@
 specialist: review-agent
 issueId: PAN-879
 outcome: changes-requested
-timestamp: 2026-04-27T13:39:19Z
+timestamp: 2026-04-27T14:01:58Z
 ---
 
 # Verdict: CHANGES_REQUESTED
 
 ## Summary
-PAN-879 implements a canonical stash taxonomy with named prefixes, a janitor in the Deacon for stale stash cleanup, lifecycle management for pre-merge/pre-spawn/review-temp/salvageable stashes, and a dashboard inspector UI for recovering or dismissing salvageable stashes. The implementation is structurally sound with good test coverage. However, two critical issues block merge: (1) the new stash recovery and deletion endpoints are unauthenticated, expanding the dashboard's mutation surface without any authorization guard; and (2) the merge success path violates its own explicit acceptance criterion — it restores (`popStash`) the pre-merge safety stash instead of dropping it, contradicting CLAUDE.md stash hygiene rules.
+PAN-879 implements a canonical stash taxonomy (pre-merge, pre-spawn, review-temp, salvageable) with a janitor that drops stale stashes and a dashboard inspector for salvageable stash recovery. All 12 requirements are implemented and requirements coverage is complete. However, 1 blocker was found: `reconcileAndCheckIfMerged` in deacon.ts conflates tracker "closed" state with "merged" for Linear/GitLab/Rally, which can cause data loss by dropping pre-merge stashes for issues closed as "won't fix", "duplicate", or "cancelled". Two additional should-fix issues (env var zero handling, review-temp regex inconsistency) and 1 performance warning (O(N) subprocess rescans in janitor drop path) also require attention before this can merge.
 
 ## Blockers (MUST fix before merge)
 
-### 1. Unauthenticated stash recovery and deletion endpoints — `src/dashboard/server/routes/workspaces.ts:1166,1196` — `!`
-**Raised by**: security
-**Why it blocks**: `POST /api/workspaces/:issueId/stashes/:stashRef/recover` and `DELETE /api/workspaces/:issueId/stashes/:stashRef` perform destructive Git operations (branch creation, stash deletion) with no authentication, authorization, or CSRF validation. An attacker who can reach the dashboard server can enumerate stash refs via `GET /api/workspaces/:issueId/stashes`, then create recovery branches from or permanently delete salvageable user work.
+### 1. `reconcileAndCheckIfMerged` treats tracker "closed" as "merged" for non-GitHub trackers — `src/lib/cloister/deacon.ts:~2410` — `⊗`
+**Raised by**: correctness
+**Why it blocks**: For Linear/GitLab/Rally, any closed issue (including "won't fix", "duplicate", "cancelled") is treated as merged, causing the janitor to drop pre-merge safety stashes for issues that were never actually merged — irreversible data loss of uncommitted work.
 
-**Fix instruction**: Add the same trust-boundary checks used by other privileged dashboard actions before performing the Git operation. At minimum, wire in the workspace mutation permission check (the same pattern used by other destructive endpoints in the same route module). If localhost-only access is the intended guard, enforce it explicitly at the server boundary rather than relying on convention.
+The function checks `tracker.getIssue(issueId).state === 'closed'` which is only sufficient for GitHub (where `prState.merged` is checked first). For other trackers, closed = merged is wrong.
 
-### 2. Merge success path does not drop the `pre-merge:` stash — `src/lib/cloister/merge-agent.ts:1161` — `!`
-**Raised by**: requirements
-**Why it blocks**: The issue's explicit acceptance criterion states "`merge-agent.ts` drops `pre-merge:` stash on success AND on rollback." The current success path at line 1161 calls `popStash(projectPath, preMergeStashRef)` which restores the stash instead of dropping it. The corresponding test at `src/lib/cloister/__tests__/merge-agent-stash.test.ts:88` also codifies the wrong behavior (asserts `dropStash` was NOT called). This is a missing requirement (REQ-13) and violates the CLAUDE.md stash hygiene rule that "`pre-merge:*` — drop once the merge succeeds."
-
-**Fix instruction**: Change the merge success path to call `dropStash(projectPath, preMergeStashRef)` instead of `popStash(...)`. Update the test to assert that `dropStash` IS called on successful merge completion. The rollback path already correctly drops the stash — only the success path needs to be fixed.
+**Fix**: Check for a merged PR or branch existence before treating non-GitHub tracker issues as merged. Expose a merge-specific field from the tracker abstraction (e.g., `issue.merged` or `issue.closedReason`), or gate the close-as-merged logic on tracker type (GitHub-only).
 
 ## High Priority (SHOULD fix; synthesis may still approve if justified)
 
-### 1. TOCTOU race on pre-spawn stash baseline check — `src/lib/cloister/deacon.ts:cleanupSpawnAndOrphanedStashes` — `~`
+### 1. `PAN_STASH_JANITOR_CYCLES` env var silently ignores `0` — `src/lib/cloister/config.ts:~391` — `!`
 **Raised by**: correctness
-**Fix instruction**: Consider adding a minimum agent-runtime threshold (e.g., 5 minutes) before the janitor drops a pre-spawn stash, to avoid dropping a stash where `hasCommitsAhead` is true purely due to a rebased baseline rather than actual new commits.
+**Why it blocks**: The YAML config correctly accepts `stash_janitor_every_cycles: 0` to disable the janitor (sets interval to Infinity), but the env var override uses `parsed > 0`, silently ignoring `PAN_STASH_JANITOR_CYCLES=0`. This inconsistency means a user cannot disable the janitor via env var.
 
-### 2. Multi-project workspace path resolution bypasses existing pattern — `src/dashboard/server/routes/workspaces.ts:resolveWorkspacePath` — `~`
-**Raised by**: correctness
-**Fix instruction**: `resolveWorkspacePath` derives the path from issue prefix alone. For multi-project setups where two projects share a prefix, this could resolve to the wrong workspace. Reuse the workspace resolution pattern from the existing workspace detail endpoints (which use workspace metadata file) instead of deriving from prefix.
+**Fix**: Change `parsed > 0` to `parsed >= 0` in config.ts line ~391 to match config file behavior.
 
-### 3. Sequence counter incremented even when no stash is created — `src/lib/cloister/review-agent.ts:108-125` — `~`
+### 2. `review-temp` regex uses `\w+-\d+` instead of `ISSUE_ID_PATTERN` — `src/lib/stashes.ts:97` — `!`
 **Raised by**: correctness
-**Fix instruction**: Call `getNextReviewTempSequence` only after confirming the stash was actually created, to avoid cosmetic gaps in sequence numbering. Alternatively, accept the gap as currently documented — the behavior is functionally correct.
+**Why it blocks**: The `review-temp` parser accepts lowercase issue IDs (e.g., `pan-879`) while all other stash kinds use the stricter uppercase-only `ISSUE_ID_PATTERN`. This latent inconsistency means messages constructed outside `buildStashMessage` would parse differently across stash types.
 
-### 4. Stale merge reconciliation sets `mergeStatus: 'merged'` for cancelled issues — `src/lib/cloister/deacon.ts:reconcileAndCheckIfMerged` — `~`
-**Raised by**: correctness
-**Fix instruction**: Treat tracker "closed" state as a secondary heuristic only when a PR URL exists. Use the GitHub App PR state check (`prState.merged`) as the primary signal, which correctly distinguishes merged from cancelled/duplicate/wontfix.
+**Fix**: Use `ISSUE_ID_PATTERN` in the review-temp regex:
+```typescript
+const reviewTempMatch = new RegExp(`^review-temp:${ISSUE_ID_PATTERN}:(\\d+)$`).exec(message);
+```
+
+### 3. Janitor does O(N) repeated `listStashes` rescans while dropping N stashes — `src/lib/cloister/deacon.ts:2569` — `~`
+**Raised by**: performance
+**Why it blocks**: `dropStash()` calls `resolveStashOperationRef()`, which re-invokes `listStashes()` to map SHA→stackRef for every stash being dropped. Dropping N stashes costs 1 initial scan + N rescans + N drops = O(N) extra subprocess calls.
+
+**Fix**: Use the already-known `stackRef` when available, or add a batch drop path that operates on precomputed ordered stash entries directly. The `listStashes` result already contains `stackRef` for each entry — pass it through instead of re-resolving by SHA.
 
 ## Nits (advisory — safe to defer)
 
-- `src/lib/stashes.ts:130-131` — `?` — Decorated message extraction may misparse branch names with colons. Consider a more robust extraction for the `On <branch>: <message>` format. (correctness)
-- `src/lib/stashes.ts:190-205` — `?` — `resolveStashOperationRef` calls `listStashes` on every invocation. Consider caching results within a batch operation for minor performance improvement. (correctness)
-- `src/lib/cloister/review-agent.ts:1040-1047` — `?` — The `finally` block cleanup may mask the original review error if cleanup itself fails. Consider surfacing the original error prominently in error logs. (correctness)
-- `src/dashboard/frontend/src/components/InspectorPanel.tsx:186` — `?` — Salvageable stash query polls every 60s; could be event-driven eventually. Current cadence is fine for current scale. (performance)
+- `src/lib/stashes.ts:177–205` — `~` — TOCTOU in `resolveStashOperationRef`. Race window between resolve and operation is acknowledged in code comments. Acceptable since deacon is the only automated stash operator per workspace. (correctness)
+- `src/lib/cloister/review-agent.ts:~1041` — `~` — `cleanupReviewTempStash` in finally block silently swallows errors. Orphaned stash persists until janitor age-based sweep (28 days). Acceptable as safety net. (correctness)
+- `src/lib/cloister/deacon.ts:~2470` — `~` — `cleanupSpawnAndOrphanedStashes` mutates `getAgentState()` result in place before `saveAgentState`. If save fails, in-memory state is already mutated. Established pattern, not a regression. (correctness)
+- `src/lib/stashes.ts:~1230` — `?` — Recover/delete endpoints rescan stash list twice per action (performance optimization). Minor at small stash counts. (performance)
+- `src/lib/cloister/deacon.ts:~2495` — `?` — `listStashes` called per-workspace in a loop. Bounded by janitor cycle cadence (~hourly). Not a correctness issue. (correctness)
 
 ## Cross-cutting groups
 
-**Stash endpoint authorization** (same root cause — no auth layer on new mutation endpoints):
-- [blocker-1] Unauthenticated stash recovery and deletion endpoints
+**Janitor stash lifecycle** (related by shared drop/list machinery):
+- [blocker-1] C1: `reconcileAndCheckIfMerged` false positive for non-GitHub trackers causes premature stash drops
+- [high-3] Performance warning: O(N) rescans in janitor drop path (same `resolveStashOperationRef` call chain)
 
-**Merge success path** (same root cause — wrong stash operation on success):
-- [blocker-2] Merge success path does not drop `pre-merge:` stash
-- The test `src/lib/cloister/__tests__/merge-agent-stash.test.ts:88` codifies the same incorrect behavior and must be updated alongside the fix
-
-**Workspace path resolution** (related findings on path derivation):
-- [high-2] Multi-project workspace path resolution bypasses existing pattern
-- [blocker-1] The unauthenticated endpoints also use `resolveWorkspacePath`, amplifying the multi-project risk
+**Configuration consistency** (shared root cause: env var vs YAML config file handling):
+- [high-1] C2: `PAN_STASH_JANITOR_CYCLES=0` silently ignored
+- [high-2] C3: `review-temp` regex inconsistency vs other stash kinds
 
 ## What's good
-- Canonical stash taxonomy (`stashes.ts`) is well-designed with clear type definitions and consistent naming conventions.
-- Test coverage for the janitor logic, merge stash lifecycle, and review-temp cleanup is thorough and uses realistic scenarios.
-- The salvageable stash inspector UI and confirmation dialog represent a solid user-facing improvement.
-- Startup legacy-stash scan safely logs non-canonical stashes without deleting them — appropriate first step.
+- All 12 requirements from PAN-879 are implemented; requirements coverage is complete with zero missing or partial items.
+- Canonical stash taxonomy design (canonical prefix format, stable SHA refs, kind-based lifecycle rules) is well-structured and consistent across all four stash types.
+- Test coverage is thorough across canonical format parsing, janitor age cutoff, salvageable preservation, and all drop-on-completion paths.
+- Security review found zero issues — no injection, authz, data exposure, or unsafe command execution risks introduced.
 
 ## Review stats
-- Blockers: 2   High: 4   Medium: 0   Nits: 4
-- By reviewer: correctness=7, security=2, performance=2, requirements=1
-- Files touched: 19   Files with findings: 9
+- Blockers: 1   High: 3   Medium: 0   Nits: 5
+- By reviewer: correctness=10, security=0, performance=2, requirements=0
+- Files touched: 20   Files with findings: 7
 
 ## Appendix: individual reviews
 
