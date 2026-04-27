@@ -9,7 +9,7 @@
  * directly (zero-roundtrip) — this module is for everything else.
  */
 
-import type { AgentRuntimeSnapshot, Activity, AgentResolution, WaitingReason } from '@panopticon/contracts'
+import type { AgentRuntimeSnapshot, Activity, AgentResolution, WaitingReason } from '@panctl/contracts'
 
 // Use 127.0.0.1 explicitly: when /etc/hosts resolves `localhost` to ::1
 // (IPv6 first), Node's undici-based fetch() connects to [::1]:3011 and

@@ -27,7 +27,7 @@ function getCurrentVersion(): string {
 // Get latest version from npm
 async function getLatestVersion(): Promise<string> {
   try {
-    const result = execSync('npm view panopticon-cli version', {
+    const result = execSync('npm view @panctl/cli version', {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -96,7 +96,7 @@ export async function updateCommand(options: {
   console.log(chalk.dim('\nUpdating Panopticon...'));
 
   try {
-    execSync('npm install -g panopticon-cli@latest', {
+    execSync('npm install -g @panctl/cli@latest', {
       stdio: 'inherit',
     });
 
@@ -113,7 +113,7 @@ export async function updateCommand(options: {
   } catch (error) {
     console.error(chalk.red('\nUpdate failed'));
     console.error(
-      chalk.dim('Try running with sudo: sudo npm install -g panopticon-cli@latest')
+      chalk.dim('Try running with sudo: sudo npm install -g @panctl/cli@latest')
     );
     process.exit(1);
   }

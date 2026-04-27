@@ -7,8 +7,8 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import type { DomainEvent } from '@panopticon/contracts'
-import { INITIAL_READ_MODEL_STATE, applyEvent } from '@panopticon/contracts'
+import type { DomainEvent } from '@panctl/contracts'
+import { INITIAL_READ_MODEL_STATE, applyEvent } from '@panctl/contracts'
 
 const AGENT = 'agent-800'
 const TS = '2026-04-22T06:00:00.000Z'

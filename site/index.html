@@ -50,7 +50,7 @@
       <div class="hero-actions">
         <button class="copy-btn" onclick="copyCmd(this)">
           <span class="copy-dollar">$</span>
-          <span class="copy-text">npx @eltmon/panctl</span>
+          <span class="copy-text">npx @panctl/cli</span>
           <svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
           <span class="copy-toast">Copied!</span>
         </button>
@@ -367,7 +367,7 @@
           <span class="code-filename">terminal</span>
         </div>
         <pre class="code-body"><span class="code-comment"># Install and launch</span>
-<span class="code-prompt">$</span> npx @eltmon/panctl install && pan up
+<span class="code-prompt">$</span> npx @panctl/cli install && pan up
 
 <span class="code-comment"># Start working on an issue</span>
 <span class="code-prompt">$</span> pan work issue PAN-443
@@ -396,7 +396,7 @@
       <p class="cta-sub">Zero install. One command. Full control.</p>
       <button class="copy-btn copy-btn-lg" onclick="copyCmd(this)">
         <span class="copy-dollar">$</span>
-        <span class="copy-text">npx @eltmon/panctl</span>
+        <span class="copy-text">npx @panctl/cli</span>
         <svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
         <span class="copy-toast">Copied!</span>
       </button>
@@ -423,7 +423,7 @@
 
   <script>
     function copyCmd(btn) {
-      navigator.clipboard.writeText('npx @eltmon/panctl').then(() => {
+      navigator.clipboard.writeText('npx @panctl/cli').then(() => {
         btn.classList.add('copied');
         setTimeout(() => btn.classList.remove('copied'), 2000);
       });

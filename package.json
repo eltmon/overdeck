@@ -1,5 +1,5 @@
 {
-  "name": "panopticon-cli",
+  "name": "@panctl/cli",
   "version": "0.7.2",
   "description": "Multi-agent orchestration for AI coding assistants (Claude Code, Codex, Cursor, Gemini CLI)",
   "keywords": [
@@ -43,8 +43,8 @@
     }
   },
   "bin": {
-    "pan": "./dist/cli/index.js",
-    "panopticon": "./dist/cli/index.js"
+    "panctl": "./dist/cli/index.js",
+    "pan": "./dist/cli/index.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -113,7 +113,7 @@
   "devDependencies": {
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
-    "@panopticon/contracts": "workspace:*",
+    "@panctl/contracts": "workspace:*",
     "@types/better-sqlite3": "^7.6.13",
     "@types/inquirer": "^9.0.9",
     "@types/js-yaml": "^4.0.9",

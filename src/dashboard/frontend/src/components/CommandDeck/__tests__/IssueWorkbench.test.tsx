@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
+import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import { IssueWorkbench } from '../IssueWorkbench';
 import { useCommandDeckSelection } from '../../../lib/commandDeckSelection';
 

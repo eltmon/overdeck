@@ -10,7 +10,7 @@
  * This component remains pass-through so external callers can still override markers.
  */
 
-import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
+import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { RoundMarker } from '../chat/MessagesTimeline';
 import { SessionPanel } from './SessionView/SessionPanel';
 

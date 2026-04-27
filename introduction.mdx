@@ -10,7 +10,7 @@ description: 'Multi-agent orchestration for AI coding assistants'
 > — Classic Doctor Who. The Panopticon was the great hall at the heart of the Time Lord Citadel, where all could be observed. We liked the metaphor.
 
 ```bash
-npx @eltmon/panctl
+npx @panctl/cli
 ```
 
 No install step required — Command Deck opens immediately. Missing tools are prompted and installed inline the first time you use a feature that needs them.
@@ -25,7 +25,7 @@ Each stage runs as a separate agent process in its own tmux session with full te
 
 ## Architecture at a Glance
 
-Panopticon started as a CLI for orchestrating coding agents and grew into **Command Deck**, a desktop app. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — so you can spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch the app with `npx @eltmon/panctl`; keep `pan` for headless and CI.
+Panopticon started as a CLI for orchestrating coding agents and grew into **Command Deck**, a desktop app. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — so you can spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch the app with `npx @panctl/cli`; keep `pan` for headless and CI.
 
 ## Why Panopticon?
 
@@ -103,10 +103,10 @@ The dashboard at `https://pan.localhost` provides 13 views:
 ## Quick Start
 
 ```bash
-npx @eltmon/panctl
+npx @panctl/cli
 ```
 
-Command Deck opens immediately. For headless and CI, use `pan` (install via `npm install -g panopticon-cli`).
+Command Deck opens immediately. For headless and CI, use `pan` (install via `npm install -g @panctl/cli`).
 
 Dashboard runs at `https://pan.localhost` (or `http://localhost:3011` if you skip HTTPS setup).
 

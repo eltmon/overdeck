@@ -4,7 +4,7 @@
 
 **Multi-agent orchestration for AI coding assistants**
 
-[![npm version](https://img.shields.io/npm/v/panopticon-cli.svg)](https://www.npmjs.com/package/panopticon-cli)
+[![npm version](https://img.shields.io/npm/v/%40panctl%2Fcli.svg)](https://www.npmjs.com/package/@panctl/cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D22-brightgreen.svg)](https://nodejs.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/eltmon/panopticon-cli/pulls)
@@ -26,10 +26,10 @@ Panopticon is an open-source control plane for multi-agent software development.
 ## Quick Start
 
 ```bash
-npx @eltmon/panctl
+npx @panctl/cli
 ```
 
-No install step required — Command Deck opens immediately. Missing tools (tmux, gh, mkcert, etc.) are prompted and installed inline the first time you use a feature that needs them. For headless and CI, keep using `pan`.
+No install step required. Use `panctl` or `pan` after `npm install -g @panctl/cli`. The desktop app is also publishable separately as `@panctl/desktop`.
 
 For the power-user path that installs everything up front: `pan install`.
 
@@ -43,7 +43,7 @@ See the [full documentation](https://panopticon-cli.com) for detailed setup, con
 
 ## Architecture at a Glance
 
-Panopticon started as a CLI for orchestrating coding agents and grew into **Command Deck**, a desktop app. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — so you can spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch the app with `npx @eltmon/panctl`; keep `pan` for headless and CI.
+Panopticon started as a CLI for orchestrating coding agents and grew into **Command Deck**, a desktop app. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — so you can spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @panctl/cli`; keep `pan` for headless and CI, or use `@panctl/desktop` for the packaged desktop app.
 
 ---
 
@@ -192,5 +192,5 @@ MIT License - see [LICENSE](LICENSE) for details.
 ---
 
 <div align="center">
-<p><a href="https://github.com/eltmon/panopticon-cli">GitHub</a> · <a href="https://www.npmjs.com/package/panopticon-cli">npm</a> · <a href="https://panopticon-cli.com">Documentation</a></p>
+<p><a href="https://github.com/eltmon/panopticon-cli">GitHub</a> · <a href="https://www.npmjs.com/package/@panctl/cli">npm</a> · <a href="https://panopticon-cli.com">Documentation</a></p>
 </div>
