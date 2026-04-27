@@ -126,10 +126,10 @@ export function useActivityQuery(issueId: string): UseQueryResult<ActivityRespon
 
 export interface ReviewStatusData {
   issueId: string;
-  reviewStatus: string;
-  testStatus: string;
-  mergeStatus?: string;
-  verificationStatus?: string;
+  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
+  testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
+  mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
+  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
   verificationNotes?: string;
   verificationCycleCount?: number;
   verificationMaxCycles?: number;
