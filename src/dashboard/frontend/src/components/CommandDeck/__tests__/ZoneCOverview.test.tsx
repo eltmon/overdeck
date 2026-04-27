@@ -54,6 +54,15 @@ vi.mock('../ZoneCOverviewTabs/queries', () => ({
   useReviewStatusQuery: () => reviewStatusResult,
 }));
 
+vi.mock('../../../hooks/useCostStream', () => ({
+  useIssueCostStream: () => ({
+    issueCost: 0,
+    issueEvents: [],
+    isLoading: false,
+    error: null,
+  }),
+}));
+
 // Beads + ActivityTab + VBriefTab embed components that hit other code paths;
 // stub them out so this test stays focused on tab routing.
 vi.mock('../ZoneCOverviewTabs/BeadsTab', () => ({

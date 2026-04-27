@@ -98,6 +98,23 @@ import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enric
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
+async function readWorkspacePlanningMarkdown(
+  issueId: string,
+  fileName: 'STATE.md' | 'INFERENCE.md',
+): Promise<{ issueId: string; body: string }> {
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+  const projectPath = getProjectPath(undefined, issuePrefix);
+  const issueLower = issueId.toLowerCase();
+  const workspaceName = `feature-${issueLower}`;
+  const workspacePath = join(projectPath, 'workspaces', workspaceName);
+
+  const content = await readFile(join(workspacePath, '.planning', fileName), 'utf-8');
+  return {
+    issueId,
+    body: content,
+  };
+}
+
 function shouldTreatAsRerun(status: Pick<ReviewStatus, 'readyForMerge' | 'reviewStatus' | 'testStatus' | 'mergeStatus'> | null | undefined): boolean {
   if (!status) return false;
   return status.readyForMerge === true
@@ -1097,6 +1114,36 @@ const postWorkspacesRoute = HttpRouter.add(
 );
 
 // ─── Route: GET /api/workspaces/:issueId/plan ─────────────────────────────────
+
+const getWorkspaceStateMdRoute = HttpRouter.add(
+  'GET',
+  '/api/workspaces/:issueId/state-md',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+
+    return yield* Effect.promise(() =>
+      readWorkspacePlanningMarkdown(issueId, 'STATE.md')
+        .then((result) => jsonResponse(result))
+        .catch(() => jsonResponse({ error: 'STATE.md not found for this workspace' }, { status: 404 }))
+    );
+  }))
+);
+
+const getWorkspaceInferenceMdRoute = HttpRouter.add(
+  'GET',
+  '/api/workspaces/:issueId/inference-md',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+
+    return yield* Effect.promise(() =>
+      readWorkspacePlanningMarkdown(issueId, 'INFERENCE.md')
+        .then((result) => jsonResponse(result))
+        .catch(() => jsonResponse({ error: 'INFERENCE.md not found for this workspace' }, { status: 404 }))
+    );
+  }))
+);
 
 const getWorkspacePlanRoute = HttpRouter.add(
   'GET',
@@ -4682,6 +4729,8 @@ const getMergeQueueRoute = HttpRouter.add(
 export const workspacesRouteLayer = Layer.mergeAll(
   getWorkspaceRoute,
   postWorkspacesRoute,
+  getWorkspaceStateMdRoute,
+  getWorkspaceInferenceMdRoute,
   getWorkspacePlanRoute,
   getWorkspaceCleanPreviewRoute,
   postWorkspaceCleanRoute,

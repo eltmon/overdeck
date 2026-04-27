@@ -1,12 +1,7 @@
-/**
- * ActivityTab — wraps the existing ActivityView (already issue-scoped via
- * `/api/command-deck/activity/:issueId` query). Same `Issue[]` and feature
- * data signature so the per-issue Rally / story rollup keeps working.
- */
+import { ActivityFeed } from '../../GodView/ActivityFeed';
 
 import type { Issue } from '../../../types';
 import type { ProjectFeature } from '../ProjectTree/ProjectNode';
-import { ActivityView } from '../ActivityView';
 
 interface ActivityTabProps {
   issueId: string;
@@ -14,14 +9,10 @@ interface ActivityTabProps {
   featureData?: ProjectFeature | null;
 }
 
-export function ActivityTab({ issueId, issues, featureData }: ActivityTabProps) {
+export function ActivityTab({ issueId }: ActivityTabProps) {
   return (
-    <div data-testid="activity-tab" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <ActivityView
-        issueId={issueId}
-        issues={issues ? [...issues] : undefined}
-        featureData={featureData}
-      />
+    <div data-testid="activity-tab" data-issue-id={issueId} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, padding: 16 }}>
+      <ActivityFeed />
     </div>
   );
 }

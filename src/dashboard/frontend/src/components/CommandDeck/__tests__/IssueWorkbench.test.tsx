@@ -55,6 +55,15 @@ vi.mock('../ZoneCOverviewTabs/queries', () => ({
   useDiscussionsQuery: () => ({ data: undefined, isLoading: false, isError: false }),
 }));
 
+vi.mock('../../../hooks/useCostStream', () => ({
+  useIssueCostStream: () => ({
+    issueCost: 0,
+    issueEvents: [],
+    isLoading: false,
+    error: null,
+  }),
+}));
+
 function makeSession(sessionId: string): SessionNodeType {
   return {
     type: 'work',

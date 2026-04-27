@@ -11,13 +11,36 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
-import { promisify } from 'util';
 import { getPanopticonHome } from '../paths.js';
 import { getRecentRunLogs, type RunLogEntry } from './specialist-logs.js';
 import { getProject } from '../projects.js';
 import { getModelId } from '../work-type-router.js';
 
-const execAsync = promisify(exec);
+function execAsync(command: string, options: { encoding: 'utf-8'; maxBuffer: number; timeout: number }): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    exec(command, options, (error, stdoutOrResult, stderr) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      if (
+        stdoutOrResult != null
+        && typeof stdoutOrResult === 'object'
+        && 'stdout' in stdoutOrResult
+      ) {
+        const result = stdoutOrResult as { stdout?: string; stderr?: string };
+        resolve({ stdout: result.stdout ?? '', stderr: result.stderr ?? '' });
+        return;
+      }
+
+      resolve({
+        stdout: typeof stdoutOrResult === 'string' ? stdoutOrResult : '',
+        stderr: typeof stderr === 'string' ? stderr : '',
+      });
+    });
+  });
+}
 
 /** Get specialists directory (lazy to support test env overrides) */
 function getSpecialistsDir(): string {

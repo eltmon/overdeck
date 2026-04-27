@@ -202,24 +202,23 @@ describe('specialist-handoff-logger', () => {
       expect(handoffs).toHaveLength(2);
     });
 
-    it('should handle corrupted JSON gracefully', () => {
-      // Write valid handoff
+    it('should skip corrupted JSON lines and keep valid handoffs', () => {
       const validHandoff = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal');
       logSpecialistHandoff(validHandoff);
 
-      // Append corrupted JSON
       writeFileSync(
         getTestLogFile(),
         readFileSync(getTestLogFile(), 'utf-8') + '{invalid json\n',
         'utf-8'
       );
 
-      // Write another valid handoff
       const validHandoff2 = createSpecialistHandoff('test-agent', 'merge-agent', 'PAN-2', 'urgent');
       logSpecialistHandoff(validHandoff2);
 
-      // Should throw when encountering corrupted JSON
-      expect(() => readSpecialistHandoffs()).toThrow();
+      const handoffs = readSpecialistHandoffs();
+      expect(handoffs).toHaveLength(2);
+      expect(handoffs[0].issueId).toBe('PAN-2');
+      expect(handoffs[1].issueId).toBe('PAN-1');
     });
   });
 
