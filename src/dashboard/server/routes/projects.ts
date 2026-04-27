@@ -266,8 +266,7 @@ const getAllSessionTreesRoute = HttpRouter.add(
   'GET',
   '/api/session-trees',
   httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const url = new URL(request.url);
+    const url = new URL(request.url, 'http://localhost');
     const projectsParam = url.searchParams.get('projects') ?? '';
     const projectKeys = projectsParam.split(',').filter(Boolean);
 
