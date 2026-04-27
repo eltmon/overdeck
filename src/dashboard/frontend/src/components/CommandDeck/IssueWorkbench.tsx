@@ -26,7 +26,6 @@ import {
   selectSelectedSessionForIssue,
 } from '../../lib/commandDeckSelection';
 import type { Agent, Issue } from '../../types';
-import type { ProjectFeature } from './ProjectTree/ProjectNode';
 import type { OverviewTab } from './ZoneCOverview';
 import { ZoneA } from './ZoneA';
 import { ZoneB } from './ZoneB';
