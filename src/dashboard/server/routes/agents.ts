@@ -36,7 +36,7 @@ import { promisify } from 'node:util';
 
 import { Effect, Layer, Option, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
-import { DomainEvent } from '@panopticon/contracts';
+import { DomainEvent } from '@panctl/contracts';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { loadCloisterConfig } from '../../../lib/cloister/config.js';
@@ -85,7 +85,7 @@ import {
   type PendingQuestion,
 } from '../../../lib/agent-enrichment.js';
 import { parseConversationMessages } from '../services/conversation-service.js';
-import type { ConversationResponse } from '@panopticon/contracts';
+import type { ConversationResponse } from '@panctl/contracts';
 import { EventStoreService } from '../services/domain-services.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSessionAsync, listSessionsAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 

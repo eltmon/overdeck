@@ -118,7 +118,7 @@ export interface ProjectConfig {
   quality_gates?: Record<string, QualityGateConfig>;
   /** Package manager for dependency installation in workspaces (bun, npm, pnpm) */
   package_manager?: 'bun' | 'npm' | 'pnpm';
-  /** Local workspace packages that need building before quality gates (e.g., @panopticon/contracts) */
+  /** Local workspace packages that need building before quality gates (e.g., @panctl/contracts) */
   workspace_packages?: Array<{ path: string; build_command: string }>;
   /**
    * Path to the repo where per-project cost WAL files live.

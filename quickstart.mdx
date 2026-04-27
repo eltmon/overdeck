@@ -8,10 +8,10 @@ description: 'Get Panopticon running in one command'
 ## One Command
 
 ```bash
-npx @eltmon/panctl
+npx @panctl/cli
 ```
 
-That's it. `panctl` downloads the Panopticon desktop app (Command Deck), starts the embedded server, and opens the window. No `install`, no `sync`, no Docker — the app opens and you see the UI.
+That's it. `npx @panctl/cli` starts the Panopticon browser/server experience and opens the dashboard in your browser. No global install step required.
 
 Missing tools (tmux, gh, mkcert, etc.) are prompted and installed inline the first time you use a feature that needs them.
 
@@ -21,7 +21,7 @@ Missing tools (tmux, gh, mkcert, etc.) are prompted and installed inline the fir
 
 ## What Happens Next
 
-1. **Command Deck opens** — the Electron app wraps the Panopticon dashboard
+1. **Dashboard starts** — Panopticon launches the local server and opens the browser UI
 2. **Add a project** — click the project picker and point Panopticon at a GitHub or GitLab repo
 3. **Pick an issue** — select an open issue from the kanban board
 4. **Spawn an agent** — Panopticon creates a git worktree, writes a PRD (plan), and starts coding
@@ -31,7 +31,7 @@ Missing tools (tmux, gh, mkcert, etc.) are prompted and installed inline the fir
 For terminals, scripts, and CI where you don't need the GUI:
 
 ```bash
-npm install -g panopticon-cli
+npm install -g @panctl/cli
 pan up        # start dashboard server
 pan work PAN-123   # spawn agent for an issue
 ```
@@ -41,7 +41,7 @@ pan work PAN-123   # spawn agent for an issue
 If you prefer to set up all tools at once (useful for shared dev machines or CI images):
 
 ```bash
-npm install -g panopticon-cli
+npm install -g @panctl/cli
 pan install   # installs tmux, ttyd, mkcert, gh, glab, beads, claudish, ox
 pan sync      # sync skills/agents/rules to ~/.panopticon/
 pan up        # start Traefik + dashboard
@@ -57,4 +57,4 @@ Prefer a standalone app? Download the latest release for your platform:
 
 ## Architecture at a Glance
 
-Panopticon started as a CLI for orchestrating coding agents and grew into **Command Deck**, a desktop app. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — so you can spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch the app with `npx @eltmon/panctl`; keep `pan` for headless and CI.
+Panopticon started as a CLI for orchestrating coding agents and grew into **Command Deck**, a desktop app. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — so you can spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch the browser/server experience with `npx @panctl/cli`, use `@panctl/desktop` for the packaged desktop app, and keep `pan` for headless and CI.

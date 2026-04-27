@@ -19,7 +19,7 @@ import { extractPrefix } from '../../../lib/issue-id.js';
 import { listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
-import type { AgentStatus, SessionNode, SessionNodePresence, SessionNodeType } from '@panopticon/contracts';
+import type { AgentStatus, SessionNode, SessionNodePresence, SessionNodeType } from '@panctl/contracts';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 

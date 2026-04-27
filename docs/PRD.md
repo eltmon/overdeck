@@ -3706,10 +3706,10 @@ Panopticon is distributed via npm for easy installation via `npx`.
 | Name | Status | Usage |
 |------|--------|-------|
 | `panopticon` | **Taken** | (Cluster monitoring lib from 2015) |
-| `panopticon-cli` | **Available** ✅ | `npx panopticon-cli install` |
+| `@panctl/cli` | **Available** ✅ | `npx @panctl/cli` |
 | `@mindyournow/*` | **Reserved** | For MYN-specific packages |
 
-**Decision:** Use `panopticon-cli` (unscoped) for wider adoption. Panopticon is a general tool, not MYN-specific.
+**Decision:** Use the scoped package `@panctl/cli` for the official zero-install entrypoint. Panopticon is a general tool, not MYN-specific.
 
 #### npm Account & Organization
 
@@ -3717,7 +3717,7 @@ Panopticon is distributed via npm for easy installation via `npx`.
 - **Organization:** [@mindyournow](https://www.npmjs.com/org/mindyournow) (free, public packages)
 
 **Strategy:**
-- `panopticon-cli` → Unscoped (general tool, wider adoption)
+- `@panctl/cli` → Official CLI package under the panctl scope
 - `@mindyournow/*` → Future MYN-specific packages (SDK, integrations)
 
 #### Source Code Hosting
@@ -3760,9 +3760,9 @@ npm Provenance cryptographically proves that a package was built from a specific
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│  panopticon-cli                                          │
-│  ✓ Provenance                                            │
-│    Published from: github.com/eltmon/panopticon-cli      │
+│  @panctl/cli                                          │
+│  ✓ Provenance                                          │
+│    Published from: github.com/eltmon/panopticon-cli   │
 │    Commit: abc123...                                     │
 │    Workflow: .github/workflows/publish.yml               │
 │    Build: https://github.com/.../actions/runs/12345      │
@@ -3785,7 +3785,7 @@ permissions:
 |---------|--------|-------------|
 | npm Provenance | ✅ Enabled | Cryptographic proof of build origin |
 | 2FA on npm | ✅ Required | Account protection |
-| Granular tokens | ✅ Using | Scoped to `panopticon-cli` only |
+| Granular tokens | ✅ Using | Scoped to `@panctl/cli` only |
 | Branch protection | 📋 TODO | Require PR reviews for main branch |
 | Signed commits | 📋 TODO | GPG signing for commits |
 | CODEOWNERS | 📋 TODO | Require specific reviewers |
@@ -3795,7 +3795,7 @@ permissions:
 
 ```json
 {
-  "name": "panopticon-cli",
+  "name": "@panctl/cli",
   "version": "1.0.0",
   "description": "Multi-agent orchestration dashboard for Claude Code",
   "keywords": [
@@ -3857,7 +3857,7 @@ pan --version  # Should work
 npm publish
 
 # 5. Verify it's live
-npm view panopticon-cli
+npm view @panctl/cli
 ```
 
 #### Version Management
@@ -3876,10 +3876,10 @@ npm publish
 
 ```bash
 # One-shot (no global install needed)
-npx panopticon-cli install
+npx @panctl/cli
 
 # Or global install for frequent use
-npm install -g panopticon-cli
+npm install -g @panctl/cli
 pan --version
 ```
 
@@ -3891,7 +3891,7 @@ npm version 1.0.0-beta.1
 npm publish --tag beta
 
 # Users install beta with:
-npx panopticon-cli@beta install
+npx @panctl/cli@beta install
 ```
 
 #### GitHub Actions (Automated Publishing)
@@ -3925,7 +3925,7 @@ jobs:
 
 **Setup:**
 1. Go to npmjs.com → Avatar → Access Tokens → Generate New Token
-2. Choose **"Granular Access Token"** with publish permissions for `panopticon-cli`
+2. Choose **"Granular Access Token"** with publish permissions for `@panctl/cli`
 3. Add as `NPM_TOKEN` secret in GitHub repo settings
 
 #### npm Token Management

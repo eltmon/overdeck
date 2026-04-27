@@ -63,7 +63,7 @@ jobs:
           node dist/cli/index.js --version
           node dist/cli/index.js --help
 
-      - name: Publish to npm
+      - name: Publish CLI to npm
         run: |
           if [ "${{ needs.classify.outputs.npm_tag }}" = "latest" ]; then
             npm publish --provenance --access public
@@ -73,7 +73,21 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish panctl to npm
+      - name: Build contracts
+        run: cd packages/contracts && npm run build
+
+      - name: Publish contracts to npm
+        run: |
+          cd packages/contracts
+          if [ "${{ needs.classify.outputs.npm_tag }}" = "latest" ]; then
+            npm publish --provenance --access public
+          else
+            npm publish --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish desktop to npm
         run: |
           cd apps/desktop
           node scripts/build-for-publish.mjs
@@ -82,6 +96,14 @@ jobs:
           else
             npm publish --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
           fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Deprecate legacy npm packages
+        if: needs.classify.outputs.npm_tag == 'latest'
+        run: |
+          npm deprecate panopticon-cli "Renamed to @panctl/cli — use 'npx @panctl/cli' instead." || true
+          npm deprecate @eltmon/panctl "Use @panctl/cli — same package, official scope." || true
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

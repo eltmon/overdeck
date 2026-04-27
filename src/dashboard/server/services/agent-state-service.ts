@@ -25,11 +25,11 @@ import { Effect, Layer, ServiceMap, Stream, SubscriptionRef } from 'effect';
 import {
   applyEvent as applyReducerEvent,
   INITIAL_READ_MODEL_STATE,
-} from '@panopticon/contracts';
+} from '@panctl/contracts';
 import type {
   AgentRuntimeSnapshot,
   DomainEvent,
-} from '@panopticon/contracts';
+} from '@panctl/contracts';
 import { initEventStore, getSharedDb } from '../event-store.js';
 import type { StoredEvent } from '../event-store.js';
 import { setAgentRuntimeMirror, getRuntimeSnapshotSync as getMirrorSnapshot, markAgentStateServiceInProcess } from '../../../lib/agent-runtime-mirror.js';

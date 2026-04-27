@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import { saveSnapshotToCache, loadSnapshotFromCache, clearSnapshotCache } from '../snapshotCache'
-import type { DashboardSnapshot } from '@panopticon/contracts'
+import type { DashboardSnapshot } from '@panctl/contracts'
 
 function makeSnapshot(sequence = 1, issueCount = 0): DashboardSnapshot {
   return {

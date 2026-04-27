@@ -11,7 +11,7 @@
  * layer code.
  */
 
-import type { AgentRuntimeSnapshot } from '@panopticon/contracts';
+import type { AgentRuntimeSnapshot } from '@panctl/contracts';
 
 let mirror: Record<string, AgentRuntimeSnapshot> = {};
 

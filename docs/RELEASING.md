@@ -145,7 +145,7 @@ For tags like `v0.8.0-canary.1` the workflow will:
 
 Choose **stable** when:
 - the current `main` snapshot is something you would recommend to normal users
-- you want `npm install -g panopticon-cli` to pick it up by default
+- you want `npm install -g @panctl/cli` to pick it up by default
 
 Choose **canary** when:
 - you want testers to try a release candidate explicitly
