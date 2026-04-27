@@ -2,14 +2,14 @@
 specialist: review-agent
 issueId: PAN-859
 outcome: approved
-timestamp: 2026-04-27T21:54:10Z
+timestamp: 2026-04-27T22:02:28Z
 ---
 
 # Verdict: APPROVED
 
 ## Summary
 
-PAN-859 fixes a stale-closure bug in the Command Deck session selector. The old Zustand selector closed over React state (`selectedFeature`), causing the session pane to fail to open on the first click when both `setSelectedFeature` and `selectSession` were batched together by React. The fix subscribes to the full `selectedSessionByIssue` map and derives `selectedSessionId` during the React render cycle, eliminating the stale-closure window. All 4 stated requirements are verified, regression coverage is added, and no security or correctness issues were found.
+PAN-859 fixes a stale-closure bug in CommandDeck's Zustand selector where clicking a work-agent or session row required two clicks to open the terminal pane. The fix subscribes to the full `selectedSessionByIssue` map during render instead of closing over React state inside a Zustand selector, eliminating the batched-update stale-closure window entirely. All 4 requirements are verified, a regression test covers the exact bug scenario, and all 4 reviewers agree: no blockers, no warnings, 1 shared nit (acknowledged as acceptable by both reviewers).
 
 ## Blockers (MUST fix before merge)
 
@@ -21,27 +21,23 @@ _none_
 
 ## Nits (advisory — safe to defer)
 
-- `docs/design/mockups/command-deck-terminology-map.html:8` — `?` — Duplicate Google Fonts stylesheet include. Remove one of the two identical `<link>` tags. (performance)
-
-- `src/dashboard/frontend/src/components/CommandDeck/index.tsx:188` — `?` — Subscribing to the full `selectedSessionByIssue` map re-renders `CommandDeck` on any issue's session change. At current scale this is harmless. Future optimization: use `useRef` + shallow-equality custom hook if concurrent-session count grows. No action needed now. (correctness)
+- `src/dashboard/frontend/src/components/CommandDeck/index.tsx:188` — `?` — Full `selectedSessionByIssue` map subscription triggers unrelated re-renders. Both correctness and performance reviewers independently noted this is the correct trade-off for eliminating the stale-closure bug, negligible at current scale, and requires no action. Safe to defer until/if dashboard grows to many concurrent issues with frequent selection churn. (correctness, performance)
 
 ## Cross-cutting groups
 
 _none_
 
 ## What's good
-
-- Root-cause fix: Zustand selector now reads from external store during React render cycle, eliminating the stale-closure race condition.
-- Regression test added covering the exact broken user path (first click opens session pane).
-- All 4 acceptance criteria from the issue are verified with Playwright evidence.
-- Security review found no injection, authz, or sensitive-data issues.
+- Stale-closure root cause correctly identified and fixed with minimal change (3 lines in index.tsx)
+- Regression test covers the exact first-click scenario that was broken
+- All 4 requirements from the issue acceptance criteria verified as implemented
+- No security concerns introduced by the changed client-side selection/rendering logic
+- No backend hot paths affected — all API queries unchanged
 
 ## Review stats
-
-- Blockers: 0   High: 0   Medium: 0   Nits: 2
-- By reviewer: correctness=1, security=0, performance=0, requirements=0
-- Files touched: 2 source files, 1 test file (3 production files total)
-- Files with findings: 2 (both are nits; no blockers)
+- Blockers: 0   High: 0   Medium: 0   Nits: 1
+- By reviewer: correctness=1 nit, security=0, performance=1 nit, requirements=PASS
+- Files touched: 3 source files   Files with findings: 1 (shared nit)
 
 ## Appendix: individual reviews
 
