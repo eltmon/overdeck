@@ -401,12 +401,16 @@ export function fixStuckReadyForMerge(): void {
  * - testStatus = 'passed' (CI green, so review wasn't genuinely bad)
  * - mergeStatus is not terminal ('merged', 'failed')
  * - readyForMerge = false
+ * - verificationStatus != 'failed' (verification hasn't failed)
  * - The last review history entry is type='review', status='failed'
  *
  * The old reviewResultToReviewStatus() mapped COMMENTED (regardless of success)
  * to 'failed', so the history stores 'failed' for old COMMENTED reviews.
  * We use testStatus='passed' as the signal that this was a successful review
  * (CI was green), distinguishing it from genuinely failed reviews.
+ *
+ * We also exclude verification-failed issues to avoid restoring issues that
+ * genuinely failed the verification gate.
  */
 export function fixStuckCommentedReviews(): void {
   const statuses = loadReviewStatuses();
@@ -415,7 +419,8 @@ export function fixStuckCommentedReviews(): void {
     (s.testStatus === 'passed' || s.testStatus === 'skipped') &&
     s.mergeStatus !== 'merged' &&
     s.mergeStatus !== 'failed' &&
-    s.readyForMerge === false
+    s.readyForMerge === false &&
+    s.verificationStatus !== 'failed'
   );
 
   if (candidates.length === 0) return;
