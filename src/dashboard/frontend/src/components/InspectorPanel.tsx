@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
-import { Agent, Issue, WorkAgentLifecycle } from '../types';
+import { Agent, Issue, WorkAgentLifecycle, type StartAgentResponse } from '../types';
 import type { ContainerStatus, ReviewStatus, SalvageableStashInfo, WorkspaceInfo } from './inspector/types';
 import { getFriendlyModelName, shouldForceReviewTrigger } from './inspector/utils';
 import { useAlert } from './DialogProvider';
@@ -163,6 +163,18 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
   const durationHours = Math.floor(durationMins / 60);
   const duration = durationHours > 0 ? `${durationHours}h ${durationMins % 60}m` : `${durationMins}m`;
 
+  const acknowledgeGuardrailWarnings = useCallback(async (data: StartAgentResponse | undefined) => {
+    const warnings = data?.guardrails?.warnings ?? [];
+    if (warnings.length === 0) return false;
+    if (!data?.requiresAcknowledgement) return true;
+    return confirm({
+      title: 'Start agent with warnings?',
+      message: warnings.map((warning) => `• ${warning.message}`).join('\n'),
+      variant: 'destructive',
+      confirmLabel: 'Start anyway',
+    });
+  }, [confirm]);
+
   const { data: workspace } = useQuery<WorkspaceInfo>({
     queryKey: ['workspace', issueId],
     queryFn: async () => {
@@ -277,20 +289,34 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
         return res.json();
       }
 
-      const res = await fetch('/api/agents', {
+      const requestBody = { issueId, projectId: issue?.project?.id, message: message || undefined };
+      let res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId, projectId: issue?.project?.id, message: message || undefined }),
+        body: JSON.stringify(requestBody),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to start agent');
+      let data = await res.json().catch(() => ({})) as StartAgentResponse;
+      if (res.status === 409 && data.requiresAcknowledgement) {
+        const confirmed = await acknowledgeGuardrailWarnings(data);
+        if (!confirmed) throw new Error('Agent start canceled');
+        res = await fetch('/api/agents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...requestBody, guardrailAcknowledged: true }),
+        });
+        data = await res.json().catch(() => ({})) as StartAgentResponse;
       }
-      return res.json();
+      if (!res.ok) {
+        throw new Error(data.error || data.hint || 'Failed to start agent');
+      }
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
       void queryClient.invalidateQueries({ queryKey: ['agents'] });
       setTimeout(() => queryClient.invalidateQueries({ queryKey: ['agents'] }), 2000);
+      if (data.guardrails?.warnings?.length) {
+        toast.success('Agent started after acknowledging system health warnings.', { duration: 6000 });
+      }
     },
     onError: (err: Error) => {
       setAgentLaunchState(null);
