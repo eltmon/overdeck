@@ -159,7 +159,7 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
   const { reviewStatus, agent, lifecycle, workspace } = input;
   const merged = input.isMerged === true || reviewStatus?.mergeStatus === 'merged';
   const agentRunning = !!agent && agent.status !== 'stopped' && agent.status !== 'failed' && agent.status !== 'dead';
-  const noAgentOrStopped = !agent || agent.status === 'stopped';
+  const noAgentOrStopped = !agent || agent.status === 'stopped' || agent.status === 'failed' || agent.status === 'dead';
   const isResume = noAgentOrStopped && lifecycle?.canResumeSession === true;
 
   const stuck = isReviewPipelineStuck(reviewStatus ?? undefined);
@@ -277,9 +277,6 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
 
   // ── Danger zone (always overflow — shown via "…" menu) ────────────────────
   if (!merged && state !== 'merged' && state !== 'done' && state !== 'canceled') {
-    if (input.issueCanonicalState === 'done' || input.issueCanonicalState === 'canceled') {
-      overflow.push('reopen');
-    }
     overflow.push('restartFromPlan');
     if (input.issueCanonicalState !== 'done' && input.issueCanonicalState !== 'canceled') {
       overflow.push('resetIssue');

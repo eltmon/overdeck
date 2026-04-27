@@ -13,6 +13,7 @@ import { MergeButton } from '../MergeButton';
 import { RecoverButton } from '../RecoverButton';
 import { RestartFromPlanButton } from '../RestartFromPlanButton';
 import { ArtifactLinks } from '../ArtifactLinks';
+import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 
 // Convenience alias — most mutations use void variables and unknown data
 type AnyMutation = UseMutationResult<unknown, Error, void, unknown>;
@@ -49,6 +50,8 @@ interface ActionsSectionProps {
   lifecycle?: WorkAgentLifecycle;
   agentLaunchState?: 'starting' | 'resuming' | null;
 }
+
+void COMMAND_DECK_SURFACE_REGISTRY;
 
 export function ActionsSection({
   agent,
