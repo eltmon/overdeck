@@ -4,9 +4,42 @@ import type { SessionNode } from '@panctl/contracts';
 import { FeatureItem, type TreeSessionFilter } from './FeatureItem';
 import styles from '../styles/command-deck.module.css';
 
+export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker';
+
+export interface ProjectFeatureResourceDetails {
+  hasWorkspace: boolean;
+  localBranchCount: number;
+  remoteBranchCount: number;
+  tmuxSessionCount: number;
+  prs: Array<{
+    number: number;
+    title: string;
+    state: string;
+    isDraft: boolean;
+  }>;
+  hasVbrief: boolean;
+  hasBeads: boolean;
+  dockerContainerCount: number;
+}
+
+export interface ProjectFeatureResourceIdentifiers {
+  workspacePaths: string[];
+  localBranchNames: string[];
+  remoteBranchNames: string[];
+  tmuxSessionNames: string[];
+  prs: Array<{
+    number: number;
+    title: string;
+    state: string;
+    isDraft: boolean;
+  }>;
+  dockerContainerNames: string[];
+}
+
 export interface ProjectFeature {
   issueId: string;
   title: string;
+  projectName: string;
   branch: string;
   status: string;
   stateLabel: string;
@@ -23,6 +56,8 @@ export interface ProjectFeature {
   rawTrackerState?: string;
   readyForMerge?: boolean;
   sessions?: readonly SessionNode[];
+  resourceSources?: ResourceSource[];
+  resourceDetails?: ProjectFeatureResourceDetails;
 }
 
 interface ProjectNodeProps {
@@ -43,6 +78,7 @@ interface ProjectNodeProps {
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
+  onCleanupOrphanedResources?: (issueId: string) => void;
 }
 
 interface ContextMenuState {
@@ -125,7 +161,7 @@ function ProjectNodeMenu({
   );
 }
 
-export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter, onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl }: ProjectNodeProps) {
+export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter, onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources }: ProjectNodeProps) {
   const [expanded, setExpanded] = useState(features.length > 0);
   const [menu, setMenu] = useState<ContextMenuState>({ x: 0, y: 0, open: false });
 
@@ -184,6 +220,7 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
               onDeepWipe={onDeepWipe}
               onOpenStateDir={onOpenStateDir}
               onViewJsonl={onViewJsonl}
+              onCleanupOrphanedResources={onCleanupOrphanedResources}
             />
           ))
         ) : (

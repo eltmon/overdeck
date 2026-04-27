@@ -43,6 +43,7 @@ import { reopenWorkspaceState } from '../../../lib/reopen.js';
 import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { IssueDataService } from '../services/issue-data-service.js';
+import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { invalidateAgentsCache } from './agents.js';
@@ -54,6 +55,11 @@ import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../
 import { getAgentStateAsync, normalizeAgentId } from '../../../lib/agents.js';
 import type { LifecycleContext, StepResult } from '../../../lib/lifecycle/types.js';
 import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
+import {
+  getCachedResourceAllocatedIssues,
+  getResourceDetailIdentifiers,
+  sanitizeResourceAllocatedIssues,
+} from '../services/resource-discovery.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -63,8 +69,6 @@ const execFileAsync = promisify(execFile);
 // onIssuesChanged callback → event store → WebSocket RPC.
 
 function getIssueDataService(): IssueDataService {
-  // Use the shared singleton — started by server.ts on boot
-  const { getSharedIssueService } = require('../services/issue-service-singleton.js');
   return getSharedIssueService();
 }
 
@@ -206,6 +210,37 @@ function buildLifecycleContext(id: string, issueSource: string | undefined) {
   }
 
   return { ctx, projectConfig, githubCheck };
+}
+
+function isOrphanedIssue(issue: { status?: string; state?: string; rawTrackerState?: string; completedAt?: string | null }): boolean {
+  const status = issue.status?.toLowerCase() ?? '';
+  const state = issue.state?.toLowerCase() ?? '';
+  const rawTrackerState = issue.rawTrackerState?.toLowerCase() ?? '';
+  return Boolean(
+    issue.completedAt
+    || status.includes('closed')
+    || status.includes('done')
+    || status.includes('completed')
+    || state.includes('closed')
+    || state.includes('done')
+    || state.includes('completed')
+    || rawTrackerState.includes('closed')
+    || rawTrackerState.includes('done')
+    || rawTrackerState.includes('completed'),
+  );
+}
+
+function getIssueForCleanup(issueId: string) {
+  const issueDataService = getIssueDataService();
+  return issueDataService.getIssues({ includeCompleted: true }).find((issue: any) => {
+    const identifier = typeof issue?.identifier === 'string' ? issue.identifier : '';
+    return identifier.toUpperCase() === issueId.toUpperCase();
+  }) as {
+    status?: string;
+    state?: string;
+    rawTrackerState?: string;
+    completedAt?: string | null;
+  } | undefined;
 }
 
 async function runDestructiveIssueLifecycle(
@@ -1739,7 +1774,16 @@ const postIssueCleanupWorkspaceRoute = HttpRouter.add(
   '/api/issues/:id/cleanup-workspace',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
+    const rawId = params['id'] ?? '';
+    const parsedIssueId = parseIssueId(rawId);
+    if (!parsedIssueId) {
+      return jsonResponse({ error: 'Invalid issue id: ' + rawId }, { status: 400 });
+    }
+    const id = parsedIssueId.raw.toUpperCase();
+    const issue = getIssueForCleanup(id);
+    if (!issue || !isOrphanedIssue(issue)) {
+      return jsonResponse({ error: 'Cleanup is only allowed for closed/orphaned issues' }, { status: 409 });
+    }
     const cleanupLog: string[] = [];
     const eventStore = yield* EventStoreService;
 
@@ -1814,6 +1858,9 @@ const postIssueDeepWipeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: 'Invalid issue id: ' + id }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
@@ -3087,6 +3134,43 @@ const getIssueCostsRoute = HttpRouter.add(
   })),
 );
 
+const getResourceAllocatedIssuesRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/resource-allocated',
+  httpHandler(Effect.gen(function* () {
+    const issues = yield* Effect.tryPromise({
+      try: async () => sanitizeResourceAllocatedIssues(await getCachedResourceAllocatedIssues()),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+    return jsonResponse(issues);
+  })),
+);
+
+const getIssueResourceDetailsRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/:id/resource-details',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const rawId = params['id'] ?? '';
+    const parsedIssueId = parseIssueId(rawId);
+    if (!parsedIssueId) {
+      return jsonResponse({ error: 'Invalid issue id: ' + rawId }, { status: 400 });
+    }
+    const id = parsedIssueId.raw.toUpperCase();
+
+    const details = yield* Effect.tryPromise({
+      try: () => getResourceDetailIdentifiers(id),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+
+    if (!details) {
+      return jsonResponse({ error: `No resource details found for ${id}` }, { status: 404 });
+    }
+
+    return jsonResponse(details);
+  })),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const issuesRouteLayer = Layer.mergeAll(
@@ -3111,6 +3195,8 @@ export const issuesRouteLayer = Layer.mergeAll(
   getIssuePlanningStateRoute,
   postIssueGenerateTasksRoute,
   getIssueCostsRoute,
+  getResourceAllocatedIssuesRoute,
+  getIssueResourceDetailsRoute,
   getIssuePrRoute,
   getIssuePrDiffRoute,
   getIssuePrDetailsRoute,

@@ -383,6 +383,19 @@ export const ResourcesUpdatedEvent = Schema.Struct({
 })
 export type ResourcesUpdatedEvent = typeof ResourcesUpdatedEvent.Type
 
+export const SystemHealthSeverityChangedEvent = Schema.Struct({
+  type: Schema.Literal("system.health_severity_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    previousSeverity: Schema.String,
+    severity: Schema.String,
+    reasons: Schema.Array(Schema.String),
+    leakedSpecialistCount: Schema.Number,
+  }),
+})
+export type SystemHealthSeverityChangedEvent = typeof SystemHealthSeverityChangedEvent.Type
+
 // ─── Issue Events ─────────────────────────────────────────────────────────────
 
 /** Replaces socket.io `issues:snapshot` */
@@ -626,6 +639,7 @@ export const DomainEvent = Schema.Union([
   SpecialistCompletedEvent,
   SpecialistFailedEvent,
   ResourcesUpdatedEvent,
+  SystemHealthSeverityChangedEvent,
   IssuesSnapshotEvent,
   IssuesUpdatedEvent,
   IssueStatusChangedEvent,

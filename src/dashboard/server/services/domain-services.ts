@@ -125,6 +125,14 @@ function mapDomainEventToDetailed(event: StoredEvent): {
       return { source: 'dashboard', level: 'error', message: `Dashboard lifecycle failed: ${p['reason']} — ${p['error']}`, issueId, triggeringEvent: event.type };
     case 'merge.ready':
       return { source: 'merge-agent', level: 'success', message: `Issue ${issueId} ready for merge`, issueId, triggeringEvent: event.type };
+    case 'system.health_severity_changed':
+      return {
+        source: 'system-health',
+        level: p['severity'] === 'critical' ? 'error' : p['severity'] === 'warning' ? 'warn' : 'info',
+        message: `System health ${p['previousSeverity']} → ${p['severity']}`,
+        issueId,
+        triggeringEvent: event.type,
+      };
     case 'cost.event_recorded':
       return { source: 'costs', level: 'info', message: `Cost event: $${(p['cost'] as number)?.toFixed?.(2) ?? p['cost']} for ${p['agentId']}`, issueId, triggeringEvent: event.type };
     default:

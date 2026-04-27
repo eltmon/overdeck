@@ -8,6 +8,7 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET  /api/project-mappings
  *   PUT  /api/project-mappings
  *   POST /api/project-mappings
+ *   GET  /api/system/health
  *   GET  /api/godview/system-health
  *   GET  /api/health/agents
  *   POST /api/health/agents/:id/ping
@@ -46,7 +47,6 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-import { cpus as osCpus, freemem, totalmem } from 'node:os';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { createSessionAsync, killSessionAsync, resizeWindowAsync, sendKeysAsync, sessionExistsAsync } from '../../../lib/tmux.js';
@@ -65,6 +65,8 @@ import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tra
 import { extractPrefix } from '../../../lib/issue-id.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { EventStoreService } from '../services/domain-services.js';
+import { ReadModelService } from '../read-model.js';
+import { getSystemHealthSnapshot } from '../services/system-health-service.js';
 import { httpHandler } from './http-handler.js';
 import { isDeaconGloballyPaused, setDeaconGloballyPaused } from '../../../lib/database/app-settings.js';
 
@@ -185,43 +187,6 @@ function getGitHubLocalPaths(): Record<string, string> {
   }
   return out;
 }
-
-// ─── System health cache (godview) ───────────────────────────────────────────
-
-let godViewSystemHealthCache: {
-  cpu: number;
-  memPercent: number;
-  memUsed: number;
-  memTotal: number;
-  updatedAt: string;
-} | null = null;
-
-async function refreshGodViewSystemHealth() {
-  try {
-    const cpuList = osCpus();
-    const cpuUsage =
-      cpuList.reduce((acc: number, cpu) => {
-        const total = Object.values(cpu.times).reduce((s, t) => s + t, 0);
-        const idle = cpu.times.idle;
-        return acc + ((total - idle) / total) * 100;
-      }, 0) / cpuList.length;
-    const memTotal = totalmem();
-    const memFree = freemem();
-    godViewSystemHealthCache = {
-      cpu: Math.round(cpuUsage * 10) / 10,
-      memPercent: Math.round(((memTotal - memFree) / memTotal) * 1000) / 10,
-      memUsed: memTotal - memFree,
-      memTotal,
-      updatedAt: new Date().toISOString(),
-    };
-  } catch (err) {
-    console.error('[godview] system health refresh error:', err);
-  }
-  setTimeout(refreshGodViewSystemHealth, 10000);
-}
-
-// Start background refresh (non-blocking)
-refreshGodViewSystemHealth().catch(() => {});
 
 // ─── Pending confirmations store ─────────────────────────────────────────────
 
@@ -417,23 +382,38 @@ const postProjectMappingsRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: GET /api/system/health ───────────────────────────────────────────
+
+const getSystemHealthRoute = HttpRouter.add(
+  'GET',
+  '/api/system/health',
+  httpHandler(Effect.gen(function* () {
+    const readModel = yield* ReadModelService;
+    const health = yield* readModel.getSnapshot.pipe(
+      Effect.flatMap((snapshot) => Effect.promise(() => getSystemHealthSnapshot(snapshot))),
+    );
+    return jsonResponse(health);
+  })),
+);
+
 // ─── Route: GET /api/godview/system-health ───────────────────────────────────
 
 const getGodviewSystemHealthRoute = HttpRouter.add(
   'GET',
   '/api/godview/system-health',
-  Effect.sync(() => {
-    if (godViewSystemHealthCache) {
-      return jsonResponse(godViewSystemHealthCache);
-    }
+  httpHandler(Effect.gen(function* () {
+    const readModel = yield* ReadModelService;
+    const health = yield* readModel.getSnapshot.pipe(
+      Effect.flatMap((snapshot) => Effect.promise(() => getSystemHealthSnapshot(snapshot))),
+    );
     return jsonResponse({
-      cpu: 0,
-      memPercent: 0,
-      memUsed: 0,
-      memTotal: 0,
-      updatedAt: new Date().toISOString(),
+      cpu: health.summary.cpuPercent,
+      memPercent: health.summary.memoryUsedPercent,
+      memUsed: health.summary.usedMemoryBytes,
+      memTotal: health.summary.totalMemoryBytes,
+      updatedAt: health.updatedAt,
     });
-  }),
+  })),
 );
 
 // ─── Route: GET /api/health/agents ───────────────────────────────────────────
@@ -1667,6 +1647,7 @@ export const miscRouteLayer = Layer.mergeAll(
   getProjectMappingsRoute,
   putProjectMappingsRoute,
   postProjectMappingsRoute,
+  getSystemHealthRoute,
   getGodviewSystemHealthRoute,
   getHealthAgentsRoute,
   postHealthAgentPingRoute,

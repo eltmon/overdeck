@@ -43,7 +43,7 @@ vi.mock('./components/DetailPanelLayout', () => ({
   DetailPanelLayout: ({ inline }: { inline?: boolean }) => <div data-testid="detail-panel-layout" data-inline={inline ? 'true' : 'false'} />,
 }));
 vi.mock('./components/StandaloneTerminal', () => ({ StandaloneTerminal: () => null }));
-vi.mock('lucide-react', () => ({ AlertTriangle: () => null, RefreshCw: () => null, X: () => null, ArrowRight: () => null }));
+vi.mock('lucide-react', () => ({ AlertTriangle: () => null, RefreshCw: () => null, X: () => null, ArrowRight: () => null, Loader2: () => null, ChevronDown: () => null, Cpu: () => null, MemoryStick: () => null, Skull: () => null }));
 vi.mock('./components/upgrade-announcement/UpgradeAnnouncement', () => ({ UpgradeAnnouncement: () => null }));
 vi.mock('sonner', () => ({ Toaster: () => null, toast: { info: vi.fn() } }));
 vi.mock('./lib/store', () => ({
