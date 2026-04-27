@@ -362,20 +362,8 @@ const getAllSessionTreesRoute = HttpRouter.add(
         const allSessionsArr = await listSessionNamesAsync().catch(() => [] as string[]);
         const sharedTmuxSessionNames = new Set(allSessionsArr.filter(s => s.trim()));
 
-        const tasksDir = join(homedir(), '.panopticon', 'specialists', 'tasks');
-        const sharedTaskFileContents = new Map<string, string>();
-        if (await pathExists(tasksDir)) {
-          const filenames = (await readdir(tasksDir).catch(() => [] as string[])).filter(f => f.endsWith('.md'));
-          await Promise.all(filenames.map(async (f) => {
-            const content = await readOptional(join(tasksDir, f));
-            if (content) sharedTaskFileContents.set(f, content);
-          }));
-        }
-
         const sharedContext: ActivityContext = {
           tmuxSessionNames: sharedTmuxSessionNames,
-          taskFileContents: sharedTaskFileContents,
-          includeTranscripts: false,
         };
 
         return Promise.all(

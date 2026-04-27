@@ -17,7 +17,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { SessionNodePresence } from '@panopticon/contracts';
+import { AgentStatus, SessionNodePresence } from '@panopticon/contracts';
 import {
   REVIEWER_ROLES,
   getReviewerSessionName,
@@ -59,7 +59,7 @@ export interface ReviewerNode {
   startedAt: string;
   endedAt?: string;
   duration: number | null;
-  status: string;
+  status: AgentStatus;
   transcript?: string;
   presence: SessionNodePresence;
   hasJsonl?: boolean;
@@ -209,7 +209,7 @@ export async function buildReviewerNodes(
       // Per-role status:
       //   - prefer the latest round artifact's status if available
       //   - fall back to the parent review section's status
-      const status = roundMetadata?.latestStatus ?? opts.status;
+      const status = (roundMetadata?.latestStatus ?? opts.status) as AgentStatus;
 
       const node: ReviewerNode = {
         type: 'reviewer',
