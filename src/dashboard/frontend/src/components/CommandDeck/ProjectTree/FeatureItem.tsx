@@ -104,7 +104,7 @@ function formatSessionDuration(seconds: number): string {
   return `${Math.round(seconds / 3600)}h`;
 }
 
-function getAggregateActivityState(sessions: SessionNodeType[]): AggregateActivityState {
+function getAggregateActivityState(sessions: readonly SessionNodeType[]): AggregateActivityState {
   if (sessions.some(isErrorSession)) return 'error';
   if (sessions.some(isRunningSession)) return 'running';
   if (sessions.some(isQueuedSession)) return 'queued';
@@ -117,7 +117,7 @@ function getActivityDotStatus(state: AggregateActivityState): StatusDotStatus {
   return 'ended';
 }
 
-function buildActivitySummary(sessions: SessionNodeType[]): string {
+function buildActivitySummary(sessions: readonly SessionNodeType[]): string {
   if (sessions.length === 0) return 'No sessions';
 
   const runningWork = sessions.filter(session =>
@@ -166,7 +166,7 @@ function buildActivitySummary(sessions: SessionNodeType[]): string {
   return parts.join(', ');
 }
 
-function getAggregateBadges(sessions: SessionNodeType[]): AggregateBadge[] {
+function getAggregateBadges(sessions: readonly SessionNodeType[]): AggregateBadge[] {
   const workSessions = sessions.filter(session => session.type === 'work');
   const reviewerSessions = sessions.filter(session => session.type === 'reviewer' || session.type === 'review');
   const reviewerErrors = reviewerSessions.filter(isErrorSession);
@@ -229,7 +229,7 @@ const PRESENCE_PRIORITY: Record<string, number> = {
 };
 
 /** Pick the best session to auto-select: active > idle > suspended > ended; among active prefer work > review > test. */
-export function pickBestSession(sessions: SessionNodeType[]): string | null {
+export function pickBestSession(sessions: readonly SessionNodeType[]): string | null {
   if (sessions.length === 0) return null;
   const sorted = [...sessions].sort((a, b) => {
     const presenceDiff = PRESENCE_PRIORITY[a.presence] - PRESENCE_PRIORITY[b.presence];
@@ -276,7 +276,7 @@ function defaultExpandedFromState(_stateLabel: string): boolean {
 
 /** Compute the dominant session presence for the feature row StatusDot.
  *  Priority: active > thinking > waiting > idle > ended. */
-function computeDominantStatus(sessions: SessionNodeType[]): StatusDotStatus {
+function computeDominantStatus(sessions: readonly SessionNodeType[]): StatusDotStatus {
   let hasIdle = false;
   let hasThinking = false;
   let hasWaiting = false;
