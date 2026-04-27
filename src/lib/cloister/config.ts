@@ -38,6 +38,8 @@ export interface AutoActions {
 export interface MonitoringConfig {
   check_interval: number; // seconds between health checks
   heartbeat_sources: ('jsonl_mtime' | 'tmux_activity' | 'git_activity' | 'active_heartbeat')[];
+  /** Patrol cycles between stash janitor sweeps. Default: hourly based on patrol cadence. */
+  stash_janitor_every_cycles?: number;
 }
 
 /**
@@ -362,23 +364,40 @@ export function loadCloisterConfig(): CloisterConfig {
     mkdirSync(PANOPTICON_HOME, { recursive: true });
   }
 
+  let config = DEFAULT_CLOISTER_CONFIG;
+
   // If config file doesn't exist, create it with defaults
   if (!existsSync(CLOISTER_CONFIG_FILE)) {
     saveCloisterConfig(DEFAULT_CLOISTER_CONFIG);
-    return DEFAULT_CLOISTER_CONFIG;
+  } else {
+    try {
+      const content = readFileSync(CLOISTER_CONFIG_FILE, 'utf-8');
+      const parsed = parse(content) as unknown as Partial<CloisterConfig>;
+
+      // Deep merge with defaults
+      config = deepMerge(DEFAULT_CLOISTER_CONFIG, parsed);
+    } catch (error) {
+      console.error('Failed to load Cloister config:', error);
+      console.error('Using default configuration');
+      config = DEFAULT_CLOISTER_CONFIG;
+    }
   }
 
-  try {
-    const content = readFileSync(CLOISTER_CONFIG_FILE, 'utf-8');
-    const parsed = parse(content) as unknown as Partial<CloisterConfig>;
-
-    // Deep merge with defaults
-    return deepMerge(DEFAULT_CLOISTER_CONFIG, parsed);
-  } catch (error) {
-    console.error('Failed to load Cloister config:', error);
-    console.error('Using default configuration');
-    return DEFAULT_CLOISTER_CONFIG;
+  const stashJanitorEnv = process.env.PAN_STASH_JANITOR_CYCLES;
+  if (stashJanitorEnv !== undefined) {
+    const parsed = Number.parseInt(stashJanitorEnv, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      config = {
+        ...config,
+        monitoring: {
+          ...config.monitoring,
+          stash_janitor_every_cycles: parsed,
+        },
+      };
+    }
   }
+
+  return config;
 }
 
 /**

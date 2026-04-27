@@ -36,7 +36,7 @@ vi.mock('../../stashes.js', () => ({
   listStashes: vi.fn(async () => []),
 }));
 vi.mock('../../tracker-utils.js', () => ({ resolveGitHubIssue: vi.fn(() => ({ isGitHub: false })) }));
-vi.mock('../../paths.js', () => ({ PANOPTICON_HOME: '/tmp/pan', AGENTS_DIR: '/tmp/agents', PROJECT_PRDS_ACTIVE_SUBDIR: 'active', PROJECT_PRDS_PLANNED_SUBDIR: 'planned', PROJECT_PRDS_COMPLETED_SUBDIR: 'completed' }));
+vi.mock('../../paths.js', () => ({ PANOPTICON_HOME: '/tmp/pan', AGENTS_DIR: '/tmp/agents', PROJECT_PRDS_ACTIVE_SUBDIR: 'active', PROJECT_PRDS_PLANNED_SUBDIR: 'planned', PROJECT_PRDS_COMPLETED_SUBDIR: 'completed', PROJECT_DOCS_SUBDIR: 'docs', PROJECT_PRDS_SUBDIR: 'prds' }));
 vi.mock('../../tldr-daemon.js', () => ({ getTldrDaemonService: vi.fn() }));
 vi.mock('fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs/promises')>();

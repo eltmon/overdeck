@@ -144,7 +144,7 @@ export async function createNamedStash(repoPath: string, message: string, includ
   });
   for (const line of stashReflog.split('\n')) {
     const [hash, ref, msg] = line.trim().split('\t');
-    if (hash && ref?.startsWith('stash@{') && msg?.includes(message)) {
+    if (hash && ref?.startsWith('stash@{') && msg === message) {
       return ref;
     }
   }

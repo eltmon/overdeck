@@ -53,6 +53,8 @@ import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSessi
  * Default parameters for stuck-session detection.
  * Per gastown: "Let agents decide thresholds. 'Stuck' is a judgment call."
  */
+const DEFAULT_STASH_JANITOR_AGE_DAYS = 28;
+
 const DEFAULT_CONFIG: DeaconConfig = {
   pingTimeoutMs: 30_000,           // How long to wait for response
   consecutiveFailures: 3,          // Failures before force-kill
@@ -142,15 +144,24 @@ let config: DeaconConfig = { ...DEFAULT_CONFIG };
  * Load deacon configuration
  */
 export function loadConfig(): DeaconConfig {
+  config = { ...DEFAULT_CONFIG };
+
   try {
     if (existsSync(CONFIG_FILE)) {
       const content = readFileSync(CONFIG_FILE, 'utf-8');
       const loaded = JSON.parse(content);
-      config = { ...DEFAULT_CONFIG, ...loaded };
+      config = { ...config, ...loaded };
     }
   } catch (error) {
     console.error('[deacon] Failed to load config:', error);
   }
+
+  const cloisterConfig = loadCloisterConfig();
+  const configuredJanitorCycles = cloisterConfig.monitoring.stash_janitor_every_cycles;
+  if (typeof configuredJanitorCycles === 'number' && configuredJanitorCycles > 0) {
+    config.stashJanitorEveryCycles = configuredJanitorCycles;
+  }
+
   return config;
 }
 
@@ -2373,7 +2384,7 @@ export async function logNonCanonicalStashesOnStartup(): Promise<string[]> {
   return actions;
 }
 
-async function isIssueAlreadyMergedForJanitor(issueId: string): Promise<boolean> {
+async function reconcileAndCheckIfMerged(issueId: string): Promise<boolean> {
   const reviewStatus = getReviewStatus(issueId);
   if (reviewStatus?.mergeStatus === 'merged') {
     return true;
@@ -2475,13 +2486,22 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
       if (!agentState?.workspace || !agentState.preSpawnStashRef) continue;
       if (!existsSync(agentState.workspace)) continue;
 
+      let hasCommitsAhead = false;
       try {
         const { stdout } = await execAsync('git rev-list origin/main..HEAD --count', {
           cwd: agentState.workspace,
           encoding: 'utf-8',
         });
-        if ((parseInt(stdout.trim(), 10) || 0) <= 0) continue;
+        hasCommitsAhead = (parseInt(stdout.trim(), 10) || 0) > 0;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[deacon] Failed checking branch advancement for ${agentState.issueId}: ${message}`);
+        continue;
+      }
 
+      if (!hasCommitsAhead) continue;
+
+      try {
         await dropStash(agentState.workspace, agentState.preSpawnStashRef);
         delete agentState.preSpawnStashRef;
         delete agentState.preSpawnStashMessage;
@@ -2504,16 +2524,16 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
 
       try {
         const stashes = await listStashes(workspacePath);
-        const mergedPreMergeStashes: typeof stashes = [];
-        for (const stash of stashes) {
-          if (stash.kind !== 'pre-merge' || stash.issueId !== issueId.toUpperCase()) continue;
-          if (await isIssueAlreadyMergedForJanitor(issueId)) {
-            mergedPreMergeStashes.push(stash);
-          }
-        }
+        const matchingPreMergeStashes = stashes.filter(
+          (stash) => stash.kind === 'pre-merge' && stash.issueId === issueId.toUpperCase(),
+        );
+        const issueAlreadyMerged = matchingPreMergeStashes.length > 0
+          ? await reconcileAndCheckIfMerged(issueId)
+          : false;
+        const mergedPreMergeStashes = issueAlreadyMerged ? matchingPreMergeStashes : [];
 
         const staleStashes = stashes
-          .filter((stash) => stash.kind !== 'salvageable' && isOlderThanDays(stash, 28, now));
+          .filter((stash) => stash.kind !== 'salvageable' && isOlderThanDays(stash, DEFAULT_STASH_JANITOR_AGE_DAYS, now));
         const stashesToDrop = [...mergedPreMergeStashes, ...staleStashes]
           .filter((stash, index, entries) => entries.findIndex((entry) => entry.ref === stash.ref) === index)
           .sort((a, b) => {

@@ -38,7 +38,11 @@ vi.mock('../specialists.js', () => ({
   isRunning: vi.fn(async () => false),
   getAllProjectSpecialistStatuses: vi.fn(async () => []),
 }));
-vi.mock('../config.js', () => ({ loadCloisterConfig: vi.fn(() => ({})) }));
+vi.mock('../config.js', () => ({
+  loadCloisterConfig: vi.fn(() => ({
+    monitoring: {},
+  })),
+}));
 vi.mock('../../../lib/tmux.js', () => ({
   buildTmuxCommandString: vi.fn(() => 'tmux'),
   capturePaneAsync: vi.fn(async () => ''),
@@ -81,13 +85,14 @@ vi.mock('child_process', async (importOriginal) => {
   return { ...actual, exec: execMock, execFile: vi.fn() };
 });
 
-import { cleanupSpawnAndOrphanedStashes, logNonCanonicalStashesOnStartup } from '../deacon.js';
+import { cleanupSpawnAndOrphanedStashes, loadConfig, logNonCanonicalStashesOnStartup } from '../deacon.js';
 import { listRunningAgents, getAgentState, saveAgentState } from '../../../lib/agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../../../lib/stashes.js';
 import { resolveProjectFromIssue, getProject } from '../../projects.js';
 import { findWorkspacePath } from '../../lifecycle/archive-planning.js';
 import { getReviewStatus, setReviewStatus } from '../../review-status.js';
 import { createTracker } from '../../tracker/factory.js';
+import { loadCloisterConfig } from '../config.js';
 
 const mockListRunningAgents = vi.mocked(listRunningAgents);
 const mockGetAgentState = vi.mocked(getAgentState);
@@ -101,6 +106,7 @@ const mockFindWorkspacePath = vi.mocked(findWorkspacePath);
 const mockGetReviewStatus = vi.mocked(getReviewStatus);
 const mockSetReviewStatus = vi.mocked(setReviewStatus);
 const mockCreateTracker = vi.mocked(createTracker);
+const mockLoadCloisterConfig = vi.mocked(loadCloisterConfig);
 
 function installExecMock(stdoutByCommand: Record<string, string>) {
   execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
@@ -122,6 +128,7 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon', projectPath: '/repo' } as any);
     mockGetProject.mockReturnValue(null);
     mockGetReviewStatus.mockReturnValue(null as any);
+    mockLoadCloisterConfig.mockReturnValue({ monitoring: {} } as any);
     mockFindWorkspacePath.mockReturnValue('/repo/workspaces/feature-pan-879');
   });
 
@@ -176,6 +183,35 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'stash@{3}');
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-879', { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
     expect(actions).toContain('Dropped merged issue pre-merge stash for PAN-879: stash@{3}');
+  });
+
+  it('keeps pre-spawn stash metadata when branch advancement check fails', async () => {
+    const state = {
+      id: 'agent-pan-879',
+      issueId: 'PAN-879',
+      workspace: '/repo/workspaces/feature-pan-879',
+      preSpawnStashRef: 'stash@{0}',
+      preSpawnStashMessage: 'pre-spawn:PAN-879:2026-04-27T14:15:16Z',
+    } as any;
+
+    installExecMock({});
+    mockListRunningAgents.mockReturnValue([{ id: 'agent-pan-879', issueId: 'PAN-879' }] as any);
+    mockGetAgentState.mockReturnValue(state);
+
+    const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
+
+    expect(mockDropStash).not.toHaveBeenCalled();
+    expect(mockSaveAgentState).not.toHaveBeenCalled();
+    expect(state.preSpawnStashRef).toBe('stash@{0}');
+    expect(actions).toEqual([]);
+  });
+
+  it('reads stash janitor cadence from cloister monitoring config', () => {
+    mockLoadCloisterConfig.mockReturnValue({
+      monitoring: { stash_janitor_every_cycles: 7 },
+    } as any);
+
+    expect(loadConfig().stashJanitorEveryCycles).toBe(7);
   });
 
   it('logs non-canonical stashes on startup without deleting them', async () => {
