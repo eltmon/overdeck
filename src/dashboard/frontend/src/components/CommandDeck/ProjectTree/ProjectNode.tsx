@@ -4,6 +4,27 @@ import type { SessionNode } from '@panopticon/contracts';
 import { FeatureItem, type TreeSessionFilter } from './FeatureItem';
 import styles from '../styles/command-deck.module.css';
 
+export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker';
+
+export interface ProjectFeatureResourceDetails {
+  tmuxSessions: string[];
+  workspacePath: string | null;
+  localBranches: string[];
+  remoteBranches: string[];
+  pr: {
+    number: number;
+    title: string;
+    url: string;
+    state: string;
+    isDraft: boolean;
+    headRefName: string;
+    baseRefName: string;
+  } | null;
+  vbriefPath: string | null;
+  beadsPath: string | null;
+  dockerContainers: string[];
+}
+
 export interface ProjectFeature {
   issueId: string;
   title: string;
@@ -23,6 +44,8 @@ export interface ProjectFeature {
   rawTrackerState?: string;
   readyForMerge?: boolean;
   sessions?: SessionNode[];
+  resourceSources?: ResourceSource[];
+  resourceDetails?: ProjectFeatureResourceDetails;
 }
 
 interface ProjectNodeProps {

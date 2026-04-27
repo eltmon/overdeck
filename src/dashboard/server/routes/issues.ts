@@ -54,6 +54,7 @@ import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../
 import { getAgentStateAsync, normalizeAgentId } from '../../../lib/agents.js';
 import type { LifecycleContext, StepResult } from '../../../lib/lifecycle/types.js';
 import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
+import { discoverResourceAllocatedIssues } from '../services/resource-discovery.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -3015,6 +3016,18 @@ const getIssueCostsRoute = HttpRouter.add(
   })),
 );
 
+const getResourceAllocatedIssuesRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/resource-allocated',
+  httpHandler(Effect.gen(function* () {
+    const issues = yield* Effect.tryPromise({
+      try: () => discoverResourceAllocatedIssues(),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+    return jsonResponse(issues);
+  })),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const issuesRouteLayer = Layer.mergeAll(
@@ -3039,6 +3052,7 @@ export const issuesRouteLayer = Layer.mergeAll(
   getIssuePlanningStateRoute,
   postIssueGenerateTasksRoute,
   getIssueCostsRoute,
+  getResourceAllocatedIssuesRoute,
   getIssuePrRoute,
   getIssueDiscussionsRoute,
 );

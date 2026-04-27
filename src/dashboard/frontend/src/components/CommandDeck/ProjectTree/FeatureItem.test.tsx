@@ -17,6 +17,12 @@ vi.mock('lucide-react', async (importOriginal) => {
     Eye: () => <svg data-testid="eye" />,
     Layers: () => <svg data-testid="layers" />,
     GitMerge: () => <svg data-testid="merge" />,
+    GitBranch: () => <svg data-testid="git-branch" />,
+    BookText: () => <svg data-testid="book-text" />,
+    Bug: () => <svg data-testid="bug" />,
+    Container: () => <svg data-testid="container" />,
+    Radio: () => <svg data-testid="radio" />,
+    Workflow: () => <svg data-testid="workflow" />,
   };
 });
 
@@ -63,6 +69,9 @@ vi.mock('../styles/command-deck.module.css', () => ({
     featureState_planning: 'featureState_planning',
     featureState_todo: 'featureState_todo',
     featureCost: 'featureCost',
+    featureResourceStrip: 'featureResourceStrip',
+    featureResourceIcon: 'featureResourceIcon',
+    featureResourcePopover: 'featureResourcePopover',
     sessionList: 'sessionList',
     sessionNode: 'sessionNode',
     sessionNodeSelected: 'sessionNodeSelected',
@@ -384,5 +393,43 @@ describe('FeatureItem', () => {
     fireEvent.click(screen.getByTestId('chevron-right'));
     expect(screen.getByTestId('session-sess-a')).toHaveAttribute('data-selected', 'false');
     expect(screen.getByTestId('session-sess-b')).toHaveAttribute('data-selected', 'true');
+  });
+
+  it('renders resource strip details when resource metadata exists', () => {
+    render(
+      <FeatureItem
+        feature={makeFeature({
+          resourceSources: ['workspace', 'branch', 'tmux', 'pr'],
+          resourceDetails: {
+            tmuxSessions: ['agent-pan-821'],
+            workspacePath: '/tmp/workspaces/feature-pan-821',
+            localBranches: ['feature/pan-821'],
+            remoteBranches: ['origin/feature/pan-821'],
+            pr: {
+              number: 123,
+              title: 'Test PR',
+              url: 'https://example.test/pr/123',
+              state: 'OPEN',
+              isDraft: false,
+              headRefName: 'feature/pan-821',
+              baseRefName: 'main',
+            },
+            vbriefPath: null,
+            beadsPath: null,
+            dockerContainers: [],
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    expect(screen.getByTitle('workspace: /tmp/workspaces/feature-pan-821')).toBeInTheDocument();
+    expect(screen.getByTitle('branch: local 1 · remote 1')).toBeInTheDocument();
+    expect(screen.getByTitle('tmux: 1 session')).toBeInTheDocument();
+    expect(screen.getByTitle('PR: #123 open')).toBeInTheDocument();
+    expect(screen.getByText('workspace: /tmp/workspaces/feature-pan-821')).toBeInTheDocument();
+    expect(screen.getByText('tmux: agent-pan-821')).toBeInTheDocument();
+    expect(screen.getByText('PR: #123 Test PR')).toBeInTheDocument();
   });
 });

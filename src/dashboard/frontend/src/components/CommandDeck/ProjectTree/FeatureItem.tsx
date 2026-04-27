@@ -1,8 +1,8 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
-import { Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge, ChevronRight, ChevronDown, FolderOpen, FileText, Trash2 } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge, ChevronRight, ChevronDown, FolderOpen, FileText, Trash2, GitBranch, BookText, Bug, Container, Radio, Workflow } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
-import type { ProjectFeature } from './ProjectNode';
+import type { ProjectFeature, ResourceSource } from './ProjectNode';
 import { SessionNode } from './SessionNode';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import styles from '../styles/command-deck.module.css';
@@ -32,6 +32,89 @@ interface ContextMenuState {
   x: number;
   y: number;
   open: boolean;
+}
+
+const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'vbrief', 'beads', 'pr', 'docker'];
+
+function resourceColor(feature: ProjectFeature): string {
+  const state = feature.stateLabel.toLowerCase();
+  if (state.includes('closed') || state.includes('done')) return 'var(--mc-text-muted)';
+  if (state.includes('review')) return 'var(--mc-accent)';
+  if (state.includes('progress')) return 'var(--mc-success)';
+  if (state.includes('suspend')) return 'var(--mc-warning)';
+  return 'var(--mc-text-secondary)';
+}
+
+function resourceSummary(feature: ProjectFeature, source: ResourceSource): { label: string; detail: string } | null {
+  const details = feature.resourceDetails;
+  if (!details) return null;
+  switch (source) {
+    case 'workspace':
+      return details.workspacePath ? { label: 'workspace', detail: details.workspacePath } : null;
+    case 'branch': {
+      const parts: string[] = [];
+      if (details.localBranches.length > 0) parts.push(`local ${details.localBranches.length}`);
+      if (details.remoteBranches.length > 0) parts.push(`remote ${details.remoteBranches.length}`);
+      return parts.length > 0 ? { label: 'branch', detail: parts.join(' · ') } : null;
+    }
+    case 'tmux':
+      return details.tmuxSessions.length > 0 ? { label: 'tmux', detail: `${details.tmuxSessions.length} session${details.tmuxSessions.length === 1 ? '' : 's'}` } : null;
+    case 'vbrief':
+      return details.vbriefPath ? { label: 'vBRIEF', detail: 'plan.vbrief.json' } : null;
+    case 'beads':
+      return details.beadsPath ? { label: 'beads', detail: 'issues.jsonl' } : null;
+    case 'pr':
+      return details.pr ? { label: 'PR', detail: `#${details.pr.number} ${details.pr.state.toLowerCase()}` } : null;
+    case 'docker':
+      return details.dockerContainers.length > 0 ? { label: 'docker', detail: `${details.dockerContainers.length} container${details.dockerContainers.length === 1 ? '' : 's'}` } : null;
+    default:
+      return null;
+  }
+}
+
+function ResourceIcon({ source, feature }: { source: ResourceSource; feature: ProjectFeature }) {
+  const color = resourceColor(feature);
+  const summary = resourceSummary(feature, source);
+  if (!summary) return null;
+  const props = { size: 12, color, 'aria-hidden': true as const };
+  const icon = source === 'workspace' ? <FolderOpen {...props} />
+    : source === 'branch' ? <GitBranch {...props} />
+      : source === 'tmux' ? <Radio {...props} />
+        : source === 'vbrief' ? <BookText {...props} />
+          : source === 'beads' ? <Bug {...props} />
+            : source === 'pr' ? <Workflow {...props} />
+              : <Container {...props} />;
+  return (
+    <span className={styles.featureResourceIcon} title={`${summary.label}: ${summary.detail}`}>
+      {icon}
+    </span>
+  );
+}
+
+function ResourceStrip({ feature }: { feature: ProjectFeature }) {
+  const resources = RESOURCE_ICON_ORDER.filter((source) => feature.resourceSources?.includes(source) && resourceSummary(feature, source));
+  if (resources.length === 0) return null;
+
+  const details = feature.resourceDetails;
+  return (
+    <span className={styles.featureResourceStrip}>
+      {resources.map((source) => (
+        <ResourceIcon key={source} source={source} feature={feature} />
+      ))}
+      {details && (
+        <span className={styles.featureResourcePopover}>
+          {details.workspacePath && <span>workspace: {details.workspacePath}</span>}
+          {details.localBranches.map((branch) => <span key={`local-${branch}`}>branch: {branch}</span>)}
+          {details.remoteBranches.map((branch) => <span key={`remote-${branch}`}>remote: {branch}</span>)}
+          {details.tmuxSessions.map((session) => <span key={`tmux-${session}`}>tmux: {session}</span>)}
+          {details.vbriefPath && <span>vBRIEF: {details.vbriefPath}</span>}
+          {details.beadsPath && <span>beads: {details.beadsPath}</span>}
+          {details.pr && <span>PR: #{details.pr.number} {details.pr.title}</span>}
+          {details.dockerContainers.map((container) => <span key={`docker-${container}`}>docker: {container}</span>)}
+        </span>
+      )}
+    </span>
+  );
 }
 
 function StatusIcon({ status, agentStatus, stateLabel, isRally, readyForMerge }: { status: string; agentStatus: string | null; stateLabel: string; isRally?: boolean; readyForMerge?: boolean }) {
@@ -576,6 +659,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               ))}
             </span>
           )}
+          <ResourceStrip feature={feature} />
           {feature.isRally && feature.childCount != null && feature.childCount > 0 ? (
             <span className={styles.featureState} title={`${feature.completedCount || 0}/${feature.childCount} stories done${feature.inProgressCount ? `, ${feature.inProgressCount} active` : ''}`}>
               {feature.completedCount || 0}/{feature.childCount}

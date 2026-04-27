@@ -46,6 +46,7 @@ import { getReviewStatus } from '../review-status.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { LinearClient } from '../services/linear-client.js';
 import { IssueDataService } from '../services/issue-data-service.js';
+import { discoverResourceAllocatedIssues } from '../services/resource-discovery.js';
 import { httpHandler } from './http-handler.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, type ReviewerRoundMetadata } from './reviewer-tree.js';
@@ -1192,271 +1193,28 @@ const getMissionControlProjectsRoute = HttpRouter.add(
 );
 
 async function fetchProjectTree(): Promise<unknown[]> {
-  const projects = listProjects();
+  const discovered = await discoverResourceAllocatedIssues();
+  const projectTree = new Map<string, { name: string; path: string; features: Array<Record<string, unknown>> }>();
 
-  const issueTitleMap = new Map<string, string>();
-  const issueStateMap = new Map<string, string>();
-  let allIssues: Array<Record<string, unknown>> = [];
-  try {
-    const issueDataService = await getIssueDataService();
-    allIssues = issueDataService.getIssues() as Array<Record<string, unknown>>;
-    for (const issue of allIssues) {
-      const id = issue['identifier'] as string | undefined;
-      const title = issue['title'] as string | undefined;
-      const state = issue['state'] as string | undefined;
-      if (id && title) {
-        issueTitleMap.set(id.toUpperCase(), title);
-      }
-      if (id && state) {
-        issueStateMap.set(id.toUpperCase(), state);
-      }
+  for (const issue of discovered) {
+    const existing = projectTree.get(issue.projectName);
+    if (existing) {
+      existing.features.push(issue as unknown as Record<string, unknown>);
+      continue;
     }
-  } catch { /* non-fatal */ }
-
-  // Pre-group issues by project / prefix so the per-project loop is O(P + I)
-  // instead of O(P × I) (PAN-830 review high-5).
-  const rallyIssuesByProject = new Map<string, Array<Record<string, unknown>>>();
-  const trackerIssuesByPrefix = new Map<string, Array<Record<string, unknown>>>();
-  const SHOW_ALWAYS_STATES = new Set(['in_progress', 'in_review']);
-  for (const issue of allIssues) {
-    const source = issue['source'] as string | undefined;
-    if (source === 'rally' && (issue['artifactType'] as string | undefined)?.includes('PortfolioItem')) {
-      const projectName = (issue['project'] as { name?: string } | undefined)?.name;
-      if (projectName) {
-        const list = rallyIssuesByProject.get(projectName);
-        if (list) list.push(issue);
-        else rallyIssuesByProject.set(projectName, [issue]);
-      }
-    } else if (source !== 'rally') {
-      const issueId = issue['identifier'] as string | undefined;
-      const state = issue['state'] as string | undefined;
-      const prefix = issueId ? extractPrefix(issueId) : null;
-      if (prefix && state && SHOW_ALWAYS_STATES.has(state)) {
-        const list = trackerIssuesByPrefix.get(prefix.toUpperCase());
-        if (list) list.push(issue);
-        else trackerIssuesByPrefix.set(prefix.toUpperCase(), [issue]);
-      }
-    }
+    projectTree.set(issue.projectName, {
+      name: issue.projectName,
+      path: issue.projectPath,
+      features: [issue as unknown as Record<string, unknown>],
+    });
   }
 
-  const tmuxResult = await listSessionNamesAsync().catch(() => [] as string[]);
-  const tmuxSessions = new Set<string>();
-  for (const line of tmuxResult) {
-    const trimmed = line.trim();
-    if (trimmed) tmuxSessions.add(trimmed);
-  }
-
-  // Closed issues change at human cadence — cache for 2 min to avoid ~8,600
-  // gh CLI invocations per day while the projects tab is open.
-  // Fetch from ALL configured repos so multi-repo setups get correct titles (PAN-847).
-  const closedIssues: Array<{ number: number; title: string }> = [];
-  const ghConfig = getGitHubConfig();
-  const repos = ghConfig?.repos?.length
-    ? ghConfig.repos.map((r) => `${r.owner}/${r.repo}`)
-    : ['eltmon/panopticon-cli'];
-
-  await Promise.all(repos.map(async (repo) => {
-    const cached = closedIssuesCache.get(repo);
-    if (cached && (Date.now() - cached.timestamp) < CLOSED_ISSUES_TTL_MS) {
-      closedIssues.push(...cached.data);
-      return;
-    }
-    try {
-      const { stdout } = await execFileAsync('gh', [
-        'issue', 'list', '--repo', repo, '--state', 'closed',
-        '--limit', '200', '--json', 'number,title',
-      ], { encoding: 'utf-8', timeout: 15000 });
-      const parsed = JSON.parse(stdout.trim()) as Array<{ number: number; title: string }>;
-      sweepExpired(closedIssuesCache, CLOSED_ISSUES_TTL_MS);
-      closedIssuesCache.set(repo, { timestamp: Date.now(), data: parsed });
-      closedIssues.push(...parsed);
-    } catch {
-      sweepExpired(closedIssuesCache, CLOSED_ISSUES_TTL_MS);
-      closedIssuesCache.set(repo, { timestamp: Date.now(), data: [] });
-    }
-  }));
-
-  for (const ci of closedIssues) {
-    const key = `PAN-${ci.number}`;
-    if (!issueTitleMap.has(key) && ci.title) {
-      issueTitleMap.set(key, ci.title.replace(/^PAN-\d+:\s*/i, ''));
-    }
-  }
-
-  const projectTree: Array<{
-    name: string;
-    path: string;
-    features: Array<Record<string, unknown>>;
-  }> = [];
-
-  const now = Date.now();
-  const RECENT_DAYS = 7;
-  const recentMs = RECENT_DAYS * 24 * 60 * 60 * 1000;
-
-  for (const project of projects) {
-    const projectPath = (project.config as { path: string }).path;
-    const workspaceConfig = (project.config as { workspace?: { workspaces_dir?: string } }).workspace;
-    const workspacesDir = join(projectPath, workspaceConfig?.workspaces_dir || 'workspaces');
-    const features: Array<Record<string, unknown>> = [];
-
-    if (await pathExists(workspacesDir)) {
-      const entries = await readdir(workspacesDir, { withFileTypes: true }).catch(() => []);
-      const featureEntries = entries.filter(e => e.isDirectory() && e.name.startsWith('feature-'));
-
-      const featureResults = await withConcurrencyLimit(
-        featureEntries.map((entry) => async () => {
-          const featurePath = join(workspacesDir, entry.name);
-          const issueLower = entry.name.replace('feature-', '');
-          if (!/^[a-z]+-\d+$/.test(issueLower)) return null;
-          const issueId = issueLower.toUpperCase();
-          const planningDir = join(featurePath, '.planning');
-
-          const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${issueLower}`);
-          let agentStatus: string | null = null;
-          let lastActivity: number | null = null;
-
-          const stateText = await readOptional(join(agentDir, 'state.json'));
-          if (stateText) {
-            try {
-              const state = JSON.parse(stateText) as { state?: string; lastActivity?: string };
-              agentStatus = state.state || null;
-              if (state.lastActivity) lastActivity = new Date(state.lastActivity).getTime();
-            } catch { /* skip */ }
-          }
-
-          const hasTmux = tmuxSessions.has(`agent-${issueLower}`);
-          const hasRecentAgentActivity = lastActivity != null && (now - lastActivity) < recentMs;
-          const isAgentLive = (agentStatus === 'active' || agentStatus === 'suspended') && (hasTmux || hasRecentAgentActivity);
-
-          const hasWorkspace = await pathExists(featurePath);
-
-          const issueCanonicalState = issueStateMap.get(issueId) || '';
-          const showByTrackerState = ['in_progress', 'in_review'].includes(issueCanonicalState);
-
-          if (!hasTmux && !isAgentLive && !hasWorkspace && !showByTrackerState) return null;
-
-          const [hasPlanning, hasPrd, hasState, isShadow] = await Promise.all([
-            pathExists(planningDir),
-            pathExists(join(planningDir, 'PLANNING_PROMPT.md')),
-            pathExists(join(planningDir, 'STATE.md')),
-            pathExists(join(planningDir, 'INFERENCE.md')),
-          ]);
-
-          const centralReviewStatus = getReviewStatus(issueId);
-          const reviewStatus = centralReviewStatus?.reviewStatus || null;
-          const testStatus = centralReviewStatus?.testStatus || null;
-          const mergeStatus = centralReviewStatus?.mergeStatus || null;
-
-          const heartbeatFile = join(homedir(), '.panopticon', 'heartbeats', `agent-${issueLower}.json`);
-          let isHeartbeatFresh = false;
-          const hbText = await readOptional(heartbeatFile);
-          if (hbText) {
-            try {
-              const hb = JSON.parse(hbText) as { timestamp: string };
-              isHeartbeatFresh = (now - new Date(hb.timestamp).getTime()) < 10 * 60 * 1000;
-            } catch { /* skip */ }
-          }
-
-          const isAgentTrulyActive = hasTmux && (isHeartbeatFresh || agentStatus === 'active');
-
-          let stateLabel = 'Idle';
-          if (mergeStatus === 'merged') stateLabel = 'Done';
-          else if (reviewStatus === 'passed' && testStatus === 'passed') stateLabel = 'In Review';
-          else if (reviewStatus === 'reviewing' || testStatus === 'testing') stateLabel = 'In Review';
-          else if (reviewStatus === 'passed' && testStatus === 'pending') stateLabel = 'In Review';
-          else if (isAgentTrulyActive) stateLabel = 'In Progress';
-          else if (hasTmux && !isHeartbeatFresh && agentStatus === 'active') stateLabel = 'Has Context';
-          else if (agentStatus === 'suspended') stateLabel = 'Suspended';
-          else if (hasRecentAgentActivity && agentStatus === 'active' && isHeartbeatFresh) stateLabel = 'In Progress';
-          else if (hasPrd && !hasState) stateLabel = 'Planning';
-          else if (hasState) stateLabel = 'Has Context';
-
-          let title = issueTitleMap.get(issueId) || '';
-          if (!title && hasPrd) {
-            const promptContent = await readOptional(join(planningDir, 'PLANNING_PROMPT.md'));
-            if (promptContent) {
-              const firstLine = promptContent.split('\n').find(l => l.trim().length > 0) || '';
-              title = firstLine.replace(/^#+\s*/, '').trim();
-            }
-          }
-          if (!title) title = issueId;
-
-          return {
-            issueId, title, branch: `feature/${issueLower}`,
-            status: isAgentTrulyActive ? 'running' : hasState ? 'has_state' : 'idle',
-            stateLabel, agentStatus, hasPlanning, hasPrd, hasState, isShadow,
-            readyForMerge: centralReviewStatus?.readyForMerge ?? false,
-          };
-        }),
-        15,
-      );
-
-      features.push(...featureResults.filter((f): f is NonNullable<typeof f> => f !== null));
-    }
-
-    // Add Rally Features from cached issues
-    const existingIds = new Set(features.map(f => f['issueId']));
-    const projectName = (project.config as { name?: string }).name || projectPath.split('/').pop() || 'Unknown';
-
-    const rallyIssues = rallyIssuesByProject.get(projectName) ?? [];
-    for (const issue of rallyIssues) {
-      if (existingIds.has(issue['identifier'])) continue;
-
-      let stateLabel = (issue['rawTrackerState'] as string) || (issue['status'] as string) || 'Unknown';
-      if (issue['derivedStatus'] === 'closed') stateLabel = 'Done';
-      else if (issue['derivedStatus'] === 'in_progress') stateLabel = 'In Progress';
-
-      features.push({
-        issueId: issue['identifier'], title: issue['title'],
-        branch: '', status: 'idle', stateLabel, agentStatus: null,
-        hasPlanning: false, hasPrd: false, hasState: false, isShadow: false,
-        isRally: true, childCount: issue['totalChildCount'],
-        completedCount: issue['completedChildCount'], inProgressCount: issue['inProgressChildCount'],
-        rawTrackerState: issue['rawTrackerState'],
-      });
-    }
-
-    // Add tracker issues without workspaces that are in active states
-    const projectPrefixes: string[] = [];
-    if (project.config.issue_prefix) {
-      projectPrefixes.push(project.config.issue_prefix.toUpperCase());
-    }
-    if (project.config.issue_prefixes) {
-      for (const p of project.config.issue_prefixes) {
-        projectPrefixes.push(p.toUpperCase());
-      }
-    }
-    // Fallback: derive prefix from project key
-    if (projectPrefixes.length === 0) {
-      projectPrefixes.push(project.key.toUpperCase().replace(/-/g, ''));
-    }
-
-    for (const prefix of projectPrefixes) {
-      const trackerIssues = trackerIssuesByPrefix.get(prefix);
-      if (!trackerIssues) continue;
-      for (const issue of trackerIssues) {
-        const issueId = issue['identifier'] as string | undefined;
-        if (!issueId || existingIds.has(issueId)) continue;
-
-        features.push({
-          issueId,
-          title: issue['title'] || issueTitleMap.get(issueId.toUpperCase()) || issueId,
-          branch: '',
-          status: 'idle',
-          stateLabel: issue['status'] || issue['state'],
-          agentStatus: null,
-          hasPlanning: false,
-          hasPrd: false,
-          hasState: false,
-          isShadow: false,
-        });
-      }
-    }
-
-    projectTree.push({ name: projectName, path: projectPath, features });
-  }
-
-  return projectTree;
+  return [...projectTree.values()]
+    .map((project) => ({
+      ...project,
+      features: project.features.sort((a, b) => String(a['issueId']).localeCompare(String(b['issueId']))),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────
