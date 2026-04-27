@@ -172,57 +172,34 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
-      if (url === '/api/command-deck/projects') {
+      if (url === '/api/issues/resource-allocated') {
         return {
           ok: true,
           json: async () => [
             {
-              name: 'test-project',
-              path: 'test-project',
-              features: [
-                {
-                  issueId: 'PAN-821',
-                  title: 'Test Feature',
-                  projectName: 'test-project',
-                  branch: 'feature/pan-821',
-                  status: 'running',
-                  stateLabel: 'In Progress',
-                  agentStatus: 'active',
-                  hasPlanning: true,
-                  hasPrd: true,
-                  hasState: true,
-                  isShadow: false,
-                  readyForMerge: false,
-                  resourceSources: [],
-                  resourceDetails: {
-                    hasWorkspace: false,
-                    workspacePaths: [],
-                    localBranchCount: 0,
-                    localBranchNames: [],
-                    remoteBranchCount: 0,
-                    remoteBranchNames: [],
-                    tmuxSessionCount: 0,
-                    tmuxSessionNames: [],
-                    prs: [],
-                    hasVbrief: false,
-                    hasBeads: false,
-                    dockerContainerCount: 0,
-                    dockerContainerNames: [],
-                  },
-                  sessions: [
-                    {
-                      type: 'work',
-                      sessionId: 'agent-pan-821',
-                      tmuxSession: 'agent-pan-821',
-                      model: 'claude-sonnet-4-6',
-                      startedAt: new Date().toISOString(),
-                      duration: 120,
-                      status: 'running',
-                      presence: 'active',
-                    },
-                  ],
-                },
-              ],
+              issueId: 'PAN-821',
+              title: 'Test Feature',
+              projectName: 'test-project',
+              branch: 'feature/pan-821',
+              status: 'running',
+              stateLabel: 'In Progress',
+              agentStatus: 'active',
+              hasPlanning: true,
+              hasPrd: true,
+              hasState: true,
+              isShadow: false,
+              readyForMerge: false,
+              resourceSources: [],
+              resourceDetails: {
+                hasWorkspace: false,
+                localBranchCount: 0,
+                remoteBranchCount: 0,
+                tmuxSessionCount: 0,
+                prs: [],
+                hasVbrief: false,
+                hasBeads: false,
+                dockerContainerCount: 0,
+              },
             },
           ],
         };
@@ -313,8 +290,8 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     // Projects are visible by default — wait for project node to render
     await screen.findByTestId('project-node');
 
-    // Click the session
-    fireEvent.click(screen.getByTestId('session-agent-pan-821'));
+    // Wait for session tree hydration, then click the session
+    fireEvent.click(await screen.findByTestId('session-agent-pan-821'));
 
     // Verify IssueHeader and SessionPanel are rendered
     expect(screen.getByTestId('issue-header')).toBeInTheDocument();
@@ -350,7 +327,7 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
 
     // Select a session (projects are visible by default)
     await screen.findByTestId('project-node');
-    fireEvent.click(screen.getByTestId('session-agent-pan-821'));
+    fireEvent.click(await screen.findByTestId('session-agent-pan-821'));
 
     // Verify session view is shown
     expect(screen.getByTestId('session-panel')).toBeInTheDocument();

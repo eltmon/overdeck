@@ -18,7 +18,7 @@ export interface ProjectFeatureResourceDetails {
   prs: Array<{
     number: number;
     title: string;
-    url: string;
+    url?: string;
     state: string;
     isDraft: boolean;
   }>;
@@ -70,6 +70,7 @@ interface ProjectNodeProps {
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
+  onCleanupOrphanedResources?: (issueId: string) => void;
 }
 
 interface ContextMenuState {
@@ -152,7 +153,7 @@ function ProjectNodeMenu({
   );
 }
 
-export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter, onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl }: ProjectNodeProps) {
+export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter, onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources }: ProjectNodeProps) {
   const [expanded, setExpanded] = useState(features.length > 0);
   const [menu, setMenu] = useState<ContextMenuState>({ x: 0, y: 0, open: false });
 
@@ -211,6 +212,7 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
               onDeepWipe={onDeepWipe}
               onOpenStateDir={onOpenStateDir}
               onViewJsonl={onViewJsonl}
+              onCleanupOrphanedResources={onCleanupOrphanedResources}
             />
           ))
         ) : (

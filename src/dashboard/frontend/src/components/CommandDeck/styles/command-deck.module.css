@@ -335,9 +335,9 @@
   position: absolute;
   right: 0;
   bottom: calc(100% + 4px);
-  display: none;
+  display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 220px;
   max-width: 360px;
   max-height: 240px;
@@ -353,8 +353,26 @@
   white-space: nowrap;
 }
 
-.featureResourceStrip:hover .featureResourcePopover {
+.featureResourceRow {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.featureResourceCleanupButton {
+  border: 1px solid var(--mc-border);
+  background: var(--mc-bg-hover);
+  color: var(--mc-text-primary);
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.featureResourceCleanupButton:hover {
+  background: color-mix(in srgb, var(--mc-warning) 18%, var(--mc-bg-hover));
 }
 
 /* Feature ID — technical identifier, mono per PAN-698 policy */

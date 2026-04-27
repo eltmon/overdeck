@@ -19,7 +19,7 @@ export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' 
 export interface ResourcePullRequest {
   number: number;
   title: string;
-  url: string;
+  url?: string;
   state: string;
   isDraft: boolean;
 }
@@ -592,7 +592,12 @@ export function sanitizeResourceAllocatedIssues(issues: ResourceAllocatedIssue[]
       localBranchCount: issue.resourceDetails.localBranchCount,
       remoteBranchCount: issue.resourceDetails.remoteBranchCount,
       tmuxSessionCount: issue.resourceDetails.tmuxSessionCount,
-      prs: issue.resourceDetails.prs,
+      prs: issue.resourceDetails.prs.map((pr) => ({
+        number: pr.number,
+        title: pr.title,
+        state: pr.state,
+        isDraft: pr.isDraft,
+      })),
       hasVbrief: issue.resourceDetails.hasVbrief,
       hasBeads: issue.resourceDetails.hasBeads,
       dockerContainerCount: issue.resourceDetails.dockerContainerCount,

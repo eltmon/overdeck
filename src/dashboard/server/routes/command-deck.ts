@@ -46,7 +46,11 @@ import { getReviewStatus } from '../review-status.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { LinearClient } from '../services/linear-client.js';
 import { IssueDataService } from '../services/issue-data-service.js';
-import { getCachedResourceAllocatedIssues, groupResourceAllocatedIssuesByProject } from '../services/resource-discovery.js';
+import {
+  getCachedResourceAllocatedIssues,
+  groupResourceAllocatedIssuesByProject,
+  sanitizeResourceAllocatedIssues,
+} from '../services/resource-discovery.js';
 import { httpHandler } from './http-handler.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, type ReviewerRoundMetadata } from './reviewer-tree.js';
@@ -1194,7 +1198,7 @@ const getMissionControlProjectsRoute = HttpRouter.add(
 
 async function fetchProjectTree(): Promise<unknown[]> {
   const discovered = await getCachedResourceAllocatedIssues();
-  return groupResourceAllocatedIssuesByProject(discovered);
+  return groupResourceAllocatedIssuesByProject(sanitizeResourceAllocatedIssues(discovered));
 }
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────

@@ -26,6 +26,7 @@ interface FeatureItemProps {
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
+  onCleanupOrphanedResources?: (issueId: string) => void;
 }
 
 interface ContextMenuState {
@@ -72,6 +73,12 @@ function resourceSummary(feature: ProjectFeature, source: ResourceSource): { lab
   }
 }
 
+function isOrphanedFeature(feature: ProjectFeature): boolean {
+  const state = feature.stateLabel.toLowerCase();
+  const rawState = feature.rawTrackerState?.toLowerCase() ?? '';
+  return state.includes('closed') || state.includes('done') || rawState.includes('closed') || rawState.includes('done');
+}
+
 function ResourceIcon({ source, feature }: { source: ResourceSource; feature: ProjectFeature }) {
   const color = resourceColor(feature);
   const summary = resourceSummary(feature, source);
@@ -91,32 +98,73 @@ function ResourceIcon({ source, feature }: { source: ResourceSource; feature: Pr
   );
 }
 
-function ResourceStrip({ feature }: { feature: ProjectFeature }) {
+function ResourceStrip({
+  feature,
+  onCleanupOrphanedResources,
+}: {
+  feature: ProjectFeature;
+  onCleanupOrphanedResources?: (issueId: string) => void;
+}) {
   const resources = RESOURCE_ICON_ORDER.filter((source) => feature.resourceSources?.includes(source) && resourceSummary(feature, source));
+  const [popoverOpen, setPopoverOpen] = useState(false);
   if (resources.length === 0) return null;
 
   const details = feature.resourceDetails;
-  const workspaceLines = details?.workspacePaths ?? [];
-  const localBranchLines = details?.localBranchNames ?? [];
-  const remoteBranchLines = details?.remoteBranchNames ?? [];
-  const tmuxLines = details?.tmuxSessionNames ?? [];
-  const dockerLines = details?.dockerContainerNames ?? [];
+  const orphaned = isOrphanedFeature(feature);
+
+  const resourceRows = useMemo(() => {
+    if (!details) return [] as Array<{ key: string; label: string }>;
+
+    const rows: Array<{ key: string; label: string }> = [];
+    if (details.hasWorkspace) rows.push({ key: 'workspace', label: 'workspace allocated' });
+    if (details.localBranchCount > 0 || details.remoteBranchCount > 0) {
+      rows.push({ key: 'branch', label: `branches: ${details.localBranchCount} local · ${details.remoteBranchCount} remote` });
+    }
+    if (details.tmuxSessionCount > 0) rows.push({ key: 'tmux', label: `tmux: ${details.tmuxSessionCount} active session${details.tmuxSessionCount === 1 ? '' : 's'}` });
+    if (details.hasVbrief) rows.push({ key: 'vbrief', label: 'vBRIEF present' });
+    if (details.hasBeads) rows.push({ key: 'beads', label: 'beads present' });
+    for (const pr of details.prs) {
+      rows.push({ key: `pr-${pr.number}`, label: `PR: #${pr.number} ${pr.title}` });
+    }
+    if (details.dockerContainerCount > 0) rows.push({ key: 'docker', label: `docker: ${details.dockerContainerCount} running container${details.dockerContainerCount === 1 ? '' : 's'}` });
+    return rows;
+  }, [details]);
 
   return (
-    <span className={styles.featureResourceStrip}>
+    <span
+      className={styles.featureResourceStrip}
+      onMouseEnter={() => setPopoverOpen(true)}
+      onMouseLeave={() => setPopoverOpen(false)}
+      onFocus={() => setPopoverOpen(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setPopoverOpen(false);
+        }
+      }}
+    >
       {resources.map((source) => (
         <ResourceIcon key={source} source={source} feature={feature} />
       ))}
-      {details && (
+      {details && popoverOpen && (
         <span className={styles.featureResourcePopover}>
-          {workspaceLines.map((workspacePath) => <span key={`workspace-${workspacePath}`}>workspace: {workspacePath}</span>)}
-          {localBranchLines.map((branchName) => <span key={`local-${branchName}`}>branch (local): {branchName}</span>)}
-          {remoteBranchLines.map((branchName) => <span key={`remote-${branchName}`}>branch (remote): {branchName}</span>)}
-          {tmuxLines.map((sessionName) => <span key={`tmux-${sessionName}`}>tmux: {sessionName}</span>)}
-          {details.hasVbrief && <span>vBRIEF present</span>}
-          {details.hasBeads && <span>beads present</span>}
-          {details.prs.map((pr) => <span key={`pr-${pr.number}`}>PR: #{pr.number} {pr.title}</span>)}
-          {dockerLines.map((containerName) => <span key={`docker-${containerName}`}>docker: {containerName}</span>)}
+          {resourceRows.map((row) => (
+            <span key={row.key} className={styles.featureResourceRow}>
+              <span>{row.label}</span>
+              {orphaned && onCleanupOrphanedResources && row.key !== 'pr' && (
+                <button
+                  type="button"
+                  className={styles.featureResourceCleanupButton}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onCleanupOrphanedResources(feature.issueId);
+                  }}
+                  title={`Clean up orphaned ${row.key} resources`}
+                >
+                  Cleanup
+                </button>
+              )}
+            </span>
+          ))}
         </span>
       )}
     </span>
@@ -549,7 +597,7 @@ function FeatureMenu({
   );
 }
 
-export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl }: FeatureItemProps) {
+export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources }: FeatureItemProps) {
   const [expanded, setExpanded] = useState(() => {
     const persisted = readExpanded(feature.issueId);
     return persisted ?? defaultExpandedFromState();
@@ -669,7 +717,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               ))}
             </span>
           )}
-          <ResourceStrip feature={feature} />
           {feature.isRally && feature.childCount != null && feature.childCount > 0 ? (
             <span className={styles.featureState} title={`${feature.completedCount || 0}/${feature.childCount} stories done${feature.inProgressCount ? `, ${feature.inProgressCount} active` : ''}`}>
               {feature.completedCount || 0}/{feature.childCount}
@@ -701,6 +748,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             <span className={styles.featureCost}>{formatCost(cost)}</span>
           )}
         </button>
+        <ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} />
       </div>
 
       {menu.open && (

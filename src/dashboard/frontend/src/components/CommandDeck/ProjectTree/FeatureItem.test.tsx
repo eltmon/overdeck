@@ -73,6 +73,8 @@ vi.mock('../styles/command-deck.module.css', () => ({
     featureResourceIcon: 'featureResourceIcon',
     featureResourcePopover: 'featureResourcePopover',
     featureResourcePopoverOpenUpward: 'featureResourcePopoverOpenUpward',
+    featureResourceRow: 'featureResourceRow',
+    featureResourceCleanupButton: 'featureResourceCleanupButton',
     sessionList: 'sessionList',
     sessionNode: 'sessionNode',
     sessionNodeSelected: 'sessionNodeSelected',
@@ -414,25 +416,20 @@ describe('FeatureItem', () => {
     expect(screen.getByTestId('session-sess-b')).toHaveAttribute('data-selected', 'true');
   });
 
-  it('renders resource strip details when resource metadata exists', () => {
+  it('renders sanitized resource strip details when resource metadata exists', () => {
     render(
       <FeatureItem
         feature={makeFeature({
           resourceSources: ['workspace', 'branch', 'tmux', 'pr', 'docker', 'vbrief', 'beads'],
           resourceDetails: {
             hasWorkspace: true,
-            workspacePaths: ['/tmp/workspaces/feature-pan-821'],
             localBranchCount: 1,
-            localBranchNames: ['feature/pan-821'],
             remoteBranchCount: 1,
-            remoteBranchNames: ['origin/feature/pan-821'],
             tmuxSessionCount: 1,
-            tmuxSessionNames: ['agent-pan-821'],
             prs: [
               {
                 number: 123,
                 title: 'Test PR',
-                url: 'https://example.test/pr/123',
                 state: 'OPEN',
                 isDraft: false,
               },
@@ -440,7 +437,6 @@ describe('FeatureItem', () => {
             hasVbrief: true,
             hasBeads: true,
             dockerContainerCount: 2,
-            dockerContainerNames: ['pan-821-db', 'pan-821-cache'],
           },
         })}
         isSelected={false}
@@ -448,18 +444,49 @@ describe('FeatureItem', () => {
       />,
     );
 
+    fireEvent.mouseEnter(screen.getByTitle('workspace: allocated').parentElement!);
+
     expect(screen.getByTitle('workspace: allocated')).toBeInTheDocument();
     expect(screen.getByTitle('branch: local 1 · remote 1')).toBeInTheDocument();
     expect(screen.getByTitle('tmux: 1 session')).toBeInTheDocument();
     expect(screen.getByTitle('PR: 1 open')).toBeInTheDocument();
-    expect(screen.getByText('workspace: /tmp/workspaces/feature-pan-821')).toBeInTheDocument();
-    expect(screen.getByText('branch (local): feature/pan-821')).toBeInTheDocument();
-    expect(screen.getByText('branch (remote): origin/feature/pan-821')).toBeInTheDocument();
-    expect(screen.getByText('tmux: agent-pan-821')).toBeInTheDocument();
+    expect(screen.getByText('workspace allocated')).toBeInTheDocument();
+    expect(screen.getByText('branches: 1 local · 1 remote')).toBeInTheDocument();
+    expect(screen.getByText('tmux: 1 active session')).toBeInTheDocument();
     expect(screen.getByText('vBRIEF present')).toBeInTheDocument();
     expect(screen.getByText('beads present')).toBeInTheDocument();
     expect(screen.getByText('PR: #123 Test PR')).toBeInTheDocument();
-    expect(screen.getByText('docker: pan-821-db')).toBeInTheDocument();
-    expect(screen.getByText('docker: pan-821-cache')).toBeInTheDocument();
+    expect(screen.getByText('docker: 2 running containers')).toBeInTheDocument();
+  });
+
+  it('shows cleanup affordances for orphaned resources', () => {
+    const onCleanupOrphanedResources = vi.fn();
+    render(
+      <FeatureItem
+        feature={makeFeature({
+          issueId: 'PAN-777',
+          stateLabel: 'Closed',
+          rawTrackerState: 'closed',
+          resourceSources: ['workspace'],
+          resourceDetails: {
+            hasWorkspace: true,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasVbrief: false,
+            hasBeads: false,
+            dockerContainerCount: 0,
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+        onCleanupOrphanedResources={onCleanupOrphanedResources}
+      />,
+    );
+
+    fireEvent.mouseEnter(screen.getByTitle('workspace: allocated').parentElement!);
+    fireEvent.click(screen.getByRole('button', { name: 'Cleanup' }));
+    expect(onCleanupOrphanedResources).toHaveBeenCalledWith('PAN-777');
   });
 });
