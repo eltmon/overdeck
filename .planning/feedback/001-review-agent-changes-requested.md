@@ -2,77 +2,79 @@
 specialist: review-agent
 issueId: PAN-865
 outcome: changes-requested
-timestamp: 2026-04-27T09:51:46Z
+timestamp: 2026-04-27T10:12:20Z
 ---
 
 # Verdict: CHANGES_REQUESTED
 
 ## Summary
 
-PAN-865 adds a Zone C-1 overview surface to the Command Deck: tab strip with URL routing and keyboard navigation, an Overview tab with billboard + 9-tile grid, and Playwright visual coverage. All 4 reviewers completed. The PR is largely solid — security is clean, performance is fine, 8 of 9 requirements are met. However, 1 requirement is missing (the "Open VS Code" button calls the same endpoint as "Start Containers", not a real editor action), and 3 correctness bugs were found. The missing requirement is a Blocker by project policy: incomplete features cannot merge.
+PAN-865 adds a tile grid, URL routing, keyboard navigation, and an enhanced billboard to the Command Deck overview tab. Eight of nine acceptance criteria are implemented correctly. However, the requirements reviewer identified that the PR violates its own stated scope: the nine non-Overview tabs were required to render placeholder content ("Loading…" or "Coming soon") so that those tabs could be delivered in PAN-866, but the PR wires real tab components for all nine instead. This is a MUST-level scope violation that blocks merge. All other reviewer findings are warnings or nits.
 
 ## Blockers (MUST fix before merge)
 
-### 1. "Open VS Code" does nothing distinct from "Start Containers" — `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx:762-803` — `!`
-**Raised by**: requirements (REQ-10 missing), correctness (warning 3)
-**Why it blocks**: The issue scope explicitly requires "WORKSPACE — Start Containers / Stop / Open VS Code" as three distinct actions. The "Open VS Code" button POSTs to `/api/workspaces/${issueId}/containerize`, which is identical to what "Start Containers" does — there is no actual VS Code action wired. Code that doesn't do what was asked is a missing requirement and always blocks by policy.
+### 1. Non-Overview tabs are fully wired instead of placeholders — `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverview.tsx:238-266` — `!`
+**Raised by**: requirements
+**Why it blocks**: REQ-9 explicitly requires "Other 9 tabs render placeholder ('Loading…' or 'Coming soon')" so they can be delivered in PAN-866. The PR wires real components (ActivityTab, CostsTab, MarkdownTab, VBriefTab, BeadsTab, PrDiffTab, DiscussionsTab) instead, violating the stated scope of the issue.
 
-<fix instruction>: Change the "Open VS Code" button to open the workspace path in VS Code. The simplest correct fix is to use a `<a href={"vscode://file/" + workspace.data?.path}>` link (which opens the local workspace in a running VS Code instance), or wire a dedicated backend endpoint if that protocol is not available. Remove the duplicate `fetch` call that hits `containerize`. If "Open VS Code" and "Start Containers" are genuinely meant to call the same backend action, rename "Open VS Code" to be accurate about what it actually does.
+The fix is surgical: in `ZoneCOverview.tsx`, replace the nine non-Overview tab body renderers with a single placeholder:
+```tsx
+const PlaceholderBody = () => (
+  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+    Coming soon
+  </div>
+);
+```
+Then use `PlaceholderBody` for all non-Overview tabs (Activity, Costs, PRD, STATE.md, INFERENCE.md, vBRIEF, Beads, PR/Diff, Discussions) instead of their real tab components. The tab strip (showing all 10 tabs) remains; only the body changes.
 
 ## High Priority (SHOULD fix; synthesis may still approve if justified)
 
-### 1. Services tile renders nothing when services is empty array but frontendUrl exists — `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx:517-560` — `~`
+### 1. Unsafe type assertions in `isReviewPipelineStuck` call — `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx:257-262` — `~`
 **Raised by**: correctness
-<fix instruction>: Replace the `||` fallback with an explicit length check:
-```jsx
-{workspace.data?.services?.length ? (
-  workspace.data.services.map((svc) => (...))
-) : (
-  <>
-    {workspace.data?.frontendUrl && (<a>Frontend ↗</a>)}
-    {workspace.data?.apiUrl && (<a>API ↗</a>)}
-  </>
-)}
-```
-The `||` fails because `[].map(...)` returns `[]` (truthy), short-circuiting the fallback — leaving the tile visually empty.
 
-### 2. Links tile "GitHub Issue" label is wrong for Linear issues — `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx:814-850` — `~`
+The four `as` casts bypass compile-time checking between `ReviewStatusData` (which has `reviewStatus: string`) and the `PipelineStateLike` union types. If the server returns a status value not in the hardcoded union (e.g., `"unknown"`), `isReviewPipelineStuck` silently won't match it, meaning a genuinely stuck pipeline wouldn't show the Recover button. The pattern is low-probability (server and client co-developed) but technically unsound.
+
+**Fix**: Widen `PipelineStateLike` fields to `string` so the casts are unnecessary, or add a type-guard helper that accepts any string but narrows the type at the call site.
+
+### 2. `formatRuntime` returns "0m" for recently-started agents — `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx:202-209` — `?`
 **Raised by**: correctness
-<fix instruction>: The first link block unconditionally renders "GitHub Issue ↗" for any issue with a URL. For `source === 'linear'`, this produces a mislabeled link pointing to the Linear URL. Fix by checking the source:
-```jsx
-{issue?.url && (
-  <a href={issue.url} target="_blank" rel="noopener noreferrer">
-    {issue.source === 'linear' ? 'Linear' : 'GitHub Issue'} ↗
-  </a>
-)}
+
+When an agent starts within the last 60 seconds, `mins` is 0 and the display shows "0m". A zero-valued metric is uninformative and can look like a bug.
+
+**Fix**: Return `"<1m"` when `mins === 0`:
+```typescript
+if (mins === 0) return '<1m';
+return `${mins}m`;
 ```
-Then remove the separate `source === 'linear'` block below it — the first link already handles it.
 
 ## Nits (advisory — safe to defer)
 
-- `ZoneCOverview.tsx:94` — `?` — `visibleTabs` alias is harmless but unused. `const visibleTabs = ALL_TABS;` adds a no-op alias with no filtering logic behind it yet. (performance)
-- `ZoneCOverview.tsx:84-87` — `?` — `getInitialTab` is called once via useState initializer (correct React behavior), but the function reference changes every render. Non-issue, informational only — safe to ignore. (correctness)
+- `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx:451-456` — `?` — Fire-and-forget POST in Spawn Work button swallows all errors with an empty catch. Consistent with other action buttons in the file. Low priority UX enhancement; intentional for MVP.
+- `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverview.tsx:116-119` — `?` — Tab validity reset effect has a subtle dependency gap (`visibleTabs` is a module constant, making the effect dead code). Remove or add a comment explaining it's a safety net for future dynamic tab filtering.
+- `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverview.tsx:96-103` — `?` — `useEffect` for URL sync fires on every render when `activeTab` is set, but the early return makes it a no-op. Not a bug; flagged for awareness only.
 
 ## Cross-cutting groups
 
-**Open VS Code wiring** (same root cause: button label doesn't match action):
-- [blocker-1] "Open VS Code" and "Start Containers" call the same endpoint — missing REQ-10, must fix before merge
-- [high-1] Services tile empty-array truthiness bug — same `OverviewTab.tsx` file, separate tile
+_none_
 
 ## What's good
-- All 8 implemented requirements fully covered with test evidence and Playwright visual snapshot
-- Security review clean — no XSS, no unsafe HTML, no secrets, no new trust boundaries
-- Performance review clean — no regressions, shared React Query caches reused correctly
-- Keyboard navigation and URL routing both have unit test coverage and Playwright verification
+- URL sync and keyboard navigation are correctly implemented with no Tab-trap behavior
+- Tab strip shows all 10 tabs unconditionally, matching the spec
+- All data sourced from existing endpoints — no new server work introduced
+- No regressions in agent-selected mode (Zone C swap to SessionPanel still works)
+- Performance is clean — React Query centralizes caching, no duplicate fetches on tab switches
+- Security is clean — no XSS sinks, proper `rel="noopener noreferrer"` on external links, no injection surface
 
 ## Review stats
-- Blockers: 1   High: 2   Medium: 0   Nits: 2
-- By reviewer: correctness=4 (1 blocker, 2 high, 1 nit), security=0, performance=1 (1 nit), requirements=1 (1 blocker missing)
+- Blockers: 1   High: 1   Medium: 0   Nits: 3
+- By reviewer: correctness=5, security=0, performance=0, requirements=1
 - Files touched: 11   Files with findings: 3
 
 ## Appendix: individual reviews
 
-See individual reviewer output files listed in `## Reviewer Output Files` in the Synthesis Context above. Those files contain full per-reviewer detail; this synthesis is the policy layer.
+See individual reviewer output files listed in `## Reviewer Output Files` in the
+Synthesis Context above. Those files contain full per-reviewer detail; this
+synthesis is the policy layer.
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 
