@@ -21,8 +21,16 @@ export interface SalvageableStashEntry extends ParsedStashEntry {
   shortDescription: string;
 }
 
+const ISO_STASH_TIMESTAMP_PATTERN = '(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2}))';
+
 function isoForStash(date = new Date()): string {
   return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+function normalizeStashTimestamp(value: string): string {
+  return value
+    .replace(/\.\d+(Z|[+-]\d{2}:\d{2})$/, '$1')
+    .replace(/\+00:00$/, 'Z');
 }
 
 function sanitizeShortDescription(value: string): string {
@@ -69,14 +77,14 @@ export function buildStashMessage(
 }
 
 export function parseCanonicalStashMessage(message: string): ParsedStashEntry {
-  const preTimedMatch = /^(pre-merge|pre-spawn):(\w+-\d+):(\d{4}-\d{2}-\d{2}T[^:]+:[^:]+:[^:]+Z)$/.exec(message);
+  const preTimedMatch = new RegExp(`^(pre-merge|pre-spawn):(\\w+-\\d+):${ISO_STASH_TIMESTAMP_PATTERN}$`).exec(message);
   if (preTimedMatch) {
     return {
       ref: '',
       message,
       kind: preTimedMatch[1] as CanonicalStashKind,
       issueId: preTimedMatch[2].toUpperCase(),
-      createdAt: new Date(preTimedMatch[3]),
+      createdAt: new Date(normalizeStashTimestamp(preTimedMatch[3])),
     };
   }
 
@@ -91,14 +99,14 @@ export function parseCanonicalStashMessage(message: string): ParsedStashEntry {
     };
   }
 
-  const salvageableMatch = /^salvageable:(\w+-\d+):(\d{4}-\d{2}-\d{2}T[^:]+:[^:]+:[^:]+Z):(.+)$/.exec(message);
+  const salvageableMatch = new RegExp(`^salvageable:(\\w+-\\d+):${ISO_STASH_TIMESTAMP_PATTERN}:(.+)$`).exec(message);
   if (salvageableMatch) {
     return {
       ref: '',
       message,
       kind: 'salvageable',
       issueId: salvageableMatch[1].toUpperCase(),
-      createdAt: new Date(salvageableMatch[2]),
+      createdAt: new Date(normalizeStashTimestamp(salvageableMatch[2])),
       shortDescription: salvageableMatch[3],
     };
   }
@@ -129,8 +137,23 @@ export async function createNamedStash(repoPath: string, message: string, includ
     : `git stash push -m ${JSON.stringify(message)}`;
   const { stdout } = await execAsync(command, { cwd: repoPath, encoding: 'utf-8' });
   if (/No local changes to save/i.test(stdout)) return null;
-  const stashes = await listStashes(repoPath);
-  return stashes.find((entry) => entry.message === message)?.ref ?? null;
+
+  const { stdout: stashHash } = await execAsync('git rev-parse stash@{0}', { cwd: repoPath, encoding: 'utf-8' });
+  const normalizedHash = stashHash.trim();
+  if (!normalizedHash) return null;
+
+  const { stdout: stashReflog } = await execAsync('git log -g --format=%H%x09%gd refs/stash', {
+    cwd: repoPath,
+    encoding: 'utf-8',
+  });
+  for (const line of stashReflog.split('\n')) {
+    const [hash, ref] = line.trim().split('\t');
+    if (hash === normalizedHash && ref?.startsWith('stash@{')) {
+      return ref;
+    }
+  }
+
+  return null;
 }
 
 export async function popStash(repoPath: string, ref: string): Promise<void> {

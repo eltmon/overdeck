@@ -47,6 +47,13 @@ describe('stashes', () => {
     expect(parsed.issueId).toBe('PAN-879');
     expect(parsed.shortDescription).toBe('workspace-notes');
 
+    const offsetTimestamp = parseCanonicalStashMessage('pre-merge:PAN-879:2026-04-27T14:15:16.123+00:00');
+    expect(offsetTimestamp).toMatchObject({
+      kind: 'pre-merge',
+      issueId: 'PAN-879',
+    });
+    expect(offsetTimestamp.createdAt?.toISOString()).toBe('2026-04-27T14:15:16.000Z');
+
     const line = parseStashListLine('stash@{2}: On feature/pan-879: pre-spawn:PAN-879:2026-04-27T14:15:16Z');
     expect(line).toMatchObject({
       ref: 'stash@{2}',
@@ -80,21 +87,22 @@ describe('stashes', () => {
     await expect(createNamedStash('/tmp/workspace', 'pre-spawn:PAN-879:2026-04-27T14:15:16Z')).resolves.toBeNull();
   });
 
-  it('returns the matching stash ref after creating a named stash', async () => {
+  it('returns the reflog ref for the newly created stash via stable hash lookup', async () => {
     mockExecImplementation((cmd) => {
       if (cmd.startsWith('git stash push')) return { stdout: 'Saved working directory and index state WIP\n' };
-      if (cmd === 'git stash list') {
+      if (cmd === 'git rev-parse stash@{0}') return { stdout: 'abc123def456\n' };
+      if (cmd === 'git log -g --format=%H%x09%gd refs/stash') {
         return {
           stdout: [
-            'stash@{0}: On feature/pan-879: pre-spawn:PAN-879:2026-04-27T14:15:16Z',
-            'stash@{1}: On feature/pan-879: salvageable:PAN-879:2026-04-20T10:00:00Z:notes',
+            'def999\tstash@{0}',
+            'abc123def456\tstash@{1}',
           ].join('\n'),
         };
       }
       throw new Error(`unexpected command: ${cmd}`);
     });
 
-    await expect(createNamedStash('/tmp/workspace', 'pre-spawn:PAN-879:2026-04-27T14:15:16Z')).resolves.toBe('stash@{0}');
+    await expect(createNamedStash('/tmp/workspace', 'pre-spawn:PAN-879:2026-04-27T14:15:16Z')).resolves.toBe('stash@{1}');
   });
 
   it('identifies stale timed stashes by age', () => {

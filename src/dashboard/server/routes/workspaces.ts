@@ -1160,7 +1160,7 @@ const postWorkspaceRecoverStashRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const stashRef = decodeURIComponent(params['stashRef'] ?? '');
+    const stashRef = params['stashRef'] ?? '';
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
@@ -1188,7 +1188,7 @@ const deleteWorkspaceStashRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const stashRef = decodeURIComponent(params['stashRef'] ?? '');
+    const stashRef = params['stashRef'] ?? '';
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);

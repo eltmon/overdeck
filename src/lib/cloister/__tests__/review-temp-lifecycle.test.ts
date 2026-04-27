@@ -129,6 +129,29 @@ describe('review-temp stash lifecycle', () => {
     });
   });
 
+  it('clears persisted review-temp stash metadata when coordinator spawn fails', async () => {
+    execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
+      const callback = (typeof _opts === 'function' ? _opts : cb)!;
+      if (cmd === 'git status --porcelain') return callback(null, { stdout: ' M file.ts\n', stderr: '' });
+      callback(new Error(`unexpected command: ${cmd}`));
+    });
+    dropStashMock.mockRejectedValueOnce(new Error('stash cleanup failed'));
+
+    const result = await dispatchParallelReview(
+      { issueId: 'PAN-9', workspace: '/tmp/workspace', branch: 'feature/pan-9' },
+      { coordinatorSpawnFn: async () => { throw new Error('tmux unavailable'); } },
+    );
+
+    expect(result.success).toBe(false);
+    expect(reviewStatusState.get('PAN-9')).toMatchObject({
+      reviewStatus: 'failed',
+      reviewNotes: 'Coordinator spawn failed: tmux unavailable',
+    });
+    expect(reviewStatusState.get('PAN-9')?.reviewTempStashRef).toBeUndefined();
+    expect(reviewStatusState.get('PAN-9')?.reviewTempStashMessage).toBeUndefined();
+    expect(reviewStatusState.get('PAN-9')?.reviewTempStashSequence).toBeUndefined();
+  });
+
   it('drops persisted review-temp stash in runParallelReview finally block', async () => {
     reviewStatusState.set('PAN-2', {
       issueId: 'PAN-2',

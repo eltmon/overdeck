@@ -1117,6 +1117,16 @@ export async function spawnMergeAgentForBranches(
                   logActivity('merge_quality_gate_fail', `Quality gates failed for ${issueId}: ${failedNames}`);
 
                   const revertSuccess = await autoRevertMerge(projectPath);
+
+                  if (preMergeStashRef) {
+                    try {
+                      await popStash(projectPath, preMergeStashRef);
+                      console.log(`[merge-agent] ✓ Restored stashed changes after quality-gate rollback`);
+                    } catch (popErr: any) {
+                      console.warn(`[merge-agent] ⚠ Failed to restore stash after quality-gate rollback: ${popErr.message}`);
+                    }
+                  }
+
                   const revertNote = revertSuccess
                     ? 'Merge auto-reverted to clean state'
                     : 'WARNING: Auto-revert failed';

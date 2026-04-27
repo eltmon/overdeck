@@ -2412,6 +2412,9 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
       if (!existsSync(workspacePath)) continue;
 
       try {
+        // Note: listStashes() is called fresh per workspace and the await inside
+        // this loop keeps stash drops sequential, preventing index-shift races
+        // across stale-stash cleanup in different workspaces.
         const stashes = await listStashes(workspacePath);
         for (const stash of stashes) {
           if (stash.kind === 'salvageable') continue;

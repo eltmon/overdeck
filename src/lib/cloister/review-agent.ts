@@ -1359,6 +1359,9 @@ export async function dispatchParallelReview(
     setReviewStatus(opts.issueId, {
       reviewStatus: 'failed',
       reviewNotes: `Coordinator spawn failed: ${err instanceof Error ? err.message : String(err)}`,
+      reviewTempStashRef: undefined,
+      reviewTempStashMessage: undefined,
+      reviewTempStashSequence: undefined,
     });
     return {
       success: false,

@@ -82,4 +82,5 @@ describe('merge-agent pre-merge stash lifecycle', () => {
     expect(createNamedStash).toHaveBeenCalledWith('/tmp/workspace', 'pre-merge:PAN-1:2026-04-27T14:15:16Z', true);
     expect(popStash).toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
   });
+
 });
