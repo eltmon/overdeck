@@ -9,6 +9,12 @@ vi.mock('lucide-react', () => ({
 
 vi.mock('./FeatureItem', () => ({
   FeatureItem: ({ feature }: { feature: ProjectFeature }) => <div data-testid={`feature-${feature.issueId}`}>{feature.issueId}</div>,
+  sessionMatchesFilter: (session: SessionNodeType, filter: 'all' | 'alive' | 'failed') => {
+    if (filter === 'all') return true;
+    if (filter === 'alive') return session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended';
+    const status = (session.status || '').toLowerCase();
+    return status.includes('fail') || status.includes('error') || status.includes('stuck');
+  },
 }));
 
 vi.mock('../styles/command-deck.module.css', () => ({

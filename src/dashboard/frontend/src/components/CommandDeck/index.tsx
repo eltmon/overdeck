@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Compass, Plus } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
+import { sessionMatchesFilter } from './ProjectTree/FeatureItem';
 import { type TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { DeaconStatus } from './DeaconStatus';
 import { IssueWorkbench } from './IssueWorkbench';
@@ -738,11 +739,7 @@ export function CommandDeck({
                   .filter((project) => {
                     if (treeFilter === 'all') return project.features.length > 0;
                     return project.features.some((feature) =>
-                      (feature.sessions ?? []).some((session) =>
-                        treeFilter === 'alive'
-                          ? session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended'
-                          : (session.status || '').toLowerCase().includes('fail') || (session.status || '').toLowerCase().includes('error') || (session.status || '').toLowerCase().includes('stuck'),
-                      ),
+                      (feature.sessions ?? []).some((session) => sessionMatchesFilter(session, treeFilter)),
                     );
                   })
                   .map(project => (

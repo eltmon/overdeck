@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { SessionNode } from '@panctl/contracts';
-import { FeatureItem, type TreeSessionFilter } from './FeatureItem';
+import { FeatureItem, sessionMatchesFilter, type TreeSessionFilter } from './FeatureItem';
 import styles from '../styles/command-deck.module.css';
 
 export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker';
@@ -165,11 +165,7 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
   const visibleFeatures = useMemo(() => {
     if (filter === 'all') return features;
     return features.filter((feature) =>
-      (feature.sessions ?? []).some((session) =>
-        filter === 'alive'
-          ? session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended'
-          : (session.status || '').toLowerCase().includes('fail') || (session.status || '').toLowerCase().includes('error') || (session.status || '').toLowerCase().includes('stuck'),
-      ),
+      (feature.sessions ?? []).some((session) => sessionMatchesFilter(session, filter)),
     );
   }, [features, filter]);
   const [expanded, setExpanded] = useState(features.length > 0);

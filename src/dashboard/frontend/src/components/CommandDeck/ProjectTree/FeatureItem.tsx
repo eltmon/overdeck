@@ -503,7 +503,7 @@ function computeDominantStatus(sessions: readonly SessionNodeType[]): StatusDotS
 }
 
 /** Whether a session passes the tree filter. */
-function sessionMatchesFilter(session: SessionNodeType, filter: TreeSessionFilter): boolean {
+export function sessionMatchesFilter(session: SessionNodeType, filter: TreeSessionFilter): boolean {
   if (filter === 'all') return true;
   if (filter === 'alive') return session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended';
   if (filter === 'failed') {
