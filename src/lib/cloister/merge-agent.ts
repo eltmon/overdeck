@@ -36,7 +36,7 @@ import { renderPrompt } from './prompts.js';
 import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
 import { markWorkspaceStuck } from '../review-status.js';
 import { appendGitOperation, type GitOperationType } from '../git-activity.js';
-import { buildStashMessage, createNamedStash, dropStash, listStashes, popStash } from '../stashes.js';
+import { buildStashMessage, createNamedStash, dropStash, listStashes } from '../stashes.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -1158,15 +1158,12 @@ export async function spawnMergeAgentForBranches(
                 // Run post-merge cleanup (move PRD, update issue status)
                 await postMergeLifecycle(issueId, projectPath, sourceBranch);
 
-                // Successful merge keeps the user's pre-existing workspace edits by restoring
-                // the pre-merge stash. Rollback paths drop it so failed merges do not reapply
-                // potentially conflicting work onto a reverted tree.
                 if (preMergeStashRef) {
                   try {
-                    await popStash(projectPath, preMergeStashRef);
-                    console.log(`[merge-agent] ✓ Restored pre-merge stash after successful merge`);
-                  } catch (popErr: any) {
-                    console.warn(`[merge-agent] ⚠ Failed restoring pre-merge stash after merge: ${popErr.message}`);
+                    await dropStash(projectPath, preMergeStashRef);
+                    console.log(`[merge-agent] ✓ Dropped pre-merge stash after successful merge`);
+                  } catch (dropErr: any) {
+                    console.warn(`[merge-agent] ⚠ Failed dropping pre-merge stash after merge: ${dropErr.message}`);
                   }
                 }
 

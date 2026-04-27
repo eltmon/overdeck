@@ -79,13 +79,13 @@ describe('merge-agent pre-merge stash lifecycle', () => {
     setTimeoutSpy.mockRestore();
   });
 
-  it('creates and restores pre-merge stash on successful completion', async () => {
+  it('creates and drops pre-merge stash on successful completion', async () => {
     const result = await spawnMergeAgentForBranches('/tmp/workspace', 'feature/pan-1', 'main', 'PAN-1', { skipDoneReport: true });
 
     expect(result.success).toBe(true);
     expect(createNamedStash).toHaveBeenCalledWith('/tmp/workspace', 'pre-merge:PAN-1:2026-04-27T14:15:16Z', true);
-    expect(popStash).toHaveBeenCalledWith('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
-    expect(dropStash).not.toHaveBeenCalledWith('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
+    expect(dropStash).toHaveBeenCalledWith('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
+    expect(popStash).not.toHaveBeenCalledWith('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
   });
 
   it('drops pre-merge stash after quality-gate rollback', async () => {

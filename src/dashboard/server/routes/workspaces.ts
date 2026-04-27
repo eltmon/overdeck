@@ -312,10 +312,57 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
   return join(homedir(), 'Projects');
 }
 
-function resolveWorkspacePath(issueId: string): string {
-  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
-  const projectPath = getProjectPath(undefined, issuePrefix);
-  return join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+function requireTrustedMutationOrigin(request: HttpServerRequest.HttpServerRequest): HttpServerResponse.HttpServerResponse | null {
+  const origin = (() => {
+    const value = (request.headers as Record<string, string | string[] | undefined>)['origin'];
+    return Array.isArray(value) ? value[0] : value;
+  })();
+  const referer = (() => {
+    const value = (request.headers as Record<string, string | string[] | undefined>)['referer'];
+    return Array.isArray(value) ? value[0] : value;
+  })();
+
+  const port = parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
+  const dashboardUrl = process.env['DASHBOARD_URL'] ?? `http://localhost:${port}`;
+  const trustedOrigins = new Set<string>([dashboardUrl]);
+  if (process.env['NODE_ENV'] === 'development') {
+    trustedOrigins.add('http://localhost:3011');
+    trustedOrigins.add('http://localhost:3000');
+    trustedOrigins.add('http://127.0.0.1:3011');
+    trustedOrigins.add('http://127.0.0.1:3000');
+  }
+
+  const normalize = (value?: string): string | null => {
+    if (!value) return null;
+    try {
+      const url = new URL(value);
+      return `${url.protocol}//${url.host}`;
+    } catch {
+      return null;
+    }
+  };
+
+  const normalizedOrigin = normalize(origin);
+  if (normalizedOrigin) {
+    return trustedOrigins.has(normalizedOrigin)
+      ? null
+      : jsonResponse({ error: 'Invalid origin' }, { status: 403 });
+  }
+
+  const normalizedReferer = normalize(referer);
+  if (normalizedReferer) {
+    return trustedOrigins.has(normalizedReferer)
+      ? null
+      : jsonResponse({ error: 'Invalid referer' }, { status: 403 });
+  }
+
+  return jsonResponse({ error: 'Missing origin' }, { status: 403 });
+}
+
+function resolveWorkspacePath(issueId: string): string | null {
+  const info = getWorkspaceInfoForIssue(issueId);
+  if (info.isRemote || !info.localPath) return null;
+  return info.localPath;
 }
 
 function getWorkspaceLocation(issueId: string): 'local' | 'remote' | undefined {
@@ -1142,7 +1189,7 @@ const getWorkspaceStashesRoute = HttpRouter.add(
     const issueId = params['issueId'] ?? '';
     const workspacePath = resolveWorkspacePath(issueId);
 
-    if (!existsSync(workspacePath)) {
+    if (!workspacePath || !existsSync(workspacePath)) {
       return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
     }
 
@@ -1167,12 +1214,16 @@ const postWorkspaceRecoverStashRoute = HttpRouter.add(
   'POST',
   '/api/workspaces/:issueId/stashes/:stashRef/recover',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedMutationOrigin(request);
+    if (originError) return originError;
+
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const stashRef = decodeURIComponent(params['stashRef'] ?? '');
     const workspacePath = resolveWorkspacePath(issueId);
 
-    if (!existsSync(workspacePath)) {
+    if (!workspacePath || !existsSync(workspacePath)) {
       return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
     }
 
@@ -1197,12 +1248,16 @@ const deleteWorkspaceStashRoute = HttpRouter.add(
   'DELETE',
   '/api/workspaces/:issueId/stashes/:stashRef',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedMutationOrigin(request);
+    if (originError) return originError;
+
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const stashRef = decodeURIComponent(params['stashRef'] ?? '');
     const workspacePath = resolveWorkspacePath(issueId);
 
-    if (!existsSync(workspacePath)) {
+    if (!workspacePath || !existsSync(workspacePath)) {
       return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
     }
 
