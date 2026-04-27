@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import type { ReviewStatus } from './types';
 import { formatRelativeTime, isStale } from './utils';
 import { StatusHistory } from './StatusHistory';
+import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 
 const DEFAULT_VERIFICATION_MAX_CYCLES = 10;
 const DEFAULT_AUTO_REQUEUE_MAX = 7;
@@ -12,6 +13,8 @@ const DEFAULT_AUTO_REQUEUE_MAX = 7;
 interface ReviewPipelineSectionProps {
   reviewStatus: ReviewStatus;
 }
+
+void COMMAND_DECK_SURFACE_REGISTRY;
 
 interface PipelineStep {
   key: string;

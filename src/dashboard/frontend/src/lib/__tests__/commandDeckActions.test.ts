@@ -18,7 +18,7 @@ import {
   type ActionKey,
   type ZoneAInput,
 } from '../commandDeckActions';
-import { COMMAND_DECK_SURFACE_REGISTRY } from '../commandDeckSurfaceRegistry';
+import { COMMAND_DECK_PARITY_SURFACES, COMMAND_DECK_SURFACE_REGISTRY } from '../commandDeckSurfaceRegistry';
 
 const ALL_ACTION_KEYS: readonly ActionKey[] = [
   'merge', 'reviewTest', 'recover', 'stopAgent',
@@ -57,11 +57,9 @@ const failedAgentNoWorkspace = {
   status: 'failed' as const,
 };
 
-const surfaceFiles = {
-  KanbanBoard: resolve(process.cwd(), 'src/dashboard/frontend/src/components/KanbanBoard.tsx'),
-  ActionsSection: resolve(process.cwd(), 'src/dashboard/frontend/src/components/inspector/ActionsSection.tsx'),
-  AgentInfoSection: resolve(process.cwd(), 'src/dashboard/frontend/src/components/inspector/AgentInfoSection.tsx'),
-} as const;
+const surfaceFiles = Object.fromEntries(
+  COMMAND_DECK_PARITY_SURFACES.map(({ surface, file }) => [surface, resolve(process.cwd(), file)])
+) as Record<(typeof COMMAND_DECK_PARITY_SURFACES)[number]['surface'], string>;
 
 function getSourceActions(): ActionKey[] {
   return COMMAND_DECK_SURFACE_REGISTRY.map((entry) => entry.actionKey);
@@ -344,9 +342,9 @@ describe('parity smoke (master coverage)', () => {
   });
 
   it('derives parity-managed actions from source surfaces via the shared registry', () => {
-    assertSurfaceImportsRegistry('KanbanBoard');
-    assertSurfaceImportsRegistry('ActionsSection');
-    assertSurfaceImportsRegistry('AgentInfoSection');
+    for (const { surface } of COMMAND_DECK_PARITY_SURFACES) {
+      assertSurfaceImportsRegistry(surface);
+    }
 
     const sourceActions = getSourceActions();
     const reached = getCommandDeckReachableActions();

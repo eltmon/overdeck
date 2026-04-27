@@ -28,3 +28,5 @@ All PAN-867 work complete
 ## Specialist Feedback
 - None
 - **[2026-04-27T04:50Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-04-27T05:08Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-04-27T05:10Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`

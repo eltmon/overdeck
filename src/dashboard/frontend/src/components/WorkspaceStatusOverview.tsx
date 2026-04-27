@@ -23,6 +23,7 @@ import type { ReviewStatus, WorkspaceInfo } from './inspector/types';
 import { ReviewPipelineSection } from './inspector/ReviewPipelineSection';
 import { isReviewPipelineStuck } from '../lib/pipeline-state';
 import { getFriendlyModelName } from './inspector/utils';
+import { COMMAND_DECK_SURFACE_REGISTRY } from '../lib/commandDeckSurfaceRegistry';
 
 export interface WorkspaceStatusOverviewProps {
   issue: Issue;
@@ -62,6 +63,8 @@ export interface WorkspaceStatusOverviewProps {
   onResumeMessageChange?: (msg: string) => void;
   isSelected?: boolean;
 }
+
+void COMMAND_DECK_SURFACE_REGISTRY;
 
 const STUCK_MERGE_MS = 2 * 60 * 1000;
 
