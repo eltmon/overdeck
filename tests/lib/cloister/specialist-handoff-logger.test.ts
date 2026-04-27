@@ -15,10 +15,15 @@ import {
 import { existsSync, unlinkSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { PANOPTICON_HOME } from '../../../src/lib/paths.js';
+import { getPanopticonHome } from '../../../src/lib/paths.js';
 
-const TEST_LOG_FILE = join(PANOPTICON_HOME, 'logs', 'specialist-handoffs.jsonl');
-const TEST_LOG_DIR = join(PANOPTICON_HOME, 'logs');
+function getTestLogFile(): string {
+  return join(getPanopticonHome(), 'logs', 'specialist-handoffs.jsonl');
+}
+
+function getTestLogDir(): string {
+  return join(getPanopticonHome(), 'logs');
+}
 
 // Isolated temp directory for hook files — prevents tests from reading real AGENTS_DIR
 let TEST_AGENTS_DIR: string;
@@ -26,8 +31,8 @@ let TEST_AGENTS_DIR: string;
 describe('specialist-handoff-logger', () => {
   beforeEach(() => {
     // Clean up test log file
-    if (existsSync(TEST_LOG_FILE)) {
-      unlinkSync(TEST_LOG_FILE);
+    if (existsSync(getTestLogFile())) {
+      unlinkSync(getTestLogFile());
     }
     // Create a fresh temp agents dir for each test
     TEST_AGENTS_DIR = join(tmpdir(), `pan-test-agents-${Date.now()}`);
@@ -36,8 +41,8 @@ describe('specialist-handoff-logger', () => {
 
   afterEach(() => {
     // Clean up after each test
-    if (existsSync(TEST_LOG_FILE)) {
-      unlinkSync(TEST_LOG_FILE);
+    if (existsSync(getTestLogFile())) {
+      unlinkSync(getTestLogFile());
     }
     // Remove temp agents dir
     rmSync(TEST_AGENTS_DIR, { recursive: true, force: true });
@@ -101,22 +106,22 @@ describe('specialist-handoff-logger', () => {
   describe('logSpecialistHandoff', () => {
     it('should create log directory if it does not exist', () => {
       // Remove log directory if it exists
-      if (existsSync(TEST_LOG_FILE)) {
-        unlinkSync(TEST_LOG_FILE);
+      if (existsSync(getTestLogFile())) {
+        unlinkSync(getTestLogFile());
       }
 
       const handoff = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-123', 'normal');
       logSpecialistHandoff(handoff);
 
-      expect(existsSync(TEST_LOG_DIR)).toBe(true);
-      expect(existsSync(TEST_LOG_FILE)).toBe(true);
+      expect(existsSync(getTestLogDir())).toBe(true);
+      expect(existsSync(getTestLogFile())).toBe(true);
     });
 
     it('should write handoff event to JSONL file', () => {
       const handoff = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-123', 'normal');
       logSpecialistHandoff(handoff);
 
-      const content = readFileSync(TEST_LOG_FILE, 'utf-8');
+      const content = readFileSync(getTestLogFile(), 'utf-8');
       const lines = content.trim().split('\n');
 
       expect(lines).toHaveLength(1);
@@ -137,7 +142,7 @@ describe('specialist-handoff-logger', () => {
       logSpecialistHandoff(handoff2);
       logSpecialistHandoff(handoff3);
 
-      const content = readFileSync(TEST_LOG_FILE, 'utf-8');
+      const content = readFileSync(getTestLogFile(), 'utf-8');
       const lines = content.trim().split('\n');
 
       expect(lines).toHaveLength(3);
@@ -190,7 +195,7 @@ describe('specialist-handoff-logger', () => {
 
       logSpecialistHandoff(handoff1);
       // Manually add empty lines
-      writeFileSync(TEST_LOG_FILE, readFileSync(TEST_LOG_FILE, 'utf-8') + '\n\n', 'utf-8');
+      writeFileSync(getTestLogFile(), readFileSync(getTestLogFile(), 'utf-8') + '\n\n', 'utf-8');
       logSpecialistHandoff(handoff2);
 
       const handoffs = readSpecialistHandoffs();
@@ -204,8 +209,8 @@ describe('specialist-handoff-logger', () => {
 
       // Append corrupted JSON
       writeFileSync(
-        TEST_LOG_FILE,
-        readFileSync(TEST_LOG_FILE, 'utf-8') + '{invalid json\n',
+        getTestLogFile(),
+        readFileSync(getTestLogFile(), 'utf-8') + '{invalid json\n',
         'utf-8'
       );
 
@@ -256,7 +261,7 @@ describe('specialist-handoff-logger', () => {
     });
 
     it('should return empty array when log file does not exist', () => {
-      unlinkSync(TEST_LOG_FILE);
+      unlinkSync(getTestLogFile());
       const handoffs = readIssueSpecialistHandoffs('PAN-123');
       expect(handoffs).toEqual([]);
     });
@@ -554,9 +559,9 @@ describe('specialist-handoff-logger', () => {
 
     it('should handle corrupted JSON lines gracefully', async () => {
       // Write a corrupted log file
-      const logDir = join(PANOPTICON_HOME, 'logs');
+      const logDir = getTestLogDir();
       mkdirSync(logDir, { recursive: true });
-      const logFile = join(logDir, 'specialist-handoffs.jsonl');
+      const logFile = getTestLogFile();
       const handoff = createSpecialistHandoff('review-agent', 'test-agent', 'PAN-1', 'normal');
       writeFileSync(logFile, `{corrupted json}\n${JSON.stringify(handoff)}\n`, 'utf-8');
 
@@ -572,9 +577,9 @@ describe('specialist-handoff-logger', () => {
     });
 
     it('should handle empty log file', async () => {
-      const logDir = join(PANOPTICON_HOME, 'logs');
+      const logDir = getTestLogDir();
       mkdirSync(logDir, { recursive: true });
-      const logFile = join(logDir, 'specialist-handoffs.jsonl');
+      const logFile = getTestLogFile();
       writeFileSync(logFile, '', 'utf-8');
 
       const result = await updateSpecialistHandoffStatus('PAN-1', 'test-agent', 'completed', 'success');
