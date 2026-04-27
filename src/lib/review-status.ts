@@ -398,17 +398,15 @@ export function fixStuckReadyForMerge(): void {
  *
  * This identifies records where:
  * - reviewStatus = 'failed'
- * - testStatus = 'passed' (CI green)
+ * - testStatus = 'passed' (CI green, so review wasn't genuinely bad)
  * - mergeStatus is not terminal ('merged', 'failed')
  * - readyForMerge = false
- * - The last review history entry is type='review', status='commented'
+ * - The last review history entry is type='review', status='failed'
  *
- * These are issues where a COMMENTED review (success=true, no blockers) was
- * incorrectly stored as 'failed' because the old reviewResultToReviewStatus
- * did not distinguish COMMENTED(success) from COMMENTED(failure).
- *
- * We check the history to avoid accidentally "fixing" genuinely failed reviews
- * that happen to have a prior COMMENTED entry in their history.
+ * The old reviewResultToReviewStatus() mapped COMMENTED (regardless of success)
+ * to 'failed', so the history stores 'failed' for old COMMENTED reviews.
+ * We use testStatus='passed' as the signal that this was a successful review
+ * (CI was green), distinguishing it from genuinely failed reviews.
  */
 export function fixStuckCommentedReviews(): void {
   const statuses = loadReviewStatuses();
@@ -424,11 +422,13 @@ export function fixStuckCommentedReviews(): void {
 
   const toFix: string[] = [];
   for (const s of candidates) {
-    // Check if the last review history entry is 'commented'
+    // Check if the last review history entry is 'failed' (the old COMMENTED mapping
+    // stored 'failed' in history). testStatus='passed' signals CI was green,
+    // so this was a successful review incorrectly stored as 'failed'.
     const lastReviewEntry = [...(s.history || [])]
       .reverse()
       .find(h => h.type === 'review');
-    if (lastReviewEntry?.status === 'commented') {
+    if (lastReviewEntry?.status === 'failed') {
       toFix.push(s.issueId);
     }
   }

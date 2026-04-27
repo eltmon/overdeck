@@ -125,7 +125,7 @@ export async function reviewRunCommand(
     }
   }
 
-  const exitCode = mapToExitCode(result.reviewResult, verdict);
+  const exitCode = mapToExitCode(result.reviewResult, verdict, result.success);
 
   // Persist the terminal review status. The dashboard reads this from the DB
   // on next observation — no server API needed.
@@ -200,6 +200,7 @@ async function detectFilesChanged(cwd: string): Promise<string[]> {
 function mapToExitCode(
   reviewResult: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED',
   verdictJson?: string,
+  success?: boolean,
 ): 0 | 1 | 2 {
   // synthesis.json is authoritative when present — it's the new contract.
   if (verdictJson === 'approved') return 0;
@@ -209,5 +210,7 @@ function mapToExitCode(
   // Fallback to the legacy REVIEW_RESULT tail marker parser.
   if (reviewResult === 'APPROVED') return 0;
   if (reviewResult === 'CHANGES_REQUESTED') return 1;
+  // PAN-869: COMMENTED with success=true means review completed with no blockers
+  if (reviewResult === 'COMMENTED' && success) return 0;
   return 2;
 }

@@ -3,22 +3,26 @@
 ## Status: Ready for Merge
 
 ## Current Phase
-Work complete - commits pushed, GitHub PR created
+Fixing review issues found by correctness reviewer, then re-submitting
 
 ## Completed Work
-- [x] fix reviewResultToReviewStatus in review-agent.ts to return 'passed' for COMMENTED when success=true (commit: 76b35b0a)
-- [x] Update review-run.ts to pass full ReviewResult object instead of just reviewResult string (commit: 76b35b0a)
-- [x] Add backfill function fixStuckCommentedReviews in review-status.ts to fix existing stuck COMMENTED records (commit: 76b35b0a)
-- [x] Call fixStuckCommentedReviews on dashboard startup in main.ts (commit: 76b35b0a)
-- [x] Update tests in review-agent.test.ts to use new function signature (commit: 76b35b0a)
+- [x] reviewResultToReviewStatus fix: COMMENTED (success=true) → 'passed' (commit: 76b35b0a)
+- [x] review-run.ts: pass full ReviewResult to reviewResultToReviewStatus (commit: 76b35b0a)
+- [x] Add fixStuckCommentedReviews backfill (commit: 76b35b0a)
+- [x] Call fixStuckCommentedReviews on dashboard startup (commit: 76b35b0a)
+- [x] Update tests for new function signature (commit: 76b35b0a)
+- [x] Fix mapToExitCode to respect success flag for COMMENTED (commit: TBD)
+- [x] Fix backfill to check status='failed' instead of 'commented' (commit: TBD)
 
 ## Remaining Work
-- None - waiting for review approval
+- Commit fixes, push, re-submit
 
 ## Key Decisions
 - D1: COMMENTED (success=true) = review passed with no blockers → maps to 'passed' so readyForMerge=true
 - D2: COMMENTED (success=false) = synthesis/protocol failure → keeps as 'failed' so deacon retries
-- D3: Backfill conservative approach: only fix records where last review history entry is 'commented' type
+- D3: Backfill uses status='failed' + testStatus='passed' as signal (old COMMENTED was stored as 'failed')
 
 ## Specialist Feedback
-- (none yet)
+- **[2026-04-27T02:57Z] review-agent → COMMENTED** — correctness reviewer found:
+  - `fixStuckCommentedReviews` backfill checked `status: 'commented'` but history stores `'failed'` → DEAD CODE (fixed)
+  - `mapToExitCode` returns 2 for all COMMENTED regardless of success → INCONSISTENT (fixed)
