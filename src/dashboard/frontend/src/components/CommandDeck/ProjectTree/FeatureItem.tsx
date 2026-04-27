@@ -1,8 +1,8 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
-import { Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge, ChevronRight, ChevronDown, FolderOpen, FileText, Trash2 } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge, ChevronRight, ChevronDown, FolderOpen, FileText, Trash2, GitBranch, BookText, Bug, Container, Radio, Workflow } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
-import type { ProjectFeature } from './ProjectNode';
+import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
 import { SessionNode } from './SessionNode';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import styles from '../styles/command-deck.module.css';
@@ -26,12 +26,219 @@ interface FeatureItemProps {
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
+  onCleanupOrphanedResources?: (issueId: string) => void;
 }
 
 interface ContextMenuState {
   x: number;
   y: number;
   open: boolean;
+}
+
+const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'vbrief', 'beads', 'pr', 'docker'];
+
+function resourceColor(feature: ProjectFeature): string {
+  const state = feature.stateLabel.toLowerCase();
+  if (state.includes('closed') || state.includes('done')) return 'var(--mc-text-muted)';
+  if (state.includes('review')) return 'var(--mc-accent)';
+  if (state.includes('progress')) return 'var(--mc-success)';
+  if (state.includes('suspend')) return 'var(--mc-warning)';
+  return 'var(--mc-text-secondary)';
+}
+
+function formatPrState(pr: { number: number; title: string; state: string; isDraft: boolean }): string {
+  const normalizedState = pr.state.toLowerCase();
+  return pr.isDraft ? `${normalizedState}, draft` : normalizedState;
+}
+
+function resourceSummary(feature: ProjectFeature, source: ResourceSource): { label: string; detail: string } | null {
+  const details = feature.resourceDetails;
+  if (!details) return null;
+  switch (source) {
+    case 'workspace':
+      return details.hasWorkspace ? { label: 'workspace', detail: 'allocated' } : null;
+    case 'branch': {
+      const parts: string[] = [];
+      if (details.localBranchCount > 0) parts.push(`local ${details.localBranchCount}`);
+      if (details.remoteBranchCount > 0) parts.push(`remote ${details.remoteBranchCount}`);
+      return parts.length > 0 ? { label: 'branch', detail: parts.join(' · ') } : null;
+    }
+    case 'tmux':
+      return details.tmuxSessionCount > 0 ? { label: 'tmux', detail: `${details.tmuxSessionCount} session${details.tmuxSessionCount === 1 ? '' : 's'}` } : null;
+    case 'vbrief':
+      return details.hasVbrief ? { label: 'vBRIEF', detail: 'present' } : null;
+    case 'beads':
+      return details.hasBeads ? { label: 'beads', detail: 'present' } : null;
+    case 'pr':
+      return details.prs.length > 0
+        ? {
+            label: 'PR',
+            detail: details.prs.map((pr) => `#${pr.number} (${formatPrState(pr)})`).join(' · '),
+          }
+        : null;
+    case 'docker':
+      return details.dockerContainerCount > 0 ? { label: 'docker', detail: `${details.dockerContainerCount} container${details.dockerContainerCount === 1 ? '' : 's'}` } : null;
+    default:
+      return null;
+  }
+}
+
+function isOrphanedFeature(feature: ProjectFeature): boolean {
+  const state = feature.stateLabel.toLowerCase();
+  const rawState = feature.rawTrackerState?.toLowerCase() ?? '';
+  return state.includes('closed') || state.includes('done') || rawState.includes('closed') || rawState.includes('done');
+}
+
+function ResourceIcon({ source, feature }: { source: ResourceSource; feature: ProjectFeature }) {
+  const color = resourceColor(feature);
+  const summary = resourceSummary(feature, source);
+  if (!summary) return null;
+  const props = { size: 12, color, 'aria-hidden': true as const };
+  const icon = source === 'workspace' ? <FolderOpen {...props} />
+    : source === 'branch' ? <GitBranch {...props} />
+      : source === 'tmux' ? <Radio {...props} />
+        : source === 'vbrief' ? <BookText {...props} />
+          : source === 'beads' ? <Bug {...props} />
+            : source === 'pr' ? <Workflow {...props} />
+              : <Container {...props} />;
+  return (
+    <span className={styles.featureResourceIcon} title={`${summary.label}: ${summary.detail}`}>
+      {icon}
+    </span>
+  );
+}
+
+function ResourceStrip({
+  feature,
+  onCleanupOrphanedResources,
+}: {
+  feature: ProjectFeature;
+  onCleanupOrphanedResources?: (issueId: string) => void;
+}) {
+  const details = feature.resourceDetails;
+  const resources = RESOURCE_ICON_ORDER.filter((source) => feature.resourceSources?.includes(source) && resourceSummary(feature, source));
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
+  const orphaned = isOrphanedFeature(feature);
+  const shouldRender = resources.length > 0;
+
+  useEffect(() => {
+    if (!shouldRender) return;
+    if (!popoverOpen) return;
+    if (!details) return;
+    if (!feature.issueId) return;
+    if (detailIdentifiers) return;
+
+    let cancelled = false;
+    void fetch(`/api/issues/${encodeURIComponent(feature.issueId)}/resource-details`)
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return response.json() as Promise<ProjectFeatureResourceIdentifiers>;
+      })
+      .then((payload) => {
+        if (cancelled || !payload) return;
+        setDetailIdentifiers(payload);
+      })
+      .catch(() => {
+        // Fall back to summary-only rows when detail fetch fails.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [shouldRender, popoverOpen, details, feature.issueId, detailIdentifiers]);
+
+  const resourceRows = useMemo(() => {
+    if (!details) return [] as Array<{ key: string; label: string }>;
+
+    const identifiers = detailIdentifiers;
+    const rows: Array<{ key: string; label: string }> = [];
+
+    if ((identifiers?.workspacePaths.length ?? 0) > 0) {
+      for (const workspacePath of identifiers?.workspacePaths ?? []) {
+        rows.push({ key: `workspace-${workspacePath}`, label: `workspace: ${workspacePath}` });
+      }
+    } else if (details.hasWorkspace) {
+      rows.push({ key: 'workspace', label: 'workspace allocated' });
+    }
+
+    if ((identifiers?.localBranchNames.length ?? 0) > 0 || (identifiers?.remoteBranchNames.length ?? 0) > 0) {
+      for (const branchName of identifiers?.localBranchNames ?? []) {
+        rows.push({ key: `local-branch-${branchName}`, label: `branch (local): ${branchName}` });
+      }
+      for (const branchName of identifiers?.remoteBranchNames ?? []) {
+        rows.push({ key: `remote-branch-${branchName}`, label: `branch (remote): ${branchName}` });
+      }
+    } else if (details.localBranchCount > 0 || details.remoteBranchCount > 0) {
+      rows.push({ key: 'branch', label: `branches: ${details.localBranchCount} local · ${details.remoteBranchCount} remote` });
+    }
+
+    if ((identifiers?.tmuxSessionNames.length ?? 0) > 0) {
+      for (const sessionName of identifiers?.tmuxSessionNames ?? []) {
+        rows.push({ key: `tmux-${sessionName}`, label: `tmux: ${sessionName}` });
+      }
+    } else if (details.tmuxSessionCount > 0) {
+      rows.push({ key: 'tmux', label: `tmux: ${details.tmuxSessionCount} active session${details.tmuxSessionCount === 1 ? '' : 's'}` });
+    }
+
+    if (details.hasVbrief) rows.push({ key: 'vbrief', label: 'vBRIEF present' });
+    if (details.hasBeads) rows.push({ key: 'beads', label: 'beads present' });
+    for (const pr of identifiers?.prs ?? details.prs) {
+      rows.push({ key: `pr-${pr.number}`, label: `PR: #${pr.number} ${pr.title} (${formatPrState(pr)})` });
+    }
+
+    if ((identifiers?.dockerContainerNames.length ?? 0) > 0) {
+      for (const containerName of identifiers?.dockerContainerNames ?? []) {
+        rows.push({ key: `docker-${containerName}`, label: `docker: ${containerName}` });
+      }
+    } else if (details.dockerContainerCount > 0) {
+      rows.push({ key: 'docker', label: `docker: ${details.dockerContainerCount} running container${details.dockerContainerCount === 1 ? '' : 's'}` });
+    }
+
+    return rows;
+  }, [details, detailIdentifiers]);
+
+  if (!shouldRender) return null;
+
+  return (
+    <span
+      className={styles.featureResourceStrip}
+      onMouseEnter={() => setPopoverOpen(true)}
+      onMouseLeave={() => setPopoverOpen(false)}
+      onFocus={() => setPopoverOpen(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          setPopoverOpen(false);
+        }
+      }}
+    >
+      {resources.map((source) => (
+        <ResourceIcon key={source} source={source} feature={feature} />
+      ))}
+      {details && popoverOpen && (
+        <span className={styles.featureResourcePopover}>
+          {resourceRows.map((row) => (
+            <span key={row.key} className={styles.featureResourceRow}>
+              <span>{row.label}</span>
+              {orphaned && onCleanupOrphanedResources && !row.key.startsWith('pr-') && (
+                <button
+                  type="button"
+                  className={styles.featureResourceCleanupButton}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onCleanupOrphanedResources(feature.issueId);
+                  }}
+                  title={`Clean up orphaned ${row.key} resources`}
+                >
+                  Cleanup
+                </button>
+              )}
+            </span>
+          ))}
+        </span>
+      )}
+    </span>
+  );
 }
 
 function StatusIcon({ status, agentStatus, stateLabel, isRally, readyForMerge }: { status: string; agentStatus: string | null; stateLabel: string; isRally?: boolean; readyForMerge?: boolean }) {
@@ -64,7 +271,6 @@ function StatusIcon({ status, agentStatus, stateLabel, isRally, readyForMerge }:
 
 function formatCost(cost: number): string {
   if (cost < 0.01) return '<$0.01';
-  if (cost < 1) return `$${cost.toFixed(2)}`;
   return `$${cost.toFixed(2)}`;
 }
 
@@ -104,7 +310,7 @@ function formatSessionDuration(seconds: number): string {
   return `${Math.round(seconds / 3600)}h`;
 }
 
-function getAggregateActivityState(sessions: SessionNodeType[]): AggregateActivityState {
+function getAggregateActivityState(sessions: readonly SessionNodeType[]): AggregateActivityState {
   if (sessions.some(isErrorSession)) return 'error';
   if (sessions.some(isRunningSession)) return 'running';
   if (sessions.some(isQueuedSession)) return 'queued';
@@ -117,7 +323,7 @@ function getActivityDotStatus(state: AggregateActivityState): StatusDotStatus {
   return 'ended';
 }
 
-function buildActivitySummary(sessions: SessionNodeType[]): string {
+function buildActivitySummary(sessions: readonly SessionNodeType[]): string {
   if (sessions.length === 0) return 'No sessions';
 
   const runningWork = sessions.filter(session =>
@@ -166,7 +372,7 @@ function buildActivitySummary(sessions: SessionNodeType[]): string {
   return parts.join(', ');
 }
 
-function getAggregateBadges(sessions: SessionNodeType[]): AggregateBadge[] {
+function getAggregateBadges(sessions: readonly SessionNodeType[]): AggregateBadge[] {
   const workSessions = sessions.filter(session => session.type === 'work');
   const reviewerSessions = sessions.filter(session => session.type === 'reviewer' || session.type === 'review');
   const reviewerErrors = reviewerSessions.filter(isErrorSession);
@@ -229,7 +435,7 @@ const PRESENCE_PRIORITY: Record<string, number> = {
 };
 
 /** Pick the best session to auto-select: active > idle > suspended > ended; among active prefer work > review > test. */
-export function pickBestSession(sessions: SessionNodeType[]): string | null {
+export function pickBestSession(sessions: readonly SessionNodeType[]): string | null {
   if (sessions.length === 0) return null;
   const sorted = [...sessions].sort((a, b) => {
     const presenceDiff = PRESENCE_PRIORITY[a.presence] - PRESENCE_PRIORITY[b.presence];
@@ -270,13 +476,13 @@ function writeExpanded(issueId: string, expanded: boolean): void {
 /** Default to collapsed for every issue. The session list dominates the
  *  tree height when expanded — collapsed-by-default keeps the tree scannable.
  *  Users can expand individual features; that choice is persisted. */
-function defaultExpandedFromState(_stateLabel: string): boolean {
+function defaultExpandedFromState(): boolean {
   return false;
 }
 
 /** Compute the dominant session presence for the feature row StatusDot.
  *  Priority: active > thinking > waiting > idle > ended. */
-function computeDominantStatus(sessions: SessionNodeType[]): StatusDotStatus {
+function computeDominantStatus(sessions: readonly SessionNodeType[]): StatusDotStatus {
   let hasIdle = false;
   let hasThinking = false;
   let hasWaiting = false;
@@ -461,24 +667,29 @@ function FeatureMenu({
   );
 }
 
-export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl }: FeatureItemProps) {
+export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources }: FeatureItemProps) {
   const [expanded, setExpanded] = useState(() => {
     const persisted = readExpanded(feature.issueId);
-    return persisted ?? defaultExpandedFromState(feature.stateLabel);
+    return persisted ?? defaultExpandedFromState();
   });
   const [menu, setMenu] = useState<ContextMenuState>({ x: 0, y: 0, open: false });
 
   // Derive best session once per data change instead of on every click (PAN-821 review)
   // Respect the tree filter so auto-select picks a visible session.
-  const visibleSessions = feature.sessions?.filter(s => sessionMatchesFilter(s, filter)) ?? [];
+  const visibleSessions = useMemo(
+    () => feature.sessions?.filter((session) => sessionMatchesFilter(session, filter)) ?? [],
+    [feature.sessions, filter],
+  );
   const hasVisibleSessions = visibleSessions.length > 0;
-  const bestSessionId = useMemo(() =>
-    visibleSessions.length > 0 ? pickBestSession(visibleSessions) : null,
-  [visibleSessions]);
+  const bestSessionId = useMemo(
+    () => (visibleSessions.length > 0 ? pickBestSession(visibleSessions) : null),
+    [visibleSessions],
+  );
 
-  const hasJsonl = useMemo(() =>
-    visibleSessions.some(s => s.hasJsonl),
-  [visibleSessions]);
+  const hasJsonl = useMemo(
+    () => visibleSessions.some((session) => session.hasJsonl),
+    [visibleSessions],
+  );
 
   const aggregateSessions = feature.sessions?.filter(isWorkOrSpecialistSession) ?? [];
   const activityState = getAggregateActivityState(aggregateSessions);
@@ -607,6 +818,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             <span className={styles.featureCost}>{formatCost(cost)}</span>
           )}
         </button>
+        <ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} />
       </div>
 
       {menu.open && (

@@ -261,6 +261,7 @@
 
 .featureLabel {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -308,6 +309,76 @@
   background: var(--mc-error) !important;
   opacity: 1 !important;
   box-shadow: 0 0 8px color-mix(in srgb, var(--mc-error) 45%, transparent);
+}
+
+.featureResourceStrip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  color: var(--mc-text-secondary);
+}
+
+.featureResourceIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.85;
+}
+
+.featureResourceStrip:hover .featureResourceIcon {
+  opacity: 1;
+}
+
+.featureResourcePopover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 4px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 220px;
+  max-width: 360px;
+  max-height: 240px;
+  overflow: auto;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--mc-border);
+  background: var(--mc-bg-main);
+  color: var(--mc-text-primary);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  font-size: 10px;
+  z-index: 20;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.featureResourcePopover * {
+  pointer-events: none;
+}
+
+.featureResourceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.featureResourceCleanupButton {
+  pointer-events: auto;
+  border: 1px solid var(--mc-border);
+  background: var(--mc-bg-hover);
+  color: var(--mc-text-primary);
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.featureResourceCleanupButton:hover {
+  background: color-mix(in srgb, var(--mc-warning) 18%, var(--mc-bg-hover));
 }
 
 /* Feature ID — technical identifier, mono per PAN-698 policy */

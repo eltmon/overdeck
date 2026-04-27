@@ -29,11 +29,10 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Install Bun
-        run: curl -fsSL https://bun.sh/install | bash
-
-      - name: Add Bun to PATH
-        run: echo "$HOME/.bun/bin" >> $GITHUB_PATH
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -55,11 +54,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Bun
-        run: curl -fsSL https://bun.sh/install | bash
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
-      - name: Add Bun to PATH
-        run: echo "$HOME/.bun/bin" >> $GITHUB_PATH
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -76,11 +79,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Bun
-        run: curl -fsSL https://bun.sh/install | bash
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
-      - name: Add Bun to PATH
-        run: echo "$HOME/.bun/bin" >> $GITHUB_PATH
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -94,3 +101,26 @@ jobs:
         # Root cause (PAN-805): reconciler tests with real async I/O (Retry-After sleeping)
         # exhaust heap when parallelized across many workers.
         run: npm test
+
+      - name: Resource discovery benchmark
+        run: VITEST_INCLUDE_BENCH=1 npx vitest run src/dashboard/server/services/resource-discovery.bench.ts
+
+      - name: Install Playwright browsers
+        run: cd src/dashboard/frontend && npx playwright install --with-deps chromium
+
+      - name: Start dashboard server
+        run: |
+          DASHBOARD_URL=http://localhost:3011 nohup node dist/dashboard/server.js > /tmp/pan-dashboard.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3011/api/health > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/pan-dashboard.log
+          exit 1
+
+      - name: Run Command Deck Playwright spec
+        env:
+          DASHBOARD_URL: http://localhost:3011
+        run: cd src/dashboard/frontend && npm run test:playwright
