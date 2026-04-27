@@ -115,15 +115,15 @@ function ResourceStrip({
   feature: ProjectFeature;
   onCleanupOrphanedResources?: (issueId: string) => void;
 }) {
+  const details = feature.resourceDetails;
   const resources = RESOURCE_ICON_ORDER.filter((source) => feature.resourceSources?.includes(source) && resourceSummary(feature, source));
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
-
-  const details = feature.resourceDetails;
   const orphaned = isOrphanedFeature(feature);
-  if (resources.length === 0) return null;
+  const shouldRender = resources.length > 0;
 
   useEffect(() => {
+    if (!shouldRender) return;
     if (!popoverOpen) return;
     if (!details) return;
     if (!feature.issueId) return;
@@ -146,7 +146,7 @@ function ResourceStrip({
     return () => {
       cancelled = true;
     };
-  }, [popoverOpen, details, feature.issueId, detailIdentifiers]);
+  }, [shouldRender, popoverOpen, details, feature.issueId, detailIdentifiers]);
 
   const resourceRows = useMemo(() => {
     if (!details) return [] as Array<{ key: string; label: string }>;
@@ -197,6 +197,8 @@ function ResourceStrip({
 
     return rows;
   }, [details, detailIdentifiers]);
+
+  if (!shouldRender) return null;
 
   return (
     <span

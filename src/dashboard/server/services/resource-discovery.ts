@@ -521,12 +521,16 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   }
 
   await Promise.all([...issueMap.values()].map(async (issue) => {
+    if (issue.resourceDetails.tmuxSessions.length === 0) return;
+
     const issueLower = issue.issueId.toLowerCase();
     const agentId = `agent-${issueLower}`;
     const runtimeState = await getAgentRuntimeStateAsync(agentId).catch(() => null);
     if (!runtimeState) return;
+
     issue.agentStatus = runtimeState.state;
-    issue.lastActivity = Date.parse(runtimeState.lastActivity);
+    const lastActivity = Date.parse(runtimeState.lastActivity);
+    issue.lastActivity = Number.isFinite(lastActivity) ? lastActivity : null;
   }));
 
   const discoveredIssues = [...issueMap.values()]

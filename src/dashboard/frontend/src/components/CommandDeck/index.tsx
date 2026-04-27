@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo, useReducer } from 'r
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Compass, Plus } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
-import type { TreeSessionFilter } from './ProjectTree/FeatureItem';
+import { pickBestSession, type TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { DeaconStatus } from './DeaconStatus';
 import { IssueWorkbench } from './IssueWorkbench';
 import { BeadsDialog } from '../BeadsDialog';
@@ -79,17 +79,6 @@ async function fetchVersion(): Promise<{ version: string }> {
   const res = await fetch('/api/version');
   if (!res.ok) throw new Error('Failed to fetch version');
   return res.json();
-}
-
-/** Prefer active > idle > ended when auto-selecting a session on feature click. */
-function pickBestSession(sessions: readonly SessionNode[]): SessionNode | null {
-  if (sessions.length === 0) return null;
-  const order: Record<string, number> = { active: 0, idle: 1, ended: 2 };
-  return [...sessions].sort((a, b) => {
-    const ao = order[a.presence] ?? 999;
-    const bo = order[b.presence] ?? 999;
-    return ao - bo;
-  })[0] ?? null;
 }
 
 async function fetchAllSessionTrees(projectKeys: string[]): Promise<ProjectSessionTree[]> {
@@ -405,8 +394,8 @@ export function CommandDeck({
         break;
       }
     }
-    const best = pickBestSession(sessions);
-    selectSession(issueId, best?.sessionId ?? null);
+    const bestSessionId = pickBestSession(sessions);
+    selectSession(issueId, bestSessionId);
     setSelectedConversation(null);
     setIsDraft(false);
   }, [selectSession, projectsWithSessions]);

@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks';
 
-import { bench, describe, expect, it } from 'vitest';
+import { beforeAll, bench, describe, expect, it } from 'vitest';
 
 import { discoverResourceAllocatedIssuesFresh } from './resource-discovery.js';
 
@@ -21,12 +21,13 @@ const DISCOVERY_TARGET_MS = 1_000;
 const isBenchmarkMode = process.argv.some((arg) => arg === 'bench' || arg === '--bench');
 
 describe('discoverResourceAllocatedIssuesFresh', () => {
-  it(`completes a full uncached discovery pass in under ${DISCOVERY_TARGET_MS}ms`, async () => {
+  beforeAll(async () => {
     // Prime long-lived singleton dependencies (issue service, module init, V8 JIT)
-    // outside the measurement window. The assertion is meant to guard the steady-
-    // state request path, not one-time process bootstrap cost.
+    // outside the measured test. The gate is for steady-state discovery latency.
     await discoverResourceAllocatedIssuesFresh();
+  });
 
+  it(`completes a full uncached discovery pass in under ${DISCOVERY_TARGET_MS}ms`, async () => {
     const startedAt = performance.now();
     await discoverResourceAllocatedIssuesFresh();
     const durationMs = performance.now() - startedAt;
