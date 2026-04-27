@@ -34,3 +34,5 @@ Review feedback addressed; resubmitting after removing the tab-strip keyboard fo
 - **[2026-04-27T09:51Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
 - **[2026-04-27T10:12Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
 - **[2026-04-27T10:12Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
+- **[2026-04-27T10:18Z] verification-gate → FAILED** — `.planning/feedback/003-verification-gate-failed.md`
+- **[2026-04-27T10:36Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`

@@ -2,79 +2,87 @@
 specialist: review-agent
 issueId: PAN-865
 outcome: changes-requested
-timestamp: 2026-04-27T10:12:20Z
+timestamp: 2026-04-27T10:36:06Z
 ---
 
 # Verdict: CHANGES_REQUESTED
 
 ## Summary
+PAN-865 implements the Zone C Overview tab for the Command Deck issue-selected mode, including a 10-tab strip (Overview + 9 placeholders), URL routing, keyboard navigation, a billboard/tile-grid body, and a batched session-tree server route. All 9 requirements pass. Four high-priority findings must be addressed before merge: a user-visible broken-link bug in service rendering, and three architectural issues in the session-tree polling path that cause unnecessary I/O and subprocess churn on a hot 10-second endpoint.
 
-PAN-865 adds a tile grid, URL routing, keyboard navigation, and an enhanced billboard to the Command Deck overview tab. Eight of nine acceptance criteria are implemented correctly. However, the requirements reviewer identified that the PR violates its own stated scope: the nine non-Overview tabs were required to render placeholder content ("Loading…" or "Coming soon") so that those tabs could be delivered in PAN-866, but the PR wires real tab components for all nine instead. This is a MUST-level scope violation that blocks merge. All other reviewer findings are warnings or nits.
+## High Priority (SHOULD fix before merge)
 
-## Blockers (MUST fix before merge)
+### 1. Service links render `href="undefined"` when `svc.url` is missing — `~`
+**Raised by**: correctness
+**Location**: `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx:519`
+**Why it matters**: When a workspace service has no `url` bound (e.g., a container not yet port-mapped), the anchor renders `href="undefined"`, creating a clickable link to the literal string `"undefined"` as a relative URL. This is a user-visible regression on any such workspace.
 
-### 1. Non-Overview tabs are fully wired instead of placeholders — `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverview.tsx:238-266` — `!`
-**Raised by**: requirements
-**Why it blocks**: REQ-9 explicitly requires "Other 9 tabs render placeholder ('Loading…' or 'Coming soon')" so they can be delivered in PAN-866. The PR wires real components (ActivityTab, CostsTab, MarkdownTab, VBriefTab, BeadsTab, PrDiffTab, DiscussionsTab) instead, violating the stated scope of the issue.
-
-The fix is surgical: in `ZoneCOverview.tsx`, replace the nine non-Overview tab body renderers with a single placeholder:
+Fix — filter out services without URLs before rendering anchors:
 ```tsx
-const PlaceholderBody = () => (
-  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-    Coming soon
-  </div>
-);
+{workspace.data.services.filter(svc => svc.url).map((svc) => (
+  <a key={svc.name} href={svc.url!} target="_blank" rel="noopener noreferrer">
+    {svc.name} ↗
+  </a>
+))}
 ```
-Then use `PlaceholderBody` for all non-Overview tabs (Activity, Costs, PRD, STATE.md, INFERENCE.md, vBRIEF, Beads, PR/Diff, Discussions) instead of their real tab components. The tab strip (showing all 10 tabs) remains; only the body changes.
+Or render the service name as plain text when `url` is absent.
 
-## High Priority (SHOULD fix; synthesis may still approve if justified)
+### 2. Session-tree polling re-fetches full activity including transcript capture — `~`
+**Raised by**: performance
+**Location**: `src/dashboard/server/routes/projects.ts:235`
+**Why it matters**: The new `/api/session-trees` bulk endpoint calls `fetchActivityDataWithContext()` for each project, which captures up to 500 tmux pane lines per session via `capturePaneAsync()`, reads `output.log`, and resolves JSONL paths — all on a 10-second polling cadence. The session-tree UI only needs presence/status/session identity; transcript capture is redundant I/O and subprocess work multiplied across every active workspace.
 
-### 1. Unsafe type assertions in `isReviewPipelineStuck` call — `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx:257-262` — `~`
+Fix — split the route onto a metadata-only session-tree path that collects only the fields the tree renders (`sessionId`, `type`, `role`, `startedAt`, `endedAt`, `presence`, `status`, optional `roundMetadata`). Defer transcript/log capture to the detail views that render transcript content.
+
+### 3. Session-tree route rescans specialist task files once per project in the same request — `~`
+**Raised by**: performance
+**Location**: `src/dashboard/server/routes/projects.ts:189–196` and `projects.ts:276–283`
+**Why it matters**: `GET /api/session-trees` fans out with `Promise.all(projectKeys.map(fetchProjectSessionTree))`. Each `fetchProjectSessionTree()` independently reads `~/.panopticon/specialists/tasks` and iterates every `*.md` file. A single bulk request for N projects repeats the same full task-directory scan N times. With many projects and accumulated task files, every 10s sidebar poll multiplies identical disk I/O by the project count.
+
+Fix — hoist task-file loading to the `/api/session-trees` route handler once per HTTP request (just like the already-hoisted tmux session-name set), then pass the shared `sharedTaskFileContents` map into each `fetchProjectSessionTree()` call.
+
+### 4. `handleTabClick` pushes history state in both controlled and uncontrolled modes — `~`
 **Raised by**: correctness
+**Location**: `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverview.tsx:118`
+**Why it matters**: `handleTabClick` unconditionally calls `window.history.pushState` even when `activeTab` is provided (controlled mode). If the parent rejects the `onTabChange` callback, the URL diverges from the displayed tab. PAN-866 adds controlled tab switching, which will surface this inconsistency.
 
-The four `as` casts bypass compile-time checking between `ReviewStatusData` (which has `reviewStatus: string`) and the `PipelineStateLike` union types. If the server returns a status value not in the hardcoded union (e.g., `"unknown"`), `isReviewPipelineStuck` silently won't match it, meaning a genuinely stuck pipeline wouldn't show the Recover button. The pattern is low-probability (server and client co-developed) but technically unsound.
-
-**Fix**: Widen `PipelineStateLike` fields to `string` so the casts are unnecessary, or add a type-guard helper that accepts any string but narrows the type at the call site.
-
-### 2. `formatRuntime` returns "0m" for recently-started agents — `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx:202-209` — `?`
-**Raised by**: correctness
-
-When an agent starts within the last 60 seconds, `mins` is 0 and the display shows "0m". A zero-valued metric is uninformative and can look like a bug.
-
-**Fix**: Return `"<1m"` when `mins === 0`:
+Fix — gate URL push on uncontrolled mode:
 ```typescript
-if (mins === 0) return '<1m';
-return `${mins}m`;
+const handleTabClick = (next: OverviewTab) => {
+  if (onTabChange) onTabChange(next);
+  else setInternalTab(next);
+
+  if (!activeTab) {
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('tab', next);
+    window.history.pushState(window.history.state, '', nextUrl);
+  }
+};
 ```
 
 ## Nits (advisory — safe to defer)
 
-- `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx:451-456` — `?` — Fire-and-forget POST in Spawn Work button swallows all errors with an empty catch. Consistent with other action buttons in the file. Low priority UX enhancement; intentional for MVP.
-- `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverview.tsx:116-119` — `?` — Tab validity reset effect has a subtle dependency gap (`visibleTabs` is a module constant, making the effect dead code). Remove or add a comment explaining it's a safety net for future dynamic tab filtering.
-- `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverview.tsx:96-103` — `?` — `useEffect` for URL sync fires on every render when `activeTab` is set, but the early return makes it a no-op. Not a bug; flagged for awareness only.
+- `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx:258` — `?` — Type assertion includes impossible `undefined` variant in `isReviewPipelineStuck` call. Remove `| undefined` from the non-optional `reviewStatus`/`testStatus` fields for accurate type narrowing. (correctness)
+- `src/dashboard/frontend/src/components/CommandDeck/index.tsx:59` — `?` — `pickBestSession()` sorts the entire array just to return one element. A single-pass scan would be O(n) instead of O(n log n). Minor since session lists are small. (performance)
 
 ## Cross-cutting groups
 
-_none_
+**Session-tree polling inefficiency** (same `/api/session-trees` endpoint, same hot 10s poll):
+- [high-2] Transcript capture on metadata-only polling route
+- [high-3] Per-project repeated task-directory scans
+Both stem from the new bulk tree endpoint reusing paths designed for transcript-detail views. Fix together by hoisting shared reads and splitting metadata vs. transcript capture.
 
 ## What's good
-- URL sync and keyboard navigation are correctly implemented with no Tab-trap behavior
-- Tab strip shows all 10 tabs unconditionally, matching the spec
-- All data sourced from existing endpoints — no new server work introduced
-- No regressions in agent-selected mode (Zone C swap to SessionPanel still works)
-- Performance is clean — React Query centralizes caching, no duplicate fetches on tab switches
-- Security is clean — no XSS sinks, proper `rel="noopener noreferrer"` on external links, no injection surface
+- All 9 requirements implemented and verified; requirements reviewer passes with zero missing items.
+- Clean separation of concerns: issue-selected vs. agent-selected arbitration is correct and tested.
+- Keyboard navigation (arrow keys, Home/End, Tab/Shift-Tab pass-through) is properly wired.
+- Security reviewer found no injection, auth bypass, or XSS regressions.
+- Server-side Effect 3.x API migration (`HttpRouter.request` → `HttpServerRequest`) is correctly applied.
 
 ## Review stats
-- Blockers: 1   High: 1   Medium: 0   Nits: 3
-- By reviewer: correctness=5, security=0, performance=0, requirements=1
-- Files touched: 11   Files with findings: 3
-
-## Appendix: individual reviews
-
-See individual reviewer output files listed in `## Reviewer Output Files` in the
-Synthesis Context above. Those files contain full per-reviewer detail; this
-synthesis is the policy layer.
+- Blockers: 0   High: 4   Medium: 0   Nits: 2
+- By reviewer: correctness=3 (1 high, 2 nits), security=0, performance=3 (2 high, 1 nit), requirements=0
+- Files touched: 13   Files with findings: 4
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 
