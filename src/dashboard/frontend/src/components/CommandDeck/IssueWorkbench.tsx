@@ -19,8 +19,8 @@
  * issue-selected.
  */
 
-import { useMemo } from 'react';
-import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import {
   useCommandDeckSelection,
   selectSelectedSessionForIssue,
@@ -67,11 +67,53 @@ export function IssueWorkbench({
 
   const isAgentSelected = !!selectedSession;
 
-  const handleSwitchTab = (_tab: OverviewTab) => {
-    // TODO: propagate to ZoneCOverview via ref or state lift if needed
-    // For now the action strip's tab-switch buttons are visual only;
-    // full wiring can land in a follow-up bead.
-  };
+  const readTabFromUrl = useCallback((): OverviewTab => {
+    const fromUrl = new URLSearchParams(window.location.search).get('tab');
+    switch (fromUrl) {
+      case 'overview':
+      case 'activity':
+      case 'costs':
+      case 'prd':
+      case 'state':
+      case 'inference':
+      case 'vbrief':
+      case 'beads':
+      case 'prdiff':
+      case 'discussions':
+        return fromUrl;
+      default:
+        return 'overview';
+    }
+  }, []);
+
+  const [activeTab, setActiveTab] = useState<OverviewTab>(() => readTabFromUrl());
+
+  useEffect(() => {
+    if (selectedSessionId) return;
+    const currentUrl = new URL(window.location.href);
+    const nextTab = readTabFromUrl();
+    setActiveTab(nextTab);
+    if (!currentUrl.searchParams.has('tab')) {
+      currentUrl.searchParams.set('tab', nextTab);
+      window.history.replaceState(window.history.state, '', currentUrl);
+    }
+  }, [readTabFromUrl, selectedSessionId]);
+
+  const handleSwitchTab = useCallback((tab: OverviewTab) => {
+    setActiveTab(tab);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('tab', tab);
+    window.history.pushState(window.history.state, '', nextUrl);
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => {
+      if (selectedSessionId) return;
+      setActiveTab(readTabFromUrl());
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [readTabFromUrl, selectedSessionId]);
 
   return (
     <div
@@ -103,7 +145,11 @@ export function IssueWorkbench({
         </>
       ) : (
         <>
-          <ZoneCOverview issueId={issueId} />
+          <ZoneCOverview
+            issueId={issueId}
+            activeTab={activeTab}
+            onTabChange={handleSwitchTab}
+          />
           <IssueComposer issueId={issueId} sessions={sessions} />
         </>
       )}

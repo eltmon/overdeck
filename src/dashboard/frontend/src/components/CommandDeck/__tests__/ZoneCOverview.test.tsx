@@ -13,8 +13,21 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+vi.mock('../../DialogProvider', () => ({
+  useConfirm: () => vi.fn(async () => true),
+  useAlert: () => vi.fn(async () => undefined),
+}));
+
 import { ZoneCOverview } from '../ZoneCOverview';
+
+function render(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 const planningResult = vi.hoisted(() => ({
   data: undefined as undefined | Record<string, unknown>,
@@ -53,11 +66,14 @@ const reviewStatusResult = vi.hoisted(() => ({
 
 vi.mock('../ZoneCOverviewTabs/queries', () => ({
   usePlanningQuery: () => planningResult,
+  usePlanningSummaryQuery: () => planningResult,
   useActivityQuery: () => activityResult,
   useIssueCostsQuery: () => costsResult,
   usePrQuery: () => prResult,
+  usePrDiffQuery: () => prResult,
   useDiscussionsQuery: () => discussionsResult,
   useReviewStatusQuery: () => reviewStatusResult,
+  useWorkspaceQuery: () => ({ data: undefined, isLoading: false, isError: false }),
 }));
 
 vi.mock('../../../hooks/useCostStream', () => ({
