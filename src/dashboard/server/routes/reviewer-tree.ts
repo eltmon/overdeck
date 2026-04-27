@@ -18,6 +18,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { AgentStatus, SessionNodePresence } from '@panopticon/contracts';
+import { normalizeAgentStatus } from '../services/agent-status.js';
 import {
   REVIEWER_ROLES,
   getReviewerSessionName,
@@ -209,7 +210,8 @@ export async function buildReviewerNodes(
       // Per-role status:
       //   - prefer the latest round artifact's status if available
       //   - fall back to the parent review section's status
-      const status = (roundMetadata?.latestStatus ?? opts.status) as AgentStatus;
+      const rawStatus = roundMetadata?.latestStatus ?? opts.status;
+      const status = normalizeAgentStatus(rawStatus);
 
       const node: ReviewerNode = {
         type: 'reviewer',

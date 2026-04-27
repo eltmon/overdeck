@@ -232,26 +232,22 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
     (s) => s.status === 'running' || s.status === 'active',
   ).length;
 
-  const sparklineEvents = useMemo(
+  const costSparklineEvents = useMemo(
     () =>
-      sections
-        .map((s) => ({
-          ts: Date.parse(s.startedAt),
-          category: (
-            {
-              planning: 'info' as const,
-              work: 'info' as const,
-              review: 'review' as const,
-              reviewer: 'review' as const,
-              test: 'success' as const,
-              merge: 'success' as const,
-              legacy: 'warning' as const,
-            } as const
-          )[s.type as string] ?? 'info',
-        }))
-        .filter((e) => !Number.isNaN(e.ts))
-        .map((e) => ({ timestamp: e.ts, category: e.category })),
-    [sections],
+      (costs.data?.sessions ?? [])
+        .filter((session) => typeof session.cost === 'number' && session.cost > 0)
+        .map((session) => {
+          const endedAt = session.endedAt ? Date.parse(session.endedAt) : NaN;
+          const startedAt = Date.parse(session.startedAt);
+          const timestamp = Number.isNaN(endedAt) ? startedAt : endedAt;
+          return {
+            timestamp,
+            weight: session.cost,
+            category: 'info' as const,
+          };
+        })
+        .filter((event) => !Number.isNaN(event.timestamp)),
+    [costs.data?.sessions],
   );
 
   const reviewerSections = useMemo(
@@ -999,7 +995,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
 
       {/* 5. Cost sparkline */}
       <Section
-        title="Activity over the last hour"
+        title="Cost trend over recent sessions"
         rightSlot={
           <button
             type="button"
@@ -1023,9 +1019,9 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
           data-testid="overview-sparkline"
           style={{ display: 'flex', alignItems: 'center', gap: 12 }}
         >
-          <ActivitySparkline events={sparklineEvents} />
+          <ActivitySparkline events={costSparklineEvents} ariaLabel="Cost trend across recent sessions" />
           <span style={{ fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
-            {sparklineEvents.length} session start{sparklineEvents.length === 1 ? '' : 's'}
+            {costSparklineEvents.length} billed session{costSparklineEvents.length === 1 ? '' : 's'}
           </span>
         </div>
       </Section>

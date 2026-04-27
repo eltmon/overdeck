@@ -86,7 +86,26 @@ const COSTS_RESPONSE = {
   issueId: ISSUE_ID,
   totalCost: 4.32,
   totalTokens: 42000,
-  sessions: [],
+  sessions: [
+    {
+      sessionId: 'planning-1',
+      startedAt: new Date(Date.now() - 110 * 60_000).toISOString(),
+      endedAt: new Date(Date.now() - 105 * 60_000).toISOString(),
+      type: 'planning',
+      model: 'claude-sonnet-4-6',
+      cost: 0.5,
+      tokenCount: 3000,
+    },
+    {
+      sessionId: 'work-1',
+      startedAt: new Date(Date.now() - 80 * 60_000).toISOString(),
+      endedAt: new Date(Date.now() - 20 * 60_000).toISOString(),
+      type: 'work',
+      model: 'claude-sonnet-4-6',
+      cost: 3.82,
+      tokenCount: 39000,
+    },
+  ],
   byModel: {
     'claude-sonnet-4-6': { cost: 4.32, tokens: 42000 },
   },

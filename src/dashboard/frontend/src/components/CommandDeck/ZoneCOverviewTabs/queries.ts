@@ -90,6 +90,7 @@ export interface IssueCostData {
   sessions: SessionCost[];
   byModel: Record<string, { cost: number; tokens: number }>;
   byStage?: Record<string, { cost: number; tokens: number }>;
+  lastUpdated?: string;
 }
 
 async function fetchJson<T>(url: string): Promise<T> {

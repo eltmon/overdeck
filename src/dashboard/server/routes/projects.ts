@@ -19,7 +19,8 @@ import { extractPrefix } from '../../../lib/issue-id.js';
 import { listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
-import type { AgentStatus, SessionNode, SessionNodePresence, SessionNodeType } from '@panopticon/contracts';
+import type { SessionNode, SessionNodePresence, SessionNodeType } from '@panopticon/contracts';
+import { normalizeAgentStatus } from '../services/agent-status.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
@@ -55,30 +56,6 @@ function mapSessionType(type: string): SessionNodeType {
   return (validTypes.includes(type as SessionNodeType) ? type : 'legacy') as SessionNodeType;
 }
 
-function mapAgentStatus(status: string): AgentStatus {
-  switch (status) {
-    case 'running': return 'running';
-    case 'active':
-    case 'reviewing':
-    case 'testing':
-    case 'merging':
-    case 'verifying':
-      return 'running';
-    case 'completed':
-    case 'passed':
-    case 'queued':
-    case 'merged':
-    case 'suspended':
-      return 'stopped';
-    case 'failed':
-    case 'blocked':
-    case 'commented':
-    case 'changes-requested':
-    case 'dispatch_failed':
-      return 'error';
-    default: return 'unknown';
-  }
-}
 
 interface ActivityContext {
   tmuxSessionNames?: Set<string>;
@@ -140,10 +117,10 @@ async function collectSessionTreeNodes(
         duration: state.startedAt
           ? (() => {
               const ms = Date.now() - new Date(state.startedAt).getTime();
-              return Number.isNaN(ms) ? 0 : Math.floor(ms / 1000);
+              return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
             })()
-          : 0,
-        status: mapAgentStatus(
+          : null,
+        status: normalizeAgentStatus(
           rtState?.state === 'active'
             ? 'running'
             : rtState?.state === 'suspended'
@@ -200,7 +177,7 @@ async function collectSessionTreeNodes(
         startedAt: latestReview.timestamp,
         endedAt: undefined,
         duration: 0,
-        status: mapAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
+        status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
         presence: orchestratorPresence,
       });
       const reviewerNodes = await buildReviewerNodes({
@@ -211,7 +188,7 @@ async function collectSessionTreeNodes(
         tmuxSessionNames: context.tmuxSessionNames,
         startedAt: latestReview.timestamp,
         endedAt: undefined,
-        status: mapAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
+        status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
       });
       sections.push(...reviewerNodes);
     }

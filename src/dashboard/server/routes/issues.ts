@@ -2980,6 +2980,7 @@ const getIssueCostsRoute = HttpRouter.add(
         models: {},
         providers: {},
         byModel: {},
+        sessions: [],
         byStage: {},
         budget: undefined,
         budgetWarning: false,
@@ -3002,6 +3003,7 @@ const getIssueCostsRoute = HttpRouter.add(
           { cost: stats.cost, tokens: stats.tokens },
         ])
       ),
+      sessions: issueData.sessions ?? [],
       byStage: Object.fromEntries(
         Object.entries(issueData.stages || {}).map(([stage, stats]: [string, any]) => [
           stage,

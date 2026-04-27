@@ -120,6 +120,53 @@ describe('ZoneCOverview', () => {
     expect(screen.getByTestId('overview-cost-tile-loading')).toHaveTextContent('Loading…');
   });
 
+  it('renders the overview sparkline from billed cost sessions', () => {
+    costsResult.data = {
+      issueId: ISSUE,
+      totalCost: 4.32,
+      totalTokens: 42000,
+      sessions: [
+        {
+          sessionId: 'session-1',
+          startedAt: '2026-04-27T10:00:00.000Z',
+          endedAt: '2026-04-27T10:05:00.000Z',
+          type: 'work',
+          model: 'claude-sonnet-4-6',
+          cost: 1.25,
+          tokenCount: 12000,
+        },
+        {
+          sessionId: 'session-2',
+          startedAt: '2026-04-27T11:00:00.000Z',
+          endedAt: null,
+          type: 'review',
+          model: 'claude-sonnet-4-6',
+          cost: 3.07,
+          tokenCount: 30000,
+        },
+        {
+          sessionId: 'session-3',
+          startedAt: '2026-04-27T12:00:00.000Z',
+          endedAt: '2026-04-27T12:02:00.000Z',
+          type: 'test',
+          model: 'claude-sonnet-4-6',
+          cost: 0,
+          tokenCount: 0,
+        },
+      ],
+      byModel: {
+        'claude-sonnet-4-6': { cost: 4.32, tokens: 42000 },
+      },
+      byStage: {
+        work: { cost: 4.32, tokens: 42000 },
+      },
+    };
+
+    render(<ZoneCOverview issueId={ISSUE} />);
+    expect(screen.getByTestId('overview-sparkline')).toHaveTextContent('2 billed sessions');
+    expect(screen.getByRole('img', { name: 'Cost trend across recent sessions' })).toBeInTheDocument();
+  });
+
   it('always renders all 10 tabs, including INFERENCE without planning content', () => {
     planningResult.data = { prd: '# PRD', state: '# STATE' };
     render(<ZoneCOverview issueId={ISSUE} />);
