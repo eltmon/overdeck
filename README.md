@@ -29,7 +29,7 @@ Panopticon is an open-source control plane for multi-agent software development.
 npx @panctl/cli
 ```
 
-No install step required. Use `panctl` or `pan` after `npm install -g @panctl/cli`. The desktop app is also publishable separately as `@panctl/desktop`.
+No install step required. `npx @panctl/cli` starts the browser/server experience, and you can use `panctl` or `pan` after `npm install -g @panctl/cli`. The packaged desktop app is published separately as `@panctl/desktop`.
 
 For the power-user path that installs everything up front: `pan install`.
 

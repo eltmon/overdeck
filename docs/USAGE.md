@@ -22,10 +22,16 @@
 ### Quick Install
 
 ```bash
-npm install -g @panctl/cli && pan install && pan up
+npx @panctl/cli
 ```
 
-**That's it!** Dashboard runs at https://pan.localhost (or http://localhost:3010 if you skip HTTPS setup).
+**That's it!** Panopticon starts the browser/server experience and opens the dashboard at https://pan.localhost (or http://localhost:3010 if you skip HTTPS setup).
+
+For a full local install with reusable `panctl` and `pan` commands:
+
+```bash
+npm install -g @panctl/cli && pan install && pan up
+```
 
 ### Step-by-Step Installation
 
