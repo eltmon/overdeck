@@ -114,8 +114,53 @@ import { reconcileGitHubMergeStatus } from '../../../../../src/dashboard/server/
 describe('reconcileGitHubMergeStatus', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    reviewStatusStore.clear();
     mockIsGitHubAppConfigured.mockReturnValue(true);
     clearReviewStatus('PAN-349');
+  });
+
+  it('returns false when status is null', async () => {
+    await expect(reconcileGitHubMergeStatus('PAN-349', null)).resolves.toBe(false);
+    expect(mockGetPullRequestState).not.toHaveBeenCalled();
+  });
+
+  it('returns false when prUrl is missing', async () => {
+    setReviewStatus('PAN-349', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: true,
+      mergeStatus: 'verifying',
+    });
+
+    await expect(reconcileGitHubMergeStatus('PAN-349', getReviewStatus('PAN-349'))).resolves.toBe(false);
+    expect(mockGetPullRequestState).not.toHaveBeenCalled();
+  });
+
+  it('returns false when prUrl is not a GitHub PR URL', async () => {
+    setReviewStatus('PAN-349', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: true,
+      mergeStatus: 'verifying',
+      prUrl: 'https://example.com/not-a-pr',
+    });
+
+    await expect(reconcileGitHubMergeStatus('PAN-349', getReviewStatus('PAN-349'))).resolves.toBe(false);
+    expect(mockGetPullRequestState).not.toHaveBeenCalled();
+  });
+
+  it('returns false when the GitHub app is not configured', async () => {
+    setReviewStatus('PAN-349', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: true,
+      mergeStatus: 'verifying',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/349',
+    });
+    mockIsGitHubAppConfigured.mockReturnValue(false);
+
+    await expect(reconcileGitHubMergeStatus('PAN-349', getReviewStatus('PAN-349'))).resolves.toBe(false);
+    expect(mockGetPullRequestState).not.toHaveBeenCalled();
   });
 
   it('marks the issue merged when GitHub says the PR already merged', async () => {
@@ -137,7 +182,7 @@ describe('reconcileGitHubMergeStatus', () => {
     expect(status?.mergeNotes).toBeUndefined();
   });
 
-  it('leaves the issue unchanged when the PR is still open', async () => {
+  it('returns false when the PR is still open', async () => {
     setReviewStatus('PAN-349', {
       reviewStatus: 'passed',
       testStatus: 'passed',
@@ -155,5 +200,21 @@ describe('reconcileGitHubMergeStatus', () => {
     expect(status?.mergeStatus).toBe('verifying');
     expect(status?.readyForMerge).toBe(true);
     expect(status?.mergeNotes).toContain('Timed out');
+  });
+
+  it('returns false when GitHub state lookup throws', async () => {
+    setReviewStatus('PAN-349', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: true,
+      mergeStatus: 'verifying',
+      prUrl: 'https://github.com/eltmon/panopticon-cli/pull/349',
+    });
+    mockGetPullRequestState.mockRejectedValue(new Error('boom'));
+
+    await expect(reconcileGitHubMergeStatus('PAN-349', getReviewStatus('PAN-349'))).resolves.toBe(false);
+    const status = getReviewStatus('PAN-349');
+    expect(status?.mergeStatus).toBe('verifying');
+    expect(status?.readyForMerge).toBe(true);
   });
 });

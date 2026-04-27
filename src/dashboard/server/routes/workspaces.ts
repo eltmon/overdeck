@@ -327,6 +327,7 @@ function parseGitHubPullRequestUrl(url?: string | null): { owner: string; repo: 
   };
 }
 
+// Exported for unit tests covering late-success merge reconciliation guards.
 export async function reconcileGitHubMergeStatus(issueId: string, status: Pick<ReviewStatus, 'prUrl' | 'mergeStatus' | 'readyForMerge'> | null | undefined): Promise<boolean> {
   if (!status?.prUrl) return false;
 
@@ -4180,15 +4181,20 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
           prMergeErr.message?.includes('ECONNREFUSED');
         if (isTransient) {
           const reconciled = await reconcileGitHubMergeStatus(issueId, getReviewStatus(issueId));
-          if (!reconciled) {
+          if (reconciled) {
+            artifactMerged = true;
+            console.log(`[merge] Reconciliation confirmed PR merged for ${issueId} after transient error; proceeding to success path`);
+          } else {
             setReviewStatus(issueId, { mergeStatus: 'verifying', mergeNotes: error });
+            completePendingOperation(issueId, error);
+            return { success: false, statusCode: 500, error };
           }
           // readyForMerge stays true while reconciliation catches up or the operator retries.
         } else {
           setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
+          completePendingOperation(issueId, error);
+          return { success: false, statusCode: 500, error };
         }
-        completePendingOperation(issueId, error);
-        return { success: false, statusCode: 500, error };
       }
     }
 
