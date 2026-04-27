@@ -47,6 +47,10 @@ describe('stashes', () => {
     expect(buildStashMessage('salvageable', 'pan-879', when, 'UI Draft + notes')).toBe('salvageable:PAN-879:2026-04-27T14:15:16Z:ui-draft-notes');
   });
 
+  it('rejects invalid issue ids at the stash-message boundary', () => {
+    expect(() => buildStashMessage('pre-merge', 'PAN-879; rm -rf /')).toThrow('Invalid issue ID format');
+  });
+
   it('parses canonical stash messages and stash list lines', () => {
     const parsed = parseCanonicalStashMessage('salvageable:PAN-879:2026-04-27T14:15:16Z:workspace-notes');
     expect(parsed.kind).toBe('salvageable');
@@ -205,6 +209,17 @@ describe('stashes', () => {
       expect.anything(),
       expect.any(Function),
     );
+  });
+
+  it('rejects invalid issue ids when creating recovery branches', async () => {
+    mockExecImplementation((cmd) => {
+      if (cmd === 'git rev-parse --verify "stash@{3}"') return { stdout: 'abc123def456abc123def456abc123def456abcd\n' };
+      throw new Error(`unexpected command: ${cmd}`);
+    });
+
+    await expect(
+      createRecoveryBranchFromStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'PAN-879; touch /tmp/pwned', 'UI Draft + notes', 'stash@{3}'),
+    ).rejects.toThrow('Invalid issue ID format');
   });
 
   it('identifies salvageable stash entries', () => {

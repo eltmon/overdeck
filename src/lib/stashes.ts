@@ -26,6 +26,7 @@ export interface SalvageableStashEntry extends ParsedStashEntry {
 
 const ISO_STASH_TIMESTAMP_PATTERN = '(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2}))';
 const ISSUE_ID_PATTERN = '([A-Z]+(?:-[A-Z]+)*-\\d+)';
+const ISSUE_ID_REGEX = new RegExp(`^${ISSUE_ID_PATTERN}$`);
 
 function isoForStash(date = new Date()): string {
   return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -44,6 +45,14 @@ function sanitizeShortDescription(value: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 48) || 'recovery';
+}
+
+function validateIssueId(issueId: string): string {
+  const normalizedIssueId = issueId.toUpperCase();
+  if (!ISSUE_ID_REGEX.test(normalizedIssueId)) {
+    throw new Error(`Invalid issue ID format: ${issueId}`);
+  }
+  return normalizedIssueId;
 }
 
 export function buildStashMessage(
@@ -68,7 +77,7 @@ export function buildStashMessage(
   arg3: Date | number = new Date(),
   arg4?: string,
 ): string {
-  const normalizedIssueId = issueId.toUpperCase();
+  const normalizedIssueId = validateIssueId(issueId);
   if (kind === 'review-temp') {
     // PAN-879 / GitHub issue #879: review-temp is the canonical sequence-based exception
     // to the timestamped stash taxonomy. Acceptance criteria were updated to match.
@@ -176,9 +185,10 @@ export async function createNamedStash(repoPath: string, message: string, includ
 
 async function resolveStashOperationRef(repoPath: string, ref: string, stackRef?: string): Promise<string> {
   // PAN-879 assumes stash janitor / merge / review flows are serialized within a single
-  // workspace, so re-resolving the stable SHA to a stack slot immediately before the git
-  // command is sufficient. If per-workspace stash operations ever run concurrently, the
-  // resolve+operate sequence must be guarded by a lock.
+  // workspace. Per-workspace stash operations must not run concurrently; callers may
+  // resolve a stack slot and immediately consume it, but another stash mutation in between
+  // can still shift indices. The rev-parse checks below re-validate the resolved slot
+  // against the expected SHA immediately before use.
   const candidateRef = /^stash@\{\d+\}$/.test(ref) ? ref : stackRef;
   if (candidateRef) {
     const { stdout: resolvedSha } = await execAsync(`git rev-parse --verify ${JSON.stringify(candidateRef)}`, {
@@ -231,7 +241,8 @@ export async function createRecoveryBranchFromStash(
   stackRef?: string,
 ): Promise<string> {
   const operationRef = await resolveStashOperationRef(repoPath, stashRef, stackRef);
-  const branchName = `recovery/${issueId.toUpperCase()}-${sanitizeShortDescription(shortDescription)}`;
+  const normalizedIssueId = validateIssueId(issueId);
+  const branchName = `recovery/${normalizedIssueId}-${sanitizeShortDescription(shortDescription)}`;
   await execAsync(`git branch ${JSON.stringify(branchName)} ${JSON.stringify(operationRef)}`, {
     cwd: repoPath,
     encoding: 'utf-8',

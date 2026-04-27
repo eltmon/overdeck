@@ -2569,9 +2569,11 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
         const staleStashes = stashes
           .filter((stash) => stash.kind !== 'salvageable' && isOlderThanDays(stash, DEFAULT_STASH_JANITOR_AGE_DAYS, now));
         // Preserve the first occurrence so a stash that is both "merged" and "stale" keeps the
-        // merged label in logs, then drop in descending stack order so earlier slots stay stable.
-        const stashesToDrop = [...mergedPreMergeStashes, ...staleStashes]
-          .filter((stash, index, entries) => entries.findIndex((entry) => entry.ref === stash.ref) === index)
+        // merged label in logs. Drop known stack slots in descending order so earlier slots stay
+        // stable, then fall back to SHA-based resolution for entries without stackRef.
+        const dedupedStashesToDrop = [...mergedPreMergeStashes, ...staleStashes]
+          .filter((stash, index, entries) => entries.findIndex((entry) => entry.ref === stash.ref) === index);
+        const stashesWithStackRef = dedupedStashesToDrop
           .map((stash) => {
             const indexMatch = stash.stackRef?.match(/stash@\{(\d+)\}/);
             const stashIndex = indexMatch ? parseInt(indexMatch[1], 10) : Number.NaN;
@@ -2580,6 +2582,8 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
           .filter((entry) => Number.isFinite(entry.stashIndex))
           .sort((a, b) => b.stashIndex - a.stashIndex)
           .map((entry) => entry.stash);
+        const stashesWithoutStackRef = dedupedStashesToDrop.filter((stash) => !stash.stackRef);
+        const stashesToDrop = [...stashesWithStackRef, ...stashesWithoutStackRef];
         for (const stash of stashesToDrop) {
           await dropStash(workspacePath, stash.ref, stash.stackRef);
           const reason = mergedPreMergeStashes.some((entry) => entry.ref === stash.ref)
