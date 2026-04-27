@@ -103,11 +103,11 @@ interface SessionTreeContext {
 async function collectSessionTreeNodes(
   issueId: string,
   workspacePath: string,
+  projectPath: string,
   context: SessionTreeContext,
 ): Promise<SessionNode[]> {
   const issueLower = issueId.toLowerCase();
   const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
-  const projectPath = getProjectPath(issuePrefix);
   const agentsDir = join(homedir(), '.panopticon', 'agents');
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
@@ -157,8 +157,8 @@ async function collectSessionTreeNodes(
   }
 
   if (!hasPlanningSection) {
-    const stateMdPath = join(workspacePath, '.planning', 'STATE.md');
-    if (await pathExists(stateMdPath)) {
+    const planningDir = join(workspacePath, '.planning');
+    if (await pathExists(planningDir)) {
       const sessionId = `planning-${issueLower}-state`;
       const jsonlPath = await resolveJsonlPath(sessionId, workspacePath);
       sections.push({
@@ -321,7 +321,7 @@ export async function fetchProjectSessionTree(
         if (!hasAgent && !hasPlanning) return null;
         try {
           const workspacePath = join(workspacesDir, c.name);
-          const sessions = await collectSessionTreeNodes(c.issueId, workspacePath, effectiveSharedContext);
+          const sessions = await collectSessionTreeNodes(c.issueId, workspacePath, projectPath, effectiveSharedContext);
           if (sessions.length === 0) return null;
           const title = await resolveFeatureTitle(c.issueId, c.issueLower, project);
           return { issueId: c.issueId, title, sessions };
