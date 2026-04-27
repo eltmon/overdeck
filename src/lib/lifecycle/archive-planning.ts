@@ -18,6 +18,7 @@ import {
   ARCHIVES_DIR,
   PROJECT_DOCS_SUBDIR,
   PROJECT_PRDS_SUBDIR,
+  PROJECT_PRDS_ACTIVE_SUBDIR,
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from '../paths.js';
 import { findPrdAtStatus, canonicalPrdSubdir } from '../prd-locations.js';
@@ -82,19 +83,52 @@ export async function movePrd(
   }
 
   const formatLabel = source.format === 'subdir' ? 'PRD subdirectory' : 'PRD';
+
+  // For the legacy `flat` format the PRD is a single `.md` file, but the vBRIEF
+  // JSON sidecar (`<id>-plan.vbrief.json`) lives next to it and was historically
+  // left behind in active/ after merge (PAN-487). Detect it here so we can move
+  // it alongside the `.md`. The `subdir` format already moves both files because
+  // they share the directory.
+  const issueLowerForSidecar = ctx.issueId.toLowerCase();
+  const flatActive = source.format === 'flat'
+    ? join(ctx.projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR)
+    : null;
+  const flatCompleted = source.format === 'flat'
+    ? join(ctx.projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_COMPLETED_SUBDIR)
+    : null;
+  const sidecarLower = flatActive ? join(flatActive, `${issueLowerForSidecar}-plan.vbrief.json`) : null;
+  const sidecarUpper = flatActive ? join(flatActive, `${ctx.issueId.toUpperCase()}-plan.vbrief.json`) : null;
+  // Always land sidecar at canonical lowercase in completed/.
+  const sidecarDest = flatCompleted ? join(flatCompleted, `${issueLowerForSidecar}-plan.vbrief.json`) : null;
+  const resolvedSidecarSource = sidecarLower && existsSync(sidecarLower)
+    ? sidecarLower
+    : (sidecarUpper && existsSync(sidecarUpper) ? sidecarUpper : null);
+
   try {
     await execAsync(`git mv "${source.path}" "${dest}"`, { cwd: ctx.projectPath });
+    if (resolvedSidecarSource && sidecarDest) {
+      try {
+        await execAsync(`git mv "${resolvedSidecarSource}" "${sidecarDest}"`, { cwd: ctx.projectPath });
+      } catch {
+        // sidecar may not be tracked — fall back to plain copy
+        try { cpSync(resolvedSidecarSource, sidecarDest); } catch { /* non-fatal */ }
+      }
+    }
     await execAsync(`git commit -m "Move ${ctx.issueId} PRD to completed"`, { cwd: ctx.projectPath });
     if (pushToRemote) {
       await execAsync('git push', { cwd: ctx.projectPath });
     }
-    return stepOk(step, [`Moved ${formatLabel} from active/ to completed/ via git mv`]);
+    const sidecarNote = resolvedSidecarSource ? ' (with vBRIEF sidecar)' : '';
+    return stepOk(step, [`Moved ${formatLabel} from active/ to completed/ via git mv${sidecarNote}`]);
   } catch {
     // git mv failed — fall back to plain copy. cpSync handles both file and directory.
     try {
       cpSync(source.path, dest, { recursive: true });
       if (!existsSync(dest)) {
         return stepFailed(step, 'PRD copy appeared to succeed but destination not found');
+      }
+      if (resolvedSidecarSource && sidecarDest) {
+        try { cpSync(resolvedSidecarSource, sidecarDest); } catch { /* non-fatal */ }
       }
       return stepOk(step, [`Copied ${formatLabel} to completed/ (git mv failed, plain copy succeeded)`]);
     } catch (err) {
@@ -149,6 +183,16 @@ export async function archiveWorkspaceArtifacts(
     if (existsSync(stateMd)) {
       cpSync(stateMd, join(archiveDir, 'STATE.md'));
       details.push('Archived STATE.md');
+    }
+
+    // Archive plan.vbrief.json — the canonical structured plan. Moved to
+    // docs/prds/completed/ above, but the workspace copy may have agent-driven
+    // updates (sequence, completion timestamps) not yet copied to docs/. Preserve
+    // both so the archive reflects the true final state of the workspace.
+    const vbriefJson = join(workspacePath, '.planning', 'plan.vbrief.json');
+    if (existsSync(vbriefJson)) {
+      cpSync(vbriefJson, join(archiveDir, 'plan.vbrief.json'));
+      details.push('Archived plan.vbrief.json');
     }
 
     // Archive beads/

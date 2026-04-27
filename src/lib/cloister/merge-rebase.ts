@@ -57,7 +57,24 @@ export async function rebaseFeatureBranch(
     console.log(`${logPrefix} Fetching origin/${baseBranch}...`);
     await execAsync(`git fetch origin ${baseBranch}`, execOpts);
 
-    // Step 2: Check if rebase is needed
+    // Step 2: Strip tracked .planning/ artifacts unconditionally.
+    // .planning/ is workspace-local and must never land on main (#888) — strip it
+    // BEFORE checking behind-count so up-to-date branches are still cleaned. We use
+    // `git rm --cached` so the worktree files survive (workspace still uses them).
+    const planningDir = join(workspacePath, '.planning');
+    if (existsSync(planningDir)) {
+      try {
+        await execAsync('git rm -r --cached --ignore-unmatch .planning/', execOpts);
+        await execAsync(
+          'git diff --cached --quiet || git commit -m "chore: strip ephemeral .planning/ artifacts before merge"',
+          execOpts,
+        );
+      } catch {
+        // Non-fatal — .planning/ might not be tracked
+      }
+    }
+
+    // Step 3: Check if rebase is needed
     const { stdout: behindCount } = await execAsync(
       `git rev-list --count HEAD..origin/${baseBranch}`,
       execOpts,
@@ -66,26 +83,18 @@ export async function rebaseFeatureBranch(
 
     if (behind === 0) {
       console.log(`${logPrefix} Already up-to-date with origin/${baseBranch}`);
+      // Push any cleanup commit we just made.
+      try {
+        await execAsync(
+          `git push --force-with-lease origin HEAD:${featureBranch}`,
+          execOpts,
+        );
+      } catch { /* up-to-date push is non-fatal */ }
       const { stdout: currentHead } = await execAsync('git rev-parse HEAD', execOpts);
       return { success: true, skipped: true, newHead: currentHead.trim() };
     }
 
     console.log(`${logPrefix} ${behind} commits behind origin/${baseBranch}, rebasing...`);
-
-    // Step 3: Remove .planning/ artifacts before rebase (always cause conflicts)
-    const planningDir = join(workspacePath, '.planning');
-    if (existsSync(planningDir)) {
-      try {
-        await execAsync('git rm -rf .planning/ 2>/dev/null || true', execOpts);
-        await execAsync(
-          'git diff --cached --quiet || git commit -m "chore: remove planning artifacts before rebase"',
-          execOpts,
-        );
-        console.log(`${logPrefix} Removed .planning/ before rebase`);
-      } catch {
-        // Non-fatal — .planning/ might not be tracked
-      }
-    }
 
     // Step 4: Rebase onto base branch
     try {
