@@ -14,7 +14,7 @@ import { useState, useMemo } from 'react';
 import {
   Play, RefreshCw, RotateCcw, FolderPlus, Check, Loader2,
   MoreHorizontal, FileText, ListTodo, ScrollText, Brain, MessageSquare,
-  Upload, Send, XCircle,
+  Upload, Send, XCircle, GitMerge,
 } from 'lucide-react';
 import type { Agent, Issue } from '../../types';
 import { getZoneAActions, type ActionKey } from '../../lib/commandDeckActions';
@@ -61,6 +61,7 @@ export function ZoneActionStrip({
     reopenMutation,
     createWorkspaceMutation,
     copySettingsMutation,
+    syncMainMutation,
     onStartAgent,
     onReview,
     onCancel,
@@ -68,6 +69,7 @@ export function ZoneActionStrip({
     onReopen,
     onCreateWorkspace,
     onCopySettings,
+    onSyncMain,
   } = useZoneAActions(issueId, agent, issue);
 
   const layout = useMemo(() => {
@@ -354,6 +356,20 @@ export function ZoneActionStrip({
           >
             <FileText className="w-3 h-3" />
             Status
+          </button>
+        );
+
+      case 'syncMain':
+        return (
+          <button
+            key={key}
+            onClick={onSyncMain}
+            disabled={syncMainMutation.isPending}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent disabled:opacity-50"
+            title="Sync with main"
+          >
+            {syncMainMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <GitMerge className="w-3 h-3" />}
+            {syncMainMutation.isPending ? 'Syncing...' : 'Sync'}
           </button>
         );
 

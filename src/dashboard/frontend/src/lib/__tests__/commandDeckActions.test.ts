@@ -22,7 +22,7 @@ const ALL_ACTION_KEYS: readonly ActionKey[] = [
   'startAgent', 'resumeSession', 'resetSession',
   'createWorkspace', 'copySettings',
   'beads', 'vbrief', 'state', 'prd', 'inference',
-  'discussions', 'transcripts', 'upload', 'syncDiscussions', 'statusReview',
+  'discussions', 'transcripts', 'upload', 'syncDiscussions', 'syncMain', 'statusReview',
   'reopen', 'restartFromPlan', 'resetIssue', 'cancel',
   'stopSession', 'viewTerminal',
 ];
@@ -39,6 +39,15 @@ const baseZoneA: ZoneAInput = {
   hasTranscripts: false,
   issueCanonicalState: 'in_progress',
   isMerged: false,
+};
+
+const agentWithGit = {
+  status: 'stopped' as const,
+  git: {
+    branch: 'feature/pan-867',
+    uncommittedFiles: 0,
+    latestCommit: 'abc123 test commit',
+  },
 };
 
 describe('getZoneAActions', () => {
@@ -138,6 +147,14 @@ describe('getZoneAActions', () => {
     expect(layout.secondary).toContain('upload');
   });
 
+  it('surfaces syncMain when the agent has git metadata', () => {
+    const layout = getZoneAActions({
+      ...baseZoneA,
+      agent: agentWithGit,
+    });
+    expect(layout.secondary).toContain('syncMain');
+  });
+
   it('inference / discussions / transcripts only surface when present', () => {
     const without = getZoneAActions(baseZoneA);
     expect(without.secondary).not.toContain('inference');
@@ -225,6 +242,7 @@ describe('parity smoke (master coverage)', () => {
         hasInference: true,
         hasDiscussions: true,
         hasTranscripts: true,
+        agent: agentWithGit,
       }),
       getZoneAActions({
         ...baseZoneA,
@@ -315,6 +333,7 @@ describe('parity smoke (master coverage)', () => {
       { name: 'Transcripts', key: 'transcripts', find: () => flattenActions(getZoneAActions({ ...baseZoneA, hasTranscripts: true })) },
       { name: 'Upload', key: 'upload', find: () => flattenActions(getZoneAActions(baseZoneA)) },
       { name: 'SyncDiscussions', key: 'syncDiscussions', find: () => flattenActions(getZoneAActions(baseZoneA)) },
+      { name: 'SyncMain', key: 'syncMain', find: () => flattenActions(getZoneAActions({ ...baseZoneA, agent: agentWithGit })) },
       { name: 'StatusReview', key: 'statusReview', find: () => flattenActions(getZoneAActions(baseZoneA)) },
       { name: 'Reopen', key: 'reopen', find: () => flattenActions(getZoneAActions({ ...baseZoneA, issueCanonicalState: 'done' })) },
       { name: 'RestartFromPlan', key: 'restartFromPlan', find: () => flattenActions(getZoneAActions(baseZoneA)) },

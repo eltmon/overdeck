@@ -58,6 +58,7 @@ export type ActionKey =
   | 'transcripts'
   | 'upload'
   | 'syncDiscussions'
+  | 'syncMain'
   | 'statusReview'
   // Danger zone
   | 'reopen'
@@ -79,7 +80,7 @@ export interface ActionLayout {
 
 export interface ZoneAInput {
   reviewStatus?: ReviewStatus | null;
-  agent?: Pick<Agent, 'status' | 'agentPhase'> | null;
+  agent?: Pick<Agent, 'status' | 'agentPhase' | 'git'> | null;
   lifecycle?: Pick<WorkAgentLifecycle, 'canResumeSession'> | null;
   workspace?: Pick<WorkspaceInfo, 'exists'> | null;
   hasPlan: boolean;
@@ -271,6 +272,7 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
   if (input.hasInference) secondary.push('inference');
   if (input.hasDiscussions) secondary.push('discussions');
   if (input.hasTranscripts) secondary.push('transcripts');
+  if (agent?.git) secondary.push('syncMain');
   secondary.push('statusReview', 'syncDiscussions', 'upload');
 
   // ── Danger zone (always overflow — shown via "…" menu) ────────────────────
