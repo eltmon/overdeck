@@ -9,12 +9,19 @@
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
-export interface PlanningResponse {
+export interface PlanningSummaryResponse {
+  hasPrd: boolean;
+  hasState: boolean;
+  acceptanceProgress?: { completed: number; total: number; percent: number };
+  stashCount?: number;
+  statusReviewedAt?: string;
+}
+
+export interface PlanningResponse extends PlanningSummaryResponse {
   prd?: string;
   state?: string;
   inference?: string;
   statusReview?: string;
-  statusReviewedAt?: string;
   transcripts?: Array<unknown>;
   discussions?: Array<{
     file?: string;
@@ -23,8 +30,6 @@ export interface PlanningResponse {
     createdAt?: string;
   }>;
   notes?: Array<unknown>;
-  acceptanceProgress?: { completed: number; total: number; percent: number };
-  stashCount?: number;
 }
 
 export interface ReviewerRoundSummary {
@@ -95,11 +100,19 @@ async function fetchJson<T>(url: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export function usePlanningSummaryQuery(issueId: string): UseQueryResult<PlanningSummaryResponse> {
+  return useQuery({
+    queryKey: ['command-deck-planning', issueId, 'summary'],
+    queryFn: () => fetchJson<PlanningSummaryResponse>(`/api/command-deck/planning/${issueId}?summary=1`),
+    refetchInterval: 30_000,
+  });
+}
+
 export function usePlanningQuery(issueId: string): UseQueryResult<PlanningResponse> {
   return useQuery({
-    queryKey: ['command-deck-planning', issueId],
+    queryKey: ['command-deck-planning', issueId, 'full'],
     queryFn: () => fetchJson<PlanningResponse>(`/api/command-deck/planning/${issueId}`),
-    refetchInterval: 30_000,
+    refetchInterval: false,
   });
 }
 

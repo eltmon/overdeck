@@ -573,25 +573,34 @@ const getMissionControlPlanningRoute = HttpRouter.add(
   '/api/command-deck/planning/:issueId',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
+    const request = yield* HttpServerRequest.HttpServerRequest;
     const issueId = params['issueId'] ?? '';
+    const url = new URL(request.url, 'http://localhost');
+    const summaryOnly = url.searchParams.get('summary') === '1';
 
     const result = yield* Effect.tryPromise({
-      try: () => fetchPlanningData(issueId),
+      try: () => fetchPlanningData(issueId, { summaryOnly }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     return jsonResponse(result);
   })),
 );
 
-async function fetchPlanningData(issueId: string): Promise<unknown> {
+async function fetchPlanningData(
+  issueId: string,
+  options: { summaryOnly?: boolean } = {},
+): Promise<unknown> {
   const issueLower = issueId.toLowerCase();
   const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+  const summaryOnly = options.summaryOnly ?? false;
 
   const projectPath = getProjectPath(issuePrefix);
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
   const planningDir = join(workspacePath, '.planning');
 
   const result: {
+    hasPrd: boolean;
+    hasState: boolean;
     prd?: string;
     state?: string;
     inference?: string;
@@ -602,7 +611,7 @@ async function fetchPlanningData(issueId: string): Promise<unknown> {
     notes: Array<{ filename: string; content: string; uploadedAt: string }>;
     acceptanceProgress?: { completed: number; total: number; percent: number };
     stashCount?: number;
-  } = { transcripts: [], discussions: [], notes: [] };
+  } = { hasPrd: false, hasState: false, transcripts: [], discussions: [], notes: [] };
 
   // Helper: read PRD content from a location, handling both flat and subdir formats.
   const readPrdContent = async (loc: PrdLocation | null): Promise<string | undefined> => {
@@ -616,12 +625,25 @@ async function fetchPlanningData(issueId: string): Promise<unknown> {
 
   if (!await pathExists(planningDir)) {
     const prd = await readPrdContent(findPrdAtStatus(projectPath, issueId, 'active'));
-    if (prd) result.prd = prd;
+    if (prd) {
+      result.prd = prd;
+      result.hasPrd = true;
+    }
+    if (summaryOnly) {
+      return {
+        hasPrd: result.hasPrd,
+        hasState: false,
+        acceptanceProgress: result.acceptanceProgress,
+        stashCount: result.stashCount,
+        statusReviewedAt: result.statusReviewedAt,
+      };
+    }
     return result;
   }
 
   result.state = await readOptional(join(planningDir, 'STATE.md')) ?? undefined;
   result.inference = await readOptional(join(planningDir, 'INFERENCE.md')) ?? undefined;
+  result.hasState = Boolean(result.state);
 
   const statusReviewPath = join(planningDir, 'STATUS_REVIEW.md');
   const statusReview = await readOptional(statusReviewPath);
@@ -636,12 +658,14 @@ async function fetchPlanningData(issueId: string): Promise<unknown> {
       const content = await readPrdContent(findPrdAtStatus(projectPath, issueId, status));
       if (content) {
         result.prd = content;
+        result.hasPrd = true;
         break;
       }
     }
   }
 
   if (!result.prd && result.state) result.prd = result.state;
+  result.hasPrd = Boolean(result.prd);
 
   const readArtifactDir = async (subdir: string, dateField: string): Promise<Array<{ filename: string; content: string; [key: string]: string }>> => {
     const dirPath = join(planningDir, subdir);
@@ -694,6 +718,16 @@ async function fetchPlanningData(issueId: string): Promise<unknown> {
       result.stashCount = count;
     }
   } catch { /* not a git repo or git unavailable */ }
+
+  if (summaryOnly) {
+    return {
+      hasPrd: result.hasPrd,
+      hasState: result.hasState,
+      acceptanceProgress: result.acceptanceProgress,
+      stashCount: result.stashCount,
+      statusReviewedAt: result.statusReviewedAt,
+    };
+  }
 
   return result;
 }

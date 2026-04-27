@@ -10,9 +10,8 @@
  *   6. Recent activity feed   (issue-scoped, capped at 10 events)
  *   7. Quick links            (chips that switch tabs)
  *
- * This component keeps the data dependencies tight: planning + activity + costs
- * are shared via {usePlanningQuery, useActivityQuery, useIssueCostsQuery} so
- * sibling tabs reuse the cached responses.
+ * This component keeps the data dependencies tight: planning summary + activity
+ * + costs are shared so sibling tabs reuse cached lightweight responses.
  */
 
 import { useMemo, useState } from 'react';
@@ -23,7 +22,7 @@ import { RoundCard, type RoundData, type RoundVerdict } from '../RoundCard';
 import {
   useActivityQuery,
   useIssueCostsQuery,
-  usePlanningQuery,
+  usePlanningSummaryQuery,
   useReviewStatusQuery,
   usePrQuery,
   useWorkspaceQuery,
@@ -212,7 +211,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [isRecoverPending, setIsRecoverPending] = useState(false);
-  const planning = usePlanningQuery(issueId);
+  const planning = usePlanningSummaryQuery(issueId);
   const activity = useActivityQuery(issueId);
   const costs = useIssueCostsQuery(issueId);
   const reviewStatus = useReviewStatusQuery(issueId);
@@ -254,12 +253,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
     [sections],
   );
 
-  const isRecoverable = isReviewPipelineStuck(reviewStatus.data ? {
-    reviewStatus: reviewStatus.data.reviewStatus as 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked' | undefined,
-    testStatus: reviewStatus.data.testStatus as 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed' | undefined,
-    mergeStatus: reviewStatus.data.mergeStatus as 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed' | undefined,
-    verificationStatus: reviewStatus.data.verificationStatus as 'pending' | 'running' | 'passed' | 'failed' | 'skipped' | undefined,
-  } : undefined);
+  const isRecoverable = isReviewPipelineStuck(reviewStatus.data ?? undefined);
   const recentEvents = useMemo(() => sections.slice(-10).reverse(), [sections]);
 
   return (
@@ -825,7 +819,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                 {issue.source === 'linear' ? 'Linear' : 'GitHub Issue'} ↗
               </a>
             )}
-            {planning.data?.prd && (
+            {planning.data?.hasPrd && (
               <button
                 type="button"
                 onClick={() => onSwitchTab?.('prd')}
@@ -842,7 +836,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                 View PRD ↗
               </button>
             )}
-            {!issue?.url && !planning.data?.prd && (
+            {!issue?.url && !planning.data?.hasPrd && (
               <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No links available</span>
             )}
           </div>
