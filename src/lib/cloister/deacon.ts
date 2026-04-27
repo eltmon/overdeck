@@ -29,6 +29,7 @@ import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssue } from '../projects.js';
 import { logDeaconEvent, logAgentLifecycle } from '../persistent-logger.js';
 import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
+import { getShadowState } from '../shadow-state.js';
 
 // Review status file location (same as dashboard server)
 const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
@@ -3320,7 +3321,7 @@ async function cleanupOrphanedReviewSessions(): Promise<string[]> {
  *
  * Called by runPatrol() on every patrol cycle AND during deacon startup.
  */
-async function autoResumeStoppedWorkAgents(): Promise<string[]> {
+export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
   const resumed: string[] = [];
   if (!existsSync(AGENTS_DIR)) return resumed;
 
@@ -3388,6 +3389,19 @@ async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       continue;
     }
 
+    const shadowState = await getShadowState(state.issueId);
+    const issueClosed = shadowState?.trackerStatus === 'closed';
+    if (issueClosed) {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — issue ${state.issueId} is CLOSED on tracker`);
+      continue;
+    }
+
+    const deliberatelyStopped = state.stoppedByUser === true;
+    if (deliberatelyStopped) {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — deliberately stopped by user (stoppedByUser=true)`);
+      continue;
+    }
+
     // Resume agents with pending review feedback regardless of why they stopped.
     // Review/test/verification failures mean the specialist pipeline needs the
     // agent to fix issues — auto-resume must NOT block on runtime.state here.
@@ -3399,15 +3413,6 @@ async function autoResumeStoppedWorkAgents(): Promise<string[]> {
     if (hasPendingReviewFeedback) {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} resuming — review feedback pending (review=${review?.reviewStatus}, test=${review?.testStatus}, verification=${review?.verificationStatus})`);
     } else {
-      // No pending feedback: skip if the user deliberately stopped the agent.
-      // stoppedByUser is set by markAgentStopped (kill, pan work done, etc.).
-      // recoverOrphanedAgents does NOT set this flag, so orphaned/crashed agents
-      // pass through here and get resumed.
-      const deliberatelyStopped = state.stoppedByUser === true;
-      if (deliberatelyStopped) {
-        logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — deliberately stopped by user (stoppedByUser=true)`);
-        continue;
-      }
 
       // Skip agents that are on standby for UAT tweaks after pan done.
       // review-response phase means the agent is waiting for human input via pan tell,

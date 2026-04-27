@@ -373,19 +373,25 @@ export function getAgentDir(agentId: string): string {
 }
 
 export function getAgentState(agentId: string): AgentState | null {
-  const stateFile = join(getAgentDir(agentId), 'state.json');
+  const normalizedId = normalizeAgentId(agentId);
+  const stateFile = join(getAgentDir(normalizedId), 'state.json');
   if (!existsSync(stateFile)) return null;
 
   const content = readFileSync(stateFile, 'utf8');
-  return JSON.parse(content);
+  const state = JSON.parse(content) as AgentState;
+  if (!state.id) state.id = normalizedId;
+  return state;
 }
 
 export async function getAgentStateAsync(agentId: string): Promise<AgentState | null> {
-  const stateFile = join(getAgentDir(agentId), 'state.json');
+  const normalizedId = normalizeAgentId(agentId);
+  const stateFile = join(getAgentDir(normalizedId), 'state.json');
   if (!existsSync(stateFile)) return null;
 
   const content = await readFile(stateFile, 'utf-8');
-  return JSON.parse(content);
+  const state = JSON.parse(content) as AgentState;
+  if (!state.id) state.id = normalizedId;
+  return state;
 }
 
 export function saveAgentState(state: AgentState): void {
@@ -430,6 +436,14 @@ function markAgentStopped(state: AgentState): void {
   state.stoppedAt = new Date().toISOString();
   state.stoppedByUser = true;
   logAgentLifecycle(state.id, `status changed: ${oldStatus} → stopped (markAgentStopped, user-initiated)`);
+}
+
+export function markAgentStoppedState(state: AgentState): AgentState {
+  if (!state.id) {
+    state.id = normalizeAgentId(state.issueId);
+  }
+  markAgentStopped(state);
+  return state;
 }
 
 /** Test-only internals. Do not import outside of test files. */
@@ -1180,9 +1194,11 @@ export function listRunningAgents(): (AgentState & { tmuxActive: boolean })[] {
   for (const dir of dirs) {
     const state = getAgentState(dir.name);
     if (state) {
+      const normalizedId = normalizeAgentId(state.id || dir.name);
       agents.push({
         ...state,
-        tmuxActive: tmuxNames.has(state.id),
+        id: normalizedId,
+        tmuxActive: tmuxNames.has(normalizedId),
       });
     }
   }
@@ -1205,9 +1221,11 @@ export async function listRunningAgentsAsync(): Promise<(AgentState & { tmuxActi
     entries.map(async (entry) => {
       const state = await getAgentStateAsync(entry);
       if (state) {
+        const normalizedId = normalizeAgentId(state.id || entry);
         agents.push({
           ...state,
-          tmuxActive: tmuxNames.has(state.id),
+          id: normalizedId,
+          tmuxActive: tmuxNames.has(normalizedId),
         });
       }
     })
@@ -1272,7 +1290,7 @@ export function stopAgent(agentId: string): void {
     // Ensure id is set — runtime state files may lack it (PAN-150)
     if (!state.id) state.id = normalizedId;
 
-    markAgentStopped(state);
+    markAgentStoppedState(state);
     saveAgentState(state);
   }
 
@@ -1308,7 +1326,7 @@ export async function stopAgentAsync(agentId: string): Promise<void> {
   if (state) {
     if (!state.id) state.id = normalizedId;
 
-    markAgentStopped(state);
+    markAgentStoppedState(state);
     saveAgentState(state);
   }
 

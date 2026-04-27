@@ -17,7 +17,8 @@ import { promisify } from 'util';
 import type { IssueTracker } from '../tracker/interface.js';
 import type { LifecycleContext, StepResult } from './types.js';
 import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
-import { extractNumber, extractPrefix } from '../issue-id.js';
+import { extractNumber, extractPrefix, normalizeIssueId } from '../issue-id.js';
+import { getAgentState, markAgentStoppedState, saveAgentState } from '../agents.js';
 
 const execAsync = promisify(exec);
 
@@ -45,6 +46,14 @@ export interface CloseIssueOptions {
  * If a tracker is provided, uses the abstraction layer.
  * Otherwise, falls back to direct gh CLI (GitHub) or Linear SDK calls.
  */
+function markWorkAgentStoppedForIssue(issueId: string): void {
+  const agentId = `agent-${normalizeIssueId(issueId)}`;
+  const state = getAgentState(agentId);
+  if (!state) return;
+  markAgentStoppedState(state);
+  saveAgentState(state);
+}
+
 export async function closeIssue(
   ctx: LifecycleContext,
   opts: CloseIssueOptions = {},
@@ -91,6 +100,7 @@ async function closeViaTracker(
   const step = 'close-issue:transition';
   try {
     await tracker.transitionIssue(ctx.issueId, 'closed');
+    markWorkAgentStoppedForIssue(ctx.issueId);
     if (comment) {
       try {
         await tracker.addComment(ctx.issueId, comment);
@@ -147,6 +157,7 @@ async function closeGitHubDirect(ctx: LifecycleContext, comment?: string): Promi
       `gh issue close ${number} --repo ${owner}/${repo}${commentArg}`,
       { encoding: 'utf-8' },
     );
+    markWorkAgentStoppedForIssue(ctx.issueId);
     return stepOk(step, [`Closed GitHub issue #${number} on ${owner}/${repo}`]);
   } catch (err) {
     return stepFailed(step, `gh issue close failed: ${(err as Error).message}`);
@@ -236,6 +247,7 @@ async function closeLinearDirect(ctx: LifecycleContext, apiKey: string): Promise
       }
     }
 
+    markWorkAgentStoppedForIssue(ctx.issueId);
     return stepOk(step, [`Moved Linear issue ${ctx.issueId} to Done`]);
   } catch (err) {
     const message = (err as Error).message;
@@ -268,6 +280,7 @@ async function closeRallyDirect(ctx: LifecycleContext): Promise<StepResult> {
       project: ctx.rally.project,
     });
     await tracker.transitionIssue(ctx.issueId, 'closed');
+    markWorkAgentStoppedForIssue(ctx.issueId);
     return stepOk(step, [`Closed Rally issue ${ctx.issueId}`]);
   } catch (err) {
     return stepFailed(step, `Rally close failed: ${(err as Error).message}`);
