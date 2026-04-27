@@ -437,7 +437,6 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
           ) : workspace.data?.hasAgent ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
               <span><strong>Model:</strong> {workspace.data.agentModelFull || workspace.data.agentModel || 'unknown'}</span>
-              {agent?.startedAt && <span><strong>Runtime:</strong> {formatRuntime(agent.startedAt)}</span>}
               {workspace.data.agentSessionId && (
                 <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
                   {workspace.data.agentSessionId}
