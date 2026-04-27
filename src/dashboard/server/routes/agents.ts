@@ -1681,12 +1681,18 @@ const postAgentsRoute = HttpRouter.add(
 
     let preSpawnStashRef: string | null = null;
     let preSpawnStashMessage: string | null = null;
+    let preSpawnBaselineHead: string | null = null;
     try {
       const { stdout: statusOut } = yield* Effect.promise(() => execAsync('git status --porcelain', {
         cwd: workspacePath,
         encoding: 'utf-8',
       }));
       if (statusOut.trim()) {
+        const { stdout: headOut } = yield* Effect.promise(() => execAsync('git rev-parse HEAD', {
+          cwd: workspacePath,
+          encoding: 'utf-8',
+        }));
+        preSpawnBaselineHead = headOut.trim() || null;
         preSpawnStashMessage = buildStashMessage('pre-spawn', issueId, new Date());
         preSpawnStashRef = yield* Effect.promise(() => createNamedStash(workspacePath, preSpawnStashMessage!, true));
         if (preSpawnStashRef) {
@@ -1695,20 +1701,23 @@ const postAgentsRoute = HttpRouter.add(
             workspacePath,
             stashRef: preSpawnStashRef,
             stashMessage: preSpawnStashMessage,
+            baselineHead: preSpawnBaselineHead,
           }));
+        } else {
+          preSpawnBaselineHead = null;
         }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      preSpawnStashRef = null;
+      preSpawnStashMessage = null;
+      preSpawnBaselineHead = null;
       yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.pre_spawn_stash_failed', {
         issueId,
         workspacePath,
         error: message,
       }));
-      return jsonResponse({
-        error: `Failed to create pre-spawn stash for ${issueId}: ${message}`,
-        hint: 'Fix the workspace git state and retry starting the agent.',
-      }, { status: 500 });
+      console.warn(`[start-agent] Failed to create pre-spawn stash for ${issueId}: ${message}`);
     }
 
     // Spawn pan start command
@@ -1846,6 +1855,7 @@ const postAgentsRoute = HttpRouter.add(
             message: 'Waiting for containers to start...',
             ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
             ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
+            ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
           }, null, 2)));
           yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_waiting_for_containers', {
             issueId,
@@ -1913,6 +1923,9 @@ const postAgentsRoute = HttpRouter.add(
                       phase,
                       message: 'Container startup timed out before work agent spawn',
                       error: `Containers for ${issueId} did not become healthy within ${maxWaitMs}ms`,
+                      ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
+                      ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
+                      ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
                     }, null, 2));
                     return;
                   }
@@ -1958,6 +1971,9 @@ const postAgentsRoute = HttpRouter.add(
                     phase,
                     message: 'Container startup failed before work agent spawn',
                     error: errorMessage,
+                    ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
+                    ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
+                    ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
                   }, null, 2)).catch(() => undefined);
                   console.error(`[start-agent] Background container startup failed for ${issueId}:`, err);
                 }
@@ -2009,6 +2025,7 @@ const postAgentsRoute = HttpRouter.add(
       message: 'Work agent spawn requested',
       ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
       ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
+      ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
     }, null, 2)));
     yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_placeholder_created', {
       issueId,

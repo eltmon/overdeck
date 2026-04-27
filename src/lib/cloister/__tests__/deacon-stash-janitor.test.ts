@@ -123,7 +123,7 @@ function installExecMock(stdoutByCommand: Record<string, string>) {
 describe('cleanupSpawnAndOrphanedStashes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    installExecMock({ 'git rev-list origin/main..HEAD --count': '1\n' });
+    installExecMock({ 'git rev-list spawn-head..HEAD --count': '1\n' });
     mockIsOlderThanDays.mockReturnValue(false);
     mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon', projectPath: '/repo' } as any);
     mockGetProject.mockReturnValue(null);
@@ -139,6 +139,7 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
       workspace: '/repo/workspaces/feature-pan-879',
       preSpawnStashRef: 'stash@{0}',
       preSpawnStashMessage: 'pre-spawn:PAN-879:2026-04-27T14:15:16Z',
+      preSpawnBaselineHead: 'spawn-head',
     } as any;
 
     mockListRunningAgents.mockReturnValue([{ id: 'agent-pan-879', issueId: 'PAN-879' }] as any);
@@ -147,8 +148,14 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
 
     expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'stash@{0}');
+    expect(execMock).toHaveBeenCalledWith(
+      expect.stringContaining('git rev-list spawn-head..HEAD --count'),
+      expect.anything(),
+      expect.any(Function),
+    );
     expect(state.preSpawnStashRef).toBeUndefined();
     expect(state.preSpawnStashMessage).toBeUndefined();
+    expect(state.preSpawnBaselineHead).toBeUndefined();
     expect(mockSaveAgentState).toHaveBeenCalledWith(state);
     expect(actions).toContain('Dropped pre-spawn stash for PAN-879');
   });
@@ -194,6 +201,7 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
       workspace: '/repo/workspaces/feature-pan-879',
       preSpawnStashRef: 'stash@{0}',
       preSpawnStashMessage: 'pre-spawn:PAN-879:2026-04-27T14:15:16Z',
+      preSpawnBaselineHead: 'spawn-head',
     } as any;
 
     installExecMock({});
@@ -205,6 +213,27 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     expect(mockDropStash).not.toHaveBeenCalled();
     expect(mockSaveAgentState).not.toHaveBeenCalled();
     expect(state.preSpawnStashRef).toBe('stash@{0}');
+    expect(state.preSpawnBaselineHead).toBe('spawn-head');
+    expect(actions).toEqual([]);
+  });
+
+  it('preserves pre-spawn stash when baseline head is missing', async () => {
+    const state = {
+      id: 'agent-pan-879',
+      issueId: 'PAN-879',
+      workspace: '/repo/workspaces/feature-pan-879',
+      preSpawnStashRef: 'stash@{0}',
+      preSpawnStashMessage: 'pre-spawn:PAN-879:2026-04-27T14:15:16Z',
+    } as any;
+
+    mockListRunningAgents.mockReturnValue([{ id: 'agent-pan-879', issueId: 'PAN-879' }] as any);
+    mockGetAgentState.mockReturnValue(state);
+
+    const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
+
+    expect(mockDropStash).not.toHaveBeenCalled();
+    expect(mockSaveAgentState).not.toHaveBeenCalled();
+    expect(execMock).not.toHaveBeenCalled();
     expect(actions).toEqual([]);
   });
 

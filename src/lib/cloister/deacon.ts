@@ -2489,17 +2489,21 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
       const agentState = getAgentState(agent.id);
       if (!agentState?.workspace || !agentState.preSpawnStashRef) continue;
       if (!existsSync(agentState.workspace)) continue;
+      if (!agentState.preSpawnBaselineHead) {
+        console.warn(`[deacon] Missing pre-spawn baseline head for ${agentState.issueId}; preserving stash`);
+        continue;
+      }
 
       let hasCommitsAhead = false;
       try {
-        const { stdout } = await execAsync('git rev-list origin/main..HEAD --count', {
+        const { stdout } = await execAsync(`git rev-list ${agentState.preSpawnBaselineHead}..HEAD --count`, {
           cwd: agentState.workspace,
           encoding: 'utf-8',
         });
         hasCommitsAhead = (parseInt(stdout.trim(), 10) || 0) > 0;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.warn(`[deacon] Failed checking branch advancement for ${agentState.issueId}: ${message}`);
+        console.warn(`[deacon] Failed checking post-spawn commits for ${agentState.issueId}: ${message}`);
         continue;
       }
 
@@ -2509,6 +2513,7 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
         await dropStash(agentState.workspace, agentState.preSpawnStashRef);
         delete agentState.preSpawnStashRef;
         delete agentState.preSpawnStashMessage;
+        delete agentState.preSpawnBaselineHead;
         saveAgentState(agentState);
         actions.push(`Dropped pre-spawn stash for ${agentState.issueId}`);
       } catch (error) {
@@ -2519,6 +2524,7 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
         }
         delete agentState.preSpawnStashRef;
         delete agentState.preSpawnStashMessage;
+        delete agentState.preSpawnBaselineHead;
         saveAgentState(agentState);
       }
     }

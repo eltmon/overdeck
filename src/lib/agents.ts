@@ -368,6 +368,7 @@ export interface AgentState {
   sageoxSessionPath?: string; // Path to SageOx session folder for parent linking
   preSpawnStashRef?: string;
   preSpawnStashMessage?: string;
+  preSpawnBaselineHead?: string;
 }
 
 export function getAgentDir(agentId: string): string {
@@ -966,6 +967,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     workType: options.workType,
     preSpawnStashRef: existingState?.preSpawnStashRef,
     preSpawnStashMessage: existingState?.preSpawnStashMessage,
+    preSpawnBaselineHead: existingState?.preSpawnBaselineHead,
   };
 
   saveAgentState(state);
