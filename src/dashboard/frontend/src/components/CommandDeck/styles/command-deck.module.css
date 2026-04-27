@@ -264,6 +264,50 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+}
+
+.featureBadgeGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.featureBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.featureBadge_running {
+  background: color-mix(in srgb, var(--mc-success) 16%, transparent);
+  color: var(--mc-success);
+  border-color: color-mix(in srgb, var(--mc-success) 40%, transparent);
+}
+
+.featureBadge_stopped {
+  background: color-mix(in srgb, var(--mc-text-muted) 10%, transparent);
+  color: var(--mc-text-muted);
+  border-color: color-mix(in srgb, var(--mc-text-muted) 22%, transparent);
+}
+
+.featureBadge_error {
+  background: color-mix(in srgb, var(--mc-error) 16%, transparent);
+  color: var(--mc-error);
+  border-color: color-mix(in srgb, var(--mc-error) 40%, transparent);
+}
+
+.featureActivityError {
+  background: var(--mc-error) !important;
+  opacity: 1 !important;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--mc-error) 45%, transparent);
 }
 
 /* Feature ID — technical identifier, mono per PAN-698 policy */
@@ -280,9 +324,46 @@
   color: var(--mc-text-muted);
   flex-shrink: 0;
   padding: 1px 6px;
-  border-radius: 3px;
+  border-radius: 999px;
   background: var(--mc-bg-hover);
   white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.featureState_done {
+  background: color-mix(in srgb, var(--mc-success) 14%, transparent);
+  color: var(--mc-success);
+  border-color: color-mix(in srgb, var(--mc-success) 32%, transparent);
+}
+
+.featureState_progress {
+  background: color-mix(in srgb, var(--mc-accent) 16%, transparent);
+  color: var(--mc-accent);
+  border-color: color-mix(in srgb, var(--mc-accent) 36%, transparent);
+}
+
+.featureState_review {
+  background: color-mix(in srgb, var(--mc-warning) 16%, transparent);
+  color: var(--mc-warning);
+  border-color: color-mix(in srgb, var(--mc-warning) 36%, transparent);
+}
+
+.featureState_context {
+  background: color-mix(in srgb, #14b8a6 16%, transparent);
+  color: #0f766e;
+  border-color: color-mix(in srgb, #14b8a6 36%, transparent);
+}
+
+.featureState_planning {
+  background: color-mix(in srgb, #8b5cf6 16%, transparent);
+  color: #7c3aed;
+  border-color: color-mix(in srgb, #8b5cf6 36%, transparent);
+}
+
+.featureState_todo {
+  background: var(--mc-bg-hover);
+  color: var(--mc-text-muted);
+  border-color: color-mix(in srgb, var(--mc-text-muted) 16%, transparent);
 }
 
 /* Feature Item Wrapper (expandable) */

@@ -68,6 +68,149 @@ function formatCost(cost: number): string {
   return `$${cost.toFixed(2)}`;
 }
 
+type AggregateActivityState = 'running' | 'error' | 'queued' | 'stopped';
+
+type AggregateBadge =
+  | { key: 'work'; label: string; tone: 'running' | 'stopped' }
+  | { key: 'reviewers'; label: string; tone: 'running' | 'stopped' }
+  | { key: 'review-error'; label: string; tone: 'error' };
+
+function isWorkOrSpecialistSession(session: SessionNodeType): boolean {
+  return session.type === 'work'
+    || session.type === 'planning'
+    || session.type === 'review'
+    || session.type === 'reviewer'
+    || session.type === 'test'
+    || session.type === 'merge';
+}
+
+function isErrorSession(session: SessionNodeType): boolean {
+  const status = session.status.toLowerCase();
+  return status === 'error' || status.includes('fail') || status.includes('stuck');
+}
+
+function isQueuedSession(session: SessionNodeType): boolean {
+  const status = session.status.toLowerCase();
+  return status === 'starting' || status === 'unknown' || status.includes('queued');
+}
+
+function isRunningSession(session: SessionNodeType): boolean {
+  return session.status === 'running' && session.presence === 'active';
+}
+
+function formatSessionDuration(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  return `${Math.round(seconds / 3600)}h`;
+}
+
+function getAggregateActivityState(sessions: SessionNodeType[]): AggregateActivityState {
+  if (sessions.some(isErrorSession)) return 'error';
+  if (sessions.some(isRunningSession)) return 'running';
+  if (sessions.some(isQueuedSession)) return 'queued';
+  return 'stopped';
+}
+
+function getActivityDotStatus(state: AggregateActivityState): StatusDotStatus {
+  if (state === 'running') return 'active';
+  if (state === 'queued') return 'waiting';
+  return 'ended';
+}
+
+function buildActivitySummary(sessions: SessionNodeType[]): string {
+  if (sessions.length === 0) return 'No sessions';
+
+  const runningWork = sessions.filter(session =>
+    session.type === 'work' && isRunningSession(session),
+  );
+  const reviewErrors = sessions.filter(session =>
+    (session.type === 'review' || session.type === 'reviewer') && isErrorSession(session),
+  );
+  const queued = sessions.filter(isQueuedSession);
+  const stoppedReviewers = sessions.filter(session =>
+    session.type === 'reviewer' && !isRunningSession(session) && !isErrorSession(session) && !isQueuedSession(session),
+  );
+  const genericRunning = sessions.filter(session =>
+    session.type !== 'work' && isRunningSession(session),
+  );
+
+  const parts: string[] = [];
+
+  if (runningWork.length > 0) {
+    const longest = runningWork.reduce((max, session) => Math.max(max, session.duration), 0);
+    parts.push(`${runningWork.length} work agent${runningWork.length === 1 ? '' : 's'} running ${formatSessionDuration(longest)}`);
+  }
+
+  if (genericRunning.length > 0) {
+    parts.push(`${genericRunning.length} specialist${genericRunning.length === 1 ? '' : 's'} running`);
+  }
+
+  if (reviewErrors.length > 0) {
+    parts.push(`${reviewErrors.length} review error${reviewErrors.length === 1 ? '' : 's'}`);
+  }
+
+  if (queued.length > 0) {
+    parts.push(`${queued.length} queued or starting`);
+  }
+
+  if (stoppedReviewers.length > 0) {
+    parts.push(`${stoppedReviewers.length} reviewer${stoppedReviewers.length === 1 ? '' : 's'} stopped`);
+  }
+
+  if (parts.length === 0) {
+    return sessions.every(session => session.presence === 'ended')
+      ? `All ${sessions.length} session${sessions.length === 1 ? '' : 's'} stopped`
+      : `${sessions.length} session${sessions.length === 1 ? '' : 's'} idle`;
+  }
+
+  return parts.join(', ');
+}
+
+function getAggregateBadges(sessions: SessionNodeType[]): AggregateBadge[] {
+  const workSessions = sessions.filter(session => session.type === 'work');
+  const reviewerSessions = sessions.filter(session => session.type === 'reviewer' || session.type === 'review');
+  const reviewerErrors = reviewerSessions.filter(isErrorSession);
+  const activeReviewers = reviewerSessions.filter(session => isRunningSession(session) || isQueuedSession(session));
+
+  const badges: AggregateBadge[] = [];
+
+  if (workSessions.length > 0) {
+    badges.push({
+      key: 'work',
+      label: '▸ work',
+      tone: workSessions.some(isRunningSession) ? 'running' : 'stopped',
+    });
+  }
+
+  if (reviewerSessions.length > 0) {
+    badges.push({
+      key: 'reviewers',
+      label: `●●● ${reviewerSessions.length}`,
+      tone: activeReviewers.length > 0 ? 'running' : 'stopped',
+    });
+  }
+
+  if (reviewerErrors.length > 0) {
+    badges.push({
+      key: 'review-error',
+      label: '✕ review',
+      tone: 'error',
+    });
+  }
+
+  return badges;
+}
+
+function getFeatureStateTone(stateLabel: string): 'done' | 'progress' | 'review' | 'context' | 'planning' | 'todo' {
+  const normalized = stateLabel.trim().toLowerCase();
+  if (normalized === 'done') return 'done';
+  if (normalized === 'in progress' || normalized === 'active') return 'progress';
+  if (normalized === 'in review' || normalized === 'review') return 'review';
+  if (normalized === 'has context') return 'context';
+  if (normalized === 'planning') return 'planning';
+  return 'todo';
+}
+
 const TYPE_PRIORITY: Record<string, number> = {
   work: 0,
   review: 1,
@@ -337,13 +480,19 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     visibleSessions.some(s => s.hasJsonl),
   [visibleSessions]);
 
+  const aggregateSessions = feature.sessions?.filter(isWorkOrSpecialistSession) ?? [];
+  const activityState = getAggregateActivityState(aggregateSessions);
+  const activitySummary = buildActivitySummary(aggregateSessions);
+  const aggregateBadges = getAggregateBadges(aggregateSessions);
+  const featureStateTone = getFeatureStateTone(feature.stateLabel);
+
   // Dominant session state for the feature row StatusDot (blocker-7)
   const dominantStatus = feature.sessions && feature.sessions.length > 0
     ? computeDominantStatus(feature.sessions)
     : null;
 
   // Live flash when dominant status or visible session count changes (blocker-8)
-  const flashKey = `${feature.issueId}:${dominantStatus ?? 'none'}:${visibleSessions.length}`;
+  const flashKey = `${feature.issueId}:${dominantStatus ?? 'none'}:${visibleSessions.length}:${activityState}`;
   const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
 
   const handleToggleExpanded = useCallback((e: React.MouseEvent) => {
@@ -403,8 +552,10 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               <Eye size={14} style={{ color: 'var(--mc-accent)' }} />
             ) : feature.isRally ? (
               <StatusIcon status={feature.status} agentStatus={feature.agentStatus} stateLabel={feature.stateLabel} isRally={feature.isRally} readyForMerge={feature.readyForMerge} />
+            ) : aggregateSessions.length > 0 ? (
+              <StatusDot status={getActivityDotStatus(activityState)} title={activitySummary} className={activityState === 'error' ? styles.featureActivityError : undefined} />
             ) : dominantStatus ? (
-              <StatusDot status={dominantStatus} />
+              <StatusDot status={dominantStatus} title={activitySummary} />
             ) : (
               <StatusIcon status={feature.status} agentStatus={feature.agentStatus} stateLabel={feature.stateLabel} readyForMerge={feature.readyForMerge} />
             )}
@@ -413,6 +564,18 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           <span className={styles.featureLabel} title={title || feature.issueId}>
             {title || feature.issueId}
           </span>
+          {!feature.isRally && aggregateBadges.length > 0 && (
+            <span className={styles.featureBadgeGroup}>
+              {aggregateBadges.map((badge) => (
+                <span
+                  key={badge.key}
+                  className={`${styles.featureBadge} ${styles[`featureBadge_${badge.tone}` as keyof typeof styles]}`}
+                >
+                  {badge.label}
+                </span>
+              ))}
+            </span>
+          )}
           {feature.isRally && feature.childCount != null && feature.childCount > 0 ? (
             <span className={styles.featureState} title={`${feature.completedCount || 0}/${feature.childCount} stories done${feature.inProgressCount ? `, ${feature.inProgressCount} active` : ''}`}>
               {feature.completedCount || 0}/{feature.childCount}
@@ -438,7 +601,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               )}
             </span>
           ) : (
-            <span className={styles.featureState}>{feature.stateLabel}</span>
+            <span className={`${styles.featureState} ${styles[`featureState_${featureStateTone}` as keyof typeof styles]}`}>{feature.stateLabel}</span>
           )}
           {cost !== undefined && cost > 0 && (
             <span className={styles.featureCost}>{formatCost(cost)}</span>
