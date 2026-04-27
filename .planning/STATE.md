@@ -27,3 +27,6 @@ All beads implemented. Running final quality gates before calling pan done.
   - Fixed: parallelized `killAllReviewerSessions` with `Promise.all`
 - **[2026-04-27T06:45Z] review-agent → APPROVED** — `.planning/feedback/001-review-agent-approved.md`
 - **[2026-04-27T06:45Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
+- **[2026-04-27T09:17Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-04-27T09:17Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
+- **[2026-04-27T09:42Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
