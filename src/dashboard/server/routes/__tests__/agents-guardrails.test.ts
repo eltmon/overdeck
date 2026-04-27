@@ -68,8 +68,24 @@ describe('evaluateSpawnGuardrails', () => {
     vi.unstubAllEnvs();
   });
 
+  it('does not block exactly at the memory threshold boundary', () => {
+    vi.stubEnv('PAN_MEMORY_BLOCK_GB', '2');
+
+    const decision = evaluateSpawnGuardrails(createHealthSnapshot({
+      summary: {
+        availableMemoryBytes: 2 * GIB,
+      },
+    }));
+
+    expect(decision.blocked).toBe(false);
+    expect(decision.warnings).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'memory_pressure', severity: 'critical' })]),
+    );
+  });
+
   it('returns non-blocking warnings when work agent count is high but below the hard limit', () => {
-    vi.stubEnv('PAN_HEALTH_MAX_WORK_AGENTS', '6');
+    vi.stubEnv('PAN_AGENT_WARN_COUNT', '5');
+    vi.stubEnv('PAN_AGENT_BLOCK_COUNT', '6');
 
     const decision = evaluateSpawnGuardrails(createHealthSnapshot({
       summary: {
@@ -89,6 +105,8 @@ describe('evaluateSpawnGuardrails', () => {
   });
 
   it('blocks spawns when available memory is critically low', () => {
+    vi.stubEnv('PAN_MEMORY_BLOCK_GB', '2');
+
     const decision = evaluateSpawnGuardrails(createHealthSnapshot({
       severity: 'critical',
       summary: {
@@ -110,7 +128,7 @@ describe('evaluateSpawnGuardrails', () => {
   });
 
   it('escalates leaked specialists to a blocking hint when critical conditions are also present', () => {
-    vi.stubEnv('PAN_HEALTH_MAX_WORK_AGENTS', '6');
+    vi.stubEnv('PAN_AGENT_BLOCK_COUNT', '6');
 
     const decision = evaluateSpawnGuardrails(createHealthSnapshot({
       severity: 'critical',

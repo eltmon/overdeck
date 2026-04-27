@@ -262,6 +262,14 @@ export interface SystemHealthConsumer {
   issueId?: string;
   currentIssue?: string;
   leaked?: boolean;
+  killTarget?: {
+    kind: 'agent' | 'specialist' | 'container';
+    agentId?: string;
+    containerId?: string;
+    projectKey?: string;
+    issueId?: string;
+    specialistType?: string;
+  };
 }
 
 export interface SystemHealthSnapshot {
@@ -286,6 +294,8 @@ export interface SystemHealthSnapshot {
     leakedSpecialistCount: number;
     containerCount: number;
     containerMemoryBytes: number;
+    panopticonMemoryBytes: number;
+    panopticonMemoryPercent: number;
   };
   thresholds: {
     memoryAvailableWarningBytes: number;

@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { AlertTriangle, ChevronDown, Cpu, Loader2, MemoryStick, Skull, X } from 'lucide-react';
+import { useConfirm } from './DialogProvider';
+import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { useKillAgent } from '../hooks/useKillAgent';
 import { useSystemHealth } from '../hooks/useSystemHealth';
 import type { SystemHealthConsumer, SystemHealthSnapshot } from '../types';
@@ -24,20 +27,82 @@ function topConsumerLabel(consumer: SystemHealthConsumer): string {
   return consumer.label;
 }
 
-function KillButton({ consumer }: { consumer: SystemHealthConsumer }) {
-  const killable = consumer.type !== 'container' && consumer.id.startsWith('agent-');
-  const { confirmAndKill, isPending } = useKillAgent(killable ? consumer.id : undefined);
+function KillButton({ consumer, onSelectLeaked }: { consumer: SystemHealthConsumer; onSelectLeaked: () => void }) {
+  const confirm = useConfirm();
+  const queryClient = useQueryClient();
+  const { confirmAndKill, isPending: isAgentPending } = useKillAgent(consumer.killTarget?.kind === 'agent' ? consumer.killTarget.agentId : undefined, {
+    onSuccess: () => {
+      if (consumer.leaked) onSelectLeaked();
+    },
+  });
 
-  if (!killable) return null;
+  const cleanupMutation = useMutation<{ ok?: boolean; success?: boolean }, Error, void>({
+    mutationFn: async () => {
+      const target = consumer.killTarget;
+      if (!target) throw new Error('No kill target available');
+
+      if (target.kind === 'container') {
+        if (!target.containerId) throw new Error('Missing container id');
+        const res = await fetch(`/api/resources/docker/container/${target.containerId}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Failed to remove container');
+        return res.json();
+      }
+
+      if (target.kind === 'specialist') {
+        if (!target.projectKey || !target.issueId || !target.specialistType) {
+          throw new Error('Missing specialist target');
+        }
+        const res = await fetch(`/api/specialists/${target.projectKey}/${target.issueId}/${target.specialistType}/kill`, { method: 'POST' });
+        if (!res.ok) throw new Error('Failed to kill specialist');
+        return res.json();
+      }
+
+      throw new Error('Unsupported kill target');
+    },
+    onSuccess: async () => {
+      await refreshDashboardState(queryClient);
+      await queryClient.invalidateQueries({ queryKey: ['system-health'] });
+      if (consumer.leaked) onSelectLeaked();
+    },
+  });
+
+  const isPending = isAgentPending || cleanupMutation.isPending;
+  const target = consumer.killTarget;
+  if (!target) return null;
+
+  const title = target.kind === 'container'
+    ? `Remove container ${consumer.label}`
+    : target.kind === 'specialist'
+      ? `Kill specialist ${consumer.label}`
+      : `Kill ${consumer.label}`;
+
+  const handleClick = async () => {
+    if (target.kind === 'agent') {
+      await confirmAndKill();
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: target.kind === 'container' ? 'Remove Container' : 'Kill Specialist',
+      message: target.kind === 'container'
+        ? `Remove Docker container ${consumer.label}?`
+        : `Kill specialist ${consumer.label}?`,
+      variant: 'destructive',
+      confirmLabel: target.kind === 'container' ? 'Remove' : 'Kill',
+    });
+    if (confirmed) {
+      cleanupMutation.mutate();
+    }
+  };
 
   return (
     <button
-      onClick={() => void confirmAndKill()}
+      onClick={() => void handleClick()}
       disabled={isPending}
       className="rounded border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-50"
-      title={`Kill ${consumer.label}`}
+      title={title}
     >
-      {isPending ? 'Killing…' : 'Kill'}
+      {isPending ? 'Killing…' : target.kind === 'container' ? 'Remove' : 'Kill'}
     </button>
   );
 }
@@ -45,6 +110,7 @@ function KillButton({ consumer }: { consumer: SystemHealthConsumer }) {
 export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
   const { data, isLoading, error } = useSystemHealth();
   const [open, setOpen] = useState(false);
+  const [highlightLeakedOnly, setHighlightLeakedOnly] = useState(false);
   const previousSeverity = useRef<SystemHealthSnapshot['severity'] | null>(null);
 
   useEffect(() => {
@@ -58,15 +124,21 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
       duration: 10000,
       action: {
         label: 'Open',
-        onClick: () => setOpen(true),
+        onClick: () => {
+          setHighlightLeakedOnly((data.leakedSpecialists?.length ?? 0) > 0);
+          setOpen(true);
+        },
       },
     });
   }, [compact, data]);
 
   const leakedFirstConsumers = useMemo(() => {
     const consumers = data?.topConsumers ?? [];
-    return [...consumers].sort((a, b) => Number(b.leaked ?? false) - Number(a.leaked ?? false));
-  }, [data]);
+    const sorted = [...consumers].sort((a, b) => Number(b.leaked ?? false) - Number(a.leaked ?? false));
+    if (!highlightLeakedOnly) return sorted;
+    const leakedOnly = sorted.filter((consumer) => consumer.leaked);
+    return leakedOnly.length > 0 ? leakedOnly : sorted;
+  }, [data?.topConsumers, highlightLeakedOnly]);
 
   if (isLoading) {
     return (
@@ -89,7 +161,10 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          setHighlightLeakedOnly(false);
+          setOpen((value) => !value);
+        }}
         className={`flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-xs transition-colors hover:bg-accent ${severityClasses(data.severity)} ${compact ? 'justify-center px-1.5' : 'justify-between'}`}
         data-testid="system-health-pill"
       >
@@ -113,7 +188,10 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
               <div className="text-xs text-muted-foreground">Updated {new Date(data.updatedAt).toLocaleTimeString()}</div>
             </div>
             <button
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                setHighlightLeakedOnly(false);
+                setOpen(false);
+              }}
               className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
               title="Close"
             >
@@ -133,12 +211,21 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
               <div className="text-muted-foreground">Avail {formatBytes(data.summary.availableMemoryBytes)}</div>
             </div>
             <div className="rounded-lg border border-border p-2">
+              <div className="text-muted-foreground">Panopticon</div>
+              <div className="mt-1 font-semibold text-foreground">{formatBytes(data.summary.panopticonMemoryBytes)}</div>
+              <div className="text-muted-foreground">{data.summary.panopticonMemoryPercent.toFixed(1)}% of host RAM</div>
+            </div>
+            <div className="rounded-lg border border-border p-2">
               <div className="text-muted-foreground">Swap</div>
               <div className="mt-1 font-semibold text-foreground">{data.summary.swapUsedPercent.toFixed(1)}%</div>
             </div>
             <div className="rounded-lg border border-border p-2">
               <div className="text-muted-foreground">Work agents</div>
               <div className="mt-1 font-semibold text-foreground">{data.summary.workAgentCount}</div>
+            </div>
+            <div className="rounded-lg border border-border p-2">
+              <div className="text-muted-foreground">Containers</div>
+              <div className="mt-1 font-semibold text-foreground">{data.summary.containerCount}</div>
             </div>
           </div>
 
@@ -150,9 +237,19 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
             </div>
           )}
 
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Top consumers</div>
-            <div className="text-xs text-muted-foreground">Leaked specialists: {data.summary.leakedSpecialistCount}</div>
+            <div className="flex items-center gap-2">
+              {highlightLeakedOnly && data.summary.leakedSpecialistCount > 0 && (
+                <button
+                  onClick={() => setHighlightLeakedOnly(false)}
+                  className="rounded border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  Show all
+                </button>
+              )}
+              <div className="text-xs text-muted-foreground">Leaked specialists: {data.summary.leakedSpecialistCount}</div>
+            </div>
           </div>
           <div className="space-y-2 max-h-72 overflow-auto pr-1">
             {leakedFirstConsumers.map((consumer) => (
@@ -162,7 +259,7 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
                     <div className="truncate text-sm font-medium text-foreground">{topConsumerLabel(consumer)}</div>
                     <div className="text-xs text-muted-foreground">{consumer.type} · {consumer.memoryGb.toFixed(2)} GB{consumer.cpuPercent != null ? ` · ${consumer.cpuPercent.toFixed(1)}% CPU` : ''}</div>
                   </div>
-                  <KillButton consumer={consumer} />
+                  <KillButton consumer={consumer} onSelectLeaked={() => setHighlightLeakedOnly(true)} />
                 </div>
               </div>
             ))}

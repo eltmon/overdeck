@@ -6,11 +6,14 @@ import { promisify } from 'node:util';
 import type { DashboardSnapshot } from '@panopticon/contracts';
 
 import { listRunningAgentsAsync, getAgentRuntimeStateAsync, type AgentState } from '../../../lib/agents.js';
+import { loadConfig } from '../../../lib/config-yaml.js';
+import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { listPaneValuesAsync } from '../../../lib/tmux.js';
 import { DockerStatsCollector, type ContainerStats } from '../../../lib/docker-stats.js';
+import { initEventStore } from '../event-store.js';
 
 const execAsync = promisify(exec);
-const CACHE_TTL_MS = 10_000;
+const CACHE_TTL_MS = 15_000;
 const KB = 1024;
 const GIB = 1024 ** 3;
 
@@ -76,6 +79,14 @@ export interface HealthConsumer {
   issueId?: string;
   currentIssue?: string;
   leaked?: boolean;
+  killTarget?: {
+    kind: 'agent' | 'specialist' | 'container';
+    agentId?: string;
+    containerId?: string;
+    projectKey?: string;
+    issueId?: string;
+    specialistType?: string;
+  };
 }
 
 export interface SystemHealthSnapshot {
@@ -100,6 +111,8 @@ export interface SystemHealthSnapshot {
     leakedSpecialistCount: number;
     containerCount: number;
     containerMemoryBytes: number;
+    panopticonMemoryBytes: number;
+    panopticonMemoryPercent: number;
   };
   thresholds: SystemHealthThresholds;
   reasons: string[];
@@ -110,9 +123,12 @@ export interface SystemHealthSnapshot {
 
 let dockerStatsCollector: DockerStatsCollector | null = null;
 let previousCpuSample: CpuSample | null = null;
+let previousCpuSampleAt = 0;
 let cachedHealth: SystemHealthSnapshot | null = null;
 let cacheExpiresAt = 0;
 let inflightRefresh: Promise<SystemHealthSnapshot> | null = null;
+let previousSeverity: SystemHealthSeverity | null = null;
+let eventStorePromise: Promise<ReturnType<typeof initEventStore>> | null = null;
 
 function getDockerStatsCollector(): DockerStatsCollector {
   if (!dockerStatsCollector) {
@@ -140,10 +156,27 @@ function classifyAgentKind(agentId: string): HealthAgentProcess['kind'] {
   return 'other';
 }
 
-function defaultThresholds(): SystemHealthThresholds {
+function resolveFiniteNumber(value: string | undefined, fallback: number): number {
+  if (value == null || value.trim() === '') return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+export function getResourceConfig() {
+  const { config } = loadConfig();
   return {
-    memoryAvailableWarningBytes: Number(process.env['PAN_HEALTH_MEMORY_WARN_GB'] ?? 4) * GIB,
-    memoryAvailableCriticalBytes: Number(process.env['PAN_HEALTH_MEMORY_CRITICAL_GB'] ?? 2) * GIB,
+    memoryWarnGb: resolveFiniteNumber(process.env['PAN_MEMORY_WARN_GB'], config.resources.memoryWarnGb),
+    memoryBlockGb: resolveFiniteNumber(process.env['PAN_MEMORY_BLOCK_GB'], config.resources.memoryBlockGb),
+    agentWarnCount: Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_AGENT_WARN_COUNT'], config.resources.agentWarnCount))),
+    agentBlockCount: Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_AGENT_BLOCK_COUNT'], config.resources.agentBlockCount))),
+  };
+}
+
+function defaultThresholds(): SystemHealthThresholds {
+  const resources = getResourceConfig();
+  return {
+    memoryAvailableWarningBytes: resources.memoryWarnGb * GIB,
+    memoryAvailableCriticalBytes: resources.memoryBlockGb * GIB,
     swapUsedWarningPercent: Number(process.env['PAN_HEALTH_SWAP_WARN_PERCENT'] ?? 20),
     swapUsedCriticalPercent: Number(process.env['PAN_HEALTH_SWAP_CRITICAL_PERCENT'] ?? 50),
     cpuLoadWarningPerCore: Number(process.env['PAN_HEALTH_LOAD_WARN_PER_CORE'] ?? 1),
@@ -188,9 +221,11 @@ async function readCpuPercent(): Promise<number> {
   const idle = (values[3] ?? 0) + (values[4] ?? 0);
   const total = values.reduce((sum, value) => sum + value, 0);
   const current: CpuSample = { idle, total };
+  const now = Date.now();
 
-  if (!previousCpuSample) {
+  if (!previousCpuSample || (previousCpuSampleAt > 0 && now - previousCpuSampleAt > CACHE_TTL_MS * 2)) {
     previousCpuSample = current;
+    previousCpuSampleAt = now;
     const coreCount = Math.max(cpus().length, 1);
     const fallback = Math.min((await readLoadAverage()) / coreCount, 1) * 100;
     return Math.round(fallback * 10) / 10;
@@ -199,13 +234,14 @@ async function readCpuPercent(): Promise<number> {
   const totalDelta = current.total - previousCpuSample.total;
   const idleDelta = current.idle - previousCpuSample.idle;
   previousCpuSample = current;
+  previousCpuSampleAt = now;
 
   if (totalDelta <= 0) return 0;
   return Math.round(((totalDelta - idleDelta) / totalDelta) * 1000) / 10;
 }
 
 async function readProcessTable(): Promise<Map<number, ProcessRow>> {
-  const { stdout } = await execAsync('ps -eo pid=,ppid=,rss=,comm=', {
+  const { stdout } = await execAsync('ps -eo pid=,ppid=,rss=,args=', {
     encoding: 'utf-8',
     timeout: 10_000,
   });
@@ -288,9 +324,9 @@ function evaluateSeverity(
   const criticalReasons: string[] = [];
   const warningReasons: string[] = [];
 
-  if (data.availableMemoryBytes <= thresholds.memoryAvailableCriticalBytes) {
+  if (data.availableMemoryBytes < thresholds.memoryAvailableCriticalBytes) {
     criticalReasons.push(`Available RAM is low (${bytesToGb(data.availableMemoryBytes)} GB).`);
-  } else if (data.availableMemoryBytes <= thresholds.memoryAvailableWarningBytes) {
+  } else if (data.availableMemoryBytes < thresholds.memoryAvailableWarningBytes) {
     warningReasons.push(`Available RAM is tight (${bytesToGb(data.availableMemoryBytes)} GB).`);
   }
 
@@ -361,16 +397,39 @@ function buildTopConsumers(
 ): HealthConsumer[] {
   const leakedByName = new Map(leakedSpecialists.map((item) => [item.name, item]));
 
-  const agentConsumers = agents.map((agent) => ({
-    id: agent.id,
-    label: agent.id,
-    type: agent.kind === 'specialist' ? 'specialist' : 'agent',
-    memoryBytes: agent.memoryBytes,
-    memoryGb: agent.memoryGb,
-    issueId: agent.issueId,
-    currentIssue: agent.currentIssue,
-    leaked: leakedByName.has(agent.id.replace(/^specialist-/, '') as string) || leakedByName.has(agent.id as string),
-  } satisfies HealthConsumer));
+  const agentConsumers = agents.map((agent) => {
+    const isSpecialist = agent.kind === 'specialist';
+    const leaked = leakedByName.has(agent.id.replace(/^specialist-/, '')) || leakedByName.has(agent.id);
+    const currentIssue = agent.currentIssue ?? agent.issueId;
+    const resolved = currentIssue ? resolveProjectFromIssue(currentIssue) : null;
+    const specialistType = isSpecialist
+      ? agent.id.startsWith('specialist-')
+        ? agent.id.replace(/^specialist-/, '')
+        : agent.id
+      : undefined;
+
+    return {
+      id: agent.id,
+      label: agent.id,
+      type: isSpecialist ? 'specialist' : 'agent',
+      memoryBytes: agent.memoryBytes,
+      memoryGb: agent.memoryGb,
+      issueId: agent.issueId,
+      currentIssue: agent.currentIssue,
+      leaked,
+      killTarget: isSpecialist
+        ? {
+            kind: 'specialist',
+            projectKey: resolved?.projectKey,
+            issueId: currentIssue,
+            specialistType,
+          }
+        : {
+            kind: 'agent',
+            agentId: agent.id,
+          },
+    } satisfies HealthConsumer;
+  });
 
   const containerConsumers = containers.map((container) => ({
     id: container.id,
@@ -379,6 +438,10 @@ function buildTopConsumers(
     memoryBytes: container.memoryUsage,
     memoryGb: bytesToGb(container.memoryUsage),
     cpuPercent: container.cpuPercent,
+    killTarget: {
+      kind: 'container',
+      containerId: container.id,
+    },
   } satisfies HealthConsumer));
 
   return [...agentConsumers, ...containerConsumers]
@@ -415,6 +478,8 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
   const planningAgentCount = agents.filter((agent) => agent.kind === 'planning').length;
   const specialistSessionCount = agents.filter((agent) => agent.kind === 'specialist').length;
   const swapUsedPercent = toPercent(swapUsedBytes, memory.swapTotal);
+  const panopticonMemoryBytes = agents.reduce((sum, agent) => sum + agent.memoryBytes, 0) + containerMemoryBytes;
+  const panopticonMemoryPercent = toPercent(panopticonMemoryBytes, memory.memTotal);
 
   const result: SystemHealthSnapshot = {
     severity: evaluation.severity,
@@ -438,6 +503,8 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
       leakedSpecialistCount: leakedSpecialists.length,
       containerCount: containers.length,
       containerMemoryBytes,
+      panopticonMemoryBytes,
+      panopticonMemoryPercent,
     },
     thresholds,
     reasons: evaluation.reasons,
@@ -446,6 +513,25 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
     topConsumers: buildTopConsumers(agents, containers, leakedSpecialists),
   };
 
+  if (previousSeverity && previousSeverity !== result.severity) {
+    try {
+      const store = eventStorePromise ??= initEventStore();
+      await (await store).appendAsync({
+        type: 'system.health_severity_changed',
+        timestamp: result.updatedAt,
+        payload: {
+          previousSeverity,
+          severity: result.severity,
+          reasons: result.reasons,
+          leakedSpecialistCount: leakedSpecialists.length,
+        },
+      } as never);
+    } catch (err) {
+      console.error('[system-health] Failed to append severity transition event:', err);
+    }
+  }
+
+  previousSeverity = result.severity;
   cachedHealth = result;
   cacheExpiresAt = Date.now() + CACHE_TTL_MS;
   return result;

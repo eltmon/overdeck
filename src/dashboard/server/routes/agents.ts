@@ -76,7 +76,7 @@ import { getReviewStatus } from '../../../lib/review-status.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { IssueLifecycle } from '../services/issue-lifecycle.js';
 import { ReadModelService } from '../read-model.js';
-import { getSystemHealthSnapshot, type HealthLeakedSpecialist, type SystemHealthSnapshot } from '../services/system-health-service.js';
+import { getSystemHealthSnapshot, getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapshot } from '../services/system-health-service.js';
 import {
   getClaudeProjectDir as getClaudeProjectDirShared,
   getActiveSessionPath as getActiveSessionPathShared,
@@ -224,16 +224,17 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
   const availableGb = Math.round((health.summary.availableMemoryBytes / (1024 ** 3)) * 10) / 10;
   const workAgentCount = health.summary.workAgentCount;
   const leakedSpecialists = health.leakedSpecialists;
-  const hardWorkAgentLimit = Number(process.env['PAN_HEALTH_MAX_WORK_AGENTS'] ?? 6);
-  const warnWorkAgentLimit = Math.max(1, hardWorkAgentLimit - 1);
+  const resourceConfig = getResourceConfig();
+  const hardWorkAgentLimit = Math.max(1, resourceConfig.agentBlockCount);
+  const warnWorkAgentLimit = Math.max(1, resourceConfig.agentWarnCount);
 
-  if (health.summary.availableMemoryBytes <= health.thresholds.memoryAvailableCriticalBytes) {
+  if (health.summary.availableMemoryBytes < health.thresholds.memoryAvailableCriticalBytes) {
     warnings.push({
       severity: 'critical',
       code: 'memory_pressure',
       message: `Available RAM is critically low (${availableGb} GB).`,
     });
-  } else if (health.summary.availableMemoryBytes <= health.thresholds.memoryAvailableWarningBytes) {
+  } else if (health.summary.availableMemoryBytes < health.thresholds.memoryAvailableWarningBytes) {
     warnings.push({
       severity: 'warning',
       code: 'memory_pressure',

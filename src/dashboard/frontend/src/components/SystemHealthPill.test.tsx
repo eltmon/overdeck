@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+import { DialogProvider } from './DialogProvider';
 import { SystemHealthPill } from './SystemHealthPill';
 import type { SystemHealthSnapshot } from '../types';
 
@@ -26,11 +27,20 @@ vi.mock('../hooks/useSystemHealth', () => ({
   },
 }));
 
+const { mockConfirmAndKill, mockRefreshDashboardState } = vi.hoisted(() => ({
+  mockConfirmAndKill: vi.fn(),
+  mockRefreshDashboardState: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('../hooks/useKillAgent', () => ({
   useKillAgent: () => ({
-    confirmAndKill: vi.fn(),
+    confirmAndKill: mockConfirmAndKill,
     isPending: false,
   }),
+}));
+
+vi.mock('../lib/refresh-dashboard-state', () => ({
+  refreshDashboardState: mockRefreshDashboardState,
 }));
 
 const GIB = 1024 ** 3;
@@ -58,6 +68,8 @@ function createSnapshot(severity: SystemHealthSnapshot['severity']): SystemHealt
       leakedSpecialistCount: severity === 'critical' ? 1 : 0,
       containerCount: 1,
       containerMemoryBytes: 2 * GIB,
+      panopticonMemoryBytes: 3 * GIB,
+      panopticonMemoryPercent: 4.7,
     },
     thresholds: {
       memoryAvailableWarningBytes: 4 * GIB,
@@ -72,7 +84,37 @@ function createSnapshot(severity: SystemHealthSnapshot['severity']): SystemHealt
     reasons: severity === 'critical' ? ['Available RAM below critical threshold'] : [],
     agents: [],
     leakedSpecialists: severity === 'critical' ? [{ name: 'specialist-pan-1', currentIssue: 'PAN-1', reason: 'parent agent missing' }] : [],
-    topConsumers: [],
+    topConsumers: severity === 'critical'
+      ? [
+          {
+            id: 'specialist-review-agent',
+            label: 'specialist-review-agent',
+            type: 'specialist',
+            memoryBytes: 1 * GIB,
+            memoryGb: 1,
+            currentIssue: 'PAN-1',
+            leaked: true,
+            killTarget: {
+              kind: 'specialist',
+              projectKey: 'panopticon-cli',
+              issueId: 'PAN-1',
+              specialistType: 'review-agent',
+            },
+          },
+          {
+            id: 'container-1',
+            label: 'container-1',
+            type: 'container',
+            memoryBytes: 512 * 1024 * 1024,
+            memoryGb: 0.5,
+            cpuPercent: 12,
+            killTarget: {
+              kind: 'container',
+              containerId: 'abcdef123456',
+            },
+          },
+        ]
+      : [],
   };
 }
 
@@ -83,7 +125,9 @@ function renderPill(queryClient = new QueryClient({
     queryClient,
     ...render(
       <QueryClientProvider client={queryClient}>
-        <SystemHealthPill />
+        <DialogProvider>
+          <SystemHealthPill />
+        </DialogProvider>
       </QueryClientProvider>,
     ),
   };
@@ -102,7 +146,9 @@ describe('SystemHealthPill', () => {
     hookState.current = { data: createSnapshot('critical'), isLoading: false, error: null };
     rerender(
       <QueryClientProvider client={queryClient}>
-        <SystemHealthPill />
+        <DialogProvider>
+          <SystemHealthPill />
+        </DialogProvider>
       </QueryClientProvider>,
     );
 
@@ -118,6 +164,8 @@ describe('SystemHealthPill', () => {
     });
 
     expect(screen.getByText('System health')).toBeInTheDocument();
+    expect(screen.getByText('Show all')).toBeInTheDocument();
+    expect(screen.getByText('specialist-review-agent · PAN-1')).toBeInTheDocument();
   });
 
   it('does not repeat the toast while severity remains critical', () => {
@@ -127,7 +175,25 @@ describe('SystemHealthPill', () => {
     const { rerender, queryClient } = renderPill();
     rerender(
       <QueryClientProvider client={queryClient}>
-        <SystemHealthPill />
+        <DialogProvider>
+          <SystemHealthPill />
+        </DialogProvider>
+      </QueryClientProvider>,
+    );
+
+    expect(mockToastError).not.toHaveBeenCalled();
+  });
+
+  it('does not toast on warning transitions', () => {
+    hookState.current = { data: createSnapshot('normal'), isLoading: false, error: null };
+
+    const { rerender, queryClient } = renderPill();
+    hookState.current = { data: createSnapshot('warning'), isLoading: false, error: null };
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <DialogProvider>
+          <SystemHealthPill />
+        </DialogProvider>
       </QueryClientProvider>,
     );
 
@@ -135,12 +201,15 @@ describe('SystemHealthPill', () => {
   });
 
   it('renders the dropdown when the pill button is clicked', () => {
-    hookState.current = { data: createSnapshot('normal'), isLoading: false, error: null };
+    hookState.current = { data: createSnapshot('critical'), isLoading: false, error: null };
 
     renderPill();
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     expect(screen.getByText('System health')).toBeInTheDocument();
     expect(screen.getByText('Top consumers')).toBeInTheDocument();
+    expect(screen.getByText('Panopticon')).toBeInTheDocument();
+    expect(screen.getByText('Remove')).toBeInTheDocument();
+    expect(screen.getAllByText('Kill').length).toBeGreaterThan(0);
   });
 });
