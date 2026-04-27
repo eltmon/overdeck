@@ -14,6 +14,7 @@ import { startConversationLifecycleService, stopConversationLifecycleService } f
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
 import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
+import { processPendingFeedbackDeliveries } from './pending-feedback.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatus } from '../../lib/review-status.js';
 import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
@@ -196,6 +197,7 @@ try {
 
 // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
 await processPendingLifecycle();
+await processPendingFeedbackDeliveries();
 
 // Cloister/Deacon auto-start. Deacon is the Layer 3 safety net that catches
 // work agents that forgot to call `pan work done`, nudges dead-end agents,
