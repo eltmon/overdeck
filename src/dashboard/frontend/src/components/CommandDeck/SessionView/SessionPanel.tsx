@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
+import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { Conversation } from '../ConversationList';
 import { ConversationPanel } from '../../chat/ConversationPanel';
 import type { RoundMarker } from '../../chat/MessagesTimeline';

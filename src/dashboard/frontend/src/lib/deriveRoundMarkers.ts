@@ -6,7 +6,7 @@
  */
 
 import type { RoundMarker } from '../components/chat/MessagesTimeline';
-import type { ReviewerRoundMetadata } from '@panopticon/contracts';
+import type { ReviewerRoundMetadata } from '@panctl/contracts';
 
 interface TimestampedItem {
   id: string;

@@ -226,7 +226,7 @@ export async function runVerificationForIssue(
 
     // Ensure dependencies are installed and workspace packages are built.
     // Worktrees need their own node_modules (not symlinked from main repo)
-    // so that local workspace packages like @panopticon/contracts resolve
+    // so that local workspace packages like @panctl/contracts resolve
     // to the worktree's version, not the main repo's stale build.
     const packageManager = projectConfig?.package_manager || 'npm';
     const installCmd = packageManager === 'bun' ? 'bun install' : `${packageManager} install`;
@@ -237,7 +237,7 @@ export async function runVerificationForIssue(
       console.warn(`[${logPrefix}] Dependency install warning: ${installErr.message}`);
     }
 
-    // Build workspace packages (e.g., @panopticon/contracts) before running gates
+    // Build workspace packages (e.g., @panctl/contracts) before running gates
     const workspacePackages = (projectConfig as any)?.workspace_packages as Array<{ path: string; build_command: string }> | undefined;
     if (workspacePackages) {
       for (const pkg of workspacePackages) {

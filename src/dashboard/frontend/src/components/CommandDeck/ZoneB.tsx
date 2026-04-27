@@ -15,7 +15,7 @@
  */
 
 import { useMemo } from 'react';
-import type { SessionNode as SessionNodeType, SessionNodePresence } from '@panopticon/contracts';
+import type { SessionNode as SessionNodeType, SessionNodePresence } from '@panctl/contracts';
 import { useLiveFlash } from '../../lib/useLiveFlash';
 import { useDashboardStore } from '../../lib/store';
 import { RoleBadge, type ReviewerRole } from './RoleBadge';

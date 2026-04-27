@@ -17,7 +17,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { AgentStatus, SessionNodePresence } from '@panopticon/contracts';
+import type { AgentStatus, SessionNodePresence } from '@panctl/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import {
   REVIEWER_ROLES,

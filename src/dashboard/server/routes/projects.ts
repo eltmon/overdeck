@@ -19,7 +19,7 @@ import { extractPrefix } from '../../../lib/issue-id.js';
 import { listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
-import type { SessionNode, SessionNodePresence, SessionNodeType } from '@panopticon/contracts';
+import type { SessionNode, SessionNodePresence, SessionNodeType } from '@panctl/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';

@@ -1,4 +1,4 @@
-import type { AgentStatus } from '@panopticon/contracts';
+import type { AgentStatus } from '@panctl/contracts';
 
 export function normalizeAgentStatus(status: string): AgentStatus {
   switch (status) {

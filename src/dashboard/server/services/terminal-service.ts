@@ -13,7 +13,7 @@
 
 import { Cause, Effect, Layer, Queue, ServiceMap, Stream } from 'effect';
 import { homedir } from 'node:os';
-import { PanRpcError, TerminalOutput } from '@panopticon/contracts';
+import { PanRpcError, TerminalOutput } from '@panctl/contracts';
 import { buildTmuxArgs, resizeWindowAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 
 // ─── Runtime detection ────────────────────────────────────────────────────────

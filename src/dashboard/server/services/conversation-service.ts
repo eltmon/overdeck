@@ -10,7 +10,7 @@
 import { readdir, stat, watch, open } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { ChatMessage, WorkLogEntry } from '@panopticon/contracts';
+import type { ChatMessage, WorkLogEntry } from '@panctl/contracts';
 import { calculateCost, getPricing, type AIProvider } from '../../../lib/cost.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 

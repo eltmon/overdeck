@@ -16,8 +16,8 @@ import { useDashboardStore, selectAgentList } from '../../lib/store';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
-import { WS_METHODS } from '@panopticon/contracts';
-import type { ProjectSessionTree, SessionTreeDelta } from '@panopticon/contracts';
+import { WS_METHODS } from '@panctl/contracts';
+import type { ProjectSessionTree, SessionTreeDelta } from '@panctl/contracts';
 import styles from './styles/command-deck.module.css';
 
 async function fetchConversations(): Promise<Conversation[]> {
@@ -265,7 +265,7 @@ export function CommandDeck({
       const tree = sessionTreeMap[project.name];
       if (!tree) return project;
 
-      const featureSessions = new Map<string, readonly import('@panopticon/contracts').SessionNode[]>();
+      const featureSessions = new Map<string, readonly import('@panctl/contracts').SessionNode[]>();
       for (const feature of tree.features) {
         featureSessions.set(feature.issueId.toLowerCase(), feature.sessions);
       }

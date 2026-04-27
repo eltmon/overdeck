@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
-import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
+import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import styles from '../styles/command-deck.module.css';
 
 interface SessionNodeProps {

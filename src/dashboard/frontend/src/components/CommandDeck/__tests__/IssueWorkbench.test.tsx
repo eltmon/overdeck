@@ -24,7 +24,7 @@ vi.mock('@tanstack/react-query', async () => {
   };
 });
 import type { ReactNode } from 'react';
-import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
+import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import { IssueWorkbench } from '../IssueWorkbench';
 import { useCommandDeckSelection } from '../../../lib/commandDeckSelection';
 
