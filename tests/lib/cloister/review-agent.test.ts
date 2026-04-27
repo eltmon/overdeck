@@ -35,12 +35,19 @@ import {
 // vi.mock is hoisted, so mock fns must be defined with vi.hoisted() before they
 // are referenced in the factory.
 
+const execMock = vi.hoisted(() => vi.fn());
+
 const { mockSetReviewStatus, mockGetReviewStatus, mockLoadCloisterConfig } = vi.hoisted(() => ({
   mockSetReviewStatus: vi.fn(),
   mockGetReviewStatus: vi.fn().mockReturnValue(null),
   // Throws by default so getReviewAgents() falls back to DEFAULT_REVIEW_AGENTS (same as real missing config)
   mockLoadCloisterConfig: vi.fn().mockImplementation(() => { throw new Error('no config'); }),
 }));
+
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return { ...actual, exec: execMock };
+});
 
 vi.mock('../../../src/lib/review-status.js', () => ({
   setReviewStatus: mockSetReviewStatus,
@@ -51,7 +58,7 @@ vi.mock('../../../src/lib/cloister/config.js', () => ({
   loadCloisterConfig: mockLoadCloisterConfig,
 }));
 
-const { mockKillSessionAsync, mockResolveProjectFromIssue } = vi.hoisted(() => ({
+const { mockKillSessionAsync, mockResolveProjectFromIssue, mockListStashes, mockCreateNamedStash, mockDropStash } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockResolveProjectFromIssue: vi.fn().mockReturnValue({
     projectKey: 'panopticon-cli',
@@ -59,6 +66,9 @@ const { mockKillSessionAsync, mockResolveProjectFromIssue } = vi.hoisted(() => (
     projectPath: '/tmp/panopticon-cli',
     linearTeam: 'PAN',
   }),
+  mockListStashes: vi.fn().mockResolvedValue([]),
+  mockCreateNamedStash: vi.fn().mockResolvedValue(null),
+  mockDropStash: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../../src/lib/projects.js', () => ({
@@ -76,9 +86,28 @@ vi.mock('../../../src/lib/tmux.js', async () => {
   };
 });
 
+vi.mock('../../../src/lib/stashes.js', () => ({
+  buildStashMessage: vi.fn((kind: string, issueId: string, arg: number | Date) => {
+    if (typeof arg === 'number') return `${kind}:${issueId.toUpperCase()}:${arg}`;
+    return `${kind}:${issueId.toUpperCase()}:2026-04-27T14:15:16Z`;
+  }),
+  createNamedStash: mockCreateNamedStash,
+  dropStash: mockDropStash,
+  getNextReviewTempSequence: vi.fn(() => 1),
+  listStashes: mockListStashes,
+}));
+
 describe('dispatchParallelReview', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
+      const callback = (typeof _opts === 'function' ? _opts : cb)!;
+      if (cmd === 'git status --porcelain') return callback(null, { stdout: '', stderr: '' });
+      callback(new Error(`unexpected command: ${cmd}`));
+    });
+    mockListStashes.mockResolvedValue([]);
+    mockCreateNamedStash.mockResolvedValue(null);
+    mockDropStash.mockResolvedValue(undefined);
   });
 
   const baseOpts = {

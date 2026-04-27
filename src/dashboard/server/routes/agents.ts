@@ -70,6 +70,7 @@ import { extractPrefix } from '../../../lib/issue-id.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
+import { buildStashMessage, createNamedStash } from '../../../lib/stashes.js';
 import { calculateCost, getPricing, type TokenUsage } from '../../../lib/cost.js';
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { getReviewStatus } from '../../../lib/review-status.js';
@@ -1812,6 +1813,47 @@ const postAgentsRoute = HttpRouter.add(
         .catch(() => { /* No existing session — good */ })
     );
 
+    let preSpawnStashRef: string | null = null;
+    let preSpawnStashMessage: string | null = null;
+    let preSpawnBaselineHead: string | null = null;
+    try {
+      const { stdout: statusOut } = yield* Effect.promise(() => execAsync('git status --porcelain', {
+        cwd: workspacePath,
+        encoding: 'utf-8',
+      }));
+      if (statusOut.trim()) {
+        const { stdout: headOut } = yield* Effect.promise(() => execAsync('git rev-parse HEAD', {
+          cwd: workspacePath,
+          encoding: 'utf-8',
+        }));
+        preSpawnBaselineHead = headOut.trim() || null;
+        preSpawnStashMessage = buildStashMessage('pre-spawn', issueId, new Date());
+        preSpawnStashRef = yield* Effect.promise(() => createNamedStash(workspacePath, preSpawnStashMessage!, true));
+        if (preSpawnStashRef) {
+          yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.pre_spawn_stash_created', {
+            issueId,
+            workspacePath,
+            stashRef: preSpawnStashRef,
+            stashMessage: preSpawnStashMessage,
+            baselineHead: preSpawnBaselineHead,
+          }));
+        } else {
+          preSpawnBaselineHead = null;
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      preSpawnStashRef = null;
+      preSpawnStashMessage = null;
+      preSpawnBaselineHead = null;
+      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.pre_spawn_stash_failed', {
+        issueId,
+        workspacePath,
+        error: message,
+      }));
+      console.warn(`[start-agent] Failed to create pre-spawn stash for ${issueId}: ${message}`);
+    }
+
     // Spawn pan start command
     const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => {
       const activityId = `activity-${Date.now()}`;
@@ -1945,6 +1987,9 @@ const postAgentsRoute = HttpRouter.add(
             workspace: workspacePath,
             phase,
             message: 'Waiting for containers to start...',
+            ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
+            ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
+            ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
           }, null, 2)));
           yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_waiting_for_containers', {
             issueId,
@@ -2012,6 +2057,9 @@ const postAgentsRoute = HttpRouter.add(
                       phase,
                       message: 'Container startup timed out before work agent spawn',
                       error: `Containers for ${issueId} did not become healthy within ${maxWaitMs}ms`,
+                      ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
+                      ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
+                      ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
                     }, null, 2));
                     return;
                   }
@@ -2057,6 +2105,9 @@ const postAgentsRoute = HttpRouter.add(
                     phase,
                     message: 'Container startup failed before work agent spawn',
                     error: errorMessage,
+                    ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
+                    ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
+                    ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
                   }, null, 2)).catch(() => undefined);
                   console.error(`[start-agent] Background container startup failed for ${issueId}:`, err);
                 }
@@ -2107,6 +2158,9 @@ const postAgentsRoute = HttpRouter.add(
       workspace: workspacePath,
       phase,
       message: 'Work agent spawn requested',
+      ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
+      ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
+      ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
     }, null, 2)));
     yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_placeholder_created', {
       issueId,

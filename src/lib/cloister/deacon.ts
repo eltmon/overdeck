@@ -26,14 +26,14 @@ import { setReviewStatus, loadReviewStatuses, getReviewStatus } from '../review-
 import { markWorkspaceStuck } from '../database/review-status-db.js';
 import { isDeaconGloballyPaused } from '../database/app-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
-import { resolveProjectFromIssue } from '../projects.js';
+import { resolveProjectFromIssue, listProjects, getProject } from '../projects.js';
 import { logDeaconEvent, logAgentLifecycle } from '../persistent-logger.js';
-import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
+import { emitActivityTts } from '../activity-logger.js';
 import { getShadowState } from '../shadow-state.js';
+import type { TrackerConfig } from '../tracker/factory.js';
 
 // Review status file location (same as dashboard server)
 const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
-
 
 import {
   SpecialistType,
@@ -42,6 +42,8 @@ import {
   getAllProjectSpecialistStatuses,
 } from './specialists.js';
 import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState, resumeAgent } from '../agents.js';
+import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSession, killSessionAsync, listPaneValues, listPaneValuesAsync, listSessionNamesAsync, sessionExists, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
 
 // ============================================================================
@@ -52,6 +54,14 @@ import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSessi
  * Default parameters for stuck-session detection.
  * Per gastown: "Let agents decide thresholds. 'Stuck' is a judgment call."
  */
+const DEFAULT_STASH_JANITOR_AGE_DAYS = 28;
+const STASH_JANITOR_BASELINE_MISSING_PATTERNS = [
+  'unknown revision or path not in the working tree',
+  'bad revision',
+  'ambiguous argument',
+  'fatal: invalid revision range',
+];
+
 const DEFAULT_CONFIG: DeaconConfig = {
   pingTimeoutMs: 30_000,           // How long to wait for response
   consecutiveFailures: 3,          // Failures before force-kill
@@ -59,6 +69,7 @@ const DEFAULT_CONFIG: DeaconConfig = {
   patrolIntervalMs: 60_000,        // Safety net — immediate processing happens via pipeline events
   massDeathThreshold: 2,           // Deaths within window triggers alert
   massDeathWindowMs: 60_000,       // 1 minute window for mass death detection
+  stashJanitorEveryCycles: 60,
 };
 
 export interface DeaconConfig {
@@ -68,6 +79,7 @@ export interface DeaconConfig {
   patrolIntervalMs: number;
   massDeathThreshold: number;
   massDeathWindowMs: number;
+  stashJanitorEveryCycles: number;
 }
 
 // ============================================================================
@@ -139,15 +151,24 @@ let config: DeaconConfig = { ...DEFAULT_CONFIG };
  * Load deacon configuration
  */
 export function loadConfig(): DeaconConfig {
+  config = { ...DEFAULT_CONFIG };
+
   try {
     if (existsSync(CONFIG_FILE)) {
       const content = readFileSync(CONFIG_FILE, 'utf-8');
       const loaded = JSON.parse(content);
-      config = { ...DEFAULT_CONFIG, ...loaded };
+      config = { ...config, ...loaded };
     }
   } catch (error) {
     console.error('[deacon] Failed to load config:', error);
   }
+
+  const cloisterConfig = loadCloisterConfig();
+  const configuredJanitorCycles = cloisterConfig.monitoring.stash_janitor_every_cycles;
+  if (typeof configuredJanitorCycles === 'number' && configuredJanitorCycles >= 0) {
+    config.stashJanitorEveryCycles = configuredJanitorCycles;
+  }
+
   return config;
 }
 
@@ -921,14 +942,10 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
  * The feedback is useless once consumed, so we always delete — no archive, no
  * retention. See docs/REVIEW-AGENT-ARCHITECTURE.md.
  */
-export async function cleanupAbandonedFeedback(): Promise<string[]> {
-  const actions: string[] = [];
-
-  const { listProjects } = await import('../projects.js');
-  const { getReviewStatus } = await import('../review-status.js');
-  const { clearFeedbackFiles } = await import('./feedback-writer.js');
-
+function listFeatureWorkspaces(): Array<{ issueId: string; workspacePath: string }> {
   const projects = listProjects();
+  const workspaces: Array<{ issueId: string; workspacePath: string }> = [];
+
   for (const { config: projectConfig } of projects) {
     const workspacesRoot = join(projectConfig.path, 'workspaces');
     if (!existsSync(workspacesRoot)) continue;
@@ -943,46 +960,58 @@ export async function cleanupAbandonedFeedback(): Promise<string[]> {
     }
 
     for (const entry of entries) {
-      const workspacePath = join(workspacesRoot, entry);
-      const feedbackDir = join(workspacePath, '.planning', 'feedback');
-      if (!existsSync(feedbackDir)) continue;
+      workspaces.push({
+        issueId: entry.replace(/^feature-/, '').toUpperCase(),
+        workspacePath: join(workspacesRoot, entry),
+      });
+    }
+  }
 
-      // Derive issueId from workspace dir name: feature-pan-539 → PAN-539
-      // or feature-min-123 → MIN-123 (same transform regardless of project).
-      const issueLower = entry.replace(/^feature-/, '');
-      const issueId = issueLower.toUpperCase();
+  return workspaces;
+}
 
-      // Gate 1: work agent tmux session active? If yes, feedback may be current.
-      const agentSession = `agent-${issueLower}`;
-      try {
-        if (await sessionExistsAsync(agentSession)) continue;
-      } catch {
-        // Treat lookup error as "session might exist" — skip out of caution.
-        continue;
-      }
+export async function cleanupAbandonedFeedback(): Promise<string[]> {
+  const actions: string[] = [];
 
-      // Gate 2: review in flight? If yes, feedback is about to be consumed.
-      try {
-        const status = getReviewStatus(issueId);
-        if (status?.reviewStatus === 'reviewing') continue;
-      } catch {
-        // No status entry → safe to clean.
-      }
+  const { getReviewStatus } = await import('../review-status.js');
+  const { clearFeedbackFiles } = await import('./feedback-writer.js');
 
-      // Both gates passed — feedback is abandoned, safe to delete.
-      try {
-        const before = readdirSync(feedbackDir)
-          .filter(f => /^\d{3}-/.test(f) && f.endsWith('.md'))
-          .length;
-        if (before === 0) continue;
-        await clearFeedbackFiles(workspacePath);
-        actions.push(
-          `Cleared ${before} abandoned feedback file(s) in ${entry} (agent stopped, no in-flight review)`,
-        );
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[deacon] cleanupAbandonedFeedback failed for ${entry}:`, msg);
-      }
+  for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
+    const feedbackDir = join(workspacePath, '.planning', 'feedback');
+    if (!existsSync(feedbackDir)) continue;
+
+    const issueLower = issueId.toLowerCase();
+
+    // Gate 1: work agent tmux session active? If yes, feedback may be current.
+    const agentSession = `agent-${issueLower}`;
+    try {
+      if (await sessionExistsAsync(agentSession)) continue;
+    } catch {
+      // Treat lookup error as "session might exist" — skip out of caution.
+      continue;
+    }
+
+    // Gate 2: review in flight? If yes, feedback is about to be consumed.
+    try {
+      const status = getReviewStatus(issueId);
+      if (status?.reviewStatus === 'reviewing') continue;
+    } catch {
+      // No status entry → safe to clean.
+    }
+
+    // Both gates passed — feedback is abandoned, safe to delete.
+    try {
+      const before = readdirSync(feedbackDir)
+        .filter(f => /^\d{3}-/.test(f) && f.endsWith('.md'))
+        .length;
+      if (before === 0) continue;
+      await clearFeedbackFiles(workspacePath);
+      actions.push(
+        `Cleared ${before} abandoned feedback file(s) in feature-${issueLower} (agent stopped, no in-flight review)`,
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[deacon] cleanupAbandonedFeedback failed for feature-${issueLower}:`, msg);
     }
   }
 
@@ -2341,6 +2370,243 @@ export async function checkDeadEndAgents(): Promise<string[]> {
   return actions;
 }
 
+export async function logNonCanonicalStashesOnStartup(): Promise<string[]> {
+  const actions: string[] = [];
+
+  for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
+    if (!existsSync(workspacePath)) continue;
+
+    try {
+      const stashes = await listStashes(workspacePath);
+      for (const stash of stashes) {
+        if (stash.kind !== 'unknown') continue;
+        const message = `Non-canonical stash in ${issueId} (${workspacePath}): ${stash.ref} ${stash.message} — audit recommended`;
+        console.warn(`[deacon] ${message}`);
+        emitActivityEntry({ source: 'dashboard', level: 'warn', message });
+        actions.push(message);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[deacon] Failed non-canonical stash scan for ${issueId}: ${message}`);
+    }
+  }
+
+  return actions;
+}
+
+async function reconcileAndCheckIfMerged(
+  issueId: string,
+  cycleCache?: Map<string, boolean>,
+): Promise<boolean> {
+  const cacheKey = issueId.toUpperCase();
+  const cached = cycleCache?.get(cacheKey);
+  if (cached !== undefined) return cached;
+  const remember = (result: boolean): boolean => {
+    cycleCache?.set(cacheKey, result);
+    return result;
+  };
+
+  const reviewStatus = getReviewStatus(issueId);
+  if (reviewStatus?.mergeStatus === 'merged') {
+    return remember(true);
+  }
+
+  if (reviewStatus?.prUrl) {
+    const prRef = reviewStatus.prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+    if (prRef) {
+      try {
+        const { getPullRequestState, isGitHubAppConfigured } = await import('../github-app.js');
+        if (isGitHubAppConfigured()) {
+          const prState = await getPullRequestState(prRef[1], prRef[2], Number.parseInt(prRef[3], 10));
+          if (prState.merged) {
+            setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
+            return remember(true);
+          }
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[deacon] Failed GitHub merge reconciliation for ${issueId}: ${message}`);
+      }
+    }
+  }
+
+  const resolved = resolveProjectFromIssue(issueId);
+  if (!resolved) {
+    return remember(false);
+  }
+
+  const project = getProject(resolved.projectKey);
+  if (!project?.tracker) {
+    return remember(false);
+  }
+
+  try {
+    const { createTracker } = await import('../tracker/factory.js');
+    const panopticonConfig = await import('../config.js');
+    const globalTrackerConfig = panopticonConfig.loadConfig().trackers;
+
+    let trackerConfig: TrackerConfig | null = null;
+    if (project.tracker === 'github' && project.github_repo) {
+      const [owner, repo] = project.github_repo.split('/');
+      if (!owner || !repo) {
+        console.warn(`[deacon] Cannot reconcile ${issueId}: invalid GitHub repo config for ${resolved.projectKey}`);
+        return remember(false);
+      }
+      trackerConfig = {
+        type: 'github',
+        owner,
+        repo,
+        tokenEnv: globalTrackerConfig.github?.token_env,
+      };
+    } else if (project.tracker === 'gitlab' && project.gitlab_repo) {
+      trackerConfig = {
+        type: 'gitlab',
+        projectId: project.gitlab_repo,
+        tokenEnv: globalTrackerConfig.gitlab?.token_env,
+      };
+    } else if (project.tracker === 'linear') {
+      trackerConfig = {
+        type: 'linear',
+        apiKeyEnv: globalTrackerConfig.linear?.api_key_env,
+        team: resolved.linearTeam,
+      };
+    } else if (project.tracker === 'rally') {
+      trackerConfig = {
+        type: 'rally',
+        apiKeyEnv: globalTrackerConfig.rally?.api_key_env,
+        server: globalTrackerConfig.rally?.server,
+        workspace: globalTrackerConfig.rally?.workspace,
+        project: project.rally_project ?? globalTrackerConfig.rally?.project,
+      };
+    }
+
+    if (!trackerConfig) {
+      console.warn(`[deacon] Cannot reconcile ${issueId}: incomplete tracker config for ${resolved.projectKey}`);
+      return remember(false);
+    }
+
+    if (project.tracker === 'github') {
+      return remember(false);
+    }
+
+    const tracker = createTracker(trackerConfig);
+    await tracker.getIssue(issueId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[deacon] Failed tracker merge reconciliation for ${issueId}: ${message}`);
+  }
+
+  return remember(false);
+}
+
+export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<string[]> {
+  const actions: string[] = [];
+
+  try {
+    const agents = listRunningAgents();
+    for (const agent of agents) {
+      if (!agent.id.startsWith('agent-')) continue;
+      const agentState = getAgentState(agent.id);
+      if (!agentState?.workspace || !agentState.preSpawnStashRef) continue;
+      if (!existsSync(agentState.workspace)) continue;
+      if (!agentState.preSpawnBaselineHead) {
+        console.warn(`[deacon] Missing pre-spawn baseline head for ${agentState.issueId}; preserving stash`);
+        continue;
+      }
+
+      let hasCommitsAhead = false;
+      try {
+        const { stdout } = await execAsync(`git rev-list ${agentState.preSpawnBaselineHead}..HEAD --count`, {
+          cwd: agentState.workspace,
+          encoding: 'utf-8',
+        });
+        hasCommitsAhead = (parseInt(stdout.trim(), 10) || 0) > 0;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const baselineMissing = STASH_JANITOR_BASELINE_MISSING_PATTERNS.some((pattern) => message.includes(pattern));
+        if (!baselineMissing) {
+          console.warn(`[deacon] Failed checking post-spawn commits for ${agentState.issueId}: ${message}`);
+          continue;
+        }
+        console.warn(`[deacon] Missing baseline ref for ${agentState.issueId}; dropping pre-spawn stash because the running agent has moved past spawn`);
+        hasCommitsAhead = true;
+      }
+
+      if (!hasCommitsAhead) continue;
+
+      try {
+        await dropStash(agentState.workspace, agentState.preSpawnStashRef);
+        agentState.preSpawnStashRef = undefined;
+        agentState.preSpawnStashMessage = undefined;
+        agentState.preSpawnBaselineHead = undefined;
+        saveAgentState(agentState);
+        actions.push(`Dropped pre-spawn stash for ${agentState.issueId}`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/not found|does not exist/i.test(message)) {
+          console.warn(`[deacon] Failed dropping pre-spawn stash for ${agentState.issueId}: ${message}`);
+          continue;
+        }
+        agentState.preSpawnStashRef = undefined;
+        agentState.preSpawnStashMessage = undefined;
+        agentState.preSpawnBaselineHead = undefined;
+        saveAgentState(agentState);
+      }
+    }
+
+    const mergeReconciliationCache = new Map<string, boolean>();
+
+    for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
+      if (!existsSync(workspacePath)) continue;
+
+      try {
+        const stashes = await listStashes(workspacePath);
+        const matchingPreMergeStashes = stashes.filter(
+          (stash) => stash.kind === 'pre-merge' && stash.issueId === issueId.toUpperCase(),
+        );
+        const issueAlreadyMerged = matchingPreMergeStashes.length > 0
+          ? await reconcileAndCheckIfMerged(issueId, mergeReconciliationCache)
+          : false;
+        const mergedPreMergeStashes = issueAlreadyMerged ? matchingPreMergeStashes : [];
+
+        const staleStashes = stashes
+          .filter((stash) => stash.kind !== 'salvageable' && isOlderThanDays(stash, DEFAULT_STASH_JANITOR_AGE_DAYS, now));
+        // Preserve the first occurrence so a stash that is both "merged" and "stale" keeps the
+        // merged label in logs. Drop known stack slots in descending order so earlier slots stay
+        // stable, then fall back to SHA-based resolution for entries without stackRef.
+        const dedupedStashesToDrop = [...mergedPreMergeStashes, ...staleStashes]
+          .filter((stash, index, entries) => entries.findIndex((entry) => entry.ref === stash.ref) === index);
+        const stashesWithStackRef = dedupedStashesToDrop
+          .map((stash) => {
+            const indexMatch = stash.stackRef?.match(/stash@\{(\d+)\}/);
+            const stashIndex = indexMatch ? parseInt(indexMatch[1], 10) : Number.NaN;
+            return { stash, stashIndex };
+          })
+          .filter((entry) => Number.isFinite(entry.stashIndex))
+          .sort((a, b) => b.stashIndex - a.stashIndex)
+          .map((entry) => entry.stash);
+        const stashesWithoutStackRef = dedupedStashesToDrop.filter((stash) => !stash.stackRef);
+        const stashesToDrop = [...stashesWithStackRef, ...stashesWithoutStackRef];
+        for (const stash of stashesToDrop) {
+          await dropStash(workspacePath, stash.ref, stash.stackRef);
+          const reason = mergedPreMergeStashes.some((entry) => entry.ref === stash.ref)
+            ? 'merged issue'
+            : 'stale';
+          actions.push(`Dropped ${reason} ${stash.kind} stash for ${issueId}: ${stash.ref}`);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[deacon] Failed stash janitor sweep for ${issueId}: ${message}`);
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[deacon] Error in stash janitor: ${message}`);
+  }
+
+  return actions;
+}
+
 // Track per-agent cooldowns for first-completion nudges
 const firstCompletionCooldowns = new Map<string, number>();
 const FIRST_COMPLETION_IDLE_MS = 10 * 60 * 1000; // 10 minutes idle before nudging
@@ -3053,6 +3319,17 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...stuckActions);
   for (const a of stuckActions) addLog('action', a, state.patrolCycle);
 
+  const configuredStashJanitorEveryCycles = config.stashJanitorEveryCycles
+    ?? Math.round((60 * 60 * 1000) / config.patrolIntervalMs);
+  const stashJanitorEveryCycles = configuredStashJanitorEveryCycles > 0
+    ? Math.max(1, configuredStashJanitorEveryCycles)
+    : Number.POSITIVE_INFINITY;
+  if (Number.isFinite(stashJanitorEveryCycles) && state.patrolCycle % stashJanitorEveryCycles === 0) {
+    const stashJanitorActions = await cleanupSpawnAndOrphanedStashes();
+    actions.push(...stashJanitorActions);
+    for (const a of stashJanitorActions) addLog('action', a, state.patrolCycle);
+  }
+
   // Periodic agent state cleanup (PAN-154)
   if (Math.random() < 0.003) {
     const cleanupActions = await cleanupStaleAgentState();
@@ -3376,12 +3653,14 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
  * `agent-<issueLower>` does not exist. We only check existence (not state)
  * because a stopped agent may still have its tmux session alive transiently.
  */
-async function cleanupOrphanedReviewSessions(): Promise<string[]> {
+export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
   const actions: string[] = [];
   let reviewSessions: string[];
   try {
-    reviewSessions = (await listSessionNamesAsync())
-      .filter(s => /^review-/.test(s));
+    const allSessions = await listSessionNamesAsync();
+    const legacyReviewSessions = allSessions.filter(s => /^review-/.test(s));
+    const canonicalReviewSessions = allSessions.filter(s => /^specialist-.*-review-/.test(s) && !s.includes('coordinator'));
+    reviewSessions = [...new Set([...legacyReviewSessions, ...canonicalReviewSessions])];
   } catch {
     return actions;
   }
@@ -3389,13 +3668,24 @@ async function cleanupOrphanedReviewSessions(): Promise<string[]> {
   logDeaconEvent(`cleanupOrphanedReviewSessions started: found ${reviewSessions.length} review session(s)`);
 
   for (const reviewSession of reviewSessions) {
-    // review-PAN-540-1713456789000-correctness → agent-pan-540
-    const match = reviewSession.match(/^review-([A-Za-z0-9]+-\d+)-\d+/);
-    if (!match) {
+    let issueId: string | null = null;
+
+    const legacyMatch = reviewSession.match(/^review-([A-Za-z0-9]+-\d+)-\d+/);
+    if (legacyMatch) {
+      issueId = legacyMatch[1].toUpperCase();
+    } else {
+      const canonicalMatch = reviewSession.match(/^specialist-(.+)-([A-Za-z0-9]+-\d+)-review-[a-z-]+$/);
+      if (canonicalMatch) {
+        issueId = canonicalMatch[2].toUpperCase();
+      }
+    }
+
+    if (!issueId) {
       logDeaconEvent(`cleanupOrphanedReviewSessions: ${reviewSession} skipped — unparseable session name`);
       continue;
     }
-    const workAgentSession = `agent-${match[1].toLowerCase()}`;
+
+    const workAgentSession = `agent-${issueId.toLowerCase()}`;
     if (sessionExists(workAgentSession)) {
       logDeaconEvent(`cleanupOrphanedReviewSessions: ${reviewSession} kept — work agent ${workAgentSession} exists`);
       continue;

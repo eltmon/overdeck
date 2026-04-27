@@ -1,38 +1,17 @@
-# PAN-846: Reviewer and specialist tmux sessions leak after completion (RAM accumulation)
-
-## Status: Implementation Complete
-
-## Current Phase
-All beads implemented. Running final quality gates before calling pan done.
-
-## Completed Work
-- [x] pan-rnrs: Add reviewer session cleanup in runParallelReview finally block (commit: 61a1d09f)
-- [x] pan-utvf: Add specialist tmux session cleanup after completion signaling (commit: d7839034)
-- [x] pan-gbwm: Add deacon janitor for orphan reviewer/specialist sessions (commit: a3a85e7a)
-- [x] pan-j98b: Integration test asserting reviewer sessions don't outlive runParallelReview (commit: 48da097b)
-
-## Remaining Work
-(none)
-
-## Key Decisions
-- Reviewer sessions are killed when runParallelReview finishes (via finally block). Next dispatch spawns fresh sessions.
-- Specialist sessions are killed in /api/specialists/done after setting state to idle.
-- The deacon janitor is a safety net for crashes where cleanup didn't run.
+# Agent State: PAN-879
 
 ## Specialist Feedback
-- **[2026-04-26T19:03Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-  - Fixed: narrowed `isSpecialist` prefix match to avoid killing unrelated sessions
-  - Fixed: added NaN guard on `parseInt(session_created)`
-  - Fixed: replaced redundant `sessionExistsAsync` with Set membership check
-  - Fixed: parallelized `killAllReviewerSessions` with `Promise.all`
-- **[2026-04-27T06:45Z] review-agent → APPROVED** — `.planning/feedback/001-review-agent-approved.md`
-- **[2026-04-27T06:45Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
-- **[2026-04-27T09:17Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-- **[2026-04-27T09:17Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
-- **[2026-04-27T09:42Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
-- **[2026-04-27T09:50Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-- **[2026-04-27T09:50Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
-- **[2026-04-27T10:07Z] verification-gate → FAILED** — `.planning/feedback/003-verification-gate-failed.md`
-- **[2026-04-27T11:05Z] review-agent → COMMENTED** — `.planning/feedback/001-review-agent-commented.md`
-- **[2026-04-27T11:05Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
-- **[2026-04-27T15:06Z] verification-gate → FAILED** — `.planning/feedback/003-verification-gate-failed.md`
+
+- **[2026-04-27T13:20Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-04-27T13:39Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-04-27T13:39Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
+- **[2026-04-27T14:01Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-04-27T14:02Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
+- **[2026-04-27T14:22Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-04-27T14:22Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
+- **[2026-04-27T14:37Z] review-agent → APPROVED** — `.planning/feedback/001-review-agent-approved.md`
+- **[2026-04-27T14:37Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
+- **[2026-04-27T15:26Z] review-agent → COMMENTED** — `.planning/feedback/001-review-agent-commented.md`
+- **[2026-04-27T15:26Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
+- **[2026-04-27T15:36Z] review-agent → APPROVED** — `.planning/feedback/001-review-agent-approved.md`
+- **[2026-04-27T15:36Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`

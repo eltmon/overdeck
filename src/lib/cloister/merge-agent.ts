@@ -36,6 +36,7 @@ import { renderPrompt } from './prompts.js';
 import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
 import { markWorkspaceStuck } from '../review-status.js';
 import { appendGitOperation, type GitOperationType } from '../git-activity.js';
+import { buildStashMessage, createNamedStash, dropStash, listStashes } from '../stashes.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -168,6 +169,19 @@ const _completedPostMerge = new Set<string>();
 const _closeIssueFailures = new Map<string, number>();
 const MAX_CLOSE_RETRIES = 3;
 
+async function dropLingeringPreMergeStashes(issueId: string, projectPath: string): Promise<void> {
+  try {
+    const stashes = await listStashes(projectPath);
+    const preMergeStashes = stashes.filter((entry) => entry.kind === 'pre-merge' && entry.issueId === issueId.toUpperCase());
+    for (const stash of preMergeStashes) {
+      await dropStash(projectPath, stash.ref);
+      console.log(`[merge-agent] ✓ Dropped lingering pre-merge stash ${stash.ref}`);
+    }
+  } catch (error: any) {
+    console.warn(`[merge-agent] Could not drop lingering pre-merge stashes: ${error.message}`);
+  }
+}
+
 export async function postMergeLifecycle(issueId: string, projectPath: string, sourceBranch?: string, options?: { skipDeploy?: boolean }): Promise<void> {
   // Guard 1: skip if already completed (defense-in-depth against infinite loops)
   if (_completedPostMerge.has(issueId)) {
@@ -218,6 +232,8 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   }
 
   console.log(`[merge-agent] Running post-merge cleanup for ${issueId}`);
+
+  await dropLingeringPreMergeStashes(issueId, projectPath);
 
   // 1. Move PRD from active to completed (via lifecycle module)
   try {
@@ -905,21 +921,20 @@ export async function spawnMergeAgentForBranches(
   });
   const headBefore = headBeforeRaw.trim();
 
-  // Stash any uncommitted changes so the merge starts from a clean state
-  // We restore the stash after completion (success or rollback)
-  let stashCreated = false;
+  // Stash any uncommitted changes so the merge starts from a clean state.
+  // Drop the safety snapshot once the merge succeeds or rolls back.
+  let preMergeStashRef: string | null = null;
   try {
     const { stdout: statusOut } = await execAsync('git status --porcelain', {
       cwd: projectPath,
       encoding: 'utf-8',
     });
     if (statusOut.trim()) {
-      await execAsync('git stash push -u -m "Pre-merge stash for ' + issueId + '"', {
-        cwd: projectPath,
-        encoding: 'utf-8',
-      });
-      stashCreated = true;
-      console.log(`[merge-agent] Stashed uncommitted changes before merge`);
+      const stashMessage = buildStashMessage('pre-merge', issueId, new Date());
+      preMergeStashRef = await createNamedStash(projectPath, stashMessage, true);
+      if (preMergeStashRef) {
+        console.log(`[merge-agent] Stashed uncommitted changes before merge as ${preMergeStashRef}`);
+      }
     }
   } catch (stashErr: any) {
     console.warn(`[merge-agent] Failed to stash: ${stashErr.message} (continuing anyway)`);
@@ -1117,6 +1132,16 @@ export async function spawnMergeAgentForBranches(
                   logActivity('merge_quality_gate_fail', `Quality gates failed for ${issueId}: ${failedNames}`);
 
                   const revertSuccess = await autoRevertMerge(projectPath);
+
+                  if (preMergeStashRef) {
+                    try {
+                      await dropStash(projectPath, preMergeStashRef);
+                      console.log(`[merge-agent] ✓ Dropped pre-merge stash after quality-gate rollback`);
+                    } catch (dropErr: any) {
+                      console.warn(`[merge-agent] ⚠ Failed to drop pre-merge stash after quality-gate rollback: ${dropErr.message}`);
+                    }
+                  }
+
                   const revertNote = revertSuccess
                     ? 'Merge auto-reverted to clean state'
                     : 'WARNING: Auto-revert failed';
@@ -1133,13 +1158,12 @@ export async function spawnMergeAgentForBranches(
                 // Run post-merge cleanup (move PRD, update issue status)
                 await postMergeLifecycle(issueId, projectPath, sourceBranch);
 
-                // Restore stashed changes
-                if (stashCreated) {
+                if (preMergeStashRef) {
                   try {
-                    await execAsync('git stash pop', { cwd: projectPath, encoding: 'utf-8' });
-                    console.log(`[merge-agent] ✓ Restored stashed changes after successful merge`);
-                  } catch (popErr: any) {
-                    console.warn(`[merge-agent] ⚠ Failed to restore stash after merge: ${popErr.message}`);
+                    await dropStash(projectPath, preMergeStashRef);
+                    console.log(`[merge-agent] ✓ Dropped pre-merge stash after successful merge`);
+                  } catch (dropErr: any) {
+                    console.warn(`[merge-agent] ⚠ Failed dropping pre-merge stash after merge: ${dropErr.message}`);
                   }
                 }
 
@@ -1175,12 +1199,12 @@ export async function spawnMergeAgentForBranches(
                 }
 
                 // Restore stashed changes after revert
-                if (stashCreated) {
+                if (preMergeStashRef) {
                   try {
-                    await execAsync('git stash pop', { cwd: projectPath, encoding: 'utf-8' });
-                    console.log(`[merge-agent] ✓ Restored stashed changes after revert`);
-                  } catch (popErr: any) {
-                    console.warn(`[merge-agent] ⚠ Failed to restore stash after revert: ${popErr.message}`);
+                    await dropStash(projectPath, preMergeStashRef);
+                    console.log(`[merge-agent] ✓ Dropped pre-merge stash after revert`);
+                  } catch (dropErr: any) {
+                    console.warn(`[merge-agent] ⚠ Failed to drop pre-merge stash after revert: ${dropErr.message}`);
                   }
                 }
 
