@@ -51,8 +51,18 @@ vi.mock('../../../src/lib/cloister/config.js', () => ({
   loadCloisterConfig: mockLoadCloisterConfig,
 }));
 
-const { mockKillSessionAsync } = vi.hoisted(() => ({
+const { mockKillSessionAsync, mockResolveProjectFromIssue } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
+  mockResolveProjectFromIssue: vi.fn().mockReturnValue({
+    projectKey: 'panopticon-cli',
+    projectName: 'Panopticon CLI',
+    projectPath: '/tmp/panopticon-cli',
+    linearTeam: 'PAN',
+  }),
+}));
+
+vi.mock('../../../src/lib/projects.js', () => ({
+  resolveProjectFromIssue: mockResolveProjectFromIssue,
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
