@@ -298,7 +298,13 @@ export async function fetchActivityDataWithContext(
           const ms = Date.now() - new Date(state.startedAt).getTime();
           return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
         })() : null,
-        status: rtState?.state === 'active' ? 'running' : rtState?.state === 'suspended' ? 'completed' : (state.status || 'completed'),
+        status: rtState?.state === 'active' ? 'running'
+          : rtState?.state === 'suspended' ? 'completed'
+          // If runtime state is unavailable but the tmux session IS alive,
+          // the agent is running — don't fall back to stale state.json
+          // which may say "stopped" from a previous lifecycle.
+          : (presence === 'active' || presence === 'idle') ? 'running'
+          : (state.status || 'completed'),
         transcript: jsonlPath ? undefined : transcript,
         presence,
         hasJsonl: !!jsonlPath,
@@ -508,7 +514,8 @@ export async function fetchActivityDataWithContext(
         issueId,
       );
 
-      const specialistPresence: SessionNodePresence = tmuxSessionNames.has(tmuxSessionName)
+      const specialistIsLive = tmuxSessionNames.has(tmuxSessionName);
+      const specialistPresence: SessionNodePresence = specialistIsLive
         ? (ss.status === 'running' ? 'active' : 'idle')
         : 'ended';
       const specialistSessionId = tmuxSessionName;
@@ -527,7 +534,9 @@ export async function fetchActivityDataWithContext(
         model: 'specialist',
         startedAt: ss.startedAt,
         duration,
-        status: ss.status,
+        // If tmux session is alive, the specialist is running — don't trust
+        // the cached ss.status which may be stale from a previous dispatch.
+        status: specialistIsLive ? 'running' : ss.status,
         transcript: specialistJsonlPath ? undefined : transcriptParts.join('\n'),
         presence: specialistPresence,
         hasJsonl: !!specialistJsonlPath,

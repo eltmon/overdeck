@@ -208,9 +208,11 @@ export async function buildReviewerNodes(
       }
 
       // Per-role status:
-      //   - prefer the latest round artifact's status if available
+      //   - if the tmux session is alive, the reviewer is running NOW —
+      //     round artifacts are from PREVIOUS rounds and stale
+      //   - otherwise prefer the latest round artifact's status
       //   - fall back to the parent review section's status
-      const rawStatus = roundMetadata?.latestStatus ?? opts.status;
+      const rawStatus = isLive ? 'running' : (roundMetadata?.latestStatus ?? opts.status);
       const status = normalizeAgentStatus(rawStatus);
 
       const node: ReviewerNode = {
