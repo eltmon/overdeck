@@ -303,6 +303,20 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     expect(screen.queryByTestId('detail-panel')).not.toBeInTheDocument();
   });
 
+  it('opens the session pane on the first session click when no feature is already selected', async () => {
+    renderCommandDeck();
+
+    await screen.findByTestId('project-node');
+    expect(screen.queryByTestId('issue-workbench')).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByTestId('session-agent-pan-821'));
+
+    const workbench = screen.getByTestId('issue-workbench');
+    expect(workbench).toBeInTheDocument();
+    expect(workbench).toHaveAttribute('data-issue', 'PAN-821');
+    expect(screen.getByTestId('session-panel')).toHaveAttribute('data-session', 'agent-pan-821');
+  });
+
   it('auto-selects best session when feature is clicked (B5)', async () => {
     renderCommandDeck();
 
