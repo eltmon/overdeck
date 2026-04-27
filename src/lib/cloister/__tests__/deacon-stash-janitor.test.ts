@@ -205,6 +205,22 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     expect(actions).not.toContain('Dropped merged issue pre-merge stash for PAN-879: 9999999999999999999999999999999999999999');
   });
 
+  it('preserves pre-merge stashes for github issues that are merely closed', async () => {
+    mockListRunningAgents.mockReturnValue([] as any);
+    mockGetAgentState.mockReturnValue(null);
+    mockListStashes.mockResolvedValue([
+      { ref: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', stackRef: 'stash@{4}', kind: 'pre-merge', issueId: 'PAN-879', createdAt: new Date('2026-04-27T00:00:00Z'), message: 'pre-merge:PAN-879:2026-04-27T00:00:00Z' } as any,
+    ]);
+    mockGetProject.mockReturnValue({ tracker: 'github', github_repo: 'owner/repo' } as any);
+
+    const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
+
+    expect(mockCreateTracker).not.toHaveBeenCalled();
+    expect(mockDropStash).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'stash@{4}');
+    expect(mockSetReviewStatus).not.toHaveBeenCalledWith('PAN-879', { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
+    expect(actions).not.toContain('Dropped merged issue pre-merge stash for PAN-879: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+  });
+
   it('keeps pre-spawn stash metadata when branch advancement check fails for an ambiguous error', async () => {
     const state = {
       id: 'agent-pan-879',

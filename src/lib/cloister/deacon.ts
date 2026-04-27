@@ -2482,12 +2482,12 @@ async function reconcileAndCheckIfMerged(
       return remember(false);
     }
 
-    const tracker = createTracker(trackerConfig);
-    const issue = await tracker.getIssue(issueId);
-    if (project.tracker === 'github' && issue.state === 'closed') {
-      setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
-      return remember(true);
+    if (project.tracker === 'github') {
+      return remember(false);
     }
+
+    const tracker = createTracker(trackerConfig);
+    await tracker.getIssue(issueId);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[deacon] Failed tracker merge reconciliation for ${issueId}: ${message}`);
