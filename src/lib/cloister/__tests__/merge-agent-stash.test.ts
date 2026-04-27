@@ -108,8 +108,8 @@ describe('merge-agent pre-merge stash lifecycle', () => {
 
     expect(result.success).toBe(false);
     expect(autoRevertMerge).toHaveBeenCalledWith('/tmp/workspace');
-    expect(popStash).toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
-    expect(dropStash).not.toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
+    expect(dropStash).toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
+    expect(popStash).not.toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
   });
 
   it('drops lingering pre-merge stashes during post-merge lifecycle', async () => {

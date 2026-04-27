@@ -30,6 +30,7 @@ import { resolveProjectFromIssue, listProjects, getProject } from '../projects.j
 import { logDeaconEvent, logAgentLifecycle } from '../persistent-logger.js';
 import { emitActivityTts } from '../activity-logger.js';
 import { getShadowState } from '../shadow-state.js';
+import type { TrackerConfig } from '../tracker/factory.js';
 
 // Review status file location (same as dashboard server)
 const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
@@ -2424,17 +2425,19 @@ async function reconcileAndCheckIfMerged(issueId: string): Promise<boolean> {
     const panopticonConfig = await import('../config.js');
     const globalTrackerConfig = panopticonConfig.loadConfig().trackers;
 
-    let trackerConfig: Record<string, unknown> | null = null;
+    let trackerConfig: TrackerConfig | null = null;
     if (project.tracker === 'github' && project.github_repo) {
       const [owner, repo] = project.github_repo.split('/');
-      if (owner && repo) {
-        trackerConfig = {
-          type: 'github',
-          owner,
-          repo,
-          tokenEnv: globalTrackerConfig.github?.token_env,
-        };
+      if (!owner || !repo) {
+        console.warn(`[deacon] Cannot reconcile ${issueId}: invalid GitHub repo config for ${resolved.projectKey}`);
+        return false;
       }
+      trackerConfig = {
+        type: 'github',
+        owner,
+        repo,
+        tokenEnv: globalTrackerConfig.github?.token_env,
+      };
     } else if (project.tracker === 'gitlab' && project.gitlab_repo) {
       trackerConfig = {
         type: 'gitlab',
@@ -2458,10 +2461,11 @@ async function reconcileAndCheckIfMerged(issueId: string): Promise<boolean> {
     }
 
     if (!trackerConfig) {
+      console.warn(`[deacon] Cannot reconcile ${issueId}: incomplete tracker config for ${resolved.projectKey}`);
       return false;
     }
 
-    const tracker = createTracker(trackerConfig as any);
+    const tracker = createTracker(trackerConfig);
     const issue = await tracker.getIssue(issueId);
     if (issue.state === 'closed') {
       setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
