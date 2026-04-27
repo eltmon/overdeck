@@ -2,65 +2,64 @@
 specialist: review-agent
 issueId: PAN-865
 outcome: changes-requested
-timestamp: 2026-04-27T11:34:13Z
+timestamp: 2026-04-27T11:50:21Z
 ---
 
 # Verdict: CHANGES_REQUESTED
 
 ## Summary
-
-PAN-865 implements the Zone C overview tab skeleton: a 10-tab strip with Overview as default, a billboard + tile grid + summaries + trend strip in the Overview tab, URL-backed tab state, sticky positioning, keyboard navigation, and full issue-selected vs agent-selected wiring. The PR delivers 8 of 9 stated requirements; all review disciplines are otherwise clean. Three findings reach blocker threshold: a WAI-ARIA keyboard navigation violation (Tab key traps focus inside the tab strip), a TypeScript type safety gap in `projects.ts` (`roundMetadata` on `ActivitySection` interface), and the AGENT tile omitting the explicitly-scoped "runtime" field. The work agent must address all three before merge.
+PAN-865 adds a Zone C tab strip with a sticky 10-tab shell and an Overview tab surface (billboard, tile grid, summaries, trend strip) to the Command Deck. The PR is structurally sound and well-tested — 7 of 9 acceptance criteria are fully implemented. Two findings block merge: (1) the AGENT tile's **Spawn Work** button calls a non-existent endpoint (`POST /api/agents/start` does not exist in the changed routes), making the primary CTA in the Overview surface non-functional; (2) keyboard navigation covers arrow keys but Tab/Shift-Tab is explicitly mentioned in the issue and not implemented. The work agent must wire the button to a working endpoint and decide whether to implement Tab/Shift-Tab or align the spec wording.
 
 ## Blockers (MUST fix before merge)
 
-### 1. Tab key traps keyboard focus inside tab strip — `ZoneCOverview.tsx:172-176` — `~`
-**Raised by**: correctness
-**Why it blocks**: Keyboard-only and screen-reader users cannot Tab past the tab strip to reach the overview content, reviewer grid, or action buttons — the tab panel is unreachable via keyboard. This is a WAI-ARIA tabs pattern violation.
-
-<fix instruction>
-Remove the `Tab`/`Shift-Tab` key handler at lines 172-176. Rely on `ArrowLeft`/`ArrowRight` (already correctly implemented at lines 160-169) for tab cycling. Standard `Tab` behavior will then move focus into the tab panel content. The WAI-ARIA tabs pattern requires `ArrowLeft`/`ArrowRight` to cycle tabs and `Tab` to move focus from the active tab to the tab panel — not to cycle tabs.
-</fix>
-
-### 2. `ActivitySection` interface missing `roundMetadata` field — `projects.ts:69-82` — `~`
-**Raised by**: correctness
-**Why it blocks**: `mapSectionToSessionNode()` at line 111 accesses `section.roundMetadata` but the local `ActivitySection` interface does not declare it, creating a TypeScript type safety gap. If the source data ever removes `roundMetadata`, the compiler will not catch the regression.
-
-<fix instruction>
-Add `roundMetadata?: ReviewerRoundMetadata` to the local `ActivitySection` interface in `projects.ts`. Import `ReviewerRoundMetadata` from `./reviewer-tree.js` or `./command-deck.js`. The field is already present in the identical interface in `command-deck.ts:255`.
-</fix>
-
-### 3. AGENT tile does not show runtime — `OverviewTab.tsx:424-473` — `~`
+### 1. Spawn Work button calls non-existent endpoint — `OverviewTab.tsx:452-457` — `!`
 **Raised by**: requirements
-**Why it blocks**: The issue explicitly scopes the AGENT tile to "model, runtime, session id". Runtime is surfaced in the billboard at lines 389-395 but not inside the AGENT tile itself. Per the "No Partial Implementations" policy, a feature is complete only when all stated scope items are delivered.
+**Why it blocks**: The AGENT tile's "Spawn Work" button fires `POST /api/agents/start`, but no such route exists in the changed server code (`agents.ts` only exposes `POST /api/agents`). The button is wired but non-functional — the core spawn-work behavior requested in the issue scope is not delivered.
 
-<fix instruction>
-Add runtime display to the AGENT tile using the existing `formatRuntime(agent.startedAt)` helper. The helper already exists and is used in the billboard — reuse it inside the AGENT tile section (around line 424-473) so the tile matches its explicit scope: "model, runtime, session id".
-</fix>
+Fix: Change the fetch URL to target an existing route. If the intent is to use `POST /api/agents` (the start-agent route), update the URL to `/api/agents` and ensure the request body matches the route's expected schema. If the route was renamed or moved, find the correct path.
+
+### 2. Tab/Shift-Tab keyboard navigation not implemented — `ZoneCOverview.tsx:156-183` — `~`
+**Raised by**: requirements
+**Why it blocks**: The issue text explicitly lists Tab/Shift-Tab as part of the required keyboard navigation behavior. The implementation provides arrow keys, Home/End, and standard browser tab behavior (keys pass through without navigating the strip). The test explicitly asserts Tab/Shift-Tab leaves the active tab unchanged rather than roving the focus. This is a partial implementation of a stated requirement.
+
+Fix: Either implement roving-tabindex behavior for the tab strip so Tab/Shift-Tab moves focus between tabs, or (if standard browser tab behavior was the intent) update the issue/spec wording to remove "Tab/Shift-Tab" from the requirement text and simplify the test.
 
 ## High Priority (SHOULD fix; synthesis may still approve if justified)
 
-_none_
+### 1. Planning poll shells out to git on every refresh — `command-deck.ts:681` — `~`
+**Raised by**: performance
+**Why it blocks**: `fetchPlanningData()` runs `git stash list` synchronously every time `/api/command-deck/planning/:issueId` is called, and the frontend polls this endpoint every 30 seconds. This creates repeated child-process churn on an admin/dashboard path.
+
+Fix: Cache `stashCount` server-side with a TTL (e.g. 60s) similar to the existing `costCache`, or move stash count to a workspace-status endpoint that refreshes on demand rather than on every poll.
 
 ## Nits (advisory — safe to defer)
 
-- `OverviewTab.tsx:521` — `?` — Defense-in-depth URL scheme validation for rendered links. Consider normalizing or allowlisting schemes (http/https/vscode) before rendering navigable `href` values as a defense-in-depth measure. (security)
-- `src/dashboard/frontend/tests/pan-865-command-deck-overview.spec.ts:76-83` — `?` — E2E test reviewer data uses generic `role: 'review'` instead of specific reviewer roles (`correctness`, `security`, `performance`, `requirements`, `synthesis`). The reviewer grid always shows "no rounds yet" placeholders; consider using realistic role data so the snapshot captures round cards. (correctness)
-- `OverviewTab.tsx:257-262` — `?` — Verbose per-field `as` casts in `isReviewPipelineStuck` call. Consider casting once at the object level: `isReviewPipelineStuck(reviewStatus.data as PipelineStateLike)`. (correctness)
-- `IssueWorkbench.tsx:70-74` — `?` — `handleSwitchTab` is a documented no-op with a TODO comment. Zone A tab-switch buttons are visual only and don't actually switch Zone C's tab. Track for follow-up if intentional. (correctness)
+- `ZoneCOverview.tsx:101-108` — `~` — URL sync effect relies on `window.location` reads inside useEffect with a guard. The guard makes it correct; flagging as SHOULD for awareness. Not a blocker. (correctness)
+- `OverviewTab.tsx:257-262` — `~` — Type assertion widening: `ReviewStatusData` fields are `string` but are cast to specific unions without runtime validation. `isReviewPipelineStuck` handles unknown values safely (returns false). Safe but a code smell — consider updating `ReviewStatusData` to use union types. (correctness)
+- `index.tsx:198` — `?` — Removed `refetchInterval` from session-trees query. WebSocket delta subscription handles updates; a modest `refetchInterval: 30000` would guard against reconnection gaps. (correctness)
+- `OverviewTab.tsx:452-457` — `?` — Fire-and-forget POST swallows all errors silently. Consistent with existing codebase patterns (lines 620, 656, 688, 707, 751, 792), so not a blocker, but a toast on non-2xx would improve UX. (correctness)
+- `OverviewTab.tsx:215` — `?` — Six independent polling queries refresh the same view (5s–30s intervals), creating bursty background traffic. Acceptable for an admin view; relaxation would reduce request volume with no user-visible downside. (performance)
 
 ## Cross-cutting groups
 
-_none_
+**Endpoint wiring for spawn-work:**
+- [blocker-1] Spawn Work button → non-existent `/api/agents/start`
+- The endpoint `POST /api/agents` exists in `agents.ts` and is the canonical start-agent route. The fix is to redirect the button to that route or confirm the correct URL.
+
+**Keyboard navigation scope:**
+- [blocker-2] Tab/Shift-Tab not implemented (partial arrow-key-only coverage)
+- Either implement the full roving-tabindex or revise the spec to match the arrow-key-only implementation.
 
 ## What's good
-
-- All 8 of 9 explicitly-scoped requirements are fully implemented and verified, including the sticky tab strip, URL sync, keyboard navigation (arrow/Home/End), billboard + tile grid + summaries + trend strip, issue vs agent mode wiring, and Playwright visual verification.
-- Security and performance reviews found zero issues — no injection vectors, no hot-path regressions, no N+1 patterns, bounded caches on expensive lookups.
-- Backend routes (`command-deck.ts`, `projects.ts`) correctly reuse existing endpoints with TTL-cached lookups rather than introducing new unbounded operations.
+- Tab strip shell, URL state sync, and keyboard arrow-key nav are well-implemented with good test coverage.
+- Seven of nine acceptance criteria fully met — PR is structurally solid.
+- Visual verification with Playwright provides regression coverage.
+- Security review found no new vulnerabilities introduced by this PR.
+- Type-safe query hooks centralized in `queries.ts` give a clean data layer.
 
 ## Review stats
-- Blockers: 3   High: 0   Medium: 0   Nits: 4
-- By reviewer: correctness=5, security=1, performance=0, requirements=1
+- Blockers: 1   High: 1   Medium: 0   Nits: 5
+- By reviewer: correctness=2 warnings + 3 suggestions, security=0 findings, performance=1 warning + 1 optimization, requirements=1 blocker + 1 partial
 - Files touched: 14   Files with findings: 6
 
 ## Appendix: individual reviews
