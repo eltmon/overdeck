@@ -532,7 +532,7 @@ export async function fetchActivityDataWithContext(
 
   // Cost breakdown — TTL-cached to avoid re-scanning cost events on every 5s poll (PAN-830 review high-4).
   let costByStage: Record<string, { cost: number; tokens: number }> = {};
-  let totalCost = 0;
+  let totalCost: number | null = null;
   try {
     const cacheKey = issueId.toUpperCase();
     sweepExpired(costCache, COST_CACHE_TTL_MS);
@@ -560,7 +560,7 @@ export async function fetchActivityDataWithContext(
       aggregateCost,
       agents,
     });
-    totalCost = resolvedCost.resolvedTotalCost ?? 0;
+    totalCost = resolvedCost.resolvedTotalCost;
 
     return {
       issueId,
