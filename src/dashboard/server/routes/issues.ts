@@ -2560,8 +2560,9 @@ async function resolveIssuePullRequestRef(issueId: string): Promise<
   }
 }
 
-export async function fetchIssuePullRequest(issueId: string): Promise<IssuePrEndpointResponse> {
-  const prRef = await resolveIssuePullRequestRef(issueId);
+async function fetchIssuePullRequestFromRef(
+  prRef: Awaited<ReturnType<typeof resolveIssuePullRequestRef>>,
+): Promise<IssuePrEndpointResponse> {
   if (!prRef.repoArg || !prRef.prNumber) {
     return { issueId: prRef.issueId, pr: null, error: prRef.error };
   }
@@ -2583,6 +2584,11 @@ export async function fetchIssuePullRequest(issueId: string): Promise<IssuePrEnd
   } catch (err: any) {
     return { issueId: prRef.issueId, pr: null, error: `gh pr view failed: ${err.message}` };
   }
+}
+
+export async function fetchIssuePullRequest(issueId: string): Promise<IssuePrEndpointResponse> {
+  const prRef = await resolveIssuePullRequestRef(issueId);
+  return fetchIssuePullRequestFromRef(prRef);
 }
 
 async function fetchIssuePullRequestDiffFromRef(
@@ -2620,7 +2626,7 @@ export async function fetchIssuePullRequestDetails(issueId: string): Promise<Iss
   }
 
   const [prResult, diffResult] = await Promise.all([
-    fetchIssuePullRequest(issueId),
+    fetchIssuePullRequestFromRef(prRef),
     fetchIssuePullRequestDiffFromRef(prRef),
   ]);
 

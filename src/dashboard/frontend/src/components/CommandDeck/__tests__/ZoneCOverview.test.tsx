@@ -69,6 +69,7 @@ vi.mock('../ZoneCOverviewTabs/queries', () => ({
   useActivityQuery: () => activityResult,
   useIssueCostsQuery: () => costsResult,
   usePrQuery: () => prResult,
+  usePrDiffQuery: () => ({ data: undefined, isLoading: false, isError: false }),
   useDiscussionsQuery: () => discussionsResult,
   useReviewStatusQuery: () => reviewStatusResult,
   useWorkspaceQuery: () => workspaceResult,
@@ -337,10 +338,8 @@ describe('ZoneCOverview', () => {
     expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
   });
 
-  it('initializes the active tab from the URL query string', () => {
-    window.history.replaceState({}, '', '/command-deck?tab=costs');
-
-    render(<ZoneCOverview issueId={ISSUE} />);
+  it('initializes the active tab from a controlled prop', () => {
+    render(<ZoneCOverview issueId={ISSUE} activeTab="costs" />);
     expect(screen.getByTestId('zone-c-overview-placeholder')).toHaveTextContent('Coming soon');
     expect(screen.getByTestId('zone-c-overview-tab-costs')).toHaveAttribute('aria-selected', 'true');
   });
@@ -370,16 +369,16 @@ describe('ZoneCOverview', () => {
     expect(screen.getByTestId('zone-c-overview-placeholder')).toHaveTextContent('Coming soon');
   });
 
-  it('does not intercept Tab and Shift-Tab inside the tab strip', () => {
+  it('supports Tab and Shift-Tab navigation inside the tab strip', () => {
     render(<ZoneCOverview issueId={ISSUE} />);
     const tablist = screen.getByRole('tablist');
 
     fireEvent.keyDown(tablist, { key: 'Tab' });
-    expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
-    expect(window.location.search).toBe('');
+    expect(screen.getByTestId('zone-c-overview-placeholder')).toHaveTextContent('Coming soon');
+    expect(new URLSearchParams(window.location.search).get('tab')).toBe('activity');
 
     fireEvent.keyDown(tablist, { key: 'Tab', shiftKey: true });
     expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
-    expect(window.location.search).toBe('');
+    expect(new URLSearchParams(window.location.search).get('tab')).toBe('overview');
   });
 });

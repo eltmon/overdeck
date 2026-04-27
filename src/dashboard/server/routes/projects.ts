@@ -250,7 +250,14 @@ const getProjectSessionTreeRoute = HttpRouter.add(
   })),
 );
 
-async function buildIssueTitleMap(): Promise<Map<string, string>> {
+const ISSUE_TITLE_MAP_TTL_MS = 30_000;
+let issueTitleMapCache: { timestamp: number; data: ReadonlyMap<string, string> } | null = null;
+
+async function buildIssueTitleMap(): Promise<ReadonlyMap<string, string>> {
+  if (issueTitleMapCache && issueTitleMapCache.timestamp > Date.now() - ISSUE_TITLE_MAP_TTL_MS) {
+    return issueTitleMapCache.data;
+  }
+
   const issueTitles = new Map<string, string>();
   try {
     const issueDataService = await getIssueDataService();
@@ -265,6 +272,8 @@ async function buildIssueTitleMap(): Promise<Map<string, string>> {
   } catch {
     // non-fatal: callers fall back to planning prompt or issue id
   }
+
+  issueTitleMapCache = { timestamp: Date.now(), data: issueTitles };
   return issueTitles;
 }
 

@@ -40,10 +40,6 @@ const ALL_TABS: readonly OverviewTabSpec[] = [
   { key: 'discussions', label: 'Discussions' },
 ];
 
-function isOverviewTab(value: string | null | undefined): value is OverviewTab {
-  return !!value && ALL_TABS.some((tab) => tab.key === value);
-}
-
 function PlaceholderBody() {
   return (
     <div
@@ -75,13 +71,7 @@ export function ZoneCOverview({
   issue,
   agent,
 }: ZoneCOverviewProps) {
-  const getInitialTab = (): OverviewTab => {
-    if (activeTab) return activeTab;
-    const fromUrl = new URLSearchParams(window.location.search).get('tab');
-    return isOverviewTab(fromUrl) ? fromUrl : 'overview';
-  };
-
-  const [internalTab, setInternalTab] = useState<OverviewTab>(getInitialTab);
+  const [internalTab, setInternalTab] = useState<OverviewTab>(activeTab ?? 'overview');
   const tab = activeTab ?? internalTab;
   const tabRefs = useRef<Record<OverviewTab, HTMLButtonElement | null>>({
     overview: null,
@@ -132,13 +122,13 @@ export function ZoneCOverview({
           const currentIndex = visibleTabs.findIndex((spec) => spec.key === tab);
           if (currentIndex === -1) return;
 
-          if (event.key === 'ArrowRight') {
+          if (event.key === 'ArrowRight' || (event.key === 'Tab' && !event.shiftKey)) {
             event.preventDefault();
             const next = visibleTabs[(currentIndex + 1) % visibleTabs.length]?.key;
             if (next) moveTabFocus(next);
           }
 
-          if (event.key === 'ArrowLeft') {
+          if (event.key === 'ArrowLeft' || (event.key === 'Tab' && event.shiftKey)) {
             event.preventDefault();
             const next = visibleTabs[(currentIndex - 1 + visibleTabs.length) % visibleTabs.length]?.key;
             if (next) moveTabFocus(next);
