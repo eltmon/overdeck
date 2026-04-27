@@ -42,6 +42,7 @@ import {
   getAllProjectSpecialistStatuses,
 } from './specialists.js';
 import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState, resumeAgent } from '../agents.js';
+import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSession, killSessionAsync, listPaneValues, listPaneValuesAsync, listSessionNamesAsync, sessionExists, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
 
 // ============================================================================
@@ -2338,6 +2339,73 @@ export async function checkDeadEndAgents(): Promise<string[]> {
   return actions;
 }
 
+export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<string[]> {
+  const actions: string[] = [];
+
+  try {
+    const agents = listRunningAgents();
+    for (const agent of agents) {
+      if (!agent.id.startsWith('agent-')) continue;
+      const agentState = getAgentState(agent.id);
+      if (!agentState?.workspace || !agentState.preSpawnStashRef) continue;
+      if (!existsSync(agentState.workspace)) continue;
+
+      try {
+        const { stdout } = await execAsync('git rev-list origin/main..HEAD --count', {
+          cwd: agentState.workspace,
+          encoding: 'utf-8',
+        });
+        if ((parseInt(stdout.trim(), 10) || 0) <= 0) continue;
+
+        await dropStash(agentState.workspace, agentState.preSpawnStashRef);
+        delete agentState.preSpawnStashRef;
+        delete agentState.preSpawnStashMessage;
+        saveAgentState(agentState);
+        actions.push(`Dropped pre-spawn stash for ${agentState.issueId}`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/not found|does not exist/i.test(message)) {
+          console.warn(`[deacon] Failed dropping pre-spawn stash for ${agentState.issueId}: ${message}`);
+          continue;
+        }
+        delete agentState.preSpawnStashRef;
+        delete agentState.preSpawnStashMessage;
+        saveAgentState(agentState);
+      }
+    }
+
+    const issueIds = new Set<string>();
+    for (const agent of agents) {
+      if (agent.issueId) issueIds.add(agent.issueId.toUpperCase());
+    }
+
+    for (const issueId of issueIds) {
+      const resolved = resolveProjectFromIssue(issueId);
+      if (!resolved) continue;
+      const workspacePath = findWorkspacePath(resolved.projectPath, issueId.toLowerCase());
+      if (!workspacePath || !existsSync(workspacePath)) continue;
+
+      try {
+        const stashes = await listStashes(workspacePath);
+        for (const stash of stashes) {
+          if (stash.kind === 'salvageable') continue;
+          if (!isOlderThanDays(stash, 28, now)) continue;
+          await dropStash(workspacePath, stash.ref);
+          actions.push(`Dropped stale ${stash.kind} stash for ${issueId}: ${stash.ref}`);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[deacon] Failed stash janitor sweep for ${issueId}: ${message}`);
+      }
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[deacon] Error in stash janitor: ${message}`);
+  }
+
+  return actions;
+}
+
 // Track per-agent cooldowns for first-completion nudges
 const firstCompletionCooldowns = new Map<string, number>();
 const FIRST_COMPLETION_IDLE_MS = 10 * 60 * 1000; // 10 minutes idle before nudging
@@ -3049,6 +3117,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   const stuckActions = await checkStuckWorkAgents();
   actions.push(...stuckActions);
   for (const a of stuckActions) addLog('action', a, state.patrolCycle);
+
+  const stashJanitorActions = await cleanupSpawnAndOrphanedStashes();
+  actions.push(...stashJanitorActions);
+  for (const a of stashJanitorActions) addLog('action', a, state.patrolCycle);
 
   // Periodic agent state cleanup (PAN-154)
   if (Math.random() < 0.003) {

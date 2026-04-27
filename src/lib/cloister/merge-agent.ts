@@ -36,6 +36,7 @@ import { renderPrompt } from './prompts.js';
 import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
 import { markWorkspaceStuck } from '../review-status.js';
 import { appendGitOperation, type GitOperationType } from '../git-activity.js';
+import { buildStashMessage, createNamedStash, popStash } from '../stashes.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -907,19 +908,18 @@ export async function spawnMergeAgentForBranches(
 
   // Stash any uncommitted changes so the merge starts from a clean state
   // We restore the stash after completion (success or rollback)
-  let stashCreated = false;
+  let preMergeStashRef: string | null = null;
   try {
     const { stdout: statusOut } = await execAsync('git status --porcelain', {
       cwd: projectPath,
       encoding: 'utf-8',
     });
     if (statusOut.trim()) {
-      await execAsync('git stash push -u -m "Pre-merge stash for ' + issueId + '"', {
-        cwd: projectPath,
-        encoding: 'utf-8',
-      });
-      stashCreated = true;
-      console.log(`[merge-agent] Stashed uncommitted changes before merge`);
+      const stashMessage = buildStashMessage('pre-merge', issueId, new Date());
+      preMergeStashRef = await createNamedStash(projectPath, stashMessage, true);
+      if (preMergeStashRef) {
+        console.log(`[merge-agent] Stashed uncommitted changes before merge as ${preMergeStashRef}`);
+      }
     }
   } catch (stashErr: any) {
     console.warn(`[merge-agent] Failed to stash: ${stashErr.message} (continuing anyway)`);
@@ -1134,9 +1134,9 @@ export async function spawnMergeAgentForBranches(
                 await postMergeLifecycle(issueId, projectPath, sourceBranch);
 
                 // Restore stashed changes
-                if (stashCreated) {
+                if (preMergeStashRef) {
                   try {
-                    await execAsync('git stash pop', { cwd: projectPath, encoding: 'utf-8' });
+                    await popStash(projectPath, preMergeStashRef);
                     console.log(`[merge-agent] ✓ Restored stashed changes after successful merge`);
                   } catch (popErr: any) {
                     console.warn(`[merge-agent] ⚠ Failed to restore stash after merge: ${popErr.message}`);
@@ -1175,9 +1175,9 @@ export async function spawnMergeAgentForBranches(
                 }
 
                 // Restore stashed changes after revert
-                if (stashCreated) {
+                if (preMergeStashRef) {
                   try {
-                    await execAsync('git stash pop', { cwd: projectPath, encoding: 'utf-8' });
+                    await popStash(projectPath, preMergeStashRef);
                     console.log(`[merge-agent] ✓ Restored stashed changes after revert`);
                   } catch (popErr: any) {
                     console.warn(`[merge-agent] ⚠ Failed to restore stash after revert: ${popErr.message}`);

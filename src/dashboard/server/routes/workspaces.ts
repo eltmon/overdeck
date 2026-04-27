@@ -14,6 +14,8 @@ import { httpHandler } from './http-handler.js';
  *   POST   /api/workspaces/:issueId/containerize
  *   POST   /api/workspaces/:issueId/containers/:containerName/:action
  *   POST   /api/workspaces/:issueId/refresh-db
+ *   POST   /api/workspaces/:issueId/stashes/:stashRef/recover
+ *   DELETE /api/workspaces/:issueId/stashes/:stashRef
  *   GET    /api/workspaces/:issueId/tldr
  *
  * Lifecycle endpoints (/api/issues/):
@@ -94,6 +96,7 @@ import { extractPrefix, extractNumber } from '../../../lib/issue-id.js';
 import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
 import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
+import { createRecoveryBranchFromStash, dropStash, isSalvageableStash, listStashes } from '../../../lib/stashes.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -1003,13 +1006,16 @@ const getWorkspaceRoute = HttpRouter.add(
         const canContainerize = !hasDocker && existsSync(join(projectPath, 'infra', 'new-feature'));
 
         const agentSession = `agent-${issueLower}`;
-        const [git, repoGit, containers, mrUrl, sessionNames, paneOutput] = yield* Effect.promise(() => Promise.all([
+        const [git, repoGit, containers, mrUrl, sessionNames, paneOutput, salvageableStashes] = yield* Effect.promise(() => Promise.all([
           getGitStatusAsync(workspacePath),
           getRepoGitStatusAsync(workspacePath),
           hasDocker ? getContainerStatusAsync(issueId, projectPath) : Promise.resolve(null),
           getMrUrlAsync(issueId, workspacePath),
           listSessionNamesAsync(),
           capturePaneAsync(agentSession, 50).catch(() => ''),
+          listStashes(workspacePath)
+            .then((entries) => entries.filter(isSalvageableStash).filter((entry) => entry.issueId === issueId.toUpperCase()))
+            .catch(() => []),
         ]));
 
         let hasAgent = false;
@@ -1063,6 +1069,13 @@ const getWorkspaceRoute = HttpRouter.add(
           canContainerize,
           pendingOperation,
           location,
+          salvageableStashes: salvageableStashes.map((entry) => ({
+            ref: entry.ref,
+            issueId: entry.issueId,
+            message: entry.message,
+            shortDescription: entry.shortDescription,
+            createdAt: entry.createdAt?.toISOString(),
+          })),
         });
   }))
 );
@@ -1121,6 +1134,56 @@ const getWorkspacePlanRoute = HttpRouter.add(
     const doc = readPlan(planPath);
     const cp = criticalPath(doc);
     return jsonResponse({ ...doc, criticalPath: cp });
+  }))
+);
+
+const postWorkspaceRecoverStashRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/stashes/:stashRef/recover',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const stashRef = decodeURIComponent(params['stashRef'] ?? '');
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+
+    const stashes = yield* Effect.promise(() => listStashes(workspacePath));
+    const stash = stashes.find((entry) => entry.ref === stashRef);
+    if (!stash || !isSalvageableStash(stash) || stash.issueId !== issueId.toUpperCase()) {
+      return jsonResponse({ error: 'Salvageable stash not found for this workspace' }, { status: 404 });
+    }
+
+    const branchName = yield* Effect.promise(() => createRecoveryBranchFromStash(
+      workspacePath,
+      stash.ref,
+      stash.issueId,
+      stash.shortDescription,
+    ));
+
+    return jsonResponse({ success: true, branchName });
+  }))
+);
+
+const deleteWorkspaceStashRoute = HttpRouter.add(
+  'DELETE',
+  '/api/workspaces/:issueId/stashes/:stashRef',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const stashRef = decodeURIComponent(params['stashRef'] ?? '');
+    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+
+    const stashes = yield* Effect.promise(() => listStashes(workspacePath));
+    const stash = stashes.find((entry) => entry.ref === stashRef);
+    if (!stash || !isSalvageableStash(stash) || stash.issueId !== issueId.toUpperCase()) {
+      return jsonResponse({ error: 'Salvageable stash not found for this workspace' }, { status: 404 });
+    }
+
+    yield* Effect.promise(() => dropStash(workspacePath, stash.ref));
+    return jsonResponse({ success: true });
   }))
 );
 
@@ -4719,6 +4782,8 @@ export const workspacesRouteLayer = Layer.mergeAll(
   getWorkspaceRoute,
   postWorkspacesRoute,
   getWorkspacePlanRoute,
+  postWorkspaceRecoverStashRoute,
+  deleteWorkspaceStashRoute,
   getWorkspaceCleanPreviewRoute,
   postWorkspaceCleanRoute,
   postWorkspaceContainerizeRoute,

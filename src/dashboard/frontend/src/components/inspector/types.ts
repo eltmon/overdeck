@@ -48,6 +48,14 @@ export interface PendingOperation {
   error?: string;
 }
 
+export interface SalvageableStashInfo {
+  ref: string;
+  issueId: string;
+  message: string;
+  shortDescription: string;
+  createdAt?: string;
+}
+
 export interface WorkspaceInfo {
   exists: boolean;
   corrupted?: boolean;
@@ -69,6 +77,7 @@ export interface WorkspaceInfo {
   git?: GitStatus;
   repoGit?: { frontend: GitStatus | null; api: GitStatus | null };
   services?: { name: string; url?: string }[];
+  salvageableStashes?: SalvageableStashInfo[];
 }
 
 export interface ContainerMenuState {
