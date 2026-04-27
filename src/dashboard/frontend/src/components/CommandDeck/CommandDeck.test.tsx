@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CommandDeck } from './index';
+import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 
 vi.mock('./styles/command-deck.module.css', () => ({
   default: {
@@ -281,6 +282,7 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
 describe('CommandDeck — project-selected session view (PAN-821)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useCommandDeckSelection.getState().clearAll();
     localStorage.clear();
   });
 
@@ -314,6 +316,24 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     const workbench = screen.getByTestId('issue-workbench');
     expect(workbench).toBeInTheDocument();
     expect(workbench).toHaveAttribute('data-issue', 'PAN-821');
+    expect(screen.getByTestId('session-panel')).toHaveAttribute('data-session', 'agent-pan-821');
+  });
+
+  it('keeps the same session pane on a second click of the same session row', async () => {
+    renderCommandDeck();
+
+    await screen.findByTestId('project-node');
+
+    const sessionButton = await screen.findByTestId('session-agent-pan-821');
+    fireEvent.click(sessionButton);
+
+    const firstWorkbench = screen.getByTestId('issue-workbench');
+    const firstSessionPanel = screen.getByTestId('session-panel');
+
+    fireEvent.click(sessionButton);
+
+    expect(screen.getByTestId('issue-workbench')).toBe(firstWorkbench);
+    expect(screen.getByTestId('session-panel')).toBe(firstSessionPanel);
     expect(screen.getByTestId('session-panel')).toHaveAttribute('data-session', 'agent-pan-821');
   });
 

@@ -3,7 +3,7 @@
 ## Status: Implementation Complete
 
 ## Current Phase
-Resubmitting PAN-859 after fixing the approved-review nit in the static Command Deck terminology mockup.
+Resubmitting PAN-859 after tightening the CommandDeck regression tests per review feedback.
 
 ## Completed Work
 - [x] context-recovery: Recovered PAN-859 requirements from GitHub because `.planning/` artifacts were missing at workspace start (commit: pending)
@@ -12,6 +12,7 @@ Resubmitting PAN-859 after fixing the approved-review nit in the static Command 
 - [x] focused-tests: Ran `npm test -- --run src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx src/dashboard/frontend/src/components/CommandDeck/__tests__/IssueWorkbench.test.tsx src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx` and got 31 passing tests across 3 files (commit: pending)
 - [x] playwright-pan-859: Verified in Playwright that clicking the PAN-859 work-agent row opens the agent pane on the first click and that a second click is idempotent; screenshot saved as `pan-859-first-click.png` (commit: pending)
 - [x] review-nit: Removed the duplicate Google Fonts Material Symbols stylesheet include from `docs/design/mockups/command-deck-terminology-map.html` per approved review feedback (commit: pending)
+- [x] test-hardening: Reset the CommandDeck selection store in `beforeEach` and added an explicit second-click idempotency regression test in `CommandDeck.test.tsx` (commit: pending)
 
 ## Remaining Work
 - [x] cross-session-verification: Verified the same first-click session-row behavior on PAN-855's work session in the live tree; screenshot saved as `pan-859-cross-session-verification.png` (commit: pending)
@@ -34,3 +35,5 @@ Resubmitting PAN-859 after fixing the approved-review nit in the static Command 
 - **[2026-04-27T22:08Z] review-agent → APPROVED** — `.planning/feedback/003-review-agent-approved.md`
 - **[2026-04-27T22:15Z] review-agent → APPROVED** — `.planning/feedback/004-review-agent-approved.md`
 - **[2026-04-27T22:15Z] review-agent → COMMENTED** — `.planning/feedback/005-review-agent-commented.md`
+- **[2026-04-27T22:46Z] review-agent → APPROVED** — `.planning/feedback/006-review-agent-approved.md`
+- **[2026-04-27T22:46Z] review-agent → APPROVED** — `.planning/feedback/006-review-agent-approved.md`
