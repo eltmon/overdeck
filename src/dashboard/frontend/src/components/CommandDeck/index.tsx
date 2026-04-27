@@ -3,9 +3,7 @@ import { useQuery, useQueryClient, useQueries } from '@tanstack/react-query';
 import { Compass, Plus } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import type { TreeSessionFilter } from './ProjectTree/FeatureItem';
-import { BadgeBar } from './FeatureMetadata/BadgeBar';
 import { DeaconStatus } from './DeaconStatus';
-import { DetailPanelLayout } from '../DetailPanelLayout';
 import { IssueWorkbench } from './IssueWorkbench';
 import { BeadsDialog } from '../BeadsDialog';
 import { ConversationList, type Conversation } from './ConversationList';
@@ -126,7 +124,28 @@ interface CommandDeckProps {
   onConversationViewModeChange?: (mode: ViewMode) => void;
 }
 
-type SidebarTab = 'conversations' | 'projects';
+const FILTER_CONVERSATIONS_KEY = 'mc-filter-conversations';
+const FILTER_PROJECTS_KEY = 'mc-filter-projects';
+
+function loadFilterConversations(): boolean {
+  try {
+    const v = localStorage.getItem(FILTER_CONVERSATIONS_KEY);
+    if (v === 'false') return false;
+  } catch {
+    // ignore
+  }
+  return true;
+}
+
+function loadFilterProjects(): boolean {
+  try {
+    const v = localStorage.getItem(FILTER_PROJECTS_KEY);
+    if (v === 'false') return false;
+  } catch {
+    // ignore
+  }
+  return true;
+}
 
 export function CommandDeck({
   issues = [],
@@ -139,7 +158,8 @@ export function CommandDeck({
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [isDraft, setIsDraft] = useState(false);
   const [showBeads, setShowBeads] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('conversations');
+  const [showConversations, setShowConversations] = useState(() => loadFilterConversations());
+  const [showProjects, setShowProjects] = useState(() => loadFilterProjects());
   const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
 
@@ -186,7 +206,7 @@ export function CommandDeck({
     queries: projects.map(project => ({
       queryKey: ['session-tree', project.name],
       queryFn: () => fetchProjectSessionTree(project.name),
-      enabled: sidebarTab === 'projects',
+      enabled: showProjects,
     })),
   });
 
@@ -209,7 +229,7 @@ export function CommandDeck({
 
   // Subscribe to live session tree deltas for each project
   useEffect(() => {
-    if (sidebarTab !== 'projects') return;
+    if (!showProjects) return;
     const transport = getTransport();
     const unsubscribes: Array<() => void> = [];
 
@@ -239,7 +259,7 @@ export function CommandDeck({
         unsubscribe();
       }
     };
-  }, [sidebarTab, projects, queryClient]);
+  }, [showProjects, projects, queryClient]);
 
   // Merge session trees into project features, preserving object identity
   // for features whose sessions haven't changed (avoids O(total features)
@@ -488,7 +508,7 @@ export function CommandDeck({
     setIsDraft(true);
     setSelectedConversation(null);
     setSelectedFeature(null);
-    setSidebarTab('conversations');
+    setShowConversations(true);
   }, []);
 
   const handleDraftPromoted = useCallback((conv: Conversation, firstMessage: string) => {
@@ -580,39 +600,51 @@ export function CommandDeck({
           <div className={styles.sidebarHeader}>
             <div className={styles.sidebarHeaderRow}>
               <h2 className={styles.sidebarTitle}>Command Deck</h2>
-              {sidebarTab === 'conversations' && (
-                <div className={styles.sidebarHeaderGroup}>
-                  <ModelPicker
-                    value={sidebarModel}
-                    onChange={(modelId) => {
-                      setSidebarModel(modelId);
-                      saveStoredModel(modelId);
-                    }}
-                  />
-                  <button
-                    className={styles.conversationAddBtn}
-                    onClick={handleDraftCreated}
-                    title="New conversation"
-                    aria-label="New conversation"
-                  >
-                    <Plus size={13} />
-                  </button>
-                </div>
-              )}
+              <div className={styles.sidebarHeaderGroup}>
+                <ModelPicker
+                  value={sidebarModel}
+                  onChange={(modelId) => {
+                    setSidebarModel(modelId);
+                    saveStoredModel(modelId);
+                  }}
+                />
+                <button
+                  className={styles.conversationAddBtn}
+                  onClick={handleDraftCreated}
+                  title="New conversation"
+                  aria-label="New conversation"
+                >
+                  <Plus size={13} />
+                </button>
+              </div>
             </div>
 
-            {/* Segmented control */}
+            {/* Filter chips */}
             <div className={styles.segmentControl}>
               <button
-                className={`${styles.segmentButton} ${sidebarTab === 'conversations' ? styles.segmentButtonActive : ''}`}
-                onClick={() => setSidebarTab('conversations')}
+                className={`${styles.segmentButton} ${showConversations ? styles.segmentButtonActive : ''}`}
+                onClick={() => {
+                  setShowConversations(v => {
+                    const next = !v;
+                    try { localStorage.setItem(FILTER_CONVERSATIONS_KEY, String(next)); } catch { /* ignore */ }
+                    return next;
+                  });
+                }}
+                aria-pressed={showConversations}
               >
                 Conversations
                 <span className={styles.segmentCount}>{conversations.length}</span>
               </button>
               <button
-                className={`${styles.segmentButton} ${sidebarTab === 'projects' ? styles.segmentButtonActive : ''}`}
-                onClick={() => setSidebarTab('projects')}
+                className={`${styles.segmentButton} ${showProjects ? styles.segmentButtonActive : ''}`}
+                onClick={() => {
+                  setShowProjects(v => {
+                    const next = !v;
+                    try { localStorage.setItem(FILTER_PROJECTS_KEY, String(next)); } catch { /* ignore */ }
+                    return next;
+                  });
+                }}
+                aria-pressed={showProjects}
               >
                 Projects
                 <span className={styles.segmentCount}>
@@ -622,7 +654,7 @@ export function CommandDeck({
             </div>
 
             {/* Tree session filter (blocker-4) */}
-            {sidebarTab === 'projects' && (
+            {showProjects && (
               <div className={styles.treeFilterRow}>
                 {(['all', 'alive', 'failed'] as TreeSessionFilter[]).map((f) => (
                   <button
@@ -637,45 +669,48 @@ export function CommandDeck({
             )}
           </div>
 
-          {/* Tab content — each gets full height */}
+          {/* Unified sidebar content */}
           <div className={styles.projectTree}>
-            {sidebarTab === 'conversations' ? (
+            {showConversations && (
               <ConversationList
                 selectedConversation={selectedConversation}
                 onSelectConversation={handleSelectConversation}
               />
-            ) : isLoading && projects.length === 0 ? (
-              <div className={styles.skeletonList}>
-                <div className={styles.skeletonItem} style={{ width: '60%' }} />
-                <div className={styles.skeletonItem} style={{ width: '80%' }} />
-                <div className={styles.skeletonItem} style={{ width: '45%' }} />
-                <div className={styles.skeletonItem} style={{ width: '70%' }} />
-              </div>
-            ) : projects.length === 0 ? (
-              <div className={styles.emptyProject}>No projects configured</div>
-            ) : (
-              projectsWithSessions.map(project => (
-                <ProjectNode
-                  key={project.path}
-                  name={project.name}
-                  features={project.features}
-                  selectedFeature={selectedFeature}
-                  onSelectFeature={handleSelectFeature}
-                  selectedSessionId={selectedSessionId}
-                  onSelectSession={handleSelectSession}
-                  issueTitles={issueTitles}
-                  issueCosts={issueCosts}
-                  filter={treeFilter}
-                  onStopSession={handleStopSession}
-                  onViewTerminal={handleViewTerminal}
-                  onPauseSession={handlePauseSession}
-                  onResumeSession={handleResumeSession}
-                  onRestartSession={handleRestartSession}
-                  onDeepWipe={handleDeepWipe}
-                  onOpenStateDir={handleOpenStateDir}
-                  onViewJsonl={handleViewJsonl}
-                />
-              ))
+            )}
+            {showProjects && (
+              isLoading && projects.length === 0 ? (
+                <div className={styles.skeletonList}>
+                  <div className={styles.skeletonItem} style={{ width: '60%' }} />
+                  <div className={styles.skeletonItem} style={{ width: '80%' }} />
+                  <div className={styles.skeletonItem} style={{ width: '45%' }} />
+                  <div className={styles.skeletonItem} style={{ width: '70%' }} />
+                </div>
+              ) : projects.length === 0 ? (
+                <div className={styles.emptyProject}>No projects configured</div>
+              ) : (
+                projectsWithSessions.map(project => (
+                  <ProjectNode
+                    key={project.path}
+                    name={project.name}
+                    features={project.features}
+                    selectedFeature={selectedFeature}
+                    onSelectFeature={handleSelectFeature}
+                    selectedSessionId={selectedSessionId}
+                    onSelectSession={handleSelectSession}
+                    issueTitles={issueTitles}
+                    issueCosts={issueCosts}
+                    filter={treeFilter}
+                    onStopSession={handleStopSession}
+                    onViewTerminal={handleViewTerminal}
+                    onPauseSession={handlePauseSession}
+                    onResumeSession={handleResumeSession}
+                    onRestartSession={handleRestartSession}
+                    onDeepWipe={handleDeepWipe}
+                    onOpenStateDir={handleOpenStateDir}
+                    onViewJsonl={handleViewJsonl}
+                  />
+                ))
+              )
             )}
           </div>
 
@@ -722,7 +757,7 @@ export function CommandDeck({
                 </div>
               );
             })()
-          ) : selectedFeature && sidebarTab === 'projects' ? (
+          ) : selectedFeature ? (
             (() => {
               const selectedAgent = agents.find(a => a.issueId?.toLowerCase() === selectedFeature?.toLowerCase() && a.id.startsWith('agent-'))
                 ?? agents.find(a => a.issueId?.toLowerCase() === selectedFeature?.toLowerCase());
@@ -742,45 +777,6 @@ export function CommandDeck({
                 />
               );
             })()
-          ) : selectedFeature ? (
-            <>
-              {/* Feature Header */}
-              <div className={styles.featureHeader}>
-                <h1 className={styles.featureTitle}>{selectedIssueTitle}</h1>
-                <span className={styles.featureId}>{selectedFeature}</span>
-                {selectedFeatureData?.isShadow && (
-                  <span className={styles.badge} style={{ borderColor: 'var(--mc-accent)', color: 'var(--mc-accent)' }}>
-                    Shadow
-                  </span>
-                )}
-              </div>
-
-              {/* Badge Bar */}
-              <BadgeBar
-                issueId={selectedFeature}
-                source={issues.find(i => i.identifier === selectedFeature)?.source}
-                onOpenBeads={() => setShowBeads(true)}
-              />
-
-              {/* Inspector + Terminal split view */}
-              {(() => {
-                const issue = issues.find(i => i.identifier === selectedFeature);
-                const agent = agents.find(a => a.issueId?.toLowerCase() === selectedFeature?.toLowerCase() && a.id.startsWith('agent-'))
-                  ?? agents.find(a => a.issueId?.toLowerCase() === selectedFeature?.toLowerCase());
-                return issue ? (
-                  <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-                    <DetailPanelLayout
-                      inline
-                      agent={agent}
-                      issueId={selectedFeature}
-                      issue={issue}
-                      issueUrl={issue.url}
-                      onClose={() => setSelectedFeature(null)}
-                    />
-                  </div>
-                ) : null;
-              })()}
-            </>
           ) : (
             <div className={styles.contentEmpty}>
               <div style={{ textAlign: 'center' }}>
