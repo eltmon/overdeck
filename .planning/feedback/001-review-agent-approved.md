@@ -2,47 +2,52 @@
 specialist: review-agent
 issueId: PAN-859
 outcome: approved
-timestamp: 2026-04-27T21:45:13Z
+timestamp: 2026-04-27T21:54:10Z
 ---
 
 # Verdict: APPROVED
 
 ## Summary
 
-PAN-859 fixes a stale-closure bug in the CommandDeck session-selection subscription: clicking a work-agent row in the project tree now opens the terminal pane on the first click instead of requiring a second click. The root cause was a Zustand selector that closed over a React state variable (`selectedFeature`), causing the selector to be evaluated with the old state when both `setSelectedFeature` and `selectSession` fired in the same interaction. The fix separates the Zustand subscription (subscribes to the full `selectedSessionByIssue` map) from the React-state-derived `selectedSessionId`, so the right pane renders correctly on the first interaction. All 4 acceptance criteria are verified implemented, a regression test covers the exact user path, and no reviewers raised blockers.
+PAN-859 fixes a stale-closure bug in the Command Deck session selector. The old Zustand selector closed over React state (`selectedFeature`), causing the session pane to fail to open on the first click when both `setSelectedFeature` and `selectSession` were batched together by React. The fix subscribes to the full `selectedSessionByIssue` map and derives `selectedSessionId` during the React render cycle, eliminating the stale-closure window. All 4 stated requirements are verified, regression coverage is added, and no security or correctness issues were found.
 
-## High Priority (SHOULD fix; synthesis approved without requiring)
+## Blockers (MUST fix before merge)
 
-### 1. Duplicate Google Fonts stylesheet in static mockup — `docs/design/mockups/command-deck-terminology-map.html:7` — `?`
-**Raised by**: performance
-**Why it matters**: The mockup HTML includes the same Google Fonts `Material Symbols Outlined` stylesheet twice on consecutive lines, causing a redundant external request.
+_none_
 
-Remove the duplicate `<link>` line.
+## High Priority (SHOULD fix; synthesis may still approve if justified)
+
+_none_
 
 ## Nits (advisory — safe to defer)
 
-- `src/dashboard/frontend/src/components/CommandDeck/IssueWorkbench.tsx:61` — `?` — Pre-existing selector pattern noted for awareness. `issueId` is a prop (stable), not a state variable, so no staleness bug exists today. Flagged only for awareness if future refactoring introduces dynamic `issueId` within a component's lifetime. (correctness)
+- `docs/design/mockups/command-deck-terminology-map.html:8` — `?` — Duplicate Google Fonts stylesheet include. Remove one of the two identical `<link>` tags. (performance)
+
+- `src/dashboard/frontend/src/components/CommandDeck/index.tsx:188` — `?` — Subscribing to the full `selectedSessionByIssue` map re-renders `CommandDeck` on any issue's session change. At current scale this is harmless. Future optimization: use `useRef` + shallow-equality custom hook if concurrent-session count grows. No action needed now. (correctness)
 
 ## Cross-cutting groups
 
 _none_
 
 ## What's good
-- Root cause correctly identified and fixed with minimal, targeted changes (3 lines of production code)
-- Thorough correctness analysis with edge-case table covering all 6 interaction scenarios
-- Regression test directly covers the broken user path (first click with no pre-selected feature)
-- Requirements coverage complete: all 4 acceptance criteria verified implemented
-- No security surface introduced; all 5 changed files reviewed clean
-- No performance regressions in application runtime code
+
+- Root-cause fix: Zustand selector now reads from external store during React render cycle, eliminating the stale-closure race condition.
+- Regression test added covering the exact broken user path (first click opens session pane).
+- All 4 acceptance criteria from the issue are verified with Playwright evidence.
+- Security review found no injection, authz, or sensitive-data issues.
 
 ## Review stats
+
 - Blockers: 0   High: 0   Medium: 0   Nits: 2
-- By reviewer: correctness=0, security=0, performance=1, requirements=0
-- Files touched: 5   Files with findings: 2
+- By reviewer: correctness=1, security=0, performance=0, requirements=0
+- Files touched: 2 source files, 1 test file (3 production files total)
+- Files with findings: 2 (both are nits; no blockers)
 
 ## Appendix: individual reviews
 
-See individual reviewer output files listed in `## Reviewer Output Files` in the Synthesis Context above. Those files contain full per-reviewer detail; this synthesis is the policy layer.
+See individual reviewer output files listed in `## Reviewer Output Files` in the
+Synthesis Context above. Those files contain full per-reviewer detail; this
+synthesis is the policy layer.
 
 ## ✅ CODE APPROVED — YOUR WORK IS COMPLETE
 
