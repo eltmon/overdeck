@@ -16,6 +16,7 @@ import {
   Tag,
   FileText,
   RefreshCw,
+  RotateCcw,
   Box,
   Play,
   GitMerge,
@@ -23,7 +24,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 import { Agent, Issue, WorkAgentLifecycle } from '../types';
-import type { ContainerStatus, ReviewStatus, WorkspaceInfo } from './inspector/types';
+import type { ContainerStatus, ReviewStatus, SalvageableStashInfo, WorkspaceInfo } from './inspector/types';
 import { getFriendlyModelName, shouldForceReviewTrigger } from './inspector/utils';
 import { useAlert } from './DialogProvider';
 import { BeadsDialog } from './BeadsDialog';
@@ -180,6 +181,18 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       return data;
     },
     refetchInterval: (workspaceCreating || containersStarting || !!agentLaunchState) ? 5000 : 30000,
+  });
+
+  const { data: stashData } = useQuery<{ salvageableStashes: SalvageableStashInfo[] }>({
+    queryKey: ['workspace-stashes', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/stashes`);
+      if (!res.ok) throw new Error('Failed to fetch workspace stashes');
+      return res.json();
+    },
+    enabled: workspace?.exists === true,
+    refetchInterval: 60000,
+    staleTime: 30000,
   });
 
   // Self-contained review status query (shares cache key with DetailPanelLayout)
@@ -532,6 +545,43 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     },
   });
 
+  const recoverStashMutation = useMutation({
+    mutationFn: async (stashRef: string) => {
+      const res = await fetch(`/api/workspaces/${issueId}/stashes/${encodeURIComponent(stashRef)}/recover`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to recover stash');
+      return data as { branchName: string };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['workspace-stashes', issueId] });
+      toast.success(`Created ${data.branchName}`);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Failed to recover stash');
+    },
+  });
+
+  const dismissStashMutation = useMutation({
+    mutationFn: async (stashRef: string) => {
+      const res = await fetch(`/api/workspaces/${issueId}/stashes/${encodeURIComponent(stashRef)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to dismiss stash');
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspace-stashes', issueId] });
+      toast.success('Stash dismissed');
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Failed to dismiss stash');
+    },
+  });
+
   const handleCopy = useCallback(() => {
     copyToClipboard(tmuxCommand);
     setCopied(true);
@@ -594,6 +644,21 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
   const handleContainerContextMenu = (e: React.MouseEvent, containerName: string, isRunning: boolean) => {
     e.preventDefault();
     setContainerMenu({ x: e.clientX, y: e.clientY, containerName, isRunning });
+  };
+
+  const handleRecoverStash = async (stashRef: string) => {
+    recoverStashMutation.mutate(stashRef);
+  };
+
+  const handleDismissStash = async (stashRef: string) => {
+    if (await confirm({
+      title: 'Dismiss Stash',
+      message: 'Are you sure? This stash will be dropped permanently',
+      variant: 'destructive',
+      confirmLabel: 'Dismiss',
+    })) {
+      dismissStashMutation.mutate(stashRef);
+    }
   };
 
   return (
@@ -902,6 +967,45 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
               >
                 {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
+            </div>
+          </div>
+        )}
+
+        {stashData?.salvageableStashes && stashData.salvageableStashes.length > 0 && (
+          <div className="px-3 py-2 border-b border-border text-xs">
+            <div className="uppercase tracking-wider text-[10px] mb-2 font-semibold text-muted-foreground">Salvageable Stashes</div>
+            <div className="space-y-2">
+              {stashData.salvageableStashes.map((stash) => (
+                <div key={stash.ref} className="rounded border border-border px-2 py-2 bg-card/40">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-medium text-foreground truncate">{stash.shortDescription}</div>
+                      <div className="text-muted-foreground font-mono text-[10px] truncate">{stash.ref}</div>
+                      {stash.createdAt && (
+                        <div className="text-muted-foreground text-[10px]">{new Date(stash.createdAt).toLocaleString()}</div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => handleRecoverStash(stash.ref)}
+                        disabled={recoverStashMutation.isPending}
+                        className="flex items-center gap-1 px-2 py-1 text-xs rounded text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-50"
+                      >
+                        {recoverStashMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+                        Recover
+                      </button>
+                      <button
+                        onClick={() => handleDismissStash(stash.ref)}
+                        disabled={dismissStashMutation.isPending}
+                        className="flex items-center gap-1 px-2 py-1 text-xs rounded text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                      >
+                        {dismissStashMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
