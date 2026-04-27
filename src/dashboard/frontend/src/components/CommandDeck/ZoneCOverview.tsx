@@ -13,7 +13,7 @@
  * Discussions tab pulls from `/api/issues/:issueId/discussions` (pan-1r7j).
  */
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Issue, Agent } from '../../types';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 import { OverviewTab } from './ZoneCOverviewTabs/OverviewTab';
@@ -56,6 +56,10 @@ const ALL_TABS: readonly OverviewTabSpec[] = [
   { key: 'discussions', label: 'Discussions' },
 ];
 
+function isOverviewTab(value: string | null | undefined): value is OverviewTab {
+  return !!value && ALL_TABS.some((tab) => tab.key === value);
+}
+
 interface ZoneCOverviewProps {
   issueId: string;
   /** Optional controlled active tab; defaults to 'overview'. */
@@ -79,17 +83,55 @@ export function ZoneCOverview({
   issue,
   agent,
 }: ZoneCOverviewProps) {
-  const [internalTab, setInternalTab] = useState<OverviewTab>('overview');
+  const getInitialTab = (): OverviewTab => {
+    if (activeTab) return activeTab;
+    const fromUrl = new URLSearchParams(window.location.search).get('tab');
+    return isOverviewTab(fromUrl) ? fromUrl : 'overview';
+  };
+
+  const [internalTab, setInternalTab] = useState<OverviewTab>(getInitialTab);
   const tab = activeTab ?? internalTab;
 
   const planning = usePlanningQuery(issueId);
   const hasInference = !!(planning.data?.inference && planning.data.inference.trim() !== '');
 
-  const visibleTabs = ALL_TABS.filter((spec) => spec.key !== 'inference' || hasInference);
+  const visibleTabs = useMemo(
+    () => ALL_TABS.filter((spec) => spec.key !== 'inference' || hasInference),
+    [hasInference],
+  );
+
+  useEffect(() => {
+    if (activeTab) return;
+    const current = new URLSearchParams(window.location.search).get('tab');
+    if (current === tab) return;
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('tab', tab);
+    window.history.replaceState(window.history.state, '', nextUrl);
+  }, [activeTab, tab]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      if (activeTab) return;
+      const next = new URLSearchParams(window.location.search).get('tab');
+      setInternalTab(isOverviewTab(next) ? next : 'overview');
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (visibleTabs.some((spec) => spec.key === tab)) return;
+    if (onTabChange) onTabChange('overview');
+    else setInternalTab('overview');
+  }, [onTabChange, tab, visibleTabs]);
 
   const handleTabClick = (next: OverviewTab) => {
     if (onTabChange) onTabChange(next);
     else setInternalTab(next);
+
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('tab', next);
+    window.history.pushState(window.history.state, '', nextUrl);
   };
 
   return (
@@ -106,6 +148,22 @@ export function ZoneCOverview({
       <div
         role="tablist"
         aria-label={`Issue ${issueId} overview tabs`}
+        onKeyDown={(event) => {
+          const currentIndex = visibleTabs.findIndex((spec) => spec.key === tab);
+          if (currentIndex === -1) return;
+
+          if (event.key === 'ArrowRight' || (event.key === 'Tab' && !event.shiftKey)) {
+            event.preventDefault();
+            const next = visibleTabs[(currentIndex + 1) % visibleTabs.length]?.key;
+            if (next) handleTabClick(next);
+          }
+
+          if (event.key === 'ArrowLeft' || (event.key === 'Tab' && event.shiftKey)) {
+            event.preventDefault();
+            const next = visibleTabs[(currentIndex - 1 + visibleTabs.length) % visibleTabs.length]?.key;
+            if (next) handleTabClick(next);
+          }
+        }}
         style={{
           display: 'flex',
           gap: 4,
@@ -113,6 +171,10 @@ export function ZoneCOverview({
           borderBottom: '1px solid var(--mc-border, var(--border))',
           overflowX: 'auto',
           flexShrink: 0,
+          position: 'sticky',
+          top: 0,
+          background: 'var(--mc-surface, var(--background))',
+          zIndex: 1,
         }}
       >
         {visibleTabs.map((spec) => {
@@ -122,6 +184,8 @@ export function ZoneCOverview({
               key={spec.key}
               role="tab"
               aria-selected={active}
+              aria-controls={`zone-c-overview-panel-${spec.key}`}
+              tabIndex={active ? 0 : -1}
               data-testid={`zone-c-overview-tab-${spec.key}`}
               onClick={() => handleTabClick(spec.key)}
               style={{
@@ -150,6 +214,7 @@ export function ZoneCOverview({
       </div>
       <div
         role="tabpanel"
+        id={`zone-c-overview-panel-${tab}`}
         data-testid={`zone-c-overview-panel-${tab}`}
         style={{
           flex: 1,

@@ -82,6 +82,7 @@ const ISSUE = 'PAN-830';
 
 describe('ZoneCOverview', () => {
   beforeEach(() => {
+    window.history.replaceState({}, '', '/command-deck');
     planningResult.data = undefined;
     planningResult.isLoading = false;
     activityResult.data = { issueId: ISSUE, sections: [] };
@@ -186,5 +187,45 @@ describe('ZoneCOverview', () => {
     expect(screen.getByTestId('overview-link-beads')).toBeInTheDocument();
     expect(screen.getByTestId('overview-link-costs')).toBeInTheDocument();
     expect(screen.getByTestId('overview-link-activity')).toBeInTheDocument();
+  });
+
+  it('syncs active tab to the URL query string', () => {
+    render(<ZoneCOverview issueId={ISSUE} />);
+    fireEvent.click(screen.getByTestId('zone-c-overview-tab-costs'));
+    expect(new URLSearchParams(window.location.search).get('tab')).toBe('costs');
+  });
+
+  it('initializes the active tab from the URL query string', () => {
+    window.history.replaceState({}, '', '/command-deck?tab=costs');
+    costsResult.data = {
+      issueId: ISSUE,
+      totalCost: 1.23,
+      totalTokens: 4500,
+      sessions: [],
+      byModel: { 'claude-sonnet-4-6': { cost: 1.23, tokens: 4500 } },
+      byStage: { planning: { cost: 0.5, tokens: 1500 } },
+    };
+
+    render(<ZoneCOverview issueId={ISSUE} />);
+    expect(screen.getByTestId('costs-tab')).toBeInTheDocument();
+    expect(screen.getByTestId('zone-c-overview-tab-costs')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('supports arrow-key tab navigation', () => {
+    render(<ZoneCOverview issueId={ISSUE} />);
+    fireEvent.keyDown(screen.getByRole('tablist'), { key: 'ArrowRight' });
+    expect(screen.getByTestId('activity-tab-stub')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('tab')).toBe('activity');
+  });
+
+  it('supports Tab and Shift-Tab navigation inside the tab strip', () => {
+    render(<ZoneCOverview issueId={ISSUE} />);
+    const tablist = screen.getByRole('tablist');
+
+    fireEvent.keyDown(tablist, { key: 'Tab' });
+    expect(screen.getByTestId('activity-tab-stub')).toBeInTheDocument();
+
+    fireEvent.keyDown(tablist, { key: 'Tab', shiftKey: true });
+    expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
   });
 });
