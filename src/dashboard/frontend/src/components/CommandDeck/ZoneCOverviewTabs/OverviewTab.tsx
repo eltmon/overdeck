@@ -449,7 +449,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               <button
                 type="button"
                 onClick={() => {
-                  void fetch(`/api/agents/start`, {
+                  void fetch(`/api/agents`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ issueId }),

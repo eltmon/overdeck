@@ -169,6 +169,13 @@ export function ZoneCOverview({
             if (next) moveTabFocus(next);
           }
 
+          if (event.key === 'Tab') {
+            event.preventDefault();
+            const delta = event.shiftKey ? -1 : 1;
+            const next = visibleTabs[(currentIndex + delta + visibleTabs.length) % visibleTabs.length]?.key;
+            if (next) moveTabFocus(next);
+          }
+
           if (event.key === 'Home') {
             event.preventDefault();
             const next = visibleTabs[0]?.key;

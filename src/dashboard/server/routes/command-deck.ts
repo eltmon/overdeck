@@ -86,6 +86,8 @@ const CLOSED_ISSUES_TTL_MS = 120_000; // 2 minutes
  *  Keyed by upper-cased issueId so concurrent issues don't share stale data. */
 const costCache = new Map<string, { timestamp: number; data: { totalCost: number; costByStage: Record<string, { cost: number; tokens: number }> } }>();
 const COST_CACHE_TTL_MS = 30_000; // 30 seconds
+const stashCountCache = new Map<string, { timestamp: number; count: number }>();
+const STASH_COUNT_CACHE_TTL_MS = 60_000; // 60 seconds
 
 /** Evict expired entries from a TTL cache Map to prevent unbounded growth. */
 function sweepExpired<T>(cache: Map<string, { timestamp: number; data: T }>, ttlMs: number): void {
@@ -680,8 +682,17 @@ async function fetchPlanningData(issueId: string): Promise<unknown> {
 
   // Stash count for workspace hygiene warning (PAN-847)
   try {
-    const { stdout: stashList } = await execAsync('git stash list', { cwd: workspacePath, encoding: 'utf-8' });
-    result.stashCount = stashList.trim() ? stashList.trim().split('\n').length : 0;
+    const cacheKey = workspacePath;
+    const cached = stashCountCache.get(cacheKey);
+    if (cached && cached.timestamp > Date.now() - STASH_COUNT_CACHE_TTL_MS) {
+      result.stashCount = cached.count;
+    } else {
+      const { stdout: stashList } = await execAsync('git stash list', { cwd: workspacePath, encoding: 'utf-8' });
+      const count = stashList.trim() ? stashList.trim().split('\n').length : 0;
+      sweepExpired(stashCountCache, STASH_COUNT_CACHE_TTL_MS);
+      stashCountCache.set(cacheKey, { timestamp: Date.now(), count });
+      result.stashCount = count;
+    }
   } catch { /* not a git repo or git unavailable */ }
 
   return result;
