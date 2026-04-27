@@ -6,7 +6,7 @@ export default defineConfig([
     format: 'esm',
     dts: true,
     clean: true,
-    outExtensions: () => ({ js: '.mjs', dts: '.d.mts' }),
+    outExtensions: () => ({ js: '.mjs', dts: '.d.ts' }),
     outDir: 'dist',
   },
   {

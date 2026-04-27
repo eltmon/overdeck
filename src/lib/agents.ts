@@ -465,7 +465,7 @@ export const __testInternals = { markAgentRunning, markAgentStopped };
 // ~30 call sites across the cloister consumed the old shape and migrating
 // every field access in one PR would have been mechanical noise.
 
-import type { AgentRuntimeSnapshot } from '@panopticon/contracts';
+import type { AgentRuntimeSnapshot } from '@panctl/contracts';
 import {
   getAgentRuntimeSnapshot as fetchAgentRuntimeSnapshot,
   emitAgentEvent,

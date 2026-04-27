@@ -13,7 +13,7 @@ export default defineConfig({
   shims: true,
   outExtensions: () => ({ js: '.js', dts: '.d.ts' }),
   deps: {
-    alwaysBundle: (id) => id.startsWith('@panopticon/'),
+    alwaysBundle: (id) => id.startsWith('@panctl/'),
   },
   outDir: 'dist',
 });

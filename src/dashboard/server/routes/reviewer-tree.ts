@@ -17,7 +17,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { SessionNodePresence } from '@panopticon/contracts';
+import { SessionNodePresence } from '@panctl/contracts';
 import {
   REVIEWER_ROLES,
   getReviewerSessionName,

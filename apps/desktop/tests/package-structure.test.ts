@@ -22,9 +22,9 @@ describe("package.json", () => {
     expect(pkg.private).toBeUndefined();
   });
 
-  it("has name '@eltmon/panctl'", () => {
+  it("has name '@panctl/desktop'", () => {
     const pkg = readPkg();
-    expect(pkg.name).toBe("@eltmon/panctl");
+    expect(pkg.name).toBe("@panctl/desktop");
   });
 
   it("has a bin entry pointing to bin/panctl.mjs", () => {

@@ -26,6 +26,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const packageJsonPath = join(__dirname, '..', '..', 'package.json');
 const desktopPackageJsonPath = join(__dirname, '..', '..', 'apps', 'desktop', 'package.json');
+const contractsPackageJsonPath = join(__dirname, '..', '..', 'packages', 'contracts', 'package.json');
 
 export function registerReleaseCommands(program: Command): void {
   const release = program
@@ -72,6 +73,14 @@ function readDesktopPackageJson(): PackageJson {
 
 function writeDesktopPackageJson(pkg: PackageJson): void {
   writeFileSync(desktopPackageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
+}
+
+function readContractsPackageJson(): PackageJson {
+  return JSON.parse(readFileSync(contractsPackageJsonPath, 'utf-8')) as PackageJson;
+}
+
+function writeContractsPackageJson(pkg: PackageJson): void {
+  writeFileSync(contractsPackageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
 }
 
 function getCurrentVersion(): string {
@@ -135,8 +144,8 @@ function buildReleaseNotesMarkdown(params: {
   const { channel, version, from, to, entries } = params;
   const range = from ? `${from}...${to}` : to;
   const installCommand = channel === 'stable'
-    ? 'npm install -g panopticon-cli'
-    : `npm install -g panopticon-cli@${channel}`;
+    ? 'npm install -g @panctl/cli'
+    : `npm install -g @panctl/cli@${channel}`;
 
   const bullets = entries.length > 0
     ? entries.map((entry) => `- ${entry}`).join('\n')
@@ -357,6 +366,10 @@ async function releaseCreateCommand(channel: ReleaseChannel, version?: string): 
   desktopPkg.version = resolvedVersion;
   writeDesktopPackageJson(desktopPkg);
 
+  const contractsPkg = readContractsPackageJson();
+  contractsPkg.version = resolvedVersion;
+  writeContractsPackageJson(contractsPkg);
+
   const entries = getCommitSubjects(repoRoot, previousTag ? `${previousTag}..HEAD` : 'HEAD');
   const releaseNotes = buildReleaseNotesMarkdown({
     channel,
@@ -370,7 +383,7 @@ async function releaseCreateCommand(channel: ReleaseChannel, version?: string): 
 
   run('bun install', repoRoot);
 
-  run('git add package.json apps/desktop/package.json bun.lock', repoRoot);
+  run('git add package.json apps/desktop/package.json packages/contracts/package.json bun.lock', repoRoot);
   run(`git commit -m "chore: release ${resolvedVersion}"`, repoRoot);
   run(`git tag -a ${tagName} -m "Release ${resolvedVersion}"`, repoRoot);
 

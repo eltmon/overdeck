@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { ChevronRight } from 'lucide-react';
-import type { SessionNode } from '@panopticon/contracts';
+import type { SessionNode } from '@panctl/contracts';
 import { FeatureItem, type TreeSessionFilter } from './FeatureItem';
 import styles from '../styles/command-deck.module.css';
 

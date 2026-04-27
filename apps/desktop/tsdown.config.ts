@@ -13,7 +13,7 @@ export default defineConfig([
     entry: ["src/main.ts"],
     clean: true,
     deps: {
-      alwaysBundle: (id: string) => id.startsWith("@panopticon/"),
+      alwaysBundle: (id: string) => id.startsWith("@panctl/"),
       neverBundle: ["electron"],
     },
   },

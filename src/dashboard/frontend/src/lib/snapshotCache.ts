@@ -9,7 +9,7 @@
  * If the snapshot is too large (> 2MB), output buffers are stripped first.
  */
 
-import type { DashboardSnapshot } from '@panopticon/contracts'
+import type { DashboardSnapshot } from '@panctl/contracts'
 
 const CACHE_KEY = 'pan-snapshot-cache-v1'
 const MAX_BYTES = 2 * 1024 * 1024 // 2MB

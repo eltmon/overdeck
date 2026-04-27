@@ -10,7 +10,7 @@
 
 import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { DomainEvent } from '@panopticon/contracts'
+import { DomainEvent } from '@panctl/contracts'
 import { bodyToEvent } from '../../src/dashboard/server/routes/agents'
 
 const AGENT = 'agent-800'

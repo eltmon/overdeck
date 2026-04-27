@@ -9,7 +9,7 @@
  */
 
 import type { DbAdapter } from '../event-store.js';
-import type { DashboardSnapshot } from '@panopticon/contracts';
+import type { DashboardSnapshot } from '@panctl/contracts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
