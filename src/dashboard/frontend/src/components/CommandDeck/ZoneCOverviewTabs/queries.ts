@@ -192,8 +192,17 @@ export interface PullRequestData {
 export interface PrEndpointResponse {
   issueId: string;
   pr: PullRequestData | null;
+  error?: string;
+}
+
+export interface PrDiffResponse {
+  issueId: string;
   diff: string | null;
   error?: string;
+}
+
+export interface PrDetailsResponse extends PrEndpointResponse {
+  diff: string | null;
 }
 
 export function usePrQuery(issueId: string): UseQueryResult<PrEndpointResponse> {
@@ -201,6 +210,19 @@ export function usePrQuery(issueId: string): UseQueryResult<PrEndpointResponse> 
     queryKey: ['issuePr', issueId],
     queryFn: () => fetchJson<PrEndpointResponse>(`/api/issues/${issueId}/pr`),
     refetchInterval: 30_000,
+  });
+}
+
+export function usePrDiffQuery(issueId: string): UseQueryResult<PrDiffResponse> {
+  return useQuery({
+    queryKey: ['issuePr', issueId, 'details'],
+    queryFn: () => fetchJson<PrDetailsResponse>(`/api/issues/${issueId}/pr/details`),
+    select: (data) => ({
+      issueId: data.issueId,
+      diff: data.diff,
+      error: data.error,
+    }),
+    refetchInterval: false,
   });
 }
 

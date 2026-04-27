@@ -280,7 +280,7 @@ export async function fetchActivityDataWithContext(
         startedAt: state.startedAt || state.createdAt || new Date().toISOString(),
         duration: state.startedAt ? (() => {
           const ms = Date.now() - new Date(state.startedAt).getTime();
-          return isNaN(ms) ? null : Math.floor(ms / 1000);
+          return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
         })() : null,
         status: rtState?.state === 'active' ? 'running' : rtState?.state === 'suspended' ? 'completed' : (state.status || 'completed'),
         transcript: jsonlPath ? undefined : transcript,
@@ -303,7 +303,7 @@ export async function fetchActivityDataWithContext(
         type: 'legacy',
         sessionId,
         model: 'unknown',
-        startedAt: (fileStat?.birthtime && !isNaN(fileStat.birthtime.getTime()) ? fileStat.birthtime.toISOString() : undefined)
+        startedAt: (fileStat?.birthtime && !Number.isNaN(fileStat.birthtime.getTime()) ? fileStat.birthtime.toISOString() : undefined)
           || fileStat?.mtime?.toISOString()
           || new Date().toISOString(),
         duration: null,
@@ -671,19 +671,21 @@ async function fetchPlanningData(
   } catch { /* no vBRIEF plan */ }
 
   // Stash count for workspace hygiene warning (PAN-847)
-  try {
-    const cacheKey = workspacePath;
-    const cached = stashCountCache.get(cacheKey);
-    if (cached && cached.timestamp > Date.now() - STASH_COUNT_CACHE_TTL_MS) {
-      result.stashCount = cached.count;
-    } else {
-      const { stdout: stashList } = await execAsync('git stash list', { cwd: workspacePath, encoding: 'utf-8' });
-      const count = stashList.trim() ? stashList.trim().split('\n').length : 0;
+  if (!summaryOnly) {
+    try {
+      const cacheKey = workspacePath;
       sweepExpired(stashCountCache, STASH_COUNT_CACHE_TTL_MS);
-      stashCountCache.set(cacheKey, { timestamp: Date.now(), count });
-      result.stashCount = count;
-    }
-  } catch { /* not a git repo or git unavailable */ }
+      const cached = stashCountCache.get(cacheKey);
+      if (cached && cached.timestamp > Date.now() - STASH_COUNT_CACHE_TTL_MS) {
+        result.stashCount = cached.count;
+      } else {
+        const { stdout: stashList } = await execAsync('git stash list', { cwd: workspacePath, encoding: 'utf-8' });
+        const count = stashList.trim() ? stashList.trim().split('\n').length : 0;
+        stashCountCache.set(cacheKey, { timestamp: Date.now(), count });
+        result.stashCount = count;
+      }
+    } catch { /* not a git repo or git unavailable */ }
+  }
 
   if (summaryOnly) {
     return {

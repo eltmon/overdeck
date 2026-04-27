@@ -6,7 +6,7 @@
  * can land in PAN-866 without expanding this issue's scope.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { Issue, Agent } from '../../types';
 import { OverviewTab } from './ZoneCOverviewTabs/OverviewTab';
 
@@ -97,13 +97,6 @@ export function ZoneCOverview({
   });
 
   const visibleTabs = ALL_TABS;
-
-
-  useEffect(() => {
-    if (visibleTabs.some((spec) => spec.key === tab)) return;
-    if (onTabChange) onTabChange('overview');
-    else setInternalTab('overview');
-  }, [onTabChange, tab, visibleTabs]);
 
   const handleTabClick = (next: OverviewTab) => {
     if (onTabChange) onTabChange(next);

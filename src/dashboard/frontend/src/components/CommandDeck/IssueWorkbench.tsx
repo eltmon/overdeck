@@ -90,7 +90,13 @@ export function IssueWorkbench({
 
   useEffect(() => {
     if (selectedSessionId) return;
-    setActiveTab(readTabFromUrl());
+    const currentUrl = new URL(window.location.href);
+    const nextTab = readTabFromUrl();
+    setActiveTab(nextTab);
+    if (!currentUrl.searchParams.has('tab')) {
+      currentUrl.searchParams.set('tab', nextTab);
+      window.history.replaceState(window.history.state, '', currentUrl);
+    }
   }, [readTabFromUrl, selectedSessionId]);
 
   const handleSwitchTab = useCallback((tab: OverviewTab) => {

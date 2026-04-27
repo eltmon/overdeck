@@ -65,6 +65,7 @@ vi.mock('../ZoneCOverviewTabs/queries', () => ({
   useIssueCostsQuery: () => ({ data: undefined, isLoading: false, isError: false }),
   useReviewStatusQuery: () => ({ data: undefined, isLoading: false, isError: false }),
   usePrQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  usePrDiffQuery: () => ({ data: undefined, isLoading: false, isError: false }),
   useDiscussionsQuery: () => ({ data: undefined, isLoading: false, isError: false }),
   useWorkspaceQuery: () => ({ data: { exists: false, issueId: '' }, isLoading: false, isError: false }),
 }));
@@ -101,6 +102,7 @@ function Wrapper({ children }: { children: ReactNode }) {
 
 describe('IssueWorkbench', () => {
   beforeEach(() => {
+    window.history.replaceState({}, '', '/command-deck');
     act(() => {
       useCommandDeckSelection.getState().clearAll();
     });
@@ -123,6 +125,7 @@ describe('IssueWorkbench', () => {
     expect(screen.getByTestId('zone-c-overview')).toBeInTheDocument();
     expect(screen.queryByTestId('zone-b')).not.toBeInTheDocument();
     expect(screen.queryByTestId('session-panel')).not.toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('tab')).toBe('overview');
   });
 
   it('renders issue-selected mode when the slice explicitly clears session focus', () => {

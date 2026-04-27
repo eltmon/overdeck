@@ -59,6 +59,7 @@ function mapSessionType(type: string): SessionNodeType {
 
 interface ActivityContext {
   tmuxSessionNames?: Set<string>;
+  issueTitles?: ReadonlyMap<string, string>;
 }
 
 const LEGACY_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -200,20 +201,13 @@ async function collectSessionTreeNodes(
 async function resolveFeatureTitle(
   issueId: string,
   issueLower: string,
+  issueTitles: ReadonlyMap<string, string>,
   project?: { config: { path: string; workspace?: { workspaces_dir?: string } } },
 ): Promise<string> {
-  // Try issue data service first
-  try {
-    const issueDataService = await getIssueDataService();
-    const allIssues = issueDataService.getIssues() as Array<Record<string, unknown>>;
-    const issue = allIssues.find(i =>
-      i['identifier'] === issueId ||
-      (i['identifier'] as string)?.toLowerCase() === issueId.toLowerCase()
-    );
-    if (issue?.['title']) {
-      return String(issue['title']);
-    }
-  } catch { /* non-fatal */ }
+  const mappedTitle = issueTitles.get(issueId) ?? issueTitles.get(issueId.toLowerCase());
+  if (mappedTitle) {
+    return mappedTitle;
+  }
 
   // Fall back to PLANNING_PROMPT.md first line
   if (project) {
@@ -256,6 +250,24 @@ const getProjectSessionTreeRoute = HttpRouter.add(
   })),
 );
 
+async function buildIssueTitleMap(): Promise<Map<string, string>> {
+  const issueTitles = new Map<string, string>();
+  try {
+    const issueDataService = await getIssueDataService();
+    const allIssues = issueDataService.getIssues() as Array<Record<string, unknown>>;
+    for (const issue of allIssues) {
+      const identifier = typeof issue['identifier'] === 'string' ? issue['identifier'] : null;
+      const title = typeof issue['title'] === 'string' ? issue['title'].trim() : '';
+      if (!identifier || !title) continue;
+      issueTitles.set(identifier, title);
+      issueTitles.set(identifier.toLowerCase(), title);
+    }
+  } catch {
+    // non-fatal: callers fall back to planning prompt or issue id
+  }
+  return issueTitles;
+}
+
 export async function fetchProjectSessionTree(
   projectKey: string,
   sharedContext?: ActivityContext,
@@ -283,6 +295,7 @@ export async function fetchProjectSessionTree(
     title: string;
     sessions: SessionNode[];
   }> = [];
+  const issueTitles = sharedContext?.issueTitles ?? await buildIssueTitleMap();
 
   if (await pathExists(workspacesDir)) {
     const entries = await readdir(workspacesDir, { withFileTypes: true }).catch(() => []);
@@ -308,7 +321,7 @@ export async function fetchProjectSessionTree(
           const workspacePath = join(workspacesDir, c.name);
           const sessions = await collectSessionTreeNodes(c.issueId, workspacePath, projectPath, effectiveSharedContext);
           if (sessions.length === 0) return null;
-          const title = await resolveFeatureTitle(c.issueId, c.issueLower, project);
+          const title = await resolveFeatureTitle(c.issueId, c.issueLower, issueTitles, project);
           return { issueId: c.issueId, title, sessions };
         } catch (err) {
           console.warn(`[fetchProjectSessionTree] Failed to process feature ${c.issueId}:`, err);
@@ -334,7 +347,7 @@ const getAllSessionTreesRoute = HttpRouter.add(
   '/api/session-trees',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const url = new URL(request.url);
+    const url = new URL(request.url, 'http://localhost');
     const projectsParam = url.searchParams.get('projects') ?? '';
     const projectKeys = projectsParam.split(',').filter(Boolean);
 
@@ -347,8 +360,10 @@ const getAllSessionTreesRoute = HttpRouter.add(
         const allSessionsArr = await listSessionNamesAsync().catch(() => [] as string[]);
         const sharedTmuxSessionNames = new Set(allSessionsArr.filter(s => s.trim()));
 
+        const issueTitles = await buildIssueTitleMap();
         const sharedContext: ActivityContext = {
           tmuxSessionNames: sharedTmuxSessionNames,
+          issueTitles,
         };
 
         return Promise.all(

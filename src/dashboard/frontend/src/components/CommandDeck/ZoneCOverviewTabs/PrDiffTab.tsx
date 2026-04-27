@@ -1,7 +1,8 @@
 /**
  * PrDiffTab — pull-request and diff view for the issue-selected Command Deck.
  *
- * Pulls from `/api/issues/:issueId/pr` (gh pr view + gh pr diff). Renders:
+ * Pulls PR metadata from `/api/issues/:issueId/pr` and the patch from
+ * `/api/issues/:issueId/pr/details` (shared PR-resolution path). Renders:
  *   - Header: PR number, title, state badge, draft pill, branches, age
  *   - CI rollup row: per-check status (success / failure / pending)
  *   - Reviewers row: requested + decision
@@ -15,7 +16,7 @@
 
 import { useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { usePrQuery, type PullRequestData } from './queries';
+import { usePrDiffQuery, usePrQuery, type PullRequestData } from './queries';
 
 const DIFF_LINE_HEIGHT = 17; // font-size 11 × line-height 1.5, rounded up
 
@@ -94,6 +95,7 @@ function StateBadge({ pr }: { pr: PullRequestData }) {
 
 export function PrDiffTab({ issueId }: PrDiffTabProps) {
   const { data, isLoading, isError } = usePrQuery(issueId);
+  const diffQuery = usePrDiffQuery(issueId);
 
   // fileMax drives the bar-chart scale. Naively using `Math.max(...)` lets one
   // 50,000-line file squash every smaller file's bar into sub-pixel territory.
@@ -109,7 +111,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
     return Math.max(1, sorted[idx] ?? 1);
   }, [data]);
 
-  const diffLines = useMemo(() => data?.diff?.split('\n') ?? [], [data?.diff]);
+  const diffLines = useMemo(() => diffQuery.data?.diff?.split('\n') ?? [], [diffQuery.data?.diff]);
   const diffScrollRef = useRef<HTMLDivElement>(null);
   const diffVirtualizer = useVirtualizer({
     count: diffLines.length,
@@ -396,7 +398,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
         )}
       </section>
 
-      {data.diff && (
+      {diffQuery.data?.diff && (
         <section
           data-testid="prdiff-tab-diff"
           style={{

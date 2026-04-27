@@ -2510,22 +2510,32 @@ export interface IssuePullRequestData {
 export interface IssuePrEndpointResponse {
   issueId: string;
   pr: IssuePullRequestData | null;
+  error?: string;
+}
+
+export interface IssuePrDiffEndpointResponse {
+  issueId: string;
   diff: string | null;
   error?: string;
 }
 
-export async function fetchIssuePullRequest(issueId: string): Promise<IssuePrEndpointResponse> {
+export interface IssuePrDetailsResponse extends IssuePrEndpointResponse {
+  diff: string | null;
+}
+
+async function resolveIssuePullRequestRef(issueId: string): Promise<
+  | { issueId: string; repoArg: string; prNumber: string }
+  | { issueId: string; repoArg: null; prNumber: null; error?: string }
+> {
   const upper = issueId.toUpperCase();
   const githubCheck = isGitHubIssue(issueId);
   if (!githubCheck.isGitHub || !githubCheck.owner || !githubCheck.repo) {
-    return { issueId: upper, pr: null, diff: null };
+    return { issueId: upper, repoArg: null, prNumber: null };
   }
 
   const branchName = `feature/${issueId.toLowerCase()}`;
   const repoArg = `${githubCheck.owner}/${githubCheck.repo}`;
 
-  // Find the PR number for the feature branch (open or closed/merged).
-  let prNumber: string;
   try {
     const { stdout } = await execFileAsync(
       'gh',
@@ -2540,54 +2550,86 @@ export async function fetchIssuePullRequest(issueId: string): Promise<IssuePrEnd
       ],
       { encoding: 'utf-8', timeout: 15000 },
     );
-    prNumber = stdout.trim();
+    const prNumber = stdout.trim();
+    if (!prNumber) {
+      return { issueId: upper, repoArg: null, prNumber: null };
+    }
+    return { issueId: upper, repoArg, prNumber };
   } catch (err: any) {
-    return { issueId: upper, pr: null, diff: null, error: `gh pr list failed: ${err.message}` };
+    return { issueId: upper, repoArg: null, prNumber: null, error: `gh pr list failed: ${err.message}` };
   }
-  if (!prNumber) {
-    return { issueId: upper, pr: null, diff: null };
+}
+
+export async function fetchIssuePullRequest(issueId: string): Promise<IssuePrEndpointResponse> {
+  const prRef = await resolveIssuePullRequestRef(issueId);
+  if (!prRef.repoArg || !prRef.prNumber) {
+    return { issueId: prRef.issueId, pr: null, error: prRef.error };
   }
 
-  // Pull the rich fields via `gh pr view --json …` and `gh pr diff` in
-  // parallel — they depend only on the PR number.
-  let pr: IssuePullRequestData;
-  let diff: string | null = null;
-  let diffError: string | undefined;
   try {
-    const [viewResult, diffResult] = await Promise.allSettled([
-      execFileAsync(
-        'gh',
-        [
-          'pr', 'view', prNumber,
-          '--repo', repoArg,
-          '--json', GH_PR_VIEW_FIELDS,
-        ],
-        { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
-      ),
-      execFileAsync(
-        'gh',
-        [
-          'pr', 'diff', prNumber,
-          '--repo', repoArg,
-          '--patch',
-        ],
-        { encoding: 'utf-8', timeout: 30000, maxBuffer: 16 * 1024 * 1024 },
-      ),
-    ]);
-    if (viewResult.status === 'rejected') {
-      return { issueId: upper, pr: null, diff: null, error: `gh pr view failed: ${viewResult.reason?.message ?? String(viewResult.reason)}` };
-    }
-    pr = JSON.parse(viewResult.value.stdout) as IssuePullRequestData;
-    if (diffResult.status === 'fulfilled') {
-      diff = diffResult.value.stdout;
-    } else {
-      diffError = `gh pr diff failed: ${diffResult.reason?.message ?? String(diffResult.reason)}`;
-    }
+    const { stdout } = await execFileAsync(
+      'gh',
+      [
+        'pr', 'view', prRef.prNumber,
+        '--repo', prRef.repoArg,
+        '--json', GH_PR_VIEW_FIELDS,
+      ],
+      { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
+    );
+    return {
+      issueId: prRef.issueId,
+      pr: JSON.parse(stdout) as IssuePullRequestData,
+    };
   } catch (err: any) {
-    return { issueId: upper, pr: null, diff: null, error: `gh pr fetch failed: ${err.message}` };
+    return { issueId: prRef.issueId, pr: null, error: `gh pr view failed: ${err.message}` };
+  }
+}
+
+async function fetchIssuePullRequestDiffFromRef(
+  prRef: Awaited<ReturnType<typeof resolveIssuePullRequestRef>>,
+): Promise<IssuePrDiffEndpointResponse> {
+  if (!prRef.repoArg || !prRef.prNumber) {
+    return { issueId: prRef.issueId, diff: null, error: prRef.error };
   }
 
-  return { issueId: upper, pr, diff, error: diffError };
+  try {
+    const { stdout } = await execFileAsync(
+      'gh',
+      [
+        'pr', 'diff', prRef.prNumber,
+        '--repo', prRef.repoArg,
+        '--patch',
+      ],
+      { encoding: 'utf-8', timeout: 30000, maxBuffer: 16 * 1024 * 1024 },
+    );
+    return { issueId: prRef.issueId, diff: stdout };
+  } catch (err: any) {
+    return { issueId: prRef.issueId, diff: null, error: `gh pr diff failed: ${err.message}` };
+  }
+}
+
+export async function fetchIssuePullRequestDiff(issueId: string): Promise<IssuePrDiffEndpointResponse> {
+  const prRef = await resolveIssuePullRequestRef(issueId);
+  return fetchIssuePullRequestDiffFromRef(prRef);
+}
+
+export async function fetchIssuePullRequestDetails(issueId: string): Promise<IssuePrDetailsResponse> {
+  const prRef = await resolveIssuePullRequestRef(issueId);
+  if (!prRef.repoArg || !prRef.prNumber) {
+    return { issueId: prRef.issueId, pr: null, diff: null, error: prRef.error };
+  }
+
+  const [prResult, diffResult] = await Promise.all([
+    fetchIssuePullRequest(issueId),
+    fetchIssuePullRequestDiffFromRef(prRef),
+  ]);
+
+  return {
+    issueId: prRef.issueId,
+    pr: prResult.pr,
+    diff: diffResult.diff,
+    error: prResult.error ?? diffResult.error,
+  };
 }
 
 const getIssuePrRoute = HttpRouter.add(
@@ -2597,6 +2639,28 @@ const getIssuePrRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const result = yield* Effect.promise(() => fetchIssuePullRequest(id));
+    return jsonResponse(result);
+  })),
+);
+
+const getIssuePrDiffRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/:id/pr/diff',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const result = yield* Effect.promise(() => fetchIssuePullRequestDiff(id));
+    return jsonResponse(result);
+  })),
+);
+
+const getIssuePrDetailsRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/:id/pr/details',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const result = yield* Effect.promise(() => fetchIssuePullRequestDetails(id));
     return jsonResponse(result);
   })),
 );
@@ -3042,6 +3106,8 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssueGenerateTasksRoute,
   getIssueCostsRoute,
   getIssuePrRoute,
+  getIssuePrDiffRoute,
+  getIssuePrDetailsRoute,
   getIssueDiscussionsRoute,
 );
 

@@ -150,6 +150,10 @@ const WORKSPACE_RESPONSE = {
 const PR_RESPONSE = {
   issueId: ISSUE_ID,
   pr: null,
+};
+
+const PR_DIFF_RESPONSE = {
+  issueId: ISSUE_ID,
   diff: null,
 };
 
@@ -173,6 +177,7 @@ test.describe('PAN-865 command deck overview', () => {
     await page.route('**/api/issues/*/costs', route => route.fulfill({ json: COSTS_RESPONSE }));
     await page.route('**/api/review/*/status', route => route.fulfill({ json: REVIEW_STATUS_RESPONSE }));
     await page.route('**/api/workspaces/*', route => route.fulfill({ json: WORKSPACE_RESPONSE }));
+    await page.route('**/api/issues/*/pr/details', route => route.fulfill({ json: { ...PR_RESPONSE, diff: PR_DIFF_RESPONSE.diff } }));
     await page.route('**/api/issues/*/pr', route => route.fulfill({ json: PR_RESPONSE }));
     await page.route('**/api/issues/*/discussions', route => route.fulfill({ json: DISCUSSIONS_RESPONSE }));
     await page.route('**/api/cloister/**', route => route.fulfill({ json: { running: false, lastCheck: null, summary: { active: 0, stale: 0, warning: 0, stuck: 0, total: 0 }, agentsNeedingAttention: [] } }));

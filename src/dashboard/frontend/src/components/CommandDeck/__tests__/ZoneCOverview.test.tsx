@@ -370,16 +370,16 @@ describe('ZoneCOverview', () => {
     expect(screen.getByTestId('zone-c-overview-placeholder')).toHaveTextContent('Coming soon');
   });
 
-  it('leaves Tab and Shift-Tab for standard focus navigation', () => {
+  it('does not intercept Tab and Shift-Tab inside the tab strip', () => {
     render(<ZoneCOverview issueId={ISSUE} />);
     const tablist = screen.getByRole('tablist');
 
     fireEvent.keyDown(tablist, { key: 'Tab' });
-    expect(screen.getByTestId('zone-c-overview-tab-overview')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
     expect(window.location.search).toBe('');
 
     fireEvent.keyDown(tablist, { key: 'Tab', shiftKey: true });
-    expect(screen.getByTestId('zone-c-overview-tab-overview')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
     expect(window.location.search).toBe('');
   });
 });
