@@ -671,6 +671,12 @@ function FeatureMenu({
 }
 
 export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources }: FeatureItemProps) {
+  const trimmedTitle = title?.trim() ?? '';
+  const displayTitle = trimmedTitle || '(untitled)';
+  const titleClassName = trimmedTitle
+    ? styles.featureLabel
+    : `${styles.featureLabel} ${styles.featureLabelUntitled}`;
+
   const [expanded, setExpanded] = useState(() => {
     const persisted = readExpanded(feature.issueId);
     return persisted ?? defaultExpandedFromState();
@@ -772,8 +778,8 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             )}
           </span>
           <span className={styles.featureId_sidebar}>{feature.issueId}</span>
-          <span className={styles.featureLabel} title={title || feature.issueId}>
-            {title || feature.issueId}
+          <span className={titleClassName} title={displayTitle}>
+            {displayTitle}
           </span>
           {!feature.isRally && aggregateBadges.length > 0 && (
             <span className={styles.featureBadgeGroup}>

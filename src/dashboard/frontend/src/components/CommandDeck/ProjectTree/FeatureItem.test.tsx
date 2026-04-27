@@ -55,6 +55,7 @@ vi.mock('../styles/command-deck.module.css', () => ({
     featureStatus: 'featureStatus',
     featureId_sidebar: 'featureId_sidebar',
     featureLabel: 'featureLabel',
+    featureLabelUntitled: 'featureLabelUntitled',
     featureBadgeGroup: 'featureBadgeGroup',
     featureBadge: 'featureBadge',
     featureBadge_running: 'featureBadge_running',
@@ -204,6 +205,36 @@ describe('FeatureItem', () => {
     expect(screen.getAllByText('PAN-821')[0]).toBeInTheDocument();
     expect(screen.queryByTestId('chevron-right')).not.toBeInTheDocument();
     expect(screen.queryByTestId('chevron-down')).not.toBeInTheDocument();
+  });
+
+  it('renders a muted untitled placeholder when title is empty', () => {
+    render(
+      <FeatureItem
+        feature={makeFeature()}
+        title="   "
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    const placeholder = screen.getByText('(untitled)');
+    expect(placeholder).toBeInTheDocument();
+    expect(placeholder).toHaveClass('featureLabelUntitled');
+    expect(screen.getByText('PAN-821')).toBeInTheDocument();
+  });
+
+  it('does not duplicate the issue id when title is missing', () => {
+    render(
+      <FeatureItem
+        feature={makeFeature()}
+        title=""
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    expect(screen.getAllByText('PAN-821')).toHaveLength(1);
+    expect(screen.getByText('(untitled)')).toBeInTheDocument();
   });
 
   it('shows caret when sessions are present', () => {

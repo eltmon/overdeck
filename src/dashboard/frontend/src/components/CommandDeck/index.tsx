@@ -708,7 +708,7 @@ export function CommandDeck({
                     onClick={() => setTreeFilter(f)}
                     className={`${styles.treeFilterButton} ${treeFilter === f ? styles.treeFilterButtonActive : ''}`}
                   >
-                    {f}
+                    {f === 'all' ? 'All' : f === 'alive' ? 'Alive' : 'Failed'}
                   </button>
                 ))}
               </div>
@@ -734,7 +734,18 @@ export function CommandDeck({
               ) : projects.length === 0 ? (
                 <div className={styles.emptyProject}>No projects configured</div>
               ) : (
-                projectsWithSessions.map(project => (
+                projectsWithSessions
+                  .filter((project) => {
+                    if (treeFilter === 'all') return project.features.length > 0;
+                    return project.features.some((feature) =>
+                      (feature.sessions ?? []).some((session) =>
+                        treeFilter === 'alive'
+                          ? session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended'
+                          : (session.status || '').toLowerCase().includes('fail') || (session.status || '').toLowerCase().includes('error') || (session.status || '').toLowerCase().includes('stuck'),
+                      ),
+                    );
+                  })
+                  .map(project => (
                   <ProjectNode
                     key={project.path}
                     name={project.name}
