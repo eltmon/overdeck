@@ -241,7 +241,9 @@ export function CommandDeck({
     };
   }, [sidebarTab, projects, queryClient]);
 
-  // Merge session trees into project features
+  // Merge session trees into project features, preserving object identity
+  // for features whose sessions haven't changed (avoids O(total features)
+  // re-renders per delta — only features in the affected project re-render).
   const projectsWithSessions = useMemo(() => {
     return projects.map(project => {
       const tree = sessionTreeMap[project.name];
@@ -252,13 +254,16 @@ export function CommandDeck({
         featureSessions.set(feature.issueId.toLowerCase(), [...feature.sessions]);
       }
 
-      return {
-        ...project,
-        features: project.features.map((feature: ProjectFeature) => ({
-          ...feature,
-          sessions: featureSessions.get(feature.issueId.toLowerCase()) ?? feature.sessions,
-        })),
-      };
+      let featuresChanged = false;
+      const nextFeatures = project.features.map((feature: ProjectFeature) => {
+        const treeSessions = featureSessions.get(feature.issueId.toLowerCase());
+        if (!treeSessions && !feature.sessions) return feature;
+        if (treeSessions === feature.sessions) return feature;
+        featuresChanged = true;
+        return { ...feature, sessions: treeSessions ?? feature.sessions };
+      });
+      if (!featuresChanged) return project;
+      return { ...project, features: nextFeatures };
     });
   }, [projects, sessionTreeMap]);
 

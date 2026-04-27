@@ -87,7 +87,7 @@ const LEGACY_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
  *  timestamp-named tmux sessions that no longer carry live context. */
 function isStaleLegacySession(s: SessionNode): boolean {
   if (s.type !== 'legacy') return false;
-  if (s.presence !== 'ended' && s.status === 'running') return false;
+  if (s.presence !== 'ended' || s.status === 'running') return false;
   const startedAtMs = Date.parse(s.startedAt);
   if (Number.isNaN(startedAtMs)) return false;
   return (Date.now() - startedAtMs) > LEGACY_SESSION_MAX_AGE_MS;
