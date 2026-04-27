@@ -68,6 +68,9 @@ export interface ActivityResponse {
   sections: ActivitySection[];
   costByStage?: Record<string, { cost: number; tokens: number }>;
   totalCost?: number;
+  aggregateCost?: number | null;
+  liveCost?: number | null;
+  resolvedTotalCost?: number | null;
 }
 
 export interface SessionCost {
@@ -84,6 +87,9 @@ export interface SessionCost {
 export interface IssueCostData {
   issueId: string;
   totalCost: number;
+  resolvedTotalCost?: number | null;
+  aggregateCost?: number | null;
+  liveCost?: number | null;
   totalTokens: number;
   inputTokens?: number;
   outputTokens?: number;

@@ -216,9 +216,6 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
           ],
         };
       }
-      if (url === '/api/costs/by-issue') {
-        return { ok: true, json: async () => ({ issues: [] }) };
-      }
       if (url === '/api/version') {
         return { ok: true, json: async () => ({ version: '0.8.0' }) };
       }
@@ -248,6 +245,36 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
                 ],
               },
             ],
+          }),
+        };
+      }
+      if (url.startsWith('/api/command-deck/activity/')) {
+        return {
+          ok: true,
+          json: async () => ({
+            issueId: 'PAN-821',
+            sections: [],
+            resolvedTotalCost: 5.1,
+          }),
+        };
+      }
+      if (url.startsWith('/api/command-deck/planning/')) {
+        return {
+          ok: true,
+          json: async () => ({
+            transcripts: [],
+            discussions: [],
+            notes: [],
+          }),
+        };
+      }
+      if (url.startsWith('/api/review/')) {
+        return {
+          ok: true,
+          json: async () => ({
+            reviewStatus: 'pending',
+            testStatus: 'pending',
+            verificationStatus: 'pending',
           }),
         };
       }
@@ -343,6 +370,15 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     expect(screen.getByTestId('issue-workbench')).toBe(firstWorkbench);
     expect(screen.getByTestId('session-panel')).toBe(firstSessionPanel);
     expect(screen.getByTestId('session-panel')).toHaveAttribute('data-session', 'agent-pan-821');
+  });
+
+  it('uses issue-local unified cost data for the issue header instead of global costs-by-issue', async () => {
+    renderCommandDeck();
+
+    await screen.findByTestId('project-node');
+    fireEvent.click(await screen.findByTestId('session-agent-pan-821'));
+
+    expect(screen.getByTestId('issue-header')).toHaveAttribute('data-issue', 'PAN-821');
   });
 
   it('auto-selects best session when feature is clicked (B5)', async () => {
