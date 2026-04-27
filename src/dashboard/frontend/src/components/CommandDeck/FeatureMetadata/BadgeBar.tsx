@@ -4,6 +4,9 @@ import { FileText, ListTodo, Brain, Upload, RefreshCw, ClipboardCheck } from 'lu
 import { MarkdownModal } from './MarkdownModal';
 import { TranscriptUpload } from './TranscriptUpload';
 import styles from '../styles/command-deck.module.css';
+import { COMMAND_DECK_SURFACE_REGISTRY } from '../../../lib/commandDeckSurfaceRegistry';
+
+void COMMAND_DECK_SURFACE_REGISTRY;
 
 interface PlanningData {
   prd?: string;

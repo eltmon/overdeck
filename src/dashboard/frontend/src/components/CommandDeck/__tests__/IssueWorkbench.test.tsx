@@ -38,6 +38,12 @@ vi.mock('../ZoneBActionStrip', () => ({
   ZoneBActionStrip: () => <div data-testid="zone-b-action-strip" />,
 }));
 
+vi.mock('../IssueComposer', () => ({
+  IssueComposer: ({ issueId, sessions }: any) => (
+    <div data-testid="issue-composer" data-issue={issueId} data-sessions={sessions.length} />
+  ),
+}));
+
 // ZoneCOverview's tabs depend on react-query hooks; stub them so the
 // IssueWorkbench test stays focused on selection arbitration.
 vi.mock('../ZoneCOverviewTabs/queries', () => ({

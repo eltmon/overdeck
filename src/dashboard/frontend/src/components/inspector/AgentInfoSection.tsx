@@ -2,6 +2,7 @@ import { GitBranch, GitMerge, Folder, Cloud, Monitor, Loader2 } from 'lucide-rea
 import { Agent } from '../../types';
 import type { WorkspaceInfo } from './types';
 import { getFriendlyModelName } from './utils';
+import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 
 interface AgentInfoSectionProps {
   agent: Agent;
@@ -10,6 +11,8 @@ interface AgentInfoSectionProps {
   syncMainPending: boolean;
   onSyncMain: () => void;
 }
+
+void COMMAND_DECK_SURFACE_REGISTRY;
 
 export function AgentInfoSection({ agent, duration, workspace, syncMainPending, onSyncMain }: AgentInfoSectionProps) {
   return (
