@@ -16,6 +16,7 @@ import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { processPendingFeedbackDeliveries } from './pending-feedback.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
+import { ensureInternalToken } from '../../lib/internal-token.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatus } from '../../lib/review-status.js';
 import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
 import { clearStuckForks } from '../../lib/database/conversations-db.js';
@@ -35,6 +36,11 @@ declare const Bun: unknown;
 
 // Ensure PANOPTICON_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getPanopticonHome(), { recursive: true });
+
+// Ensure the internal token exists before any in-process CLI sender resolves it (PAN-891).
+// Generates and persists a random token at <PANOPTICON_HOME>/internal-token (mode 0600)
+// on first start; reused on subsequent starts. Used by /api/internal/pipeline/notify.
+ensureInternalToken();
 
 // Prepare the managed tmux context exactly once, before any code path can spawn
 // tmux. After this call `buildTmuxArgs`, `buildTmuxCommandString`, and

@@ -4734,6 +4734,24 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
   'POST',
   '/api/internal/pipeline/notify',
   httpHandler(Effect.gen(function* () {
+    // Shared-secret check (PAN-891 review feedback). The dashboard binds 0.0.0.0
+    // by default, so this stateful endpoint must be unreachable without the
+    // server-issued token. Same token is read by CLI senders via getInternalToken().
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const { INTERNAL_TOKEN_HEADER, getInternalToken } = yield* Effect.promise(() =>
+      import('../../../lib/internal-token.js'),
+    );
+    const expected = getInternalToken();
+    if (!expected) {
+      return jsonResponse({ ok: false, error: 'internal token not configured' }, 503);
+    }
+    const headers = request.headers as Record<string, string | string[] | undefined>;
+    const raw = headers[INTERNAL_TOKEN_HEADER];
+    const provided = Array.isArray(raw) ? raw[0] : raw;
+    if (!provided || provided !== expected) {
+      return jsonResponse({ ok: false, error: 'forbidden' }, 403);
+    }
+
     const body = yield* readJsonBody;
     const { type, issueId } = body as { type?: string; issueId?: string };
 

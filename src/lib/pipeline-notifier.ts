@@ -15,6 +15,7 @@
  */
 
 import type { ReviewStatus } from './review-status.js';
+import { getInternalToken, INTERNAL_TOKEN_HEADER } from './internal-token.js';
 
 export type PipelineEvent =
   | { type: 'status_changed'; issueId: string; status: ReviewStatus }
@@ -48,12 +49,20 @@ export function notifyPipeline(event: PipelineEvent): void {
   // dashboard at localhost:3011 to receive the POST.
   if (process.env.NODE_ENV === 'test') return;
 
+  // Resolve shared secret (PAN-891). If the dashboard hasn't started in this
+  // home (no token file, no env), skip the forward — DB write is durable.
+  const token = getInternalToken();
+  if (!token) return;
+
   const baseUrl = process.env.DASHBOARD_URL || 'http://localhost:3011';
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 1000);
   void fetch(`${baseUrl}/api/internal/pipeline/notify`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      [INTERNAL_TOKEN_HEADER]: token,
+    },
     body: JSON.stringify({ type: 'status_changed', issueId: event.issueId }),
     signal: ctrl.signal,
   })
