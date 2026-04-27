@@ -36,7 +36,7 @@ import { renderPrompt } from './prompts.js';
 import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
 import { markWorkspaceStuck } from '../review-status.js';
 import { appendGitOperation, type GitOperationType } from '../git-activity.js';
-import { buildStashMessage, createNamedStash, dropStash, listStashes, popStash } from '../stashes.js';
+import { buildStashMessage, createNamedStash, dropStash, listStashes } from '../stashes.js';
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -1135,10 +1135,10 @@ export async function spawnMergeAgentForBranches(
 
                   if (preMergeStashRef) {
                     try {
-                      await popStash(projectPath, preMergeStashRef);
-                      console.log(`[merge-agent] ✓ Restored pre-merge stash after quality-gate rollback`);
-                    } catch (popErr: any) {
-                      console.warn(`[merge-agent] ⚠ Failed to restore pre-merge stash after quality-gate rollback: ${popErr.message}`);
+                      await dropStash(projectPath, preMergeStashRef);
+                      console.log(`[merge-agent] ✓ Dropped pre-merge stash after quality-gate rollback`);
+                    } catch (dropErr: any) {
+                      console.warn(`[merge-agent] ⚠ Failed to drop pre-merge stash after quality-gate rollback: ${dropErr.message}`);
                     }
                   }
 
@@ -1161,10 +1161,10 @@ export async function spawnMergeAgentForBranches(
                 // Restore stashed changes
                 if (preMergeStashRef) {
                   try {
-                    await popStash(projectPath, preMergeStashRef);
-                    console.log(`[merge-agent] ✓ Restored pre-merge stash after successful merge`);
-                  } catch (popErr: any) {
-                    console.warn(`[merge-agent] ⚠ Failed to restore pre-merge stash after merge: ${popErr.message}`);
+                    await dropStash(projectPath, preMergeStashRef);
+                    console.log(`[merge-agent] ✓ Dropped pre-merge stash after successful merge`);
+                  } catch (dropErr: any) {
+                    console.warn(`[merge-agent] ⚠ Failed to drop pre-merge stash after merge: ${dropErr.message}`);
                   }
                 }
 
@@ -1202,10 +1202,10 @@ export async function spawnMergeAgentForBranches(
                 // Restore stashed changes after revert
                 if (preMergeStashRef) {
                   try {
-                    await popStash(projectPath, preMergeStashRef);
-                    console.log(`[merge-agent] ✓ Restored pre-merge stash after revert`);
-                  } catch (popErr: any) {
-                    console.warn(`[merge-agent] ⚠ Failed to restore pre-merge stash after revert: ${popErr.message}`);
+                    await dropStash(projectPath, preMergeStashRef);
+                    console.log(`[merge-agent] ✓ Dropped pre-merge stash after revert`);
+                  } catch (dropErr: any) {
+                    console.warn(`[merge-agent] ⚠ Failed to drop pre-merge stash after revert: ${dropErr.message}`);
                   }
                 }
 

@@ -3616,12 +3616,14 @@ async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
  * `agent-<issueLower>` does not exist. We only check existence (not state)
  * because a stopped agent may still have its tmux session alive transiently.
  */
-async function cleanupOrphanedReviewSessions(): Promise<string[]> {
+export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
   const actions: string[] = [];
   let reviewSessions: string[];
   try {
-    reviewSessions = (await listSessionNamesAsync())
-      .filter(s => /^review-/.test(s));
+    const allSessions = await listSessionNamesAsync();
+    const legacyReviewSessions = allSessions.filter(s => /^review-/.test(s));
+    const canonicalReviewSessions = allSessions.filter(s => /^specialist-.*-review-/.test(s) && !s.includes('coordinator'));
+    reviewSessions = [...new Set([...legacyReviewSessions, ...canonicalReviewSessions])];
   } catch {
     return actions;
   }
@@ -3629,13 +3631,24 @@ async function cleanupOrphanedReviewSessions(): Promise<string[]> {
   logDeaconEvent(`cleanupOrphanedReviewSessions started: found ${reviewSessions.length} review session(s)`);
 
   for (const reviewSession of reviewSessions) {
-    // review-PAN-540-1713456789000-correctness → agent-pan-540
-    const match = reviewSession.match(/^review-([A-Za-z0-9]+-\d+)-\d+/);
-    if (!match) {
+    let issueId: string | null = null;
+
+    const legacyMatch = reviewSession.match(/^review-([A-Za-z0-9]+-\d+)-\d+/);
+    if (legacyMatch) {
+      issueId = legacyMatch[1].toUpperCase();
+    } else {
+      const canonicalMatch = reviewSession.match(/^specialist-(.+)-([A-Za-z0-9]+-\d+)-review-[a-z-]+$/);
+      if (canonicalMatch) {
+        issueId = canonicalMatch[2].toUpperCase();
+      }
+    }
+
+    if (!issueId) {
       logDeaconEvent(`cleanupOrphanedReviewSessions: ${reviewSession} skipped — unparseable session name`);
       continue;
     }
-    const workAgentSession = `agent-${match[1].toLowerCase()}`;
+
+    const workAgentSession = `agent-${issueId.toLowerCase()}`;
     if (sessionExists(workAgentSession)) {
       logDeaconEvent(`cleanupOrphanedReviewSessions: ${reviewSession} kept — work agent ${workAgentSession} exists`);
       continue;

@@ -79,16 +79,16 @@ describe('merge-agent pre-merge stash lifecycle', () => {
     setTimeoutSpy.mockRestore();
   });
 
-  it('creates and restores pre-merge stash on successful completion', async () => {
+  it('creates and drops pre-merge stash on successful completion', async () => {
     const result = await spawnMergeAgentForBranches('/tmp/workspace', 'feature/pan-1', 'main', 'PAN-1', { skipDoneReport: true });
 
     expect(result.success).toBe(true);
     expect(createNamedStash).toHaveBeenCalledWith('/tmp/workspace', 'pre-merge:PAN-1:2026-04-27T14:15:16Z', true);
-    expect(popStash).toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
-    expect(dropStash).not.toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
+    expect(dropStash).toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
+    expect(popStash).not.toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
   });
 
-  it('restores pre-merge stash after quality-gate rollback', async () => {
+  it('drops pre-merge stash after quality-gate rollback', async () => {
     vi.mocked(runMergeValidation).mockResolvedValueOnce({ valid: true, skipped: true });
     vi.mocked(loadProjectsConfig).mockReturnValueOnce({
       projects: {
@@ -109,8 +109,8 @@ describe('merge-agent pre-merge stash lifecycle', () => {
 
     expect(result.success).toBe(false);
     expect(autoRevertMerge).toHaveBeenCalledWith('/tmp/workspace');
-    expect(popStash).toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
-    expect(dropStash).not.toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
+    expect(dropStash).toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
+    expect(popStash).not.toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
   });
 
   it('drops lingering pre-merge stashes during post-merge lifecycle', async () => {

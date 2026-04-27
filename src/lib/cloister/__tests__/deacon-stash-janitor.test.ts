@@ -85,7 +85,7 @@ vi.mock('child_process', async (importOriginal) => {
   return { ...actual, exec: execMock, execFile: vi.fn() };
 });
 
-import { cleanupSpawnAndOrphanedStashes, loadConfig, logNonCanonicalStashesOnStartup } from '../deacon.js';
+import { cleanupOrphanedReviewSessions, cleanupSpawnAndOrphanedStashes, loadConfig, logNonCanonicalStashesOnStartup } from '../deacon.js';
 import { listRunningAgents, getAgentState, saveAgentState } from '../../../lib/agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../../../lib/stashes.js';
 import { resolveProjectFromIssue, getProject } from '../../projects.js';
@@ -93,10 +93,14 @@ import { findWorkspacePath } from '../../lifecycle/archive-planning.js';
 import { getReviewStatus, setReviewStatus } from '../../review-status.js';
 import { createTracker } from '../../tracker/factory.js';
 import { loadCloisterConfig } from '../config.js';
+import { listSessionNamesAsync, killSessionAsync, sessionExists } from '../../../lib/tmux.js';
 
 const mockListRunningAgents = vi.mocked(listRunningAgents);
 const mockGetAgentState = vi.mocked(getAgentState);
 const mockSaveAgentState = vi.mocked(saveAgentState);
+const mockListSessionNamesAsync = vi.mocked(listSessionNamesAsync);
+const mockKillSessionAsync = vi.mocked(killSessionAsync);
+const mockSessionExists = vi.mocked(sessionExists);
 const mockDropStash = vi.mocked(dropStash);
 const mockIsOlderThanDays = vi.mocked(isOlderThanDays);
 const mockListStashes = vi.mocked(listStashes);
@@ -130,6 +134,8 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     mockGetReviewStatus.mockReturnValue(null as any);
     mockLoadCloisterConfig.mockReturnValue({ monitoring: {} } as any);
     mockFindWorkspacePath.mockReturnValue('/repo/workspaces/feature-pan-879');
+    mockListSessionNamesAsync.mockResolvedValue([]);
+    mockSessionExists.mockReturnValue(false);
   });
 
   it('drops a pre-spawn stash after the agent branch has commits ahead of main', async () => {
@@ -255,5 +261,44 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     expect(mockDropStash).not.toHaveBeenCalled();
     expect(actions[0]).toContain('Non-canonical stash in PAN-879');
     expect(actions[0]).toContain('audit recommended');
+  });
+});
+
+describe('cleanupOrphanedReviewSessions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockListSessionNamesAsync.mockResolvedValue([]);
+    mockSessionExists.mockReturnValue(false);
+  });
+
+  it('kills orphaned canonical reviewer sessions', async () => {
+    mockListSessionNamesAsync.mockResolvedValue([
+      'specialist-panopticon-PAN-879-review-correctness',
+      'specialist-panopticon-PAN-879-review-synthesis',
+      'specialist-panopticon-PAN-879-review-coordinator',
+    ]);
+
+    const actions = await cleanupOrphanedReviewSessions();
+
+    expect(mockKillSessionAsync).toHaveBeenCalledTimes(2);
+    expect(mockKillSessionAsync).toHaveBeenCalledWith('specialist-panopticon-PAN-879-review-correctness');
+    expect(mockKillSessionAsync).toHaveBeenCalledWith('specialist-panopticon-PAN-879-review-synthesis');
+    expect(mockKillSessionAsync).not.toHaveBeenCalledWith('specialist-panopticon-PAN-879-review-coordinator');
+    expect(actions).toEqual([
+      'Killed orphaned specialist-panopticon-PAN-879-review-correctness (work agent agent-pan-879 not running)',
+      'Killed orphaned specialist-panopticon-PAN-879-review-synthesis (work agent agent-pan-879 not running)',
+    ]);
+  });
+
+  it('keeps canonical reviewer sessions when the work agent still exists', async () => {
+    mockListSessionNamesAsync.mockResolvedValue([
+      'specialist-panopticon-PAN-879-review-correctness',
+    ]);
+    mockSessionExists.mockImplementation((name: string) => name === 'agent-pan-879');
+
+    const actions = await cleanupOrphanedReviewSessions();
+
+    expect(mockKillSessionAsync).not.toHaveBeenCalled();
+    expect(actions).toEqual([]);
   });
 });
