@@ -1,9 +1,9 @@
 # PAN-815: Command Deck: unify Conversations and Projects into one filterable list
 
-## Status: In Progress
+## Status: Implementation Complete
 
 ## Current Phase
-Implementation complete — committing changes and closing beads.
+All work complete. Ready for merge.
 
 ## Completed Work
 - Replaced `SidebarTab` segmented control with independent filter chip toggles (`showConversations` / `showProjects`)
@@ -13,11 +13,12 @@ Implementation complete — committing changes and closing beads.
 - Removed dead `DetailPanelLayout` fallback branch for selected features
 - Updated CommandDeck tests for new filter chip behavior
 - All 312 test files pass (3889 tests)
+- Typecheck passes
+- Lint passes
+- Frontend build passes
 
 ## Remaining Work
-- Close beads after commit
-- Run lint gate
-- Push and submit
+None
 
 ## Key Decisions
 - Filter chips are independent toggles (both visible by default), not a single-select control
