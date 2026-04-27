@@ -351,6 +351,11 @@
   font-size: 10px;
   z-index: 20;
   white-space: nowrap;
+  pointer-events: none;
+}
+
+.featureResourcePopover * {
+  pointer-events: none;
 }
 
 .featureResourceRow {
@@ -361,6 +366,7 @@
 }
 
 .featureResourceCleanupButton {
+  pointer-events: auto;
   border: 1px solid var(--mc-border);
   background: var(--mc-bg-hover);
   color: var(--mc-text-primary);
