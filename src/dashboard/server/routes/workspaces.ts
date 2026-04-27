@@ -55,6 +55,10 @@ import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tra
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { EventStoreService } from '../services/domain-services.js';
 import {
+  enqueuePendingFeedbackDelivery,
+  markPendingFeedbackDelivered,
+} from '../pending-feedback.js';
+import {
   getReviewStatus,
   setReviewStatus as setReviewStatusBase,
   markWorkspaceStuck,
@@ -100,6 +104,25 @@ function shouldTreatAsRerun(status: Pick<ReviewStatus, 'readyForMerge' | 'review
     || status.reviewStatus === 'passed'
     || status.testStatus === 'passed'
     || (status.reviewStatus === 'passed' && status.testStatus === 'passed' && status.mergeStatus === 'failed');
+}
+
+async function deliverQueuedFeedback(
+  issueId: string,
+  kind: 'review-blocked' | 'review-failed' | 'test-failed',
+  filePath: string,
+  message: string,
+): Promise<void> {
+  const agentId = `agent-${issueId.toLowerCase()}`;
+  await enqueuePendingFeedbackDelivery({
+    issueId,
+    agentId,
+    kind,
+    filePath,
+    message,
+    createdAt: new Date().toISOString(),
+  });
+  await messageAgent(agentId, message);
+  await markPendingFeedbackDelivered(issueId, kind);
 }
 
 async function ensureWorkAgentReadyForMerge(
@@ -2223,7 +2246,8 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
             );
           } else {
             const msg = `SPECIALIST FEEDBACK: review-agent reported ${reviewStatus.toUpperCase()} for ${issueId}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix ALL issues. Do NOT stop at the prompt — keep working until every blocking issue is resolved and you have invoked /rebase-and-submit.`;
-            yield* Effect.promise(() => messageAgent(agentId, msg));
+            const deliveryKind = reviewStatus === 'blocked' ? 'review-blocked' : 'review-failed';
+            yield* Effect.promise(() => deliverQueuedFeedback(issueId, deliveryKind, fileResult.filePath!, msg));
             console.log(
               `[review-status] Auto-sent feedback to ${agentId} (file: ${fileResult.relativePath})`
             );
@@ -2310,7 +2334,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
             );
           } else {
             const msg = `SPECIALIST FEEDBACK: test-agent reported FAILED for ${issueId}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix the failing tests and re-submit. Do NOT stop at the prompt — keep working until all tests pass and you have invoked /rebase-and-submit.`;
-            yield* Effect.promise(() => messageAgent(agentId, msg));
+            yield* Effect.promise(() => deliverQueuedFeedback(issueId, 'test-failed', fileResult.filePath!, msg));
             console.log(
               `[review-status] Auto-sent test failure to ${agentId} (file: ${fileResult.relativePath})`
             );
