@@ -308,6 +308,17 @@ function validateOrigin(request: HttpServerRequest.HttpServerRequest): { ok: tru
   const referer = getHeader(request, 'referer');
   const trusted = getTrustedOrigins();
 
+  // Safe reads can omit both Origin and Referer on same-origin fetches.
+  // Enforce origin checks only when a caller supplies one, or when the
+  // request method can mutate state.
+  if (!origin && !referer) {
+    const method = request.method.toUpperCase();
+    if (method === 'GET' || method === 'HEAD') {
+      return { ok: true };
+    }
+    return { ok: false, error: 'Missing origin' };
+  }
+
   // If Origin is present, it must exactly match a trusted origin
   if (origin) {
     const normalized = normalizeOrigin(origin);
@@ -326,7 +337,6 @@ function validateOrigin(request: HttpServerRequest.HttpServerRequest): { ok: tru
     return { ok: false, error: 'Invalid referer' };
   }
 
-  // Require at least one of Origin or Referer for CSRF protection
   return { ok: false, error: 'Missing origin' };
 }
 
