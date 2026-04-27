@@ -31,18 +31,22 @@ vi.mock('../../git-activity.js', () => ({ appendGitOperation: vi.fn() }));
 vi.mock('../../stashes.js', () => ({
   buildStashMessage: vi.fn(() => 'pre-merge:PAN-1:2026-04-27T14:15:16Z'),
   createNamedStash: vi.fn(async () => 'stash@{0}'),
+  dropStash: vi.fn(async () => {}),
   popStash: vi.fn(async () => {}),
+  listStashes: vi.fn(async () => []),
 }));
 vi.mock('../../tracker-utils.js', () => ({ resolveGitHubIssue: vi.fn(() => ({ isGitHub: false })) }));
-vi.mock('../../paths.js', () => ({ PANOPTICON_HOME: '/tmp/pan', AGENTS_DIR: '/tmp/agents', PROJECT_PRDS_ACTIVE_SUBDIR: 'active' }));
+vi.mock('../../paths.js', () => ({ PANOPTICON_HOME: '/tmp/pan', AGENTS_DIR: '/tmp/agents', PROJECT_PRDS_ACTIVE_SUBDIR: 'active', PROJECT_PRDS_PLANNED_SUBDIR: 'planned', PROJECT_PRDS_COMPLETED_SUBDIR: 'completed' }));
 vi.mock('../../tldr-daemon.js', () => ({ getTldrDaemonService: vi.fn() }));
 vi.mock('fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs/promises')>();
   return { ...actual, writeFile: vi.fn(async () => {}), rm: vi.fn(async () => {}) };
 });
 
-import { spawnMergeAgentForBranches } from '../merge-agent.js';
-import { createNamedStash, popStash } from '../../stashes.js';
+import { postMergeLifecycle, spawnMergeAgentForBranches } from '../merge-agent.js';
+import { createNamedStash, dropStash, popStash, listStashes } from '../../stashes.js';
+import { runMergeValidation, autoRevertMerge, runQualityGates } from '../validation.js';
+import { loadProjectsConfig } from '../../projects.js';
 
 describe('merge-agent pre-merge stash lifecycle', () => {
   let setTimeoutSpy: ReturnType<typeof vi.spyOn>;
@@ -75,12 +79,61 @@ describe('merge-agent pre-merge stash lifecycle', () => {
     setTimeoutSpy.mockRestore();
   });
 
-  it('creates and restores pre-merge stash on successful completion', async () => {
+  it('creates and drops pre-merge stash on successful completion', async () => {
     const result = await spawnMergeAgentForBranches('/tmp/workspace', 'feature/pan-1', 'main', 'PAN-1', { skipDoneReport: true });
 
     expect(result.success).toBe(true);
     expect(createNamedStash).toHaveBeenCalledWith('/tmp/workspace', 'pre-merge:PAN-1:2026-04-27T14:15:16Z', true);
-    expect(popStash).toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
+    expect(dropStash).toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
   });
 
+  it('drops pre-merge stash after quality-gate rollback', async () => {
+    vi.mocked(runMergeValidation).mockResolvedValueOnce({ valid: true, skipped: true });
+    vi.mocked(loadProjectsConfig).mockReturnValueOnce({
+      projects: {
+        panopticon: {
+          name: 'Panopticon',
+          path: '/tmp/workspace',
+          quality_gates: {
+            lint: { command: 'npm run lint', phase: 'pre_push', required: true },
+          },
+        },
+      },
+    } as any);
+    vi.mocked(runQualityGates).mockResolvedValueOnce([
+      { name: 'lint', passed: false, required: true, output: 'fail', durationMs: 1, error: 'lint failed' },
+    ]);
+
+    const result = await spawnMergeAgentForBranches('/tmp/workspace', 'feature/pan-1', 'main', 'PAN-1', { skipDoneReport: true });
+
+    expect(result.success).toBe(false);
+    expect(autoRevertMerge).toHaveBeenCalledWith('/tmp/workspace');
+    expect(popStash).toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
+    expect(dropStash).not.toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
+  });
+
+  it('drops lingering pre-merge stashes during post-merge lifecycle', async () => {
+    vi.mocked(listStashes).mockResolvedValueOnce([
+      {
+        ref: 'stash@{1}',
+        message: 'pre-merge:PAN-1:2026-04-27T14:15:16Z',
+        kind: 'pre-merge',
+        issueId: 'PAN-1',
+        createdAt: new Date('2026-04-27T14:15:16Z'),
+      },
+      {
+        ref: 'stash@{0}',
+        message: 'salvageable:PAN-1:2026-04-27T14:15:16Z:user work',
+        kind: 'salvageable',
+        issueId: 'PAN-1',
+        shortDescription: 'user work',
+        createdAt: new Date('2026-04-27T14:15:16Z'),
+      },
+    ] as any);
+
+    await postMergeLifecycle('PAN-1', '/tmp/workspace', 'feature/pan-1', { skipDeploy: true });
+
+    expect(dropStash).toHaveBeenCalledWith('/tmp/workspace', 'stash@{1}');
+    expect(dropStash).not.toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
+  });
 });

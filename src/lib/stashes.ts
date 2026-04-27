@@ -138,17 +138,13 @@ export async function createNamedStash(repoPath: string, message: string, includ
   const { stdout } = await execAsync(command, { cwd: repoPath, encoding: 'utf-8' });
   if (/No local changes to save/i.test(stdout)) return null;
 
-  const { stdout: stashHash } = await execAsync('git rev-parse stash@{0}', { cwd: repoPath, encoding: 'utf-8' });
-  const normalizedHash = stashHash.trim();
-  if (!normalizedHash) return null;
-
-  const { stdout: stashReflog } = await execAsync('git log -g --format=%H%x09%gd refs/stash', {
+  const { stdout: stashReflog } = await execAsync('git stash list --format="%H%x09%gd%x09%s"', {
     cwd: repoPath,
     encoding: 'utf-8',
   });
   for (const line of stashReflog.split('\n')) {
-    const [hash, ref] = line.trim().split('\t');
-    if (hash === normalizedHash && ref?.startsWith('stash@{')) {
+    const [hash, ref, msg] = line.trim().split('\t');
+    if (hash && ref?.startsWith('stash@{') && msg?.includes(message)) {
       return ref;
     }
   }

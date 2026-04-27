@@ -26,7 +26,7 @@ import { setReviewStatus, loadReviewStatuses, getReviewStatus } from '../review-
 import { markWorkspaceStuck } from '../database/review-status-db.js';
 import { isDeaconGloballyPaused } from '../database/app-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
-import { resolveProjectFromIssue, listProjects } from '../projects.js';
+import { resolveProjectFromIssue, listProjects, getProject } from '../projects.js';
 import { logDeaconEvent, logAgentLifecycle } from '../persistent-logger.js';
 import { emitActivityTts } from '../activity-logger.js';
 import { getShadowState } from '../shadow-state.js';
@@ -2373,6 +2373,97 @@ export async function logNonCanonicalStashesOnStartup(): Promise<string[]> {
   return actions;
 }
 
+async function isIssueAlreadyMergedForJanitor(issueId: string): Promise<boolean> {
+  const reviewStatus = getReviewStatus(issueId);
+  if (reviewStatus?.mergeStatus === 'merged') {
+    return true;
+  }
+
+  if (reviewStatus?.prUrl) {
+    const prRef = reviewStatus.prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+    if (prRef) {
+      try {
+        const { getPullRequestState, isGitHubAppConfigured } = await import('../github-app.js');
+        if (isGitHubAppConfigured()) {
+          const prState = await getPullRequestState(prRef[1], prRef[2], Number.parseInt(prRef[3], 10));
+          if (prState.merged) {
+            setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
+            return true;
+          }
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[deacon] Failed GitHub merge reconciliation for ${issueId}: ${message}`);
+      }
+    }
+  }
+
+  const resolved = resolveProjectFromIssue(issueId);
+  if (!resolved) {
+    return false;
+  }
+
+  const project = getProject(resolved.projectKey);
+  if (!project?.tracker) {
+    return false;
+  }
+
+  try {
+    const { createTracker } = await import('../tracker/factory.js');
+    const panopticonConfig = await import('../config.js');
+    const globalTrackerConfig = panopticonConfig.loadConfig().trackers;
+
+    let trackerConfig: Record<string, unknown> | null = null;
+    if (project.tracker === 'github' && project.github_repo) {
+      const [owner, repo] = project.github_repo.split('/');
+      if (owner && repo) {
+        trackerConfig = {
+          type: 'github',
+          owner,
+          repo,
+          tokenEnv: globalTrackerConfig.github?.token_env,
+        };
+      }
+    } else if (project.tracker === 'gitlab' && project.gitlab_repo) {
+      trackerConfig = {
+        type: 'gitlab',
+        projectId: project.gitlab_repo,
+        tokenEnv: globalTrackerConfig.gitlab?.token_env,
+      };
+    } else if (project.tracker === 'linear') {
+      trackerConfig = {
+        type: 'linear',
+        apiKeyEnv: globalTrackerConfig.linear?.api_key_env,
+        team: resolved.linearTeam,
+      };
+    } else if (project.tracker === 'rally') {
+      trackerConfig = {
+        type: 'rally',
+        apiKeyEnv: globalTrackerConfig.rally?.api_key_env,
+        server: globalTrackerConfig.rally?.server,
+        workspace: globalTrackerConfig.rally?.workspace,
+        project: project.rally_project ?? globalTrackerConfig.rally?.project,
+      };
+    }
+
+    if (!trackerConfig) {
+      return false;
+    }
+
+    const tracker = createTracker(trackerConfig as any);
+    const issue = await tracker.getIssue(issueId);
+    if (issue.state === 'closed') {
+      setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
+      return true;
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[deacon] Failed tracker merge reconciliation for ${issueId}: ${message}`);
+  }
+
+  return false;
+}
+
 export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<string[]> {
   const actions: string[] = [];
 
@@ -2412,15 +2503,30 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
       if (!existsSync(workspacePath)) continue;
 
       try {
-        // Note: listStashes() is called fresh per workspace and the await inside
-        // this loop keeps stash drops sequential, preventing index-shift races
-        // across stale-stash cleanup in different workspaces.
         const stashes = await listStashes(workspacePath);
+        const mergedPreMergeStashes: typeof stashes = [];
         for (const stash of stashes) {
-          if (stash.kind === 'salvageable') continue;
-          if (!isOlderThanDays(stash, 28, now)) continue;
+          if (stash.kind !== 'pre-merge' || stash.issueId !== issueId.toUpperCase()) continue;
+          if (await isIssueAlreadyMergedForJanitor(issueId)) {
+            mergedPreMergeStashes.push(stash);
+          }
+        }
+
+        const staleStashes = stashes
+          .filter((stash) => stash.kind !== 'salvageable' && isOlderThanDays(stash, 28, now));
+        const stashesToDrop = [...mergedPreMergeStashes, ...staleStashes]
+          .filter((stash, index, entries) => entries.findIndex((entry) => entry.ref === stash.ref) === index)
+          .sort((a, b) => {
+            const aIndex = parseInt(a.ref.match(/stash@\{(\d+)\}/)?.[1] ?? '-1', 10);
+            const bIndex = parseInt(b.ref.match(/stash@\{(\d+)\}/)?.[1] ?? '-1', 10);
+            return bIndex - aIndex;
+          });
+        for (const stash of stashesToDrop) {
           await dropStash(workspacePath, stash.ref);
-          actions.push(`Dropped stale ${stash.kind} stash for ${issueId}: ${stash.ref}`);
+          const reason = mergedPreMergeStashes.some((entry) => entry.ref === stash.ref)
+            ? 'merged issue'
+            : 'stale';
+          actions.push(`Dropped ${reason} ${stash.kind} stash for ${issueId}: ${stash.ref}`);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

@@ -87,15 +87,14 @@ describe('stashes', () => {
     await expect(createNamedStash('/tmp/workspace', 'pre-spawn:PAN-879:2026-04-27T14:15:16Z')).resolves.toBeNull();
   });
 
-  it('returns the reflog ref for the newly created stash via stable hash lookup', async () => {
+  it('returns the stash ref by matching the canonical message after creation', async () => {
     mockExecImplementation((cmd) => {
       if (cmd.startsWith('git stash push')) return { stdout: 'Saved working directory and index state WIP\n' };
-      if (cmd === 'git rev-parse stash@{0}') return { stdout: 'abc123def456\n' };
-      if (cmd === 'git log -g --format=%H%x09%gd refs/stash') {
+      if (cmd === 'git stash list --format="%H%x09%gd%x09%s"') {
         return {
           stdout: [
-            'def999\tstash@{0}',
-            'abc123def456\tstash@{1}',
+            'def999\tstash@{0}\tpre-spawn:PAN-111:2026-04-27T14:15:16Z',
+            'abc123def456\tstash@{1}\tpre-spawn:PAN-879:2026-04-27T14:15:16Z',
           ].join('\n'),
         };
       }

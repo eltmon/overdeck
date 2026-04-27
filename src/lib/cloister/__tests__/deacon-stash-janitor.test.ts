@@ -26,10 +26,12 @@ vi.mock('../../../lib/review-status.js', () => ({
 vi.mock('../../database/review-status-db.js', () => ({ markWorkspaceStuck: vi.fn() }));
 vi.mock('../../database/app-settings.js', () => ({ isDeaconGloballyPaused: vi.fn(() => false) }));
 vi.mock('../../shadow-state.js', () => ({ getShadowState: vi.fn(async () => null) }));
-vi.mock('../../projects.js', () => ({ resolveProjectFromIssue: vi.fn(), listProjects: vi.fn(() => [{ config: { path: '/repo' } }]) }));
+vi.mock('../../projects.js', () => ({ resolveProjectFromIssue: vi.fn(), listProjects: vi.fn(() => [{ config: { path: '/repo' } }]), getProject: vi.fn(() => null) }));
 vi.mock('../../lifecycle/archive-planning.js', () => ({ findWorkspacePath: vi.fn() }));
 vi.mock('../../persistent-logger.js', () => ({ logDeaconEvent: vi.fn(), logAgentLifecycle: vi.fn() }));
 vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: vi.fn(), emitActivityTts: vi.fn() }));
+vi.mock('../../config.js', () => ({ loadConfig: vi.fn(() => ({ trackers: { primary: 'linear', linear: { type: 'linear', api_key_env: 'LINEAR_API_KEY' } } })) }));
+vi.mock('../../tracker/factory.js', () => ({ createTracker: vi.fn() }));
 vi.mock('../specialists.js', () => ({
   SpecialistType: {},
   getTmuxSessionName: vi.fn((t: string) => `specialist-${t}`),
@@ -82,8 +84,10 @@ vi.mock('child_process', async (importOriginal) => {
 import { cleanupSpawnAndOrphanedStashes, logNonCanonicalStashesOnStartup } from '../deacon.js';
 import { listRunningAgents, getAgentState, saveAgentState } from '../../../lib/agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../../../lib/stashes.js';
-import { resolveProjectFromIssue } from '../../projects.js';
+import { resolveProjectFromIssue, getProject } from '../../projects.js';
 import { findWorkspacePath } from '../../lifecycle/archive-planning.js';
+import { getReviewStatus, setReviewStatus } from '../../review-status.js';
+import { createTracker } from '../../tracker/factory.js';
 
 const mockListRunningAgents = vi.mocked(listRunningAgents);
 const mockGetAgentState = vi.mocked(getAgentState);
@@ -92,7 +96,11 @@ const mockDropStash = vi.mocked(dropStash);
 const mockIsOlderThanDays = vi.mocked(isOlderThanDays);
 const mockListStashes = vi.mocked(listStashes);
 const mockResolveProjectFromIssue = vi.mocked(resolveProjectFromIssue);
+const mockGetProject = vi.mocked(getProject);
 const mockFindWorkspacePath = vi.mocked(findWorkspacePath);
+const mockGetReviewStatus = vi.mocked(getReviewStatus);
+const mockSetReviewStatus = vi.mocked(setReviewStatus);
+const mockCreateTracker = vi.mocked(createTracker);
 
 function installExecMock(stdoutByCommand: Record<string, string>) {
   execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
@@ -111,7 +119,9 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     vi.clearAllMocks();
     installExecMock({ 'git rev-list origin/main..HEAD --count': '1\n' });
     mockIsOlderThanDays.mockReturnValue(false);
-    mockResolveProjectFromIssue.mockReturnValue({ projectPath: '/repo' } as any);
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'panopticon', projectPath: '/repo' } as any);
+    mockGetProject.mockReturnValue(null);
+    mockGetReviewStatus.mockReturnValue(null as any);
     mockFindWorkspacePath.mockReturnValue('/repo/workspaces/feature-pan-879');
   });
 
@@ -150,6 +160,22 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'stash@{1}');
     expect(mockDropStash).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'stash@{2}');
     expect(actions).toContain('Dropped stale pre-merge stash for PAN-879: stash@{1}');
+  });
+
+  it('drops pre-merge stashes immediately when tracker state shows the issue is already merged', async () => {
+    mockListRunningAgents.mockReturnValue([] as any);
+    mockGetAgentState.mockReturnValue(null);
+    mockListStashes.mockResolvedValue([
+      { ref: 'stash@{3}', kind: 'pre-merge', issueId: 'PAN-879', createdAt: new Date('2026-04-27T00:00:00Z'), message: 'pre-merge:PAN-879:2026-04-27T00:00:00Z' } as any,
+    ]);
+    mockGetProject.mockReturnValue({ tracker: 'linear' } as any);
+    mockCreateTracker.mockReturnValue({ getIssue: vi.fn(async () => ({ state: 'closed' })) } as any);
+
+    const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
+
+    expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'stash@{3}');
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-879', { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
+    expect(actions).toContain('Dropped merged issue pre-merge stash for PAN-879: stash@{3}');
   });
 
   it('logs non-canonical stashes on startup without deleting them', async () => {

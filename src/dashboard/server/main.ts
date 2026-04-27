@@ -199,15 +199,16 @@ try {
 await processPendingLifecycle();
 await processPendingFeedbackDeliveries();
 
-try {
-  const { logNonCanonicalStashesOnStartup } = await import('../../lib/cloister/deacon.js');
-  const findings = await logNonCanonicalStashesOnStartup();
-  if (findings.length > 0) {
-    emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Detected ${findings.length} non-canonical stash(es) on startup; audit recommended` });
-  }
-} catch (err: any) {
-  console.warn(`[panopticon] Failed non-canonical stash startup scan: ${err.message}`);
-}
+void import('../../lib/cloister/deacon.js')
+  .then(({ logNonCanonicalStashesOnStartup }) => logNonCanonicalStashesOnStartup())
+  .then((findings) => {
+    if (findings.length > 0) {
+      emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Detected ${findings.length} non-canonical stash(es) on startup; audit recommended` });
+    }
+  })
+  .catch((err: any) => {
+    console.warn(`[panopticon] Failed non-canonical stash startup scan: ${err.message}`);
+  });
 
 // Cloister/Deacon auto-start. Deacon is the Layer 3 safety net that catches
 // work agents that forgot to call `pan work done`, nudges dead-end agents,
