@@ -115,6 +115,9 @@ async function ensureReviewTempStash(issueId: string, workspace: string): Promis
   const existingEntries = await listStashes(workspace);
   const sequence = getNextReviewTempSequence(existingEntries, issueId);
   const message = buildStashMessage('review-temp', issueId, sequence);
+  // We read porcelain status immediately before stashing and rely on review orchestration being
+  // single-threaded per workspace; if another actor clears the dirtiness window before stash push,
+  // createNamedStash can legitimately return null and the review should just continue without one.
   const ref = await createNamedStash(workspace, message, true);
   if (!ref) return null;
 

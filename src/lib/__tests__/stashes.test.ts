@@ -84,6 +84,29 @@ describe('stashes', () => {
       issueId: 'PAN-879',
       sequence: 7,
     });
+
+    const multiHyphen = parseCanonicalStashMessage('pre-merge:KRUX-SUB-3:2026-04-27T14:15:16Z');
+    expect(multiHyphen).toMatchObject({
+      kind: 'pre-merge',
+      issueId: 'KRUX-SUB-3',
+    });
+
+    expect(parseStashListLine('')).toBeNull();
+
+    const invalidDateLine = parseStashListLine('stash@{1}\tabc123def456abc123def456abc123def456abcd\tnot-a-date\tOn feature/pan-879: pre-spawn:PAN-879:2026-04-27T14:15:16Z');
+    expect(invalidDateLine).toMatchObject({
+      ref: 'abc123def456abc123def456abc123def456abcd',
+      stackRef: 'stash@{1}',
+      kind: 'pre-spawn',
+    });
+    expect(invalidDateLine?.createdAt?.toISOString()).toBe('2026-04-27T14:15:16.000Z');
+
+    const legacyLine = parseStashListLine('stash@{4}: On feature/pan-879: pre-merge:PAN-879:2026-04-27T14:15:16Z');
+    expect(legacyLine).toMatchObject({
+      ref: 'stash@{4}',
+      stackRef: 'stash@{4}',
+      kind: 'pre-merge',
+    });
   });
 
   it('computes next review-temp sequence for an issue', () => {

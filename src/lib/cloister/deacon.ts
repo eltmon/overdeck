@@ -55,6 +55,12 @@ import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSessi
  * Per gastown: "Let agents decide thresholds. 'Stuck' is a judgment call."
  */
 const DEFAULT_STASH_JANITOR_AGE_DAYS = 28;
+const STASH_JANITOR_BASELINE_MISSING_PATTERNS = [
+  'unknown revision or path not in the working tree',
+  'bad revision',
+  'ambiguous argument',
+  'fatal: invalid revision range',
+];
 
 const DEFAULT_CONFIG: DeaconConfig = {
   pingTimeoutMs: 30_000,           // How long to wait for response
@@ -2385,10 +2391,21 @@ export async function logNonCanonicalStashesOnStartup(): Promise<string[]> {
   return actions;
 }
 
-async function reconcileAndCheckIfMerged(issueId: string): Promise<boolean> {
+async function reconcileAndCheckIfMerged(
+  issueId: string,
+  cycleCache?: Map<string, boolean>,
+): Promise<boolean> {
+  const cacheKey = issueId.toUpperCase();
+  const cached = cycleCache?.get(cacheKey);
+  if (cached !== undefined) return cached;
+  const remember = (result: boolean): boolean => {
+    cycleCache?.set(cacheKey, result);
+    return result;
+  };
+
   const reviewStatus = getReviewStatus(issueId);
   if (reviewStatus?.mergeStatus === 'merged') {
-    return true;
+    return remember(true);
   }
 
   if (reviewStatus?.prUrl) {
@@ -2400,7 +2417,7 @@ async function reconcileAndCheckIfMerged(issueId: string): Promise<boolean> {
           const prState = await getPullRequestState(prRef[1], prRef[2], Number.parseInt(prRef[3], 10));
           if (prState.merged) {
             setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
-            return true;
+            return remember(true);
           }
         }
       } catch (error) {
@@ -2412,12 +2429,12 @@ async function reconcileAndCheckIfMerged(issueId: string): Promise<boolean> {
 
   const resolved = resolveProjectFromIssue(issueId);
   if (!resolved) {
-    return false;
+    return remember(false);
   }
 
   const project = getProject(resolved.projectKey);
   if (!project?.tracker) {
-    return false;
+    return remember(false);
   }
 
   try {
@@ -2430,7 +2447,7 @@ async function reconcileAndCheckIfMerged(issueId: string): Promise<boolean> {
       const [owner, repo] = project.github_repo.split('/');
       if (!owner || !repo) {
         console.warn(`[deacon] Cannot reconcile ${issueId}: invalid GitHub repo config for ${resolved.projectKey}`);
-        return false;
+        return remember(false);
       }
       trackerConfig = {
         type: 'github',
@@ -2462,21 +2479,21 @@ async function reconcileAndCheckIfMerged(issueId: string): Promise<boolean> {
 
     if (!trackerConfig) {
       console.warn(`[deacon] Cannot reconcile ${issueId}: incomplete tracker config for ${resolved.projectKey}`);
-      return false;
+      return remember(false);
     }
 
     const tracker = createTracker(trackerConfig);
     const issue = await tracker.getIssue(issueId);
     if (issue.state === 'closed') {
       setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
-      return true;
+      return remember(true);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.warn(`[deacon] Failed tracker merge reconciliation for ${issueId}: ${message}`);
   }
 
-  return false;
+  return remember(false);
 }
 
 export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<string[]> {
@@ -2503,17 +2520,22 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
         hasCommitsAhead = (parseInt(stdout.trim(), 10) || 0) > 0;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.warn(`[deacon] Failed checking post-spawn commits for ${agentState.issueId}: ${message}`);
-        continue;
+        const baselineMissing = STASH_JANITOR_BASELINE_MISSING_PATTERNS.some((pattern) => message.includes(pattern));
+        if (!baselineMissing) {
+          console.warn(`[deacon] Failed checking post-spawn commits for ${agentState.issueId}: ${message}`);
+          continue;
+        }
+        console.warn(`[deacon] Missing baseline ref for ${agentState.issueId}; dropping pre-spawn stash because the running agent has moved past spawn`);
+        hasCommitsAhead = true;
       }
 
       if (!hasCommitsAhead) continue;
 
       try {
         await dropStash(agentState.workspace, agentState.preSpawnStashRef);
-        delete agentState.preSpawnStashRef;
-        delete agentState.preSpawnStashMessage;
-        delete agentState.preSpawnBaselineHead;
+        agentState.preSpawnStashRef = undefined;
+        agentState.preSpawnStashMessage = undefined;
+        agentState.preSpawnBaselineHead = undefined;
         saveAgentState(agentState);
         actions.push(`Dropped pre-spawn stash for ${agentState.issueId}`);
       } catch (error) {
@@ -2522,12 +2544,14 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
           console.warn(`[deacon] Failed dropping pre-spawn stash for ${agentState.issueId}: ${message}`);
           continue;
         }
-        delete agentState.preSpawnStashRef;
-        delete agentState.preSpawnStashMessage;
-        delete agentState.preSpawnBaselineHead;
+        agentState.preSpawnStashRef = undefined;
+        agentState.preSpawnStashMessage = undefined;
+        agentState.preSpawnBaselineHead = undefined;
         saveAgentState(agentState);
       }
     }
+
+    const mergeReconciliationCache = new Map<string, boolean>();
 
     for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
       if (!existsSync(workspacePath)) continue;
@@ -2538,12 +2562,14 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
           (stash) => stash.kind === 'pre-merge' && stash.issueId === issueId.toUpperCase(),
         );
         const issueAlreadyMerged = matchingPreMergeStashes.length > 0
-          ? await reconcileAndCheckIfMerged(issueId)
+          ? await reconcileAndCheckIfMerged(issueId, mergeReconciliationCache)
           : false;
         const mergedPreMergeStashes = issueAlreadyMerged ? matchingPreMergeStashes : [];
 
         const staleStashes = stashes
           .filter((stash) => stash.kind !== 'salvageable' && isOlderThanDays(stash, DEFAULT_STASH_JANITOR_AGE_DAYS, now));
+        // Preserve the first occurrence so a stash that is both "merged" and "stale" keeps the
+        // merged label in logs, then drop in descending stack order so earlier slots stay stable.
         const stashesToDrop = [...mergedPreMergeStashes, ...staleStashes]
           .filter((stash, index, entries) => entries.findIndex((entry) => entry.ref === stash.ref) === index)
           .map((stash) => {

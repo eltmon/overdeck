@@ -112,15 +112,20 @@ const mockSetReviewStatus = vi.mocked(setReviewStatus);
 const mockCreateTracker = vi.mocked(createTracker);
 const mockLoadCloisterConfig = vi.mocked(loadCloisterConfig);
 
-function installExecMock(stdoutByCommand: Record<string, string>) {
+function installExecMock(resultsByCommand: Record<string, string | Error>) {
   execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
     const callback = (typeof _opts === 'function' ? _opts : cb)!;
-    const match = Object.entries(stdoutByCommand).find(([needle]) => cmd.includes(needle));
+    const match = Object.entries(resultsByCommand).find(([needle]) => cmd.includes(needle));
     if (!match) {
       callback(new Error(`unexpected command: ${cmd}`));
       return;
     }
-    callback(null, { stdout: match[1], stderr: '' });
+    const result = match[1];
+    if (result instanceof Error) {
+      callback(result);
+      return;
+    }
+    callback(null, { stdout: result, stderr: '' });
   });
 }
 
@@ -200,7 +205,7 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     expect(actions).toContain('Dropped merged issue pre-merge stash for PAN-879: 9999999999999999999999999999999999999999');
   });
 
-  it('keeps pre-spawn stash metadata when branch advancement check fails', async () => {
+  it('keeps pre-spawn stash metadata when branch advancement check fails for an ambiguous error', async () => {
     const state = {
       id: 'agent-pan-879',
       issueId: 'PAN-879',
@@ -223,24 +228,30 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     expect(actions).toEqual([]);
   });
 
-  it('preserves pre-spawn stash when baseline head is missing', async () => {
+  it('drops pre-spawn stash when the saved baseline ref no longer exists', async () => {
     const state = {
       id: 'agent-pan-879',
       issueId: 'PAN-879',
       workspace: '/repo/workspaces/feature-pan-879',
       preSpawnStashRef: 'abc123def456abc123def456abc123def456abcd',
       preSpawnStashMessage: 'pre-spawn:PAN-879:2026-04-27T14:15:16Z',
+      preSpawnBaselineHead: 'spawn-head',
     } as any;
 
+    installExecMock({
+      'git rev-list spawn-head..HEAD --count': new Error('fatal: bad revision'),
+    });
     mockListRunningAgents.mockReturnValue([{ id: 'agent-pan-879', issueId: 'PAN-879' }] as any);
     mockGetAgentState.mockReturnValue(state);
 
     const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
 
-    expect(mockDropStash).not.toHaveBeenCalled();
-    expect(mockSaveAgentState).not.toHaveBeenCalled();
-    expect(execMock).not.toHaveBeenCalled();
-    expect(actions).toEqual([]);
+    expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'abc123def456abc123def456abc123def456abcd');
+    expect(mockSaveAgentState).toHaveBeenCalledWith(state);
+    expect(state.preSpawnStashRef).toBeUndefined();
+    expect(state.preSpawnStashMessage).toBeUndefined();
+    expect(state.preSpawnBaselineHead).toBeUndefined();
+    expect(actions).toContain('Dropped pre-spawn stash for PAN-879');
   });
 
   it('reads stash janitor cadence from cloister monitoring config', () => {

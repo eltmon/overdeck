@@ -25,6 +25,7 @@ export interface SalvageableStashEntry extends ParsedStashEntry {
 }
 
 const ISO_STASH_TIMESTAMP_PATTERN = '(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2}))';
+const ISSUE_ID_PATTERN = '([A-Z]+(?:-[A-Z]+)*-\\d+)';
 
 function isoForStash(date = new Date()): string {
   return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -82,7 +83,7 @@ export function buildStashMessage(
 }
 
 export function parseCanonicalStashMessage(message: string): ParsedStashEntry {
-  const preTimedMatch = new RegExp(`^(pre-merge|pre-spawn):(\\w+-\\d+):${ISO_STASH_TIMESTAMP_PATTERN}$`).exec(message);
+  const preTimedMatch = new RegExp(`^(pre-merge|pre-spawn):${ISSUE_ID_PATTERN}:${ISO_STASH_TIMESTAMP_PATTERN}$`).exec(message);
   if (preTimedMatch) {
     return {
       ref: '',
@@ -104,7 +105,7 @@ export function parseCanonicalStashMessage(message: string): ParsedStashEntry {
     };
   }
 
-  const salvageableMatch = new RegExp(`^salvageable:(\\w+-\\d+):${ISO_STASH_TIMESTAMP_PATTERN}:(.+)$`).exec(message);
+  const salvageableMatch = new RegExp(`^salvageable:${ISSUE_ID_PATTERN}:${ISO_STASH_TIMESTAMP_PATTERN}:(.+)$`).exec(message);
   if (salvageableMatch) {
     return {
       ref: '',
@@ -174,6 +175,10 @@ export async function createNamedStash(repoPath: string, message: string, includ
 }
 
 async function resolveStashOperationRef(repoPath: string, ref: string): Promise<string> {
+  // PAN-879 assumes stash janitor / merge / review flows are serialized within a single
+  // workspace, so re-resolving the stable SHA to a stack slot immediately before the git
+  // command is sufficient. If per-workspace stash operations ever run concurrently, the
+  // resolve+operate sequence must be guarded by a lock.
   if (/^stash@\{\d+\}$/.test(ref)) {
     await execAsync(`git rev-parse --verify ${JSON.stringify(ref)}`, {
       cwd: repoPath,

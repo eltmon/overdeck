@@ -312,6 +312,12 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
   return join(homedir(), 'Projects');
 }
 
+function resolveWorkspacePath(issueId: string): string {
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+  const projectPath = getProjectPath(undefined, issuePrefix);
+  return join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+}
+
 function getWorkspaceLocation(issueId: string): 'local' | 'remote' | undefined {
   try {
     const meta = loadWorkspaceMetadata(issueId);
@@ -1134,11 +1140,13 @@ const getWorkspaceStashesRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
-    const projectPath = getProjectPath(undefined, issuePrefix);
-    const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+    const workspacePath = resolveWorkspacePath(issueId);
 
-    const stashes = yield* Effect.promise(() => listStashes(workspacePath).catch(() => []));
+    if (!existsSync(workspacePath)) {
+      return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
+    }
+
+    const stashes = yield* Effect.promise(() => listStashes(workspacePath));
     const salvageableStashes = stashes
       .filter(isSalvageableStash)
       .filter((entry) => entry.issueId === issueId.toUpperCase())
@@ -1162,9 +1170,7 @@ const postWorkspaceRecoverStashRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const stashRef = decodeURIComponent(params['stashRef'] ?? '');
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
-    const projectPath = getProjectPath(undefined, issuePrefix);
-    const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+    const workspacePath = resolveWorkspacePath(issueId);
 
     if (!existsSync(workspacePath)) {
       return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
@@ -1194,9 +1200,7 @@ const deleteWorkspaceStashRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     const stashRef = decodeURIComponent(params['stashRef'] ?? '');
-    const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
-    const projectPath = getProjectPath(undefined, issuePrefix);
-    const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+    const workspacePath = resolveWorkspacePath(issueId);
 
     if (!existsSync(workspacePath)) {
       return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
