@@ -20,6 +20,7 @@ import { listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import type { AgentStatus, SessionNode, SessionNodePresence, SessionNodeType } from '@panctl/contracts';
+import type { ReviewerRoundMetadata } from './reviewer-tree.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
@@ -78,6 +79,7 @@ interface ActivitySection {
   transcript?: string;
   presence: SessionNodePresence;
   hasJsonl?: boolean;
+  roundMetadata?: ReviewerRoundMetadata;
 }
 
 const LEGACY_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
