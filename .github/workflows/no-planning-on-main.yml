@@ -1,0 +1,51 @@
+# Reject any push to main that introduces .planning/ files.
+#
+# .planning/ is workspace-local scratch (STATE.md, feedback/, plan.vbrief.json,
+# beads, etc.) tracked on feature branches so the dashboard and agents can read
+# it during the workspace lifecycle. It must NEVER land on main — when it does,
+# `pan sync-main` propagates one workspace's STATE.md into every other active
+# workspace, cross-contaminating their planning context (#888).
+#
+# The merge pipeline strips .planning/ from feature branches before
+# `gh pr merge --squash` runs (see strip-planning-from-branch.ts). This workflow
+# is a final guardrail — if anything bypasses the merge pipeline (manual push,
+# admin override, future regression), this fails the workflow on main and the
+# branch protection rule blocks the push.
+#
+# Trigger is push-to-main only. We deliberately do NOT run on pull_request:
+# feature branches legitimately carry .planning/ during the workspace lifecycle
+# and only get stripped by the merge pipeline at merge time. Running on PRs
+# would always-fail every feature PR.
+
+name: no-planning-on-main
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  reject-planning-paths:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Fail if .planning/ paths are tracked
+        run: |
+          set -euo pipefail
+          tracked=$(git ls-files -- '.planning/' || true)
+          if [ -n "$tracked" ]; then
+            echo "::error::Refusing to advance main — .planning/ files are tracked:"
+            echo "$tracked" | sed 's/^/  /'
+            echo ""
+            echo ".planning/ is workspace-local and must never land on main."
+            echo "See #888 and src/lib/cloister/strip-planning-from-branch.ts"
+            exit 1
+          fi
+          echo "OK — no .planning/ paths tracked on main."

@@ -9,7 +9,7 @@
     "build": "tsdown"
   },
   "dependencies": {
-    "@panopticon/contracts": "workspace:*",
+    "@panctl/contracts": "workspace:*",
     "effect": "catalog:",
     "@effect/platform-bun": "catalog:",
     "@effect/platform-node": "catalog:",

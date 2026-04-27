@@ -22,6 +22,7 @@ interface ActivitySparklineProps {
   height?: number;
   now?: number;
   className?: string;
+  ariaLabel?: string;
 }
 
 const CATEGORY_COLORS: Record<SparklineCategory, string> = {
@@ -45,6 +46,7 @@ export function ActivitySparkline({
   height = 16,
   now,
   className,
+  ariaLabel,
 }: ActivitySparklineProps) {
   const nowMs = now ?? Date.now();
   const windowMs = windowMinutes * 60_000;
@@ -83,7 +85,7 @@ export function ActivitySparkline({
       viewBox={`0 0 ${width} ${height}`}
       className={className}
       role="img"
-      aria-label={`Activity over the last ${windowMinutes} minutes`}
+      aria-label={ariaLabel ?? `Activity over the last ${windowMinutes} minutes`}
       style={{ display: 'inline-block', overflow: 'visible' }}
     >
       {counts.map((count, i) => {

@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
 import type { DbAdapter } from '../../src/dashboard/server/event-store.js'
 import { createProjectionCache } from '../../src/dashboard/server/services/projection-cache.js'
-import type { DashboardSnapshot } from '@panopticon/contracts'
+import type { DashboardSnapshot } from '@panctl/contracts'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

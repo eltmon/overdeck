@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
-import type { DashboardSnapshot } from '@panopticon/contracts';
-import { WS_METHODS } from '@panopticon/contracts';
+import type { DashboardSnapshot } from '@panctl/contracts';
+import { WS_METHODS } from '@panctl/contracts';
 import { useDashboardStore } from './store';
 import { getTransport, type PanRpcProtocolClient } from './wsTransport';
 

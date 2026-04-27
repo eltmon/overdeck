@@ -43,6 +43,7 @@ import { reopenWorkspaceState } from '../../../lib/reopen.js';
 import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { IssueDataService } from '../services/issue-data-service.js';
+import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { invalidateAgentsCache } from './agents.js';
@@ -54,6 +55,11 @@ import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../
 import { getAgentStateAsync, normalizeAgentId } from '../../../lib/agents.js';
 import type { LifecycleContext, StepResult } from '../../../lib/lifecycle/types.js';
 import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
+import {
+  getCachedResourceAllocatedIssues,
+  getResourceDetailIdentifiers,
+  sanitizeResourceAllocatedIssues,
+} from '../services/resource-discovery.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -63,8 +69,6 @@ const execFileAsync = promisify(execFile);
 // onIssuesChanged callback → event store → WebSocket RPC.
 
 function getIssueDataService(): IssueDataService {
-  // Use the shared singleton — started by server.ts on boot
-  const { getSharedIssueService } = require('../services/issue-service-singleton.js');
   return getSharedIssueService();
 }
 
@@ -206,6 +210,37 @@ function buildLifecycleContext(id: string, issueSource: string | undefined) {
   }
 
   return { ctx, projectConfig, githubCheck };
+}
+
+function isOrphanedIssue(issue: { status?: string; state?: string; rawTrackerState?: string; completedAt?: string | null }): boolean {
+  const status = issue.status?.toLowerCase() ?? '';
+  const state = issue.state?.toLowerCase() ?? '';
+  const rawTrackerState = issue.rawTrackerState?.toLowerCase() ?? '';
+  return Boolean(
+    issue.completedAt
+    || status.includes('closed')
+    || status.includes('done')
+    || status.includes('completed')
+    || state.includes('closed')
+    || state.includes('done')
+    || state.includes('completed')
+    || rawTrackerState.includes('closed')
+    || rawTrackerState.includes('done')
+    || rawTrackerState.includes('completed'),
+  );
+}
+
+function getIssueForCleanup(issueId: string) {
+  const issueDataService = getIssueDataService();
+  return issueDataService.getIssues({ includeCompleted: true }).find((issue: any) => {
+    const identifier = typeof issue?.identifier === 'string' ? issue.identifier : '';
+    return identifier.toUpperCase() === issueId.toUpperCase();
+  }) as {
+    status?: string;
+    state?: string;
+    rawTrackerState?: string;
+    completedAt?: string | null;
+  } | undefined;
 }
 
 async function runDestructiveIssueLifecycle(
@@ -1739,7 +1774,16 @@ const postIssueCleanupWorkspaceRoute = HttpRouter.add(
   '/api/issues/:id/cleanup-workspace',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
+    const rawId = params['id'] ?? '';
+    const parsedIssueId = parseIssueId(rawId);
+    if (!parsedIssueId) {
+      return jsonResponse({ error: 'Invalid issue id: ' + rawId }, { status: 400 });
+    }
+    const id = parsedIssueId.raw.toUpperCase();
+    const issue = getIssueForCleanup(id);
+    if (!issue || !isOrphanedIssue(issue)) {
+      return jsonResponse({ error: 'Cleanup is only allowed for closed/orphaned issues' }, { status: 409 });
+    }
     const cleanupLog: string[] = [];
     const eventStore = yield* EventStoreService;
 
@@ -1814,6 +1858,9 @@ const postIssueDeepWipeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: 'Invalid issue id: ' + id }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
@@ -2510,22 +2557,32 @@ export interface IssuePullRequestData {
 export interface IssuePrEndpointResponse {
   issueId: string;
   pr: IssuePullRequestData | null;
+  error?: string;
+}
+
+export interface IssuePrDiffEndpointResponse {
+  issueId: string;
   diff: string | null;
   error?: string;
 }
 
-export async function fetchIssuePullRequest(issueId: string): Promise<IssuePrEndpointResponse> {
+export interface IssuePrDetailsResponse extends IssuePrEndpointResponse {
+  diff: string | null;
+}
+
+async function resolveIssuePullRequestRef(issueId: string): Promise<
+  | { issueId: string; repoArg: string; prNumber: string }
+  | { issueId: string; repoArg: null; prNumber: null; error?: string }
+> {
   const upper = issueId.toUpperCase();
   const githubCheck = isGitHubIssue(issueId);
   if (!githubCheck.isGitHub || !githubCheck.owner || !githubCheck.repo) {
-    return { issueId: upper, pr: null, diff: null };
+    return { issueId: upper, repoArg: null, prNumber: null };
   }
 
   const branchName = `feature/${issueId.toLowerCase()}`;
   const repoArg = `${githubCheck.owner}/${githubCheck.repo}`;
 
-  // Find the PR number for the feature branch (open or closed/merged).
-  let prNumber: string;
   try {
     const { stdout } = await execFileAsync(
       'gh',
@@ -2540,54 +2597,92 @@ export async function fetchIssuePullRequest(issueId: string): Promise<IssuePrEnd
       ],
       { encoding: 'utf-8', timeout: 15000 },
     );
-    prNumber = stdout.trim();
+    const prNumber = stdout.trim();
+    if (!prNumber) {
+      return { issueId: upper, repoArg: null, prNumber: null };
+    }
+    return { issueId: upper, repoArg, prNumber };
   } catch (err: any) {
-    return { issueId: upper, pr: null, diff: null, error: `gh pr list failed: ${err.message}` };
+    return { issueId: upper, repoArg: null, prNumber: null, error: `gh pr list failed: ${err.message}` };
   }
-  if (!prNumber) {
-    return { issueId: upper, pr: null, diff: null };
+}
+
+async function fetchIssuePullRequestFromRef(
+  prRef: Awaited<ReturnType<typeof resolveIssuePullRequestRef>>,
+): Promise<IssuePrEndpointResponse> {
+  if (!prRef.repoArg || !prRef.prNumber) {
+    return { issueId: prRef.issueId, pr: null, error: prRef.error };
   }
 
-  // Pull the rich fields via `gh pr view --json …` and `gh pr diff` in
-  // parallel — they depend only on the PR number.
-  let pr: IssuePullRequestData;
-  let diff: string | null = null;
-  let diffError: string | undefined;
   try {
-    const [viewResult, diffResult] = await Promise.allSettled([
-      execFileAsync(
-        'gh',
-        [
-          'pr', 'view', prNumber,
-          '--repo', repoArg,
-          '--json', GH_PR_VIEW_FIELDS,
-        ],
-        { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
-      ),
-      execFileAsync(
-        'gh',
-        [
-          'pr', 'diff', prNumber,
-          '--repo', repoArg,
-          '--patch',
-        ],
-        { encoding: 'utf-8', timeout: 30000, maxBuffer: 16 * 1024 * 1024 },
-      ),
-    ]);
-    if (viewResult.status === 'rejected') {
-      return { issueId: upper, pr: null, diff: null, error: `gh pr view failed: ${viewResult.reason?.message ?? String(viewResult.reason)}` };
-    }
-    pr = JSON.parse(viewResult.value.stdout) as IssuePullRequestData;
-    if (diffResult.status === 'fulfilled') {
-      diff = diffResult.value.stdout;
-    } else {
-      diffError = `gh pr diff failed: ${diffResult.reason?.message ?? String(diffResult.reason)}`;
-    }
+    const { stdout } = await execFileAsync(
+      'gh',
+      [
+        'pr', 'view', prRef.prNumber,
+        '--repo', prRef.repoArg,
+        '--json', GH_PR_VIEW_FIELDS,
+      ],
+      { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
+    );
+    return {
+      issueId: prRef.issueId,
+      pr: JSON.parse(stdout) as IssuePullRequestData,
+    };
   } catch (err: any) {
-    return { issueId: upper, pr: null, diff: null, error: `gh pr fetch failed: ${err.message}` };
+    return { issueId: prRef.issueId, pr: null, error: `gh pr view failed: ${err.message}` };
+  }
+}
+
+export async function fetchIssuePullRequest(issueId: string): Promise<IssuePrEndpointResponse> {
+  const prRef = await resolveIssuePullRequestRef(issueId);
+  return fetchIssuePullRequestFromRef(prRef);
+}
+
+async function fetchIssuePullRequestDiffFromRef(
+  prRef: Awaited<ReturnType<typeof resolveIssuePullRequestRef>>,
+): Promise<IssuePrDiffEndpointResponse> {
+  if (!prRef.repoArg || !prRef.prNumber) {
+    return { issueId: prRef.issueId, diff: null, error: prRef.error };
   }
 
-  return { issueId: upper, pr, diff, error: diffError };
+  try {
+    const { stdout } = await execFileAsync(
+      'gh',
+      [
+        'pr', 'diff', prRef.prNumber,
+        '--repo', prRef.repoArg,
+        '--patch',
+      ],
+      { encoding: 'utf-8', timeout: 30000, maxBuffer: 16 * 1024 * 1024 },
+    );
+    return { issueId: prRef.issueId, diff: stdout };
+  } catch (err: any) {
+    return { issueId: prRef.issueId, diff: null, error: `gh pr diff failed: ${err.message}` };
+  }
+}
+
+export async function fetchIssuePullRequestDiff(issueId: string): Promise<IssuePrDiffEndpointResponse> {
+  const prRef = await resolveIssuePullRequestRef(issueId);
+  return fetchIssuePullRequestDiffFromRef(prRef);
+}
+
+export async function fetchIssuePullRequestDetails(issueId: string): Promise<IssuePrDetailsResponse> {
+  const prRef = await resolveIssuePullRequestRef(issueId);
+  if (!prRef.repoArg || !prRef.prNumber) {
+    return { issueId: prRef.issueId, pr: null, diff: null, error: prRef.error };
+  }
+
+  const [prResult, diffResult] = await Promise.all([
+    fetchIssuePullRequestFromRef(prRef),
+    fetchIssuePullRequestDiffFromRef(prRef),
+  ]);
+
+  return {
+    issueId: prRef.issueId,
+    pr: prResult.pr,
+    diff: diffResult.diff,
+    error: prResult.error ?? diffResult.error,
+  };
 }
 
 const getIssuePrRoute = HttpRouter.add(
@@ -2597,6 +2692,28 @@ const getIssuePrRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
     const result = yield* Effect.promise(() => fetchIssuePullRequest(id));
+    return jsonResponse(result);
+  })),
+);
+
+const getIssuePrDiffRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/:id/pr/diff',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const result = yield* Effect.promise(() => fetchIssuePullRequestDiff(id));
+    return jsonResponse(result);
+  })),
+);
+
+const getIssuePrDetailsRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/:id/pr/details',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const result = yield* Effect.promise(() => fetchIssuePullRequestDetails(id));
     return jsonResponse(result);
   })),
 );
@@ -2980,6 +3097,7 @@ const getIssueCostsRoute = HttpRouter.add(
         models: {},
         providers: {},
         byModel: {},
+        sessions: [],
         byStage: {},
         budget: undefined,
         budgetWarning: false,
@@ -3002,6 +3120,7 @@ const getIssueCostsRoute = HttpRouter.add(
           { cost: stats.cost, tokens: stats.tokens },
         ])
       ),
+      sessions: issueData.sessions ?? [],
       byStage: Object.fromEntries(
         Object.entries(issueData.stages || {}).map(([stage, stats]: [string, any]) => [
           stage,
@@ -3012,6 +3131,43 @@ const getIssueCostsRoute = HttpRouter.add(
       budgetWarning: issueData.budgetWarning,
       lastUpdated: issueData.lastUpdated,
     });
+  })),
+);
+
+const getResourceAllocatedIssuesRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/resource-allocated',
+  httpHandler(Effect.gen(function* () {
+    const issues = yield* Effect.tryPromise({
+      try: async () => sanitizeResourceAllocatedIssues(await getCachedResourceAllocatedIssues()),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+    return jsonResponse(issues);
+  })),
+);
+
+const getIssueResourceDetailsRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/:id/resource-details',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const rawId = params['id'] ?? '';
+    const parsedIssueId = parseIssueId(rawId);
+    if (!parsedIssueId) {
+      return jsonResponse({ error: 'Invalid issue id: ' + rawId }, { status: 400 });
+    }
+    const id = parsedIssueId.raw.toUpperCase();
+
+    const details = yield* Effect.tryPromise({
+      try: () => getResourceDetailIdentifiers(id),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+
+    if (!details) {
+      return jsonResponse({ error: `No resource details found for ${id}` }, { status: 404 });
+    }
+
+    return jsonResponse(details);
   })),
 );
 
@@ -3039,7 +3195,11 @@ export const issuesRouteLayer = Layer.mergeAll(
   getIssuePlanningStateRoute,
   postIssueGenerateTasksRoute,
   getIssueCostsRoute,
+  getResourceAllocatedIssuesRoute,
+  getIssueResourceDetailsRoute,
   getIssuePrRoute,
+  getIssuePrDiffRoute,
+  getIssuePrDetailsRoute,
   getIssueDiscussionsRoute,
 );
 

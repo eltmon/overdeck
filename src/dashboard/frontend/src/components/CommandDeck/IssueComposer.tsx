@@ -13,7 +13,8 @@ import { useState, useCallback, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { SendHorizontal, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
+import type { SessionNode as SessionNodeType } from '@panctl/contracts';
+import type { StartAgentResponse } from '../../types';
 
 interface IssueComposerProps {
   issueId: string;
@@ -59,16 +60,27 @@ export function IssueComposer({ issueId, sessions }: IssueComposerProps) {
 
   const spawnMutation = useMutation({
     mutationFn: async (message: string) => {
-      const res = await fetch('/api/agents', {
+      const requestBody = { issueId, message: message || undefined };
+      let res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId, message: message || undefined }),
+        body: JSON.stringify(requestBody),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to start agent');
+      let data = await res.json().catch(() => ({})) as StartAgentResponse;
+      if (res.status === 409 && data.requiresAcknowledgement) {
+        const confirmed = window.confirm((data.guardrails?.warnings ?? []).map((warning) => `• ${warning.message}`).join('\n'));
+        if (!confirmed) throw new Error('Agent start canceled');
+        res = await fetch('/api/agents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...requestBody, guardrailAcknowledged: true }),
+        });
+        data = await res.json().catch(() => ({})) as StartAgentResponse;
       }
-      return res.json();
+      if (!res.ok) {
+        throw new Error(data.error || data.hint || 'Failed to start agent');
+      }
+      return data;
     },
     onSuccess: () => {
       setText('');

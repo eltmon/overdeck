@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
-import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
+import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import styles from '../styles/command-deck.module.css';
 
 interface SessionNodeProps {
@@ -56,7 +56,8 @@ function TypeBadge({ type, role }: { type: SessionNodeType['type']; role?: strin
   return <span className={styles.sessionTypeBadge}>{label}</span>;
 }
 
-function formatDuration(seconds: number): string {
+function formatDuration(seconds: number | null): string {
+  if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return '—';
   if (seconds < 60) return `${Math.round(seconds)}s`;
   if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
   return `${Math.round(seconds / 3600)}h`;

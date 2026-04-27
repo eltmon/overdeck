@@ -9,7 +9,7 @@
 import { Effect, Layer, Queue, Stream } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
-import { PanRpcGroup, PanRpcError, WS_METHODS } from '@panopticon/contracts';
+import { PanRpcGroup, PanRpcError, WS_METHODS } from '@panctl/contracts';
 import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
@@ -18,7 +18,7 @@ import { parseConversationMessages, watchConversation } from './services/convers
 import { sessionFilePath } from '../../lib/paths.js';
 import { listSessionNamesAsync } from '../../lib/tmux.js';
 import { listProjects } from '../../lib/projects.js';
-import type { AgentStatus, ConversationEvent, DomainEvent, SessionTreeDelta } from '@panopticon/contracts';
+import type { AgentStatus, ConversationEvent, DomainEvent, SessionTreeDelta } from '@panctl/contracts';
 import type { StoredEvent } from './event-store.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

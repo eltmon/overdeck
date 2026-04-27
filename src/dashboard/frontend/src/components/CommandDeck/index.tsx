@@ -1,8 +1,9 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo, useReducer } from 'react';
+import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Compass, Plus } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
-import type { TreeSessionFilter } from './ProjectTree/FeatureItem';
+import { pickBestSession, type TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { DeaconStatus } from './DeaconStatus';
 import { IssueWorkbench } from './IssueWorkbench';
 import { BeadsDialog } from '../BeadsDialog';
@@ -11,13 +12,13 @@ import { ConversationPanel, type ViewMode } from '../chat/ConversationPanel';
 import { ModelPicker, loadStoredModel, saveStoredModel } from '../chat/ModelPicker';
 import { DraftConversationPanel } from '../chat/DraftConversationPanel';
 import type { ChatMessage } from '../chat/chat-types';
-import type { Agent, Issue } from '../../types';
+import type { Agent, Issue, StartAgentResponse } from '../../types';
 import { useDashboardStore, selectAgentList } from '../../lib/store';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
-import { WS_METHODS } from '@panopticon/contracts';
-import type { ProjectSessionTree, SessionTreeDelta, SessionNode } from '@panopticon/contracts';
+import { WS_METHODS } from '@panctl/contracts';
+import type { ProjectSessionTree, SessionTreeDelta } from '@panctl/contracts';
 import styles from './styles/command-deck.module.css';
 
 async function fetchConversations(): Promise<Conversation[]> {
@@ -32,10 +33,36 @@ interface ProjectData {
   features: ProjectFeature[];
 }
 
+function groupProjects(issues: ProjectFeature[]): ProjectData[] {
+  const grouped = new Map<string, ProjectData>();
+
+  for (const issue of issues) {
+    const existing = grouped.get(issue.projectName);
+    if (existing) {
+      existing.features.push(issue);
+      continue;
+    }
+
+    grouped.set(issue.projectName, {
+      name: issue.projectName,
+      path: issue.projectName,
+      features: [issue],
+    });
+  }
+
+  return [...grouped.values()]
+    .map((project) => ({
+      ...project,
+      features: [...project.features].sort((a, b) => a.issueId.localeCompare(b.issueId)),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 async function fetchProjects(): Promise<ProjectData[]> {
-  const res = await fetch('/api/command-deck/projects');
-  if (!res.ok) throw new Error('Failed to fetch projects');
-  return res.json();
+  const res = await fetch('/api/issues/resource-allocated');
+  if (!res.ok) throw new Error('Failed to fetch resource-allocated issues');
+  const issues = await res.json() as ProjectFeature[];
+  return groupProjects(issues);
 }
 
 interface IssueCostEntry {
@@ -53,17 +80,6 @@ async function fetchVersion(): Promise<{ version: string }> {
   const res = await fetch('/api/version');
   if (!res.ok) throw new Error('Failed to fetch version');
   return res.json();
-}
-
-/** Prefer active > idle > ended when auto-selecting a session on feature click. */
-function pickBestSession(sessions: readonly SessionNode[]): SessionNode | null {
-  if (sessions.length === 0) return null;
-  const order: Record<string, number> = { active: 0, idle: 1, ended: 2 };
-  return [...sessions].sort((a, b) => {
-    const ao = order[a.presence] ?? 999;
-    const bo = order[b.presence] ?? 999;
-    return ao - bo;
-  })[0] ?? null;
 }
 
 async function fetchAllSessionTrees(projectKeys: string[]): Promise<ProjectSessionTree[]> {
@@ -156,6 +172,7 @@ export function CommandDeck({
   onConvIdChange,
   onConversationViewModeChange,
 }: CommandDeckProps) {
+  const [projectQueryEpoch, bumpProjectQueryEpoch] = useReducer((value: number) => value + 1, 0);
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [isDraft, setIsDraft] = useState(false);
@@ -184,9 +201,9 @@ export function CommandDeck({
   const queryClient = useQueryClient();
 
   const { data: projects = [], isLoading } = useQuery({
-    queryKey: ['command-deck-projects'],
+    queryKey: ['command-deck-projects', projectQueryEpoch],
     queryFn: fetchProjects,
-    refetchInterval: 10000,
+    refetchInterval: 30000,
   });
 
   // Get aggregated cost data for all issues
@@ -209,7 +226,6 @@ export function CommandDeck({
     queryKey: ['session-trees', projectNamesKey],
     queryFn: () => fetchAllSessionTrees(projects.map(p => p.name)),
     enabled: showProjects && projects.length > 0,
-    refetchInterval: 10000,
   });
 
   const sessionTreeDataRef = useRef<Record<string, ProjectSessionTree>>({});
@@ -228,9 +244,6 @@ export function CommandDeck({
   }, [sessionTrees]);
 
   // Track current project names key for delta handlers (avoids stale closure)
-  const projectNamesKeyRef = useRef(projectNamesKey);
-  projectNamesKeyRef.current = projectNamesKey;
-
   // Subscribe to live session tree deltas for each project
   useEffect(() => {
     if (!showProjects) return;
@@ -244,19 +257,20 @@ export function CommandDeck({
             projectKey: project.name,
           }) as unknown as import('effect').Stream.Stream<SessionTreeDelta, Error>,
         (delta) => {
-          const bulkKey = ['session-trees', projectNamesKeyRef.current] as const;
+          const bulkKey = ['session-trees', projectNamesKey] as const;
           const bulkData = queryClient.getQueryData<ProjectSessionTree[]>(bulkKey);
           if (!bulkData) return;
           const tree = bulkData.find(t => t.projectKey === project.name);
           if (!tree) return;
           if (delta.kind === 'session_added') {
-            // Lightweight delta — refetch to get full session data
-            queryClient.invalidateQueries({ queryKey: bulkKey });
-          } else {
-            const updated = applySessionTreeDelta(tree, delta);
-            const newBulkData = bulkData.map(t => t.projectKey === project.name ? updated : t);
-            queryClient.setQueryData(bulkKey, newBulkData);
+            void queryClient.invalidateQueries({ queryKey: bulkKey, exact: true });
+            return;
           }
+
+          const updated = applySessionTreeDelta(tree, delta);
+          if (updated === tree) return;
+          const newBulkData = bulkData.map(t => t.projectKey === project.name ? updated : t);
+          queryClient.setQueryData(bulkKey, newBulkData);
         },
       );
       unsubscribes.push(unsubscribe);
@@ -267,7 +281,7 @@ export function CommandDeck({
         unsubscribe();
       }
     };
-  }, [showProjects, projectNamesKey, queryClient]);
+  }, [showProjects, projectNamesKey, projects, queryClient]);
 
   // Merge session trees into project features, preserving object identity
   // for features whose sessions haven't changed (avoids O(total features)
@@ -277,9 +291,9 @@ export function CommandDeck({
       const tree = sessionTreeMap[project.name];
       if (!tree) return project;
 
-      const featureSessions = new Map<string, import('@panopticon/contracts').SessionNode[]>();
+      const featureSessions = new Map<string, readonly import('@panctl/contracts').SessionNode[]>();
       for (const feature of tree.features) {
-        featureSessions.set(feature.issueId.toLowerCase(), [...feature.sessions]);
+        featureSessions.set(feature.issueId.toLowerCase(), feature.sessions);
       }
 
       let featuresChanged = false;
@@ -370,21 +384,10 @@ export function CommandDeck({
 
   const handleSelectFeature = useCallback((issueId: string) => {
     setSelectedFeature(issueId);
-    // Auto-select the best alive session so the user doesn't have to click twice
-    // (feature → session). Falls back to issue-selected mode when no sessions exist.
-    let sessions: SessionNode[] = [];
-    for (const project of projectsWithSessions) {
-      const feature = project.features.find(f => f.issueId === issueId);
-      if (feature) {
-        sessions = feature.sessions ?? [];
-        break;
-      }
-    }
-    const best = pickBestSession(sessions);
-    selectSession(issueId, best?.sessionId ?? null);
+    selectSession(issueId, null);
     setSelectedConversation(null);
     setIsDraft(false);
-  }, [selectSession, projectsWithSessions]);
+  }, [selectSession]);
 
   const handleSelectSession = useCallback((issueId: string, sessionId: string) => {
     setSelectedFeature(issueId);
@@ -400,6 +403,20 @@ export function CommandDeck({
       await refreshDashboardState(queryClient);
     } catch {
       // Silently ignore — the user can retry from Zone B if needed
+    }
+  }, [queryClient]);
+
+  const handleCleanupOrphanedResources = useCallback(async (issueId: string) => {
+    if (!window.confirm(`Clean up orphaned resources for ${issueId}? This removes leftover local workspace state for a closed issue.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/issues/${encodeURIComponent(issueId)}/cleanup-workspace`, { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to clean up orphaned resources');
+      bumpProjectQueryEpoch();
+      await refreshDashboardState(queryClient);
+    } catch {
+      // Silently ignore — user can retry from the resource popover
     }
   }, [queryClient]);
 
@@ -448,15 +465,28 @@ export function CommandDeck({
 
   const handleRestartSession = useCallback(async (sessionId: string, issueId: string) => {
     try {
-      // Step 1: stop current agent
       await fetch(`/api/agents/${sessionId}`, { method: 'DELETE' });
-      // Step 2: start a new agent for the same issue
-      const res = await fetch('/api/agents', {
+      const requestBody = { issueId };
+      let res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId }),
+        body: JSON.stringify(requestBody),
       });
-      if (!res.ok) throw new Error('Failed to restart agent');
+      let data = await res.json().catch(() => ({})) as StartAgentResponse;
+      if (res.status === 409 && data.requiresAcknowledgement) {
+        const confirmed = window.confirm((data.guardrails?.warnings ?? []).map((warning) => `• ${warning.message}`).join('\n'));
+        if (!confirmed) throw new Error('Agent start canceled');
+        res = await fetch('/api/agents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...requestBody, guardrailAcknowledged: true }),
+        });
+        data = await res.json().catch(() => ({})) as StartAgentResponse;
+      }
+      if (!res.ok) throw new Error(data.error || data.hint || 'Failed to restart agent');
+      if (data.guardrails?.warnings?.length) {
+        toast.success('Agent started after acknowledging system health warnings.', { duration: 6000 });
+      }
       await refreshDashboardState(queryClient);
     } catch {
       // Silently ignore — user can retry
@@ -465,7 +495,7 @@ export function CommandDeck({
 
   const handleDeepWipe = useCallback(async (issueId: string) => {
     try {
-      const res = await fetch(`/api/issues/${issueId}/deep-wipe`, {
+      const res = await fetch(`/api/issues/${encodeURIComponent(issueId)}/deep-wipe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deleteWorkspace: true }),
@@ -724,6 +754,7 @@ export function CommandDeck({
                     onDeepWipe={handleDeepWipe}
                     onOpenStateDir={handleOpenStateDir}
                     onViewJsonl={handleViewJsonl}
+                    onCleanupOrphanedResources={handleCleanupOrphanedResources}
                   />
                 ))
               )

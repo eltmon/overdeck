@@ -69,6 +69,10 @@ export interface ReviewStatus {
   deaconIgnoredReason?: string;
   /** Commits at time of review request — used to detect new commits after review */
   lastReviewCommits?: { ahead: number; behind: number; branch: string; commits: string[] };
+  /** Active canonical review-temp stash for the current review cycle. */
+  reviewTempStashRef?: string;
+  reviewTempStashMessage?: string;
+  reviewTempStashSequence?: number;
 }
 
 function verificationSatisfied(status: Pick<ReviewStatus, 'verificationStatus'>): boolean {

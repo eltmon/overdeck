@@ -9,12 +9,13 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Square, Loader2, Terminal, Pause, Play, MoreHorizontal,
   FolderOpen, FileText, Trash2, RotateCcw, Download, History,
 } from 'lucide-react';
-import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
+import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import { useConfirm } from '../DialogProvider';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 
@@ -86,20 +87,32 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
   const restartMutation = useMutation({
     mutationFn: async () => {
       if (session.type !== 'work') throw new Error('Cannot restart non-work sessions');
-      // Stop current agent
       await fetch(`/api/agents/${session.sessionId}`, { method: 'DELETE' });
-      // Use the authoritative issueId prop; fall back to derivation only when unavailable
       const targetIssueId = issueId ?? session.sessionId.replace(/^agent-/, '').toUpperCase();
-      // Start new agent
-      const res = await fetch('/api/agents', {
+      const requestBody = { issueId: targetIssueId };
+      let res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId: targetIssueId }),
+        body: JSON.stringify(requestBody),
       });
-      if (!res.ok) throw new Error('Failed to restart agent');
-      return res.json();
+      let data = await res.json().catch(() => ({})) as { error?: string; hint?: string; requiresAcknowledgement?: boolean; guardrails?: { warnings?: Array<{ message: string }> } };
+      if (res.status === 409 && data.requiresAcknowledgement) {
+        const confirmed = window.confirm((data.guardrails?.warnings ?? []).map((warning) => `• ${warning.message}`).join('\n'));
+        if (!confirmed) throw new Error('Agent start canceled');
+        res = await fetch('/api/agents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...requestBody, guardrailAcknowledged: true }),
+        });
+        data = await res.json().catch(() => ({})) as { error?: string; hint?: string; guardrails?: { warnings?: Array<{ message: string }> } };
+      }
+      if (!res.ok) throw new Error(data.error || data.hint || 'Failed to restart agent');
+      return data;
     },
-    onSuccess: async () => {
+    onSuccess: async (data) => {
+      if ((data.guardrails?.warnings ?? []).length > 0) {
+        toast.success('Agent started after acknowledging system health warnings.', { duration: 6000 });
+      }
       await refreshDashboardState(queryClient);
     },
   });

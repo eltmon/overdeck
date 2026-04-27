@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
+import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import { FeatureItem, pickBestSession } from './FeatureItem';
-import type { ProjectFeature } from './ProjectNode';
+import type { ProjectFeature, ProjectFeatureResourceIdentifiers } from './ProjectNode';
 
 vi.mock('lucide-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('lucide-react')>();
@@ -17,6 +17,12 @@ vi.mock('lucide-react', async (importOriginal) => {
     Eye: () => <svg data-testid="eye" />,
     Layers: () => <svg data-testid="layers" />,
     GitMerge: () => <svg data-testid="merge" />,
+    GitBranch: () => <svg data-testid="git-branch" />,
+    BookText: () => <svg data-testid="book-text" />,
+    Bug: () => <svg data-testid="bug" />,
+    Container: () => <svg data-testid="container" />,
+    Radio: () => <svg data-testid="radio" />,
+    Workflow: () => <svg data-testid="workflow" />,
   };
 });
 
@@ -63,6 +69,12 @@ vi.mock('../styles/command-deck.module.css', () => ({
     featureState_planning: 'featureState_planning',
     featureState_todo: 'featureState_todo',
     featureCost: 'featureCost',
+    featureResourceStrip: 'featureResourceStrip',
+    featureResourceIcon: 'featureResourceIcon',
+    featureResourcePopover: 'featureResourcePopover',
+    featureResourcePopoverOpenUpward: 'featureResourcePopoverOpenUpward',
+    featureResourceRow: 'featureResourceRow',
+    featureResourceCleanupButton: 'featureResourceCleanupButton',
     sessionList: 'sessionList',
     sessionNode: 'sessionNode',
     sessionNodeSelected: 'sessionNodeSelected',
@@ -73,6 +85,7 @@ function makeFeature(overrides?: Partial<ProjectFeature>): ProjectFeature {
   return {
     issueId: 'PAN-821',
     title: 'Test Feature',
+    projectName: 'test-project',
     branch: 'feature/pan-821',
     status: 'has_state',
     stateLabel: 'In Progress',
@@ -81,6 +94,23 @@ function makeFeature(overrides?: Partial<ProjectFeature>): ProjectFeature {
     hasPrd: true,
     hasState: true,
     isShadow: false,
+    isRally: false,
+    resourceSources: [],
+    resourceDetails: {
+      hasWorkspace: false,
+      workspacePaths: [],
+      localBranchCount: 0,
+      localBranchNames: [],
+      remoteBranchCount: 0,
+      remoteBranchNames: [],
+      tmuxSessionCount: 0,
+      tmuxSessionNames: [],
+      prs: [],
+      hasVbrief: false,
+      hasBeads: false,
+      dockerContainerCount: 0,
+      dockerContainerNames: [],
+    },
     ...overrides,
   };
 }
@@ -145,10 +175,22 @@ describe('FeatureItem', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        workspacePaths: [],
+        localBranchNames: [],
+        remoteBranchNames: [],
+        tmuxSessionNames: [],
+        prs: [],
+        dockerContainerNames: [],
+      } satisfies ProjectFeatureResourceIdentifiers),
+    })));
   });
 
   afterEach(() => {
     localStorage.clear();
+    vi.unstubAllGlobals();
   });
 
   it('renders feature info without caret when no sessions', () => {
@@ -274,7 +316,7 @@ describe('FeatureItem', () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
-  it('auto-selects best session when row is clicked and sessions exist', () => {
+  it('does not auto-select a session when the issue row is clicked', () => {
     const onSelect = vi.fn();
     const onSelectSession = vi.fn();
     const sessions = [
@@ -291,7 +333,7 @@ describe('FeatureItem', () => {
     );
     fireEvent.click(screen.getAllByText('PAN-821')[0]!);
     expect(onSelect).toHaveBeenCalledTimes(1);
-    expect(onSelectSession).toHaveBeenCalledWith('PAN-821', 'active-1');
+    expect(onSelectSession).not.toHaveBeenCalled();
   });
 
   it('does not call onSelectSession when row is clicked and no sessions exist', () => {
@@ -384,5 +426,102 @@ describe('FeatureItem', () => {
     fireEvent.click(screen.getByTestId('chevron-right'));
     expect(screen.getByTestId('session-sess-a')).toHaveAttribute('data-selected', 'false');
     expect(screen.getByTestId('session-sess-b')).toHaveAttribute('data-selected', 'true');
+  });
+
+  it('renders concrete resource strip details when the popover detail fetch returns identifiers', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        workspacePaths: ['/tmp/workspaces/feature-pan-821'],
+        localBranchNames: ['feature/pan-821'],
+        remoteBranchNames: ['origin/feature/pan-821'],
+        tmuxSessionNames: ['agent-pan-821'],
+        prs: [
+          {
+            number: 123,
+            title: 'Test PR',
+            state: 'OPEN',
+            isDraft: false,
+          },
+        ],
+        dockerContainerNames: ['pan-821-db', 'pan-821-cache'],
+      } satisfies ProjectFeatureResourceIdentifiers),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <FeatureItem
+        feature={makeFeature({
+          resourceSources: ['workspace', 'branch', 'tmux', 'pr', 'docker', 'vbrief', 'beads'],
+          resourceDetails: {
+            hasWorkspace: true,
+            localBranchCount: 1,
+            remoteBranchCount: 1,
+            tmuxSessionCount: 1,
+            prs: [
+              {
+                number: 123,
+                title: 'Test PR',
+                state: 'OPEN',
+                isDraft: false,
+              },
+            ],
+            hasVbrief: true,
+            hasBeads: true,
+            dockerContainerCount: 2,
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    fireEvent.mouseEnter(screen.getByTitle('workspace: allocated').parentElement!);
+
+    expect(screen.getByTitle('workspace: allocated')).toBeInTheDocument();
+    expect(screen.getByTitle('branch: local 1 · remote 1')).toBeInTheDocument();
+    expect(screen.getByTitle('tmux: 1 session')).toBeInTheDocument();
+    expect(screen.getByTitle('PR: #123 (open)')).toBeInTheDocument();
+    expect(await screen.findByText('workspace: /tmp/workspaces/feature-pan-821')).toBeInTheDocument();
+    expect(screen.getByText('branch (local): feature/pan-821')).toBeInTheDocument();
+    expect(screen.getByText('branch (remote): origin/feature/pan-821')).toBeInTheDocument();
+    expect(screen.getByText('tmux: agent-pan-821')).toBeInTheDocument();
+    expect(screen.getByText('vBRIEF present')).toBeInTheDocument();
+    expect(screen.getByText('beads present')).toBeInTheDocument();
+    expect(screen.getByText('PR: #123 Test PR (open)')).toBeInTheDocument();
+    expect(screen.getByText('docker: pan-821-db')).toBeInTheDocument();
+    expect(screen.getByText('docker: pan-821-cache')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-821/resource-details');
+  });
+
+  it('shows cleanup affordances for orphaned resources', () => {
+    const onCleanupOrphanedResources = vi.fn();
+    render(
+      <FeatureItem
+        feature={makeFeature({
+          issueId: 'PAN-777',
+          stateLabel: 'Closed',
+          rawTrackerState: 'closed',
+          resourceSources: ['workspace'],
+          resourceDetails: {
+            hasWorkspace: true,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasVbrief: false,
+            hasBeads: false,
+            dockerContainerCount: 0,
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+        onCleanupOrphanedResources={onCleanupOrphanedResources}
+      />,
+    );
+
+    fireEvent.mouseEnter(screen.getByTitle('workspace: allocated').parentElement!);
+    fireEvent.click(screen.getByRole('button', { name: 'Cleanup' }));
+    expect(onCleanupOrphanedResources).toHaveBeenCalledWith('PAN-777');
   });
 });

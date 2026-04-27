@@ -1,73 +1,81 @@
 ---
 specialist: review-agent
-issueId: PAN-866
+issueId: PAN-865
 outcome: changes-requested
-timestamp: 2026-04-27T10:45:38Z
+timestamp: 2026-04-27T15:37:52Z
 ---
 
 # Verdict: CHANGES_REQUESTED
 
 ## Summary
-PAN-866 implements 9 Zone C tabs (Activity, Costs, PRD, STATE, INFERENCE, vBRIEF, Beads, PR/Diff, Discussions) with backend markdown endpoints, activity scoping, and specialist context improvements. All 10 functional requirements are implemented and verified by code evidence. However, the requirements reviewer identified that the explicit acceptance criterion "Visual verified with Playwright" has no artifact or evidence in the changed files — this is a MUST-level blocker. The correctness reviewer also flagged two live code quality issues (dead props in the component interface, unnecessary type assertions) that should be addressed together.
+
+PAN-865 adds a 10-tab strip to Zone C of the Command Deck with an Overview tab that renders a billboard, tile grid, summaries, and a trend strip. The PR is a substantial and well-structured addition. However, 1 acceptance criterion is not satisfied — Tab/Shift-Tab keyboard navigation was specified but not implemented — and 3 high-priority correctness issues were found. The PR cannot merge until REQ-9 is resolved.
 
 ## Blockers (MUST fix before merge)
 
-### 1. Missing Playwright visual verification — `!` (requirements)
+### 1. Tab/Shift-Tab keyboard navigation missing — `ZoneCOverview.tsx` — `!`
 **Raised by**: requirements
-**Why it blocks**: The issue body includes "Visual verified with Playwright" as an explicit acceptance criterion, but there is no evidence (test file, screenshot, or Playwright run artifact) that the Zone C tab UI was exercised in a browser and visually checked.
+**Why it blocks**: The issue acceptance criteria explicitly require "Tab / Shift-Tab" keyboard navigation, the implementation handles only Arrow keys/Home/End, and the tests explicitly assert that Tab/Shift-Tab are NOT intercepted — confirming the gap.
 
-<fix instruction>: Run Playwright tests for the Zone C Overview component or capture browser screenshots of all 9 tabs rendering for the issue-scoped view. Commit the test file or screenshot artifact to the workspace. If Playwright infrastructure is not available in this workspace, the work agent should flag this to the user so they can perform the visual verification themselves or explicitly defer it.
+<fix instruction>
+Implement Tab/Shift-Tab navigation in the tab strip in `ZoneCOverview.tsx`, then update the tests in `ZoneCOverview.test.tsx` to assert the correct behavior instead of asserting that Tab is not intercepted. If the product decision changed and Tab nav is intentionally deferred, update the issue acceptance criteria before merge.
+</fix instruction>
 
 ## High Priority (SHOULD fix; synthesis may still approve if justified)
 
-### 1. Unused props remain in ZoneCOverviewProps interface — `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverview.tsx:65-67` — `≉`
+### 1. Double PR ref resolution in `fetchIssuePullRequestDetails` — `issues.ts:2616` — `~`
 **Raised by**: correctness
-**Why it blocks**: The JSDoc on `issues?` says "Forwarded to the Activity tab" but `ActivityTab` no longer accepts these props (the PR replaced `ActivityView` with `ActivityFeed` which takes only `issueId`). Callers still passing these props get silent no-ops.
+**Why it blocks**: `fetchIssuePullRequestDetails` calls `resolveIssuePullRequestRef` to get `prRef`, then calls `fetchIssuePullRequest(issueId)` which internally calls `resolveIssuePullRequestRef` again — making a second redundant `gh pr list` subprocess call and creating a race condition where metadata and diff could come from different PRs if the PR changes between calls.
 
-<fix instruction>: Remove `issues?: readonly Issue[]` and `featureData?: ProjectFeature | null` from the `ZoneCOverviewProps` interface. Remove the corresponding type imports if they are no longer used elsewhere in the file. Also remove the `issues` and `featureData` props from the test call at `ZoneCOverview.test.tsx:188-189`.
+<fix instruction>
+In `fetchIssuePullRequestDetails`, after resolving `prRef`, inline the `gh pr view` call directly rather than calling `fetchIssuePullRequest(issueId)`. The `fetchIssuePullRequestDiffFromRef` already takes `prRef` directly. Use `Promise.all` with the inlined `gh pr view` call and `fetchIssuePullRequestDiffFromRef(prRef)` — as shown in the reviewer-provided code sketch at `issues.ts:2616-2632`.
+</fix instruction>
 
-### 2. Unnecessary type assertion bypasses type safety — `src/dashboard/frontend/src/components/GodView/ActivityFeed.tsx:32-36` — `~`
+### 2. Dead URL initialization code in `ZoneCOverview` — `ZoneCOverview.tsx:55-62` — `~`
 **Raised by**: correctness
-**Why it blocks**: The selector uses `(event as { issueId?: unknown }).issueId` cast to check for `issueId` existence, but `GodViewActivityEvent` already declares `issueId?: string`. If the type changes upstream the cast would silently hide it.
+**Why it blocks**: `ZoneCOverview.getInitialTab()` reads `window.location.search` but `activeTab` is always provided by the parent `IssueWorkbench`, making the internal tab state initialization dead code. This is confusion rather than a functional bug, but it indicates the component's dual controlled/uncontrolled contract is unclear.
 
-<fix instruction>: Replace the verbose cast with direct property access:
-```typescript
-if (event.issueId) {
-  return event.issueId.toUpperCase() === issueId.toUpperCase();
-}
-return event.agentId.toLowerCase() === `agent-${issueId.toLowerCase()}`;
-```
+<fix instruction>
+Remove the URL initialization from `ZoneCOverview.getInitialTab()` since `activeTab` is always controlled by the parent, or explicitly document that the component supports both controlled and uncontrolled modes.
+</fix instruction>
+
+### 3. `buildIssueTitleMap` rebuilds unbounded Map on every session-trees request — `projects.ts:253` — `~`
+**Raised by**: correctness, performance
+**Why it blocks**: `buildIssueTitleMap()` walks the full in-memory issue list for every `GET /api/session-trees` request. At larger tracker sizes this is O(all issues) per poll cycle. The correctness reviewer notes this is in a request handler so it is GC'd after each response — acceptable at current scale, but a growth risk.
+
+<fix instruction>
+Consider adding a TTL cache for the title map (similar to the existing stash count cache), or lazy-build it only for projects that have active sessions. Low priority — safe to defer to a follow-up if issue count is still small.
+</fix instruction>
 
 ## Nits (advisory — safe to defer)
 
-- `src/lib/cloister/specialist-context.ts:176` — `?` — Shell interpolation of `model` without escaping. Consider `shell-escape` or `execFile` for defense-in-depth. (correctness)
-- `src/lib/cloister/specialist-context.ts:19-29` — `?` — Custom `execAsync` wrapper duplicates `promisify(exec)` behavior. Add a comment explaining why or revert to the standard library pattern. (correctness)
-- `tests/unit/dashboard/server/routes/workspace-planning-markdown.test.ts` — `?` — Missing test for Rally-format issue IDs (e.g., `DE123`) in `getWorkspacePathForResolve`. (correctness)
-- `src/dashboard/frontend/src/components/GodView/ActivityFeed.tsx:33` — `?` — Selector does per-render filter over `recentActivity`. Note: bounded at 50 entries, no action needed in this PR. (performance)
+- `OverviewTab.tsx:421-427` — `?` — Action buttons fire-and-forget POST requests without user feedback. The "Review & Test", "Sync", and "Stop" buttons silently swallow errors with no loading indicator or success/error toast. Consider adding a pending state for consistency with "Spawn Work". (correctness)
+- `ZoneB.tsx:54` — `?` — `formatDuration` null check uses `?? NaN` pattern unnecessarily — `!Number.isFinite(null)` is already `true`, so the `?? NaN` is redundant. Simpler: `if (!Number.isFinite(seconds) || !seconds || seconds <= 0)`. (correctness)
+- `OverviewTab.tsx:490` — `?` — Destructured `stageName` in byStage map callback. Not a bug; mentioned for readability awareness only. No action needed. (correctness)
+- `agent-status.ts:16-17` — `?` — `completed`, `passed`, `merged` all normalize to `stopped`, losing semantic distinction. Design choice; worth documenting if downstream consumers may need to distinguish `merged` from `suspended`. (correctness)
+- `projects.ts:125` — `?` — Legacy planning fallback node gets epoch `startedAt` on stat failure, making it instantly stale (24h threshold). Benign — the filter works correctly. No action needed. (correctness)
+- `projects.ts:253` — `?` — Same as high-3 above. (performance)
 
 ## Cross-cutting groups
 
-**Dead props pollution in Zone C component hierarchy** (correctness):
-- [high-1] Unused `issues` / `featureData` props declared in `ZoneCOverviewProps`
-- [high-2] `ActivityFeed` no longer accepts those props (API changed in same PR)
-- [nit-1] Tests still pass the dead props — should be cleaned up together
+**PR resolution redundancy** (all stem from `fetchIssuePullRequestDetails` calling `resolveIssuePullRequestRef` twice):
+- [high-1] Double PR ref resolution in `fetchIssuePullRequestDetails`
 
-**Specialist context improvements** (correctness, out of scope for Zone C but in diff):
-- [nit-2] `execAsync` wrapper divergence from `promisify(exec)`
-- [nit-3] `model` shell interpolation without escaping
+**URL sync ambiguity** (both stem from dual controlled/uncontrolled tab state):
+- [high-2] Dead URL initialization in `ZoneCOverview`
+- [nit-1] Fire-and-forget action buttons lack feedback
 
 ## What's good
-- All 10 functional requirements implemented with code-level evidence in the diff
-- Path traversal protection in `getWorkspacePathForIssue` is correctly implemented
-- JSON parse hardening in `specialist-handoff-logger` prevents entire handoff log corruption on malformed lines
-- Activity scoping by `issueId` works correctly with case-insensitive fallback to `agentId`
-- Costs tab correctly shows aggregate data even when live WebSocket stream has transient error
-- No blocking sync I/O introduced in new server code (`execAsync` / `fs/promises` used correctly)
+- PR is a large, well-structured refactor with proper error handling throughout
+- Security review found zero vulnerabilities introduced by these changes
+- Performance materially improved on Command Deck hot path: lightweight summary endpoints for 5s polling, batched session-tree fetches, virtualized PR diffs
+- Requirements coverage is 8/9 with only Tab/Shift-Tab nav outstanding
+- All four Playwright snapshots and unit tests in `ZoneCOverview.test.tsx` and `IssueWorkbench.test.tsx` provide solid coverage for shipped behavior
 
 ## Review stats
-- Blockers: 1   High: 2   Medium: 0   Nits: 4
-- By reviewer: correctness=5, security=0, performance=1, requirements=1
-- Files touched: 18   Files with findings: 6
+- Blockers: 1   High: 3   Medium: 0   Nits: 6
+- By reviewer: correctness=8, security=0, performance=2, requirements=1
+- Files touched: 33   Files with findings: 12
 
 ## Appendix: individual reviews
 
@@ -81,7 +89,7 @@ synthesis is the policy layer.
 2. Fix the code for EVERY issue listed
 3. Run tests locally to verify your fixes
 4. Commit every change
-5. Invoke the /rebase-and-submit skill for PAN-866 — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)
+5. Invoke the /rebase-and-submit skill for PAN-865 — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)
 
 Do NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully.
 

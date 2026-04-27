@@ -366,6 +366,9 @@ export interface AgentState {
 
   // SageOx session tracking (PAN-278)
   sageoxSessionPath?: string; // Path to SageOx session folder for parent linking
+  preSpawnStashRef?: string;
+  preSpawnStashMessage?: string;
+  preSpawnBaselineHead?: string;
 }
 
 export function getAgentDir(agentId: string): string {
@@ -465,7 +468,7 @@ export const __testInternals = { markAgentRunning, markAgentStopped };
 // ~30 call sites across the cloister consumed the old shape and migrating
 // every field access in one PR would have been mechanical noise.
 
-import type { AgentRuntimeSnapshot } from '@panopticon/contracts';
+import type { AgentRuntimeSnapshot } from '@panctl/contracts';
 import {
   getAgentRuntimeSnapshot as fetchAgentRuntimeSnapshot,
   emitAgentEvent,
@@ -946,6 +949,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   }
 
   // Create state
+  const existingState = getAgentState(agentId);
   const state: AgentState = {
     id: agentId,
     issueId: options.issueId,
@@ -961,6 +965,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     // Work type system (PAN-118)
     phase: options.phase,
     workType: options.workType,
+    preSpawnStashRef: existingState?.preSpawnStashRef,
+    preSpawnStashMessage: existingState?.preSpawnStashMessage,
+    preSpawnBaselineHead: existingState?.preSpawnBaselineHead,
   };
 
   saveAgentState(state);

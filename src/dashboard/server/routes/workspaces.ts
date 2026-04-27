@@ -14,6 +14,9 @@ import { httpHandler } from './http-handler.js';
  *   POST   /api/workspaces/:issueId/containerize
  *   POST   /api/workspaces/:issueId/containers/:containerName/:action
  *   POST   /api/workspaces/:issueId/refresh-db
+ *   GET    /api/workspaces/:issueId/stashes
+ *   POST   /api/workspaces/:issueId/stashes/:stashRef/recover
+ *   DELETE /api/workspaces/:issueId/stashes/:stashRef
  *   GET    /api/workspaces/:issueId/tldr
  *
  * Lifecycle endpoints (/api/issues/):
@@ -94,6 +97,7 @@ import { extractPrefix, extractNumber, parseIssueId } from '../../../lib/issue-i
 import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
 import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
+import { createRecoveryBranchFromStash, dropStash, isSalvageableStash, listStashes } from '../../../lib/stashes.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -341,6 +345,59 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
     }
   }
   return join(homedir(), 'Projects');
+}
+
+function requireTrustedMutationOrigin(request: HttpServerRequest.HttpServerRequest): HttpServerResponse.HttpServerResponse | null {
+  const origin = (() => {
+    const value = (request.headers as Record<string, string | string[] | undefined>)['origin'];
+    return Array.isArray(value) ? value[0] : value;
+  })();
+  const referer = (() => {
+    const value = (request.headers as Record<string, string | string[] | undefined>)['referer'];
+    return Array.isArray(value) ? value[0] : value;
+  })();
+
+  const port = parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
+  const dashboardUrl = process.env['DASHBOARD_URL'] ?? `http://localhost:${port}`;
+  const trustedOrigins = new Set<string>([dashboardUrl]);
+  if (process.env['NODE_ENV'] === 'development') {
+    trustedOrigins.add('http://localhost:3011');
+    trustedOrigins.add('http://localhost:3000');
+    trustedOrigins.add('http://127.0.0.1:3011');
+    trustedOrigins.add('http://127.0.0.1:3000');
+  }
+
+  const normalize = (value?: string): string | null => {
+    if (!value) return null;
+    try {
+      const url = new URL(value);
+      return `${url.protocol}//${url.host}`;
+    } catch {
+      return null;
+    }
+  };
+
+  const normalizedOrigin = normalize(origin);
+  if (normalizedOrigin) {
+    return trustedOrigins.has(normalizedOrigin)
+      ? null
+      : jsonResponse({ error: 'Invalid origin' }, { status: 403 });
+  }
+
+  const normalizedReferer = normalize(referer);
+  if (normalizedReferer) {
+    return trustedOrigins.has(normalizedReferer)
+      ? null
+      : jsonResponse({ error: 'Invalid referer' }, { status: 403 });
+  }
+
+  return jsonResponse({ error: 'Missing origin' }, { status: 403 });
+}
+
+function resolveWorkspacePath(issueId: string): string | null {
+  const info = getWorkspaceInfoForIssue(issueId);
+  if (info.isRemote || !info.localPath) return null;
+  return info.localPath;
 }
 
 function getWorkspaceLocation(issueId: string): 'local' | 'remote' | undefined {
@@ -1210,6 +1267,97 @@ const getWorkspacePlanRoute = HttpRouter.add(
     const doc = readPlan(planPath);
     const cp = criticalPath(doc);
     return jsonResponse({ ...doc, criticalPath: cp });
+  }))
+);
+
+const getWorkspaceStashesRoute = HttpRouter.add(
+  'GET',
+  '/api/workspaces/:issueId/stashes',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const workspacePath = resolveWorkspacePath(issueId);
+
+    if (!workspacePath || !existsSync(workspacePath)) {
+      return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
+    }
+
+    const stashes = yield* Effect.promise(() => listStashes(workspacePath));
+    const salvageableStashes = stashes
+      .filter(isSalvageableStash)
+      .filter((entry) => entry.issueId === issueId.toUpperCase())
+      .map((entry) => ({
+        ref: entry.ref,
+        stackRef: entry.stackRef,
+        issueId: entry.issueId,
+        message: entry.message,
+        shortDescription: entry.shortDescription,
+        createdAt: entry.createdAt?.toISOString(),
+      }));
+
+    return jsonResponse({ salvageableStashes });
+  }))
+);
+
+const postWorkspaceRecoverStashRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/stashes/:stashRef/recover',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedMutationOrigin(request);
+    if (originError) return originError;
+
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const stashRef = decodeURIComponent(params['stashRef'] ?? '');
+    const workspacePath = resolveWorkspacePath(issueId);
+
+    if (!workspacePath || !existsSync(workspacePath)) {
+      return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
+    }
+
+    const stashes = yield* Effect.promise(() => listStashes(workspacePath));
+    const stash = stashes.find((entry) => entry.ref === stashRef);
+    if (!stash || !isSalvageableStash(stash) || stash.issueId !== issueId.toUpperCase()) {
+      return jsonResponse({ error: 'Salvageable stash not found for this workspace' }, { status: 404 });
+    }
+
+    const branchName = yield* Effect.promise(() => createRecoveryBranchFromStash(
+      workspacePath,
+      stash.ref,
+      stash.issueId,
+      stash.shortDescription,
+    ));
+
+    return jsonResponse({ success: true, branchName });
+  }))
+);
+
+const deleteWorkspaceStashRoute = HttpRouter.add(
+  'DELETE',
+  '/api/workspaces/:issueId/stashes/:stashRef',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedMutationOrigin(request);
+    if (originError) return originError;
+
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const stashRef = decodeURIComponent(params['stashRef'] ?? '');
+    const workspacePath = resolveWorkspacePath(issueId);
+
+    if (!workspacePath || !existsSync(workspacePath)) {
+      return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
+    }
+
+    const stashes = yield* Effect.promise(() => listStashes(workspacePath));
+    const stash = stashes.find((entry) => entry.ref === stashRef);
+    if (!stash || !isSalvageableStash(stash) || stash.issueId !== issueId.toUpperCase()) {
+      return jsonResponse({ error: 'Salvageable stash not found for this workspace' }, { status: 404 });
+    }
+
+    yield* Effect.promise(() => dropStash(workspacePath, stash.ref));
+    return jsonResponse({ success: true });
   }))
 );
 
@@ -4177,6 +4325,42 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       return { success: false, statusCode: 500, error };
     }
 
+    // Step 2b: Strip ephemeral `.planning/` from the feature branch BEFORE merge (#888).
+    // `.planning/` is tracked on feature branches for live workspace use, but must not
+    // land on main — otherwise other active workspaces sync-main pull each other's
+    // STATE.md/feedback files and cross-contaminate. The post-merge cleanup
+    // (`cleanPlanningArtifacts`) is a safety net that runs AFTER the squash commit is
+    // already public; this strip is the primary defense and runs BEFORE `gh pr merge`.
+    //
+    // NOTE: `rebaseFeatureBranch()` in merge-rebase.ts ALSO performs an idempotent
+    // `.planning/` strip during its rebase prep. The two are not currently composed
+    // (this route does not call rebaseFeatureBranch), so there's no double-strip
+    // today. If a future caller chains both, the second strip is a no-op (ls-files
+    // returns nothing → skip). Keep the dual-path safety; do not consolidate
+    // without auditing every entry point that triggers a merge.
+    try {
+      const { stripPlanningFromFeatureBranch } = await import(
+        '../../../lib/cloister/strip-planning-from-branch.js'
+      );
+      const stripResult = await stripPlanningFromFeatureBranch(workspacePath, branchName, issueId);
+      if (!stripResult.success) {
+        const error = `Pre-merge .planning/ strip failed: ${stripResult.reason}`;
+        console.error(`[merge] ${error}`);
+        setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error, readyForMerge: false });
+        completePendingOperation(issueId, error);
+        return { success: false, statusCode: 500, error };
+      }
+      if (stripResult.pushed) {
+        console.log(`[merge] Stripped .planning/ from ${branchName} for ${issueId} — new HEAD ${stripResult.newHead?.slice(0, 8)}`);
+      }
+    } catch (stripErr: any) {
+      const error = `Pre-merge .planning/ strip threw: ${stripErr.message}`;
+      console.error(`[merge] ${error}`);
+      setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error, readyForMerge: false });
+      completePendingOperation(issueId, error);
+      return { success: false, statusCode: 500, error };
+    }
+
     // Step 3: Post-rebase verification gate (typecheck, lint, test)
     // Ensures the rebase didn't introduce issues before merging.
     setReviewStatus(issueId, { mergeStatus: 'verifying', mergeNotes: undefined });
@@ -4768,12 +4952,74 @@ const getMergeQueueRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/internal/pipeline/notify ────────────────────────────────
+//
+// Cross-process bridge for `notifyPipeline()` (PAN-891).
+//
+// `notifyPipeline` is an in-process handler registry; only the dashboard server
+// registers a handler. CLI processes (e.g. `pan review run`) write to the
+// shared SQLite review-status table but their `notifyPipeline()` calls are
+// no-ops in their own process. This endpoint lets them poke the dashboard so
+// it re-emits the `review.status_changed` domain event with the latest DB
+// snapshot (which the in-process handler enriches from live tmux sessions).
+//
+// Body: `{ type: 'status_changed', issueId: string }`. The body intentionally
+// does NOT carry a status payload — the server re-reads from SQLite to avoid
+// stale snapshots and races between writers.
+
+const postInternalPipelineNotifyRoute = HttpRouter.add(
+  'POST',
+  '/api/internal/pipeline/notify',
+  httpHandler(Effect.gen(function* () {
+    // Shared-secret check (PAN-891 review feedback). The dashboard binds 0.0.0.0
+    // by default, so this stateful endpoint must be unreachable without the
+    // server-issued token. Same token is read by CLI senders via getInternalToken().
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const { INTERNAL_TOKEN_HEADER, getInternalToken } = yield* Effect.promise(() =>
+      import('../../../lib/internal-token.js'),
+    );
+    const expected = getInternalToken();
+    if (!expected) {
+      return jsonResponse({ ok: false, error: 'internal token not configured' }, 503);
+    }
+    const headers = request.headers as Record<string, string | string[] | undefined>;
+    const raw = headers[INTERNAL_TOKEN_HEADER];
+    const provided = Array.isArray(raw) ? raw[0] : raw;
+    if (!provided || provided !== expected) {
+      return jsonResponse({ ok: false, error: 'forbidden' }, 403);
+    }
+
+    const body = yield* readJsonBody;
+    const { type, issueId } = body as { type?: string; issueId?: string };
+
+    if (type !== 'status_changed' || !issueId) {
+      return jsonResponse({ ok: false, error: 'expected { type: "status_changed", issueId }' }, 400);
+    }
+
+    const status = getReviewStatus(issueId);
+    if (!status) {
+      return jsonResponse({ ok: false, error: `no review status found for ${issueId}` }, 404);
+    }
+
+    // Re-enter the in-process pipeline handler — this triggers the same
+    // enrichment + event-store append path as direct in-process calls.
+    const { notifyPipeline } = yield* Effect.promise(() =>
+      import('../../../lib/pipeline-notifier.js'),
+    );
+    notifyPipeline({ type: 'status_changed', issueId, status });
+    return jsonResponse({ ok: true });
+  })),
+);
+
 export const workspacesRouteLayer = Layer.mergeAll(
   getWorkspaceRoute,
   postWorkspacesRoute,
   getWorkspaceStateMdRoute,
   getWorkspaceInferenceMdRoute,
   getWorkspacePlanRoute,
+  getWorkspaceStashesRoute,
+  postWorkspaceRecoverStashRoute,
+  deleteWorkspaceStashRoute,
   getWorkspaceCleanPreviewRoute,
   postWorkspaceCleanRoute,
   postWorkspaceContainerizeRoute,
@@ -4795,6 +5041,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   getWorkspaceTldrRoute,
   postWorkspaceRefreshTokenRoute,
   getMergeQueueRoute,
+  postInternalPipelineNotifyRoute,
 );
 
 export default workspacesRouteLayer;

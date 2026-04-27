@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { PrDiffTab } from '../PrDiffTab';
-import type { PrEndpointResponse, PullRequestData } from '../queries';
+import type { PrDiffResponse, PrEndpointResponse, PullRequestData } from '../queries';
 
 const prResult = vi.hoisted(() => ({
   data: undefined as undefined | PrEndpointResponse,
@@ -24,8 +24,15 @@ const prResult = vi.hoisted(() => ({
   isError: false,
 }));
 
+const prDiffResult = vi.hoisted(() => ({
+  data: undefined as undefined | PrDiffResponse,
+  isLoading: false,
+  isError: false,
+}));
+
 vi.mock('../queries', () => ({
   usePrQuery: () => prResult,
+  usePrDiffQuery: () => prDiffResult,
 }));
 
 const ISSUE = 'PAN-830';
@@ -69,6 +76,9 @@ describe('PrDiffTab', () => {
     prResult.data = undefined;
     prResult.isLoading = false;
     prResult.isError = false;
+    prDiffResult.data = undefined;
+    prDiffResult.isLoading = false;
+    prDiffResult.isError = false;
   });
 
   it('renders the loading state', () => {
@@ -84,14 +94,14 @@ describe('PrDiffTab', () => {
   });
 
   it('renders the empty state when no PR exists', () => {
-    prResult.data = { issueId: ISSUE, pr: null, diff: null };
+    prResult.data = { issueId: ISSUE, pr: null };
     render(<PrDiffTab issueId={ISSUE} />);
     expect(screen.getByTestId('prdiff-tab-empty')).toBeInTheDocument();
     expect(screen.getByTestId('prdiff-tab-empty').textContent).toContain('feature/pan-830');
   });
 
   it('surfaces a backend error message in the empty state', () => {
-    prResult.data = { issueId: ISSUE, pr: null, diff: null, error: 'gh pr list failed: not authenticated' };
+    prResult.data = { issueId: ISSUE, pr: null, error: 'gh pr list failed: not authenticated' };
     render(<PrDiffTab issueId={ISSUE} />);
     expect(screen.getByTestId('prdiff-tab-error-msg')).toBeInTheDocument();
     expect(screen.getByTestId('prdiff-tab-error-msg').textContent).toContain('gh pr list failed');
@@ -101,6 +111,9 @@ describe('PrDiffTab', () => {
     prResult.data = {
       issueId: ISSUE,
       pr: makePr(),
+    };
+    prDiffResult.data = {
+      issueId: ISSUE,
       diff: [
         'diff --git a/src/foo.ts b/src/foo.ts',
         '--- a/src/foo.ts',
@@ -153,7 +166,6 @@ describe('PrDiffTab', () => {
     prResult.data = {
       issueId: ISSUE,
       pr: makePr({ isDraft: true }),
-      diff: null,
     };
     render(<PrDiffTab issueId={ISSUE} />);
     expect(screen.getByTestId('pr-state-badge').textContent?.toLowerCase()).toContain('draft');
@@ -163,7 +175,6 @@ describe('PrDiffTab', () => {
     prResult.data = {
       issueId: ISSUE,
       pr: makePr({ state: 'MERGED' }),
-      diff: null,
     };
     render(<PrDiffTab issueId={ISSUE} />);
     expect(screen.getByTestId('pr-state-badge').textContent?.toLowerCase()).toContain('merged');
@@ -173,7 +184,6 @@ describe('PrDiffTab', () => {
     prResult.data = {
       issueId: ISSUE,
       pr: makePr({ reviewRequests: [] }),
-      diff: null,
     };
     render(<PrDiffTab issueId={ISSUE} />);
     expect(screen.queryByTestId('prdiff-tab-reviewers')).not.toBeInTheDocument();
@@ -183,7 +193,6 @@ describe('PrDiffTab', () => {
     prResult.data = {
       issueId: ISSUE,
       pr: makePr({ statusCheckRollup: [] }),
-      diff: null,
     };
     render(<PrDiffTab issueId={ISSUE} />);
     expect(screen.getByTestId('prdiff-tab-checks-empty')).toBeInTheDocument();
@@ -197,6 +206,9 @@ describe('PrDiffTab', () => {
     prResult.data = {
       issueId: ISSUE,
       pr: makePr(),
+    };
+    prDiffResult.data = {
+      issueId: ISSUE,
       diff: lines.join('\n'),
     };
     const start = performance.now();

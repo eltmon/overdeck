@@ -11,7 +11,11 @@ import App, {
   serializeConversationViewModes,
 } from './App';
 
-vi.mock('./components/KanbanBoard', () => ({ KanbanBoard: () => null }));
+vi.mock('./components/KanbanBoard', () => ({
+  KanbanBoard: ({ onSelectIssue }: { onSelectIssue?: (issueId: string | null) => void }) => (
+    <button onClick={() => onSelectIssue?.('PAN-123')}>Open issue</button>
+  ),
+}));
 vi.mock('./components/AgentList', () => ({ AgentList: () => null }));
 vi.mock('./components/AgentOutputPanel', () => ({ AgentOutputPanel: () => null }));
 vi.mock('./components/HealthDashboard', () => ({ HealthDashboard: () => null }));
@@ -35,16 +39,27 @@ vi.mock('./components/BootstrapGate', () => ({ BootstrapGate: ({ children }: { c
 vi.mock('./components/skeletons/KanbanSkeleton', () => ({ KanbanSkeleton: () => null }));
 vi.mock('./components/skeletons/AgentListSkeleton', () => ({ AgentListSkeleton: () => null }));
 vi.mock('./components/skeletons/GodViewSkeleton', () => ({ GodViewSkeleton: () => null }));
-vi.mock('./components/DetailPanelLayout', () => ({ DetailPanelLayout: () => null }));
+vi.mock('./components/DetailPanelLayout', () => ({
+  DetailPanelLayout: ({ inline }: { inline?: boolean }) => <div data-testid="detail-panel-layout" data-inline={inline ? 'true' : 'false'} />,
+}));
 vi.mock('./components/StandaloneTerminal', () => ({ StandaloneTerminal: () => null }));
-vi.mock('lucide-react', () => ({ AlertTriangle: () => null, RefreshCw: () => null, X: () => null, ArrowRight: () => null }));
+vi.mock('lucide-react', () => ({ AlertTriangle: () => null, RefreshCw: () => null, X: () => null, ArrowRight: () => null, Loader2: () => null, ChevronDown: () => null, Cpu: () => null, MemoryStick: () => null, Skull: () => null }));
 vi.mock('./components/upgrade-announcement/UpgradeAnnouncement', () => ({ UpgradeAnnouncement: () => null }));
 vi.mock('sonner', () => ({ Toaster: () => null, toast: { info: vi.fn() } }));
 vi.mock('./lib/store', () => ({
-  useDashboardStore: vi.fn(() => []),
-  selectAgentList: vi.fn(),
-  selectIssues: vi.fn(),
-  selectDashboardLifecycle: vi.fn(),
+  useDashboardStore: vi.fn((selector?: unknown) => {
+    if (typeof selector === 'function') {
+      return selector({
+        agents: [],
+        issues: [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }],
+        dashboardLifecycle: { active: false },
+      });
+    }
+    return [];
+  }),
+  selectAgentList: (state: { agents: unknown[] }) => state.agents,
+  selectIssues: (state: { issues: unknown[] }) => state.issues,
+  selectDashboardLifecycle: (state: { dashboardLifecycle: { active: boolean } }) => state.dashboardLifecycle,
 }));
 vi.mock('./components/CommandDeck', () => ({
   CommandDeck: ({ conversationViewMode, onConversationViewModeChange }: {
@@ -174,5 +189,32 @@ describe('App conversation view routing', () => {
 
     expect(screen.getByTestId('view-mode')).toHaveTextContent('terminal');
     expect(window.location.search).toBe('?views=77:terminal,161:terminal');
+  });
+});
+
+describe('App kanban issue details', () => {
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/');
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/version') {
+        return new Response(JSON.stringify({ version: '0.5.0' }), { status: 200 });
+      }
+      if (url === '/api/tracker-status') {
+        return new Response(JSON.stringify({ primary: 'github', configured: [] }), { status: 200 });
+      }
+      if (url === '/api/confirmations') {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    }));
+  });
+
+  it('opens issue details inline in a modal from kanban selection', () => {
+    renderApp();
+
+    fireEvent.click(screen.getByText('Open issue'));
+
+    expect(screen.getByTestId('detail-panel-layout')).toHaveAttribute('data-inline', 'true');
   });
 });

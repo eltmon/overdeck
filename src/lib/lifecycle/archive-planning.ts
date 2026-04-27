@@ -10,7 +10,8 @@
  *   3. Rotate previous archives to prevent overwrite
  */
 
-import { existsSync, mkdirSync, cpSync, rmSync } from 'fs';
+import { existsSync } from 'fs';
+import { mkdir, cp, rm, rename } from 'fs/promises';
 import { join, dirname } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -18,6 +19,7 @@ import {
   ARCHIVES_DIR,
   PROJECT_DOCS_SUBDIR,
   PROJECT_PRDS_SUBDIR,
+  PROJECT_PRDS_ACTIVE_SUBDIR,
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from '../paths.js';
 import { findPrdAtStatus, canonicalPrdSubdir } from '../prd-locations.js';
@@ -78,23 +80,55 @@ export async function movePrd(
   const dest = source.format === 'subdir' ? completedSubdir : completedFlat;
   const destParent = dirname(dest);
   if (!existsSync(destParent)) {
-    mkdirSync(destParent, { recursive: true });
+    await mkdir(destParent, { recursive: true });
   }
 
   const formatLabel = source.format === 'subdir' ? 'PRD subdirectory' : 'PRD';
+
+  // For the legacy `flat` format the PRD is a single `.md` file, but the vBRIEF
+  // JSON sidecar (`<id>-plan.vbrief.json`) lives next to it and was historically
+  // left behind in active/ after merge (PAN-487). Detect it here so we can move
+  // it alongside the `.md`. The `subdir` format already moves both files because
+  // they share the directory.
+  const flatActive = source.format === 'flat'
+    ? join(ctx.projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR)
+    : null;
+  const flatCompleted = source.format === 'flat'
+    ? join(ctx.projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_COMPLETED_SUBDIR)
+    : null;
+  const sidecarLower = flatActive ? join(flatActive, `${issueLower}-plan.vbrief.json`) : null;
+  const sidecarUpper = flatActive ? join(flatActive, `${ctx.issueId.toUpperCase()}-plan.vbrief.json`) : null;
+  // Always land sidecar at canonical lowercase in completed/.
+  const sidecarDest = flatCompleted ? join(flatCompleted, `${issueLower}-plan.vbrief.json`) : null;
+  const resolvedSidecarSource = sidecarLower && existsSync(sidecarLower)
+    ? sidecarLower
+    : (sidecarUpper && existsSync(sidecarUpper) ? sidecarUpper : null);
+
   try {
     await execAsync(`git mv "${source.path}" "${dest}"`, { cwd: ctx.projectPath });
+    if (resolvedSidecarSource && sidecarDest) {
+      try {
+        await execAsync(`git mv "${resolvedSidecarSource}" "${sidecarDest}"`, { cwd: ctx.projectPath });
+      } catch {
+        // sidecar may not be tracked — fall back to plain copy
+        try { await cp(resolvedSidecarSource, sidecarDest); } catch { /* non-fatal */ }
+      }
+    }
     await execAsync(`git commit -m "Move ${ctx.issueId} PRD to completed"`, { cwd: ctx.projectPath });
     if (pushToRemote) {
       await execAsync('git push', { cwd: ctx.projectPath });
     }
-    return stepOk(step, [`Moved ${formatLabel} from active/ to completed/ via git mv`]);
+    const sidecarNote = resolvedSidecarSource ? ' (with vBRIEF sidecar)' : '';
+    return stepOk(step, [`Moved ${formatLabel} from active/ to completed/ via git mv${sidecarNote}`]);
   } catch {
-    // git mv failed — fall back to plain copy. cpSync handles both file and directory.
+    // git mv failed — fall back to plain copy. cp handles both file and directory.
     try {
-      cpSync(source.path, dest, { recursive: true });
+      await cp(source.path, dest, { recursive: true });
       if (!existsSync(dest)) {
         return stepFailed(step, 'PRD copy appeared to succeed but destination not found');
+      }
+      if (resolvedSidecarSource && sidecarDest) {
+        try { await cp(resolvedSidecarSource, sidecarDest); } catch { /* non-fatal */ }
       }
       return stepOk(step, [`Copied ${formatLabel} to completed/ (git mv failed, plain copy succeeded)`]);
     } catch (err) {
@@ -130,31 +164,42 @@ export async function archiveWorkspaceArtifacts(
         version++;
       }
       const rotatedDir = `${archiveDir}.${version}`;
-      cpSync(archiveDir, rotatedDir, { recursive: true });
-      rmSync(archiveDir, { recursive: true, force: true });
+      // Rename is O(1) metadata vs. copy+delete which is O(archive size). Both
+      // paths live under ARCHIVES_DIR so they're on the same filesystem.
+      await rename(archiveDir, rotatedDir);
     }
 
-    mkdirSync(archiveDir, { recursive: true });
+    await mkdir(archiveDir, { recursive: true });
     const details: string[] = [];
 
     // Archive .planning/feedback/
     const feedbackDir = join(workspacePath, '.planning', 'feedback');
     if (existsSync(feedbackDir)) {
-      cpSync(feedbackDir, join(archiveDir, 'feedback'), { recursive: true });
+      await cp(feedbackDir, join(archiveDir, 'feedback'), { recursive: true });
       details.push('Archived feedback/');
     }
 
     // Archive STATE.md
     const stateMd = join(workspacePath, '.planning', 'STATE.md');
     if (existsSync(stateMd)) {
-      cpSync(stateMd, join(archiveDir, 'STATE.md'));
+      await cp(stateMd, join(archiveDir, 'STATE.md'));
       details.push('Archived STATE.md');
+    }
+
+    // Archive plan.vbrief.json — the canonical structured plan. Moved to
+    // docs/prds/completed/ above, but the workspace copy may have agent-driven
+    // updates (sequence, completion timestamps) not yet copied to docs/. Preserve
+    // both so the archive reflects the true final state of the workspace.
+    const vbriefJson = join(workspacePath, '.planning', 'plan.vbrief.json');
+    if (existsSync(vbriefJson)) {
+      await cp(vbriefJson, join(archiveDir, 'plan.vbrief.json'));
+      details.push('Archived plan.vbrief.json');
     }
 
     // Archive beads/
     const beadsDir = join(workspacePath, '.planning', 'beads');
     if (existsSync(beadsDir)) {
-      cpSync(beadsDir, join(archiveDir, 'beads'), { recursive: true });
+      await cp(beadsDir, join(archiveDir, 'beads'), { recursive: true });
       details.push('Archived beads/');
     }
 
@@ -162,7 +207,7 @@ export async function archiveWorkspaceArtifacts(
     // but this preserves the workspace-specific version with agent annotations)
     const prdMd = join(workspacePath, '.planning', 'PRD.md');
     if (existsSync(prdMd)) {
-      cpSync(prdMd, join(archiveDir, 'PRD.md'));
+      await cp(prdMd, join(archiveDir, 'PRD.md'));
       details.push('Archived workspace PRD.md');
     }
 

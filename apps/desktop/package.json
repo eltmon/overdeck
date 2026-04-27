@@ -1,6 +1,6 @@
 {
-  "name": "@eltmon/panctl",
-  "version": "0.7.2",
+  "name": "@panctl/desktop",
+  "version": "0.8.0",
   "description": "Panopticon Command Deck — AI agent monitoring desktop app",
   "main": "dist-electron/main.js",
   "productName": "Panopticon",
@@ -40,7 +40,7 @@
     "electron-updater": "^6.8.3"
   },
   "devDependencies": {
-    "@panopticon/contracts": "workspace:*",
+    "@panctl/contracts": "workspace:*",
     "@types/node": "^22.0.0",
     "electron": "40.6.0",
     "electron-builder": "^25.1.8",
