@@ -14,6 +14,9 @@ import { httpHandler } from './http-handler.js';
  *   POST   /api/workspaces/:issueId/containerize
  *   POST   /api/workspaces/:issueId/containers/:containerName/:action
  *   POST   /api/workspaces/:issueId/refresh-db
+ *   GET    /api/workspaces/:issueId/stashes
+ *   POST   /api/workspaces/:issueId/stashes/:stashRef/recover
+ *   DELETE /api/workspaces/:issueId/stashes/:stashRef
  *   GET    /api/workspaces/:issueId/tldr
  *
  * Lifecycle endpoints (/api/issues/):
@@ -94,6 +97,7 @@ import { extractPrefix, extractNumber } from '../../../lib/issue-id.js';
 import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
 import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
+import { createRecoveryBranchFromStash, dropStash, isSalvageableStash, listStashes } from '../../../lib/stashes.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -306,6 +310,59 @@ function getProjectPath(linearProjectId?: string, issuePrefix?: string): string 
     }
   }
   return join(homedir(), 'Projects');
+}
+
+function requireTrustedMutationOrigin(request: HttpServerRequest.HttpServerRequest): HttpServerResponse.HttpServerResponse | null {
+  const origin = (() => {
+    const value = (request.headers as Record<string, string | string[] | undefined>)['origin'];
+    return Array.isArray(value) ? value[0] : value;
+  })();
+  const referer = (() => {
+    const value = (request.headers as Record<string, string | string[] | undefined>)['referer'];
+    return Array.isArray(value) ? value[0] : value;
+  })();
+
+  const port = parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
+  const dashboardUrl = process.env['DASHBOARD_URL'] ?? `http://localhost:${port}`;
+  const trustedOrigins = new Set<string>([dashboardUrl]);
+  if (process.env['NODE_ENV'] === 'development') {
+    trustedOrigins.add('http://localhost:3011');
+    trustedOrigins.add('http://localhost:3000');
+    trustedOrigins.add('http://127.0.0.1:3011');
+    trustedOrigins.add('http://127.0.0.1:3000');
+  }
+
+  const normalize = (value?: string): string | null => {
+    if (!value) return null;
+    try {
+      const url = new URL(value);
+      return `${url.protocol}//${url.host}`;
+    } catch {
+      return null;
+    }
+  };
+
+  const normalizedOrigin = normalize(origin);
+  if (normalizedOrigin) {
+    return trustedOrigins.has(normalizedOrigin)
+      ? null
+      : jsonResponse({ error: 'Invalid origin' }, { status: 403 });
+  }
+
+  const normalizedReferer = normalize(referer);
+  if (normalizedReferer) {
+    return trustedOrigins.has(normalizedReferer)
+      ? null
+      : jsonResponse({ error: 'Invalid referer' }, { status: 403 });
+  }
+
+  return jsonResponse({ error: 'Missing origin' }, { status: 403 });
+}
+
+function resolveWorkspacePath(issueId: string): string | null {
+  const info = getWorkspaceInfoForIssue(issueId);
+  if (info.isRemote || !info.localPath) return null;
+  return info.localPath;
 }
 
 function getWorkspaceLocation(issueId: string): 'local' | 'remote' | undefined {
@@ -1121,6 +1178,97 @@ const getWorkspacePlanRoute = HttpRouter.add(
     const doc = readPlan(planPath);
     const cp = criticalPath(doc);
     return jsonResponse({ ...doc, criticalPath: cp });
+  }))
+);
+
+const getWorkspaceStashesRoute = HttpRouter.add(
+  'GET',
+  '/api/workspaces/:issueId/stashes',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const workspacePath = resolveWorkspacePath(issueId);
+
+    if (!workspacePath || !existsSync(workspacePath)) {
+      return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
+    }
+
+    const stashes = yield* Effect.promise(() => listStashes(workspacePath));
+    const salvageableStashes = stashes
+      .filter(isSalvageableStash)
+      .filter((entry) => entry.issueId === issueId.toUpperCase())
+      .map((entry) => ({
+        ref: entry.ref,
+        stackRef: entry.stackRef,
+        issueId: entry.issueId,
+        message: entry.message,
+        shortDescription: entry.shortDescription,
+        createdAt: entry.createdAt?.toISOString(),
+      }));
+
+    return jsonResponse({ salvageableStashes });
+  }))
+);
+
+const postWorkspaceRecoverStashRoute = HttpRouter.add(
+  'POST',
+  '/api/workspaces/:issueId/stashes/:stashRef/recover',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedMutationOrigin(request);
+    if (originError) return originError;
+
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const stashRef = decodeURIComponent(params['stashRef'] ?? '');
+    const workspacePath = resolveWorkspacePath(issueId);
+
+    if (!workspacePath || !existsSync(workspacePath)) {
+      return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
+    }
+
+    const stashes = yield* Effect.promise(() => listStashes(workspacePath));
+    const stash = stashes.find((entry) => entry.ref === stashRef);
+    if (!stash || !isSalvageableStash(stash) || stash.issueId !== issueId.toUpperCase()) {
+      return jsonResponse({ error: 'Salvageable stash not found for this workspace' }, { status: 404 });
+    }
+
+    const branchName = yield* Effect.promise(() => createRecoveryBranchFromStash(
+      workspacePath,
+      stash.ref,
+      stash.issueId,
+      stash.shortDescription,
+    ));
+
+    return jsonResponse({ success: true, branchName });
+  }))
+);
+
+const deleteWorkspaceStashRoute = HttpRouter.add(
+  'DELETE',
+  '/api/workspaces/:issueId/stashes/:stashRef',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originError = requireTrustedMutationOrigin(request);
+    if (originError) return originError;
+
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    const stashRef = decodeURIComponent(params['stashRef'] ?? '');
+    const workspacePath = resolveWorkspacePath(issueId);
+
+    if (!workspacePath || !existsSync(workspacePath)) {
+      return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
+    }
+
+    const stashes = yield* Effect.promise(() => listStashes(workspacePath));
+    const stash = stashes.find((entry) => entry.ref === stashRef);
+    if (!stash || !isSalvageableStash(stash) || stash.issueId !== issueId.toUpperCase()) {
+      return jsonResponse({ error: 'Salvageable stash not found for this workspace' }, { status: 404 });
+    }
+
+    yield* Effect.promise(() => dropStash(workspacePath, stash.ref));
+    return jsonResponse({ success: true });
   }))
 );
 
@@ -4778,6 +4926,9 @@ export const workspacesRouteLayer = Layer.mergeAll(
   getWorkspaceRoute,
   postWorkspacesRoute,
   getWorkspacePlanRoute,
+  getWorkspaceStashesRoute,
+  postWorkspaceRecoverStashRoute,
+  deleteWorkspaceStashRoute,
   getWorkspaceCleanPreviewRoute,
   postWorkspaceCleanRoute,
   postWorkspaceContainerizeRoute,

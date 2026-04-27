@@ -235,6 +235,102 @@ export interface ResourcesSnapshot {
   updatedAt: string;
 }
 
+export interface SystemHealthAgentProcess {
+  id: string;
+  issueId: string;
+  kind: 'work' | 'planning' | 'specialist' | 'other';
+  status: string;
+  tmuxActive: boolean;
+  memoryBytes: number;
+  memoryGb: number;
+  currentIssue?: string;
+}
+
+export interface SystemHealthLeakedSpecialist {
+  name: string;
+  currentIssue: string;
+  reason: string;
+}
+
+export interface SystemHealthConsumer {
+  id: string;
+  label: string;
+  type: 'agent' | 'specialist' | 'container';
+  memoryBytes: number;
+  memoryGb: number;
+  cpuPercent?: number;
+  issueId?: string;
+  currentIssue?: string;
+  leaked?: boolean;
+  killTarget?: {
+    kind: 'agent' | 'specialist' | 'container';
+    agentId?: string;
+    containerId?: string;
+    projectKey?: string;
+    issueId?: string;
+    specialistType?: string;
+  };
+}
+
+export interface SystemHealthSnapshot {
+  severity: 'normal' | 'warning' | 'critical';
+  updatedAt: string;
+  summary: {
+    cpuPercent: number;
+    loadAverage1m: number;
+    loadPerCore1m: number;
+    totalMemoryBytes: number;
+    usedMemoryBytes: number;
+    availableMemoryBytes: number;
+    memoryUsedPercent: number;
+    swapTotalBytes: number;
+    swapUsedBytes: number;
+    swapUsedPercent: number;
+    overcommitPercent: number;
+    agentCount: number;
+    workAgentCount: number;
+    planningAgentCount: number;
+    specialistSessionCount: number;
+    leakedSpecialistCount: number;
+    containerCount: number;
+    containerMemoryBytes: number;
+    panopticonMemoryBytes: number;
+    panopticonMemoryPercent: number;
+  };
+  thresholds: {
+    memoryAvailableWarningBytes: number;
+    memoryAvailableCriticalBytes: number;
+    swapUsedWarningPercent: number;
+    swapUsedCriticalPercent: number;
+    cpuLoadWarningPerCore: number;
+    cpuLoadCriticalPerCore: number;
+    overcommitWarningPercent: number;
+    overcommitCriticalPercent: number;
+  };
+  reasons: string[];
+  agents: SystemHealthAgentProcess[];
+  leakedSpecialists: SystemHealthLeakedSpecialist[];
+  topConsumers: SystemHealthConsumer[];
+}
+
+export interface StartAgentGuardrailWarning {
+  severity?: 'warning' | 'critical';
+  code?: string;
+  message: string;
+}
+
+export interface StartAgentResponse {
+  success?: boolean;
+  blocked?: boolean;
+  skipped?: boolean;
+  requiresAcknowledgement?: boolean;
+  error?: string;
+  hint?: string;
+  guardrails?: {
+    warnings?: StartAgentGuardrailWarning[];
+  };
+}
+
 // State transition result
 export interface StateTransitionResult {
   success: boolean;

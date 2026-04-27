@@ -48,6 +48,15 @@ export interface PendingOperation {
   error?: string;
 }
 
+export interface SalvageableStashInfo {
+  ref: string;
+  stackRef?: string;
+  issueId: string;
+  message: string;
+  shortDescription: string;
+  createdAt?: string;
+}
+
 export interface WorkspaceInfo {
   exists: boolean;
   corrupted?: boolean;

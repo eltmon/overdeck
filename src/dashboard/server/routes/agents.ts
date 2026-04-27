@@ -70,11 +70,14 @@ import { extractPrefix } from '../../../lib/issue-id.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
+import { buildStashMessage, createNamedStash } from '../../../lib/stashes.js';
 import { calculateCost, getPricing, type TokenUsage } from '../../../lib/cost.js';
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { getReviewStatus } from '../../../lib/review-status.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { IssueLifecycle } from '../services/issue-lifecycle.js';
+import { ReadModelService } from '../read-model.js';
+import { getSystemHealthSnapshot, getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapshot } from '../services/system-health-service.js';
 import {
   getClaudeProjectDir as getClaudeProjectDirShared,
   getActiveSessionPath as getActiveSessionPathShared,
@@ -193,6 +196,110 @@ async function getGitStatusAsync(workspacePath: string): Promise<{ branch: strin
   } catch {
     return null;
   }
+}
+
+interface SpawnGuardrailAdvisory {
+  severity: 'warning' | 'critical';
+  code: 'memory_pressure' | 'agent_capacity' | 'leaked_specialists';
+  message: string;
+}
+
+export interface SpawnGuardrailDecision {
+  blocked: boolean;
+  requiresAcknowledgement: boolean;
+  status: number;
+  error?: string;
+  hint?: string;
+  warnings: SpawnGuardrailAdvisory[];
+  health: Pick<SystemHealthSnapshot, 'severity' | 'summary' | 'reasons' | 'leakedSpecialists'>;
+}
+
+function formatLeakedSpecialistSummary(leaked: HealthLeakedSpecialist[]): string {
+  return leaked
+    .slice(0, 3)
+    .map((item) => `${item.name} (${item.currentIssue})`)
+    .join(', ');
+}
+
+export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuardrailDecision {
+  const warnings: SpawnGuardrailAdvisory[] = [];
+  const availableGb = Math.round((health.summary.availableMemoryBytes / (1024 ** 3)) * 10) / 10;
+  const workAgentCount = health.summary.workAgentCount;
+  const leakedSpecialists = health.leakedSpecialists;
+  const resourceConfig = getResourceConfig();
+  const hardWorkAgentLimit = Math.max(1, resourceConfig.agentBlockCount);
+  const warnWorkAgentLimit = Math.max(1, resourceConfig.agentWarnCount);
+
+  if (health.summary.availableMemoryBytes < health.thresholds.memoryAvailableCriticalBytes) {
+    warnings.push({
+      severity: 'critical',
+      code: 'memory_pressure',
+      message: `Available RAM is critically low (${availableGb} GB).`,
+    });
+  } else if (health.summary.availableMemoryBytes < health.thresholds.memoryAvailableWarningBytes) {
+    warnings.push({
+      severity: 'warning',
+      code: 'memory_pressure',
+      message: `Available RAM is tight (${availableGb} GB).`,
+    });
+  }
+
+  if (workAgentCount >= hardWorkAgentLimit) {
+    warnings.push({
+      severity: 'critical',
+      code: 'agent_capacity',
+      message: `Work agent count is at the limit (${workAgentCount}/${hardWorkAgentLimit}).`,
+    });
+  } else if (workAgentCount >= warnWorkAgentLimit) {
+    warnings.push({
+      severity: 'warning',
+      code: 'agent_capacity',
+      message: `Work agent count is high (${workAgentCount}/${hardWorkAgentLimit}).`,
+    });
+  }
+
+  if (leakedSpecialists.length > 0) {
+    warnings.push({
+      severity: workAgentCount >= hardWorkAgentLimit || health.summary.availableMemoryBytes < health.thresholds.memoryAvailableCriticalBytes ? 'critical' : 'warning',
+      code: 'leaked_specialists',
+      message: `Leaked specialist sessions detected: ${formatLeakedSpecialistSummary(leakedSpecialists)}${leakedSpecialists.length > 3 ? `, +${leakedSpecialists.length - 3} more` : ''}.`,
+    });
+  }
+
+  const blockingWarnings = warnings.filter((warning) => warning.severity === 'critical');
+  if (blockingWarnings.length > 0) {
+    const hasLeakedSpecialists = leakedSpecialists.length > 0;
+    return {
+      blocked: true,
+      requiresAcknowledgement: false,
+      status: 429,
+      error: blockingWarnings[0]?.message ?? 'System health is blocking new agent spawns.',
+      hint: hasLeakedSpecialists
+        ? 'Clean up leaked specialist sessions first, then retry the spawn.'
+        : 'Reduce memory pressure or active work-agent count before retrying.',
+      warnings,
+      health: {
+        severity: health.severity,
+        summary: health.summary,
+        reasons: health.reasons,
+        leakedSpecialists: health.leakedSpecialists,
+      },
+    };
+  }
+
+  return {
+    blocked: false,
+    requiresAcknowledgement: warnings.length > 0,
+    status: warnings.length > 0 ? 409 : 200,
+    hint: warnings.length > 0 ? 'Acknowledge the system health warnings before starting this agent.' : undefined,
+    warnings,
+    health: {
+      severity: health.severity,
+      summary: health.summary,
+      reasons: health.reasons,
+      leakedSpecialists: health.leakedSpecialists,
+    },
+  };
 }
 
 // Shared enrichment utilities (PAN-440) — aliases for readability
@@ -1362,8 +1469,10 @@ const postAgentsRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
     const lifecycle = yield* IssueLifecycle;
+    const readModel = yield* ReadModelService;
 
     const { issueId, projectId } = body as any;
+    const guardrailAcknowledged = (body as any).guardrailAcknowledged === true;
 
     if (!issueId) {
       return jsonResponse({ error: 'issueId required' }, { status: 400 });
@@ -1552,6 +1661,31 @@ const postAgentsRoute = HttpRouter.add(
       }, { status: 422 });
     }
 
+    const health = yield* readModel.getSnapshot.pipe(
+      Effect.flatMap((snapshot) => Effect.promise(() => getSystemHealthSnapshot(snapshot))),
+    );
+    const spawnGuardrails = evaluateSpawnGuardrails(health);
+    if (spawnGuardrails.blocked) {
+      return jsonResponse({
+        success: false,
+        blocked: true,
+        skipped: true,
+        error: spawnGuardrails.error,
+        hint: spawnGuardrails.hint,
+        guardrails: spawnGuardrails,
+      }, { status: spawnGuardrails.status });
+    }
+    if (spawnGuardrails.requiresAcknowledgement && !guardrailAcknowledged) {
+      return jsonResponse({
+        success: false,
+        blocked: false,
+        skipped: true,
+        requiresAcknowledgement: true,
+        hint: spawnGuardrails.hint,
+        guardrails: spawnGuardrails,
+      }, { status: spawnGuardrails.status });
+    }
+
     if (planningDir) {
       // Commit planning artifacts before handing off to the work agent.
       // The entire block is best-effort — never let git errors abort the agent start.
@@ -1635,6 +1769,7 @@ const postAgentsRoute = HttpRouter.add(
         vmName: workspaceMetadata.vmName,
         agentId: state.id,
         projectPath,
+        guardrails: spawnGuardrails,
       });
     }
 
@@ -1677,6 +1812,47 @@ const postAgentsRoute = HttpRouter.add(
         .then(() => console.log(`[start-agent] Killed stale tmux session ${agentSessionName}`))
         .catch(() => { /* No existing session — good */ })
     );
+
+    let preSpawnStashRef: string | null = null;
+    let preSpawnStashMessage: string | null = null;
+    let preSpawnBaselineHead: string | null = null;
+    try {
+      const { stdout: statusOut } = yield* Effect.promise(() => execAsync('git status --porcelain', {
+        cwd: workspacePath,
+        encoding: 'utf-8',
+      }));
+      if (statusOut.trim()) {
+        const { stdout: headOut } = yield* Effect.promise(() => execAsync('git rev-parse HEAD', {
+          cwd: workspacePath,
+          encoding: 'utf-8',
+        }));
+        preSpawnBaselineHead = headOut.trim() || null;
+        preSpawnStashMessage = buildStashMessage('pre-spawn', issueId, new Date());
+        preSpawnStashRef = yield* Effect.promise(() => createNamedStash(workspacePath, preSpawnStashMessage!, true));
+        if (preSpawnStashRef) {
+          yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.pre_spawn_stash_created', {
+            issueId,
+            workspacePath,
+            stashRef: preSpawnStashRef,
+            stashMessage: preSpawnStashMessage,
+            baselineHead: preSpawnBaselineHead,
+          }));
+        } else {
+          preSpawnBaselineHead = null;
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      preSpawnStashRef = null;
+      preSpawnStashMessage = null;
+      preSpawnBaselineHead = null;
+      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.pre_spawn_stash_failed', {
+        issueId,
+        workspacePath,
+        error: message,
+      }));
+      console.warn(`[start-agent] Failed to create pre-spawn stash for ${issueId}: ${message}`);
+    }
 
     // Spawn pan start command
     const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => {
@@ -1811,6 +1987,9 @@ const postAgentsRoute = HttpRouter.add(
             workspace: workspacePath,
             phase,
             message: 'Waiting for containers to start...',
+            ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
+            ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
+            ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
           }, null, 2)));
           yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_waiting_for_containers', {
             issueId,
@@ -1878,6 +2057,9 @@ const postAgentsRoute = HttpRouter.add(
                       phase,
                       message: 'Container startup timed out before work agent spawn',
                       error: `Containers for ${issueId} did not become healthy within ${maxWaitMs}ms`,
+                      ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
+                      ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
+                      ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
                     }, null, 2));
                     return;
                   }
@@ -1923,6 +2105,9 @@ const postAgentsRoute = HttpRouter.add(
                     phase,
                     message: 'Container startup failed before work agent spawn',
                     error: errorMessage,
+                    ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
+                    ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
+                    ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
                   }, null, 2)).catch(() => undefined);
                   console.error(`[start-agent] Background container startup failed for ${issueId}:`, err);
                 }
@@ -1942,6 +2127,7 @@ const postAgentsRoute = HttpRouter.add(
             containerActivityId,
             agentId: earlyAgentId,
             projectPath,
+            guardrails: spawnGuardrails,
           });
         }
       }
@@ -1972,6 +2158,9 @@ const postAgentsRoute = HttpRouter.add(
       workspace: workspacePath,
       phase,
       message: 'Work agent spawn requested',
+      ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
+      ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
+      ...(preSpawnBaselineHead ? { preSpawnBaselineHead } : {}),
     }, null, 2)));
     yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_placeholder_created', {
       issueId,
@@ -1999,6 +2188,7 @@ const postAgentsRoute = HttpRouter.add(
       message: `Starting agent for ${issueId}`,
       activityId,
       projectPath,
+      guardrails: spawnGuardrails,
     });
   })),
 );
