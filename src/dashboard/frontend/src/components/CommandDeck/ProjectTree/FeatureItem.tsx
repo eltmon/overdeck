@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
 import { Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge, ChevronRight, ChevronDown, FolderOpen, FileText, Trash2 } from 'lucide-react';
-import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
+import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { ProjectFeature } from './ProjectNode';
 import { SessionNode } from './SessionNode';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';

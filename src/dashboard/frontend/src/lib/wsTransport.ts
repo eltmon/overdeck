@@ -11,7 +11,7 @@
 import { Duration, Effect, Exit, Layer, ManagedRuntime, Schedule, Scope, Stream } from 'effect'
 import { RpcClient, RpcSerialization } from 'effect/unstable/rpc'
 import * as Socket from 'effect/unstable/socket/Socket'
-import { PanRpcGroup } from '@panopticon/contracts'
+import { PanRpcGroup } from '@panctl/contracts'
 
 // ─── Protocol setup ───────────────────────────────────────────────────────────
 

@@ -12,14 +12,14 @@
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { Effect, Layer, ServiceMap } from 'effect';
-import type { DashboardSnapshot, DomainEvent } from '@panopticon/contracts';
+import type { DashboardSnapshot, DomainEvent } from '@panctl/contracts';
 import { AGENTS_DIR } from '../../lib/paths.js';
 import {
   type ReadModelState,
   INITIAL_READ_MODEL_STATE,
   applyEvent as applyEventReducer,
-} from '@panopticon/contracts';
-import type { AgentSnapshot, AgentStatus, AgentPhase, AgentResolution, ReviewStatusSnapshot, SpecialistSnapshot, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panopticon/contracts';
+} from '@panctl/contracts';
+import type { AgentSnapshot, AgentStatus, AgentPhase, AgentResolution, ReviewStatusSnapshot, SpecialistSnapshot, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panctl/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
 import { logDeaconEvent } from '../../lib/persistent-logger.js';
 
