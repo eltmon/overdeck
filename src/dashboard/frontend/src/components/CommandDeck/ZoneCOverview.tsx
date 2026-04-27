@@ -1,30 +1,14 @@
 /**
  * ZoneCOverview — issue-selected Zone C: tab strip + per-tab body.
  *
- * The tab strip is sticky at the top; the body switches based on the selected
- * tab. Each tab is its own component under `./ZoneCOverviewTabs/` so the data
- * dependencies stay clear and sibling tabs share a query cache via the hooks
- * exported from `./ZoneCOverviewTabs/queries.ts`.
- *
- * INFERENCE tab is hidden when no inference content exists for the issue (the
- * planning endpoint returns it null/empty if no inference.md was generated).
- *
- * The PR/Diff tab pulls from `/api/issues/:issueId/pr` (pan-9yn5) and the
- * Discussions tab pulls from `/api/issues/:issueId/discussions` (pan-1r7j).
+ * The tab strip is sticky at the top. PAN-865 only delivers the Overview body;
+ * the other nine tabs intentionally render placeholders so their full content
+ * can land in PAN-866 without expanding this issue's scope.
  */
 
-import { useState } from 'react';
-import type { Issue } from '../../types';
-import type { ProjectFeature } from './ProjectTree/ProjectNode';
+import { useRef, useState } from 'react';
+import type { Issue, Agent } from '../../types';
 import { OverviewTab } from './ZoneCOverviewTabs/OverviewTab';
-import { ActivityTab } from './ZoneCOverviewTabs/ActivityTab';
-import { CostsTab } from './ZoneCOverviewTabs/CostsTab';
-import { MarkdownTab } from './ZoneCOverviewTabs/MarkdownTab';
-import { VBriefTab } from './ZoneCOverviewTabs/VBriefTab';
-import { BeadsTab } from './ZoneCOverviewTabs/BeadsTab';
-import { PrDiffTab } from './ZoneCOverviewTabs/PrDiffTab';
-import { DiscussionsTab } from './ZoneCOverviewTabs/DiscussionsTab';
-import { usePlanningQuery } from './ZoneCOverviewTabs/queries';
 
 export type OverviewTab =
   | 'overview'
@@ -56,34 +40,68 @@ const ALL_TABS: readonly OverviewTabSpec[] = [
   { key: 'discussions', label: 'Discussions' },
 ];
 
+function PlaceholderBody() {
+  return (
+    <div
+      data-testid="zone-c-overview-placeholder"
+      style={{
+        padding: '2rem',
+        textAlign: 'center',
+        color: 'var(--mc-text-muted, var(--muted-foreground))',
+      }}
+    >
+      Coming soon
+    </div>
+  );
+}
+
 interface ZoneCOverviewProps {
   issueId: string;
   /** Optional controlled active tab; defaults to 'overview'. */
   activeTab?: OverviewTab;
   onTabChange?: (tab: OverviewTab) => void;
-  /** Forwarded to the Activity tab so the Rally / story rollup keeps working. */
-  issues?: readonly Issue[];
-  featureData?: ProjectFeature | null;
+  issue?: Issue;
+  agent?: Agent;
 }
 
 export function ZoneCOverview({
   issueId,
   activeTab,
   onTabChange,
-  issues,
-  featureData,
+  issue,
+  agent,
 }: ZoneCOverviewProps) {
-  const [internalTab, setInternalTab] = useState<OverviewTab>('overview');
+  const [internalTab, setInternalTab] = useState<OverviewTab>(activeTab ?? 'overview');
   const tab = activeTab ?? internalTab;
+  const tabRefs = useRef<Record<OverviewTab, HTMLButtonElement | null>>({
+    overview: null,
+    activity: null,
+    costs: null,
+    prd: null,
+    state: null,
+    inference: null,
+    vbrief: null,
+    beads: null,
+    prdiff: null,
+    discussions: null,
+  });
 
-  const planning = usePlanningQuery(issueId);
-  const hasInference = !!(planning.data?.inference && planning.data.inference.trim() !== '');
-
-  const visibleTabs = ALL_TABS.filter((spec) => spec.key !== 'inference' || hasInference);
+  const visibleTabs = ALL_TABS;
 
   const handleTabClick = (next: OverviewTab) => {
     if (onTabChange) onTabChange(next);
     else setInternalTab(next);
+
+    if (!activeTab) {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.set('tab', next);
+      window.history.pushState(window.history.state, '', nextUrl);
+    }
+  };
+
+  const moveTabFocus = (next: OverviewTab) => {
+    handleTabClick(next);
+    tabRefs.current[next]?.focus();
   };
 
   return (
@@ -100,6 +118,34 @@ export function ZoneCOverview({
       <div
         role="tablist"
         aria-label={`Issue ${issueId} overview tabs`}
+        onKeyDown={(event) => {
+          const currentIndex = visibleTabs.findIndex((spec) => spec.key === tab);
+          if (currentIndex === -1) return;
+
+          if (event.key === 'ArrowRight' || (event.key === 'Tab' && !event.shiftKey)) {
+            event.preventDefault();
+            const next = visibleTabs[(currentIndex + 1) % visibleTabs.length]?.key;
+            if (next) moveTabFocus(next);
+          }
+
+          if (event.key === 'ArrowLeft' || (event.key === 'Tab' && event.shiftKey)) {
+            event.preventDefault();
+            const next = visibleTabs[(currentIndex - 1 + visibleTabs.length) % visibleTabs.length]?.key;
+            if (next) moveTabFocus(next);
+          }
+
+          if (event.key === 'Home') {
+            event.preventDefault();
+            const next = visibleTabs[0]?.key;
+            if (next) moveTabFocus(next);
+          }
+
+          if (event.key === 'End') {
+            event.preventDefault();
+            const next = visibleTabs[visibleTabs.length - 1]?.key;
+            if (next) moveTabFocus(next);
+          }
+        }}
         style={{
           display: 'flex',
           gap: 4,
@@ -107,6 +153,10 @@ export function ZoneCOverview({
           borderBottom: '1px solid var(--mc-border, var(--border))',
           overflowX: 'auto',
           flexShrink: 0,
+          position: 'sticky',
+          top: 0,
+          background: 'var(--mc-surface, var(--background))',
+          zIndex: 1,
         }}
       >
         {visibleTabs.map((spec) => {
@@ -114,8 +164,13 @@ export function ZoneCOverview({
           return (
             <button
               key={spec.key}
+              ref={(node) => {
+                tabRefs.current[spec.key] = node;
+              }}
               role="tab"
               aria-selected={active}
+              aria-controls={`zone-c-overview-panel-${spec.key}`}
+              tabIndex={active ? 0 : -1}
               data-testid={`zone-c-overview-tab-${spec.key}`}
               onClick={() => handleTabClick(spec.key)}
               style={{
@@ -144,6 +199,7 @@ export function ZoneCOverview({
       </div>
       <div
         role="tabpanel"
+        id={`zone-c-overview-panel-${tab}`}
         data-testid={`zone-c-overview-panel-${tab}`}
         style={{
           flex: 1,
@@ -151,36 +207,15 @@ export function ZoneCOverview({
           overflow: 'auto',
         }}
       >
-        {tab === 'overview' && <OverviewTab issueId={issueId} onSwitchTab={handleTabClick} />}
-        {tab === 'activity' && (
-          <ActivityTab issueId={issueId} issues={issues} featureData={featureData} />
-        )}
-        {tab === 'costs' && <CostsTab issueId={issueId} />}
-        {tab === 'prd' && (
-          <MarkdownTab
-            body={planning.data?.prd}
-            isLoading={planning.isLoading}
-            emptyLabel="No PRD recorded for this issue."
+        {tab === 'overview' && (
+          <OverviewTab
+            issueId={issueId}
+            onSwitchTab={handleTabClick}
+            issue={issue}
+            agent={agent}
           />
         )}
-        {tab === 'state' && (
-          <MarkdownTab
-            body={planning.data?.state}
-            isLoading={planning.isLoading}
-            emptyLabel="No STATE.md recorded for this issue."
-          />
-        )}
-        {tab === 'inference' && (
-          <MarkdownTab
-            body={planning.data?.inference}
-            isLoading={planning.isLoading}
-            emptyLabel="No INFERENCE.md recorded for this issue."
-          />
-        )}
-        {tab === 'vbrief' && <VBriefTab issueId={issueId} />}
-        {tab === 'beads' && <BeadsTab issueId={issueId} />}
-        {tab === 'prdiff' && <PrDiffTab issueId={issueId} />}
-        {tab === 'discussions' && <DiscussionsTab issueId={issueId} />}
+        {tab !== 'overview' && <PlaceholderBody />}
       </div>
     </div>
   );

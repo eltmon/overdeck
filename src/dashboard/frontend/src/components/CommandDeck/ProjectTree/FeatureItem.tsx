@@ -343,7 +343,10 @@ function buildActivitySummary(sessions: readonly SessionNodeType[]): string {
   const parts: string[] = [];
 
   if (runningWork.length > 0) {
-    const longest = runningWork.reduce((max, session) => Math.max(max, session.duration), 0);
+    const longest = runningWork.reduce(
+      (max, session) => Math.max(max, session.duration ?? 0),
+      0,
+    );
     parts.push(`${runningWork.length} work agent${runningWork.length === 1 ? '' : 's'} running ${formatSessionDuration(longest)}`);
   }
 
@@ -719,10 +722,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       setExpanded(true);
       writeExpanded(feature.issueId, true);
     }
-    if (bestSessionId && onSelectSession) {
-      onSelectSession(feature.issueId, bestSessionId);
-    }
-  }, [onSelect, bestSessionId, feature.issueId, onSelectSession, expanded]);
+  }, [onSelect, expanded, feature.issueId]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();

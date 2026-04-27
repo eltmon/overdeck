@@ -38,7 +38,8 @@ function writeView(sessionId: string, view: PanelView): void {
   } catch { /* ignore */ }
 }
 
-function formatDuration(seconds: number): string {
+function formatDuration(seconds: number | null): string {
+  if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return '—';
   if (seconds < 60) return `${Math.round(seconds)}s`;
   if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
   return `${Math.round(seconds / 3600)}h`;

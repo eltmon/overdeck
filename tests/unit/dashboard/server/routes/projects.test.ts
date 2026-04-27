@@ -4,14 +4,31 @@ import { join } from 'node:path';
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
   listProjects: vi.fn(),
+  resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'panopticon-cli' })),
 }));
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
   listSessionNamesAsync: vi.fn(),
 }));
 
-vi.mock('../../../../../src/dashboard/server/routes/command-deck.js', () => ({
-  fetchActivityDataWithContext: vi.fn(),
+vi.mock('../../../../../src/lib/agents.js', () => ({
+  getAgentRuntimeStateAsync: vi.fn(),
+}));
+
+vi.mock('../../../../../src/lib/cloister/specialists.js', () => ({
+  getTmuxSessionName: vi.fn(() => 'review-agent-panopticon-cli'),
+}));
+
+vi.mock('../../../../../src/dashboard/server/review-status.js', () => ({
+  getReviewStatus: vi.fn(() => null),
+}));
+
+vi.mock('../../../../../src/dashboard/server/routes/jsonl-resolver.js', () => ({
+  resolveJsonlPath: vi.fn(async () => null),
+}));
+
+vi.mock('../../../../../src/dashboard/server/routes/reviewer-tree.js', () => ({
+  buildReviewerNodes: vi.fn(async () => []),
 }));
 
 vi.mock('../../../../../src/dashboard/server/services/issue-service-singleton.js', () => ({
@@ -27,14 +44,17 @@ vi.mock('node:fs/promises', async () => {
     access: vi.fn(),
     readdir: vi.fn(),
     readFile: vi.fn(),
+    stat: vi.fn(),
   };
 });
 
 import { fetchProjectSessionTree } from '../../../../../src/dashboard/server/routes/projects.ts';
 import { listProjects } from '../../../../../src/lib/projects.js';
 import { listSessionNamesAsync } from '../../../../../src/lib/tmux.js';
-import { fetchActivityDataWithContext } from '../../../../../src/dashboard/server/routes/command-deck.js';
-import { access, readdir, readFile } from 'node:fs/promises';
+import { getAgentRuntimeStateAsync } from '../../../../../src/lib/agents.js';
+import { access, readdir, readFile, stat } from 'node:fs/promises';
+
+const RECENT_PLANNING_MTIME = new Date(Date.now() - 60_000);
 
 function mockAccess(paths: Set<string>) {
   return (access as any).mockImplementation((p: string) => {
@@ -48,6 +68,7 @@ function mockAccess(paths: Set<string>) {
 describe('fetchProjectSessionTree', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (stat as any).mockResolvedValue({ mtime: RECENT_PLANNING_MTIME });
   });
 
   it('returns null for unknown project key', async () => {
@@ -78,30 +99,30 @@ describe('fetchProjectSessionTree', () => {
         config: { name: 'panopticon-cli', path: '/tmp/panopticon-cli', workspace: { workspaces_dir: 'workspaces' } },
       },
     ]);
-    (listSessionNamesAsync as any).mockResolvedValue([]);
+    (listSessionNamesAsync as any).mockResolvedValue(['agent-pan-539']);
+    (getAgentRuntimeStateAsync as any).mockResolvedValue({ state: 'active' });
     mockAccess(new Set([
       '/tmp/panopticon-cli/workspaces',
       '/tmp/panopticon-cli/workspaces/feature-pan-821/.planning',
       join(homedir(), '.panopticon', 'agents', 'agent-pan-539'),
+      join(homedir(), '.panopticon', 'agents', 'agent-pan-539', 'state.json'),
     ]));
     (readdir as any).mockResolvedValue([
       { name: 'feature-pan-821', isDirectory: () => true },
       { name: 'feature-pan-539', isDirectory: () => true },
     ]);
-    (fetchActivityDataWithContext as any).mockImplementation(async (issueId: string) => ({
-      issueId,
-      sections: [
-        {
-          type: 'work',
-          sessionId: `agent-${issueId.toLowerCase()}`,
+    (readFile as any).mockImplementation((p: string) => {
+      if (p === join(homedir(), '.panopticon', 'agents', 'agent-pan-539', 'state.json')) {
+        return Promise.resolve(JSON.stringify({
           model: 'gpt-4',
           startedAt: '2026-01-01T00:00:00Z',
-          duration: 100,
           status: 'running',
-          presence: 'active',
-        },
-      ],
-    }));
+        }));
+      }
+      const err = new Error('ENOENT');
+      (err as any).code = 'ENOENT';
+      return Promise.reject(err);
+    });
 
     const result = await fetchProjectSessionTree('panopticon-cli');
     expect(result).not.toBeNull();
@@ -112,11 +133,8 @@ describe('fetchProjectSessionTree', () => {
     expect(tree.features[1]?.issueId).toBe('PAN-821');
     expect(tree.features[0]?.sessions).toHaveLength(1);
     expect(tree.features[1]?.sessions).toHaveLength(1);
-
-    // Subprocess fan-out fix: listSessionNamesAsync called exactly once
+    expect((tree.features[1]?.sessions as Array<{ startedAt: string }>)[0]?.startedAt).toBe(RECENT_PLANNING_MTIME.toISOString());
     expect(listSessionNamesAsync).toHaveBeenCalledTimes(1);
-    // fetchActivityDataWithContext called per feature but without redundant tmux spawns
-    expect(fetchActivityDataWithContext).toHaveBeenCalledTimes(2);
   });
 
   it('skips features with no agent dir and no planning dir', async () => {
@@ -174,20 +192,6 @@ describe('fetchProjectSessionTree', () => {
       const err = new Error('ENOENT');
       (err as any).code = 'ENOENT';
       return Promise.reject(err);
-    });
-    (fetchActivityDataWithContext as any).mockResolvedValue({
-      issueId: 'PAN-123',
-      sections: [
-        {
-          type: 'work',
-          sessionId: 'agent-pan-123',
-          model: 'gpt-4',
-          startedAt: '2026-01-01T00:00:00Z',
-          duration: 100,
-          status: 'running',
-          presence: 'active',
-        },
-      ],
     });
 
     const result = await fetchProjectSessionTree('panopticon-cli');

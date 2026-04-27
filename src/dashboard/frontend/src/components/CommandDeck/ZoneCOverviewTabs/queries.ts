@@ -9,12 +9,19 @@
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
-export interface PlanningResponse {
+export interface PlanningSummaryResponse {
+  hasPrd: boolean;
+  hasState: boolean;
+  acceptanceProgress?: { completed: number; total: number; percent: number };
+  stashCount?: number;
+  statusReviewedAt?: string;
+}
+
+export interface PlanningResponse extends PlanningSummaryResponse {
   prd?: string;
   state?: string;
   inference?: string;
   statusReview?: string;
-  statusReviewedAt?: string;
   transcripts?: Array<unknown>;
   discussions?: Array<{
     file?: string;
@@ -23,8 +30,6 @@ export interface PlanningResponse {
     createdAt?: string;
   }>;
   notes?: Array<unknown>;
-  acceptanceProgress?: { completed: number; total: number; percent: number };
-  stashCount?: number;
 }
 
 export interface ReviewerRoundSummary {
@@ -85,6 +90,7 @@ export interface IssueCostData {
   sessions: SessionCost[];
   byModel: Record<string, { cost: number; tokens: number }>;
   byStage?: Record<string, { cost: number; tokens: number }>;
+  lastUpdated?: string;
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -95,28 +101,36 @@ async function fetchJson<T>(url: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export function usePlanningSummaryQuery(issueId: string): UseQueryResult<PlanningSummaryResponse> {
+  return useQuery({
+    queryKey: ['command-deck-planning', issueId, 'summary'],
+    queryFn: () => fetchJson<PlanningSummaryResponse>(`/api/command-deck/planning/${issueId}?summary=1`),
+    refetchInterval: 30_000,
+  });
+}
+
 export function usePlanningQuery(issueId: string): UseQueryResult<PlanningResponse> {
   return useQuery({
-    queryKey: ['command-deck-planning', issueId],
+    queryKey: ['command-deck-planning', issueId, 'full'],
     queryFn: () => fetchJson<PlanningResponse>(`/api/command-deck/planning/${issueId}`),
-    refetchInterval: 30_000,
+    refetchInterval: false,
   });
 }
 
 export function useActivityQuery(issueId: string): UseQueryResult<ActivityResponse> {
   return useQuery({
-    queryKey: ['command-deck-activity', issueId],
-    queryFn: () => fetchJson<ActivityResponse>(`/api/command-deck/activity/${issueId}`),
+    queryKey: ['command-deck-activity', issueId, 'summary'],
+    queryFn: () => fetchJson<ActivityResponse>(`/api/command-deck/activity/${issueId}?summary=1`),
     refetchInterval: 5_000,
   });
 }
 
 export interface ReviewStatusData {
   issueId: string;
-  reviewStatus: string;
-  testStatus: string;
-  mergeStatus?: string;
-  verificationStatus?: string;
+  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
+  testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
+  mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
+  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
   verificationNotes?: string;
   verificationCycleCount?: number;
   verificationMaxCycles?: number;
@@ -130,7 +144,7 @@ export function useReviewStatusQuery(issueId: string): UseQueryResult<ReviewStat
   return useQuery({
     queryKey: ['review-status', issueId],
     queryFn: () => fetchJson<ReviewStatusData>(`/api/review/${issueId}/status`),
-    refetchInterval: 10_000,
+    refetchInterval: 30_000,
   });
 }
 
@@ -178,8 +192,17 @@ export interface PullRequestData {
 export interface PrEndpointResponse {
   issueId: string;
   pr: PullRequestData | null;
+  error?: string;
+}
+
+export interface PrDiffResponse {
+  issueId: string;
   diff: string | null;
   error?: string;
+}
+
+export interface PrDetailsResponse extends PrEndpointResponse {
+  diff: string | null;
 }
 
 export function usePrQuery(issueId: string): UseQueryResult<PrEndpointResponse> {
@@ -187,6 +210,19 @@ export function usePrQuery(issueId: string): UseQueryResult<PrEndpointResponse> 
     queryKey: ['issuePr', issueId],
     queryFn: () => fetchJson<PrEndpointResponse>(`/api/issues/${issueId}/pr`),
     refetchInterval: 30_000,
+  });
+}
+
+export function usePrDiffQuery(issueId: string): UseQueryResult<PrDiffResponse> {
+  return useQuery({
+    queryKey: ['issuePr', issueId, 'details'],
+    queryFn: () => fetchJson<PrDetailsResponse>(`/api/issues/${issueId}/pr/details`),
+    select: (data) => ({
+      issueId: data.issueId,
+      diff: data.diff,
+      error: data.error,
+    }),
+    refetchInterval: false,
   });
 }
 
@@ -226,6 +262,48 @@ export function useDiscussionsQuery(
     queryKey: ['issueDiscussions', issueId],
     queryFn: () =>
       fetchJson<DiscussionsResponse>(`/api/issues/${issueId}/discussions`),
+    refetchInterval: 30_000,
+  });
+}
+
+// ─── Workspace (/api/workspaces/:issueId) ───────────────────────────────────
+
+export interface WorkspaceContainer {
+  name: string;
+  status: string;
+  health?: string;
+  ports?: string;
+}
+
+export interface WorkspaceData {
+  exists: boolean;
+  issueId: string;
+  path?: string;
+  frontendUrl?: string;
+  apiUrl?: string;
+  mrUrl?: string;
+  hasAgent?: boolean;
+  agentSessionId?: string | null;
+  agentModel?: string;
+  agentModelFull?: string;
+  git?: { ahead: number; behind: number; branch: string; dirty: boolean } | null;
+  repoGit?: { ahead: number; behind: number; branch: string; dirty: boolean } | null;
+  services?: Array<{ name: string; url?: string }>;
+  containers?: WorkspaceContainer[] | null;
+  hasDocker?: boolean;
+  canContainerize?: boolean;
+  pendingOperation?: string | null;
+  location?: 'local' | 'remote';
+  isRemote?: boolean;
+  vmName?: string;
+  remotePath?: string;
+  corrupted?: boolean;
+}
+
+export function useWorkspaceQuery(issueId: string): UseQueryResult<WorkspaceData> {
+  return useQuery({
+    queryKey: ['workspace', issueId],
+    queryFn: () => fetchJson<WorkspaceData>(`/api/workspaces/${issueId}`),
     refetchInterval: 30_000,
   });
 }

@@ -239,14 +239,14 @@ describe('buildReviewerNodes (PAN-830)', () => {
     });
 
     const correctnessNode = nodes.find(n => n.role === 'correctness')!;
-    expect(correctnessNode.status).toBe('failed');
+    expect(correctnessNode.status).toBe('error');
     expect(correctnessNode.roundMetadata).toBeDefined();
     expect(correctnessNode.roundMetadata!.latestRound).toBe(1);
     expect(correctnessNode.roundMetadata!.roundCount).toBe(1);
 
     // Other roles fall back to parent status
     const security = nodes.find(n => n.role === 'security')!;
-    expect(security.status).toBe('completed');
+    expect(security.status).toBe('stopped');
     expect(security.roundMetadata).toBeUndefined();
   });
 
@@ -269,7 +269,7 @@ describe('buildReviewerNodes (PAN-830)', () => {
     });
 
     const synthesisNode = nodes.find(n => n.role === 'synthesis')!;
-    expect(synthesisNode.status).toBe('completed');
+    expect(synthesisNode.status).toBe('stopped');
     expect(synthesisNode.roundMetadata!.roundCount).toBe(2);
     expect(synthesisNode.roundMetadata!.latestRound).toBe(2);
     expect(synthesisNode.roundMetadata!.history.map(h => h.round)).toEqual([1, 2]);
