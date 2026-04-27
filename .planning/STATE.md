@@ -1,9 +1,9 @@
 # PAN-859: Command Deck: clicking work-agent row in tree doesn't show terminal pane until second click
 
-## Status: Implementation Complete
+## Status: Review Follow-up Complete
 
 ## Current Phase
-Resubmitting PAN-859 after fixing review nits in conversations origin validation and tightening the CommandDeck conversation-switch assertion.
+Resubmitting PAN-859 after fixing the review-requested specialist session regression, restoring resource discovery filtering, and restoring review coordinator observability.
 
 ## Completed Work
 - [x] context-recovery: Recovered PAN-859 requirements from GitHub because `.planning/` artifacts were missing at workspace start (commit: pending)
@@ -14,6 +14,10 @@ Resubmitting PAN-859 after fixing review nits in conversations origin validation
 - [x] review-nit: Removed the duplicate Google Fonts Material Symbols stylesheet include from `docs/design/mockups/command-deck-terminology-map.html` per approved review feedback (commit: pending)
 - [x] test-hardening: Reset the CommandDeck selection store in `beforeEach` and added an explicit second-click idempotency regression test in `CommandDeck.test.tsx` (commit: pending)
 - [x] review-followup: Removed unreachable origin-validation fallback code in `conversations.ts` and its mirrored test helper, and tightened the CommandDeck conversation-switch test to assert `conversation-panel` renders with real mocked conversation data (commit: pending)
+- [x] review-blocker-fix: Restored per-issue specialist tmux session resolution and tmux-liveness-derived status in `src/dashboard/server/routes/command-deck.ts` so running specialists resolve to the correct session and no longer show stale ended/running state (commit: pending)
+- [x] resource-filter-fix: Restored active/live resource discovery filtering in `src/dashboard/server/services/resource-discovery.ts` so stale merged issues with leftover branches/workspaces do not pollute the Command Deck tree (commit: pending)
+- [x] coordinator-observability-fix: Restored review coordinator exit visibility in `src/lib/cloister/review-agent.ts` by removing error swallowing, enabling `remain-on-exit`, and logging output plus exit status under `.pan/review/coordinator/` (commit: pending)
+- [x] review-followup-verification: Passed `npm run typecheck`, `npm run lint`, and targeted Vitest regressions after the latest review-requested fixes (commit: pending)
 
 ## Remaining Work
 - [x] cross-session-verification: Verified the same first-click session-row behavior on PAN-855's work session in the live tree; screenshot saved as `pan-859-cross-session-verification.png` (commit: pending)
@@ -42,3 +46,5 @@ Resubmitting PAN-859 after fixing review nits in conversations origin validation
 - **[2026-04-27T23:00Z] review-agent → APPROVED** — `.planning/feedback/008-review-agent-approved.md`
 - **[2026-04-27T23:06Z] review-agent → APPROVED** — `.planning/feedback/009-review-agent-approved.md`
 - **[2026-04-27T23:06Z] review-agent → APPROVED** — `.planning/feedback/009-review-agent-approved.md`
+- **[2026-04-27T23:14Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/010-review-agent-changes-requested.md`
+- [2026-04-27T19:21Z] local verification → passed — `npm run typecheck`, `npm run lint`, `npm test -- --run src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx src/lib/cloister/__tests__/review-temp-lifecycle.test.ts`
