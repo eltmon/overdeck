@@ -2,13 +2,13 @@
 specialist: review-agent
 issueId: PAN-858
 outcome: changes-requested
-timestamp: 2026-04-27T00:17:02Z
+timestamp: 2026-04-27T00:26:32Z
 ---
 
 # Verdict: CHANGES_REQUESTED
 
 ## Summary
-PAN-858 adds fit-and-finish to the Command Deck project tree: derived session labels, colored status pills, legacy session staleness filtering, orphan directory validation (fixing phantom 800/800 rows), indentation fixes, and filter button CSS extraction. The implementation is solid — 9 of 10 acceptance criteria are fully realized. However, two issues rise to the level that must block the merge: (1) a logic error in `isStaleLegacySession` that can cause active-but-errored legacy sessions to incorrectly disappear after 24h, and (2) a render cascade in the session tree delta path that causes O(total features) React re-renders per delta at scale. The requirements reviewer also notes that before screenshots are missing from the PR (REQ-10 partial), which the reviewer graded as SHOULD/administrative — per policy that is not a functional gap, but the work agent should attach them.
+PAN-858 adds fit-and-finish to the Command Deck project tree: derived session labels, colored status pills, legacy session staleness filtering, orphan directory validation (fixing phantom 800/800 rows), indentation fixes, and filter button CSS extraction. The implementation is solid — 9 of 10 acceptance criteria are fully realized. However, two issues must block the merge: (1) a logic error in `isStaleLegacySession` that can cause active-but-errored legacy sessions to incorrectly disappear after 24h, and (2) a render cascade in the session tree delta path that causes O(total features) React re-renders per delta at scale. The requirements reviewer also notes that before screenshots are missing from the PR (REQ-10 partial) — per policy this is an administrative gap not a functional blocker, but the work agent should attach them.
 
 ## Blockers (MUST fix before merge)
 
