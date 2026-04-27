@@ -143,7 +143,7 @@ export function useReviewStatusQuery(issueId: string): UseQueryResult<ReviewStat
   return useQuery({
     queryKey: ['review-status', issueId],
     queryFn: () => fetchJson<ReviewStatusData>(`/api/review/${issueId}/status`),
-    refetchInterval: 10_000,
+    refetchInterval: 30_000,
   });
 }
 
@@ -281,6 +281,6 @@ export function useWorkspaceQuery(issueId: string): UseQueryResult<WorkspaceData
   return useQuery({
     queryKey: ['workspace', issueId],
     queryFn: () => fetchJson<WorkspaceData>(`/api/workspaces/${issueId}`),
-    refetchInterval: 10_000,
+    refetchInterval: 30_000,
   });
 }

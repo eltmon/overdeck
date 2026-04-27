@@ -98,24 +98,6 @@ export function ZoneCOverview({
 
   const visibleTabs = ALL_TABS;
 
-  useEffect(() => {
-    if (activeTab) return;
-    const current = new URLSearchParams(window.location.search).get('tab');
-    if (current === tab) return;
-    const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set('tab', tab);
-    window.history.replaceState(window.history.state, '', nextUrl);
-  }, [activeTab, tab]);
-
-  useEffect(() => {
-    const onPopState = () => {
-      if (activeTab) return;
-      const next = new URLSearchParams(window.location.search).get('tab');
-      setInternalTab(isOverviewTab(next) ? next : 'overview');
-    };
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, [activeTab]);
 
   useEffect(() => {
     if (visibleTabs.some((spec) => spec.key === tab)) return;

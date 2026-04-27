@@ -14,13 +14,17 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { httpHandler } from './http-handler.js';
-import { listProjects } from '../../../lib/projects.js';
+import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
 import { listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import type { AgentStatus, SessionNode, SessionNodePresence, SessionNodeType } from '@panopticon/contracts';
-import type { ReviewerRoundMetadata } from './reviewer-tree.js';
+import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
+import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
+import { getReviewStatus } from '../review-status.js';
+import { resolveJsonlPath } from './jsonl-resolver.js';
+import { buildReviewerNodes, type ReviewerRoundMetadata } from './reviewer-tree.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
@@ -63,24 +67,6 @@ function mapAgentStatus(status: string): AgentStatus {
 
 interface ActivityContext {
   tmuxSessionNames?: Set<string>;
-  taskFileContents?: Map<string, string>;
-  includeTranscripts?: boolean;
-}
-
-interface ActivitySection {
-  type: string;
-  role?: string;
-  sessionId: string;
-  tmuxSession?: string;
-  model: string;
-  startedAt: string;
-  endedAt?: string;
-  duration: number | null;
-  status: string;
-  transcript?: string;
-  presence: SessionNodePresence;
-  hasJsonl?: boolean;
-  roundMetadata?: ReviewerRoundMetadata;
 }
 
 const LEGACY_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -96,22 +82,134 @@ function isStaleLegacySession(s: SessionNode): boolean {
   return (Date.now() - startedAtMs) > LEGACY_SESSION_MAX_AGE_MS;
 }
 
-function mapSectionToSessionNode(section: ActivitySection): SessionNode {
-  return {
-    type: mapSessionType(section.type),
-    role: section.role,
-    sessionId: section.sessionId,
-    tmuxSession: section.tmuxSession,
-    model: section.model,
-    startedAt: section.startedAt,
-    endedAt: section.endedAt,
-    duration: section.duration ?? 0,
-    status: mapAgentStatus(section.status),
-    transcript: section.transcript,
-    presence: section.presence,
-    hasJsonl: section.hasJsonl,
-    roundMetadata: section.roundMetadata,
-  };
+async function derivePresence(
+  agentId: string,
+  rtState: { state: string } | null,
+  tmuxSessionNames: Set<string>,
+): Promise<SessionNodePresence> {
+  const hasTmux = tmuxSessionNames.has(agentId);
+  if (!hasTmux) return 'ended';
+  if (!rtState) return 'idle';
+  if (rtState.state === 'active') return 'active';
+  if (rtState.state === 'suspended') return 'suspended';
+  if (rtState.state === 'idle' || rtState.state === 'waiting-on-human') return 'idle';
+  return 'ended';
+}
+
+interface SessionTreeContext {
+  tmuxSessionNames: Set<string>;
+}
+
+async function collectSessionTreeNodes(
+  issueId: string,
+  workspacePath: string,
+  context: SessionTreeContext,
+): Promise<SessionNode[]> {
+  const issueLower = issueId.toLowerCase();
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+  const projectPath = getProjectPath(issuePrefix);
+  const agentsDir = join(homedir(), '.panopticon', 'agents');
+  const agentId = `agent-${issueLower}`;
+  const planningAgentId = `planning-${issueLower}`;
+  const sections: SessionNode[] = [];
+  let hasPlanningSection = false;
+
+  for (const checkId of [planningAgentId, agentId]) {
+    const agentDir = join(agentsDir, checkId);
+    if (!await pathExists(agentDir)) continue;
+    const stateText = await readOptional(join(agentDir, 'state.json'));
+    if (!stateText) continue;
+
+    try {
+      const state = JSON.parse(stateText) as { model?: string; runtime?: string; startedAt?: string; createdAt?: string; status?: string };
+      const isPlanning = checkId.startsWith('planning-');
+      const sectionType = isPlanning ? 'planning' : 'work';
+      if (isPlanning) hasPlanningSection = true;
+      const rtState = await getAgentRuntimeStateAsync(checkId);
+      const presence = await derivePresence(checkId, rtState, context.tmuxSessionNames);
+      const jsonlPath = await resolveJsonlPath(checkId, workspacePath);
+      sections.push({
+        type: sectionType,
+        sessionId: checkId,
+        tmuxSession: sectionType === 'work' || sectionType === 'planning' ? checkId : undefined,
+        model: state.model || state.runtime || 'unknown',
+        startedAt: state.startedAt || state.createdAt || new Date().toISOString(),
+        endedAt: undefined,
+        duration: state.startedAt
+          ? (() => {
+              const ms = Date.now() - new Date(state.startedAt).getTime();
+              return Number.isNaN(ms) ? 0 : Math.floor(ms / 1000);
+            })()
+          : 0,
+        status: mapAgentStatus(
+          rtState?.state === 'active'
+            ? 'running'
+            : rtState?.state === 'suspended'
+              ? 'completed'
+              : (state.status || 'completed'),
+        ),
+        presence,
+        hasJsonl: !!jsonlPath,
+      });
+    } catch {
+      // skip malformed state
+    }
+  }
+
+  if (!hasPlanningSection) {
+    const stateMdPath = join(workspacePath, '.planning', 'STATE.md');
+    if (await pathExists(stateMdPath)) {
+      const sessionId = `planning-${issueLower}-state`;
+      const jsonlPath = await resolveJsonlPath(sessionId, workspacePath);
+      sections.push({
+        type: 'legacy',
+        sessionId,
+        model: 'unknown',
+        startedAt: new Date().toISOString(),
+        duration: 0,
+        status: 'stopped',
+        presence: 'ended',
+        hasJsonl: !!jsonlPath,
+      });
+    }
+  }
+
+  const centralStatus = getReviewStatus(issueId.toUpperCase());
+  if (centralStatus?.history && centralStatus.history.length > 0) {
+    const reviewEntries = centralStatus.history.filter((entry) => entry.type === 'review');
+    const latestReview = reviewEntries[reviewEntries.length - 1];
+    if (latestReview) {
+      const resolvedProject = resolveProjectFromIssue(issueId);
+      const reviewerProjectKey = resolvedProject?.projectKey ?? issuePrefix.toLowerCase();
+      const orchestratorSessionName = getTmuxSessionName('review-agent', reviewerProjectKey);
+      const orchestratorPresence: SessionNodePresence = context.tmuxSessionNames.has(orchestratorSessionName)
+        ? (latestReview.status === 'reviewing' ? 'active' : 'idle')
+        : 'ended';
+      sections.push({
+        type: 'review',
+        sessionId: orchestratorSessionName,
+        model: 'specialist',
+        startedAt: latestReview.timestamp,
+        endedAt: undefined,
+        duration: 0,
+        status: mapAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
+        presence: orchestratorPresence,
+      });
+      const reviewerNodes = await buildReviewerNodes({
+        issueId,
+        projectKey: reviewerProjectKey,
+        workspacePath,
+        projectPath,
+        tmuxSessionNames: context.tmuxSessionNames,
+        startedAt: latestReview.timestamp,
+        endedAt: undefined,
+        status: latestReview.status === 'reviewing' ? 'running' : latestReview.status,
+      });
+      sections.push(...reviewerNodes);
+    }
+  }
+
+  return sections.filter((s) => !isStaleLegacySession(s));
 }
 
 async function resolveFeatureTitle(
@@ -191,16 +289,9 @@ export async function fetchProjectSessionTree(
   const sharedTmuxSessionNames = sharedContext?.tmuxSessionNames
     ?? new Set((await listSessionNamesAsync().catch(() => [] as string[])).filter(s => s.trim()));
 
-  const effectiveSharedContext: ActivityContext = {
+  const effectiveSharedContext: SessionTreeContext = {
     tmuxSessionNames: sharedTmuxSessionNames,
-    taskFileContents: sharedContext?.taskFileContents,
-    includeTranscripts: sharedContext?.includeTranscripts ?? false,
   };
-
-  // Dynamic import breaks static dependency cycle with command-deck.ts (PAN-821)
-  // Without this, rolldown bundles projects.ts after server.ts, causing
-  // ReferenceError: projectsRouteLayer is not defined at startup.
-  const { fetchActivityDataWithContext } = await import('./command-deck.js');
 
   const features: Array<{
     issueId: string;
@@ -229,14 +320,10 @@ export async function fetchProjectSessionTree(
         ]);
         if (!hasAgent && !hasPlanning) return null;
         try {
-          const activityData = await fetchActivityDataWithContext(c.issueId, effectiveSharedContext) as {
-            issueId: string;
-            sections: ActivitySection[];
-          };
-          if (!activityData.sections || activityData.sections.length === 0) return null;
+          const workspacePath = join(workspacesDir, c.name);
+          const sessions = await collectSessionTreeNodes(c.issueId, workspacePath, effectiveSharedContext);
+          if (sessions.length === 0) return null;
           const title = await resolveFeatureTitle(c.issueId, c.issueLower, project);
-          const allSessions = activityData.sections.map(mapSectionToSessionNode);
-          const sessions = allSessions.filter(s => !isStaleLegacySession(s));
           return { issueId: c.issueId, title, sessions };
         } catch (err) {
           console.warn(`[fetchProjectSessionTree] Failed to process feature ${c.issueId}:`, err);

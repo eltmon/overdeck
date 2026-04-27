@@ -508,10 +508,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       setExpanded(true);
       writeExpanded(feature.issueId, true);
     }
-    if (bestSessionId && onSelectSession) {
-      onSelectSession(feature.issueId, bestSessionId);
-    }
-  }, [onSelect, bestSessionId, feature.issueId, onSelectSession, expanded]);
+  }, [onSelect, expanded, feature.issueId]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();

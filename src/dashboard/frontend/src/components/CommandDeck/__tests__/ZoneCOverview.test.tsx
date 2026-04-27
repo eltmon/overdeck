@@ -318,10 +318,10 @@ describe('ZoneCOverview', () => {
 
     fireEvent.keyDown(tablist, { key: 'Tab' });
     expect(screen.getByTestId('zone-c-overview-tab-overview')).toHaveAttribute('aria-selected', 'true');
-    expect(new URLSearchParams(window.location.search).get('tab')).toBe('overview');
+    expect(window.location.search).toBe('');
 
     fireEvent.keyDown(tablist, { key: 'Tab', shiftKey: true });
     expect(screen.getByTestId('zone-c-overview-tab-overview')).toHaveAttribute('aria-selected', 'true');
-    expect(new URLSearchParams(window.location.search).get('tab')).toBe('overview');
+    expect(window.location.search).toBe('');
   });
 });

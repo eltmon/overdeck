@@ -90,7 +90,7 @@ const stashCountCache = new Map<string, { timestamp: number; count: number }>();
 const STASH_COUNT_CACHE_TTL_MS = 60_000; // 60 seconds
 
 /** Evict expired entries from a TTL cache Map to prevent unbounded growth. */
-function sweepExpired<T>(cache: Map<string, { timestamp: number; data: T }>, ttlMs: number): void {
+function sweepExpired<T extends { timestamp: number }>(cache: Map<string, T>, ttlMs: number): void {
   const cutoff = Date.now() - ttlMs;
   for (const [key, entry] of cache) {
     if (entry.timestamp < cutoff) {
