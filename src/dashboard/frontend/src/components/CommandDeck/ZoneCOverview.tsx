@@ -152,15 +152,27 @@ export function ZoneCOverview({
           const currentIndex = visibleTabs.findIndex((spec) => spec.key === tab);
           if (currentIndex === -1) return;
 
-          if (event.key === 'ArrowRight' || (event.key === 'Tab' && !event.shiftKey)) {
+          if (event.key === 'ArrowRight') {
             event.preventDefault();
             const next = visibleTabs[(currentIndex + 1) % visibleTabs.length]?.key;
             if (next) handleTabClick(next);
           }
 
-          if (event.key === 'ArrowLeft' || (event.key === 'Tab' && event.shiftKey)) {
+          if (event.key === 'ArrowLeft') {
             event.preventDefault();
             const next = visibleTabs[(currentIndex - 1 + visibleTabs.length) % visibleTabs.length]?.key;
+            if (next) handleTabClick(next);
+          }
+
+          if (event.key === 'Home') {
+            event.preventDefault();
+            const next = visibleTabs[0]?.key;
+            if (next) handleTabClick(next);
+          }
+
+          if (event.key === 'End') {
+            event.preventDefault();
+            const next = visibleTabs[visibleTabs.length - 1]?.key;
             if (next) handleTabClick(next);
           }
         }}

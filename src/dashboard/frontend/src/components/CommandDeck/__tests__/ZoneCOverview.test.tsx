@@ -213,17 +213,35 @@ describe('ZoneCOverview', () => {
 
   it('supports arrow-key tab navigation', () => {
     render(<ZoneCOverview issueId={ISSUE} />);
-    fireEvent.keyDown(screen.getByRole('tablist'), { key: 'ArrowRight' });
+    const tablist = screen.getByRole('tablist');
+
+    fireEvent.keyDown(tablist, { key: 'ArrowRight' });
     expect(screen.getByTestId('activity-tab-stub')).toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).get('tab')).toBe('activity');
+
+    fireEvent.keyDown(tablist, { key: 'ArrowLeft' });
+    expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('tab')).toBe('overview');
   });
 
-  it('supports Tab and Shift-Tab navigation inside the tab strip', () => {
+  it('supports Home and End navigation inside the tab strip', () => {
+    render(<ZoneCOverview issueId={ISSUE} />);
+    const tablist = screen.getByRole('tablist');
+
+    fireEvent.click(screen.getByTestId('zone-c-overview-tab-costs'));
+    fireEvent.keyDown(tablist, { key: 'Home' });
+    expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
+
+    fireEvent.keyDown(tablist, { key: 'End' });
+    expect(screen.getByTestId('discussions-tab')).toBeInTheDocument();
+  });
+
+  it('does not trap focus on Tab and Shift-Tab', () => {
     render(<ZoneCOverview issueId={ISSUE} />);
     const tablist = screen.getByRole('tablist');
 
     fireEvent.keyDown(tablist, { key: 'Tab' });
-    expect(screen.getByTestId('activity-tab-stub')).toBeInTheDocument();
+    expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
 
     fireEvent.keyDown(tablist, { key: 'Tab', shiftKey: true });
     expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
