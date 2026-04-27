@@ -56,6 +56,7 @@ export interface ReviewerNode {
   type: 'reviewer';
   role: ReviewerRole;
   sessionId: string;
+  tmuxSession?: string;
   model: string;
   startedAt: string;
   endedAt?: string;
@@ -219,6 +220,8 @@ export async function buildReviewerNodes(
         type: 'reviewer',
         role,
         sessionId,
+        // Expose tmux session name when live so the Terminal tab can attach
+        tmuxSession: isLive ? sessionId : undefined,
         model: 'specialist',
         startedAt: opts.startedAt,
         endedAt: opts.endedAt,
