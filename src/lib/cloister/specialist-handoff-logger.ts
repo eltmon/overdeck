@@ -8,7 +8,7 @@
 import { existsSync, mkdirSync, appendFileSync, readFileSync } from 'fs';
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { PANOPTICON_HOME } from '../paths.js';
+import { getPanopticonHome } from '../paths.js';
 
 /**
  * Compute live queue depth.
@@ -45,13 +45,15 @@ export interface SpecialistHandoff {
 /**
  * Specialist handoff log file path
  */
-const SPECIALIST_HANDOFF_LOG_FILE = join(PANOPTICON_HOME, 'logs', 'specialist-handoffs.jsonl');
+function getSpecialistHandoffLogFile(): string {
+  return join(getPanopticonHome(), 'logs', 'specialist-handoffs.jsonl');
+}
 
 /**
  * Ensure log directory exists
  */
 function ensureLogDir(): void {
-  const logDir = join(PANOPTICON_HOME, 'logs');
+  const logDir = join(getPanopticonHome(), 'logs');
   if (!existsSync(logDir)) {
     mkdirSync(logDir, { recursive: true });
   }
@@ -66,7 +68,7 @@ export function logSpecialistHandoff(event: SpecialistHandoff): void {
   ensureLogDir();
 
   const line = JSON.stringify(event) + '\n';
-  appendFileSync(SPECIALIST_HANDOFF_LOG_FILE, line, 'utf-8');
+  appendFileSync(getSpecialistHandoffLogFile(), line, 'utf-8');
 }
 
 /**
@@ -112,11 +114,11 @@ export function createSpecialistHandoff(
 export function readSpecialistHandoffs(limit?: number): SpecialistHandoff[] {
   ensureLogDir();
 
-  if (!existsSync(SPECIALIST_HANDOFF_LOG_FILE)) {
+  if (!existsSync(getSpecialistHandoffLogFile())) {
     return [];
   }
 
-  const content = readFileSync(SPECIALIST_HANDOFF_LOG_FILE, 'utf-8');
+  const content = readFileSync(getSpecialistHandoffLogFile(), 'utf-8');
   const lines = content.trim().split('\n').filter(line => line.trim());
 
   const events = lines.map(line => JSON.parse(line) as SpecialistHandoff);
@@ -242,9 +244,9 @@ export async function updateSpecialistHandoffStatus(
   status: 'processing' | 'completed' | 'failed',
   result?: 'success' | 'failure',
 ): Promise<boolean> {
-  if (!existsSync(SPECIALIST_HANDOFF_LOG_FILE)) return false;
+  if (!existsSync(getSpecialistHandoffLogFile())) return false;
 
-  const content = await readFile(SPECIALIST_HANDOFF_LOG_FILE, 'utf-8');
+  const content = await readFile(getSpecialistHandoffLogFile(), 'utf-8');
   const lines = content.trim().split('\n').filter(l => l.trim());
 
   // Scan in reverse to find the most recent matching active record
@@ -278,7 +280,7 @@ export async function updateSpecialistHandoffStatus(
         : {}),
     };
     lines[matchIdx] = JSON.stringify(updated);
-    await writeFile(SPECIALIST_HANDOFF_LOG_FILE, lines.join('\n') + '\n', 'utf-8');
+    await writeFile(getSpecialistHandoffLogFile(), lines.join('\n') + '\n', 'utf-8');
     return true;
   } catch {
     return false;

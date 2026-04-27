@@ -157,9 +157,43 @@ export async function runVerificationForIssue(
           return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
         }
 
-        // Non-conflict merge failure (network, permissions, etc.) — log and continue
-        // Don't block verification for transient git issues
-        console.warn(`[${logPrefix}] Sync-target warning for ${issueId}: ${mergeErr.message} (continuing)`);
+        const newCycleCount = currentCycles + 1;
+        const failedCheck = 'sync-target-branch';
+        const rawOutput = mergeOut || mergeErr.message || '(no output)';
+        const truncatedOutput =
+          rawOutput.length > 3000 ? rawOutput.slice(0, 3000) + '\n...(truncated)' : rawOutput;
+        const summary = `Sync with ${syncTargetBranch} FAILED:\n\n${truncatedOutput}`;
+
+        setReviewStatus(issueId, {
+          reviewStatus: 'pending',
+          verificationStatus: 'failed',
+          verificationNotes: summary,
+          verificationCycleCount: newCycleCount,
+          verificationMaxCycles: VERIFICATION_MAX_CYCLES,
+        });
+
+        const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix the ${syncTargetBranch} sync failure BEFORE resubmitting\n\nThe verification gate could not sync the latest ${syncTargetBranch} into your workspace.\n\n1. Read the error output above carefully\n2. Run: git fetch origin ${syncTargetBranch}\n3. Run: git merge origin/${syncTargetBranch}\n4. If git reports conflicts, resolve them and verify the merge succeeds cleanly\n5. Run the project's build and tests to verify nothing broke\n6. Commit and push ALL changes\n7. ONLY THEN resubmit: pan review request ${issueId} -m "Fixed ${failedCheck}"\n\nDo NOT resubmit until your branch syncs cleanly with ${syncTargetBranch} and tests pass.`;
+
+        try {
+          const fileResult = await writeFeedbackFile({
+            issueId,
+            workspacePath,
+            specialist: 'verification-gate',
+            outcome: 'failed',
+            summary: `Sync with ${syncTargetBranch} FAILED (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
+            markdownBody: feedbackBody,
+          });
+          if (fileResult.success) {
+            const agentId = `agent-${issueId.toLowerCase()}`;
+            const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — could not sync ${syncTargetBranch}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix the sync failure and re-run verification. Do NOT stop at the prompt — keep working until verification passes.`;
+            await messageAgent(agentId, msg);
+            console.log(`[${logPrefix}] Sync-target failed for ${issueId} — sent sync failure feedback to ${agentId}`);
+          }
+        } catch (feedbackErr: any) {
+          console.error(`[${logPrefix}] Failed to write sync-target feedback for ${issueId}:`, feedbackErr);
+        }
+
+        return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
       }
     } else {
       console.log(`[${logPrefix}] Skipping target-branch sync for ${issueId}; verifying current workspace state`);

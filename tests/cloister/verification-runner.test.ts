@@ -189,6 +189,46 @@ describe('runVerificationForIssue', () => {
       expect(commands).not.toContain('git merge origin/main --no-edit');
       expect(runQualityGatesMock).toHaveBeenCalledOnce();
     });
+
+    it('writes feedback and stops when syncing target branch fails without merge conflicts', async () => {
+      execMock
+        .mockResolvedValueOnce({ stdout: '', stderr: '' })
+        .mockRejectedValueOnce(Object.assign(new Error('fetch rejected'), {
+          stdout: '',
+          stderr: 'fatal: Not possible to fast-forward, aborting.\n',
+        }));
+
+      const result = await runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test');
+
+      expect(result.outcome).toBe('failed');
+      if (result.outcome === 'failed') {
+        expect(result.failedCheck).toBe('sync-target-branch');
+        expect(result.cycleCount).toBe(1);
+      }
+      expect(setReviewStatusMock).toHaveBeenCalledWith(
+        issueId,
+        expect.objectContaining({
+          reviewStatus: 'pending',
+          verificationStatus: 'failed',
+          verificationCycleCount: 1,
+        })
+      );
+      expect(writeFeedbackFileMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          issueId,
+          workspacePath,
+          specialist: 'verification-gate',
+          outcome: 'failed',
+          summary: expect.stringContaining('Sync with main FAILED'),
+          markdownBody: expect.stringContaining('fatal: Not possible to fast-forward, aborting.'),
+        })
+      );
+      expect(messageAgentMock).toHaveBeenCalledWith(
+        `agent-${issueId.toLowerCase()}`,
+        expect.stringContaining('Failed check: sync-target-branch')
+      );
+      expect(runQualityGatesMock).not.toHaveBeenCalled();
+    });
   });
 
   describe('verification fails', () => {
