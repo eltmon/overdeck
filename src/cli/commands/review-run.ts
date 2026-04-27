@@ -130,7 +130,7 @@ export async function reviewRunCommand(
   // Persist the terminal review status. The dashboard reads this from the DB
   // on next observation — no server API needed.
   try {
-    const mapped = reviewResultToReviewStatus(result.reviewResult);
+    const mapped = reviewResultToReviewStatus(result);
     setReviewStatus(issueId, {
       reviewStatus: mapped,
       reviewNotes: result.notes,

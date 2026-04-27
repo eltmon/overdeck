@@ -392,6 +392,56 @@ export function fixStuckReadyForMerge(): void {
   }
 }
 
+/**
+ * PAN-869: On server startup, fix any issues where reviewStatus was incorrectly
+ * set to 'failed' due to the old COMMENTED → 'failed' mapping bug.
+ *
+ * This identifies records where:
+ * - reviewStatus = 'failed'
+ * - testStatus = 'passed' (CI green)
+ * - mergeStatus is not terminal ('merged', 'failed')
+ * - readyForMerge = false
+ * - The last review history entry is type='review', status='commented'
+ *
+ * These are issues where a COMMENTED review (success=true, no blockers) was
+ * incorrectly stored as 'failed' because the old reviewResultToReviewStatus
+ * did not distinguish COMMENTED(success) from COMMENTED(failure).
+ *
+ * We check the history to avoid accidentally "fixing" genuinely failed reviews
+ * that happen to have a prior COMMENTED entry in their history.
+ */
+export function fixStuckCommentedReviews(): void {
+  const statuses = loadReviewStatuses();
+  const candidates = Object.values(statuses).filter(s =>
+    s.reviewStatus === 'failed' &&
+    (s.testStatus === 'passed' || s.testStatus === 'skipped') &&
+    s.mergeStatus !== 'merged' &&
+    s.mergeStatus !== 'failed' &&
+    s.readyForMerge === false
+  );
+
+  if (candidates.length === 0) return;
+
+  const toFix: string[] = [];
+  for (const s of candidates) {
+    // Check if the last review history entry is 'commented'
+    const lastReviewEntry = [...(s.history || [])]
+      .reverse()
+      .find(h => h.type === 'review');
+    if (lastReviewEntry?.status === 'commented') {
+      toFix.push(s.issueId);
+    }
+  }
+
+  if (toFix.length === 0) return;
+  console.log(`[review-status] Restoring reviewStatus='passed' for ${toFix.length} issue(s) with COMMENTED reviews (PAN-869 backfill)`);
+  for (const issueId of toFix) {
+    console.log(`[review-status] Restoring reviewStatus='passed' for ${issueId}`);
+    // reviewStatus='passed' will trigger readyForMerge recomputation in setReviewStatus
+    setReviewStatus(issueId, { reviewStatus: 'passed' });
+  }
+}
+
 export function clearReviewStatus(issueId: string): void {
   try {
     dbDelete(issueId);

@@ -15,7 +15,7 @@ import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer
 import { initTrackerConfigCache } from './services/tracker-config.js';
 import { processPendingLifecycle } from './pending-lifecycle.js';
 import { setPipelineHandler } from '../../lib/pipeline-notifier.js';
-import { clearStuckMergeStatuses, fixStuckReadyForMerge, getReviewStatus } from '../../lib/review-status.js';
+import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatus } from '../../lib/review-status.js';
 import { enrichReviewStatus } from '../../lib/review-status-enrichment.js';
 import { clearStuckForks } from '../../lib/database/conversations-db.js';
 import { getEventStore } from './event-store.js';
@@ -177,6 +177,8 @@ emitActivityEntry({ source: 'dashboard', level: 'info', message: 'Cleared stuck 
 } }
 // Restore readyForMerge for issues where review+test passed but readyForMerge is stuck false.
 fixStuckReadyForMerge();
+// PAN-869: restore reviewStatus='passed' for issues with COMMENTED reviews that were incorrectly marked 'failed'
+fixStuckCommentedReviews();
 
 // Reset stuck merge queue entries (PAN-632): any 'processing' entries were
 // in-flight when the server died — reset to 'queued' so they resume.
