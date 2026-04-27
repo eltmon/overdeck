@@ -37,7 +37,7 @@ jobs:
       - name: Fail if .planning/ paths are tracked
         run: |
           set -euo pipefail
-          tracked=$(git ls-files -- '.planning/*' || true)
+          tracked=$(git ls-files -- '.planning/' || true)
           if [ -n "$tracked" ]; then
             echo "::error::Refusing to advance main — .planning/ files are tracked:"
             echo "$tracked" | sed 's/^/  /'

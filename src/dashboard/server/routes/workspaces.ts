@@ -4094,6 +4094,13 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     // STATE.md/feedback files and cross-contaminate. The post-merge cleanup
     // (`cleanPlanningArtifacts`) is a safety net that runs AFTER the squash commit is
     // already public; this strip is the primary defense and runs BEFORE `gh pr merge`.
+    //
+    // NOTE: `rebaseFeatureBranch()` in merge-rebase.ts ALSO performs an idempotent
+    // `.planning/` strip during its rebase prep. The two are not currently composed
+    // (this route does not call rebaseFeatureBranch), so there's no double-strip
+    // today. If a future caller chains both, the second strip is a no-op (ls-files
+    // returns nothing → skip). Keep the dual-path safety; do not consolidate
+    // without auditing every entry point that triggers a merge.
     try {
       const { stripPlanningFromFeatureBranch } = await import(
         '../../../lib/cloister/strip-planning-from-branch.js'

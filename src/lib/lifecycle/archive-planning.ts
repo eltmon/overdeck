@@ -11,7 +11,7 @@
  */
 
 import { existsSync } from 'fs';
-import { mkdir, cp, rm } from 'fs/promises';
+import { mkdir, cp, rm, rename } from 'fs/promises';
 import { join, dirname } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -90,17 +90,16 @@ export async function movePrd(
   // left behind in active/ after merge (PAN-487). Detect it here so we can move
   // it alongside the `.md`. The `subdir` format already moves both files because
   // they share the directory.
-  const issueLowerForSidecar = ctx.issueId.toLowerCase();
   const flatActive = source.format === 'flat'
     ? join(ctx.projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_ACTIVE_SUBDIR)
     : null;
   const flatCompleted = source.format === 'flat'
     ? join(ctx.projectPath, PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR, PROJECT_PRDS_COMPLETED_SUBDIR)
     : null;
-  const sidecarLower = flatActive ? join(flatActive, `${issueLowerForSidecar}-plan.vbrief.json`) : null;
+  const sidecarLower = flatActive ? join(flatActive, `${issueLower}-plan.vbrief.json`) : null;
   const sidecarUpper = flatActive ? join(flatActive, `${ctx.issueId.toUpperCase()}-plan.vbrief.json`) : null;
   // Always land sidecar at canonical lowercase in completed/.
-  const sidecarDest = flatCompleted ? join(flatCompleted, `${issueLowerForSidecar}-plan.vbrief.json`) : null;
+  const sidecarDest = flatCompleted ? join(flatCompleted, `${issueLower}-plan.vbrief.json`) : null;
   const resolvedSidecarSource = sidecarLower && existsSync(sidecarLower)
     ? sidecarLower
     : (sidecarUpper && existsSync(sidecarUpper) ? sidecarUpper : null);
@@ -165,8 +164,9 @@ export async function archiveWorkspaceArtifacts(
         version++;
       }
       const rotatedDir = `${archiveDir}.${version}`;
-      await cp(archiveDir, rotatedDir, { recursive: true });
-      await rm(archiveDir, { recursive: true, force: true });
+      // Rename is O(1) metadata vs. copy+delete which is O(archive size). Both
+      // paths live under ARCHIVES_DIR so they're on the same filesystem.
+      await rename(archiveDir, rotatedDir);
     }
 
     await mkdir(archiveDir, { recursive: true });
