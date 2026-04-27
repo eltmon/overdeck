@@ -8,7 +8,6 @@
 
 import { useEffect, useState } from 'react';
 import type { Issue, Agent } from '../../types';
-import type { ProjectFeature } from './ProjectTree/ProjectNode';
 import { OverviewTab } from './ZoneCOverviewTabs/OverviewTab';
 
 export type OverviewTab =
