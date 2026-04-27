@@ -761,8 +761,6 @@ export function CommandDeck({
               onOpenBeads={() => setShowBeads(true)}
               agent={selectedAgent}
               issue={selectedIssue ?? undefined}
-              issues={issues}
-              featureData={selectedFeatureData}
             />
           ) : (
             <div className={styles.contentEmpty}>
