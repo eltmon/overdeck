@@ -296,14 +296,14 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   // Kill the session unconditionally if it exists — don't require agentState to exist first
   // (state file may have been cleaned up already, leaving an orphaned session alive).
   try {
-    const { getAgentState, saveAgentState } = await import('../agents.js');
+    const { getAgentState, markAgentStoppedState, saveAgentState } = await import('../agents.js');
     const { killSession, sessionExists } = await import('../tmux.js');
     const agentId = `agent-${issueId.toLowerCase()}`;
     if (sessionExists(agentId)) {
       killSession(agentId);
       const agentState = getAgentState(agentId);
       if (agentState) {
-        agentState.status = 'stopped';
+        markAgentStoppedState(agentState);
         saveAgentState(agentState);
       }
       console.log(`[merge-agent] ✓ Killed work agent session ${agentId} to free resources`);
