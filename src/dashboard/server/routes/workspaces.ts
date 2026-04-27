@@ -34,7 +34,7 @@ import { httpHandler } from './http-handler.js';
  *   POST   /api/workspaces/:issueId/unstick
  */
 
-import { exec, spawn } from 'node:child_process';
+import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { access, chmod, mkdir, readdir, readFile, stat, symlink, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -92,6 +92,7 @@ import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 function shouldTreatAsRerun(status: Pick<ReviewStatus, 'readyForMerge' | 'reviewStatus' | 'testStatus' | 'mergeStatus'> | null | undefined): boolean {
   if (!status) return false;
@@ -150,6 +151,36 @@ async function ensureWorkAgentReadyForMerge(
     agentId,
     detail: `Started fresh work agent ${state.id} and sent merge preparation request.`,
   };
+}
+
+/**
+ * Check whether origin/branchName already contains origin/targetBranch.
+ * If true, no rebase is needed — the branch is already up to date with target.
+ */
+export async function isBranchAlreadyRebased(
+  workspacePath: string,
+  branchName: string,
+  targetBranch: string,
+): Promise<{ alreadyRebased: boolean; currentHead?: string }> {
+  try {
+    await Promise.all([
+      execFileAsync('git', ['fetch', 'origin', targetBranch], { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 }),
+      execFileAsync('git', ['fetch', 'origin', branchName], { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 }),
+    ]);
+    await execFileAsync(
+      'git',
+      ['merge-base', '--is-ancestor', `origin/${targetBranch}`, `origin/${branchName}`],
+      { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
+    );
+    const { stdout: currentHead } = await execFileAsync(
+      'git',
+      ['rev-parse', `origin/${branchName}`],
+      { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
+    );
+    return { alreadyRebased: true, currentHead: currentHead.trim() };
+  } catch {
+    return { alreadyRebased: false };
+  }
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -3910,58 +3941,67 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
 
     let rebaseResult: { success: boolean; reason?: string; conflictFiles?: string[]; newHead?: string };
 
-    try {
-      const recovery = await ensureWorkAgentReadyForMerge(issueId, workspacePath, rebaseMsg);
-      console.log(`[merge] ${recovery.detail}`);
+    // Pre-check: if origin/<branch> already contains origin/<target>, the branch
+    // is already rebased — no rebase or push is needed.
+    const { alreadyRebased, currentHead } = await isBranchAlreadyRebased(workspacePath, branchName, targetBranch);
 
-      // Poll for the push: check if remote HEAD changed
-      const { stdout: headBefore } = await execAsync(
-        `git rev-parse origin/${branchName} 2>/dev/null || echo NONE`,
-        { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
-      );
+    if (alreadyRebased && currentHead) {
+      console.log(`[merge] ${branchName} already contains origin/${targetBranch} — skipping rebase request for ${issueId}`);
+      rebaseResult = { success: true, newHead: currentHead };
+    } else {
+      try {
+        const recovery = await ensureWorkAgentReadyForMerge(issueId, workspacePath, rebaseMsg);
+        console.log(`[merge] ${recovery.detail}`);
 
-      const REBASE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes — complex rebases with conflicts need time
-      const POLL_INTERVAL_MS = 5000;
-      const startTime = Date.now();
-      let newHead: string | null = null;
+        // Poll for the push: check if remote HEAD changed
+        const { stdout: headBefore } = await execAsync(
+          `git rev-parse origin/${branchName} 2>/dev/null || echo NONE`,
+          { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+        );
 
-      while (Date.now() - startTime < REBASE_TIMEOUT_MS) {
-        await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+        const REBASE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes — complex rebases with conflicts need time
+        const POLL_INTERVAL_MS = 5000;
+        const startTime = Date.now();
+        let newHead: string | null = null;
 
-        try {
-          await execAsync('git fetch origin', { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
-          const { stdout: headNow } = await execAsync(
-            `git rev-parse origin/${branchName}`,
-            { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
-          );
-          if (headNow.trim() !== headBefore.trim()) {
-            newHead = headNow.trim();
-            console.log(`[merge] Work agent pushed rebased branch for ${issueId} (new HEAD: ${newHead.slice(0, 8)})`);
+        while (Date.now() - startTime < REBASE_TIMEOUT_MS) {
+          await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+
+          try {
+            await execAsync('git fetch origin', { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
+            const { stdout: headNow } = await execAsync(
+              `git rev-parse origin/${branchName}`,
+              { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
+            );
+            if (headNow.trim() !== headBefore.trim()) {
+              newHead = headNow.trim();
+              console.log(`[merge] Work agent pushed rebased branch for ${issueId} (new HEAD: ${newHead.slice(0, 8)})`);
+              break;
+            }
+          } catch { /* fetch failed, retry */ }
+
+          if (!await sessionExistsAsync(agentId)) {
+            console.log(`[merge] Work agent ${agentId} stopped during rebase`);
             break;
           }
-        } catch { /* fetch failed, retry */ }
-
-        if (!await sessionExistsAsync(agentId)) {
-          console.log(`[merge] Work agent ${agentId} stopped during rebase`);
-          break;
         }
-      }
 
-      if (newHead) {
-        rebaseResult = { success: true, newHead };
-      } else if (!await sessionExistsAsync(agentId)) {
+        if (newHead) {
+          rebaseResult = { success: true, newHead };
+        } else if (!await sessionExistsAsync(agentId)) {
+          rebaseResult = {
+            success: false,
+            reason: `Work agent ${agentId} stopped before completing the rebase onto ${targetBranch}`,
+          };
+        } else {
+          rebaseResult = { success: false, reason: `Work agent did not push the rebased branch within ${REBASE_TIMEOUT_MS / 60000} minutes` };
+        }
+      } catch (recoveryErr: any) {
         rebaseResult = {
           success: false,
-          reason: `Work agent ${agentId} stopped before completing the rebase onto ${targetBranch}`,
+          reason: recoveryErr.message || `Work agent ${agentId} could not be prepared for merge`,
         };
-      } else {
-        rebaseResult = { success: false, reason: `Work agent did not push the rebased branch within ${REBASE_TIMEOUT_MS / 60000} minutes` };
       }
-    } catch (recoveryErr: any) {
-      rebaseResult = {
-        success: false,
-        reason: recoveryErr.message || `Work agent ${agentId} could not be prepared for merge`,
-      };
     }
 
     if (!rebaseResult.success) {
@@ -4074,7 +4114,17 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       if (!artifactMerged) {
         const error = `${primaryForge} merge failed: ${prMergeErr.message}`;
         console.error(`[merge] ${error}`);
-        setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
+        const isTransient =
+          prMergeErr.message?.includes('Timed out waiting for GitHub PR') ||
+          prMergeErr.message?.includes('ECONNRESET') ||
+          prMergeErr.message?.includes('ETIMEDOUT') ||
+          prMergeErr.message?.includes('ECONNREFUSED');
+        if (isTransient) {
+          setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error });
+          // readyForMerge stays true so the issue remains in Awaiting Merge for retry
+        } else {
+          setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
+        }
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 500, error };
       }
@@ -4120,6 +4170,9 @@ const postWorkspaceMergeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!/^[A-Z]+-\d+$/i.test(issueId)) {
+      return jsonResponse({ error: 'Invalid issue ID format' }, { status: 400 });
+    }
     const eventStore = yield* EventStoreService;
 
     const result = yield* Effect.promise(() => triggerMerge(issueId));

@@ -36,7 +36,7 @@ function cleanupTestFiles() {
   if (existsSync(TEST_SHADOW_STATE_DIR)) {
     const files = readdirSync(TEST_SHADOW_STATE_DIR);
     for (const file of files) {
-      if (file.startsWith('TEST-')) {
+      if (file.startsWith(TEST_PREFIX)) {
         try {
           unlinkSync(join(TEST_SHADOW_STATE_DIR, file));
         } catch {

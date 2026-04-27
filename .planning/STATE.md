@@ -1,29 +1,29 @@
-# PAN-869: Awaiting Merge lane misses PRs with COMMENTED reviews + green CI
+# PAN-850: Merge flow: stuck on no-op rebase + tight GitHub merge poll timeout
 
-## Status: In Review
+## Status: Implementation Complete
 
 ## Current Phase
-Waiting for verification to pass (intermittent test failure - re-requested review)
+All beads implemented, tested, and pushed. Ready for merge.
 
 ## Completed Work
-- [x] reviewResultToReviewStatus fix: COMMENTED (success=true) → 'passed'
-- [x] review-run.ts: pass full ReviewResult to reviewResultToReviewStatus
-- [x] Add fixStuckCommentedReviews backfill
-- [x] Call fixStuckCommentedReviews on dashboard startup
-- [x] Update tests for new function signature
-- [x] Fix mapToExitCode to respect success flag for COMMENTED
-- [x] Fix backfill to check status='failed' instead of 'commented'
+- [x] pan-47zu: Add no-op rebase detection to triggerMerge in workspaces.ts (commit: c62b8aff)
+- [x] pan-uopq: Increase GITHUB_MERGE_TIMEOUT_MS to 15 minutes in forge.ts (commit: 9aad69df)
+- [x] pan-mtds: Preserve readyForMerge on transient merge failures in workspaces.ts (commit: 8015f35c)
+- [x] pan-fl83: Unit tests for no-op rebase path and timeout value (commit: e2a7fd06)
 
 ## Remaining Work
-- None - waiting for review pipeline
+(None — all beads complete)
 
 ## Key Decisions
-- D1: COMMENTED (success=true) = review passed with no blockers → maps to 'passed' so readyForMerge=true
-- D2: COMMENTED (success=false) = synthesis/protocol failure → keeps as 'failed' so deacon retries
-- D3: Backfill uses status='failed' + testStatus='passed' as signal (old COMMENTED was stored as 'failed')
+- Using `git merge-base --is-ancestor` pre-check (as specified in issue body) to skip rebase when branch already contains target
+- Timeout increase to 15 minutes (issue spec); not making configurable to keep change minimal
+- Transient failure detection: checking for "Timed out waiting for GitHub PR" message
+- Extracted `isBranchAlreadyRebased` helper from triggerMerge for testability
 
 ## Specialist Feedback
-- **[2026-04-27T02:57Z] review-agent → COMMENTED** — correctness reviewer found:
-  - `fixStuckCommentedReviews` backfill checked `status: 'commented'` but history stores `'failed'` → DEAD CODE (fixed)
-  - `mapToExitCode` returns 2 for all COMMENTED regardless of success → INCONSISTENT (fixed)
-- **[2026-04-27T03:12Z] verification-gate → FAILED** — intermittent race condition in effect-patterns.test.ts reading 111 agent state files; re-requested review
+(None yet)
+- **[2026-04-26T19:01Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-04-26T19:09Z] review-agent → APPROVED** — `.planning/feedback/001-review-agent-approved.md`
+- **[2026-04-26T19:28Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
+- **[2026-04-27T04:12Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
+- **[2026-04-27T04:15Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/002-review-agent-changes-requested.md`
