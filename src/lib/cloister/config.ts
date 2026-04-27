@@ -386,7 +386,7 @@ export function loadCloisterConfig(): CloisterConfig {
   const stashJanitorEnv = process.env.PAN_STASH_JANITOR_CYCLES;
   if (stashJanitorEnv !== undefined) {
     const parsed = Number.parseInt(stashJanitorEnv, 10);
-    if (Number.isFinite(parsed) && parsed > 0) {
+    if (Number.isFinite(parsed) && parsed >= 0) {
       config = {
         ...config,
         monitoring: {

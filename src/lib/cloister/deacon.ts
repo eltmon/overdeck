@@ -2484,7 +2484,7 @@ async function reconcileAndCheckIfMerged(
 
     const tracker = createTracker(trackerConfig);
     const issue = await tracker.getIssue(issueId);
-    if (issue.state === 'closed') {
+    if (project.tracker === 'github' && issue.state === 'closed') {
       setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
       return remember(true);
     }
@@ -2581,7 +2581,7 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
           .sort((a, b) => b.stashIndex - a.stashIndex)
           .map((entry) => entry.stash);
         for (const stash of stashesToDrop) {
-          await dropStash(workspacePath, stash.ref);
+          await dropStash(workspacePath, stash.ref, stash.stackRef);
           const reason = mergedPreMergeStashes.some((entry) => entry.ref === stash.ref)
             ? 'merged issue'
             : 'stale';

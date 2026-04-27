@@ -94,7 +94,7 @@ export function parseCanonicalStashMessage(message: string): ParsedStashEntry {
     };
   }
 
-  const reviewTempMatch = /^review-temp:(\w+-\d+):(\d+)$/.exec(message);
+  const reviewTempMatch = new RegExp(`^review-temp:${ISSUE_ID_PATTERN}:(\\d+)$`).exec(message);
   if (reviewTempMatch) {
     return {
       ref: '',
@@ -174,17 +174,21 @@ export async function createNamedStash(repoPath: string, message: string, includ
   return normalizedRef || null;
 }
 
-async function resolveStashOperationRef(repoPath: string, ref: string): Promise<string> {
+async function resolveStashOperationRef(repoPath: string, ref: string, stackRef?: string): Promise<string> {
   // PAN-879 assumes stash janitor / merge / review flows are serialized within a single
   // workspace, so re-resolving the stable SHA to a stack slot immediately before the git
   // command is sufficient. If per-workspace stash operations ever run concurrently, the
   // resolve+operate sequence must be guarded by a lock.
-  if (/^stash@\{\d+\}$/.test(ref)) {
-    await execAsync(`git rev-parse --verify ${JSON.stringify(ref)}`, {
+  const candidateRef = /^stash@\{\d+\}$/.test(ref) ? ref : stackRef;
+  if (candidateRef) {
+    const { stdout: resolvedSha } = await execAsync(`git rev-parse --verify ${JSON.stringify(candidateRef)}`, {
       cwd: repoPath,
       encoding: 'utf-8',
     });
-    return ref;
+    if (/^stash@\{\d+\}$/.test(ref) || resolvedSha.trim() === ref) {
+      return candidateRef;
+    }
+    throw new Error(`Stash ${ref} no longer matches ${candidateRef}`);
   }
 
   const stashes = await listStashes(repoPath);
@@ -204,18 +208,18 @@ async function resolveStashOperationRef(repoPath: string, ref: string): Promise<
   return matchingEntry.stackRef;
 }
 
-export async function popStash(repoPath: string, ref: string): Promise<void> {
-  const operationRef = await resolveStashOperationRef(repoPath, ref);
+export async function popStash(repoPath: string, ref: string, stackRef?: string): Promise<void> {
+  const operationRef = await resolveStashOperationRef(repoPath, ref, stackRef);
   await execAsync(`git stash pop ${JSON.stringify(operationRef)}`, { cwd: repoPath, encoding: 'utf-8' });
 }
 
-export async function dropStash(repoPath: string, ref: string): Promise<void> {
-  const operationRef = await resolveStashOperationRef(repoPath, ref);
+export async function dropStash(repoPath: string, ref: string, stackRef?: string): Promise<void> {
+  const operationRef = await resolveStashOperationRef(repoPath, ref, stackRef);
   await execAsync(`git stash drop ${JSON.stringify(operationRef)}`, { cwd: repoPath, encoding: 'utf-8' });
 }
 
-export async function applyStash(repoPath: string, ref: string): Promise<void> {
-  const operationRef = await resolveStashOperationRef(repoPath, ref);
+export async function applyStash(repoPath: string, ref: string, stackRef?: string): Promise<void> {
+  const operationRef = await resolveStashOperationRef(repoPath, ref, stackRef);
   await execAsync(`git stash apply ${JSON.stringify(operationRef)}`, { cwd: repoPath, encoding: 'utf-8' });
 }
 
@@ -224,8 +228,9 @@ export async function createRecoveryBranchFromStash(
   stashRef: string,
   issueId: string,
   shortDescription: string,
+  stackRef?: string,
 ): Promise<string> {
-  const operationRef = await resolveStashOperationRef(repoPath, stashRef);
+  const operationRef = await resolveStashOperationRef(repoPath, stashRef, stackRef);
   const branchName = `recovery/${issueId.toUpperCase()}-${sanitizeShortDescription(shortDescription)}`;
   await execAsync(`git branch ${JSON.stringify(branchName)} ${JSON.stringify(operationRef)}`, {
     cwd: repoPath,

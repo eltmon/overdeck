@@ -183,13 +183,13 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
 
     const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
 
-    expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'def456abc123def456abc123def456abc123def4');
+    expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'def456abc123def456abc123def456abc123def4', 'stash@{1}');
     expect(mockDropStash).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'bogusbogusbogusbogusbogusbogusbogusbogus');
     expect(mockDropStash).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'fedcba654321fedcba654321fedcba654321fedc');
     expect(actions).toContain('Dropped stale pre-merge stash for PAN-879: def456abc123def456abc123def456abc123def4');
   });
 
-  it('drops pre-merge stashes immediately when tracker state shows the issue is already merged', async () => {
+  it('preserves pre-merge stashes for non-github issues that are merely closed', async () => {
     mockListRunningAgents.mockReturnValue([] as any);
     mockGetAgentState.mockReturnValue(null);
     mockListStashes.mockResolvedValue([
@@ -200,9 +200,9 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
 
     const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
 
-    expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', '9999999999999999999999999999999999999999');
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-879', { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
-    expect(actions).toContain('Dropped merged issue pre-merge stash for PAN-879: 9999999999999999999999999999999999999999');
+    expect(mockDropStash).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', '9999999999999999999999999999999999999999', 'stash@{3}');
+    expect(mockSetReviewStatus).not.toHaveBeenCalledWith('PAN-879', { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
+    expect(actions).not.toContain('Dropped merged issue pre-merge stash for PAN-879: 9999999999999999999999999999999999999999');
   });
 
   it('keeps pre-spawn stash metadata when branch advancement check fails for an ambiguous error', async () => {

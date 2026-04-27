@@ -85,6 +85,13 @@ describe('stashes', () => {
       sequence: 7,
     });
 
+    const multiHyphenReviewTemp = parseCanonicalStashMessage('review-temp:KRUX-SUB-3:8');
+    expect(multiHyphenReviewTemp).toMatchObject({
+      kind: 'review-temp',
+      issueId: 'KRUX-SUB-3',
+      sequence: 8,
+    });
+
     const multiHyphen = parseCanonicalStashMessage('pre-merge:KRUX-SUB-3:2026-04-27T14:15:16Z');
     expect(multiHyphen).toMatchObject({
       kind: 'pre-merge',
@@ -182,6 +189,22 @@ describe('stashes', () => {
     await applyStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
     await popStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
     await expect(createRecoveryBranchFromStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'PAN-879', 'UI Draft + notes')).resolves.toBe('recovery/PAN-879-ui-draft-notes');
+  });
+
+  it('uses the provided stack ref to avoid rescanning the stash list', async () => {
+    mockExecImplementation((cmd) => {
+      if (cmd === 'git rev-parse --verify "stash@{7}"') return { stdout: 'abc123def456abc123def456abc123def456abcd\n' };
+      if (cmd === 'git stash drop "stash@{7}"') return { stdout: '' };
+      throw new Error(`unexpected command: ${cmd}`);
+    });
+
+    await dropStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'stash@{7}');
+
+    expect(execMock).not.toHaveBeenCalledWith(
+      'git stash list --format="%gd%x09%H%x09%cI%x09%gs"',
+      expect.anything(),
+      expect.any(Function),
+    );
   });
 
   it('identifies salvageable stash entries', () => {
