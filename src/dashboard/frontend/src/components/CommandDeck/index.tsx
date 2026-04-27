@@ -142,27 +142,18 @@ interface CommandDeckProps {
   onConversationViewModeChange?: (mode: ViewMode) => void;
 }
 
-const FILTER_CONVERSATIONS_KEY = 'mc-filter-conversations';
-const FILTER_PROJECTS_KEY = 'mc-filter-projects';
+type SidebarMode = 'projects' | 'conversations';
 
-function loadFilterConversations(): boolean {
+const SIDEBAR_MODE_KEY = 'mc-sidebar-mode';
+
+function loadSidebarMode(): SidebarMode {
   try {
-    const v = localStorage.getItem(FILTER_CONVERSATIONS_KEY);
-    if (v === 'false') return false;
+    const v = localStorage.getItem(SIDEBAR_MODE_KEY);
+    if (v === 'conversations') return 'conversations';
   } catch {
     // ignore
   }
-  return true;
-}
-
-function loadFilterProjects(): boolean {
-  try {
-    const v = localStorage.getItem(FILTER_PROJECTS_KEY);
-    if (v === 'false') return false;
-  } catch {
-    // ignore
-  }
-  return true;
+  return 'projects';
 }
 
 export function CommandDeck({
@@ -177,8 +168,13 @@ export function CommandDeck({
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [isDraft, setIsDraft] = useState(false);
   const [showBeads, setShowBeads] = useState(false);
-  const [showConversations, setShowConversations] = useState(() => loadFilterConversations());
-  const [showProjects, setShowProjects] = useState(() => loadFilterProjects());
+  const [sidebarMode, setSidebarModeState] = useState<SidebarMode>(() => loadSidebarMode());
+  const showConversations = sidebarMode === 'conversations';
+  const showProjects = sidebarMode === 'projects';
+  const setSidebarMode = useCallback((mode: SidebarMode) => {
+    setSidebarModeState(mode);
+    try { localStorage.setItem(SIDEBAR_MODE_KEY, mode); } catch { /* ignore */ }
+  }, []);
   const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
 
@@ -547,8 +543,8 @@ export function CommandDeck({
     setIsDraft(true);
     setSelectedConversation(null);
     setSelectedFeature(null);
-    setShowConversations(true);
-  }, []);
+    setSidebarMode('conversations');
+  }, [setSidebarMode]);
 
   const handleDraftPromoted = useCallback((conv: Conversation, firstMessage: string) => {
     setDraftKey(0);
@@ -668,34 +664,22 @@ export function CommandDeck({
             {/* Filter chips */}
             <div className={styles.segmentControl}>
               <button
-                className={`${styles.segmentButton} ${showConversations ? styles.segmentButtonActive : ''}`}
-                onClick={() => {
-                  setShowConversations(v => {
-                    const next = !v;
-                    try { localStorage.setItem(FILTER_CONVERSATIONS_KEY, String(next)); } catch { /* ignore */ }
-                    return next;
-                  });
-                }}
-                aria-pressed={showConversations}
-              >
-                Conversations
-                <span className={styles.segmentCount}>{conversations.length}</span>
-              </button>
-              <button
                 className={`${styles.segmentButton} ${showProjects ? styles.segmentButtonActive : ''}`}
-                onClick={() => {
-                  setShowProjects(v => {
-                    const next = !v;
-                    try { localStorage.setItem(FILTER_PROJECTS_KEY, String(next)); } catch { /* ignore */ }
-                    return next;
-                  });
-                }}
+                onClick={() => setSidebarMode('projects')}
                 aria-pressed={showProjects}
               >
                 Projects
                 <span className={styles.segmentCount}>
                   {projects.reduce((sum, p) => sum + p.features.length, 0)}
                 </span>
+              </button>
+              <button
+                className={`${styles.segmentButton} ${showConversations ? styles.segmentButtonActive : ''}`}
+                onClick={() => setSidebarMode('conversations')}
+                aria-pressed={showConversations}
+              >
+                Conversations
+                <span className={styles.segmentCount}>{conversations.length}</span>
               </button>
             </div>
 

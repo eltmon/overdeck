@@ -493,18 +493,31 @@ export async function fetchActivityDataWithContext(
         } catch { /* specialist may not be running */ }
       }
 
-      let tmuxSessionName: string | undefined;
-      if (ss.status === 'running') {
-        const specialistType = ss.type === 'test' ? 'test-agent' : 'merge-agent';
-        const resolved = resolveProjectFromIssue(issueId);
-        tmuxSessionName = getTmuxSessionName(specialistType as never, resolved?.projectKey);
-      }
+      // Compute the *real* tmux session name (and agent dir) for this specialist.
+      // Specialists write their session.id into ~/.panopticon/agents/<tmuxSession>/
+      // when dispatched (see specialists.ts spawn). Using the synthetic
+      // `specialist-<type>-<startedAt>` ID here meant resolveJsonlPath could never
+      // find the JSONL transcript — the Conversation panel rendered "No
+      // conversation data available" for every specialist click. Use the real
+      // tmux session name so jsonl-resolver lands on the correct agent dir.
+      const specialistType = ss.type === 'test' ? 'test-agent' : 'merge-agent';
+      const resolvedProject = resolveProjectFromIssue(issueId);
+      const tmuxSessionName = getTmuxSessionName(
+        specialistType as never,
+        resolvedProject?.projectKey,
+        issueId,
+      );
 
-      const specialistPresence: SessionNodePresence = tmuxSessionName && tmuxSessionNames.has(tmuxSessionName)
+      const specialistPresence: SessionNodePresence = tmuxSessionNames.has(tmuxSessionName)
         ? (ss.status === 'running' ? 'active' : 'idle')
         : 'ended';
-      const specialistSessionId = `specialist-${ss.type}-${ss.startedAt}`;
-      const specialistJsonlPath = await resolveJsonlPath(specialistSessionId, workspacePath);
+      const specialistSessionId = tmuxSessionName;
+      // Specialists cd into the project root (specialists.ts:941 — `cwd = project?.path`),
+      // NOT the workspace dir, so their JSONLs are written to
+      // ~/.claude/projects/<encoded(projectPath)>/<session-uuid>.jsonl. Passing
+      // workspacePath here meant resolveJsonlPath looked in the wrong directory and
+      // returned null — the Conversation panel rendered "No conversation data".
+      const specialistJsonlPath = await resolveJsonlPath(specialistSessionId, projectPath);
 
       // Do NOT expose tmuxSession for specialist sessions — they are autonomous
       // and should not be interactively attached (PAN-821 review)

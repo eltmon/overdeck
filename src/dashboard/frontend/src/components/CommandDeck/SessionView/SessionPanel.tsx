@@ -38,22 +38,6 @@ function writeView(sessionId: string, view: PanelView): void {
   } catch { /* ignore */ }
 }
 
-function formatDuration(seconds: number | null): string {
-  if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return '—';
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
-  return `${Math.round(seconds / 3600)}h`;
-}
-
-function PresenceDot({ presence }: { presence: SessionNodeType['presence'] }) {
-  const color =
-    presence === 'active'
-      ? 'var(--mc-success)'
-      : presence === 'idle'
-        ? 'var(--mc-warning)'
-        : 'var(--mc-text-muted)';
-  return <span className={styles.sessionPanelPresence} style={{ background: color }} />;
-}
 
 function toRoundVerdict(status?: string): RoundVerdict {
   switch (status) {
@@ -122,17 +106,8 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
 
   return (
     <div className={styles.sessionPanel}>
-      {/* Session info sub-header */}
+      {/* View toggle — slim tab bar (info already shown in ZoneB) */}
       <div className={styles.sessionPanelHeader}>
-        <div className={styles.sessionPanelInfo}>
-          <span className={styles.sessionPanelType}>
-            {session.role ? `${session.type}:${session.role}` : session.type}
-          </span>
-          <PresenceDot presence={session.presence} />
-          <span className={styles.sessionPanelModel}>{session.model}</span>
-          <span className={styles.sessionPanelDuration}>{formatDuration(session.duration)}</span>
-        </div>
-
         <div className={styles.sessionPanelToggle}>
           <button
             className={`${styles.sessionPanelToggleBtn} ${view === 'conversation' ? styles.sessionPanelToggleBtnActive : ''}`}
@@ -166,6 +141,7 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
               viewMode="conversation"
               roundMarkers={roundMarkers}
               roundMetadata={session.roundMetadata}
+              embedded
             />
           ) : hasTranscript ? (
             <div className={styles.sessionPanelTranscript}>
