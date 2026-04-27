@@ -25,3 +25,5 @@ All beads implemented, tested, and pushed. Ready for merge.
 - **[2026-04-26T19:01Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
 - **[2026-04-26T19:09Z] review-agent → APPROVED** — `.planning/feedback/001-review-agent-approved.md`
 - **[2026-04-26T19:28Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
+- **[2026-04-27T04:12Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
+- **[2026-04-27T04:15Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/002-review-agent-changes-requested.md`
