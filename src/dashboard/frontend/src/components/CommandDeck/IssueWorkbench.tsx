@@ -32,6 +32,7 @@ import { ZoneA } from './ZoneA';
 import { ZoneB } from './ZoneB';
 import { ZoneCConversation } from './ZoneCConversation';
 import { ZoneCOverview } from './ZoneCOverview';
+import { IssueComposer } from './IssueComposer';
 
 interface IssueWorkbenchProps {
   issueId: string;
@@ -48,71 +49,6 @@ interface IssueWorkbenchProps {
   agent?: Agent;
   /** Full issue record — forwarded to Zone A for status gating. */
   issue?: Issue;
-}
-
-function ComposerPlaceholder({ sessions, issueId }: { sessions: readonly SessionNodeType[]; issueId: string }) {
-  const hasSessions = sessions.length > 0;
-  const allEnded = hasSessions && sessions.every((s) => s.presence === 'ended');
-
-  const handleSpawn = () => {
-    // Navigate to the start-agent endpoint for this issue
-    void fetch(`/api/agents/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ issueId }),
-    }).catch(() => { /* non-fatal */ });
-  };
-
-  return (
-    <div
-      data-testid="composer-placeholder"
-      style={{
-        padding: '12px 16px',
-        borderTop: '1px solid var(--mc-border, var(--border))',
-        background: 'var(--mc-surface-2, color-mix(in srgb, var(--foreground) 3%, transparent))',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        flexShrink: 0,
-      }}
-    >
-      <div
-        style={{
-          flex: 1,
-          padding: '8px 12px',
-          borderRadius: 6,
-          border: '1px solid var(--mc-border, var(--border))',
-          background: 'var(--mc-surface, var(--background))',
-          color: 'var(--mc-text-muted, var(--muted-foreground))',
-          fontSize: 13,
-          opacity: 0.7,
-        }}
-      >
-        {hasSessions && !allEnded
-          ? 'Select a session to chat'
-          : allEnded
-            ? 'All sessions ended — spawn work to continue'
-            : 'No sessions — start an agent to begin'}
-      </div>
-      {(!hasSessions || allEnded) && (
-        <button
-          onClick={handleSpawn}
-          style={{
-            padding: '8px 14px',
-            borderRadius: 6,
-            border: 'none',
-            background: 'var(--mc-primary, var(--primary))',
-            color: 'var(--mc-primary-foreground, var(--primary-foreground))',
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: 'pointer',
-          }}
-        >
-          {allEnded ? 'Spawn Work & Send' : 'Spawn & Send'}
-        </button>
-      )}
-    </div>
-  );
 }
 
 export function IssueWorkbench({
@@ -174,7 +110,7 @@ export function IssueWorkbench({
       ) : (
         <>
           <ZoneCOverview issueId={issueId} issues={issues} featureData={featureData} />
-          <ComposerPlaceholder sessions={sessions} issueId={issueId} />
+          <IssueComposer issueId={issueId} sessions={sessions} />
         </>
       )}
     </div>

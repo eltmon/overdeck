@@ -58,6 +58,7 @@ export type ActionKey =
   | 'transcripts'
   | 'upload'
   | 'syncDiscussions'
+  | 'syncMain'
   | 'statusReview'
   // Danger zone
   | 'reopen'
@@ -79,7 +80,7 @@ export interface ActionLayout {
 
 export interface ZoneAInput {
   reviewStatus?: ReviewStatus | null;
-  agent?: Pick<Agent, 'status' | 'agentPhase'> | null;
+  agent?: Pick<Agent, 'status' | 'agentPhase' | 'git'> | null;
   lifecycle?: Pick<WorkAgentLifecycle, 'canResumeSession'> | null;
   workspace?: Pick<WorkspaceInfo, 'exists'> | null;
   hasPlan: boolean;
@@ -158,7 +159,7 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
   const { reviewStatus, agent, lifecycle, workspace } = input;
   const merged = input.isMerged === true || reviewStatus?.mergeStatus === 'merged';
   const agentRunning = !!agent && agent.status !== 'stopped' && agent.status !== 'failed' && agent.status !== 'dead';
-  const noAgentOrStopped = !agent || agent.status === 'stopped';
+  const noAgentOrStopped = !agent || agent.status === 'stopped' || agent.status === 'failed' || agent.status === 'dead';
   const isResume = noAgentOrStopped && lifecycle?.canResumeSession === true;
 
   const stuck = isReviewPipelineStuck(reviewStatus ?? undefined);
@@ -271,13 +272,11 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
   if (input.hasInference) secondary.push('inference');
   if (input.hasDiscussions) secondary.push('discussions');
   if (input.hasTranscripts) secondary.push('transcripts');
+  if (agent?.git) secondary.push('syncMain');
   secondary.push('statusReview', 'syncDiscussions', 'upload');
 
   // ── Danger zone (always overflow — shown via "…" menu) ────────────────────
   if (!merged && state !== 'merged' && state !== 'done' && state !== 'canceled') {
-    if (input.issueCanonicalState === 'done' || input.issueCanonicalState === 'canceled') {
-      overflow.push('reopen');
-    }
     overflow.push('restartFromPlan');
     if (input.issueCanonicalState !== 'done' && input.issueCanonicalState !== 'canceled') {
       overflow.push('resetIssue');

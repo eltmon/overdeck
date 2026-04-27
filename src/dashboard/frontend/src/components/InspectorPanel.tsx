@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { COMMAND_DECK_SURFACE_REGISTRY } from '../lib/commandDeckSurfaceRegistry';
 import {
   X,
   Terminal,
@@ -78,6 +79,8 @@ function formatTokens(tokens: number): string {
   if (tokens >= 1000) return `${(tokens / 1000).toFixed(1)}K`;
   return tokens.toString();
 }
+
+void COMMAND_DECK_SURFACE_REGISTRY;
 
 export type { ReviewButtonState } from './inspector/utils';
 export { getReviewButtonState } from './inspector/utils';

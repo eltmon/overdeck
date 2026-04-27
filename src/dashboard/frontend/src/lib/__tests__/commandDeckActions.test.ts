@@ -9,6 +9,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   getZoneAActions,
   getZoneBActions,
@@ -16,13 +18,14 @@ import {
   type ActionKey,
   type ZoneAInput,
 } from '../commandDeckActions';
+import { COMMAND_DECK_PARITY_SURFACES, COMMAND_DECK_SURFACE_REGISTRY } from '../commandDeckSurfaceRegistry';
 
 const ALL_ACTION_KEYS: readonly ActionKey[] = [
   'merge', 'reviewTest', 'recover', 'stopAgent',
   'startAgent', 'resumeSession', 'resetSession',
   'createWorkspace', 'copySettings',
   'beads', 'vbrief', 'state', 'prd', 'inference',
-  'discussions', 'transcripts', 'upload', 'syncDiscussions', 'statusReview',
+  'discussions', 'transcripts', 'upload', 'syncDiscussions', 'syncMain', 'statusReview',
   'reopen', 'restartFromPlan', 'resetIssue', 'cancel',
   'stopSession', 'viewTerminal',
 ];
@@ -40,6 +43,111 @@ const baseZoneA: ZoneAInput = {
   issueCanonicalState: 'in_progress',
   isMerged: false,
 };
+
+const agentWithGit = {
+  status: 'stopped' as const,
+  git: {
+    branch: 'feature/pan-867',
+    uncommittedFiles: 0,
+    latestCommit: 'abc123 test commit',
+  },
+};
+
+const failedAgentNoWorkspace = {
+  status: 'failed' as const,
+};
+
+const surfaceFiles = Object.fromEntries(
+  COMMAND_DECK_PARITY_SURFACES.map(({ surface, file }) => [surface, resolve(process.cwd(), file)])
+) as Record<(typeof COMMAND_DECK_PARITY_SURFACES)[number]['surface'], string>;
+
+function getSourceActions(): ActionKey[] {
+  return COMMAND_DECK_SURFACE_REGISTRY.map((entry) => entry.actionKey);
+}
+
+function assertSurfaceImportsRegistry(surface: keyof typeof surfaceFiles) {
+  const source = readFileSync(surfaceFiles[surface], 'utf-8');
+  expect(source).toContain('COMMAND_DECK_SURFACE_REGISTRY');
+}
+
+function getCommandDeckReachableActions(): Set<ActionKey> {
+  const reached = new Set<ActionKey>();
+
+  for (const layout of [
+    getZoneAActions(baseZoneA),
+    getZoneAActions({
+      ...baseZoneA,
+      hasPlan: true,
+      beadsCount: 3,
+      hasInference: true,
+      hasDiscussions: true,
+      hasTranscripts: true,
+      agent: agentWithGit,
+    }),
+    getZoneAActions({
+      ...baseZoneA,
+      issueCanonicalState: 'done',
+    }),
+    getZoneAActions({
+      ...baseZoneA,
+      issueCanonicalState: 'canceled',
+    }),
+    getZoneAActions({
+      ...baseZoneA,
+      agent: { status: 'running' },
+    }),
+    getZoneAActions({
+      ...baseZoneA,
+      agent: { status: 'stopped' },
+      lifecycle: { canResumeSession: true },
+      workspace: { exists: true },
+    }),
+    getZoneAActions({
+      ...baseZoneA,
+      agent: { status: 'stopped' },
+      lifecycle: { canResumeSession: false },
+      workspace: { exists: false },
+    }),
+    getZoneAActions({
+      ...baseZoneA,
+      agent: failedAgentNoWorkspace,
+      lifecycle: { canResumeSession: false },
+      workspace: { exists: false },
+    }),
+    getZoneAActions({
+      ...baseZoneA,
+      reviewStatus: {
+        issueId: 'PAN-830',
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        mergeStatus: 'pending',
+        readyForMerge: true,
+        updatedAt: '2026-04-26T00:00:00Z',
+      },
+    }),
+    getZoneAActions({
+      ...baseZoneA,
+      reviewStatus: {
+        issueId: 'PAN-830',
+        reviewStatus: 'failed',
+        testStatus: 'pending',
+        mergeStatus: 'pending',
+        readyForMerge: false,
+        updatedAt: '2026-04-26T00:00:00Z',
+      },
+    }),
+  ]) {
+    for (const k of flattenActions(layout)) reached.add(k);
+  }
+
+  for (const k of flattenActions(getZoneBActions({
+    presence: 'active', type: 'work', hasTerminal: true,
+  }))) {
+    reached.add(k);
+  }
+
+  return reached;
+}
 
 describe('getZoneAActions', () => {
   it('default state (no agent, no review, no plan) shows fresh-start basics', () => {
@@ -119,6 +227,17 @@ describe('getZoneAActions', () => {
     expect(layout.secondary).not.toContain('resetSession');
   });
 
+  it('failed agent with no workspace still surfaces startAgent + createWorkspace', () => {
+    const layout = getZoneAActions({
+      ...baseZoneA,
+      agent: failedAgentNoWorkspace,
+      lifecycle: { canResumeSession: false },
+      workspace: { exists: false },
+    });
+    expect(layout.primary).toContain('startAgent');
+    expect(layout.secondary).toContain('createWorkspace');
+  });
+
   it('hasPlan + beadsCount surfaces beads + vbrief', () => {
     const layout = getZoneAActions({
       ...baseZoneA,
@@ -136,6 +255,14 @@ describe('getZoneAActions', () => {
     expect(layout.secondary).toContain('statusReview');
     expect(layout.secondary).toContain('syncDiscussions');
     expect(layout.secondary).toContain('upload');
+  });
+
+  it('surfaces syncMain when the agent has git metadata', () => {
+    const layout = getZoneAActions({
+      ...baseZoneA,
+      agent: agentWithGit,
+    });
+    expect(layout.secondary).toContain('syncMain');
   });
 
   it('inference / discussions / transcripts only surface when present', () => {
@@ -209,128 +336,20 @@ describe('getZoneBActions', () => {
 
 describe('parity smoke (master coverage)', () => {
   it('every ActionKey is reachable from at least one realistic state', () => {
-    // Generate the union of all action keys produced across a representative
-    // matrix of states. If any key in ALL_ACTION_KEYS isn't produced, the test
-    // tells us so we can add either a missing branch in the mapper or a missing
-    // test case here.
-    const reached = new Set<ActionKey>();
-
-    // Default + plan + artifacts + done (gives most artifact + reopen keys).
-    for (const layout of [
-      getZoneAActions(baseZoneA),
-      getZoneAActions({
-        ...baseZoneA,
-        hasPlan: true,
-        beadsCount: 3,
-        hasInference: true,
-        hasDiscussions: true,
-        hasTranscripts: true,
-      }),
-      getZoneAActions({
-        ...baseZoneA,
-        issueCanonicalState: 'done',
-      }),
-    ]) {
-      for (const k of flattenActions(layout)) reached.add(k);
-    }
-
-    // Workspace lifecycle states: running, stopped+resumable, stopped+fresh, no-workspace.
-    for (const layout of [
-      getZoneAActions({ ...baseZoneA, agent: { status: 'running' } }),
-      getZoneAActions({
-        ...baseZoneA,
-        agent: { status: 'stopped' },
-        lifecycle: { canResumeSession: true },
-        workspace: { exists: true },
-      }),
-      getZoneAActions({
-        ...baseZoneA,
-        agent: { status: 'stopped' },
-        lifecycle: { canResumeSession: false },
-        workspace: { exists: false },
-      }),
-    ]) {
-      for (const k of flattenActions(layout)) reached.add(k);
-    }
-
-    // Pipeline states: ready-to-merge, failed/blocked.
-    for (const layout of [
-      getZoneAActions({
-        ...baseZoneA,
-        reviewStatus: {
-          issueId: 'PAN-830',
-          reviewStatus: 'passed',
-          testStatus: 'passed',
-          mergeStatus: 'pending',
-          readyForMerge: true,
-          updatedAt: '2026-04-26T00:00:00Z',
-        },
-      }),
-      getZoneAActions({
-        ...baseZoneA,
-        reviewStatus: {
-          issueId: 'PAN-830',
-          reviewStatus: 'failed',
-          testStatus: 'pending',
-          mergeStatus: 'pending',
-          readyForMerge: false,
-          updatedAt: '2026-04-26T00:00:00Z',
-        },
-      }),
-    ]) {
-      for (const k of flattenActions(layout)) reached.add(k);
-    }
-
-    // Zone B — active session with terminal.
-    for (const k of flattenActions(getZoneBActions({
-      presence: 'active', type: 'work', hasTerminal: true,
-    }))) {
-      reached.add(k);
-    }
-
+    const reached = getCommandDeckReachableActions();
     const missing = ALL_ACTION_KEYS.filter((k) => !reached.has(k));
     expect(missing).toEqual([]);
   });
 
-  it('actions from existing surfaces (KanbanBoard, InspectorPanel) are present in Command Deck output', () => {
-    // Map of surface-exposed actions → the canonical ActionKey they correspond to.
-    // This ensures drift detection: if a surface adds a new action not wired into
-    // the Command Deck, the test fails.
-    const surfaceActions: Array<{ name: string; key: ActionKey; find(): ActionKey[] }> = [
-      { name: 'MergeButton', key: 'merge', find: () => flattenActions(getZoneAActions({ ...baseZoneA, reviewStatus: { issueId: 'PAN-830', reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'pending', readyForMerge: true, updatedAt: '2026-04-26T00:00:00Z' } })) },
-      { name: 'StopAgentButton', key: 'stopAgent', find: () => flattenActions(getZoneAActions({ ...baseZoneA, agent: { status: 'running' } })) },
-      { name: 'RecoverButton', key: 'recover', find: () => flattenActions(getZoneAActions({ ...baseZoneA, reviewStatus: { issueId: 'PAN-830', reviewStatus: 'failed', testStatus: 'pending', mergeStatus: 'pending', readyForMerge: false, updatedAt: '2026-04-26T00:00:00Z' } })) },
-      { name: 'StartAgent', key: 'startAgent', find: () => flattenActions(getZoneAActions({ ...baseZoneA, agent: { status: 'stopped' }, lifecycle: { canResumeSession: false }, workspace: { exists: false } })) },
-      { name: 'ResumeSession', key: 'resumeSession', find: () => flattenActions(getZoneAActions({ ...baseZoneA, agent: { status: 'stopped' }, lifecycle: { canResumeSession: true }, workspace: { exists: true } })) },
-      { name: 'ResetSession', key: 'resetSession', find: () => flattenActions(getZoneAActions({ ...baseZoneA, agent: { status: 'stopped' }, lifecycle: { canResumeSession: true }, workspace: { exists: true } })) },
-      { name: 'CreateWorkspace', key: 'createWorkspace', find: () => flattenActions(getZoneAActions({ ...baseZoneA, agent: { status: 'stopped' }, lifecycle: { canResumeSession: false }, workspace: { exists: false } })) },
-      { name: 'CopySettings', key: 'copySettings', find: () => flattenActions(getZoneAActions({ ...baseZoneA, agent: { status: 'stopped' }, lifecycle: { canResumeSession: true }, workspace: { exists: true } })) },
-      { name: 'ReviewTest', key: 'reviewTest', find: () => flattenActions(getZoneAActions({ ...baseZoneA, reviewStatus: { issueId: 'PAN-830', reviewStatus: 'failed', testStatus: 'pending', mergeStatus: 'pending', readyForMerge: false, updatedAt: '2026-04-26T00:00:00Z' } })) },
-      { name: 'Beads', key: 'beads', find: () => flattenActions(getZoneAActions({ ...baseZoneA, hasPlan: true, beadsCount: 3 })) },
-      { name: 'vBrief', key: 'vbrief', find: () => flattenActions(getZoneAActions({ ...baseZoneA, hasPlan: true })) },
-      { name: 'State', key: 'state', find: () => flattenActions(getZoneAActions(baseZoneA)) },
-      { name: 'PRD', key: 'prd', find: () => flattenActions(getZoneAActions(baseZoneA)) },
-      { name: 'Inference', key: 'inference', find: () => flattenActions(getZoneAActions({ ...baseZoneA, hasInference: true })) },
-      { name: 'Discussions', key: 'discussions', find: () => flattenActions(getZoneAActions({ ...baseZoneA, hasDiscussions: true })) },
-      { name: 'Transcripts', key: 'transcripts', find: () => flattenActions(getZoneAActions({ ...baseZoneA, hasTranscripts: true })) },
-      { name: 'Upload', key: 'upload', find: () => flattenActions(getZoneAActions(baseZoneA)) },
-      { name: 'SyncDiscussions', key: 'syncDiscussions', find: () => flattenActions(getZoneAActions(baseZoneA)) },
-      { name: 'StatusReview', key: 'statusReview', find: () => flattenActions(getZoneAActions(baseZoneA)) },
-      { name: 'Reopen', key: 'reopen', find: () => flattenActions(getZoneAActions({ ...baseZoneA, issueCanonicalState: 'done' })) },
-      { name: 'RestartFromPlan', key: 'restartFromPlan', find: () => flattenActions(getZoneAActions(baseZoneA)) },
-      { name: 'ResetIssue', key: 'resetIssue', find: () => flattenActions(getZoneAActions(baseZoneA)) },
-      { name: 'Cancel', key: 'cancel', find: () => flattenActions(getZoneAActions(baseZoneA)) },
-      { name: 'StopSession', key: 'stopSession', find: () => flattenActions(getZoneBActions({ presence: 'active', type: 'work' })) },
-      { name: 'ViewTerminal', key: 'viewTerminal', find: () => flattenActions(getZoneBActions({ presence: 'active', type: 'work', hasTerminal: true })) },
-    ];
-
-    const missing: string[] = [];
-    for (const surface of surfaceActions) {
-      const actions = surface.find();
-      if (!actions.includes(surface.key)) {
-        missing.push(`${surface.name} → ${surface.key}`);
-      }
+  it('derives parity-managed actions from source surfaces via the shared registry', () => {
+    for (const { surface } of COMMAND_DECK_PARITY_SURFACES) {
+      assertSurfaceImportsRegistry(surface);
     }
+
+    const sourceActions = getSourceActions();
+    const reached = getCommandDeckReachableActions();
+    const missing = sourceActions.filter((key) => !reached.has(key));
+
     expect(missing).toEqual([]);
   });
 });
