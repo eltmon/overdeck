@@ -9,6 +9,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Square, Loader2, Terminal, Pause, Play, MoreHorizontal,
@@ -86,20 +87,21 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
   const restartMutation = useMutation({
     mutationFn: async () => {
       if (session.type !== 'work') throw new Error('Cannot restart non-work sessions');
-      // Stop current agent
       await fetch(`/api/agents/${session.sessionId}`, { method: 'DELETE' });
-      // Use the authoritative issueId prop; fall back to derivation only when unavailable
       const targetIssueId = issueId ?? session.sessionId.replace(/^agent-/, '').toUpperCase();
-      // Start new agent
       const res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ issueId: targetIssueId }),
       });
-      if (!res.ok) throw new Error('Failed to restart agent');
-      return res.json();
+      const data = await res.json().catch(() => ({})) as { error?: string; guardrails?: { warnings?: Array<{ message: string }> } };
+      if (!res.ok) throw new Error(data.error || 'Failed to restart agent');
+      return data;
     },
-    onSuccess: async () => {
+    onSuccess: async (data) => {
+      for (const warning of data.guardrails?.warnings ?? []) {
+        toast.warning(warning.message, { duration: 8000 });
+      }
       await refreshDashboardState(queryClient);
     },
   });

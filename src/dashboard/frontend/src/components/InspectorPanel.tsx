@@ -45,6 +45,18 @@ interface SessionCost {
   tokenCount?: number;
 }
 
+interface StartAgentGuardrailWarning {
+  message: string;
+}
+
+interface StartAgentResponse {
+  success?: boolean;
+  blocked?: boolean;
+  guardrails?: {
+    warnings?: StartAgentGuardrailWarning[];
+  };
+}
+
 interface ModelCostInfo {
   cost: number;
   tokens: number;
@@ -162,6 +174,16 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
   const durationHours = Math.floor(durationMins / 60);
   const duration = durationHours > 0 ? `${durationHours}h ${durationMins % 60}m` : `${durationMins}m`;
 
+  const showStartGuardrailWarnings = useCallback(async (data: StartAgentResponse | undefined) => {
+    const warnings = data?.guardrails?.warnings ?? [];
+    if (warnings.length === 0) return;
+    await showAlert({
+      title: 'Agent started with warnings',
+      message: warnings.map((warning) => `• ${warning.message}`).join('\n'),
+      variant: 'info',
+    });
+  }, [showAlert]);
+
   const { data: workspace } = useQuery<WorkspaceInfo>({
     queryKey: ['workspace', issueId],
     queryFn: async () => {
@@ -269,15 +291,16 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ issueId, projectId: issue?.project?.id, message: message || undefined }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to start agent');
+        throw new Error(data.error || 'Failed to start agent');
       }
-      return res.json();
+      return data as StartAgentResponse;
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
       void queryClient.invalidateQueries({ queryKey: ['agents'] });
       setTimeout(() => queryClient.invalidateQueries({ queryKey: ['agents'] }), 2000);
+      await showStartGuardrailWarnings(data);
     },
     onError: (err: Error) => {
       setAgentLaunchState(null);

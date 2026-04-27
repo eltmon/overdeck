@@ -105,6 +105,12 @@ export interface IssueCost {
   durationMinutes?: number;
 }
 
+interface StartAgentResponse {
+  guardrails?: {
+    warnings?: Array<{ message: string }>;
+  };
+}
+
 // Fetch costs for all issues
 async function fetchIssueCosts(): Promise<Record<string, IssueCost>> {
   try {
@@ -2668,6 +2674,16 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   const [isStarting, setIsStarting] = useState(false);
   const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const showStartGuardrailWarnings = useCallback(async (data: StartAgentResponse | undefined) => {
+    const warnings = data?.guardrails?.warnings ?? [];
+    if (warnings.length === 0) return;
+    await showAlert({
+      title: 'Agent started with warnings',
+      message: warnings.map((warning) => `• ${warning.message}`).join('\n'),
+      variant: 'info',
+    });
+  }, [showAlert]);
+
   const startAgentMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch('/api/agents', {
@@ -2675,25 +2691,28 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ issueId: issue.identifier }),
       });
+      const text = await res.text();
+      let data: StartAgentResponse = {};
+      try {
+        data = JSON.parse(text);
+      } catch {}
       if (!res.ok) {
-        // Handle non-JSON responses (e.g., Traefik 502 "Bad Gateway")
-        const text = await res.text();
         let message = `Failed to start agent (${res.status})`;
-        try {
-          const data = JSON.parse(text);
-          message = data.error || message;
-        } catch {
-          message = text.length < 200 ? text : message;
+        if (typeof (data as any).error === 'string' && (data as any).error.length > 0) {
+          message = (data as any).error;
+        } else if (text.length < 200) {
+          message = text;
         }
         throw new Error(message);
       }
-      return res.json();
+      return data;
     },
-    onSuccess: async () => {
+    onSuccess: async (data) => {
       setIsStarting(true);
       if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
       startTimeoutRef.current = setTimeout(() => setIsStarting(false), 60000);
       await refreshDashboardState(queryClient);
+      await showStartGuardrailWarnings(data);
     },
     onError: (err: Error) => {
       setIsStarting(false);

@@ -75,6 +75,8 @@ import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { getReviewStatus } from '../../../lib/review-status.js';
 import { emitActivityEntry } from '../../../lib/activity-logger.js';
 import { IssueLifecycle } from '../services/issue-lifecycle.js';
+import { ReadModelService } from '../read-model.js';
+import { getSystemHealthSnapshot, type HealthLeakedSpecialist, type SystemHealthSnapshot } from '../services/system-health-service.js';
 import {
   getClaudeProjectDir as getClaudeProjectDirShared,
   getActiveSessionPath as getActiveSessionPathShared,
@@ -193,6 +195,105 @@ async function getGitStatusAsync(workspacePath: string): Promise<{ branch: strin
   } catch {
     return null;
   }
+}
+
+interface SpawnGuardrailAdvisory {
+  severity: 'warning' | 'critical';
+  code: 'memory_pressure' | 'agent_capacity' | 'leaked_specialists';
+  message: string;
+}
+
+export interface SpawnGuardrailDecision {
+  blocked: boolean;
+  status: number;
+  error?: string;
+  hint?: string;
+  warnings: SpawnGuardrailAdvisory[];
+  health: Pick<SystemHealthSnapshot, 'severity' | 'summary' | 'reasons' | 'leakedSpecialists'>;
+}
+
+function formatLeakedSpecialistSummary(leaked: HealthLeakedSpecialist[]): string {
+  return leaked
+    .slice(0, 3)
+    .map((item) => `${item.name} (${item.currentIssue})`)
+    .join(', ');
+}
+
+export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuardrailDecision {
+  const warnings: SpawnGuardrailAdvisory[] = [];
+  const availableGb = Math.round((health.summary.availableMemoryBytes / (1024 ** 3)) * 10) / 10;
+  const workAgentCount = health.summary.workAgentCount;
+  const leakedSpecialists = health.leakedSpecialists;
+  const hardWorkAgentLimit = Number(process.env['PAN_HEALTH_MAX_WORK_AGENTS'] ?? 6);
+  const warnWorkAgentLimit = Math.max(1, hardWorkAgentLimit - 1);
+
+  if (health.summary.availableMemoryBytes <= health.thresholds.memoryAvailableCriticalBytes) {
+    warnings.push({
+      severity: 'critical',
+      code: 'memory_pressure',
+      message: `Available RAM is critically low (${availableGb} GB).`,
+    });
+  } else if (health.summary.availableMemoryBytes <= health.thresholds.memoryAvailableWarningBytes) {
+    warnings.push({
+      severity: 'warning',
+      code: 'memory_pressure',
+      message: `Available RAM is tight (${availableGb} GB).`,
+    });
+  }
+
+  if (workAgentCount >= hardWorkAgentLimit) {
+    warnings.push({
+      severity: 'critical',
+      code: 'agent_capacity',
+      message: `Work agent count is at the limit (${workAgentCount}/${hardWorkAgentLimit}).`,
+    });
+  } else if (workAgentCount >= warnWorkAgentLimit) {
+    warnings.push({
+      severity: 'warning',
+      code: 'agent_capacity',
+      message: `Work agent count is high (${workAgentCount}/${hardWorkAgentLimit}).`,
+    });
+  }
+
+  if (leakedSpecialists.length > 0) {
+    warnings.push({
+      severity: workAgentCount >= hardWorkAgentLimit || health.summary.availableMemoryBytes <= health.thresholds.memoryAvailableCriticalBytes ? 'critical' : 'warning',
+      code: 'leaked_specialists',
+      message: `Leaked specialist sessions detected: ${formatLeakedSpecialistSummary(leakedSpecialists)}${leakedSpecialists.length > 3 ? `, +${leakedSpecialists.length - 3} more` : ''}.`,
+    });
+  }
+
+  const blockingWarnings = warnings.filter((warning) => warning.severity === 'critical');
+  if (blockingWarnings.length > 0) {
+    const hasLeakedSpecialists = leakedSpecialists.length > 0;
+    return {
+      blocked: true,
+      status: 429,
+      error: blockingWarnings[0]?.message ?? 'System health is blocking new agent spawns.',
+      hint: hasLeakedSpecialists
+        ? 'Clean up leaked specialist sessions first, then retry the spawn.'
+        : 'Reduce memory pressure or active work-agent count before retrying.',
+      warnings,
+      health: {
+        severity: health.severity,
+        summary: health.summary,
+        reasons: health.reasons,
+        leakedSpecialists: health.leakedSpecialists,
+      },
+    };
+  }
+
+  return {
+    blocked: false,
+    status: 200,
+    warnings,
+    health: {
+      severity: health.severity,
+      summary: health.summary,
+      reasons: health.reasons,
+      leakedSpecialists: health.leakedSpecialists,
+    },
+  };
 }
 
 // Shared enrichment utilities (PAN-440) — aliases for readability
@@ -1362,6 +1463,7 @@ const postAgentsRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
     const lifecycle = yield* IssueLifecycle;
+    const readModel = yield* ReadModelService;
 
     const { issueId, projectId } = body as any;
 
@@ -1552,6 +1654,21 @@ const postAgentsRoute = HttpRouter.add(
       }, { status: 422 });
     }
 
+    const health = yield* readModel.getSnapshot.pipe(
+      Effect.flatMap((snapshot) => Effect.promise(() => getSystemHealthSnapshot(snapshot))),
+    );
+    const spawnGuardrails = evaluateSpawnGuardrails(health);
+    if (spawnGuardrails.blocked) {
+      return jsonResponse({
+        success: false,
+        blocked: true,
+        skipped: true,
+        error: spawnGuardrails.error,
+        hint: spawnGuardrails.hint,
+        guardrails: spawnGuardrails,
+      }, { status: spawnGuardrails.status });
+    }
+
     if (planningDir) {
       // Commit planning artifacts before handing off to the work agent.
       // The entire block is best-effort — never let git errors abort the agent start.
@@ -1635,6 +1752,7 @@ const postAgentsRoute = HttpRouter.add(
         vmName: workspaceMetadata.vmName,
         agentId: state.id,
         projectPath,
+        guardrails: spawnGuardrails,
       });
     }
 
@@ -1942,6 +2060,7 @@ const postAgentsRoute = HttpRouter.add(
             containerActivityId,
             agentId: earlyAgentId,
             projectPath,
+            guardrails: spawnGuardrails,
           });
         }
       }
@@ -1999,6 +2118,7 @@ const postAgentsRoute = HttpRouter.add(
       message: `Starting agent for ${issueId}`,
       activityId,
       projectPath,
+      guardrails: spawnGuardrails,
     });
   })),
 );

@@ -235,6 +235,74 @@ export interface ResourcesSnapshot {
   updatedAt: string;
 }
 
+export interface SystemHealthAgentProcess {
+  id: string;
+  issueId: string;
+  kind: 'work' | 'planning' | 'specialist' | 'other';
+  status: string;
+  tmuxActive: boolean;
+  memoryBytes: number;
+  memoryGb: number;
+  currentIssue?: string;
+}
+
+export interface SystemHealthLeakedSpecialist {
+  name: string;
+  currentIssue: string;
+  reason: string;
+}
+
+export interface SystemHealthConsumer {
+  id: string;
+  label: string;
+  type: 'agent' | 'specialist' | 'container';
+  memoryBytes: number;
+  memoryGb: number;
+  cpuPercent?: number;
+  issueId?: string;
+  currentIssue?: string;
+  leaked?: boolean;
+}
+
+export interface SystemHealthSnapshot {
+  severity: 'normal' | 'warning' | 'critical';
+  updatedAt: string;
+  summary: {
+    cpuPercent: number;
+    loadAverage1m: number;
+    loadPerCore1m: number;
+    totalMemoryBytes: number;
+    usedMemoryBytes: number;
+    availableMemoryBytes: number;
+    memoryUsedPercent: number;
+    swapTotalBytes: number;
+    swapUsedBytes: number;
+    swapUsedPercent: number;
+    overcommitPercent: number;
+    agentCount: number;
+    workAgentCount: number;
+    planningAgentCount: number;
+    specialistSessionCount: number;
+    leakedSpecialistCount: number;
+    containerCount: number;
+    containerMemoryBytes: number;
+  };
+  thresholds: {
+    memoryAvailableWarningBytes: number;
+    memoryAvailableCriticalBytes: number;
+    swapUsedWarningPercent: number;
+    swapUsedCriticalPercent: number;
+    cpuLoadWarningPerCore: number;
+    cpuLoadCriticalPerCore: number;
+    overcommitWarningPercent: number;
+    overcommitCriticalPercent: number;
+  };
+  reasons: string[];
+  agents: SystemHealthAgentProcess[];
+  leakedSpecialists: SystemHealthLeakedSpecialist[];
+  topConsumers: SystemHealthConsumer[];
+}
+
 // State transition result
 export interface StateTransitionResult {
   success: boolean;

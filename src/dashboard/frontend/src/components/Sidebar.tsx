@@ -9,6 +9,7 @@ import {
 import { CloisterStatusBar } from './CloisterStatusBar';
 import { FreshnessIndicator } from './FreshnessIndicator';
 import { DeaconPauseToggle } from './DeaconPauseToggle';
+import { SystemHealthPill } from './SystemHealthPill';
 import { useTheme } from '../hooks/useTheme';
 import type { Tab } from './Header';
 
@@ -215,6 +216,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
                   <FreshnessIndicator />
                 </div>
               </div>
+              <SystemHealthPill />
               <div className="flex items-center gap-2">
                 <button
                   onClick={onSearchOpen}
@@ -293,6 +295,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
                     : <Hammer className="w-3.5 h-3.5" />}
                 </button>
               )}
+              <SystemHealthPill compact />
               <DeaconPauseToggle compact />
               <button
                 onClick={toggleCollapsed}

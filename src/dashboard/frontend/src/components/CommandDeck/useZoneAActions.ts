@@ -8,7 +8,7 @@
  * without being coupled to the inspector's broader data dependencies.
  */
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { Agent, Issue, WorkAgentLifecycle } from '../../types';
@@ -20,6 +20,12 @@ interface PlanningState {
   hasBeads: boolean;
   beadsCount: number;
   planningComplete: boolean;
+}
+
+interface StartAgentResponse {
+  guardrails?: {
+    warnings?: Array<{ message: string }>;
+  };
 }
 
 export interface ZoneAActionsState {
@@ -103,6 +109,13 @@ export function useZoneAActions(
     staleTime: 15000,
   });
 
+  const showStartGuardrailWarnings = useCallback((data: StartAgentResponse | undefined) => {
+    const warnings = data?.guardrails?.warnings ?? [];
+    for (const warning of warnings) {
+      toast.warning(warning.message, { duration: 8000 });
+    }
+  }, []);
+
   const startAgentMutation = useMutation({
     mutationFn: async (message?: string) => {
       const shouldResume = !!(agent && agent.status === 'stopped' && lifecycle?.canResumeSession);
@@ -126,15 +139,16 @@ export function useZoneAActions(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ issueId, projectId: issue?.project?.id, message: message || undefined }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Failed to start agent');
+        throw new Error(data.error || 'Failed to start agent');
       }
-      return res.json();
+      return data as StartAgentResponse;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['agents'] });
       setTimeout(() => queryClient.invalidateQueries({ queryKey: ['agents'] }), 2000);
+      showStartGuardrailWarnings(data);
     },
     onError: (err: Error) => {
       setAgentLaunchState(null);

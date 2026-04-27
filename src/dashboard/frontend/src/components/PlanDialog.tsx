@@ -50,6 +50,12 @@ interface PlanningStatus {
   hasCompletionMarker?: boolean;
 }
 
+interface StartAgentResponse {
+  guardrails?: {
+    warnings?: Array<{ message: string }>;
+  };
+}
+
 type Step = 'checking' | 'ready' | 'starting' | 'setting-up' | 'planning' | 'complete' | 'error';
 
 // Default for startDocker - can be overridden by localStorage
@@ -357,6 +363,13 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     },
   });
 
+  const showStartGuardrailWarnings = useCallback((data: StartAgentResponse | undefined) => {
+    const warnings = data?.guardrails?.warnings ?? [];
+    for (const warning of warnings) {
+      toast.warning(warning.message, { duration: 8000 });
+    }
+  }, []);
+
   // Start agent mutation - spawns work agent and updates status to "In Progress"
   const startAgentMutation = useMutation({
     mutationFn: async () => {
@@ -365,15 +378,16 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ issueId: issue.identifier, phase: 'implementation' }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json();
         throw new Error(data.error || 'Failed to start agent');
       }
-      return res.json();
+      return data as StartAgentResponse;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['agents'] });
       queryClient.invalidateQueries({ queryKey: ['issues'] });
+      showStartGuardrailWarnings(data);
       onComplete();
       onClose();
     },

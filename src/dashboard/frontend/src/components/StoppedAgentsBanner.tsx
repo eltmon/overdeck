@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { toast } from 'sonner';
 import { Play, X, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';
 import { useDashboardStore, selectAgentList } from '../lib/store';
 import { Agent } from '../types';
@@ -7,6 +8,12 @@ interface RestartResult {
   issueId: string;
   success: boolean;
   error?: string;
+}
+
+interface StartAgentResponse {
+  guardrails?: {
+    warnings?: Array<{ message: string }>;
+  };
 }
 
 export function StoppedAgentsBanner() {
@@ -80,11 +87,14 @@ export function StoppedAgentsBanner() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ issueId: agent.issueId }),
         });
+        const data = await res.json().catch(() => ({})) as StartAgentResponse & { error?: string };
         if (res.ok) {
+          for (const warning of data.guardrails?.warnings ?? []) {
+            toast.warning(`${agent.issueId}: ${warning.message}`, { duration: 8000 });
+          }
           restartResults.push({ issueId: agent.issueId, success: true });
         } else {
-          const err = await res.json().catch(() => ({}));
-          restartResults.push({ issueId: agent.issueId, success: false, error: err.error || res.statusText });
+          restartResults.push({ issueId: agent.issueId, success: false, error: data.error || res.statusText });
         }
       } catch (error) {
         restartResults.push({

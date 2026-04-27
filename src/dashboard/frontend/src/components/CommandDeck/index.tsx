@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Compass, Plus } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
@@ -30,6 +31,12 @@ interface ProjectData {
   name: string;
   path: string;
   features: ProjectFeature[];
+}
+
+interface StartAgentResponse {
+  guardrails?: {
+    warnings?: Array<{ message: string }>;
+  };
 }
 
 async function fetchProjects(): Promise<ProjectData[]> {
@@ -448,15 +455,17 @@ export function CommandDeck({
 
   const handleRestartSession = useCallback(async (sessionId: string, issueId: string) => {
     try {
-      // Step 1: stop current agent
       await fetch(`/api/agents/${sessionId}`, { method: 'DELETE' });
-      // Step 2: start a new agent for the same issue
       const res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ issueId }),
       });
-      if (!res.ok) throw new Error('Failed to restart agent');
+      const data = await res.json().catch(() => ({})) as StartAgentResponse & { error?: string };
+      if (!res.ok) throw new Error(data.error || 'Failed to restart agent');
+      for (const warning of data.guardrails?.warnings ?? []) {
+        toast.warning(warning.message, { duration: 8000 });
+      }
       await refreshDashboardState(queryClient);
     } catch {
       // Silently ignore — user can retry
