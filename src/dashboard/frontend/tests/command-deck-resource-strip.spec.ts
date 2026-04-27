@@ -19,9 +19,13 @@ const RESOURCE_ISSUES = [
     resourceSources: ['workspace', 'branch', 'tmux', 'vbrief', 'beads', 'pr', 'docker'],
     resourceDetails: {
       hasWorkspace: true,
+      workspacePaths: ['/tmp/workspaces/feature-pan-862'],
       localBranchCount: 1,
+      localBranchNames: ['feature/pan-862'],
       remoteBranchCount: 1,
+      remoteBranchNames: ['origin/feature/pan-862'],
       tmuxSessionCount: 2,
+      tmuxSessionNames: ['agent-pan-862', 'review-pan-862'],
       prs: [
         {
           number: 862,
@@ -41,6 +45,7 @@ const RESOURCE_ISSUES = [
       hasVbrief: true,
       hasBeads: true,
       dockerContainerCount: 1,
+      dockerContainerNames: ['pan-862-db'],
     },
   },
   {
@@ -60,21 +65,34 @@ const RESOURCE_ISSUES = [
     resourceSources: ['workspace', 'branch'],
     resourceDetails: {
       hasWorkspace: true,
+      workspacePaths: ['/tmp/workspaces/feature-pan-777'],
       localBranchCount: 1,
+      localBranchNames: ['feature/pan-777'],
       remoteBranchCount: 0,
+      remoteBranchNames: [],
       tmuxSessionCount: 0,
+      tmuxSessionNames: [],
       prs: [],
       hasVbrief: false,
       hasBeads: false,
       dockerContainerCount: 0,
+      dockerContainerNames: [],
     },
   },
 ];
 
 test.describe('Command Deck resource strip', () => {
   test('renders sanitized resource icons and hover details for resource-allocated issues', async ({ page }) => {
-    await page.route('**/api/issues/resource-allocated', (route) => {
-      route.fulfill({ json: RESOURCE_ISSUES });
+    await page.route('**/api/command-deck/projects', (route) => {
+      route.fulfill({
+        json: [
+          {
+            name: 'panopticon-cli',
+            path: 'panopticon-cli',
+            features: RESOURCE_ISSUES,
+          },
+        ],
+      });
     });
     await page.route('**/api/session-trees?**', (route) => {
       route.fulfill({ json: { trees: [] } });
@@ -117,16 +135,15 @@ test.describe('Command Deck resource strip', () => {
     await expect(pan862Row.getByTitle('docker: 1 container')).toBeVisible();
     await workspaceIcon.hover();
 
-    await expect(pan862Row.getByText('workspace allocated', { exact: true })).toBeVisible();
-    await expect(pan862Row.getByText('branches: 1 local · 1 remote', { exact: true })).toBeVisible();
-    await expect(pan862Row.getByText('tmux: 2 active sessions', { exact: true })).toBeVisible();
+    await expect(pan862Row.getByText('workspace: /tmp/workspaces/feature-pan-862', { exact: true })).toBeVisible();
+    await expect(pan862Row.getByText('branch (local): feature/pan-862', { exact: true })).toBeVisible();
+    await expect(pan862Row.getByText('branch (remote): origin/feature/pan-862', { exact: true })).toBeVisible();
+    await expect(pan862Row.getByText('tmux: agent-pan-862', { exact: true })).toBeVisible();
+    await expect(pan862Row.getByText('tmux: review-pan-862', { exact: true })).toBeVisible();
     await expect(pan862Row.getByText('vBRIEF present', { exact: true })).toBeVisible();
     await expect(pan862Row.getByText('beads present', { exact: true })).toBeVisible();
     await expect(pan862Row.getByText('PR: #862 PAN-862 main PR', { exact: true })).toBeVisible();
     await expect(pan862Row.getByText('PR: #863 PAN-862 draft PR', { exact: true })).toBeVisible();
-    await expect(pan862Row.getByText('docker: 1 running container', { exact: true })).toBeVisible();
-
-    await expect(page.getByText('/tmp/workspaces')).toHaveCount(0);
-    await expect(page.getByText('agent-pan-862')).toHaveCount(0);
+    await expect(pan862Row.getByText('docker: pan-862-db', { exact: true })).toBeVisible();
   });
 });

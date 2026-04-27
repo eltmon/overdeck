@@ -72,6 +72,7 @@ vi.mock('../styles/command-deck.module.css', () => ({
     featureResourceStrip: 'featureResourceStrip',
     featureResourceIcon: 'featureResourceIcon',
     featureResourcePopover: 'featureResourcePopover',
+    featureResourcePopoverOpenUpward: 'featureResourcePopoverOpenUpward',
     sessionList: 'sessionList',
     sessionNode: 'sessionNode',
     sessionNodeSelected: 'sessionNodeSelected',
@@ -82,6 +83,7 @@ function makeFeature(overrides?: Partial<ProjectFeature>): ProjectFeature {
   return {
     issueId: 'PAN-821',
     title: 'Test Feature',
+    projectName: 'test-project',
     branch: 'feature/pan-821',
     status: 'has_state',
     stateLabel: 'In Progress',
@@ -90,6 +92,23 @@ function makeFeature(overrides?: Partial<ProjectFeature>): ProjectFeature {
     hasPrd: true,
     hasState: true,
     isShadow: false,
+    isRally: false,
+    resourceSources: [],
+    resourceDetails: {
+      hasWorkspace: false,
+      workspacePaths: [],
+      localBranchCount: 0,
+      localBranchNames: [],
+      remoteBranchCount: 0,
+      remoteBranchNames: [],
+      tmuxSessionCount: 0,
+      tmuxSessionNames: [],
+      prs: [],
+      hasVbrief: false,
+      hasBeads: false,
+      dockerContainerCount: 0,
+      dockerContainerNames: [],
+    },
     ...overrides,
   };
 }
@@ -402,9 +421,13 @@ describe('FeatureItem', () => {
           resourceSources: ['workspace', 'branch', 'tmux', 'pr', 'docker', 'vbrief', 'beads'],
           resourceDetails: {
             hasWorkspace: true,
+            workspacePaths: ['/tmp/workspaces/feature-pan-821'],
             localBranchCount: 1,
+            localBranchNames: ['feature/pan-821'],
             remoteBranchCount: 1,
+            remoteBranchNames: ['origin/feature/pan-821'],
             tmuxSessionCount: 1,
+            tmuxSessionNames: ['agent-pan-821'],
             prs: [
               {
                 number: 123,
@@ -417,6 +440,7 @@ describe('FeatureItem', () => {
             hasVbrief: true,
             hasBeads: true,
             dockerContainerCount: 2,
+            dockerContainerNames: ['pan-821-db', 'pan-821-cache'],
           },
         })}
         isSelected={false}
@@ -428,12 +452,14 @@ describe('FeatureItem', () => {
     expect(screen.getByTitle('branch: local 1 · remote 1')).toBeInTheDocument();
     expect(screen.getByTitle('tmux: 1 session')).toBeInTheDocument();
     expect(screen.getByTitle('PR: 1 open')).toBeInTheDocument();
-    expect(screen.getByText('workspace allocated')).toBeInTheDocument();
-    expect(screen.getByText('branches: 1 local · 1 remote')).toBeInTheDocument();
-    expect(screen.getByText('tmux: 1 active session')).toBeInTheDocument();
+    expect(screen.getByText('workspace: /tmp/workspaces/feature-pan-821')).toBeInTheDocument();
+    expect(screen.getByText('branch (local): feature/pan-821')).toBeInTheDocument();
+    expect(screen.getByText('branch (remote): origin/feature/pan-821')).toBeInTheDocument();
+    expect(screen.getByText('tmux: agent-pan-821')).toBeInTheDocument();
     expect(screen.getByText('vBRIEF present')).toBeInTheDocument();
     expect(screen.getByText('beads present')).toBeInTheDocument();
     expect(screen.getByText('PR: #123 Test PR')).toBeInTheDocument();
-    expect(screen.getByText('docker: 2 running containers')).toBeInTheDocument();
+    expect(screen.getByText('docker: pan-821-db')).toBeInTheDocument();
+    expect(screen.getByText('docker: pan-821-cache')).toBeInTheDocument();
   });
 });

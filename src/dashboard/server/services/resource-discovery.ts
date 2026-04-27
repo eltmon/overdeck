@@ -26,13 +26,18 @@ export interface ResourcePullRequest {
 
 export interface ResourceDetails {
   hasWorkspace: boolean;
+  workspacePaths?: string[];
   localBranchCount: number;
+  localBranchNames?: string[];
   remoteBranchCount: number;
+  remoteBranchNames?: string[];
   tmuxSessionCount: number;
+  tmuxSessionNames?: string[];
   prs: ResourcePullRequest[];
   hasVbrief: boolean;
   hasBeads: boolean;
   dockerContainerCount: number;
+  dockerContainerNames?: string[];
 }
 
 export interface ResourceAllocatedIssue {
@@ -47,6 +52,10 @@ export interface ResourceAllocatedIssue {
   hasPrd: boolean;
   hasState: boolean;
   isShadow: boolean;
+  isRally: boolean;
+  childCount?: number;
+  completedCount?: number;
+  inProgressCount?: number;
   readyForMerge: boolean;
   rawTrackerState?: string;
   resourceSources: ResourceSource[];
@@ -91,6 +100,9 @@ interface TrackerIssueRecord {
   status?: string;
   rawTrackerState?: string;
   source?: string;
+  totalChildCount?: number;
+  completedChildCount?: number;
+  inProgressChildCount?: number;
 }
 
 interface GhPullRequest {
@@ -164,9 +176,13 @@ function sortPullRequests(prs: GhPullRequest[]): GhPullRequest[] {
 function summarizeResourceDetails(details: InternalResourceDetails): ResourceDetails {
   return {
     hasWorkspace: details.workspacePath !== null,
+    workspacePaths: details.workspacePath ? [details.workspacePath] : [],
     localBranchCount: details.localBranches.length,
+    localBranchNames: [...details.localBranches].sort(),
     remoteBranchCount: details.remoteBranches.length,
+    remoteBranchNames: [...details.remoteBranches].sort(),
     tmuxSessionCount: details.tmuxSessions.length,
+    tmuxSessionNames: [...details.tmuxSessions].sort(),
     prs: sortPullRequests(details.prs).map((pr) => ({
       number: pr.number,
       title: pr.title,
@@ -177,6 +193,7 @@ function summarizeResourceDetails(details: InternalResourceDetails): ResourceDet
     hasVbrief: details.vbriefPath !== null,
     hasBeads: details.beadsPath !== null,
     dockerContainerCount: details.dockerContainers.length,
+    dockerContainerNames: [...details.dockerContainers].sort(),
   };
 }
 
@@ -355,6 +372,7 @@ async function computeResourceAllocatedIssues(): Promise<ResourceAllocatedIssue[
     issue.title = tracker.title?.trim() || issue.title;
     issue.trackerState = typeof tracker.state === 'string' ? tracker.state : issue.trackerState;
     issue.rawTrackerState = tracker.rawTrackerState ?? issue.rawTrackerState;
+    issue.isRally = tracker.source === 'rally';
     issue.resourceSources.add('tracker');
   }
 
@@ -511,6 +529,10 @@ async function computeResourceAllocatedIssues(): Promise<ResourceAllocatedIssue[
         hasPrd: issue.hasPrd,
         hasState: issue.hasState,
         isShadow: issue.isShadow,
+        isRally: issue.isRally,
+        childCount: trackerIssues.get(issue.issueId)?.totalChildCount,
+        completedCount: trackerIssues.get(issue.issueId)?.completedChildCount,
+        inProgressCount: trackerIssues.get(issue.issueId)?.inProgressChildCount,
         readyForMerge: issue.readyForMerge,
         rawTrackerState: issue.rawTrackerState,
         resourceSources: [...issue.resourceSources].sort(),
@@ -560,6 +582,22 @@ export async function discoverResourceAllocatedIssues(): Promise<ResourceAllocat
 
 export async function discoverResourceAllocatedIssuesFresh(): Promise<ResourceAllocatedIssue[]> {
   return computeResourceAllocatedIssues();
+}
+
+export function sanitizeResourceAllocatedIssues(issues: ResourceAllocatedIssue[]): ResourceAllocatedIssue[] {
+  return issues.map((issue) => ({
+    ...issue,
+    resourceDetails: {
+      hasWorkspace: issue.resourceDetails.hasWorkspace,
+      localBranchCount: issue.resourceDetails.localBranchCount,
+      remoteBranchCount: issue.resourceDetails.remoteBranchCount,
+      tmuxSessionCount: issue.resourceDetails.tmuxSessionCount,
+      prs: issue.resourceDetails.prs,
+      hasVbrief: issue.resourceDetails.hasVbrief,
+      hasBeads: issue.resourceDetails.hasBeads,
+      dockerContainerCount: issue.resourceDetails.dockerContainerCount,
+    },
+  }));
 }
 
 export function groupResourceAllocatedIssuesByProject(issues: ResourceAllocatedIssue[]): Array<{

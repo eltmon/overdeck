@@ -334,12 +334,14 @@
 .featureResourcePopover {
   position: absolute;
   right: 0;
-  top: calc(100% + 4px);
+  bottom: calc(100% + 4px);
   display: none;
   flex-direction: column;
   gap: 2px;
   min-width: 220px;
   max-width: 360px;
+  max-height: 240px;
+  overflow: auto;
   padding: 6px 8px;
   border-radius: 6px;
   border: 1px solid var(--mc-border);

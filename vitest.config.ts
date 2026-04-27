@@ -13,7 +13,7 @@ export default defineConfig({
       // reconciler tests with real async I/O (sleep/retry) exhaust heap when parallelized.
       forks: { minForks: 1, maxForks: process.env.CI ? 1 : 4, singleFork: false },
     },
-    include: ['tests/**/*.test.ts', 'src/**/__tests__/**/*.test.ts'],
+    include: ['tests/**/*.test.ts', 'src/**/__tests__/**/*.test.ts', 'src/**/*.bench.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', 'src/dashboard/frontend/**'],
     coverage: {
       provider: 'v8',

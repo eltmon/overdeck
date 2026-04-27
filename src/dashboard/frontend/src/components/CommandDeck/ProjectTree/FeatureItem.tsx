@@ -96,6 +96,12 @@ function ResourceStrip({ feature }: { feature: ProjectFeature }) {
   if (resources.length === 0) return null;
 
   const details = feature.resourceDetails;
+  const workspaceLines = details?.workspacePaths ?? [];
+  const localBranchLines = details?.localBranchNames ?? [];
+  const remoteBranchLines = details?.remoteBranchNames ?? [];
+  const tmuxLines = details?.tmuxSessionNames ?? [];
+  const dockerLines = details?.dockerContainerNames ?? [];
+
   return (
     <span className={styles.featureResourceStrip}>
       {resources.map((source) => (
@@ -103,15 +109,14 @@ function ResourceStrip({ feature }: { feature: ProjectFeature }) {
       ))}
       {details && (
         <span className={styles.featureResourcePopover}>
-          {details.hasWorkspace && <span>workspace allocated</span>}
-          {(details.localBranchCount > 0 || details.remoteBranchCount > 0) && (
-            <span>branches: {details.localBranchCount} local · {details.remoteBranchCount} remote</span>
-          )}
-          {details.tmuxSessionCount > 0 && <span>tmux: {details.tmuxSessionCount} active session{details.tmuxSessionCount === 1 ? '' : 's'}</span>}
+          {workspaceLines.map((workspacePath) => <span key={`workspace-${workspacePath}`}>workspace: {workspacePath}</span>)}
+          {localBranchLines.map((branchName) => <span key={`local-${branchName}`}>branch (local): {branchName}</span>)}
+          {remoteBranchLines.map((branchName) => <span key={`remote-${branchName}`}>branch (remote): {branchName}</span>)}
+          {tmuxLines.map((sessionName) => <span key={`tmux-${sessionName}`}>tmux: {sessionName}</span>)}
           {details.hasVbrief && <span>vBRIEF present</span>}
           {details.hasBeads && <span>beads present</span>}
           {details.prs.map((pr) => <span key={`pr-${pr.number}`}>PR: #{pr.number} {pr.title}</span>)}
-          {details.dockerContainerCount > 0 && <span>docker: {details.dockerContainerCount} running container{details.dockerContainerCount === 1 ? '' : 's'}</span>}
+          {dockerLines.map((containerName) => <span key={`docker-${containerName}`}>docker: {containerName}</span>)}
         </span>
       )}
     </span>
