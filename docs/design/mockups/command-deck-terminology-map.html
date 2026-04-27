@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;800;900&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-container-high": "#222a3d",
+                    "on-primary": "#002e6a",
+                    "inverse-surface": "#dae2fd",
+                    "surface-variant": "#2d3449",
+                    "background": "#0b1326",
+                    "primary-fixed-dim": "#adc6ff",
+                    "secondary-container": "#ee9800",
+                    "secondary": "#ffb95f",
+                    "primary": "#adc6ff",
+                    "surface": "#0b1326",
+                    "error-container": "#93000a",
+                    "on-surface": "#dae2fd",
+                    "tertiary": "#4edea3",
+                    "primary-container": "#4d8eff",
+                    "surface-container-highest": "#2d3449",
+                    "outline-variant": "#424754",
+                    "inverse-primary": "#005ac2",
+                    "tertiary-container": "#00a572",
+                    "primary-fixed": "#d8e2ff",
+                    "surface-dim": "#0b1326",
+                    "on-error": "#690005",
+                    "on-tertiary-container": "#00311f",
+                    "surface-bright": "#31394d",
+                    "on-surface-variant": "#c2c6d6",
+                    "secondary-fixed": "#ffddb8",
+                    "on-primary-fixed": "#001a42",
+                    "surface-tint": "#adc6ff",
+                    "on-secondary-fixed": "#2a1700",
+                    "surface-container-low": "#131b2e",
+                    "on-tertiary-fixed-variant": "#005236",
+                    "on-secondary-container": "#5b3800",
+                    "error": "#ffb4ab",
+                    "on-secondary": "#472a00",
+                    "inverse-on-surface": "#283044",
+                    "secondary-fixed-dim": "#ffb95f",
+                    "surface-container-lowest": "#060e20",
+                    "surface-container": "#171f33",
+                    "on-tertiary": "#003824",
+                    "on-error-container": "#ffdad6",
+                    "on-background": "#dae2fd",
+                    "on-primary-container": "#00285d",
+                    "outline": "#8c909f",
+                    "on-secondary-fixed-variant": "#653e00",
+                    "tertiary-fixed-dim": "#4edea3",
+                    "tertiary-fixed": "#6ffbbe",
+                    "on-primary-fixed-variant": "#004395",
+                    "on-tertiary-fixed": "#002113"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Space Grotesk"],
+                    "display": ["Space Grotesk"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .schematic-grid {
+            background-image: radial-gradient(rgba(173, 198, 255, 0.1) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+        .callout-arrow::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 15px solid #adc6ff;
+            bottom: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body schematic-grid min-h-screen selection:bg-primary selection:text-on-primary">
+<!-- Top Navigation Anchor (Shared Component Mapping) -->
+<header class="bg-[#0b1326] text-[#adc6ff] font-['Space_Grotesk'] tracking-tighter uppercase font-bold border-b border-[#adc6ff]/15 shadow-[0_24px_48px_-12px_rgba(173,198,255,0.1)] flex justify-between items-center w-full px-6 py-4 max-w-[1920px] mx-auto fixed top-0 z-50">
+<div class="text-2xl font-black tracking-[-0.04em] text-[#adc6ff]">Panopticon Command Deck</div>
+<nav class="hidden md:flex gap-8 items-center">
+<span class="text-[#dae2fd]/60 hover:text-[#adc6ff] transition-colors duration-200 cursor-pointer">Terminologies</span>
+<span class="text-[#adc6ff] border-b-2 border-[#adc6ff] pb-1 cursor-pointer">Schematics</span>
+<span class="text-[#dae2fd]/60 hover:text-[#adc6ff] transition-colors duration-200 cursor-pointer">Analytics</span>
+<span class="text-[#dae2fd]/60 hover:text-[#adc6ff] transition-colors duration-200 cursor-pointer">System Logs</span>
+</nav>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-[#adc6ff]/60">notifications_active</span>
+<span class="material-symbols-outlined text-[#adc6ff]/60">settings</span>
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded-sm font-bold tracking-tight text-sm active:scale-[0.98] transition-transform">Deploy Signal</button>
+</div>
+</header>
+<main class="pt-24 pb-12 px-8 max-w-[1920px] mx-auto">
+<!-- Schematic Title -->
+<div class="mb-12 text-center">
+<h1 class="font-display text-7xl font-black tracking-tight text-primary uppercase">
+                COMMAND DECK TERMINOLOGY MAP
+            </h1>
+<p class="font-display text-xl text-tertiary font-bold tracking-[0.2em] mt-2">TECHNICAL ARCHITECTURE SCHEMATIC // VER 4.0.1</p>
+</div>
+<div class="flex gap-8 min-h-[1200px]">
+<!-- SIDEBAR: Projects/Conversations tree -->
+<aside class="w-[320px] flex-shrink-0 bg-surface-container-lowest border-4 border-primary p-6 relative">
+<div class="absolute -top-6 left-6 bg-primary text-on-primary px-6 py-1 font-display font-black text-2xl tracking-tighter">
+                    SIDEBAR
+                </div>
+<div class="mt-8 space-y-6 opacity-80">
+<div class="flex items-center gap-4 border-2 border-outline-variant p-4">
+<span class="material-symbols-outlined text-primary text-4xl">folder</span>
+<div class="h-4 w-32 bg-outline-variant rounded-full"></div>
+</div>
+<div class="ml-8 space-y-4">
+<div class="flex items-center gap-4 border-2 border-outline-variant/50 p-3">
+<span class="material-symbols-outlined text-secondary text-3xl">description</span>
+<div class="h-3 w-24 bg-outline-variant/50 rounded-full"></div>
+</div>
+<div class="flex items-center gap-4 border-2 border-outline-variant/50 p-3">
+<span class="material-symbols-outlined text-secondary text-3xl">description</span>
+<div class="h-3 w-28 bg-outline-variant/50 rounded-full"></div>
+</div>
+<div class="flex items-center gap-4 border-b-4 border-primary p-3 bg-primary/5">
+<span class="material-symbols-outlined text-primary text-3xl" style="font-variation-settings: 'FILL' 1;">chat_bubble</span>
+<div class="h-3 w-20 bg-primary/40 rounded-full"></div>
+</div>
+</div>
+<div class="flex items-center gap-4 border-2 border-outline-variant p-4">
+<span class="material-symbols-outlined text-primary text-4xl">folder</span>
+<div class="h-4 w-32 bg-outline-variant rounded-full"></div>
+</div>
+</div>
+<div class="absolute bottom-8 left-0 right-0 px-6">
+<div class="h-[2px] bg-primary/20 mb-6"></div>
+<div class="text-xs font-mono text-primary/60">SYSTEM_METRIC: 0x449FF2</div>
+</div>
+</aside>
+<!-- MAIN PANEL -->
+<div class="flex-grow flex flex-col gap-8">
+<!-- ZONE A: ISSUE HEADER -->
+<section class="h-48 bg-surface-container-low border-4 border-secondary p-8 relative flex items-center justify-between">
+<div class="absolute -top-6 left-12 bg-secondary text-on-secondary px-6 py-1 font-display font-black text-2xl tracking-tighter">
+                        ZONE A — ISSUE HEADER
+                    </div>
+<div class="flex items-center gap-8 w-full">
+<div class="h-12 w-96 bg-secondary/20 border-2 border-secondary/40 rounded-lg"></div>
+<div class="flex gap-4 ml-auto">
+<div class="h-10 w-24 bg-secondary border-2 border-secondary rounded-full"></div>
+<div class="h-10 w-24 bg-surface-variant border-2 border-secondary/40 rounded-full"></div>
+<div class="h-10 w-10 bg-secondary/10 border-2 border-secondary/40 rounded-sm"></div>
+</div>
+</div>
+</section>
+<!-- ZONE B: AGENT CONTEXT -->
+<section class="h-40 bg-surface-container-low border-4 border-tertiary p-8 relative flex items-center gap-12">
+<div class="absolute -top-6 left-12 bg-tertiary text-on-tertiary px-6 py-1 font-display font-black text-2xl tracking-tighter">
+                        ZONE B — AGENT CONTEXT
+                    </div>
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-tertiary/20 border-2 border-tertiary/50"></div>
+<div class="space-y-2">
+<div class="h-3 w-40 bg-tertiary/60 rounded-full"></div>
+<div class="h-2 w-24 bg-tertiary/30 rounded-full"></div>
+</div>
+</div>
+<div class="h-12 w-[2px] bg-tertiary/20"></div>
+<div class="flex gap-4">
+<div class="px-4 py-2 border-2 border-tertiary/40 font-mono text-tertiary text-sm">GPU_LOAD: 42%</div>
+<div class="px-4 py-2 border-2 border-tertiary/40 font-mono text-tertiary text-sm">LATENCY: 12ms</div>
+<div class="px-4 py-2 bg-tertiary/10 border-2 border-tertiary font-mono text-tertiary text-sm">ACTIVE_RUNTIME</div>
+</div>
+</section>
+<!-- ZONE C: MAIN BODY -->
+<section class="flex-grow bg-surface-container border-4 border-on-surface-variant p-12 relative">
+<div class="absolute -top-6 left-12 bg-on-surface-variant text-inverse-on-surface px-6 py-1 font-display font-black text-2xl tracking-tighter">
+                        ZONE C — MAIN BODY
+                    </div>
+<div class="grid grid-cols-2 gap-12 h-full items-center">
+<!-- CALLOUT BOX 1 -->
+<div class="relative group">
+<div class="absolute -top-16 left-1/2 -translate-x-1/2 bg-primary text-on-primary px-4 py-2 font-black text-lg callout-arrow">CALLOUT_01</div>
+<div class="border-4 border-primary bg-primary/5 p-10 h-[400px] flex flex-col justify-center items-center text-center">
+<h3 class="font-display text-5xl font-black text-primary leading-none uppercase mb-6">
+                                    agent-selected:<br/>CONVERSATION + COMPOSER
+                                </h3>
+<div class="w-full space-y-4 opacity-40">
+<div class="h-4 bg-primary/20 w-full rounded-full"></div>
+<div class="h-4 bg-primary/20 w-5/6 rounded-full"></div>
+<div class="h-32 border-2 border-primary/40 w-full mt-8 flex items-end p-4">
+<div class="h-10 w-full bg-primary/30 rounded-sm"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- CALLOUT BOX 2 -->
+<div class="relative group">
+<div class="absolute -top-16 left-1/2 -translate-x-1/2 bg-secondary text-on-secondary px-4 py-2 font-black text-lg callout-arrow" style="border-top-color: #ffb95f;">CALLOUT_02</div>
+<div class="border-4 border-secondary bg-secondary/5 p-10 h-[400px] flex flex-col justify-center items-center text-center">
+<h3 class="font-display text-5xl font-black text-secondary leading-none uppercase mb-6">
+                                    issue-selected:<br/>TABBED OVERVIEW / DASHBOARD
+                                </h3>
+<div class="w-full space-y-6 opacity-40">
+<div class="flex gap-4">
+<div class="h-8 w-20 bg-secondary/40 rounded-sm"></div>
+<div class="h-8 w-20 bg-secondary/20 rounded-sm"></div>
+<div class="h-8 w-20 bg-secondary/20 rounded-sm"></div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="h-32 border-2 border-secondary/40"></div>
+<div class="h-32 border-2 border-secondary/40"></div>
+</div>
+<div class="h-16 border-2 border-secondary/40"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Schematic Graphics -->
+<div class="absolute bottom-8 right-8 flex gap-2">
+<div class="w-4 h-4 bg-primary"></div>
+<div class="w-4 h-4 bg-secondary"></div>
+<div class="w-4 h-4 bg-tertiary"></div>
+<div class="w-4 h-4 bg-on-surface-variant"></div>
+</div>
+</section>
+</div>
+</div>
+<!-- System Status Footer Overlay -->
+<div class="fixed bottom-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-secondary to-tertiary opacity-50"></div>
+</main>
+<!-- Side Navigation Anchor (Shared Component Mapping) -->
+<aside class="hidden lg:flex flex-col h-screen w-16 fixed left-0 top-0 bg-[#0b1326] border-r border-[#adc6ff]/10 z-[60] pt-20 pb-8 items-center justify-between">
+<div class="flex flex-col gap-6">
+<div class="p-3 text-[#adc6ff] bg-[#adc6ff]/5 border-l-4 border-[#adc6ff] transition-all cursor-pointer">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+</div>
+<div class="p-3 text-[#dae2fd]/40 hover:bg-[#adc6ff]/10 hover:text-[#adc6ff] transition-all cursor-pointer">
+<span class="material-symbols-outlined">precision_manufacturing</span>
+</div>
+<div class="p-3 text-[#dae2fd]/40 hover:bg-[#adc6ff]/10 hover:text-[#adc6ff] transition-all cursor-pointer">
+<span class="material-symbols-outlined">lan</span>
+</div>
+<div class="p-3 text-[#dae2fd]/40 hover:bg-[#adc6ff]/10 hover:text-[#adc6ff] transition-all cursor-pointer">
+<span class="material-symbols-outlined">monitoring</span>
+</div>
+<div class="p-3 text-[#dae2fd]/40 hover:bg-[#adc6ff]/10 hover:text-[#adc6ff] transition-all cursor-pointer">
+<span class="material-symbols-outlined">history</span>
+</div>
+</div>
+<div class="flex flex-col gap-6">
+<span class="material-symbols-outlined text-[#dae2fd]/40 hover:text-[#adc6ff] cursor-pointer">menu_book</span>
+<span class="material-symbols-outlined text-[#dae2fd]/40 hover:text-[#adc6ff] cursor-pointer">build</span>
+</div>
+</aside>
+</body></html>
