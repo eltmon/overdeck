@@ -2,71 +2,59 @@
 specialist: verification-gate
 issueId: PAN-865
 outcome: failed
-timestamp: 2026-04-27T12:46:50Z
+timestamp: 2026-04-27T13:57:19Z
 ---
 
 VERIFICATION FAILED for PAN-865 (attempt 1/10):
 
 Failed check: test
 
-Verification FAILED at test (29238ms):
+Verification FAILED at test (30115ms):
 
- > aggregates sessions for active feature workspaces
-AssertionError: expected [] to have a length of 2 but got +0
+plemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
 
-- Expected
-+ Received
+stderr | src/hooks/__tests__/useNow.test.ts
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
 
-- 2
-+ 0
+stderr | src/hooks/useResourceStats.test.ts
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
 
- ❯ tests/unit/dashboard/server/routes/projects.test.ts:110:27
-    108|     const tree = result as { projectKey: string; features: Array<{ iss…
-    109|     expect(tree.projectKey).toBe('panopticon-cli');
-    110|     expect(tree.features).toHaveLength(2);
-       |                           ^
-    111|     expect(tree.features[0]?.issueId).toBe('PAN-539');
-    112|     expect(tree.features[1]?.issueId).toBe('PAN-821');
+stderr | src/__tests__/pipeline-state.test.ts
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 
- FAIL |root|  tests/unit/dashboard/server/routes/projects.test.ts > fetchProjectSessionTree > resolves feature title from PLANNING_PROMPT.md when available
-AssertionError: expected [] to have a length of 1 but got +0
+ FAIL |root|  src/dashboard/server/routes/__tests__/reviewer-tree.test.ts > buildReviewerNodes (PAN-830) > uses round metadata latestStatus when available
+AssertionError: expected 'error' to be 'failed' // Object.is equality
 
-- Expected
-+ Received
+Expected: "failed"
+Received: "error"
 
-- 1
-+ 0
+ ❯ src/dashboard/server/routes/__tests__/reviewer-tree.test.ts:242:36
+    240| 
+    241|     const correctnessNode = nodes.find(n => n.role === 'correctness')!;
+    242|     expect(correctnessNode.status).toBe('failed');
+       |                                    ^
+    243|     expect(correctnessNode.roundMetadata).toBeDefined();
+    244|     expect(correctnessNode.roundMetadata!.latestRound).toBe(1);
 
- ❯ tests/unit/dashboard/server/routes/projects.test.ts:195:27
-    193|     const result = await fetchProjectSessionTree('panopticon-cli');
-    194|     const tree = result as { features: Array<{ issueId: string; title:…
-    195|     expect(tree.features).toHaveLength(1);
-       |                           ^
-    196|     expect(tree.features[0]?.issueId).toBe('PAN-123');
-    197|     expect(tree.features[0]?.title).toBe('Implement Command Deck Sessi…
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+ FAIL |root|  src/dashboard/server/routes/__tests__/reviewer-tree.test.ts > buildReviewerNodes (PAN-830) > exposes roundMetadata with sorted history when multiple rounds present
+AssertionError: expected 'stopped' to be 'completed' // Object.is equality
 
- FAIL |panopticon-dashboard|  src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx > FeatureItem > auto-selects best session when row is clicked and sessions exist
-AssertionError: expected "spy" to be called with arguments: [ 'PAN-821', 'active-1' ]
+Expected: "completed"
+Received: "stopped"
 
-Received: 
+ ❯ src/dashboard/server/routes/__tests__/reviewer-tree.test.ts:272:34
+    270| 
+    271|     const synthesisNode = nodes.find(n => n.role === 'synthesis')!;
+    272|     expect(synthesisNode.status).toBe('completed');
+       |                                  ^
+    273|     expect(synthesisNode.roundMetadata!.roundCount).toBe(2);
+    274|     expect(synthesisNode.roundMetadata!.latestRound).toBe(2);
 
-
-
-Number of calls: 0
-
- ❯ src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx:294:29
-    292|     fireEvent.click(screen.getAllByText('PAN-821')[0]!);
-    293|     expect(onSelect).toHaveBeenCalledTimes(1);
-    294|     expect(onSelectSession).toHaveBeenCalledWith('PAN-821', 'active-1'…
-       |                             ^
-    295|   });
-    296| 
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
 
 
 
