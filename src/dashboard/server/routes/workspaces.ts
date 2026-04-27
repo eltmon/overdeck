@@ -4715,6 +4715,65 @@ const getMergeQueueRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/internal/pipeline/notify ────────────────────────────────
+//
+// Cross-process bridge for `notifyPipeline()` (PAN-891).
+//
+// `notifyPipeline` is an in-process handler registry; only the dashboard server
+// registers a handler. CLI processes (e.g. `pan review run`) write to the
+// shared SQLite review-status table but their `notifyPipeline()` calls are
+// no-ops in their own process. This endpoint lets them poke the dashboard so
+// it re-emits the `review.status_changed` domain event with the latest DB
+// snapshot (which the in-process handler enriches from live tmux sessions).
+//
+// Body: `{ type: 'status_changed', issueId: string }`. The body intentionally
+// does NOT carry a status payload — the server re-reads from SQLite to avoid
+// stale snapshots and races between writers.
+
+const postInternalPipelineNotifyRoute = HttpRouter.add(
+  'POST',
+  '/api/internal/pipeline/notify',
+  httpHandler(Effect.gen(function* () {
+    // Shared-secret check (PAN-891 review feedback). The dashboard binds 0.0.0.0
+    // by default, so this stateful endpoint must be unreachable without the
+    // server-issued token. Same token is read by CLI senders via getInternalToken().
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const { INTERNAL_TOKEN_HEADER, getInternalToken } = yield* Effect.promise(() =>
+      import('../../../lib/internal-token.js'),
+    );
+    const expected = getInternalToken();
+    if (!expected) {
+      return jsonResponse({ ok: false, error: 'internal token not configured' }, 503);
+    }
+    const headers = request.headers as Record<string, string | string[] | undefined>;
+    const raw = headers[INTERNAL_TOKEN_HEADER];
+    const provided = Array.isArray(raw) ? raw[0] : raw;
+    if (!provided || provided !== expected) {
+      return jsonResponse({ ok: false, error: 'forbidden' }, 403);
+    }
+
+    const body = yield* readJsonBody;
+    const { type, issueId } = body as { type?: string; issueId?: string };
+
+    if (type !== 'status_changed' || !issueId) {
+      return jsonResponse({ ok: false, error: 'expected { type: "status_changed", issueId }' }, 400);
+    }
+
+    const status = getReviewStatus(issueId);
+    if (!status) {
+      return jsonResponse({ ok: false, error: `no review status found for ${issueId}` }, 404);
+    }
+
+    // Re-enter the in-process pipeline handler — this triggers the same
+    // enrichment + event-store append path as direct in-process calls.
+    const { notifyPipeline } = yield* Effect.promise(() =>
+      import('../../../lib/pipeline-notifier.js'),
+    );
+    notifyPipeline({ type: 'status_changed', issueId, status });
+    return jsonResponse({ ok: true });
+  })),
+);
+
 export const workspacesRouteLayer = Layer.mergeAll(
   getWorkspaceRoute,
   postWorkspacesRoute,
@@ -4740,6 +4799,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   getWorkspaceTldrRoute,
   postWorkspaceRefreshTokenRoute,
   getMergeQueueRoute,
+  postInternalPipelineNotifyRoute,
 );
 
 export default workspacesRouteLayer;
