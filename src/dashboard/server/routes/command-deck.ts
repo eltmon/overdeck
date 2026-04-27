@@ -36,6 +36,7 @@ import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { SessionNodePresence } from '@panctl/contracts';
+import { deriveSessionPresence } from '../services/session-presence.js';
 import { findPrdAtStatus, type PrdLocation } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
 import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
@@ -92,9 +93,11 @@ const CLOSED_ISSUES_TTL_MS = 120_000; // 2 minutes
  *  Keyed by upper-cased issueId so concurrent issues don't share stale data. */
 const costCache = new Map<string, { timestamp: number; data: { totalCost: number; costByStage: Record<string, { cost: number; tokens: number }> } }>();
 const COST_CACHE_TTL_MS = 30_000; // 30 seconds
+const stashCountCache = new Map<string, { timestamp: number; count: number }>();
+const STASH_COUNT_CACHE_TTL_MS = 60_000; // 60 seconds
 
 /** Evict expired entries from a TTL cache Map to prevent unbounded growth. */
-function sweepExpired<T>(cache: Map<string, { timestamp: number; data: T }>, ttlMs: number): void {
+function sweepExpired<T extends { timestamp: number }>(cache: Map<string, T>, ttlMs: number): void {
   const cutoff = Date.now() - ttlMs;
   for (const [key, entry] of cache) {
     if (entry.timestamp < cutoff) {
@@ -158,41 +161,6 @@ function getProjectPath(issuePrefix?: string): string {
  */
 export { extractReviewerRole } from './reviewer-tree.js';
 
-/**
- * Derive session presence from runtime state, tmux session existence, and heartbeat.
- * Aligns with Cloister's stuck-detection signals (heartbeat freshness + runtime state).
- */
-async function derivePresence(
-  agentId: string,
-  rtState: { state: string } | null,
-  tmuxSessionNames: Set<string>,
-): Promise<SessionNodePresence> {
-  const hasTmux = tmuxSessionNames.has(agentId);
-  if (!hasTmux) return 'ended';
-
-  if (!rtState) return 'idle';
-
-  if (rtState.state === 'active') return 'active';
-  if (rtState.state === 'suspended') return 'suspended';
-  if (rtState.state === 'idle' || rtState.state === 'waiting-on-human') {
-    // Supplemental checks: heartbeat or output.log mtime within 5s indicates
-    // recent activity that may not yet be reflected in the in-process state mirror.
-    const heartbeatPath = join(homedir(), '.panopticon', 'heartbeats', `${agentId}.json`);
-    const hbStat = await stat(heartbeatPath).catch(() => null);
-    if (hbStat && (Date.now() - hbStat.mtime.getTime()) < 5000) {
-      return 'active';
-    }
-    const logPath = join(homedir(), '.panopticon', 'agents', agentId, 'output.log');
-    const logStat = await stat(logPath).catch(() => null);
-    if (logStat && (Date.now() - logStat.mtime.getTime()) < 5000) {
-      return 'active';
-    }
-    return 'idle';
-  }
-
-  return 'ended';
-}
-
 // resolveJsonlPath is imported from ./jsonl-resolver (PAN-830).
 
 // Read the request body as unknown JSON
@@ -213,10 +181,13 @@ const getMissionControlActivityRoute = HttpRouter.add(
   '/api/command-deck/activity/:issueId',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
+    const request = yield* HttpServerRequest.HttpServerRequest;
     const issueId = params['issueId'] ?? '';
+    const url = new URL(request.url, 'http://localhost');
+    const includeTranscripts = url.searchParams.get('summary') !== '1';
 
     const result = yield* Effect.tryPromise({
-      try: () => fetchActivityData(issueId),
+      try: () => fetchActivityDataWithContext(issueId, { includeTranscripts }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     return jsonResponse(result);
@@ -226,10 +197,11 @@ const getMissionControlActivityRoute = HttpRouter.add(
 export interface ActivityContext {
   tmuxSessionNames?: Set<string>;
   taskFileContents?: Map<string, string>;
+  includeTranscripts?: boolean;
 }
 
 export async function fetchActivityData(issueId: string): Promise<unknown> {
-  return fetchActivityDataWithContext(issueId, {});
+  return fetchActivityDataWithContext(issueId, { includeTranscripts: true });
 }
 
 export async function fetchActivityDataWithContext(
@@ -238,6 +210,7 @@ export async function fetchActivityDataWithContext(
 ): Promise<unknown> {
   const issueLower = issueId.toLowerCase();
   const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+  const includeTranscripts = context.includeTranscripts ?? true;
 
   // Use shared tmux session names if provided, else fetch once (PAN-821)
   const tmuxSessionNames = context.tmuxSessionNames ?? new Set<string>();
@@ -290,23 +263,25 @@ export async function fetchActivityDataWithContext(
       if (isPlanning) hasPlanningSection = true;
 
       let transcript = '';
-      try {
-        transcript = (await capturePaneAsync(checkId, 500)).trim();
-      } catch { /* agent may not be running */ }
+      if (includeTranscripts) {
+        try {
+          transcript = (await capturePaneAsync(checkId, 500)).trim();
+        } catch { /* agent may not be running */ }
 
-      if (!isPlanning && !transcript) {
-        const logText = await readOptional(join(agentDir, 'output.log'));
-        if (logText) transcript = logText;
-      }
+        if (!isPlanning && !transcript) {
+          const logText = await readOptional(join(agentDir, 'output.log'));
+          if (logText) transcript = logText;
+        }
 
-      if (isPlanning && !transcript) {
-        const projectPath = getProjectPath(issuePrefix);
-        const stateMdText = await readOptional(join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning', 'STATE.md'));
-        if (stateMdText) transcript = `PLANNING COMPLETE\n\n${stateMdText}`;
+        if (isPlanning && !transcript) {
+          const projectPath = getProjectPath(issuePrefix);
+          const stateMdText = await readOptional(join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning', 'STATE.md'));
+          if (stateMdText) transcript = `PLANNING COMPLETE\n\n${stateMdText}`;
+        }
       }
 
       const rtState = await getAgentRuntimeStateAsync(checkId);
-      const presence = await derivePresence(checkId, rtState, tmuxSessionNames);
+      const presence = await deriveSessionPresence(checkId, rtState, tmuxSessionNames);
 
       // Resolve JSONL path for conversation rendering (PAN-821)
       const jsonlPath = await resolveJsonlPath(checkId, workspacePath);
@@ -321,7 +296,7 @@ export async function fetchActivityDataWithContext(
         startedAt: state.startedAt || state.createdAt || new Date().toISOString(),
         duration: state.startedAt ? (() => {
           const ms = Date.now() - new Date(state.startedAt).getTime();
-          return isNaN(ms) ? null : Math.floor(ms / 1000);
+          return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
         })() : null,
         status: rtState?.state === 'active' ? 'running' : rtState?.state === 'suspended' ? 'completed' : (state.status || 'completed'),
         transcript: jsonlPath ? undefined : transcript,
@@ -344,7 +319,7 @@ export async function fetchActivityDataWithContext(
         type: 'legacy',
         sessionId,
         model: 'unknown',
-        startedAt: (fileStat?.birthtime && !isNaN(fileStat.birthtime.getTime()) ? fileStat.birthtime.toISOString() : undefined)
+        startedAt: (fileStat?.birthtime && !Number.isNaN(fileStat.birthtime.getTime()) ? fileStat.birthtime.toISOString() : undefined)
           || fileStat?.mtime?.toISOString()
           || new Date().toISOString(),
         duration: null,
@@ -506,7 +481,7 @@ export async function fetchActivityDataWithContext(
       }
 
       // Normal handling for non-review types
-      if (ss.status === 'running') {
+      if (includeTranscripts && ss.status === 'running') {
         const tmuxName = `specialist-${ss.type === 'test' ? 'test-agent' : 'merge-agent'}`;
         try {
           const output = (await capturePaneAsync(tmuxName, 100)).trim();
@@ -587,25 +562,34 @@ const getMissionControlPlanningRoute = HttpRouter.add(
   '/api/command-deck/planning/:issueId',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
+    const request = yield* HttpServerRequest.HttpServerRequest;
     const issueId = params['issueId'] ?? '';
+    const url = new URL(request.url, 'http://localhost');
+    const summaryOnly = url.searchParams.get('summary') === '1';
 
     const result = yield* Effect.tryPromise({
-      try: () => fetchPlanningData(issueId),
+      try: () => fetchPlanningData(issueId, { summaryOnly }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     return jsonResponse(result);
   })),
 );
 
-async function fetchPlanningData(issueId: string): Promise<unknown> {
+async function fetchPlanningData(
+  issueId: string,
+  options: { summaryOnly?: boolean } = {},
+): Promise<unknown> {
   const issueLower = issueId.toLowerCase();
   const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+  const summaryOnly = options.summaryOnly ?? false;
 
   const projectPath = getProjectPath(issuePrefix);
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
   const planningDir = join(workspacePath, '.planning');
 
   const result: {
+    hasPrd: boolean;
+    hasState: boolean;
     prd?: string;
     state?: string;
     inference?: string;
@@ -616,7 +600,7 @@ async function fetchPlanningData(issueId: string): Promise<unknown> {
     notes: Array<{ filename: string; content: string; uploadedAt: string }>;
     acceptanceProgress?: { completed: number; total: number; percent: number };
     stashCount?: number;
-  } = { transcripts: [], discussions: [], notes: [] };
+  } = { hasPrd: false, hasState: false, transcripts: [], discussions: [], notes: [] };
 
   // Helper: read PRD content from a location, handling both flat and subdir formats.
   const readPrdContent = async (loc: PrdLocation | null): Promise<string | undefined> => {
@@ -630,12 +614,25 @@ async function fetchPlanningData(issueId: string): Promise<unknown> {
 
   if (!await pathExists(planningDir)) {
     const prd = await readPrdContent(findPrdAtStatus(projectPath, issueId, 'active'));
-    if (prd) result.prd = prd;
+    if (prd) {
+      result.prd = prd;
+      result.hasPrd = true;
+    }
+    if (summaryOnly) {
+      return {
+        hasPrd: result.hasPrd,
+        hasState: false,
+        acceptanceProgress: result.acceptanceProgress,
+        stashCount: result.stashCount,
+        statusReviewedAt: result.statusReviewedAt,
+      };
+    }
     return result;
   }
 
   result.state = await readOptional(join(planningDir, 'STATE.md')) ?? undefined;
   result.inference = await readOptional(join(planningDir, 'INFERENCE.md')) ?? undefined;
+  result.hasState = Boolean(result.state);
 
   const statusReviewPath = join(planningDir, 'STATUS_REVIEW.md');
   const statusReview = await readOptional(statusReviewPath);
@@ -650,12 +647,14 @@ async function fetchPlanningData(issueId: string): Promise<unknown> {
       const content = await readPrdContent(findPrdAtStatus(projectPath, issueId, status));
       if (content) {
         result.prd = content;
+        result.hasPrd = true;
         break;
       }
     }
   }
 
   if (!result.prd && result.state) result.prd = result.state;
+  result.hasPrd = Boolean(result.prd);
 
   const readArtifactDir = async (subdir: string, dateField: string): Promise<Array<{ filename: string; content: string; [key: string]: string }>> => {
     const dirPath = join(planningDir, subdir);
@@ -695,10 +694,31 @@ async function fetchPlanningData(issueId: string): Promise<unknown> {
   } catch { /* no vBRIEF plan */ }
 
   // Stash count for workspace hygiene warning (PAN-847)
-  try {
-    const { stdout: stashList } = await execAsync('git stash list', { cwd: workspacePath, encoding: 'utf-8' });
-    result.stashCount = stashList.trim() ? stashList.trim().split('\n').length : 0;
-  } catch { /* not a git repo or git unavailable */ }
+  if (!summaryOnly) {
+    try {
+      const cacheKey = workspacePath;
+      sweepExpired(stashCountCache, STASH_COUNT_CACHE_TTL_MS);
+      const cached = stashCountCache.get(cacheKey);
+      if (cached && cached.timestamp > Date.now() - STASH_COUNT_CACHE_TTL_MS) {
+        result.stashCount = cached.count;
+      } else {
+        const { stdout: stashList } = await execAsync('git stash list', { cwd: workspacePath, encoding: 'utf-8' });
+        const count = stashList.trim() ? stashList.trim().split('\n').length : 0;
+        stashCountCache.set(cacheKey, { timestamp: Date.now(), count });
+        result.stashCount = count;
+      }
+    } catch { /* not a git repo or git unavailable */ }
+  }
+
+  if (summaryOnly) {
+    return {
+      hasPrd: result.hasPrd,
+      hasState: result.hasState,
+      acceptanceProgress: result.acceptanceProgress,
+      stashCount: result.stashCount,
+      statusReviewedAt: result.statusReviewedAt,
+    };
+  }
 
   return result;
 }

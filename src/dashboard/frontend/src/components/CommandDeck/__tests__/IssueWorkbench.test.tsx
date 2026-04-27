@@ -11,6 +11,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+vi.mock('../../DialogProvider', () => ({
+  useConfirm: () => vi.fn(async () => true),
+}));
+
+vi.mock('@tanstack/react-query', async () => {
+  const actual = await vi.importActual('@tanstack/react-query');
+  return {
+    ...actual,
+    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  };
+});
 import type { ReactNode } from 'react';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import { IssueWorkbench } from '../IssueWorkbench';
@@ -48,11 +60,14 @@ vi.mock('../IssueComposer', () => ({
 // IssueWorkbench test stays focused on selection arbitration.
 vi.mock('../ZoneCOverviewTabs/queries', () => ({
   usePlanningQuery: () => ({ data: undefined, isLoading: false }),
+  usePlanningSummaryQuery: () => ({ data: { hasPrd: false, hasState: false }, isLoading: false }),
   useActivityQuery: () => ({ data: { issueId: '', sections: [] }, isLoading: false }),
   useIssueCostsQuery: () => ({ data: undefined, isLoading: false, isError: false }),
   useReviewStatusQuery: () => ({ data: undefined, isLoading: false, isError: false }),
   usePrQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  usePrDiffQuery: () => ({ data: undefined, isLoading: false, isError: false }),
   useDiscussionsQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  useWorkspaceQuery: () => ({ data: { exists: false, issueId: '' }, isLoading: false, isError: false }),
 }));
 
 function makeSession(sessionId: string): SessionNodeType {
@@ -87,6 +102,7 @@ function Wrapper({ children }: { children: ReactNode }) {
 
 describe('IssueWorkbench', () => {
   beforeEach(() => {
+    window.history.replaceState({}, '', '/command-deck');
     act(() => {
       useCommandDeckSelection.getState().clearAll();
     });
@@ -109,6 +125,28 @@ describe('IssueWorkbench', () => {
     expect(screen.getByTestId('zone-c-overview')).toBeInTheDocument();
     expect(screen.queryByTestId('zone-b')).not.toBeInTheDocument();
     expect(screen.queryByTestId('session-panel')).not.toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get('tab')).toBe('overview');
+  });
+
+  it('renders issue-selected mode when the slice explicitly clears session focus', () => {
+    act(() => {
+      useCommandDeckSelection.getState().selectSession(ISSUE, null);
+    });
+
+    render(
+      <Wrapper>
+        <IssueWorkbench
+          issueId={ISSUE}
+          title="Test issue"
+          sessions={[makeSession(SESSION_ID)]}
+        />
+      </Wrapper>,
+    );
+
+    const workbench = screen.getByTestId('issue-workbench');
+    expect(workbench).toHaveAttribute('data-mode', 'issue-selected');
+    expect(screen.getByTestId('zone-c-overview')).toBeInTheDocument();
+    expect(screen.queryByTestId('zone-b')).not.toBeInTheDocument();
   });
 
   it('renders agent-selected mode when slice has a matching session', () => {

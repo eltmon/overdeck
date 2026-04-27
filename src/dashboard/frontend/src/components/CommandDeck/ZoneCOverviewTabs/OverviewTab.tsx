@@ -7,33 +7,40 @@
  *   3. Test summary           (placeholder until verification gate exposes results)
  *   4. PR summary             (placeholder — endpoint lands in pan-9yn5)
  *   5. Cost breakdown sparkline
- *   6. Recent activity feed   (issue-scoped, capped at 20 events)
+ *   6. Recent activity feed   (issue-scoped, capped at 10 events)
  *   7. Quick links            (chips that switch tabs)
  *
- * This component keeps the data dependencies tight: planning + activity + costs
- * are shared via {usePlanningQuery, useActivityQuery, useIssueCostsQuery} so
- * sibling tabs reuse the cached responses.
+ * This component keeps the data dependencies tight: planning summary + activity
+ * + costs are shared so sibling tabs reuse cached lightweight responses.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import type { Issue, Agent } from '../../../types';
 import { LiveCounter } from '../LiveCounter';
 import { ActivitySparkline } from '../ActivitySparkline';
 import { RoundCard, type RoundData, type RoundVerdict } from '../RoundCard';
 import {
   useActivityQuery,
   useIssueCostsQuery,
-  usePlanningQuery,
+  usePlanningSummaryQuery,
   useReviewStatusQuery,
   usePrQuery,
+  useWorkspaceQuery,
   type ActivitySection,
   type ReviewerRoundMetadata,
 } from './queries';
 import type { OverviewTab as OverviewTabKey } from '../ZoneCOverview';
-import { GitPullRequest, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { refreshDashboardState } from '../../../lib/refresh-dashboard-state';
+import { isReviewPipelineStuck } from '../../../lib/pipeline-state';
+import { useConfirm } from '../../DialogProvider';
+import { useQueryClient } from '@tanstack/react-query';
+import { GitPullRequest, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Box, Link2, Terminal, Play, Pause, ExternalLink, Code2, Loader2, RotateCcw } from 'lucide-react';
 
 interface OverviewTabProps {
   issueId: string;
   onSwitchTab?: (tab: OverviewTabKey) => void;
+  issue?: Issue;
+  agent?: Agent;
 }
 
 const REVIEWER_ROLES: readonly string[] = [
@@ -98,11 +105,57 @@ function lastActivityLabel(sections: readonly ActivitySection[]): string {
 }
 
 function deriveStageFromSections(sections: readonly ActivitySection[]): string {
+  if (sections.length === 0) return 'idle';
   const active = [...sections].reverse().find((s) => s.status === 'active' || s.status === 'running');
-  const target = active ?? sections[sections.length - 1];
+  const target = active ?? sections.at(-1);
   if (!target) return 'idle';
   if (target.role) return target.role;
   return target.type;
+}
+
+function Tile({
+  title,
+  icon,
+  children,
+  testid,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+  testid?: string;
+}) {
+  return (
+    <div
+      data-testid={testid}
+      style={{
+        background: 'var(--card)',
+        border: '1px solid var(--mc-border, var(--border))',
+        borderRadius: 8,
+        padding: 12,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        minHeight: 0,
+      }}
+    >
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 11,
+          fontWeight: 600,
+          color: 'var(--mc-text-muted, var(--muted-foreground))',
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+        }}
+      >
+        {icon}
+        <span>{title}</span>
+      </header>
+      <div style={{ flex: 1, minHeight: 0 }}>{children}</div>
+    </div>
+  );
 }
 
 function Section({
@@ -146,38 +199,55 @@ function Section({
   );
 }
 
-export function OverviewTab({ issueId, onSwitchTab }: OverviewTabProps) {
-  const planning = usePlanningQuery(issueId);
+function formatRuntime(startedAt: string): string {
+  const ms = Date.now() - Date.parse(startedAt);
+  if (Number.isNaN(ms) || ms < 0) return '—';
+  const hours = Math.floor(ms / 3_600_000);
+  const mins = Math.floor((ms % 3_600_000) / 60_000);
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
+
+export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabProps) {
+  const confirm = useConfirm();
+  const queryClient = useQueryClient();
+  const [isRecoverPending, setIsRecoverPending] = useState(false);
+  const [isSpawnPending, setIsSpawnPending] = useState(false);
+  const planning = usePlanningSummaryQuery(issueId);
   const activity = useActivityQuery(issueId);
   const costs = useIssueCostsQuery(issueId);
   const reviewStatus = useReviewStatusQuery(issueId);
   const pr = usePrQuery(issueId);
+  const workspace = useWorkspaceQuery(issueId);
 
   const sections = activity.data?.sections ?? [];
   const stage = deriveStageFromSections(sections);
-  const totalCost = costs.data?.totalCost ?? activity.data?.totalCost ?? 0;
+  const isCostPending = costs.isLoading && activity.isLoading;
+  const totalCost = costs.data?.totalCost
+    ?? (costs.isError ? activity.data?.totalCost : undefined)
+    ?? (!activity.isLoading ? activity.data?.totalCost : undefined)
+    ?? null;
   const lastLabel = lastActivityLabel(sections);
+  const activeAgentCount = sections.filter(
+    (s) => s.status === 'running' || s.status === 'active',
+  ).length;
 
-  const sparklineEvents = useMemo(
+  const costSparklineEvents = useMemo(
     () =>
-      sections
-        .map((s) => ({
-          ts: Date.parse(s.startedAt),
-          category: (
-            {
-              planning: 'info' as const,
-              work: 'info' as const,
-              review: 'review' as const,
-              reviewer: 'review' as const,
-              test: 'success' as const,
-              merge: 'success' as const,
-              legacy: 'warning' as const,
-            } as const
-          )[s.type as string] ?? 'info',
-        }))
-        .filter((e) => !Number.isNaN(e.ts))
-        .map((e) => ({ timestamp: e.ts, category: e.category })),
-    [sections],
+      (costs.data?.sessions ?? [])
+        .filter((session) => typeof session.cost === 'number' && session.cost > 0)
+        .map((session) => {
+          const endedAt = session.endedAt ? Date.parse(session.endedAt) : NaN;
+          const startedAt = Date.parse(session.startedAt);
+          const timestamp = Number.isNaN(endedAt) ? startedAt : endedAt;
+          return {
+            timestamp,
+            weight: session.cost,
+            category: 'info' as const,
+          };
+        })
+        .filter((event) => !Number.isNaN(event.timestamp)),
+    [costs.data?.sessions],
   );
 
   const reviewerSections = useMemo(
@@ -185,7 +255,8 @@ export function OverviewTab({ issueId, onSwitchTab }: OverviewTabProps) {
     [sections],
   );
 
-  const recentEvents = useMemo(() => sections.slice(-20).reverse(), [sections]);
+  const isRecoverable = isReviewPipelineStuck(reviewStatus.data ?? undefined);
+  const recentEvents = useMemo(() => sections.slice(-10).reverse(), [sections]);
 
   return (
     <div
@@ -214,54 +285,581 @@ export function OverviewTab({ issueId, onSwitchTab }: OverviewTabProps) {
           gap: 10,
         }}
       >
+        {/* Title row */}
         <div
           style={{
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             justifyContent: 'space-between',
             gap: 12,
             flexWrap: 'wrap',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ fontSize: 16, fontWeight: 700 }} data-testid="overview-stage">
-              {stage}
-            </span>
-            <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
-              · {issueId}
-            </span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
+            <h1
+              data-testid="overview-title"
+              style={{
+                fontSize: 18,
+                fontWeight: 700,
+                margin: 0,
+                lineHeight: 1.3,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+              title={issue?.title || issueId}
+            >
+              {issue?.title || issueId}
+            </h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {/* State pill */}
+              {issue?.status && (
+                <span
+                  data-testid="overview-status-pill"
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: '2px 8px',
+                    borderRadius: 999,
+                    background: 'color-mix(in srgb, var(--primary) 12%, transparent)',
+                    color: 'var(--primary)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.03em',
+                  }}
+                >
+                  {issue.status}
+                </span>
+              )}
+              {/* Stage pill */}
+              <span
+                data-testid="overview-stage"
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                  background: 'var(--mc-surface-2, color-mix(in srgb, var(--foreground) 5%, transparent))',
+                  color: 'var(--mc-text-muted, var(--muted-foreground))',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em',
+                }}
+              >
+                {stage}
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+                {issueId}
+              </span>
+            </div>
           </div>
+          {/* Cost metric */}
           <div
             data-testid="overview-cost"
-            style={{ fontSize: 14, fontWeight: 600 }}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-end',
+              gap: 2,
+              flexShrink: 0,
+            }}
           >
-            <LiveCounter value={totalCost} unit="$" precision={2} pulseOnIncrement />
-            <span
-              style={{
-                marginLeft: 8,
-                fontSize: 12,
-                color: 'var(--mc-text-muted, var(--muted-foreground))',
-                fontWeight: 500,
-              }}
-            >
-              spent
+            <span style={{ fontSize: 18, fontWeight: 700 }}>
+              {isCostPending || totalCost === null
+                ? <span data-testid="overview-cost-loading">Loading…</span>
+                : <LiveCounter value={totalCost} unit="$" precision={2} pulseOnIncrement />}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+              cost to date
             </span>
           </div>
         </div>
+
+        {/* Metrics row */}
         <div
           style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 16,
             fontSize: 12,
             color: 'var(--mc-text-muted, var(--muted-foreground))',
-            display: 'flex',
-            gap: 12,
+            flexWrap: 'wrap',
           }}
         >
+          {/* Runtime */}
+          {agent?.startedAt && (
+            <div data-testid="overview-runtime" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Clock size={12} />
+              <span>Runtime: {formatRuntime(agent.startedAt)}</span>
+            </div>
+          )}
+          {/* Agent count */}
+          <div data-testid="overview-agent-count" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Box size={12} />
+            <span>
+              {activeAgentCount} active agent{activeAgentCount === 1 ? '' : 's'}
+            </span>
+          </div>
+          {/* Session count */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Terminal size={12} />
+            <span>
+              {sections.length} session{sections.length === 1 ? '' : 's'}
+            </span>
+          </div>
+          {/* Last activity */}
           <span data-testid="overview-last-activity">{lastLabel}</span>
-          <span>· {sections.length} session{sections.length === 1 ? '' : 's'}</span>
         </div>
       </section>
 
-      {/* 2. Reviewer summary */}
+      {/* 2. Tile grid */}
+      <div
+        data-testid="overview-tile-grid"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: 10,
+        }}
+      >
+        {/* AGENT tile */}
+        <Tile title="Agent" icon={<Box size={14} />} testid="overview-tile-agent">
+          {agent ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+              <span><strong>Model:</strong> {agent.model}</span>
+              <span><strong>Runtime:</strong> {formatRuntime(agent.startedAt)}</span>
+              <span><strong>Status:</strong> {agent.status}</span>
+              {workspace.data?.agentSessionId && (
+                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+                  {workspace.data.agentSessionId}
+                </span>
+              )}
+            </div>
+          ) : workspace.data?.hasAgent ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+              <span><strong>Model:</strong> {workspace.data.agentModelFull || workspace.data.agentModel || 'unknown'}</span>
+              {workspace.data.agentSessionId && (
+                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+                  {workspace.data.agentSessionId}
+                </span>
+              )}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No active agent</span>
+              <button
+                type="button"
+                disabled={isSpawnPending}
+                onClick={async () => {
+                  if (isSpawnPending) return;
+                  setIsSpawnPending(true);
+                  try {
+                    await fetch(`/api/agents`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ issueId }),
+                    });
+                  } catch {
+                    // non-fatal
+                  } finally {
+                    setIsSpawnPending(false);
+                  }
+                }}
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: 'var(--mc-primary, var(--primary))',
+                  color: 'var(--mc-primary-foreground, var(--primary-foreground))',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  cursor: isSpawnPending ? 'wait' : 'pointer',
+                  opacity: isSpawnPending ? 0.6 : 1,
+                  alignSelf: 'flex-start',
+                }}
+              >
+                {isSpawnPending ? 'Spawning…' : 'Spawn Work'}
+              </button>
+            </div>
+          )}
+        </Tile>
+
+        {/* COST tile */}
+        <Tile title="Cost" icon={<Code2 size={14} />} testid="overview-tile-cost">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>
+              {isCostPending || totalCost === null
+                ? <span data-testid="overview-cost-tile-loading">Loading…</span>
+                : <LiveCounter value={totalCost} unit="$" precision={2} />}
+            </div>
+            {costs.data?.byModel && Object.keys(costs.data.byModel).length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {Object.entries(costs.data.byModel)
+                  .sort((a, b) => b[1].cost - a[1].cost)
+                  .map(([model, v]) => (
+                    <div key={model} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                      <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))' }}>{model}</span>
+                      <span>${v.cost.toFixed(2)}</span>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </Tile>
+
+        {/* BY STAGE tile */}
+        <Tile title="By Stage" icon={<Clock size={14} />} testid="overview-tile-stage">
+          {costs.data?.byStage && Object.keys(costs.data.byStage).length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {Object.entries(costs.data.byStage)
+                .sort((a, b) => b[1].cost - a[1].cost)
+                .map(([stageName, v]) => (
+                  <div key={stageName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                    <span style={{ textTransform: 'capitalize', color: 'var(--mc-text-muted, var(--muted-foreground))' }}>{stageName}</span>
+                    <span>${v.cost.toFixed(2)}</span>
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No stage data yet</span>
+          )}
+        </Tile>
+
+        {/* SERVICES tile */}
+        <Tile title="Services" icon={<ExternalLink size={14} />} testid="overview-tile-services">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {workspace.data?.services?.some((svc) => svc.url) ? (
+              workspace.data.services
+                .filter((svc) => svc.url)
+                .map((svc) => (
+                  <a
+                    key={svc.name}
+                    href={svc.url!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 12,
+                      color: 'var(--mc-primary, var(--primary))',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    {svc.name} ↗
+                  </a>
+                ))
+            ) : (
+              <>
+                {workspace.data?.frontendUrl && (
+                  <a
+                    href={workspace.data.frontendUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: 12, color: 'var(--mc-primary, var(--primary))', textDecoration: 'none' }}
+                  >
+                    Frontend ↗
+                  </a>
+                )}
+                {workspace.data?.apiUrl && (
+                  <a
+                    href={workspace.data.apiUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: 12, color: 'var(--mc-primary, var(--primary))', textDecoration: 'none' }}
+                  >
+                    API ↗
+                  </a>
+                )}
+              </>
+            )}
+            {!workspace.data?.frontendUrl && !workspace.data?.apiUrl && !workspace.data?.services?.length && (
+              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No services configured</span>
+            )}
+          </div>
+        </Tile>
+
+        {/* ATTACH tile */}
+        <Tile title="Attach" icon={<Terminal size={14} />} testid="overview-tile-attach">
+          {workspace.data?.agentSessionId ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                  padding: '6px 8px',
+                  background: 'var(--mc-surface-2, color-mix(in srgb, var(--foreground) 3%, transparent))',
+                  borderRadius: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  tmux attach -t {workspace.data.agentSessionId}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(`tmux attach -t ${workspace.data.agentSessionId}`).catch(() => { /* ignore */ });
+                  }}
+                  style={{
+                    padding: 2,
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    color: 'var(--mc-text-muted, var(--muted-foreground))',
+                    flexShrink: 0,
+                  }}
+                  title="Copy command"
+                >
+                  <Copy size={14} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No active session</span>
+          )}
+        </Tile>
+
+        {/* ACTIONS tile */}
+        <Tile title="Actions" icon={<Play size={14} />} testid="overview-tile-actions">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <button
+              type="button"
+              data-testid="overview-action-review-test"
+              onClick={() => {
+                void fetch(`/api/review/${issueId}/trigger`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                }).catch(() => { /* ignore */ });
+              }}
+              disabled={!reviewStatus.data || reviewStatus.data.reviewStatus === 'reviewing' || reviewStatus.data.testStatus === 'testing'}
+              style={{
+                padding: '5px 10px',
+                borderRadius: 6,
+                border: '1px solid var(--mc-border, var(--border))',
+                background: 'transparent',
+                fontSize: 11,
+                cursor: 'pointer',
+                opacity: !reviewStatus.data || reviewStatus.data.reviewStatus === 'reviewing' || reviewStatus.data.testStatus === 'testing' ? 0.5 : 1,
+              }}
+            >
+              {reviewStatus.data?.readyForMerge ? 'Re-Review' : 'Review & Test'}
+            </button>
+            {isRecoverable && (
+              <button
+                type="button"
+                data-testid="overview-action-recover"
+                onClick={() => {
+                  void (async () => {
+                    if (!(await confirm({
+                      title: 'Recover Pipeline',
+                      message: `Recover ${issueId}?\n\nThis will:\n• Clear failed review, test, and merge state\n• Reset circuit breaker counters\n• Remove queued specialist tasks\n• Re-dispatch review and test as needed`,
+                      confirmLabel: 'Recover',
+                    }))) {
+                      return;
+                    }
+                    setIsRecoverPending(true);
+                    try {
+                      await fetch(`/api/review/${issueId}/reset`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ rerun: true }),
+                      });
+                      await refreshDashboardState(queryClient);
+                    } catch {
+                      /* ignore */
+                    } finally {
+                      setIsRecoverPending(false);
+                    }
+                  })();
+                }}
+                disabled={isRecoverPending}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: 6,
+                  border: '1px solid var(--mc-border, var(--border))',
+                  background: 'transparent',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  opacity: isRecoverPending ? 0.5 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                {isRecoverPending ? <Loader2 size={12} /> : <RotateCcw size={12} />}
+                {isRecoverPending ? 'Recovering...' : 'Recover'}
+              </button>
+            )}
+            <button
+              type="button"
+              data-testid="overview-action-sync"
+              onClick={() => {
+                void fetch(`/api/issues/${issueId}/sync-main`, { method: 'POST' }).catch(() => { /* ignore */ });
+              }}
+              style={{
+                padding: '5px 10px',
+                borderRadius: 6,
+                border: '1px solid var(--mc-border, var(--border))',
+                background: 'transparent',
+                fontSize: 11,
+                cursor: 'pointer',
+              }}
+            >
+              Sync
+            </button>
+            {agent && (agent.status === 'running' || agent.status === 'starting' || agent.status === 'healthy') && (
+              <button
+                type="button"
+                data-testid="overview-action-stop"
+                onClick={() => {
+                  void fetch(`/api/agents/${agent.id}`, { method: 'DELETE' }).catch(() => { /* ignore */ });
+                }}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: 6,
+                  border: '1px solid var(--mc-error, #ef4444)',
+                  background: 'transparent',
+                  color: 'var(--mc-error, #ef4444)',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                }}
+              >
+                Stop
+              </button>
+            )}
+          </div>
+        </Tile>
+
+        {/* WORKSPACE tile */}
+        <Tile title="Workspace" icon={<Box size={14} />} testid="overview-tile-workspace">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {workspace.data?.containers && workspace.data.containers.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {workspace.data.containers.map((c) => (
+                  <div key={c.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: c.status === 'running' ? 'var(--mc-success, #22c55e)' : 'var(--mc-error, #ef4444)',
+                      }}
+                    />
+                    <span>{c.name}</span>
+                    <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))', marginLeft: 'auto' }}>{c.status}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {workspace.data?.hasDocker && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void fetch(`/api/workspaces/${issueId}/containers/frontend/stop`, { method: 'POST' }).catch(() => { /* ignore */ });
+                  }}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: 6,
+                    border: '1px solid var(--mc-border, var(--border))',
+                    background: 'transparent',
+                    fontSize: 11,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <Pause size={12} /> Stop
+                </button>
+              )}
+              {workspace.data?.path && (
+                <a
+                  href={`vscode://file/${workspace.data.path}`}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: 6,
+                    border: '1px solid var(--mc-border, var(--border))',
+                    background: 'transparent',
+                    fontSize: 11,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    color: 'inherit',
+                    textDecoration: 'none',
+                  }}
+                >
+                  <ExternalLink size={12} /> Open VS Code
+                </a>
+              )}
+              {workspace.data?.canContainerize && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void fetch(`/api/workspaces/${issueId}/containerize`, { method: 'POST' }).catch(() => { /* ignore */ });
+                  }}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: 6,
+                    border: '1px solid var(--mc-border, var(--border))',
+                    background: 'transparent',
+                    fontSize: 11,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <Play size={12} /> Start Containers
+                </button>
+              )}
+            </div>
+            {!workspace.data?.hasDocker && !workspace.data?.canContainerize && (
+              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No containers</span>
+            )}
+          </div>
+        </Tile>
+
+        {/* LINKS tile */}
+        <Tile title="Links" icon={<Link2 size={14} />} testid="overview-tile-links">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {issue?.url && (
+              <a
+                href={issue.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: 12, color: 'var(--mc-primary, var(--primary))', textDecoration: 'none' }}
+              >
+                {issue.source === 'linear' ? 'Linear' : 'GitHub Issue'} ↗
+              </a>
+            )}
+            {planning.data?.hasPrd && (
+              <button
+                type="button"
+                onClick={() => onSwitchTab?.('prd')}
+                style={{
+                  fontSize: 12,
+                  padding: 0,
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--mc-primary, var(--primary))',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                View PRD ↗
+              </button>
+            )}
+            {!issue?.url && !planning.data?.hasPrd && (
+              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No links available</span>
+            )}
+          </div>
+        </Tile>
+      </div>
+
+      {/* 3. Reviewer summary */}
       {reviewerSections.length > 0 && (
         <Section title="Reviewer summary">
           <div
@@ -397,7 +995,7 @@ export function OverviewTab({ issueId, onSwitchTab }: OverviewTabProps) {
 
       {/* 5. Cost sparkline */}
       <Section
-        title="Activity over the last hour"
+        title="Cost trend over recent sessions"
         rightSlot={
           <button
             type="button"
@@ -421,9 +1019,9 @@ export function OverviewTab({ issueId, onSwitchTab }: OverviewTabProps) {
           data-testid="overview-sparkline"
           style={{ display: 'flex', alignItems: 'center', gap: 12 }}
         >
-          <ActivitySparkline events={sparklineEvents} />
+          <ActivitySparkline events={costSparklineEvents} ariaLabel="Cost trend across recent sessions" />
           <span style={{ fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
-            {sparklineEvents.length} session start{sparklineEvents.length === 1 ? '' : 's'}
+            {costSparklineEvents.length} billed session{costSparklineEvents.length === 1 ? '' : 's'}
           </span>
         </div>
       </Section>

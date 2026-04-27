@@ -18,7 +18,7 @@ import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { WS_METHODS } from '@panctl/contracts';
-import type { ProjectSessionTree, SessionTreeDelta, SessionNode } from '@panctl/contracts';
+import type { ProjectSessionTree, SessionTreeDelta } from '@panctl/contracts';
 import styles from './styles/command-deck.module.css';
 
 async function fetchConversations(): Promise<Conversation[]> {
@@ -226,7 +226,6 @@ export function CommandDeck({
     queryKey: ['session-trees', projectNamesKey],
     queryFn: () => fetchAllSessionTrees(projects.map(p => p.name)),
     enabled: showProjects && projects.length > 0,
-    refetchInterval: 30000,
   });
 
   const sessionTreeDataRef = useRef<Record<string, ProjectSessionTree>>({});
@@ -385,21 +384,10 @@ export function CommandDeck({
 
   const handleSelectFeature = useCallback((issueId: string) => {
     setSelectedFeature(issueId);
-    // Auto-select the best alive session so the user doesn't have to click twice
-    // (feature → session). Falls back to issue-selected mode when no sessions exist.
-    let sessions: readonly SessionNode[] = [];
-    for (const project of projectsWithSessions) {
-      const feature = project.features.find(f => f.issueId === issueId);
-      if (feature) {
-        sessions = feature.sessions ?? [];
-        break;
-      }
-    }
-    const bestSessionId = pickBestSession(sessions);
-    selectSession(issueId, bestSessionId);
+    selectSession(issueId, null);
     setSelectedConversation(null);
     setIsDraft(false);
-  }, [selectSession, projectsWithSessions]);
+  }, [selectSession]);
 
   const handleSelectSession = useCallback((issueId: string, sessionId: string) => {
     setSelectedFeature(issueId);
@@ -827,8 +815,6 @@ export function CommandDeck({
               onOpenBeads={() => setShowBeads(true)}
               agent={selectedAgent}
               issue={selectedIssue ?? undefined}
-              issues={issues}
-              featureData={selectedFeatureData}
             />
           ) : (
             <div className={styles.contentEmpty}>

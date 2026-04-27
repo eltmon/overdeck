@@ -6,7 +6,7 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET /api/projects/:projectKey/session-tree
  */
 
-import { access, readFile, readdir } from 'node:fs/promises';
+import { access, readFile, readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -14,13 +14,19 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { httpHandler } from './http-handler.js';
-import { listProjects } from '../../../lib/projects.js';
+import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
 import { listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
-import type { AgentStatus, SessionNode, SessionNodePresence, SessionNodeType } from '@panctl/contracts';
-import type { ReviewerRoundMetadata } from './reviewer-tree.js';
+import type { SessionNode, SessionNodePresence, SessionNodeType } from '@panctl/contracts';
+import { normalizeAgentStatus } from '../services/agent-status.js';
+import { deriveSessionPresence } from '../services/session-presence.js';
+import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
+import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
+import { getReviewStatus } from '../review-status.js';
+import { resolveJsonlPath } from './jsonl-resolver.js';
+import { buildReviewerNodes, type ReviewerRoundMetadata } from './reviewer-tree.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
@@ -50,36 +56,10 @@ function mapSessionType(type: string): SessionNodeType {
   return (validTypes.includes(type as SessionNodeType) ? type : 'legacy') as SessionNodeType;
 }
 
-function mapAgentStatus(status: string): AgentStatus {
-  switch (status) {
-    case 'running': return 'running';
-    case 'active': return 'running';
-    case 'completed': return 'stopped';
-    case 'failed': return 'error';
-    case 'suspended': return 'stopped';
-    default: return 'unknown';
-  }
-}
 
 interface ActivityContext {
   tmuxSessionNames?: Set<string>;
-  taskFileContents?: Map<string, string>;
-}
-
-interface ActivitySection {
-  type: string;
-  role?: string;
-  sessionId: string;
-  tmuxSession?: string;
-  model: string;
-  startedAt: string;
-  endedAt?: string;
-  duration: number | null;
-  status: string;
-  transcript?: string;
-  presence: SessionNodePresence;
-  hasJsonl?: boolean;
-  roundMetadata?: ReviewerRoundMetadata;
+  issueTitles?: ReadonlyMap<string, string>;
 }
 
 const LEGACY_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -95,41 +75,139 @@ function isStaleLegacySession(s: SessionNode): boolean {
   return (Date.now() - startedAtMs) > LEGACY_SESSION_MAX_AGE_MS;
 }
 
-function mapSectionToSessionNode(section: ActivitySection): SessionNode {
-  return {
-    type: mapSessionType(section.type),
-    role: section.role,
-    sessionId: section.sessionId,
-    tmuxSession: section.tmuxSession,
-    model: section.model,
-    startedAt: section.startedAt,
-    endedAt: section.endedAt,
-    duration: section.duration ?? 0,
-    status: mapAgentStatus(section.status),
-    transcript: section.transcript,
-    presence: section.presence,
-    hasJsonl: section.hasJsonl,
-    roundMetadata: section.roundMetadata,
-  };
+
+interface SessionTreeContext {
+  tmuxSessionNames: Set<string>;
+}
+
+async function collectSessionTreeNodes(
+  issueId: string,
+  workspacePath: string,
+  projectPath: string,
+  context: SessionTreeContext,
+): Promise<SessionNode[]> {
+  const issueLower = issueId.toLowerCase();
+  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+  const agentsDir = join(homedir(), '.panopticon', 'agents');
+  const agentId = `agent-${issueLower}`;
+  const planningAgentId = `planning-${issueLower}`;
+  const sections: SessionNode[] = [];
+  let hasPlanningSection = false;
+
+  for (const checkId of [planningAgentId, agentId]) {
+    const agentDir = join(agentsDir, checkId);
+    if (!await pathExists(agentDir)) continue;
+    const stateText = await readOptional(join(agentDir, 'state.json'));
+    if (!stateText) continue;
+
+    try {
+      const state = JSON.parse(stateText) as { model?: string; runtime?: string; startedAt?: string; createdAt?: string; status?: string };
+      const isPlanning = checkId.startsWith('planning-');
+      const sectionType = isPlanning ? 'planning' : 'work';
+      if (isPlanning) hasPlanningSection = true;
+      const rtState = await getAgentRuntimeStateAsync(checkId);
+      const presence = await deriveSessionPresence(checkId, rtState, context.tmuxSessionNames);
+      const jsonlPath = await resolveJsonlPath(checkId, workspacePath);
+      sections.push({
+        type: sectionType,
+        sessionId: checkId,
+        tmuxSession: sectionType === 'work' || sectionType === 'planning' ? checkId : undefined,
+        model: state.model || state.runtime || 'unknown',
+        startedAt: state.startedAt || state.createdAt || new Date().toISOString(),
+        endedAt: undefined,
+        duration: state.startedAt
+          ? (() => {
+              const ms = Date.now() - new Date(state.startedAt).getTime();
+              return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
+            })()
+          : null,
+        status: normalizeAgentStatus(
+          rtState?.state === 'active'
+            ? 'running'
+            : rtState?.state === 'suspended'
+              ? 'completed'
+              : (state.status || 'completed'),
+        ),
+        presence,
+        hasJsonl: !!jsonlPath,
+      });
+    } catch {
+      // skip malformed state
+    }
+  }
+
+  if (!hasPlanningSection) {
+    const planningDir = join(workspacePath, '.planning');
+    if (await pathExists(planningDir)) {
+      const planningStatePath = join(planningDir, 'STATE.md');
+      const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
+      const planningPathForTimestamp = await pathExists(planningStatePath)
+        ? planningStatePath
+        : planningPromptPath;
+      const planningStat = await stat(planningPathForTimestamp).catch(() => null);
+      const sessionId = `planning-${issueLower}-state`;
+      const jsonlPath = await resolveJsonlPath(sessionId, workspacePath);
+      sections.push({
+        type: 'legacy',
+        sessionId,
+        model: 'unknown',
+        startedAt: planningStat?.mtime.toISOString() ?? new Date(0).toISOString(),
+        duration: 0,
+        status: 'stopped',
+        presence: 'ended',
+        hasJsonl: !!jsonlPath,
+      });
+    }
+  }
+
+  const centralStatus = getReviewStatus(issueId.toUpperCase());
+  if (centralStatus?.history && centralStatus.history.length > 0) {
+    const reviewEntries = centralStatus.history.filter((entry) => entry.type === 'review');
+    const latestReview = reviewEntries[reviewEntries.length - 1];
+    if (latestReview) {
+      const resolvedProject = resolveProjectFromIssue(issueId);
+      const reviewerProjectKey = resolvedProject?.projectKey ?? issuePrefix.toLowerCase();
+      const orchestratorSessionName = getTmuxSessionName('review-agent', reviewerProjectKey);
+      const orchestratorPresence: SessionNodePresence = context.tmuxSessionNames.has(orchestratorSessionName)
+        ? (latestReview.status === 'reviewing' ? 'active' : 'idle')
+        : 'ended';
+      sections.push({
+        type: 'review',
+        sessionId: orchestratorSessionName,
+        model: 'specialist',
+        startedAt: latestReview.timestamp,
+        endedAt: undefined,
+        duration: 0,
+        status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
+        presence: orchestratorPresence,
+      });
+      const reviewerNodes = await buildReviewerNodes({
+        issueId,
+        projectKey: reviewerProjectKey,
+        workspacePath,
+        projectPath,
+        tmuxSessionNames: context.tmuxSessionNames,
+        startedAt: latestReview.timestamp,
+        endedAt: undefined,
+        status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
+      });
+      sections.push(...reviewerNodes);
+    }
+  }
+
+  return sections.filter((s) => !isStaleLegacySession(s));
 }
 
 async function resolveFeatureTitle(
   issueId: string,
   issueLower: string,
+  issueTitles: ReadonlyMap<string, string>,
   project?: { config: { path: string; workspace?: { workspaces_dir?: string } } },
 ): Promise<string> {
-  // Try issue data service first
-  try {
-    const issueDataService = await getIssueDataService();
-    const allIssues = issueDataService.getIssues() as Array<Record<string, unknown>>;
-    const issue = allIssues.find(i =>
-      i['identifier'] === issueId ||
-      (i['identifier'] as string)?.toLowerCase() === issueId.toLowerCase()
-    );
-    if (issue?.['title']) {
-      return String(issue['title']);
-    }
-  } catch { /* non-fatal */ }
+  const mappedTitle = issueTitles.get(issueId) ?? issueTitles.get(issueId.toLowerCase());
+  if (mappedTitle) {
+    return mappedTitle;
+  }
 
   // Fall back to PLANNING_PROMPT.md first line
   if (project) {
@@ -172,7 +250,37 @@ const getProjectSessionTreeRoute = HttpRouter.add(
   })),
 );
 
-export async function fetchProjectSessionTree(projectKey: string): Promise<unknown | null> {
+const ISSUE_TITLE_MAP_TTL_MS = 30_000;
+let issueTitleMapCache: { timestamp: number; data: ReadonlyMap<string, string> } | null = null;
+
+async function buildIssueTitleMap(): Promise<ReadonlyMap<string, string>> {
+  if (issueTitleMapCache && issueTitleMapCache.timestamp > Date.now() - ISSUE_TITLE_MAP_TTL_MS) {
+    return issueTitleMapCache.data;
+  }
+
+  const issueTitles = new Map<string, string>();
+  try {
+    const issueDataService = await getIssueDataService();
+    const allIssues = issueDataService.getIssues() as Array<Record<string, unknown>>;
+    for (const issue of allIssues) {
+      const identifier = typeof issue['identifier'] === 'string' ? issue['identifier'] : null;
+      const title = typeof issue['title'] === 'string' ? issue['title'].trim() : '';
+      if (!identifier || !title) continue;
+      issueTitles.set(identifier, title);
+      issueTitles.set(identifier.toLowerCase(), title);
+    }
+  } catch {
+    // non-fatal: callers fall back to planning prompt or issue id
+  }
+
+  issueTitleMapCache = { timestamp: Date.now(), data: issueTitles };
+  return issueTitles;
+}
+
+export async function fetchProjectSessionTree(
+  projectKey: string,
+  sharedContext?: ActivityContext,
+): Promise<unknown | null> {
   const projects = listProjects();
   const project = projects.find(p =>
     p.key === projectKey || (p.config as { name?: string }).name === projectKey
@@ -183,35 +291,20 @@ export async function fetchProjectSessionTree(projectKey: string): Promise<unkno
   const workspaceConfig = (project.config as { workspace?: { workspaces_dir?: string } }).workspace;
   const workspacesDir = join(projectPath, workspaceConfig?.workspaces_dir || 'workspaces');
 
-  // Hoist shared subprocess calls once per request (PAN-821 review)
-  const allSessionsArr = await listSessionNamesAsync().catch(() => [] as string[]);
-  const sharedTmuxSessionNames = new Set(allSessionsArr.filter(s => s.trim()));
+  // Reuse shared request-scoped data when provided; otherwise fetch lazily.
+  const sharedTmuxSessionNames = sharedContext?.tmuxSessionNames
+    ?? new Set((await listSessionNamesAsync().catch(() => [] as string[])).filter(s => s.trim()));
 
-  const tasksDir = join(homedir(), '.panopticon', 'specialists', 'tasks');
-  const sharedTaskFileContents = new Map<string, string>();
-  if (await pathExists(tasksDir)) {
-    const filenames = (await readdir(tasksDir).catch(() => [] as string[])).filter(f => f.endsWith('.md'));
-    await Promise.all(filenames.map(async (f) => {
-      const content = await readOptional(join(tasksDir, f));
-      if (content) sharedTaskFileContents.set(f, content);
-    }));
-  }
-
-  const sharedContext: ActivityContext = {
+  const effectiveSharedContext: SessionTreeContext = {
     tmuxSessionNames: sharedTmuxSessionNames,
-    taskFileContents: sharedTaskFileContents,
   };
-
-  // Dynamic import breaks static dependency cycle with command-deck.ts (PAN-821)
-  // Without this, rolldown bundles projects.ts after server.ts, causing
-  // ReferenceError: projectsRouteLayer is not defined at startup.
-  const { fetchActivityDataWithContext } = await import('./command-deck.js');
 
   const features: Array<{
     issueId: string;
     title: string;
     sessions: SessionNode[];
   }> = [];
+  const issueTitles = sharedContext?.issueTitles ?? await buildIssueTitleMap();
 
   if (await pathExists(workspacesDir)) {
     const entries = await readdir(workspacesDir, { withFileTypes: true }).catch(() => []);
@@ -234,14 +327,10 @@ export async function fetchProjectSessionTree(projectKey: string): Promise<unkno
         ]);
         if (!hasAgent && !hasPlanning) return null;
         try {
-          const activityData = await fetchActivityDataWithContext(c.issueId, sharedContext) as {
-            issueId: string;
-            sections: ActivitySection[];
-          };
-          if (!activityData.sections || activityData.sections.length === 0) return null;
-          const title = await resolveFeatureTitle(c.issueId, c.issueLower, project);
-          const allSessions = activityData.sections.map(mapSectionToSessionNode);
-          const sessions = allSessions.filter(s => !isStaleLegacySession(s));
+          const workspacePath = join(workspacesDir, c.name);
+          const sessions = await collectSessionTreeNodes(c.issueId, workspacePath, projectPath, effectiveSharedContext);
+          if (sessions.length === 0) return null;
+          const title = await resolveFeatureTitle(c.issueId, c.issueLower, issueTitles, project);
           return { issueId: c.issueId, title, sessions };
         } catch (err) {
           console.warn(`[fetchProjectSessionTree] Failed to process feature ${c.issueId}:`, err);
@@ -276,13 +365,23 @@ const getAllSessionTreesRoute = HttpRouter.add(
     }
 
     const results = yield* Effect.tryPromise({
-      try: () =>
-        Promise.all(
+      try: async () => {
+        const allSessionsArr = await listSessionNamesAsync().catch(() => [] as string[]);
+        const sharedTmuxSessionNames = new Set(allSessionsArr.filter(s => s.trim()));
+
+        const issueTitles = await buildIssueTitleMap();
+        const sharedContext: ActivityContext = {
+          tmuxSessionNames: sharedTmuxSessionNames,
+          issueTitles,
+        };
+
+        return Promise.all(
           projectKeys.map(async (projectKey) => {
-            const tree = await fetchProjectSessionTree(projectKey);
+            const tree = await fetchProjectSessionTree(projectKey, sharedContext);
             return tree ?? { projectKey, features: [] };
           }),
-        ),
+        );
+      },
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
 

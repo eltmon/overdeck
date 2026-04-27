@@ -316,7 +316,7 @@ describe('FeatureItem', () => {
     expect(onSelect).toHaveBeenCalledTimes(1);
   });
 
-  it('auto-selects best session when row is clicked and sessions exist', () => {
+  it('does not auto-select a session when the issue row is clicked', () => {
     const onSelect = vi.fn();
     const onSelectSession = vi.fn();
     const sessions = [
@@ -333,7 +333,7 @@ describe('FeatureItem', () => {
     );
     fireEvent.click(screen.getAllByText('PAN-821')[0]!);
     expect(onSelect).toHaveBeenCalledTimes(1);
-    expect(onSelectSession).toHaveBeenCalledWith('PAN-821', 'active-1');
+    expect(onSelectSession).not.toHaveBeenCalled();
   });
 
   it('does not call onSelectSession when row is clicked and no sessions exist', () => {

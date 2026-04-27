@@ -258,7 +258,7 @@ export const SessionNode = Schema.Struct({
   model: Schema.String,
   startedAt: Schema.String,
   endedAt: Schema.optional(Schema.String),
-  duration: Schema.Number,
+  duration: Schema.NullOr(Schema.Number),
   status: AgentStatus,
   hasJsonl: Schema.optional(Schema.Boolean),
   transcript: Schema.optional(Schema.String),
