@@ -2,79 +2,67 @@
 specialist: review-agent
 issueId: PAN-443
 outcome: changes-requested
-timestamp: 2026-04-27T10:21:43Z
+timestamp: 2026-04-27T10:46:34Z
 ---
 
 # Verdict: CHANGES_REQUESTED
 
 ## Summary
-PAN-443 migrates npm package names from `@panopticon/*` / `panopticon-cli` / `@eltmon/panctl` to the new `@panctl/*` scope (`@panctl/cli`, `@panctl/desktop`, `@panctl/contracts`), adds multi-package publishing to the release workflow, and updates all docs to show `npx @panctl/cli` as the canonical command. Two findings block this PR: (1) a requirements gap where `reference/architecture.mdx:223` still tells users to `npm unlink panopticon-cli`, contradicting the completed rename, and (2) a build completeness gap where all three `tsdown.config.ts` files retain the old `@panopticon/` pattern in their `alwaysBundle` option, meaning the bundled output would not correctly inline `@panctl/contracts` at publish time. All other findings are either already correct pre-existing state or are positive changes (dist-backed contracts exports).
+PAN-443 renames the package scope from `@panopticon/*` to `@panctl/*` and wires up a three-package release pipeline (cli, contracts, desktop). All four reviewers found no MUST-level blockers. The requirements reviewer found the PR PARTIALLY COMPLETE (REQ-5 partial — docs describe the wrong runtime behavior for `npx @panctl/cli`). The correctness reviewer found two SHOULD warnings: a build-order regression that will break `npm run build` on fresh clones, and stale dist artifacts from a DTS extension change. Performance and security are clean. Three issues must be addressed before merge.
 
 ## Blockers (MUST fix before merge)
 
-### 1. Missing docs reference in architecture.mdx — `reference/architecture.mdx:223` — `!`
-**Raised by**: requirements
-**Why it blocks**: Requirements reviewer REQ-8 explicitly requires all "panopticon-cli" npm package references to be updated. The file still tells users to `npm unlink panopticon-cli` which refers to the old (now deprecated) package name — this contradicts the completed rename and misleads users who follow the docs after the migration.
-
-<fix instruction>
-Change `reference/architecture.mdx:223` from `npm unlink panopticon-cli` to `npm unlink @panctl/cli` (or remove the command entirely if the section is no longer applicable after the rename). The surrounding context should be reviewed to ensure the package-management instructions are consistent with the `@panctl/cli` canonical name throughout.
-</fix>
-
-### 2. tsdown `alwaysBundle` pattern not updated for rename — `tsdown.config.ts`, `apps/desktop/tsdown.config.ts`, `src/dashboard/server/tsdown.config.ts` — `!`
-**Raised by**: correctness
-**Why it blocks**: All three tsdown configs still match `@panopticon/` in their `alwaysBundle` option, which controls whether workspace local packages are inlined into the published bundle. Since the PR renamed the packages to `@panctl/contracts`, these patterns will silently stop matching — the bundled output will treat `@panctl/contracts` as an external dependency and the published npm packages will fail at runtime when `@panctl/contracts` is not installed separately. This is a build completeness gap: all import sites were renamed but the bundler configuration was missed.
-
-<fix instruction>
-Update all three `alwaysBundle` patterns to match the new scope:
-
-```typescript
-// tsdown.config.ts (root) — change line 16:
-alwaysBundle: (id) => id.startsWith('@panctl/'),
-
-// apps/desktop/tsdown.config.ts — change line 16:
-alwaysBundle: (id: string) => id.startsWith("@panctl/"),
-
-// src/dashboard/server/tsdown.config.ts — change line 13:
-alwaysBundle: [/^@panctl\//],
-```
-</fix>
+_none_
 
 ## High Priority (SHOULD fix; synthesis may still approve if justified)
 
-### 1. `catalog:` dependency in published contracts package — `packages/contracts/package.json:22` — `~`
+### 1. Docs describe wrong runtime behavior for `npx @panctl/cli` — `~`
+**Raised by**: requirements
+**Why it blocks**: The changed docs (README.md, introduction.mdx, quickstart.mdx, cli/overview.mdx, docs/USAGE.md) describe `npx @panctl/cli` as opening the Electron/Command Deck desktop app directly. However, `src/cli/index.ts:925–989` defaults to the browser/server launcher (`serve`), and the Electron launcher lives in `apps/desktop/bin/panctl.mjs`. Merging with this inconsistency means the published package will have misleading usage docs.
+
+**Fix instruction**: Update the changed docs to describe `npx @panctl/cli` as launching the browser/server experience. Reserve Electron/Command Deck wording for `@panctl/desktop`.
+
+### 2. Build order regression — `package.json:67` — `~`
 **Raised by**: correctness
-<fix instruction>
-Before publishing the contracts package, replace `"effect": "catalog:"` with the resolved semver version. The release workflow should add a step that resolves `effect` from `node_modules` and writes the resolved version back into `package.json` before `npm publish`. Alternatively, hardcode the version range directly in `packages/contracts/package.json` instead of using `catalog:` — this is the simplest fix and avoids CI complexity.
-</fix>
+**Why it blocks**: `npm run build` currently runs `build:cli` before `build:contracts`. This PR changed `packages/contracts/package.json` to export from `./dist/index.mjs` instead of `./src/index.ts`. On a fresh clone (where `dist/` is gitignored and doesn't exist), `build:cli` will fail with a module resolution error because tsdown's `alwaysBundle` will follow the `@panctl/contracts` workspace symlink and find no `dist/index.mjs`.
+
+**Fix instruction**: Reorder the build script in `package.json` to run contracts first:
+```json
+"build": "npm run build:contracts && npm run build:cli && npm run build:scripts && npm run build:dashboard"
+```
+
+### 3. Stale DTS extension artifacts — `packages/contracts/tsdown.config.ts:9` — `~`
+**Raised by**: correctness
+**Why it blocks**: The `outExtensions.dts` changed from `.d.mts` to `.d.ts`. The existing `packages/contracts/dist/` contains stale `.d.mts` files. Incremental builds will not clean the old extension, causing stale and new type declarations to coexist.
+
+**Fix instruction**: Add a pre-build clean step for contracts dist, or ensure developers do a clean build (`rm -rf packages/contracts/dist && npm run build:contracts`) after this migration. Document this in the migration notes.
 
 ## Nits (advisory — safe to defer)
 
-- `apps/desktop/src/updater.ts:80` — `?` — `setFeedURL` still references `repo: "panopticon-cli"`. This is correct — the GitHub repo name is unchanged — so no action needed. (correctness)
-- `reference/architecture.mdx:223` — `?` — The unlink command references the old package name (covered by blocker #1 above). (correctness)
-- `packages/contracts/package.json:7` — `?` — Dist-backed exports are a positive change, not a concern. (performance)
+- `docs/WORKSPACE-DEPENDENCIES.md`, `docs/EXTERNAL-EVENT-STREAM.md`, `docs/prds/*` — `?` — Historical docs still reference `@panopticon/contracts`. These files were not changed by this PR, so they are out of scope, but they should be updated in a follow-up to avoid confusing new developers. (correctness)
 
 ## Cross-cutting groups
 
-**Build configuration completeness for scope rename** (all three share the same root cause: the rename touched all import sites but missed build-time configuration):
-- [blocker-2] tsdown `alwaysBundle` pattern not updated for rename (`tsdown.config.ts`, `apps/desktop/tsdown.config.ts`, `src/dashboard/server/tsdown.config.ts`)
-- [high-1] `catalog:` dependency in published contracts package (`packages/contracts/package.json:22`)
-
-**These should be fixed together** — the tsdown fix restores bundling, and the `catalog:` fix ensures external consumers can install the published package. Both are part of the same "did we correctly handle build/config for the scope rename?" failure mode.
+**Build pipeline ordering** (all three issues relate to the new dist-based contracts export):
+- [high-2] Build order regression — `build:cli` runs before `build:contracts` which now requires `dist/`
+- [high-3] Stale DTS artifacts — old `.d.mts` files coexist with new `.d.ts` in contracts dist
+- [high-1] Docs inconsistency — docs describe Electron behavior but code ships browser/server
 
 ## What's good
-- All 7 fully-implemented requirements are correctly done: package renames, bin wiring for both `panctl` and `pan`, contracts refactoring with no remaining `@panopticon/contracts` references, multi-package publishing in CI, deprecation of legacy packages, and docs updated to show `npx @panctl/cli`.
-- Security review found zero issues — no injection paths, auth regressions, or secret exposure introduced.
-- Performance review found no regressions; dist-backed contract exports are an improvement.
-- Contracts version syncing added to the release command (`src/cli/commands/release.ts:386`) is correctly implemented.
+- Import renames are thorough and complete — zero stale `@panopticon/contracts` references remain in source code
+- Release pipeline correctly publishes all three packages and deprecates old npm names on stable release
+- Security and performance reviews are clean with no new concerns introduced
 
 ## Review stats
-- Blockers: 2   High: 1   Medium: 0   Nits: 3
-- By reviewer: correctness=2, security=0, performance=0, requirements=1
-- Files touched: 80   Files with findings: 5
+- Blockers: 0   High: 3   Medium: 0   Nits: 2
+- By reviewer: correctness=4, requirements=1, performance=0, security=0
+- Files touched: 28+   Files with findings: 7
 
 ## Appendix: individual reviews
 
-See individual reviewer output files listed in `## Reviewer Output Files` in the Synthesis Context above. Those files contain full per-reviewer detail; this synthesis is the policy layer.
+See individual reviewer output files listed in `## Reviewer Output Files` in the
+Synthesis Context above. Those files contain full per-reviewer detail; this
+synthesis is the policy layer.
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 
