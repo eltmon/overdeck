@@ -2,93 +2,80 @@
 specialist: review-agent
 issueId: PAN-879
 outcome: changes-requested
-timestamp: 2026-04-27T13:20:06Z
+timestamp: 2026-04-27T13:39:19Z
 ---
 
 # Verdict: CHANGES_REQUESTED
 
 ## Summary
-PAN-879 introduces a canonical stash taxonomy (`pre-merge`, `pre-spawn`, `review-temp`, `salvageable`), a periodic stash janitor in the Deacon patrol, and a dashboard UI for managing salvageable stashes. All 12 requirements are implemented. However, two critical correctness issues must be resolved before merge: (1) `cleanupSpawnAndOrphanedStashes` uses the `delete` operator on agent state properties instead of explicit `undefined` assignment, creating fragile type contracts and logical TOCTOU; (2) the merge agent drops (instead of pops) the pre-merge stash after successful merge, silently discarding any uncommitted workspace state that existed before the merge — a data-loss regression from prior behavior. Both are blockers per RFC 2119 policy.
+PAN-879 implements a canonical stash taxonomy with named prefixes, a janitor in the Deacon for stale stash cleanup, lifecycle management for pre-merge/pre-spawn/review-temp/salvageable stashes, and a dashboard inspector UI for recovering or dismissing salvageable stashes. The implementation is structurally sound with good test coverage. However, two critical issues block merge: (1) the new stash recovery and deletion endpoints are unauthenticated, expanding the dashboard's mutation surface without any authorization guard; and (2) the merge success path violates its own explicit acceptance criterion — it restores (`popStash`) the pre-merge safety stash instead of dropping it, contradicting CLAUDE.md stash hygiene rules.
 
 ## Blockers (MUST fix before merge)
 
-### 1. Pre-merge stash is dropped instead of popped — dirty workspace state silently discarded — `src/lib/cloister/merge-agent.ts:~1159–1175` — `!`
-**Raised by**: correctness
-**Why it blocks**: After a successful merge, any uncommitted changes that existed in the workspace before the merge are silently lost. The old code used `git stash pop` to restore those changes; the new code drops the stash instead. This is a data-loss regression for any user who had local work in the workspace.
+### 1. Unauthenticated stash recovery and deletion endpoints — `src/dashboard/server/routes/workspaces.ts:1166,1196` — `!`
+**Raised by**: security
+**Why it blocks**: `POST /api/workspaces/:issueId/stashes/:stashRef/recover` and `DELETE /api/workspaces/:issueId/stashes/:stashRef` perform destructive Git operations (branch creation, stash deletion) with no authentication, authorization, or CSRF validation. An attacker who can reach the dashboard server can enumerate stash refs via `GET /api/workspaces/:issueId/stashes`, then create recovery branches from or permanently delete salvageable user work.
 
-<fix instruction>: Before changing the drop behavior, check whether the workspace was dirty before the merge. If it was, either (a) use `git stash pop` to restore the stashed changes after a successful merge (matching prior behavior), or (b) add a guard that refuses to merge if the workspace is dirty, with a clear error message. The stash hygiene spec says "drop once the merge succeeds" — validate whether this was intentional (workspaces should be clean before merge) vs. an accidental behavioral change. Document the decision explicitly. If the prior `pop` behavior was correct for user experience, restore it.
+**Fix instruction**: Add the same trust-boundary checks used by other privileged dashboard actions before performing the Git operation. At minimum, wire in the workspace mutation permission check (the same pattern used by other destructive endpoints in the same route module). If localhost-only access is the intended guard, enforce it explicitly at the server boundary rather than relying on convention.
 
-### 2. `delete` operator on agent state properties corrupts typed state contract — `src/lib/cloister/deacon.ts:cleanupSpawnAndOrphanedStashes` — `!`
-**Raised by**: correctness
-**Why it blocks**: Using `delete agentState.preSpawnStashRef` removes the key entirely from the object, causing future `in agentState` checks to differ from `!== undefined` checks. This fragile contract will silently break any future code that relies on `'preSpawnStashRef' in agentState` vs. `agentState.preSpawnStashRef !== undefined`.
+### 2. Merge success path does not drop the `pre-merge:` stash — `src/lib/cloister/merge-agent.ts:1161` — `!`
+**Raised by**: requirements
+**Why it blocks**: The issue's explicit acceptance criterion states "`merge-agent.ts` drops `pre-merge:` stash on success AND on rollback." The current success path at line 1161 calls `popStash(projectPath, preMergeStashRef)` which restores the stash instead of dropping it. The corresponding test at `src/lib/cloister/__tests__/merge-agent-stash.test.ts:88` also codifies the wrong behavior (asserts `dropStash` was NOT called). This is a missing requirement (REQ-13) and violates the CLAUDE.md stash hygiene rule that "`pre-merge:*` — drop once the merge succeeds."
 
-<fix instruction>: Replace all `delete` calls in `cleanupSpawnAndOrphanedStashes` with explicit `undefined` assignment:
-```typescript
-agentState.preSpawnStashRef = undefined;
-agentState.preSpawnStashMessage = undefined;
-agentState.preSpawnBaselineHead = undefined;
-saveAgentState(agentState);
-```
+**Fix instruction**: Change the merge success path to call `dropStash(projectPath, preMergeStashRef)` instead of `popStash(...)`. Update the test to assert that `dropStash` IS called on successful merge completion. The rollback path already correctly drops the stash — only the success path needs to be fixed.
 
 ## High Priority (SHOULD fix; synthesis may still approve if justified)
 
-### 1. `resolveStashOperationRef` has TOCTOU window between resolution and operation — `src/lib/stashes.ts:176–200` — `~`
+### 1. TOCTOU race on pre-spawn stash baseline check — `src/lib/cloister/deacon.ts:cleanupSpawnAndOrphanedStashes` — `~`
 **Raised by**: correctness
-<fix instruction>: This is acceptable for the current single-threaded architecture. Add a comment documenting the assumption that only one Deacon patrol runs at a time and no concurrent stash operations occur. If concurrent operations ever become possible, wrap the resolve+operate sequence in a lock.
+**Fix instruction**: Consider adding a minimum agent-runtime threshold (e.g., 5 minutes) before the janitor drops a pre-spawn stash, to avoid dropping a stash where `hasCommitsAhead` is true purely due to a rebased baseline rather than actual new commits.
 
-### 2. `reconcileAndCheckIfMerged` burns rate limits when GitHub App check fails — `src/lib/cloister/deacon.ts` — `~`
+### 2. Multi-project workspace path resolution bypasses existing pattern — `src/dashboard/server/routes/workspaces.ts:resolveWorkspacePath` — `~`
 **Raised by**: correctness
-<fix instruction>: Cache the reconciliation result per issue ID for the duration of a janitor cycle. Alternatively, skip the tracker fallback when the GitHub App check returns a definitive "not merged" vs. an error, to avoid burning rate limits on consistently misconfigured tokens.
+**Fix instruction**: `resolveWorkspacePath` derives the path from issue prefix alone. For multi-project setups where two projects share a prefix, this could resolve to the wrong workspace. Reuse the workspace resolution pattern from the existing workspace detail endpoints (which use workspace metadata file) instead of deriving from prefix.
 
-### 3. `cleanupSpawnAndOrphanedStashes` silently skips agents when baseline HEAD is missing — `src/lib/cloister/deacon.ts` — `~`
+### 3. Sequence counter incremented even when no stash is created — `src/lib/cloister/review-agent.ts:108-125` — `~`
 **Raised by**: correctness
-<fix instruction>: In the `git rev-list` catch block, if the error indicates the baseline ref no longer exists, proceed to drop the stash anyway (the agent clearly has commits since it is still running). Only skip the cleanup if the error is ambiguous.
+**Fix instruction**: Call `getNextReviewTempSequence` only after confirming the stash was actually created, to avoid cosmetic gaps in sequence numbering. Alternatively, accept the gap as currently documented — the behavior is functionally correct.
 
-### 4. `getWorkspaceStashesRoute` returns 200 with empty array for non-existent workspaces — `src/dashboard/server/routes/workspaces.ts` — `~`
+### 4. Stale merge reconciliation sets `mergeStatus: 'merged'` for cancelled issues — `src/lib/cloister/deacon.ts:reconcileAndCheckIfMerged` — `~`
 **Raised by**: correctness
-<fix instruction>: Add `existsSync(workspacePath)` check and return 404 if the workspace does not exist, consistent with the recover and dismiss routes.
-
-### 5. `stashesToDrop` deduplication filter rationale is subtle and undocumented — `src/lib/cloister/deacon.ts` — `~`
-**Raised by**: correctness
-<fix instruction>: Add a comment explaining that drops must execute in descending stack order and the deduplication intentionally prefers the "merged" label over "stale" when a stash appears in both categories.
+**Fix instruction**: Treat tracker "closed" state as a secondary heuristic only when a PR URL exists. Use the GitHub App PR state check (`prState.merged`) as the primary signal, which correctly distinguishes merged from cancelled/duplicate/wontfix.
 
 ## Nits (advisory — safe to defer)
 
-- `src/lib/stashes.ts:85,96,107` — `?` — `parseCanonicalStashMessage` issue ID regex `(\w+-\d+)` is too restrictive for multi-hyphen issue IDs (e.g., `KRUX-SUB-3`). Consider `([A-Z]+(?:-[A-Z]+)*-\d+)` or reusing existing issue ID parsing utilities. (correctness)
-- `src/lib/stashes.ts:151` — `?` — `listStashes` uses raw format string. No change needed, but consider `execFileAsync` with an argument array for defense-in-depth. (correctness)
-- `src/lib/__tests__/stashes.test.ts` — `?` — Missing edge case tests for `parseStashListLine`: empty messages, all-zeros SHA, invalid ISO date strings, legacy path where `ref` falls back to `stackRef`. (correctness)
-- `src/dashboard/server/routes/workspaces.ts` — `?` — `workspacePath` is computed independently in each stash route. Extract a shared `resolveWorkspacePath(issueId)` helper if one doesn't exist. (correctness)
-- `src/lib/cloister/review-agent.ts:ensureReviewTempStash` — `?` — Swallows the case where `git status --porcelain` reports changes but `git stash push` returns "No local changes". Acceptable risk given the microsecond window. Document the assumption. (correctness)
-- `src/lib/cloister/deacon.ts:cleanupOrphanedReviewSessions` — `?` — Coordinator exclusion uses `.includes('coordinator')` substring check. More specific to check for `-coordinator-` as a segment. (correctness)
-- `src/dashboard/server/routes/workspaces.ts:1141` — `?` — `GET /api/workspaces/:issueId/stashes` shells out `git stash list` on every inspector poll (60s). Small optimization opportunity; not necessary for this PR. (performance)
+- `src/lib/stashes.ts:130-131` — `?` — Decorated message extraction may misparse branch names with colons. Consider a more robust extraction for the `On <branch>: <message>` format. (correctness)
+- `src/lib/stashes.ts:190-205` — `?` — `resolveStashOperationRef` calls `listStashes` on every invocation. Consider caching results within a batch operation for minor performance improvement. (correctness)
+- `src/lib/cloister/review-agent.ts:1040-1047` — `?` — The `finally` block cleanup may mask the original review error if cleanup itself fails. Consider surfacing the original error prominently in error logs. (correctness)
+- `src/dashboard/frontend/src/components/InspectorPanel.tsx:186` — `?` — Salvageable stash query polls every 60s; could be event-driven eventually. Current cadence is fine for current scale. (performance)
 
 ## Cross-cutting groups
 
-**Stash state management** (fix together to ensure consistent state tracking):
-- [blocker-1] Pre-merge stash drop vs. pop decision in merge-agent.ts
-- [blocker-2] `delete` vs. `undefined` assignment in deacon.ts
-- [high-3] Baseline HEAD missing silently skips cleanup in deacon.ts
+**Stash endpoint authorization** (same root cause — no auth layer on new mutation endpoints):
+- [blocker-1] Unauthenticated stash recovery and deletion endpoints
 
-**Deacon janitor correctness** (related janitor logic, fix together):
-- [high-2] Rate limit burning in `reconcileAndCheckIfMerged`
-- [high-5] Deduplication filter undocumented in `stashesToDrop`
+**Merge success path** (same root cause — wrong stash operation on success):
+- [blocker-2] Merge success path does not drop `pre-merge:` stash
+- The test `src/lib/cloister/__tests__/merge-agent-stash.test.ts:88` codifies the same incorrect behavior and must be updated alongside the fix
+
+**Workspace path resolution** (related findings on path derivation):
+- [high-2] Multi-project workspace path resolution bypasses existing pattern
+- [blocker-1] The unauthenticated endpoints also use `resolveWorkspacePath`, amplifying the multi-project risk
 
 ## What's good
-- All 12 requirements are implemented and verified; requirements reviewer found zero missing or partial items.
-- Security reviewer found no vulnerabilities in the new server routes or stash helpers.
-- Stash taxonomy design (stable SHA refs with re-resolution before operations) is sound.
-- Dashboard UI correctly scopes salvageable stash actions to the requesting issue ID.
+- Canonical stash taxonomy (`stashes.ts`) is well-designed with clear type definitions and consistent naming conventions.
+- Test coverage for the janitor logic, merge stash lifecycle, and review-temp cleanup is thorough and uses realistic scenarios.
+- The salvageable stash inspector UI and confirmation dialog represent a solid user-facing improvement.
+- Startup legacy-stash scan safely logs non-canonical stashes without deleting them — appropriate first step.
 
 ## Review stats
-- Blockers: 2   High: 5   Medium: 0   Nits: 7
-- By reviewer: correctness=2, security=0, performance=0, requirements=0
-- Files touched: 19   Files with findings: 13
+- Blockers: 2   High: 4   Medium: 0   Nits: 4
+- By reviewer: correctness=7, security=2, performance=2, requirements=1
+- Files touched: 19   Files with findings: 9
 
 ## Appendix: individual reviews
 
-See individual reviewer output files listed in `## Reviewer Output Files` in the
-Synthesis Context above. Those files contain full per-reviewer detail; this
-synthesis is the policy layer.
+See individual reviewer output files listed in `## Reviewer Output Files` in the Synthesis Context above. Those files contain full per-reviewer detail; this synthesis is the policy layer.
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 
