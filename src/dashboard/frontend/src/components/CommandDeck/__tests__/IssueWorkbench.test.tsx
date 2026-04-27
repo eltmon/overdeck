@@ -124,6 +124,27 @@ describe('IssueWorkbench', () => {
     expect(screen.queryByTestId('session-panel')).not.toBeInTheDocument();
   });
 
+  it('renders issue-selected mode when the slice explicitly clears session focus', () => {
+    act(() => {
+      useCommandDeckSelection.getState().selectSession(ISSUE, null);
+    });
+
+    render(
+      <Wrapper>
+        <IssueWorkbench
+          issueId={ISSUE}
+          title="Test issue"
+          sessions={[makeSession(SESSION_ID)]}
+        />
+      </Wrapper>,
+    );
+
+    const workbench = screen.getByTestId('issue-workbench');
+    expect(workbench).toHaveAttribute('data-mode', 'issue-selected');
+    expect(screen.getByTestId('zone-c-overview')).toBeInTheDocument();
+    expect(screen.queryByTestId('zone-b')).not.toBeInTheDocument();
+  });
+
   it('renders agent-selected mode when slice has a matching session', () => {
     act(() => {
       useCommandDeckSelection.getState().selectSession(ISSUE, SESSION_ID);

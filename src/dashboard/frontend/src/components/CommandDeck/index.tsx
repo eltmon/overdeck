@@ -209,7 +209,6 @@ export function CommandDeck({
     queryKey: ['session-trees', projectNamesKey],
     queryFn: () => fetchAllSessionTrees(projects.map(p => p.name)),
     enabled: showProjects && projects.length > 0,
-    refetchInterval: 10000,
   });
 
   const sessionTreeDataRef = useRef<Record<string, ProjectSessionTree>>({});
@@ -370,21 +369,10 @@ export function CommandDeck({
 
   const handleSelectFeature = useCallback((issueId: string) => {
     setSelectedFeature(issueId);
-    // Auto-select the best alive session so the user doesn't have to click twice
-    // (feature → session). Falls back to issue-selected mode when no sessions exist.
-    let sessions: SessionNode[] = [];
-    for (const project of projectsWithSessions) {
-      const feature = project.features.find(f => f.issueId === issueId);
-      if (feature) {
-        sessions = feature.sessions ?? [];
-        break;
-      }
-    }
-    const best = pickBestSession(sessions);
-    selectSession(issueId, best?.sessionId ?? null);
+    selectSession(issueId, null);
     setSelectedConversation(null);
     setIsDraft(false);
-  }, [selectSession, projectsWithSessions]);
+  }, [selectSession]);
 
   const handleSelectSession = useCallback((issueId: string, sessionId: string) => {
     setSelectedFeature(issueId);

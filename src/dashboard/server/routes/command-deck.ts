@@ -197,10 +197,13 @@ const getMissionControlActivityRoute = HttpRouter.add(
   '/api/command-deck/activity/:issueId',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
+    const request = yield* HttpServerRequest.HttpServerRequest;
     const issueId = params['issueId'] ?? '';
+    const url = new URL(request.url, 'http://localhost');
+    const includeTranscripts = url.searchParams.get('summary') !== '1';
 
     const result = yield* Effect.tryPromise({
-      try: () => fetchActivityData(issueId),
+      try: () => fetchActivityDataWithContext(issueId, { includeTranscripts }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     return jsonResponse(result);

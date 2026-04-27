@@ -6,7 +6,7 @@
  * can land in PAN-866 without expanding this issue's scope.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Issue, Agent } from '../../types';
 import { OverviewTab } from './ZoneCOverviewTabs/OverviewTab';
 
@@ -83,6 +83,18 @@ export function ZoneCOverview({
 
   const [internalTab, setInternalTab] = useState<OverviewTab>(getInitialTab);
   const tab = activeTab ?? internalTab;
+  const tabRefs = useRef<Record<OverviewTab, HTMLButtonElement | null>>({
+    overview: null,
+    activity: null,
+    costs: null,
+    prd: null,
+    state: null,
+    inference: null,
+    vbrief: null,
+    beads: null,
+    prdiff: null,
+    discussions: null,
+  });
 
   const visibleTabs = ALL_TABS;
 
@@ -122,6 +134,11 @@ export function ZoneCOverview({
     }
   };
 
+  const moveTabFocus = (next: OverviewTab) => {
+    handleTabClick(next);
+    tabRefs.current[next]?.focus();
+  };
+
   return (
     <div
       data-testid="zone-c-overview"
@@ -143,25 +160,32 @@ export function ZoneCOverview({
           if (event.key === 'ArrowRight') {
             event.preventDefault();
             const next = visibleTabs[(currentIndex + 1) % visibleTabs.length]?.key;
-            if (next) handleTabClick(next);
+            if (next) moveTabFocus(next);
           }
 
           if (event.key === 'ArrowLeft') {
             event.preventDefault();
             const next = visibleTabs[(currentIndex - 1 + visibleTabs.length) % visibleTabs.length]?.key;
-            if (next) handleTabClick(next);
+            if (next) moveTabFocus(next);
+          }
+
+          if (event.key === 'Tab') {
+            event.preventDefault();
+            const delta = event.shiftKey ? -1 : 1;
+            const next = visibleTabs[(currentIndex + delta + visibleTabs.length) % visibleTabs.length]?.key;
+            if (next) moveTabFocus(next);
           }
 
           if (event.key === 'Home') {
             event.preventDefault();
             const next = visibleTabs[0]?.key;
-            if (next) handleTabClick(next);
+            if (next) moveTabFocus(next);
           }
 
           if (event.key === 'End') {
             event.preventDefault();
             const next = visibleTabs[visibleTabs.length - 1]?.key;
-            if (next) handleTabClick(next);
+            if (next) moveTabFocus(next);
           }
         }}
         style={{
@@ -182,6 +206,9 @@ export function ZoneCOverview({
           return (
             <button
               key={spec.key}
+              ref={(node) => {
+                tabRefs.current[spec.key] = node;
+              }}
               role="tab"
               aria-selected={active}
               aria-controls={`zone-c-overview-panel-${spec.key}`}

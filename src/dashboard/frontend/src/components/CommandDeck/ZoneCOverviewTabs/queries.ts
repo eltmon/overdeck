@@ -105,8 +105,8 @@ export function usePlanningQuery(issueId: string): UseQueryResult<PlanningRespon
 
 export function useActivityQuery(issueId: string): UseQueryResult<ActivityResponse> {
   return useQuery({
-    queryKey: ['command-deck-activity', issueId],
-    queryFn: () => fetchJson<ActivityResponse>(`/api/command-deck/activity/${issueId}`),
+    queryKey: ['command-deck-activity', issueId, 'summary'],
+    queryFn: () => fetchJson<ActivityResponse>(`/api/command-deck/activity/${issueId}?summary=1`),
     refetchInterval: 5_000,
   });
 }
