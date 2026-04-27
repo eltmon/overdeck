@@ -115,20 +115,26 @@ export function RoundCard({ round, active = false, onClick, className }: RoundCa
           {VERDICT_LABEL[round.verdict]}
         </span>
       </div>
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          color: 'var(--muted-foreground)',
-          fontSize: 11,
-        }}
-      >
-        {typeof round.findings === 'number' && (
-          <span data-testid="round-card-findings">{round.findings} finding{round.findings === 1 ? '' : 's'}</span>
-        )}
-        <span data-testid="round-card-duration">{fmtDuration(round.duration)}</span>
-        <span data-testid="round-card-cost">{fmtCost(round.cost)}</span>
-      </div>
+      {(typeof round.findings === 'number' || round.duration != null || round.cost != null) && (
+        <div
+          style={{
+            display: 'flex',
+            gap: 8,
+            color: 'var(--muted-foreground)',
+            fontSize: 11,
+          }}
+        >
+          {typeof round.findings === 'number' && (
+            <span data-testid="round-card-findings">{round.findings} finding{round.findings === 1 ? '' : 's'}</span>
+          )}
+          {round.duration != null && (
+            <span data-testid="round-card-duration">{fmtDuration(round.duration)}</span>
+          )}
+          {round.cost != null && (
+            <span data-testid="round-card-cost">{fmtCost(round.cost)}</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -95,11 +95,12 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
 
   const hasJsonl = !!session.hasJsonl;
   const hasTranscript = !!session.transcript;
-  // Only allow terminal for work/planning sessions with a live tmux session
-  const allowTerminal = (session.type === 'work' || session.type === 'planning') &&
-    !!session.tmuxSession &&
-    session.presence === 'active';
-  const hasTerminal = allowTerminal;
+  // Allow terminal for any session with a live tmux session — reviewers and
+  // specialists have attachable tmux sessions too. The tmux session name is
+  // either the explicit tmuxSession field or the sessionId (which is the
+  // canonical tmux name for reviewer/specialist sessions).
+  const tmuxName = session.tmuxSession || (session.presence === 'active' ? session.sessionId : undefined);
+  const hasTerminal = !!tmuxName && session.presence === 'active';
   const isEnded = session.presence === 'ended';
   const roundData = useMemo(() => deriveRoundData(session.roundMetadata), [session.roundMetadata]);
   const hasFindings = roundData.length > 0;
@@ -174,8 +175,8 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
         )}
 
         {view === 'terminal' && (
-          hasTerminal ? (
-            <XTerminal sessionName={session.tmuxSession!} />
+          hasTerminal && tmuxName ? (
+            <XTerminal sessionName={tmuxName} />
           ) : (
             <div className={styles.sessionPanelEmpty}>
               {isEnded ? 'Session ended' : 'No terminal session available.'}

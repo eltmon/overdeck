@@ -873,11 +873,12 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
             {REVIEWER_ROLES.map((role) => {
               const sec = reviewerSections.find((s) => s.role === role);
               const data = findLatestRoundData(sec?.roundMetadata);
-              // When the reviewer is currently running, override the stale
-              // round artifact verdict — the card should show "running"
+              // When the reviewer is currently running, show "running" status.
+              // If there's prior round data, keep showing it but with running verdict.
+              // If no prior data, show a clean running card.
               const isLive = sec?.status === 'running' || sec?.status === 'active';
               const displayData = isLive
-                ? { round: (data?.round ?? 0) + 1, verdict: 'running' as const, findings: undefined, duration: null }
+                ? { round: data ? data.round + 1 : 1, verdict: 'running' as const }
                 : data;
               return (
                 <div
