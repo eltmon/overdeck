@@ -50,6 +50,7 @@ export interface PendingOperation {
 
 export interface SalvageableStashInfo {
   ref: string;
+  stackRef?: string;
   issueId: string;
   message: string;
   shortDescription: string;

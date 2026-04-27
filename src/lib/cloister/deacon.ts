@@ -159,7 +159,7 @@ export function loadConfig(): DeaconConfig {
 
   const cloisterConfig = loadCloisterConfig();
   const configuredJanitorCycles = cloisterConfig.monitoring.stash_janitor_every_cycles;
-  if (typeof configuredJanitorCycles === 'number' && configuredJanitorCycles > 0) {
+  if (typeof configuredJanitorCycles === 'number' && configuredJanitorCycles >= 0) {
     config.stashJanitorEveryCycles = configuredJanitorCycles;
   }
 
@@ -2547,7 +2547,7 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
         const stashesToDrop = [...mergedPreMergeStashes, ...staleStashes]
           .filter((stash, index, entries) => entries.findIndex((entry) => entry.ref === stash.ref) === index)
           .map((stash) => {
-            const indexMatch = stash.ref.match(/stash@\{(\d+)\}/);
+            const indexMatch = stash.stackRef?.match(/stash@\{(\d+)\}/);
             const stashIndex = indexMatch ? parseInt(indexMatch[1], 10) : Number.NaN;
             return { stash, stashIndex };
           })
@@ -3286,8 +3286,12 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...stuckActions);
   for (const a of stuckActions) addLog('action', a, state.patrolCycle);
 
-  const stashJanitorEveryCycles = Math.max(1, config.stashJanitorEveryCycles || Math.round((60 * 60 * 1000) / config.patrolIntervalMs));
-  if (state.patrolCycle % stashJanitorEveryCycles === 0) {
+  const configuredStashJanitorEveryCycles = config.stashJanitorEveryCycles
+    ?? Math.round((60 * 60 * 1000) / config.patrolIntervalMs);
+  const stashJanitorEveryCycles = configuredStashJanitorEveryCycles > 0
+    ? Math.max(1, configuredStashJanitorEveryCycles)
+    : Number.POSITIVE_INFINITY;
+  if (Number.isFinite(stashJanitorEveryCycles) && state.patrolCycle % stashJanitorEveryCycles === 0) {
     const stashJanitorActions = await cleanupSpawnAndOrphanedStashes();
     actions.push(...stashJanitorActions);
     for (const a of stashJanitorActions) addLog('action', a, state.patrolCycle);

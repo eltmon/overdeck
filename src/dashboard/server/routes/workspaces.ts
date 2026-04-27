@@ -1144,6 +1144,7 @@ const getWorkspaceStashesRoute = HttpRouter.add(
       .filter((entry) => entry.issueId === issueId.toUpperCase())
       .map((entry) => ({
         ref: entry.ref,
+        stackRef: entry.stackRef,
         issueId: entry.issueId,
         message: entry.message,
         shortDescription: entry.shortDescription,

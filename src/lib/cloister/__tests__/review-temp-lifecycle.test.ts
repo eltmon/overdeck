@@ -39,10 +39,10 @@ vi.mock('../../review-status.js', () => ({
 
 vi.mock('../../../lib/stashes.js', () => ({
   buildStashMessage: vi.fn((kind: string, issueId: string, arg: number) => `${kind}:${issueId.toUpperCase()}:${arg}`),
-  createNamedStash: vi.fn(async () => 'stash@{0}'),
+  createNamedStash: vi.fn(async () => 'abc123def456abc123def456abc123def456abcd'),
   dropStash: dropStashMock,
   getNextReviewTempSequence: vi.fn(() => 2),
-  listStashes: vi.fn(async () => [{ ref: 'stash@{1}', kind: 'review-temp', issueId: 'PAN-1', message: 'review-temp:PAN-1:1', sequence: 1 }]),
+  listStashes: vi.fn(async () => [{ ref: 'def456abc123def456abc123def456abc123def4', stackRef: 'stash@{1}', kind: 'review-temp', issueId: 'PAN-1', message: 'review-temp:PAN-1:1', sequence: 1 }]),
 }));
 
 vi.mock('fs/promises', async (importOriginal) => {
@@ -123,7 +123,7 @@ describe('review-temp stash lifecycle', () => {
 
     expect(result.success).toBe(true);
     expect(reviewStatusState.get('PAN-1')).toMatchObject({
-      reviewTempStashRef: 'stash@{0}',
+      reviewTempStashRef: 'abc123def456abc123def456abc123def456abcd',
       reviewTempStashMessage: 'review-temp:PAN-1:2',
       reviewTempStashSequence: 2,
     });
@@ -159,7 +159,7 @@ describe('review-temp stash lifecycle', () => {
       testStatus: 'pending',
       updatedAt: new Date().toISOString(),
       readyForMerge: false,
-      reviewTempStashRef: 'stash@{3}',
+      reviewTempStashRef: 'abc123def456abc123def456abc123def456abcd',
       reviewTempStashMessage: 'review-temp:PAN-2:3',
       reviewTempStashSequence: 3,
     });

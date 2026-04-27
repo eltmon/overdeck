@@ -143,7 +143,7 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
       id: 'agent-pan-879',
       issueId: 'PAN-879',
       workspace: '/repo/workspaces/feature-pan-879',
-      preSpawnStashRef: 'stash@{0}',
+      preSpawnStashRef: 'abc123def456abc123def456abc123def456abcd',
       preSpawnStashMessage: 'pre-spawn:PAN-879:2026-04-27T14:15:16Z',
       preSpawnBaselineHead: 'spawn-head',
     } as any;
@@ -153,7 +153,7 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
 
     const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
 
-    expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'stash@{0}');
+    expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'abc123def456abc123def456abc123def456abcd');
     expect(execMock).toHaveBeenCalledWith(
       expect.stringContaining('git rev-list spawn-head..HEAD --count'),
       expect.anything(),
@@ -170,34 +170,34 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     mockListRunningAgents.mockReturnValue([] as any);
     mockGetAgentState.mockReturnValue(null);
     mockListStashes.mockResolvedValue([
-      { ref: 'stash@{1}', kind: 'pre-merge', issueId: 'PAN-879', createdAt: new Date('2026-03-01T00:00:00Z'), message: 'pre-merge:PAN-879:2026-03-01T00:00:00Z' } as any,
-      { ref: 'stash@{bogus}', kind: 'pre-spawn', issueId: 'PAN-879', createdAt: new Date('2026-03-01T00:00:00Z'), message: 'pre-spawn:PAN-879:2026-03-01T00:00:00Z' } as any,
-      { ref: 'stash@{2}', kind: 'salvageable', issueId: 'PAN-879', createdAt: new Date('2026-03-01T00:00:00Z'), message: 'salvageable:PAN-879:2026-03-01T00:00:00Z:notes', shortDescription: 'notes' } as any,
+      { ref: 'def456abc123def456abc123def456abc123def4', stackRef: 'stash@{1}', kind: 'pre-merge', issueId: 'PAN-879', createdAt: new Date('2026-03-01T00:00:00Z'), message: 'pre-merge:PAN-879:2026-03-01T00:00:00Z' } as any,
+      { ref: 'bogusbogusbogusbogusbogusbogusbogusbogus', kind: 'pre-spawn', issueId: 'PAN-879', createdAt: new Date('2026-03-01T00:00:00Z'), message: 'pre-spawn:PAN-879:2026-03-01T00:00:00Z' } as any,
+      { ref: 'fedcba654321fedcba654321fedcba654321fedc', stackRef: 'stash@{2}', kind: 'salvageable', issueId: 'PAN-879', createdAt: new Date('2026-03-01T00:00:00Z'), message: 'salvageable:PAN-879:2026-03-01T00:00:00Z:notes', shortDescription: 'notes' } as any,
     ]);
     mockIsOlderThanDays.mockImplementation((entry) => entry.kind === 'pre-merge' || entry.kind === 'pre-spawn');
 
     const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
 
-    expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'stash@{1}');
-    expect(mockDropStash).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'stash@{bogus}');
-    expect(mockDropStash).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'stash@{2}');
-    expect(actions).toContain('Dropped stale pre-merge stash for PAN-879: stash@{1}');
+    expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'def456abc123def456abc123def456abc123def4');
+    expect(mockDropStash).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'bogusbogusbogusbogusbogusbogusbogusbogus');
+    expect(mockDropStash).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'fedcba654321fedcba654321fedcba654321fedc');
+    expect(actions).toContain('Dropped stale pre-merge stash for PAN-879: def456abc123def456abc123def456abc123def4');
   });
 
   it('drops pre-merge stashes immediately when tracker state shows the issue is already merged', async () => {
     mockListRunningAgents.mockReturnValue([] as any);
     mockGetAgentState.mockReturnValue(null);
     mockListStashes.mockResolvedValue([
-      { ref: 'stash@{3}', kind: 'pre-merge', issueId: 'PAN-879', createdAt: new Date('2026-04-27T00:00:00Z'), message: 'pre-merge:PAN-879:2026-04-27T00:00:00Z' } as any,
+      { ref: '9999999999999999999999999999999999999999', stackRef: 'stash@{3}', kind: 'pre-merge', issueId: 'PAN-879', createdAt: new Date('2026-04-27T00:00:00Z'), message: 'pre-merge:PAN-879:2026-04-27T00:00:00Z' } as any,
     ]);
     mockGetProject.mockReturnValue({ tracker: 'linear' } as any);
     mockCreateTracker.mockReturnValue({ getIssue: vi.fn(async () => ({ state: 'closed' })) } as any);
 
     const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
 
-    expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'stash@{3}');
+    expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', '9999999999999999999999999999999999999999');
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-879', { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
-    expect(actions).toContain('Dropped merged issue pre-merge stash for PAN-879: stash@{3}');
+    expect(actions).toContain('Dropped merged issue pre-merge stash for PAN-879: 9999999999999999999999999999999999999999');
   });
 
   it('keeps pre-spawn stash metadata when branch advancement check fails', async () => {
@@ -205,7 +205,7 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
       id: 'agent-pan-879',
       issueId: 'PAN-879',
       workspace: '/repo/workspaces/feature-pan-879',
-      preSpawnStashRef: 'stash@{0}',
+      preSpawnStashRef: 'abc123def456abc123def456abc123def456abcd',
       preSpawnStashMessage: 'pre-spawn:PAN-879:2026-04-27T14:15:16Z',
       preSpawnBaselineHead: 'spawn-head',
     } as any;
@@ -218,7 +218,7 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
 
     expect(mockDropStash).not.toHaveBeenCalled();
     expect(mockSaveAgentState).not.toHaveBeenCalled();
-    expect(state.preSpawnStashRef).toBe('stash@{0}');
+    expect(state.preSpawnStashRef).toBe('abc123def456abc123def456abc123def456abcd');
     expect(state.preSpawnBaselineHead).toBe('spawn-head');
     expect(actions).toEqual([]);
   });
@@ -228,7 +228,7 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
       id: 'agent-pan-879',
       issueId: 'PAN-879',
       workspace: '/repo/workspaces/feature-pan-879',
-      preSpawnStashRef: 'stash@{0}',
+      preSpawnStashRef: 'abc123def456abc123def456abc123def456abcd',
       preSpawnStashMessage: 'pre-spawn:PAN-879:2026-04-27T14:15:16Z',
     } as any;
 
@@ -249,6 +249,14 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     } as any);
 
     expect(loadConfig().stashJanitorEveryCycles).toBe(7);
+  });
+
+  it('allows disabling stash janitor via zero cadence', () => {
+    mockLoadCloisterConfig.mockReturnValue({
+      monitoring: { stash_janitor_every_cycles: 0 },
+    } as any);
+
+    expect(loadConfig().stashJanitorEveryCycles).toBe(0);
   });
 
   it('logs non-canonical stashes on startup without deleting them', async () => {

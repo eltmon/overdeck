@@ -30,7 +30,7 @@ vi.mock('../../review-status.js', () => ({ markWorkspaceStuck: vi.fn() }));
 vi.mock('../../git-activity.js', () => ({ appendGitOperation: vi.fn() }));
 vi.mock('../../stashes.js', () => ({
   buildStashMessage: vi.fn(() => 'pre-merge:PAN-1:2026-04-27T14:15:16Z'),
-  createNamedStash: vi.fn(async () => 'stash@{0}'),
+  createNamedStash: vi.fn(async () => 'abc123def456abc123def456abc123def456abcd'),
   dropStash: vi.fn(async () => {}),
   popStash: vi.fn(async () => {}),
   listStashes: vi.fn(async () => []),
@@ -84,8 +84,8 @@ describe('merge-agent pre-merge stash lifecycle', () => {
 
     expect(result.success).toBe(true);
     expect(createNamedStash).toHaveBeenCalledWith('/tmp/workspace', 'pre-merge:PAN-1:2026-04-27T14:15:16Z', true);
-    expect(dropStash).toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
-    expect(popStash).not.toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
+    expect(dropStash).toHaveBeenCalledWith('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
+    expect(popStash).not.toHaveBeenCalledWith('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
   });
 
   it('drops pre-merge stash after quality-gate rollback', async () => {
@@ -109,21 +109,23 @@ describe('merge-agent pre-merge stash lifecycle', () => {
 
     expect(result.success).toBe(false);
     expect(autoRevertMerge).toHaveBeenCalledWith('/tmp/workspace');
-    expect(dropStash).toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
-    expect(popStash).not.toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
+    expect(dropStash).toHaveBeenCalledWith('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
+    expect(popStash).not.toHaveBeenCalledWith('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
   });
 
   it('drops lingering pre-merge stashes during post-merge lifecycle', async () => {
     vi.mocked(listStashes).mockResolvedValueOnce([
       {
-        ref: 'stash@{1}',
+        ref: 'def456abc123def456abc123def456abc123def4',
+        stackRef: 'stash@{1}',
         message: 'pre-merge:PAN-1:2026-04-27T14:15:16Z',
         kind: 'pre-merge',
         issueId: 'PAN-1',
         createdAt: new Date('2026-04-27T14:15:16Z'),
       },
       {
-        ref: 'stash@{0}',
+        ref: 'abc123def456abc123def456abc123def456abcd',
+        stackRef: 'stash@{0}',
         message: 'salvageable:PAN-1:2026-04-27T14:15:16Z:user work',
         kind: 'salvageable',
         issueId: 'PAN-1',
@@ -134,7 +136,7 @@ describe('merge-agent pre-merge stash lifecycle', () => {
 
     await postMergeLifecycle('PAN-1', '/tmp/workspace', 'feature/pan-1', { skipDeploy: true });
 
-    expect(dropStash).toHaveBeenCalledWith('/tmp/workspace', 'stash@{1}');
-    expect(dropStash).not.toHaveBeenCalledWith('/tmp/workspace', 'stash@{0}');
+    expect(dropStash).toHaveBeenCalledWith('/tmp/workspace', 'def456abc123def456abc123def456abc123def4');
+    expect(dropStash).not.toHaveBeenCalledWith('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
   });
 });

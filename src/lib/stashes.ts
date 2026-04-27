@@ -6,7 +6,10 @@ const execAsync = promisify(exec);
 export type CanonicalStashKind = 'pre-merge' | 'pre-spawn' | 'review-temp' | 'salvageable';
 
 export interface ParsedStashEntry {
+  /** Stable stash object SHA for persisted references. */
   ref: string;
+  /** Current stack position (e.g. stash@{0}) for display and index-based ordering. */
+  stackRef?: string;
   message: string;
   createdAt?: Date;
   issueId?: string;
@@ -117,16 +120,38 @@ export function parseCanonicalStashMessage(message: string): ParsedStashEntry {
 }
 
 export function parseStashListLine(line: string): ParsedStashEntry | null {
-  const match = /^(stash@\{\d+\}):\s*(?:On|WIP on)\s+[^:]*:\s*(.*)$/.exec(line.trim());
-  if (!match) return null;
-  const ref = match[1];
-  const message = match[2].trim();
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+
+  const formattedMatch = /^(stash@\{\d+\})\t([0-9a-f]{40})\t([^\t]+)\t(.*)$/.exec(trimmed);
+  if (formattedMatch) {
+    const [, stackRef, ref, createdAtRaw, decoratedMessage] = formattedMatch;
+    const messageMatch = /^(?:On|WIP on)\s+[^:]*:\s*(.*)$/.exec(decoratedMessage.trim());
+    const message = (messageMatch?.[1] ?? decoratedMessage).trim();
+    const parsed = parseCanonicalStashMessage(message);
+    const createdAt = new Date(normalizeStashTimestamp(createdAtRaw));
+    return {
+      ...parsed,
+      ref,
+      stackRef,
+      message,
+      createdAt: Number.isNaN(createdAt.getTime()) ? parsed.createdAt : createdAt,
+    };
+  }
+
+  const legacyMatch = /^(stash@\{\d+\}):\s*(?:On|WIP on)\s+[^:]*:\s*(.*)$/.exec(trimmed);
+  if (!legacyMatch) return null;
+  const stackRef = legacyMatch[1];
+  const message = legacyMatch[2].trim();
   const parsed = parseCanonicalStashMessage(message);
-  return { ...parsed, ref, message };
+  return { ...parsed, ref: stackRef, stackRef, message };
 }
 
 export async function listStashes(repoPath: string): Promise<ParsedStashEntry[]> {
-  const { stdout } = await execAsync('git stash list', { cwd: repoPath, encoding: 'utf-8' });
+  const { stdout } = await execAsync('git stash list --format="%gd%x09%H%x09%cI%x09%gs"', {
+    cwd: repoPath,
+    encoding: 'utf-8',
+  });
   return stdout
     .split('\n')
     .map((line) => parseStashListLine(line))
@@ -145,19 +170,48 @@ export async function createNamedStash(repoPath: string, message: string, includ
     encoding: 'utf-8',
   });
   const normalizedRef = stashRef.trim();
-  return normalizedRef ? 'stash@{0}' : null;
+  return normalizedRef || null;
+}
+
+async function resolveStashOperationRef(repoPath: string, ref: string): Promise<string> {
+  if (/^stash@\{\d+\}$/.test(ref)) {
+    await execAsync(`git rev-parse --verify ${JSON.stringify(ref)}`, {
+      cwd: repoPath,
+      encoding: 'utf-8',
+    });
+    return ref;
+  }
+
+  const stashes = await listStashes(repoPath);
+  const matchingEntry = stashes.find((entry) => entry.ref === ref);
+  if (!matchingEntry?.stackRef) {
+    throw new Error(`Stash ${ref} not found`);
+  }
+
+  const { stdout: resolvedSha } = await execAsync(`git rev-parse --verify ${JSON.stringify(matchingEntry.stackRef)}`, {
+    cwd: repoPath,
+    encoding: 'utf-8',
+  });
+  if (resolvedSha.trim() !== ref) {
+    throw new Error(`Stash ${ref} no longer matches ${matchingEntry.stackRef}`);
+  }
+
+  return matchingEntry.stackRef;
 }
 
 export async function popStash(repoPath: string, ref: string): Promise<void> {
-  await execAsync(`git stash pop ${JSON.stringify(ref)}`, { cwd: repoPath, encoding: 'utf-8' });
+  const operationRef = await resolveStashOperationRef(repoPath, ref);
+  await execAsync(`git stash pop ${JSON.stringify(operationRef)}`, { cwd: repoPath, encoding: 'utf-8' });
 }
 
 export async function dropStash(repoPath: string, ref: string): Promise<void> {
-  await execAsync(`git stash drop ${JSON.stringify(ref)}`, { cwd: repoPath, encoding: 'utf-8' });
+  const operationRef = await resolveStashOperationRef(repoPath, ref);
+  await execAsync(`git stash drop ${JSON.stringify(operationRef)}`, { cwd: repoPath, encoding: 'utf-8' });
 }
 
 export async function applyStash(repoPath: string, ref: string): Promise<void> {
-  await execAsync(`git stash apply ${JSON.stringify(ref)}`, { cwd: repoPath, encoding: 'utf-8' });
+  const operationRef = await resolveStashOperationRef(repoPath, ref);
+  await execAsync(`git stash apply ${JSON.stringify(operationRef)}`, { cwd: repoPath, encoding: 'utf-8' });
 }
 
 export async function createRecoveryBranchFromStash(
@@ -166,8 +220,9 @@ export async function createRecoveryBranchFromStash(
   issueId: string,
   shortDescription: string,
 ): Promise<string> {
+  const operationRef = await resolveStashOperationRef(repoPath, stashRef);
   const branchName = `recovery/${issueId.toUpperCase()}-${sanitizeShortDescription(shortDescription)}`;
-  await execAsync(`git branch ${JSON.stringify(branchName)} ${JSON.stringify(stashRef)}`, {
+  await execAsync(`git branch ${JSON.stringify(branchName)} ${JSON.stringify(operationRef)}`, {
     cwd: repoPath,
     encoding: 'utf-8',
   });
