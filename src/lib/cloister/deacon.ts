@@ -2540,11 +2540,14 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
           .filter((stash) => stash.kind !== 'salvageable' && isOlderThanDays(stash, DEFAULT_STASH_JANITOR_AGE_DAYS, now));
         const stashesToDrop = [...mergedPreMergeStashes, ...staleStashes]
           .filter((stash, index, entries) => entries.findIndex((entry) => entry.ref === stash.ref) === index)
-          .sort((a, b) => {
-            const aIndex = parseInt(a.ref.match(/stash@\{(\d+)\}/)?.[1] ?? '-1', 10);
-            const bIndex = parseInt(b.ref.match(/stash@\{(\d+)\}/)?.[1] ?? '-1', 10);
-            return bIndex - aIndex;
-          });
+          .map((stash) => {
+            const indexMatch = stash.ref.match(/stash@\{(\d+)\}/);
+            const stashIndex = indexMatch ? parseInt(indexMatch[1], 10) : Number.NaN;
+            return { stash, stashIndex };
+          })
+          .filter((entry) => Number.isFinite(entry.stashIndex))
+          .sort((a, b) => b.stashIndex - a.stashIndex)
+          .map((entry) => entry.stash);
         for (const stash of stashesToDrop) {
           await dropStash(workspacePath, stash.ref);
           const reason = mergedPreMergeStashes.some((entry) => entry.ref === stash.ref)

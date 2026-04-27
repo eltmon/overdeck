@@ -66,6 +66,8 @@ export function buildStashMessage(
 ): string {
   const normalizedIssueId = issueId.toUpperCase();
   if (kind === 'review-temp') {
+    // PAN-879 / GitHub issue #879: review-temp is the canonical sequence-based exception
+    // to the timestamped stash taxonomy. Acceptance criteria were updated to match.
     return `review-temp:${normalizedIssueId}:${arg3}`;
   }
   if (kind === 'salvageable') {
@@ -138,18 +140,12 @@ export async function createNamedStash(repoPath: string, message: string, includ
   const { stdout } = await execAsync(command, { cwd: repoPath, encoding: 'utf-8' });
   if (/No local changes to save/i.test(stdout)) return null;
 
-  const { stdout: stashReflog } = await execAsync('git stash list --format="%H%x09%gd%x09%s"', {
+  const { stdout: stashRef } = await execAsync('git rev-parse --verify stash@{0}', {
     cwd: repoPath,
     encoding: 'utf-8',
   });
-  for (const line of stashReflog.split('\n')) {
-    const [hash, ref, msg] = line.trim().split('\t');
-    if (hash && ref?.startsWith('stash@{') && msg === message) {
-      return ref;
-    }
-  }
-
-  return null;
+  const normalizedRef = stashRef.trim();
+  return normalizedRef ? 'stash@{0}' : null;
 }
 
 export async function popStash(repoPath: string, ref: string): Promise<void> {

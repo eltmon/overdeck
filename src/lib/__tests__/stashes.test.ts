@@ -87,21 +87,14 @@ describe('stashes', () => {
     await expect(createNamedStash('/tmp/workspace', 'pre-spawn:PAN-879:2026-04-27T14:15:16Z')).resolves.toBeNull();
   });
 
-  it('returns the stash ref by matching the canonical message after creation', async () => {
+  it('returns stash@{0} after successful stash creation', async () => {
     mockExecImplementation((cmd) => {
       if (cmd.startsWith('git stash push')) return { stdout: 'Saved working directory and index state WIP\n' };
-      if (cmd === 'git stash list --format="%H%x09%gd%x09%s"') {
-        return {
-          stdout: [
-            'def999\tstash@{0}\tpre-spawn:PAN-111:2026-04-27T14:15:16Z',
-            'abc123def456\tstash@{1}\tpre-spawn:PAN-879:2026-04-27T14:15:16Z',
-          ].join('\n'),
-        };
-      }
+      if (cmd === 'git rev-parse --verify stash@{0}') return { stdout: 'abc123def456\n' };
       throw new Error(`unexpected command: ${cmd}`);
     });
 
-    await expect(createNamedStash('/tmp/workspace', 'pre-spawn:PAN-879:2026-04-27T14:15:16Z')).resolves.toBe('stash@{1}');
+    await expect(createNamedStash('/tmp/workspace', 'pre-spawn:PAN-879:2026-04-27T14:15:16Z')).resolves.toBe('stash@{0}');
   });
 
   it('identifies stale timed stashes by age', () => {

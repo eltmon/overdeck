@@ -158,13 +158,15 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     mockGetAgentState.mockReturnValue(null);
     mockListStashes.mockResolvedValue([
       { ref: 'stash@{1}', kind: 'pre-merge', issueId: 'PAN-879', createdAt: new Date('2026-03-01T00:00:00Z'), message: 'pre-merge:PAN-879:2026-03-01T00:00:00Z' } as any,
+      { ref: 'stash@{bogus}', kind: 'pre-spawn', issueId: 'PAN-879', createdAt: new Date('2026-03-01T00:00:00Z'), message: 'pre-spawn:PAN-879:2026-03-01T00:00:00Z' } as any,
       { ref: 'stash@{2}', kind: 'salvageable', issueId: 'PAN-879', createdAt: new Date('2026-03-01T00:00:00Z'), message: 'salvageable:PAN-879:2026-03-01T00:00:00Z:notes', shortDescription: 'notes' } as any,
     ]);
-    mockIsOlderThanDays.mockImplementation((entry) => entry.kind === 'pre-merge');
+    mockIsOlderThanDays.mockImplementation((entry) => entry.kind === 'pre-merge' || entry.kind === 'pre-spawn');
 
     const actions = await cleanupSpawnAndOrphanedStashes(new Date('2026-04-27T15:00:00Z'));
 
     expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'stash@{1}');
+    expect(mockDropStash).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'stash@{bogus}');
     expect(mockDropStash).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'stash@{2}');
     expect(actions).toContain('Dropped stale pre-merge stash for PAN-879: stash@{1}');
   });
