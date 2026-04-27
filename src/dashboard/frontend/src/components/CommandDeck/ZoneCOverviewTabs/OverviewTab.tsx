@@ -514,25 +514,27 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         {/* SERVICES tile */}
         <Tile title="Services" icon={<ExternalLink size={14} />} testid="overview-tile-services">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {workspace.data?.services?.length ? (
-              workspace.data.services.map((svc) => (
-                <a
-                  key={svc.name}
-                  href={svc.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    fontSize: 12,
-                    color: 'var(--mc-primary, var(--primary))',
-                    textDecoration: 'none',
-                  }}
-                >
-                  {svc.name} ↗
-                </a>
-              ))
+            {workspace.data?.services?.some((svc) => svc.url) ? (
+              workspace.data.services
+                .filter((svc) => svc.url)
+                .map((svc) => (
+                  <a
+                    key={svc.name}
+                    href={svc.url!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 12,
+                      color: 'var(--mc-primary, var(--primary))',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    {svc.name} ↗
+                  </a>
+                ))
             ) : (
               <>
                 {workspace.data?.frontendUrl && (

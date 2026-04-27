@@ -115,9 +115,11 @@ export function ZoneCOverview({
     if (onTabChange) onTabChange(next);
     else setInternalTab(next);
 
-    const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set('tab', next);
-    window.history.pushState(window.history.state, '', nextUrl);
+    if (!activeTab) {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.set('tab', next);
+      window.history.pushState(window.history.state, '', nextUrl);
+    }
   };
 
   return (

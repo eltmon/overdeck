@@ -63,6 +63,7 @@ function mapAgentStatus(status: string): AgentStatus {
 interface ActivityContext {
   tmuxSessionNames?: Set<string>;
   taskFileContents?: Map<string, string>;
+  includeTranscripts?: boolean;
 }
 
 interface ActivitySection {
@@ -170,7 +171,10 @@ const getProjectSessionTreeRoute = HttpRouter.add(
   })),
 );
 
-export async function fetchProjectSessionTree(projectKey: string): Promise<unknown | null> {
+export async function fetchProjectSessionTree(
+  projectKey: string,
+  sharedContext?: ActivityContext,
+): Promise<unknown | null> {
   const projects = listProjects();
   const project = projects.find(p =>
     p.key === projectKey || (p.config as { name?: string }).name === projectKey
@@ -181,23 +185,14 @@ export async function fetchProjectSessionTree(projectKey: string): Promise<unkno
   const workspaceConfig = (project.config as { workspace?: { workspaces_dir?: string } }).workspace;
   const workspacesDir = join(projectPath, workspaceConfig?.workspaces_dir || 'workspaces');
 
-  // Hoist shared subprocess calls once per request (PAN-821 review)
-  const allSessionsArr = await listSessionNamesAsync().catch(() => [] as string[]);
-  const sharedTmuxSessionNames = new Set(allSessionsArr.filter(s => s.trim()));
+  // Reuse shared request-scoped data when provided; otherwise fetch lazily.
+  const sharedTmuxSessionNames = sharedContext?.tmuxSessionNames
+    ?? new Set((await listSessionNamesAsync().catch(() => [] as string[])).filter(s => s.trim()));
 
-  const tasksDir = join(homedir(), '.panopticon', 'specialists', 'tasks');
-  const sharedTaskFileContents = new Map<string, string>();
-  if (await pathExists(tasksDir)) {
-    const filenames = (await readdir(tasksDir).catch(() => [] as string[])).filter(f => f.endsWith('.md'));
-    await Promise.all(filenames.map(async (f) => {
-      const content = await readOptional(join(tasksDir, f));
-      if (content) sharedTaskFileContents.set(f, content);
-    }));
-  }
-
-  const sharedContext: ActivityContext = {
+  const effectiveSharedContext: ActivityContext = {
     tmuxSessionNames: sharedTmuxSessionNames,
-    taskFileContents: sharedTaskFileContents,
+    taskFileContents: sharedContext?.taskFileContents,
+    includeTranscripts: sharedContext?.includeTranscripts ?? false,
   };
 
   // Dynamic import breaks static dependency cycle with command-deck.ts (PAN-821)
@@ -232,7 +227,7 @@ export async function fetchProjectSessionTree(projectKey: string): Promise<unkno
         ]);
         if (!hasAgent && !hasPlanning) return null;
         try {
-          const activityData = await fetchActivityDataWithContext(c.issueId, sharedContext) as {
+          const activityData = await fetchActivityDataWithContext(c.issueId, effectiveSharedContext) as {
             issueId: string;
             sections: ActivitySection[];
           };
@@ -274,13 +269,33 @@ const getAllSessionTreesRoute = HttpRouter.add(
     }
 
     const results = yield* Effect.tryPromise({
-      try: () =>
-        Promise.all(
+      try: async () => {
+        const allSessionsArr = await listSessionNamesAsync().catch(() => [] as string[]);
+        const sharedTmuxSessionNames = new Set(allSessionsArr.filter(s => s.trim()));
+
+        const tasksDir = join(homedir(), '.panopticon', 'specialists', 'tasks');
+        const sharedTaskFileContents = new Map<string, string>();
+        if (await pathExists(tasksDir)) {
+          const filenames = (await readdir(tasksDir).catch(() => [] as string[])).filter(f => f.endsWith('.md'));
+          await Promise.all(filenames.map(async (f) => {
+            const content = await readOptional(join(tasksDir, f));
+            if (content) sharedTaskFileContents.set(f, content);
+          }));
+        }
+
+        const sharedContext: ActivityContext = {
+          tmuxSessionNames: sharedTmuxSessionNames,
+          taskFileContents: sharedTaskFileContents,
+          includeTranscripts: false,
+        };
+
+        return Promise.all(
           projectKeys.map(async (projectKey) => {
-            const tree = await fetchProjectSessionTree(projectKey);
+            const tree = await fetchProjectSessionTree(projectKey, sharedContext);
             return tree ?? { projectKey, features: [] };
           }),
-        ),
+        );
+      },
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
 

@@ -208,6 +208,21 @@ describe('ZoneCOverview', () => {
     expect(screen.getByRole('link', { name: 'API ↗' })).toHaveAttribute('href', 'http://localhost:3011');
   });
 
+  it('filters out services without urls before rendering links', () => {
+    workspaceResult.data = {
+      exists: true,
+      issueId: ISSUE,
+      services: [
+        { name: 'Frontend', url: 'http://localhost:4173' },
+        { name: 'API', url: undefined },
+      ],
+    };
+
+    render(<ZoneCOverview issueId={ISSUE} />);
+    expect(screen.getByRole('link', { name: 'Frontend ↗' })).toHaveAttribute('href', 'http://localhost:4173');
+    expect(screen.queryByRole('link', { name: 'API ↗' })).not.toBeInTheDocument();
+  });
+
   it('renders Open VS Code as a vscode:// workspace link', () => {
     workspaceResult.data = {
       exists: true,
@@ -247,6 +262,20 @@ describe('ZoneCOverview', () => {
     render(<ZoneCOverview issueId={ISSUE} />);
     fireEvent.click(screen.getByTestId('zone-c-overview-tab-costs'));
     expect(new URLSearchParams(window.location.search).get('tab')).toBe('costs');
+  });
+
+  it('does not push url state in controlled mode when the parent keeps the same tab', () => {
+    render(
+      <ZoneCOverview
+        issueId={ISSUE}
+        activeTab="overview"
+        onTabChange={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('zone-c-overview-tab-costs'));
+    expect(new URLSearchParams(window.location.search).get('tab')).toBeNull();
+    expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
   });
 
   it('initializes the active tab from the URL query string', () => {

@@ -210,10 +210,11 @@ const getMissionControlActivityRoute = HttpRouter.add(
 export interface ActivityContext {
   tmuxSessionNames?: Set<string>;
   taskFileContents?: Map<string, string>;
+  includeTranscripts?: boolean;
 }
 
 export async function fetchActivityData(issueId: string): Promise<unknown> {
-  return fetchActivityDataWithContext(issueId, {});
+  return fetchActivityDataWithContext(issueId, { includeTranscripts: true });
 }
 
 export async function fetchActivityDataWithContext(
@@ -222,6 +223,7 @@ export async function fetchActivityDataWithContext(
 ): Promise<unknown> {
   const issueLower = issueId.toLowerCase();
   const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+  const includeTranscripts = context.includeTranscripts ?? true;
 
   // Use shared tmux session names if provided, else fetch once (PAN-821)
   const tmuxSessionNames = context.tmuxSessionNames ?? new Set<string>();
@@ -274,19 +276,21 @@ export async function fetchActivityDataWithContext(
       if (isPlanning) hasPlanningSection = true;
 
       let transcript = '';
-      try {
-        transcript = (await capturePaneAsync(checkId, 500)).trim();
-      } catch { /* agent may not be running */ }
+      if (includeTranscripts) {
+        try {
+          transcript = (await capturePaneAsync(checkId, 500)).trim();
+        } catch { /* agent may not be running */ }
 
-      if (!isPlanning && !transcript) {
-        const logText = await readOptional(join(agentDir, 'output.log'));
-        if (logText) transcript = logText;
-      }
+        if (!isPlanning && !transcript) {
+          const logText = await readOptional(join(agentDir, 'output.log'));
+          if (logText) transcript = logText;
+        }
 
-      if (isPlanning && !transcript) {
-        const projectPath = getProjectPath(issuePrefix);
-        const stateMdText = await readOptional(join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning', 'STATE.md'));
-        if (stateMdText) transcript = `PLANNING COMPLETE\n\n${stateMdText}`;
+        if (isPlanning && !transcript) {
+          const projectPath = getProjectPath(issuePrefix);
+          const stateMdText = await readOptional(join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning', 'STATE.md'));
+          if (stateMdText) transcript = `PLANNING COMPLETE\n\n${stateMdText}`;
+        }
       }
 
       const rtState = await getAgentRuntimeStateAsync(checkId);
@@ -484,7 +488,7 @@ export async function fetchActivityDataWithContext(
       }
 
       // Normal handling for non-review types
-      if (ss.status === 'running') {
+      if (includeTranscripts && ss.status === 'running') {
         const tmuxName = `specialist-${ss.type === 'test' ? 'test-agent' : 'merge-agent'}`;
         try {
           const output = (await capturePaneAsync(tmuxName, 100)).trim();
