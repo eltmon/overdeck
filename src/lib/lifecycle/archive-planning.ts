@@ -10,7 +10,8 @@
  *   3. Rotate previous archives to prevent overwrite
  */
 
-import { existsSync, mkdirSync, cpSync, rmSync } from 'fs';
+import { existsSync } from 'fs';
+import { mkdir, cp, rm } from 'fs/promises';
 import { join, dirname } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -79,7 +80,7 @@ export async function movePrd(
   const dest = source.format === 'subdir' ? completedSubdir : completedFlat;
   const destParent = dirname(dest);
   if (!existsSync(destParent)) {
-    mkdirSync(destParent, { recursive: true });
+    await mkdir(destParent, { recursive: true });
   }
 
   const formatLabel = source.format === 'subdir' ? 'PRD subdirectory' : 'PRD';
@@ -111,7 +112,7 @@ export async function movePrd(
         await execAsync(`git mv "${resolvedSidecarSource}" "${sidecarDest}"`, { cwd: ctx.projectPath });
       } catch {
         // sidecar may not be tracked — fall back to plain copy
-        try { cpSync(resolvedSidecarSource, sidecarDest); } catch { /* non-fatal */ }
+        try { await cp(resolvedSidecarSource, sidecarDest); } catch { /* non-fatal */ }
       }
     }
     await execAsync(`git commit -m "Move ${ctx.issueId} PRD to completed"`, { cwd: ctx.projectPath });
@@ -121,14 +122,14 @@ export async function movePrd(
     const sidecarNote = resolvedSidecarSource ? ' (with vBRIEF sidecar)' : '';
     return stepOk(step, [`Moved ${formatLabel} from active/ to completed/ via git mv${sidecarNote}`]);
   } catch {
-    // git mv failed — fall back to plain copy. cpSync handles both file and directory.
+    // git mv failed — fall back to plain copy. cp handles both file and directory.
     try {
-      cpSync(source.path, dest, { recursive: true });
+      await cp(source.path, dest, { recursive: true });
       if (!existsSync(dest)) {
         return stepFailed(step, 'PRD copy appeared to succeed but destination not found');
       }
       if (resolvedSidecarSource && sidecarDest) {
-        try { cpSync(resolvedSidecarSource, sidecarDest); } catch { /* non-fatal */ }
+        try { await cp(resolvedSidecarSource, sidecarDest); } catch { /* non-fatal */ }
       }
       return stepOk(step, [`Copied ${formatLabel} to completed/ (git mv failed, plain copy succeeded)`]);
     } catch (err) {
@@ -164,24 +165,24 @@ export async function archiveWorkspaceArtifacts(
         version++;
       }
       const rotatedDir = `${archiveDir}.${version}`;
-      cpSync(archiveDir, rotatedDir, { recursive: true });
-      rmSync(archiveDir, { recursive: true, force: true });
+      await cp(archiveDir, rotatedDir, { recursive: true });
+      await rm(archiveDir, { recursive: true, force: true });
     }
 
-    mkdirSync(archiveDir, { recursive: true });
+    await mkdir(archiveDir, { recursive: true });
     const details: string[] = [];
 
     // Archive .planning/feedback/
     const feedbackDir = join(workspacePath, '.planning', 'feedback');
     if (existsSync(feedbackDir)) {
-      cpSync(feedbackDir, join(archiveDir, 'feedback'), { recursive: true });
+      await cp(feedbackDir, join(archiveDir, 'feedback'), { recursive: true });
       details.push('Archived feedback/');
     }
 
     // Archive STATE.md
     const stateMd = join(workspacePath, '.planning', 'STATE.md');
     if (existsSync(stateMd)) {
-      cpSync(stateMd, join(archiveDir, 'STATE.md'));
+      await cp(stateMd, join(archiveDir, 'STATE.md'));
       details.push('Archived STATE.md');
     }
 
@@ -191,14 +192,14 @@ export async function archiveWorkspaceArtifacts(
     // both so the archive reflects the true final state of the workspace.
     const vbriefJson = join(workspacePath, '.planning', 'plan.vbrief.json');
     if (existsSync(vbriefJson)) {
-      cpSync(vbriefJson, join(archiveDir, 'plan.vbrief.json'));
+      await cp(vbriefJson, join(archiveDir, 'plan.vbrief.json'));
       details.push('Archived plan.vbrief.json');
     }
 
     // Archive beads/
     const beadsDir = join(workspacePath, '.planning', 'beads');
     if (existsSync(beadsDir)) {
-      cpSync(beadsDir, join(archiveDir, 'beads'), { recursive: true });
+      await cp(beadsDir, join(archiveDir, 'beads'), { recursive: true });
       details.push('Archived beads/');
     }
 
@@ -206,7 +207,7 @@ export async function archiveWorkspaceArtifacts(
     // but this preserves the workspace-specific version with agent annotations)
     const prdMd = join(workspacePath, '.planning', 'PRD.md');
     if (existsSync(prdMd)) {
-      cpSync(prdMd, join(archiveDir, 'PRD.md'));
+      await cp(prdMd, join(archiveDir, 'PRD.md'));
       details.push('Archived workspace PRD.md');
     }
 
