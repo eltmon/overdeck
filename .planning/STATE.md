@@ -1,9 +1,9 @@
 # PAN-859: Command Deck: clicking work-agent row in tree doesn't show terminal pane until second click
 
-## Status: In Progress
+## Status: Implementation Complete
 
 ## Current Phase
-Preparing the PAN-859 commit after passing the repo quality gates and Playwright verification.
+Resubmitting PAN-859 after review feedback; the latest commented artifact contained no actionable findings beyond the recorded approval/comment status.
 
 ## Completed Work
 - [x] context-recovery: Recovered PAN-859 requirements from GitHub because `.planning/` artifacts were missing at workspace start (commit: pending)
@@ -15,7 +15,7 @@ Preparing the PAN-859 commit after passing the repo quality gates and Playwright
 ## Remaining Work
 - [x] cross-session-verification: Verified the same first-click session-row behavior on PAN-855's work session in the live tree; screenshot saved as `pan-859-cross-session-verification.png` (commit: pending)
 - [x] final-quality-gates: Passed `npm run typecheck`, `npm run lint`, and `npm test` (327 files / 3983 tests passed, 4 files / 48 tests skipped) (commit: pending)
-- [ ] commit-and-finish: Commit the PAN-859 changes, push the branch, and run the issue completion flow
+- [x] commit-and-finish: Committed the PAN-859 changes, pushed `feature/pan-859`, and ran the issue completion flow with `pan done PAN-859` (commit: 0db98231)
 
 ## Key Decisions
 - Subscribe to the full `selectedSessionByIssue` map in `CommandDeck/index.tsx` instead of selecting through a closure over `selectedFeature`; this addresses the root cause where feature selection and session selection changed in the same click but the component did not reliably observe the session-slice update.
@@ -24,3 +24,5 @@ Preparing the PAN-859 commit after passing the repo quality gates and Playwright
 ## Specialist Feedback
 - [2026-04-27T21:31:00Z] Playwright verification → passed — `pan-859-first-click.png`
 - [2026-04-27T21:35:00Z] Playwright cross-session verification → passed — `pan-859-cross-session-verification.png`
+- **[2026-04-27T21:45Z] review-agent → APPROVED** — `.planning/feedback/001-review-agent-approved.md`
+- **[2026-04-27T21:45Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
