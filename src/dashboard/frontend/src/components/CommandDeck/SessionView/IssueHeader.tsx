@@ -27,6 +27,7 @@ interface ActivitySection {
 
 interface ActivityData {
   sections: ActivitySection[];
+  resolvedTotalCost?: number | null;
 }
 
 async function fetchPlanning(issueId: string): Promise<PlanningData> {
@@ -50,7 +51,6 @@ async function fetchActivity(issueId: string): Promise<ActivityData> {
 interface IssueHeaderProps {
   issueId: string;
   title: string;
-  cost?: number;
   source?: string;
   url?: string;
   onOpenBeads?: () => void;
@@ -164,7 +164,7 @@ function formatCost(cost: number): string {
   return `$${cost.toFixed(2)}`;
 }
 
-export function IssueHeader({ issueId, title, cost, url, onOpenBeads }: IssueHeaderProps) {
+export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderProps) {
   const [syncing, setSyncing] = useState(false);
 
   const { data: planning } = useQuery({
@@ -226,6 +226,7 @@ export function IssueHeader({ issueId, title, cost, url, onOpenBeads }: IssueHea
 
   const ac = planning?.acceptanceProgress;
   const stashCount = planning?.stashCount ?? 0;
+  const resolvedTotalCost = activity?.resolvedTotalCost ?? null;
 
   // Quality-gate indicator from verification status (PAN-847)
   const qgStatus = reviewStatus?.verificationStatus;
@@ -239,7 +240,7 @@ export function IssueHeader({ issueId, title, cost, url, onOpenBeads }: IssueHea
           : undefined;
 
   return (
-    <div className={styles.issueHeader}>
+    <div className={styles.issueHeader} data-testid="issue-header" data-issue={issueId}>
       {/* Row 1: ID + title + pipeline + cost + sparkline */}
       <div className={styles.issueHeaderRow}>
         <div className={styles.issueHeaderLeft}>
@@ -337,8 +338,8 @@ export function IssueHeader({ issueId, title, cost, url, onOpenBeads }: IssueHea
               buckets={8}
             />
           )}
-          {cost !== undefined && cost > 0 && (
-            <span className={styles.issueHeaderCost}>{formatCost(cost)}</span>
+          {resolvedTotalCost !== null && (
+            <span className={styles.issueHeaderCost} data-testid="zone-a-cost">{formatCost(resolvedTotalCost)}</span>
           )}
         </div>
       </div>

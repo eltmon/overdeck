@@ -31,12 +31,13 @@ import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 
-import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
+import { getAgentRuntimeStateAsync, listRunningAgentsAsync } from '../../../lib/agents.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { SessionNodePresence } from '@panctl/contracts';
 import { deriveSessionPresence } from '../services/session-presence.js';
+import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { findPrdAtStatus, type PrdLocation } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
 import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
@@ -536,24 +537,43 @@ export async function fetchActivityDataWithContext(
     const cacheKey = issueId.toUpperCase();
     sweepExpired(costCache, COST_CACHE_TTL_MS);
     const cached = costCache.get(cacheKey);
+    let aggregateCost = 0;
     if (cached && cached.timestamp > Date.now() - COST_CACHE_TTL_MS) {
-      totalCost = cached.data.totalCost;
+      aggregateCost = cached.data.totalCost;
       costByStage = cached.data.costByStage;
     } else {
       syncCache();
       const issueData = getCostsForIssue(cacheKey);
       if (issueData) {
-        totalCost = issueData.totalCost;
+        aggregateCost = issueData.totalCost;
         costByStage = Object.fromEntries(
           Object.entries(issueData.stages || {}).map(([stage, stats]) => [stage, { cost: stats.cost, tokens: stats.tokens }])
         );
       }
       sweepExpired(costCache, COST_CACHE_TTL_MS);
-      costCache.set(cacheKey, { timestamp: Date.now(), data: { totalCost, costByStage } });
+      costCache.set(cacheKey, { timestamp: Date.now(), data: { totalCost: aggregateCost, costByStage } });
     }
-  } catch { /* cost data optional */ }
 
-  return { issueId, sections, costByStage, totalCost };
+    const agents = await listRunningAgentsAsync();
+    const resolvedCost = resolveIssueHeadlineCost({
+      issueId,
+      aggregateCost,
+      agents,
+    });
+    totalCost = resolvedCost.resolvedTotalCost ?? 0;
+
+    return {
+      issueId,
+      sections,
+      costByStage,
+      totalCost,
+      aggregateCost: resolvedCost.aggregateCost,
+      liveCost: resolvedCost.liveCost,
+      resolvedTotalCost: resolvedCost.resolvedTotalCost,
+    };
+  } catch {
+    return { issueId, sections, costByStage, totalCost, aggregateCost: null, liveCost: null, resolvedTotalCost: null };
+  }
 }
 
 // ─── Route: GET /api/command-deck/planning/:issueId ───────────────────────

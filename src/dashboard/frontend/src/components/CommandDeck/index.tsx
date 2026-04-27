@@ -207,7 +207,6 @@ export function CommandDeck({
     refetchInterval: 30000,
   });
 
-  // Get aggregated cost data for all issues
   const { data: costData } = useQuery({
     queryKey: ['costs-by-issue'],
     queryFn: fetchCostsByIssue,
@@ -313,6 +312,16 @@ export function CommandDeck({
   // Agents from dashboard store (for terminal panel in detail view)
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
 
+  // Map aggregated costs per issue for the project tree sidebar.
+  const issueCosts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const entry of costData?.issues || []) {
+      map[entry.issueId] = entry.totalCost;
+      map[entry.issueId.toLowerCase()] = entry.totalCost;
+    }
+    return map;
+  }, [costData]);
+
   // Build title map from issues (memoized to avoid new object identity per render)
   const issueTitles = useMemo(() => {
     const map: Record<string, string> = {};
@@ -322,16 +331,6 @@ export function CommandDeck({
     }
     return map;
   }, [issues]);
-
-  // Map aggregated costs per issue (memoized to avoid new object identity per render)
-  const issueCosts = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const entry of costData?.issues || []) {
-      map[entry.issueId] = entry.totalCost;
-      map[entry.issueId.toLowerCase()] = entry.totalCost;
-    }
-    return map;
-  }, [costData]);
 
   const { data: conversations = [] } = useQuery({
     queryKey: ['conversations'],
@@ -810,7 +809,6 @@ export function CommandDeck({
               issueId={selectedFeature}
               title={selectedIssueTitle}
               sessions={selectedFeatureData?.sessions ?? []}
-              cost={issueCosts[selectedFeature.toLowerCase()] ?? issueCosts[selectedFeature]}
               source={selectedIssue?.source}
               url={selectedIssue?.url}
               onOpenBeads={() => setShowBeads(true)}

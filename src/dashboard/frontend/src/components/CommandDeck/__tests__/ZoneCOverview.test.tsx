@@ -107,7 +107,7 @@ describe('ZoneCOverview', () => {
   beforeEach(() => {
     planningResult.data = undefined;
     planningResult.isLoading = false;
-    activityResult.data = { issueId: ISSUE, sections: [] };
+    activityResult.data = { issueId: ISSUE, sections: [], resolvedTotalCost: null };
     activityResult.isLoading = false;
     costsResult.data = undefined;
     costsResult.isLoading = false;
@@ -169,6 +169,7 @@ describe('ZoneCOverview', () => {
     costsResult.data = {
       issueId: ISSUE,
       totalCost: 1.23,
+      resolvedTotalCost: 1.23,
       totalTokens: 4500,
       sessions: [],
       byModel: { 'claude-sonnet-4-6': { cost: 1.23, tokens: 4500 } },
@@ -222,6 +223,7 @@ describe('ZoneCOverview', () => {
     costsResult.data = {
       issueId: ISSUE,
       totalCost: 1.23,
+      resolvedTotalCost: 1.23,
       totalTokens: 4500,
       sessions: [],
       byModel: { 'claude-sonnet-4-6': { cost: 1.23, tokens: 4500 } },
@@ -238,5 +240,40 @@ describe('ZoneCOverview', () => {
     expect(screen.queryByTestId('costs-tab-error')).not.toBeInTheDocument();
     expect(screen.getByTestId('costs-total')).toHaveTextContent('$1.23');
     expect(screen.getByTestId('costs-stream-total')).toHaveTextContent('Live stream: $0.50');
+  });
+
+  it('prefers the resolved unified cost when issue costs and activity disagree', () => {
+    costsResult.data = {
+      issueId: ISSUE,
+      totalCost: 4.32,
+      resolvedTotalCost: 5.1,
+      totalTokens: 4500,
+      sessions: [],
+      byModel: {},
+      byStage: {},
+    };
+    activityResult.data = { issueId: ISSUE, sections: [], resolvedTotalCost: 3.25 };
+
+    render(<ZoneCOverview issueId={ISSUE} />);
+
+    expect(screen.getByTestId('overview-cost')).toHaveTextContent('$5.10');
+  });
+
+  it('shows no overview amount when neither aggregate nor live cost exists', () => {
+    costsResult.data = {
+      issueId: ISSUE,
+      totalCost: 0,
+      resolvedTotalCost: null,
+      totalTokens: 0,
+      sessions: [],
+      byModel: {},
+      byStage: {},
+    };
+    activityResult.data = { issueId: ISSUE, sections: [], resolvedTotalCost: null };
+
+    render(<ZoneCOverview issueId={ISSUE} />);
+
+    expect(screen.queryByTestId('overview-cost-loading')).not.toBeInTheDocument();
+    expect(screen.getByTestId('overview-cost')).not.toHaveTextContent('$0.00');
   });
 });
