@@ -49,7 +49,19 @@ vi.mock('../styles/command-deck.module.css', () => ({
     featureStatus: 'featureStatus',
     featureId_sidebar: 'featureId_sidebar',
     featureLabel: 'featureLabel',
+    featureBadgeGroup: 'featureBadgeGroup',
+    featureBadge: 'featureBadge',
+    featureBadge_running: 'featureBadge_running',
+    featureBadge_stopped: 'featureBadge_stopped',
+    featureBadge_error: 'featureBadge_error',
+    featureActivityError: 'featureActivityError',
     featureState: 'featureState',
+    featureState_done: 'featureState_done',
+    featureState_progress: 'featureState_progress',
+    featureState_review: 'featureState_review',
+    featureState_context: 'featureState_context',
+    featureState_planning: 'featureState_planning',
+    featureState_todo: 'featureState_todo',
     featureCost: 'featureCost',
     sessionList: 'sessionList',
     sessionNode: 'sessionNode',
@@ -161,6 +173,65 @@ describe('FeatureItem', () => {
       />,
     );
     expect(screen.getByTestId('chevron-right')).toBeInTheDocument();
+  });
+
+  it('shows an activity tooltip for aggregate session state', () => {
+    render(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [
+            makeSession({ sessionId: 'work-1', type: 'work', duration: 2280, status: 'running', presence: 'active' }),
+            makeSession({ sessionId: 'review-1', type: 'reviewer', status: 'error', presence: 'ended' }),
+            makeSession({ sessionId: 'review-2', type: 'reviewer', status: 'stopped', presence: 'ended' }),
+          ],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('status-dot')).toHaveAttribute('title', '1 work agent running 38m, 1 review error, 1 reviewer stopped');
+  });
+
+  it('shows work and review badges on the parent row', () => {
+    render(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [
+            makeSession({ sessionId: 'work-1', type: 'work', status: 'running', presence: 'active' }),
+            makeSession({ sessionId: 'review-1', type: 'reviewer', status: 'running', presence: 'active' }),
+            makeSession({ sessionId: 'review-2', type: 'reviewer', status: 'stopped', presence: 'ended' }),
+          ],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByText('▸ work')).toBeInTheDocument();
+    expect(screen.getByText('●●● 2')).toBeInTheDocument();
+  });
+
+  it('shows a review error badge when a review session failed', () => {
+    render(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [makeSession({ sessionId: 'review-1', type: 'reviewer', status: 'error', presence: 'ended' })],
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByText('✕ review')).toBeInTheDocument();
+  });
+
+  it('applies the colored kanban state pill class', () => {
+    render(
+      <FeatureItem
+        feature={makeFeature({ stateLabel: 'Planning' })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByText('Planning')).toHaveClass('featureState_planning');
   });
 
   it('toggles expansion when caret is clicked', () => {
