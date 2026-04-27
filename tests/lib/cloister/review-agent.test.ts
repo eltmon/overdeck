@@ -351,15 +351,21 @@ function makeTempDir(): string {
 
 describe('reviewResultToReviewStatus', () => {
   it('maps CHANGES_REQUESTED to blocked', () => {
-    expect(reviewResultToReviewStatus('CHANGES_REQUESTED')).toBe('blocked');
+    expect(reviewResultToReviewStatus({ reviewResult: 'CHANGES_REQUESTED', success: true })).toBe('blocked');
   });
 
   it('maps APPROVED to passed', () => {
-    expect(reviewResultToReviewStatus('APPROVED')).toBe('passed');
+    expect(reviewResultToReviewStatus({ reviewResult: 'APPROVED', success: true })).toBe('passed');
   });
 
-  it('maps COMMENTED to failed (synthesis/protocol failure — must not re-queue)', () => {
-    expect(reviewResultToReviewStatus('COMMENTED')).toBe('failed');
+  // PAN-869: COMMENTED with success=true means review completed with no blockers → 'passed'
+  it('maps COMMENTED (success=true) to passed', () => {
+    expect(reviewResultToReviewStatus({ reviewResult: 'COMMENTED', success: true })).toBe('passed');
+  });
+
+  // COMMENTED with success=false means synthesis/protocol failure — must not re-queue
+  it('maps COMMENTED (success=false) to failed', () => {
+    expect(reviewResultToReviewStatus({ reviewResult: 'COMMENTED', success: false })).toBe('failed');
   });
 });
 

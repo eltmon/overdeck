@@ -1153,14 +1153,20 @@ export async function parseReviewSynthesis(
  * Map a ReviewResult outcome to the reviewStatus value written after parallel review.
  * CHANGES_REQUESTED → 'blocked' (not 'pending') so the deacon does not immediately
  * re-dispatch the review before the work agent has a chance to address the feedback.
+ *
+ * COMMENTED with success=true means the review completed but found no blockers
+ * (PAN-869) — this should surface as 'passed' so the PR enters the Awaiting Merge
+ * column. COMMENTED with success=false means synthesis/protocol failure — keep as
+ * 'failed' so the deacon can retry.
  */
 export function reviewResultToReviewStatus(
-  reviewResult: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED',
+  result: ReviewResult,
 ): 'passed' | 'blocked' | 'failed' {
-  if (reviewResult === 'APPROVED') return 'passed';
-  if (reviewResult === 'CHANGES_REQUESTED') return 'blocked';
-  // COMMENTED signals a synthesis/protocol failure — surface as 'failed' so
-  // deacon does not re-queue it in an infinite retry loop.
+  if (result.reviewResult === 'APPROVED') return 'passed';
+  if (result.reviewResult === 'CHANGES_REQUESTED') return 'blocked';
+  // COMMENTED with success=true → review completed, no blockers found (PAN-869)
+  if (result.reviewResult === 'COMMENTED' && result.success) return 'passed';
+  // COMMENTED with success=false → synthesis/protocol failure, retry
   return 'failed';
 }
 

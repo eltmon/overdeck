@@ -392,6 +392,56 @@ export function fixStuckReadyForMerge(): void {
   }
 }
 
+/**
+ * PAN-869: On server startup, fix any issues where reviewStatus was incorrectly
+ * set to 'failed' due to the old COMMENTED → 'failed' mapping bug.
+ *
+ * This identifies records where:
+ * - reviewStatus = 'failed'
+ * - testStatus = 'passed' (CI green, so review wasn't genuinely bad)
+ * - mergeStatus is not terminal ('merged', 'failed')
+ * - readyForMerge = false
+ * - The last review history entry is type='review', status='failed'
+ *
+ * The old reviewResultToReviewStatus() mapped COMMENTED (regardless of success)
+ * to 'failed', so the history stores 'failed' for old COMMENTED reviews.
+ * We use testStatus='passed' as the signal that this was a successful review
+ * (CI was green), distinguishing it from genuinely failed reviews.
+ */
+export function fixStuckCommentedReviews(): void {
+  const statuses = loadReviewStatuses();
+  const candidates = Object.values(statuses).filter(s =>
+    s.reviewStatus === 'failed' &&
+    (s.testStatus === 'passed' || s.testStatus === 'skipped') &&
+    s.mergeStatus !== 'merged' &&
+    s.mergeStatus !== 'failed' &&
+    s.readyForMerge === false
+  );
+
+  if (candidates.length === 0) return;
+
+  const toFix: string[] = [];
+  for (const s of candidates) {
+    // Check if the last review history entry is 'failed' (the old COMMENTED mapping
+    // stored 'failed' in history). testStatus='passed' signals CI was green,
+    // so this was a successful review incorrectly stored as 'failed'.
+    const lastReviewEntry = [...(s.history || [])]
+      .reverse()
+      .find(h => h.type === 'review');
+    if (lastReviewEntry?.status === 'failed') {
+      toFix.push(s.issueId);
+    }
+  }
+
+  if (toFix.length === 0) return;
+  console.log(`[review-status] Restoring reviewStatus='passed' for ${toFix.length} issue(s) with COMMENTED reviews (PAN-869 backfill)`);
+  for (const issueId of toFix) {
+    console.log(`[review-status] Restoring reviewStatus='passed' for ${issueId}`);
+    // reviewStatus='passed' will trigger readyForMerge recomputation in setReviewStatus
+    setReviewStatus(issueId, { reviewStatus: 'passed' });
+  }
+}
+
 export function clearReviewStatus(issueId: string): void {
   try {
     dbDelete(issueId);

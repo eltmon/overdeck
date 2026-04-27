@@ -1,35 +1,29 @@
-# PAN-815: Command Deck: unify Conversations and Projects into one filterable list
+# PAN-869: Awaiting Merge lane misses PRs with COMMENTED reviews + green CI
 
-## Status: Implementation Complete
+## Status: In Review
 
 ## Current Phase
-All work complete. Ready for merge.
+Waiting for verification to pass (intermittent test failure - re-requested review)
 
 ## Completed Work
-- Replaced `SidebarTab` segmented control with independent filter chip toggles (`showConversations` / `showProjects`)
-- Unified sidebar list rendering: both ConversationList and ProjectNodes render together when both filters are active
-- Added localStorage persistence for filter state (`mc-filter-conversations`, `mc-filter-projects`)
-- Fixed content area selection logic: IssueWorkbench renders when `selectedFeature` is set regardless of filter state
-- Removed dead `DetailPanelLayout` fallback branch for selected features
-- Updated CommandDeck tests for new filter chip behavior
-- All 312 test files pass (3889 tests)
-- Typecheck passes
-- Lint passes
-- Frontend build passes
+- [x] reviewResultToReviewStatus fix: COMMENTED (success=true) → 'passed'
+- [x] review-run.ts: pass full ReviewResult to reviewResultToReviewStatus
+- [x] Add fixStuckCommentedReviews backfill
+- [x] Call fixStuckCommentedReviews on dashboard startup
+- [x] Update tests for new function signature
+- [x] Fix mapToExitCode to respect success flag for COMMENTED
+- [x] Fix backfill to check status='failed' instead of 'commented'
 
 ## Remaining Work
-None
+- None - waiting for review pipeline
 
 ## Key Decisions
-- Filter chips are independent toggles (both visible by default), not a single-select control
-- Selection state in content area is independent of sidebar filters — detail panels show regardless
-- Tree session filter (all/alive/failed) remains visible whenever projects are shown
-- Model picker and new-conversation button always visible in sidebar header
-- Filter state persisted to localStorage (not URL, to keep scope focused)
+- D1: COMMENTED (success=true) = review passed with no blockers → maps to 'passed' so readyForMerge=true
+- D2: COMMENTED (success=false) = synthesis/protocol failure → keeps as 'failed' so deacon retries
+- D3: Backfill uses status='failed' + testStatus='passed' as signal (old COMMENTED was stored as 'failed')
 
 ## Specialist Feedback
-
-- **[2026-04-27T01:36Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-- **[2026-04-27T01:55Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
-- **[2026-04-27T02:01Z] review-agent → COMMENTED** — `.planning/feedback/001-review-agent-commented.md`
-- **[2026-04-27T02:01Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
+- **[2026-04-27T02:57Z] review-agent → COMMENTED** — correctness reviewer found:
+  - `fixStuckCommentedReviews` backfill checked `status: 'commented'` but history stores `'failed'` → DEAD CODE (fixed)
+  - `mapToExitCode` returns 2 for all COMMENTED regardless of success → INCONSISTENT (fixed)
+- **[2026-04-27T03:12Z] verification-gate → FAILED** — intermittent race condition in effect-patterns.test.ts reading 111 agent state files; re-requested review
