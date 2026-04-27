@@ -11,14 +11,16 @@
 # is a final guardrail — if anything bypasses the merge pipeline (manual push,
 # admin override, future regression), this fails the workflow on main and the
 # branch protection rule blocks the push.
+#
+# Trigger is push-to-main only. We deliberately do NOT run on pull_request:
+# feature branches legitimately carry .planning/ during the workspace lifecycle
+# and only get stripped by the merge pipeline at merge time. Running on PRs
+# would always-fail every feature PR.
 
 name: no-planning-on-main
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
     branches:
       - main
 
