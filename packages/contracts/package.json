@@ -26,5 +26,7 @@
     "tsdown": "^0.21.7",
     "typescript": "catalog:"
   },
-  "files": ["dist"]
+  "files": [
+    "dist"
+  ]
 }
