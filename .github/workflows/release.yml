@@ -65,6 +65,12 @@ jobs:
 
       - name: Publish CLI to npm
         run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if npm view "${PKG_NAME}@${PKG_VERSION}" version >/dev/null 2>&1; then
+            echo "${PKG_NAME}@${PKG_VERSION} already on npm — skipping (retry-safe)."
+            exit 0
+          fi
           if [ "${{ needs.classify.outputs.npm_tag }}" = "latest" ]; then
             npm publish --provenance --access public
           else
@@ -79,6 +85,12 @@ jobs:
       - name: Publish contracts to npm
         run: |
           cd packages/contracts
+          PKG_NAME=$(node -p "require('./package.json').name")
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if npm view "${PKG_NAME}@${PKG_VERSION}" version >/dev/null 2>&1; then
+            echo "${PKG_NAME}@${PKG_VERSION} already on npm — skipping (retry-safe)."
+            exit 0
+          fi
           if [ "${{ needs.classify.outputs.npm_tag }}" = "latest" ]; then
             npm publish --provenance --access public
           else
@@ -91,6 +103,12 @@ jobs:
         run: |
           cd apps/desktop
           node scripts/build-for-publish.mjs
+          PKG_NAME=$(node -p "require('./package.json').name")
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if npm view "${PKG_NAME}@${PKG_VERSION}" version >/dev/null 2>&1; then
+            echo "${PKG_NAME}@${PKG_VERSION} already on npm — skipping (retry-safe)."
+            exit 0
+          fi
           if [ "${{ needs.classify.outputs.npm_tag }}" = "latest" ]; then
             npm publish --provenance --access public
           else
