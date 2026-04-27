@@ -251,7 +251,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
   );
 
   const reviewerSections = useMemo(
-    () => sections.filter((s) => s.type === 'review'),
+    () => sections.filter((s) => s.type === 'reviewer'),
     [sections],
   );
 
@@ -873,6 +873,12 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
             {REVIEWER_ROLES.map((role) => {
               const sec = reviewerSections.find((s) => s.role === role);
               const data = findLatestRoundData(sec?.roundMetadata);
+              // When the reviewer is currently running, override the stale
+              // round artifact verdict — the card should show "running"
+              const isLive = sec?.status === 'running' || sec?.status === 'active';
+              const displayData = isLive
+                ? { round: (data?.round ?? 0) + 1, verdict: 'running' as const, findings: undefined, duration: null }
+                : data;
               return (
                 <div
                   key={role}
@@ -880,8 +886,8 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   style={{ display: 'flex', flexDirection: 'column', gap: 4 }}
                 >
                   <ReviewerRoleLabel role={role} />
-                  {data ? (
-                    <RoundCard round={data} />
+                  {displayData ? (
+                    <RoundCard round={displayData} />
                   ) : (
                     <div
                       style={{
