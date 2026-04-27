@@ -7,7 +7,7 @@
  *   3. Test summary           (placeholder until verification gate exposes results)
  *   4. PR summary             (placeholder — endpoint lands in pan-9yn5)
  *   5. Cost breakdown sparkline
- *   6. Recent activity feed   (issue-scoped, capped at 20 events)
+ *   6. Recent activity feed   (issue-scoped, capped at 10 events)
  *   7. Quick links            (chips that switch tabs)
  *
  * This component keeps the data dependencies tight: planning + activity + costs
@@ -514,24 +514,26 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         {/* SERVICES tile */}
         <Tile title="Services" icon={<ExternalLink size={14} />} testid="overview-tile-services">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {workspace.data?.services?.map((svc) => (
-              <a
-                key={svc.name}
-                href={svc.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  fontSize: 12,
-                  color: 'var(--mc-primary, var(--primary))',
-                  textDecoration: 'none',
-                }}
-              >
-                {svc.name} ↗
-              </a>
-            )) || (
+            {workspace.data?.services?.length ? (
+              workspace.data.services.map((svc) => (
+                <a
+                  key={svc.name}
+                  href={svc.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    fontSize: 12,
+                    color: 'var(--mc-primary, var(--primary))',
+                    textDecoration: 'none',
+                  }}
+                >
+                  {svc.name} ↗
+                </a>
+              ))
+            ) : (
               <>
                 {workspace.data?.frontendUrl && (
                   <a
@@ -760,11 +762,8 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                 </button>
               )}
               {workspace.data?.path && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    void fetch(`/api/workspaces/${issueId}/containerize`, { method: 'POST' }).catch(() => { /* ignore */ });
-                  }}
+                <a
+                  href={`vscode://file/${workspace.data.path}`}
                   style={{
                     padding: '5px 10px',
                     borderRadius: 6,
@@ -775,10 +774,12 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                     display: 'flex',
                     alignItems: 'center',
                     gap: 4,
+                    color: 'inherit',
+                    textDecoration: 'none',
                   }}
                 >
                   <ExternalLink size={12} /> Open VS Code
-                </button>
+                </a>
               )}
               {workspace.data?.canContainerize && (
                 <button
@@ -818,7 +819,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                 rel="noopener noreferrer"
                 style={{ fontSize: 12, color: 'var(--mc-primary, var(--primary))', textDecoration: 'none' }}
               >
-                GitHub Issue ↗
+                {issue.source === 'linear' ? 'Linear' : 'GitHub Issue'} ↗
               </a>
             )}
             {planning.data?.prd && (
@@ -837,16 +838,6 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               >
                 View PRD ↗
               </button>
-            )}
-            {issue?.source === 'linear' && issue?.url && (
-              <a
-                href={issue.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ fontSize: 12, color: 'var(--mc-primary, var(--primary))', textDecoration: 'none' }}
-              >
-                Linear ↗
-              </a>
             )}
             {!issue?.url && !planning.data?.prd && (
               <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No links available</span>

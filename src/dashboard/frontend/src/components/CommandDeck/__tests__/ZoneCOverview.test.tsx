@@ -253,6 +253,55 @@ describe('ZoneCOverview', () => {
     expect(screen.getByText('model-11')).toBeInTheDocument();
   });
 
+  it('falls back to frontend/api links when services is an empty array', () => {
+    workspaceResult.data = {
+      exists: true,
+      issueId: ISSUE,
+      services: [],
+      frontendUrl: 'http://localhost:4173',
+      apiUrl: 'http://localhost:3011',
+    };
+
+    render(<ZoneCOverview issueId={ISSUE} />);
+    expect(screen.getByRole('link', { name: 'Frontend ↗' })).toHaveAttribute('href', 'http://localhost:4173');
+    expect(screen.getByRole('link', { name: 'API ↗' })).toHaveAttribute('href', 'http://localhost:3011');
+  });
+
+  it('renders Open VS Code as a vscode:// workspace link', () => {
+    workspaceResult.data = {
+      exists: true,
+      issueId: ISSUE,
+      path: '/tmp/pan-865',
+    };
+
+    render(<ZoneCOverview issueId={ISSUE} />);
+    expect(screen.getByRole('link', { name: 'Open VS Code' })).toHaveAttribute(
+      'href',
+      'vscode://file//tmp/pan-865',
+    );
+  });
+
+  it('labels linear issue links as Linear', () => {
+    render(
+      <ZoneCOverview
+        issueId={ISSUE}
+        issue={{
+          identifier: ISSUE,
+          title: 'Zone C overview',
+          status: 'in_progress',
+          source: 'linear',
+          url: 'https://linear.app/example/issue/PAN-865',
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: 'Linear ↗' })).toHaveAttribute(
+      'href',
+      'https://linear.app/example/issue/PAN-865',
+    );
+    expect(screen.queryByRole('link', { name: 'GitHub Issue ↗' })).not.toBeInTheDocument();
+  });
+
   it('syncs active tab to the URL query string', () => {
     render(<ZoneCOverview issueId={ISSUE} />);
     fireEvent.click(screen.getByTestId('zone-c-overview-tab-costs'));
