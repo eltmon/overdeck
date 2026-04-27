@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
-import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync, mkdtempSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import * as childProcess from 'child_process';
@@ -58,12 +58,8 @@ describe('specialist-context', () => {
   const originalPanopticonHome = process.env.PANOPTICON_HOME;
 
   beforeEach(() => {
-    testDir = join(tmpdir(), `panopticon-test-context-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    testDir = mkdtempSync(join(tmpdir(), 'panopticon-test-context-'));
     process.env.PANOPTICON_HOME = testDir;
-    if (existsSync(testDir)) {
-      rmSync(testDir, { recursive: true, force: true });
-    }
-    mkdirSync(testDir, { recursive: true });
     vi.clearAllMocks();
   });
 
