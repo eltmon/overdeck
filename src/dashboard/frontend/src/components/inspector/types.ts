@@ -77,7 +77,6 @@ export interface WorkspaceInfo {
   git?: GitStatus;
   repoGit?: { frontend: GitStatus | null; api: GitStatus | null };
   services?: { name: string; url?: string }[];
-  salvageableStashes?: SalvageableStashInfo[];
 }
 
 export interface ContainerMenuState {

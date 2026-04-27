@@ -12,6 +12,7 @@ export interface ParsedStashEntry {
   issueId?: string;
   kind: CanonicalStashKind | 'unknown';
   shortDescription?: string;
+  sequence?: number;
 }
 
 export interface SalvageableStashEntry extends ParsedStashEntry {
@@ -86,6 +87,7 @@ export function parseCanonicalStashMessage(message: string): ParsedStashEntry {
       message,
       kind: 'review-temp',
       issueId: reviewTempMatch[1].toUpperCase(),
+      sequence: parseInt(reviewTempMatch[2], 10),
     };
   }
 
@@ -155,6 +157,17 @@ export async function createRecoveryBranchFromStash(
     encoding: 'utf-8',
   });
   return branchName;
+}
+
+export function getNextReviewTempSequence(entries: ParsedStashEntry[], issueId: string): number {
+  const normalizedIssueId = issueId.toUpperCase();
+  const maxSequence = entries.reduce((max, entry) => {
+    if (entry.kind !== 'review-temp' || entry.issueId !== normalizedIssueId || entry.sequence === undefined) {
+      return max;
+    }
+    return Math.max(max, entry.sequence);
+  }, 0);
+  return maxSequence + 1;
 }
 
 export function isOlderThanDays(entry: ParsedStashEntry, days: number, now = new Date()): boolean {

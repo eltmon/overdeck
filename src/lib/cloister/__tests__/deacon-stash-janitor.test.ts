@@ -26,7 +26,7 @@ vi.mock('../../../lib/review-status.js', () => ({
 vi.mock('../../database/review-status-db.js', () => ({ markWorkspaceStuck: vi.fn() }));
 vi.mock('../../database/app-settings.js', () => ({ isDeaconGloballyPaused: vi.fn(() => false) }));
 vi.mock('../../shadow-state.js', () => ({ getShadowState: vi.fn(async () => null) }));
-vi.mock('../../projects.js', () => ({ resolveProjectFromIssue: vi.fn() }));
+vi.mock('../../projects.js', () => ({ resolveProjectFromIssue: vi.fn(), listProjects: vi.fn(() => [{ config: { path: '/repo' } }]) }));
 vi.mock('../../lifecycle/archive-planning.js', () => ({ findWorkspacePath: vi.fn() }));
 vi.mock('../../persistent-logger.js', () => ({ logDeaconEvent: vi.fn(), logAgentLifecycle: vi.fn() }));
 vi.mock('../../activity-logger.js', () => ({ emitActivityEntry: vi.fn(), emitActivityTts: vi.fn() }));
@@ -62,7 +62,12 @@ vi.mock('fs', async (importOriginal) => {
     readFileSync: vi.fn(() => '{}'),
     writeFileSync: vi.fn(),
     mkdirSync: vi.fn(),
-    readdirSync: vi.fn(() => []),
+    readdirSync: vi.fn((path: string, opts?: any) => {
+      if (String(path).includes('/workspaces') && opts?.withFileTypes) {
+        return [{ isDirectory: () => true, name: 'feature-pan-879' }];
+      }
+      return [];
+    }),
     statSync: vi.fn(() => ({ isDirectory: () => false, mtimeMs: 0 })),
     rmSync: vi.fn(),
   };
@@ -74,7 +79,7 @@ vi.mock('child_process', async (importOriginal) => {
   return { ...actual, exec: execMock, execFile: vi.fn() };
 });
 
-import { cleanupSpawnAndOrphanedStashes } from '../deacon.js';
+import { cleanupSpawnAndOrphanedStashes, logNonCanonicalStashesOnStartup } from '../deacon.js';
 import { listRunningAgents, getAgentState, saveAgentState } from '../../../lib/agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../../../lib/stashes.js';
 import { resolveProjectFromIssue } from '../../projects.js';
@@ -132,7 +137,7 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
   });
 
   it('drops old non-salvageable stashes but preserves salvageable ones', async () => {
-    mockListRunningAgents.mockReturnValue([{ id: 'agent-pan-879', issueId: 'PAN-879' }] as any);
+    mockListRunningAgents.mockReturnValue([] as any);
     mockGetAgentState.mockReturnValue(null);
     mockListStashes.mockResolvedValue([
       { ref: 'stash@{1}', kind: 'pre-merge', issueId: 'PAN-879', createdAt: new Date('2026-03-01T00:00:00Z'), message: 'pre-merge:PAN-879:2026-03-01T00:00:00Z' } as any,
@@ -145,5 +150,17 @@ describe('cleanupSpawnAndOrphanedStashes', () => {
     expect(mockDropStash).toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'stash@{1}');
     expect(mockDropStash).not.toHaveBeenCalledWith('/repo/workspaces/feature-pan-879', 'stash@{2}');
     expect(actions).toContain('Dropped stale pre-merge stash for PAN-879: stash@{1}');
+  });
+
+  it('logs non-canonical stashes on startup without deleting them', async () => {
+    mockListStashes.mockResolvedValue([
+      { ref: 'stash@{5}', kind: 'unknown', issueId: undefined, message: 'legacy stash name' } as any,
+    ]);
+
+    const actions = await logNonCanonicalStashesOnStartup();
+
+    expect(mockDropStash).not.toHaveBeenCalled();
+    expect(actions[0]).toContain('Non-canonical stash in PAN-879');
+    expect(actions[0]).toContain('audit recommended');
   });
 });

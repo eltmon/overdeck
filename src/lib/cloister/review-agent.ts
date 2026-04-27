@@ -20,6 +20,8 @@ import { writeFeedbackFile } from './feedback-writer.js';
 import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 import { resolveProjectFromIssue } from '../projects.js';
 import { getReviewerSessionName, type ReviewerRole } from './specialists.js';
+import { buildStashMessage, createNamedStash, dropStash, getNextReviewTempSequence, listStashes } from '../stashes.js';
+import { getReviewStatus, setReviewStatus } from '../review-status.js';
 
 const execAsync = promisify(exec);
 
@@ -101,6 +103,42 @@ export function getActiveParallelReviewIssues(sessionNames: string[]): Set<strin
     }
   }
   return active;
+}
+
+async function ensureReviewTempStash(issueId: string, workspace: string): Promise<{ ref: string; message: string; sequence: number } | null> {
+  const { stdout } = await execAsync('git status --porcelain', {
+    cwd: workspace,
+    encoding: 'utf-8',
+  });
+  if (!stdout.trim()) return null;
+
+  const existingEntries = await listStashes(workspace);
+  const sequence = getNextReviewTempSequence(existingEntries, issueId);
+  const message = buildStashMessage('review-temp', issueId, sequence);
+  const ref = await createNamedStash(workspace, message, true);
+  if (!ref) return null;
+
+  return { ref, message, sequence };
+}
+
+async function cleanupReviewTempStash(issueId: string, workspace: string): Promise<void> {
+  const status = getReviewStatus(issueId);
+  if (!status?.reviewTempStashRef) return;
+
+  try {
+    await dropStash(workspace, status.reviewTempStashRef);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/not found|does not exist/i.test(message)) {
+      throw error;
+    }
+  }
+
+  setReviewStatus(issueId, {
+    reviewTempStashRef: undefined,
+    reviewTempStashMessage: undefined,
+    reviewTempStashSequence: undefined,
+  });
 }
 
 /**
@@ -997,6 +1035,11 @@ export async function runParallelReview(
 
   return { result, reviewId };
   } finally {
+    try {
+      await cleanupReviewTempStash(context.issueId, context.projectPath);
+    } catch (err) {
+      console.error(`[review-agent] Failed to clean review-temp stash for ${context.issueId}:`, err);
+    }
     await killAllReviewerSessions(projectKey, context.issueId, agents);
   }
 }
@@ -1238,8 +1281,6 @@ export async function dispatchParallelReview(
     ) => Promise<{ sessionName: string }>;
   } = {},
 ): Promise<{ success: boolean; message: string; error?: string }> {
-  const { setReviewStatus } = await import('../review-status.js');
-
   // Archive feedback from any previous review cycle so the work agent only
   // sees current-cycle feedback when it reads .planning/feedback/.
   try {
@@ -1249,6 +1290,18 @@ export async function dispatchParallelReview(
     // Non-fatal: archiving is best-effort
   }
 
+  let reviewTempStash: Awaited<ReturnType<typeof ensureReviewTempStash>> = null;
+  try {
+    reviewTempStash = await ensureReviewTempStash(opts.issueId, opts.workspace);
+  } catch (err) {
+    console.error(`[review-agent] Failed to create review-temp stash for ${opts.issueId}:`, err);
+    return {
+      success: false,
+      message: 'Failed to create review-temp stash',
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+
   // Set reviewing here so callers don't race against the async coordinator.
   // The coordinator (pan review run) will overwrite this with the terminal
   // status when it exits.
@@ -1256,9 +1309,17 @@ export async function dispatchParallelReview(
     setReviewStatus(opts.issueId, {
       reviewStatus: 'reviewing',
       reviewSpawnedAt: new Date().toISOString(),
+      reviewTempStashRef: reviewTempStash?.ref,
+      reviewTempStashMessage: reviewTempStash?.message,
+      reviewTempStashSequence: reviewTempStash?.sequence,
     });
   } catch (err) {
     console.error(`[review-agent] Failed to set reviewing status for ${opts.issueId}:`, err);
+    if (reviewTempStash) {
+      try {
+        await dropStash(opts.workspace, reviewTempStash.ref);
+      } catch {}
+    }
     return {
       success: false,
       message: 'Failed to initialize review status',
@@ -1290,6 +1351,11 @@ export async function dispatchParallelReview(
     };
   } catch (err) {
     console.error(`[review-agent] Failed to spawn review coordinator for ${opts.issueId}:`, err);
+    try {
+      await cleanupReviewTempStash(opts.issueId, opts.workspace);
+    } catch (cleanupError) {
+      console.error(`[review-agent] Failed to clean review-temp stash for ${opts.issueId}:`, cleanupError);
+    }
     setReviewStatus(opts.issueId, {
       reviewStatus: 'failed',
       reviewNotes: `Coordinator spawn failed: ${err instanceof Error ? err.message : String(err)}`,

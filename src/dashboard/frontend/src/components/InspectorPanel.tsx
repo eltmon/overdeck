@@ -24,7 +24,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 import { Agent, Issue, WorkAgentLifecycle } from '../types';
-import type { ContainerStatus, ReviewStatus, WorkspaceInfo } from './inspector/types';
+import type { ContainerStatus, ReviewStatus, SalvageableStashInfo, WorkspaceInfo } from './inspector/types';
 import { getFriendlyModelName, shouldForceReviewTrigger } from './inspector/utils';
 import { useAlert } from './DialogProvider';
 import { BeadsDialog } from './BeadsDialog';
@@ -181,6 +181,18 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       return data;
     },
     refetchInterval: (workspaceCreating || containersStarting || !!agentLaunchState) ? 5000 : 30000,
+  });
+
+  const { data: stashData } = useQuery<{ salvageableStashes: SalvageableStashInfo[] }>({
+    queryKey: ['workspace-stashes', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/stashes`);
+      if (!res.ok) throw new Error('Failed to fetch workspace stashes');
+      return res.json();
+    },
+    enabled: workspace?.exists === true,
+    refetchInterval: 60000,
+    staleTime: 30000,
   });
 
   // Self-contained review status query (shares cache key with DetailPanelLayout)
@@ -544,7 +556,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       return data as { branchName: string };
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
+      queryClient.invalidateQueries({ queryKey: ['workspace-stashes', issueId] });
       toast.success(`Created ${data.branchName}`);
     },
     onError: (err: Error) => {
@@ -562,7 +574,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
+      queryClient.invalidateQueries({ queryKey: ['workspace-stashes', issueId] });
       toast.success('Stash dismissed');
     },
     onError: (err: Error) => {
@@ -959,11 +971,11 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           </div>
         )}
 
-        {workspace?.salvageableStashes && workspace.salvageableStashes.length > 0 && (
+        {stashData?.salvageableStashes && stashData.salvageableStashes.length > 0 && (
           <div className="px-3 py-2 border-b border-border text-xs">
             <div className="uppercase tracking-wider text-[10px] mb-2 font-semibold text-muted-foreground">Salvageable Stashes</div>
             <div className="space-y-2">
-              {workspace.salvageableStashes.map((stash) => (
+              {stashData.salvageableStashes.map((stash) => (
                 <div key={stash.ref} className="rounded border border-border px-2 py-2 bg-card/40">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">

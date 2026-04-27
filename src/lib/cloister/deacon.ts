@@ -26,14 +26,13 @@ import { setReviewStatus, loadReviewStatuses, getReviewStatus } from '../review-
 import { markWorkspaceStuck } from '../database/review-status-db.js';
 import { isDeaconGloballyPaused } from '../database/app-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
-import { resolveProjectFromIssue } from '../projects.js';
+import { resolveProjectFromIssue, listProjects } from '../projects.js';
 import { logDeaconEvent, logAgentLifecycle } from '../persistent-logger.js';
-import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
+import { emitActivityTts } from '../activity-logger.js';
 import { getShadowState } from '../shadow-state.js';
 
 // Review status file location (same as dashboard server)
 const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
-
 
 import {
   SpecialistType,
@@ -43,6 +42,7 @@ import {
 } from './specialists.js';
 import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunningAgents, getAgentDir, getAgentState, saveAgentState, resumeAgent } from '../agents.js';
 import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
+import { emitActivityEntry } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSession, killSessionAsync, listPaneValues, listPaneValuesAsync, listSessionNamesAsync, sessionExists, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
 
 // ============================================================================
@@ -60,6 +60,7 @@ const DEFAULT_CONFIG: DeaconConfig = {
   patrolIntervalMs: 60_000,        // Safety net — immediate processing happens via pipeline events
   massDeathThreshold: 2,           // Deaths within window triggers alert
   massDeathWindowMs: 60_000,       // 1 minute window for mass death detection
+  stashJanitorEveryCycles: 60,
 };
 
 export interface DeaconConfig {
@@ -69,6 +70,7 @@ export interface DeaconConfig {
   patrolIntervalMs: number;
   massDeathThreshold: number;
   massDeathWindowMs: number;
+  stashJanitorEveryCycles: number;
 }
 
 // ============================================================================
@@ -922,14 +924,10 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
  * The feedback is useless once consumed, so we always delete — no archive, no
  * retention. See docs/REVIEW-AGENT-ARCHITECTURE.md.
  */
-export async function cleanupAbandonedFeedback(): Promise<string[]> {
-  const actions: string[] = [];
-
-  const { listProjects } = await import('../projects.js');
-  const { getReviewStatus } = await import('../review-status.js');
-  const { clearFeedbackFiles } = await import('./feedback-writer.js');
-
+function listFeatureWorkspaces(): Array<{ issueId: string; workspacePath: string }> {
   const projects = listProjects();
+  const workspaces: Array<{ issueId: string; workspacePath: string }> = [];
+
   for (const { config: projectConfig } of projects) {
     const workspacesRoot = join(projectConfig.path, 'workspaces');
     if (!existsSync(workspacesRoot)) continue;
@@ -944,46 +942,58 @@ export async function cleanupAbandonedFeedback(): Promise<string[]> {
     }
 
     for (const entry of entries) {
-      const workspacePath = join(workspacesRoot, entry);
-      const feedbackDir = join(workspacePath, '.planning', 'feedback');
-      if (!existsSync(feedbackDir)) continue;
+      workspaces.push({
+        issueId: entry.replace(/^feature-/, '').toUpperCase(),
+        workspacePath: join(workspacesRoot, entry),
+      });
+    }
+  }
 
-      // Derive issueId from workspace dir name: feature-pan-539 → PAN-539
-      // or feature-min-123 → MIN-123 (same transform regardless of project).
-      const issueLower = entry.replace(/^feature-/, '');
-      const issueId = issueLower.toUpperCase();
+  return workspaces;
+}
 
-      // Gate 1: work agent tmux session active? If yes, feedback may be current.
-      const agentSession = `agent-${issueLower}`;
-      try {
-        if (await sessionExistsAsync(agentSession)) continue;
-      } catch {
-        // Treat lookup error as "session might exist" — skip out of caution.
-        continue;
-      }
+export async function cleanupAbandonedFeedback(): Promise<string[]> {
+  const actions: string[] = [];
 
-      // Gate 2: review in flight? If yes, feedback is about to be consumed.
-      try {
-        const status = getReviewStatus(issueId);
-        if (status?.reviewStatus === 'reviewing') continue;
-      } catch {
-        // No status entry → safe to clean.
-      }
+  const { getReviewStatus } = await import('../review-status.js');
+  const { clearFeedbackFiles } = await import('./feedback-writer.js');
 
-      // Both gates passed — feedback is abandoned, safe to delete.
-      try {
-        const before = readdirSync(feedbackDir)
-          .filter(f => /^\d{3}-/.test(f) && f.endsWith('.md'))
-          .length;
-        if (before === 0) continue;
-        await clearFeedbackFiles(workspacePath);
-        actions.push(
-          `Cleared ${before} abandoned feedback file(s) in ${entry} (agent stopped, no in-flight review)`,
-        );
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[deacon] cleanupAbandonedFeedback failed for ${entry}:`, msg);
-      }
+  for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
+    const feedbackDir = join(workspacePath, '.planning', 'feedback');
+    if (!existsSync(feedbackDir)) continue;
+
+    const issueLower = issueId.toLowerCase();
+
+    // Gate 1: work agent tmux session active? If yes, feedback may be current.
+    const agentSession = `agent-${issueLower}`;
+    try {
+      if (await sessionExistsAsync(agentSession)) continue;
+    } catch {
+      // Treat lookup error as "session might exist" — skip out of caution.
+      continue;
+    }
+
+    // Gate 2: review in flight? If yes, feedback is about to be consumed.
+    try {
+      const status = getReviewStatus(issueId);
+      if (status?.reviewStatus === 'reviewing') continue;
+    } catch {
+      // No status entry → safe to clean.
+    }
+
+    // Both gates passed — feedback is abandoned, safe to delete.
+    try {
+      const before = readdirSync(feedbackDir)
+        .filter(f => /^\d{3}-/.test(f) && f.endsWith('.md'))
+        .length;
+      if (before === 0) continue;
+      await clearFeedbackFiles(workspacePath);
+      actions.push(
+        `Cleared ${before} abandoned feedback file(s) in feature-${issueLower} (agent stopped, no in-flight review)`,
+      );
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[deacon] cleanupAbandonedFeedback failed for feature-${issueLower}:`, msg);
     }
   }
 
@@ -2339,6 +2349,30 @@ export async function checkDeadEndAgents(): Promise<string[]> {
   return actions;
 }
 
+export async function logNonCanonicalStashesOnStartup(): Promise<string[]> {
+  const actions: string[] = [];
+
+  for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
+    if (!existsSync(workspacePath)) continue;
+
+    try {
+      const stashes = await listStashes(workspacePath);
+      for (const stash of stashes) {
+        if (stash.kind !== 'unknown') continue;
+        const message = `Non-canonical stash in ${issueId} (${workspacePath}): ${stash.ref} ${stash.message} — audit recommended`;
+        console.warn(`[deacon] ${message}`);
+        emitActivityEntry({ source: 'dashboard', level: 'warn', message });
+        actions.push(message);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[deacon] Failed non-canonical stash scan for ${issueId}: ${message}`);
+    }
+  }
+
+  return actions;
+}
+
 export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<string[]> {
   const actions: string[] = [];
 
@@ -2374,16 +2408,8 @@ export async function cleanupSpawnAndOrphanedStashes(now = new Date()): Promise<
       }
     }
 
-    const issueIds = new Set<string>();
-    for (const agent of agents) {
-      if (agent.issueId) issueIds.add(agent.issueId.toUpperCase());
-    }
-
-    for (const issueId of issueIds) {
-      const resolved = resolveProjectFromIssue(issueId);
-      if (!resolved) continue;
-      const workspacePath = findWorkspacePath(resolved.projectPath, issueId.toLowerCase());
-      if (!workspacePath || !existsSync(workspacePath)) continue;
+    for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
+      if (!existsSync(workspacePath)) continue;
 
       try {
         const stashes = await listStashes(workspacePath);
@@ -3118,9 +3144,12 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...stuckActions);
   for (const a of stuckActions) addLog('action', a, state.patrolCycle);
 
-  const stashJanitorActions = await cleanupSpawnAndOrphanedStashes();
-  actions.push(...stashJanitorActions);
-  for (const a of stashJanitorActions) addLog('action', a, state.patrolCycle);
+  const stashJanitorEveryCycles = Math.max(1, config.stashJanitorEveryCycles || Math.round((60 * 60 * 1000) / config.patrolIntervalMs));
+  if (state.patrolCycle % stashJanitorEveryCycles === 0) {
+    const stashJanitorActions = await cleanupSpawnAndOrphanedStashes();
+    actions.push(...stashJanitorActions);
+    for (const a of stashJanitorActions) addLog('action', a, state.patrolCycle);
+  }
 
   // Periodic agent state cleanup (PAN-154)
   if (Math.random() < 0.003) {

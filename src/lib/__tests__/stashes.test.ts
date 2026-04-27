@@ -10,6 +10,7 @@ vi.mock('node:child_process', async (importOriginal) => {
 import {
   buildStashMessage,
   createNamedStash,
+  getNextReviewTempSequence,
   isOlderThanDays,
   parseCanonicalStashMessage,
   parseStashListLine,
@@ -53,6 +54,21 @@ describe('stashes', () => {
       issueId: 'PAN-879',
       message: 'pre-spawn:PAN-879:2026-04-27T14:15:16Z',
     });
+
+    const reviewTemp = parseCanonicalStashMessage('review-temp:PAN-879:7');
+    expect(reviewTemp).toMatchObject({
+      kind: 'review-temp',
+      issueId: 'PAN-879',
+      sequence: 7,
+    });
+  });
+
+  it('computes next review-temp sequence for an issue', () => {
+    expect(getNextReviewTempSequence([
+      { ref: 'stash@{0}', kind: 'review-temp', issueId: 'PAN-879', message: 'review-temp:PAN-879:2', sequence: 2 },
+      { ref: 'stash@{1}', kind: 'review-temp', issueId: 'PAN-879', message: 'review-temp:PAN-879:4', sequence: 4 },
+      { ref: 'stash@{2}', kind: 'review-temp', issueId: 'PAN-880', message: 'review-temp:PAN-880:9', sequence: 9 },
+    ] as any, 'pan-879')).toBe(5);
   });
 
   it('returns null when git reports no local changes to save', async () => {
