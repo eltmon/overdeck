@@ -34,7 +34,7 @@ import { httpHandler } from './http-handler.js';
  *   POST   /api/workspaces/:issueId/unstick
  */
 
-import { exec, spawn } from 'node:child_process';
+import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { access, chmod, mkdir, readdir, readFile, stat, symlink, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -92,6 +92,7 @@ import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 function shouldTreatAsRerun(status: Pick<ReviewStatus, 'readyForMerge' | 'reviewStatus' | 'testStatus' | 'mergeStatus'> | null | undefined): boolean {
   if (!status) return false;
@@ -163,15 +164,17 @@ export async function isBranchAlreadyRebased(
 ): Promise<{ alreadyRebased: boolean; currentHead?: string }> {
   try {
     await Promise.all([
-      execAsync(`git fetch origin ${targetBranch}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 }),
-      execAsync(`git fetch origin ${branchName}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 }),
+      execFileAsync('git', ['fetch', 'origin', targetBranch], { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 }),
+      execFileAsync('git', ['fetch', 'origin', branchName], { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 }),
     ]);
-    await execAsync(
-      `git merge-base --is-ancestor origin/${targetBranch} origin/${branchName}`,
+    await execFileAsync(
+      'git',
+      ['merge-base', '--is-ancestor', `origin/${targetBranch}`, `origin/${branchName}`],
       { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
     );
-    const { stdout: currentHead } = await execAsync(
-      `git rev-parse origin/${branchName}`,
+    const { stdout: currentHead } = await execFileAsync(
+      'git',
+      ['rev-parse', `origin/${branchName}`],
       { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 }
     );
     return { alreadyRebased: true, currentHead: currentHead.trim() };
@@ -3942,9 +3945,9 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     // is already rebased — no rebase or push is needed.
     const { alreadyRebased, currentHead } = await isBranchAlreadyRebased(workspacePath, branchName, targetBranch);
 
-    if (alreadyRebased) {
+    if (alreadyRebased && currentHead) {
       console.log(`[merge] ${branchName} already contains origin/${targetBranch} — skipping rebase request for ${issueId}`);
-      rebaseResult = { success: true, newHead: currentHead! };
+      rebaseResult = { success: true, newHead: currentHead };
     } else {
       try {
         const recovery = await ensureWorkAgentReadyForMerge(issueId, workspacePath, rebaseMsg);
@@ -4167,6 +4170,9 @@ const postWorkspaceMergeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!/^[A-Z]+-\d+$/i.test(issueId)) {
+      return jsonResponse({ error: 'Invalid issue ID format' }, { status: 400 });
+    }
     const eventStore = yield* EventStoreService;
 
     const result = yield* Effect.promise(() => triggerMerge(issueId));
