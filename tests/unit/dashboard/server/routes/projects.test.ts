@@ -44,6 +44,7 @@ vi.mock('node:fs/promises', async () => {
     access: vi.fn(),
     readdir: vi.fn(),
     readFile: vi.fn(),
+    stat: vi.fn(),
   };
 });
 
@@ -51,7 +52,9 @@ import { fetchProjectSessionTree } from '../../../../../src/dashboard/server/rou
 import { listProjects } from '../../../../../src/lib/projects.js';
 import { listSessionNamesAsync } from '../../../../../src/lib/tmux.js';
 import { getAgentRuntimeStateAsync } from '../../../../../src/lib/agents.js';
-import { access, readdir, readFile } from 'node:fs/promises';
+import { access, readdir, readFile, stat } from 'node:fs/promises';
+
+const RECENT_PLANNING_MTIME = new Date(Date.now() - 60_000);
 
 function mockAccess(paths: Set<string>) {
   return (access as any).mockImplementation((p: string) => {
@@ -65,6 +68,7 @@ function mockAccess(paths: Set<string>) {
 describe('fetchProjectSessionTree', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (stat as any).mockResolvedValue({ mtime: RECENT_PLANNING_MTIME });
   });
 
   it('returns null for unknown project key', async () => {
@@ -129,6 +133,7 @@ describe('fetchProjectSessionTree', () => {
     expect(tree.features[1]?.issueId).toBe('PAN-821');
     expect(tree.features[0]?.sessions).toHaveLength(1);
     expect(tree.features[1]?.sessions).toHaveLength(1);
+    expect((tree.features[1]?.sessions as Array<{ startedAt: string }>)[0]?.startedAt).toBe(RECENT_PLANNING_MTIME.toISOString());
     expect(listSessionNamesAsync).toHaveBeenCalledTimes(1);
   });
 

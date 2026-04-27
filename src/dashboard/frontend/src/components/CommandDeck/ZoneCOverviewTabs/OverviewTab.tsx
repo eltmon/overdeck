@@ -105,8 +105,9 @@ function lastActivityLabel(sections: readonly ActivitySection[]): string {
 }
 
 function deriveStageFromSections(sections: readonly ActivitySection[]): string {
+  if (sections.length === 0) return 'idle';
   const active = [...sections].reverse().find((s) => s.status === 'active' || s.status === 'running');
-  const target = active ?? sections[sections.length - 1];
+  const target = active ?? sections.at(-1);
   if (!target) return 'idle';
   if (target.role) return target.role;
   return target.type;
@@ -221,7 +222,11 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
 
   const sections = activity.data?.sections ?? [];
   const stage = deriveStageFromSections(sections);
-  const totalCost = costs.data?.totalCost ?? activity.data?.totalCost ?? 0;
+  const isCostPending = costs.isLoading && activity.isLoading;
+  const totalCost = costs.data?.totalCost
+    ?? (costs.isError ? activity.data?.totalCost : undefined)
+    ?? (!activity.isLoading ? activity.data?.totalCost : undefined)
+    ?? null;
   const lastLabel = lastActivityLabel(sections);
   const activeAgentCount = sections.filter(
     (s) => s.status === 'running' || s.status === 'active',
@@ -362,7 +367,9 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
             }}
           >
             <span style={{ fontSize: 18, fontWeight: 700 }}>
-              <LiveCounter value={totalCost} unit="$" precision={2} pulseOnIncrement />
+              {isCostPending || totalCost === null
+                ? <span data-testid="overview-cost-loading">Loading…</span>
+                : <LiveCounter value={totalCost} unit="$" precision={2} pulseOnIncrement />}
             </span>
             <span style={{ fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
               cost to date
@@ -482,7 +489,9 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         <Tile title="Cost" icon={<Code2 size={14} />} testid="overview-tile-cost">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <div style={{ fontSize: 14, fontWeight: 600 }}>
-              <LiveCounter value={totalCost} unit="$" precision={2} />
+              {isCostPending || totalCost === null
+                ? <span data-testid="overview-cost-tile-loading">Loading…</span>
+                : <LiveCounter value={totalCost} unit="$" precision={2} />}
             </div>
             {costs.data?.byModel && Object.keys(costs.data.byModel).length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

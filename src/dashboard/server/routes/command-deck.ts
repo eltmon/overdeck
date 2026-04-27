@@ -36,6 +36,7 @@ import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { SessionNodePresence } from '@panopticon/contracts';
+import { deriveSessionPresence } from '../services/session-presence.js';
 import { findPrdAtStatus, type PrdLocation } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
 import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
@@ -143,41 +144,6 @@ function getProjectPath(issuePrefix?: string): string {
  * `review-<issueId>-<timestamp>-<role>` pattern.
  */
 export { extractReviewerRole } from './reviewer-tree.js';
-
-/**
- * Derive session presence from runtime state, tmux session existence, and heartbeat.
- * Aligns with Cloister's stuck-detection signals (heartbeat freshness + runtime state).
- */
-async function derivePresence(
-  agentId: string,
-  rtState: { state: string } | null,
-  tmuxSessionNames: Set<string>,
-): Promise<SessionNodePresence> {
-  const hasTmux = tmuxSessionNames.has(agentId);
-  if (!hasTmux) return 'ended';
-
-  if (!rtState) return 'idle';
-
-  if (rtState.state === 'active') return 'active';
-  if (rtState.state === 'suspended') return 'suspended';
-  if (rtState.state === 'idle' || rtState.state === 'waiting-on-human') {
-    // Supplemental checks: heartbeat or output.log mtime within 5s indicates
-    // recent activity that may not yet be reflected in the in-process state mirror.
-    const heartbeatPath = join(homedir(), '.panopticon', 'heartbeats', `${agentId}.json`);
-    const hbStat = await stat(heartbeatPath).catch(() => null);
-    if (hbStat && (Date.now() - hbStat.mtime.getTime()) < 5000) {
-      return 'active';
-    }
-    const logPath = join(homedir(), '.panopticon', 'agents', agentId, 'output.log');
-    const logStat = await stat(logPath).catch(() => null);
-    if (logStat && (Date.now() - logStat.mtime.getTime()) < 5000) {
-      return 'active';
-    }
-    return 'idle';
-  }
-
-  return 'ended';
-}
 
 // resolveJsonlPath is imported from ./jsonl-resolver (PAN-830).
 
@@ -299,7 +265,7 @@ export async function fetchActivityDataWithContext(
       }
 
       const rtState = await getAgentRuntimeStateAsync(checkId);
-      const presence = await derivePresence(checkId, rtState, tmuxSessionNames);
+      const presence = await deriveSessionPresence(checkId, rtState, tmuxSessionNames);
 
       // Resolve JSONL path for conversation rendering (PAN-821)
       const jsonlPath = await resolveJsonlPath(checkId, workspacePath);

@@ -6,7 +6,7 @@ import { jsonResponse } from "../http-helpers.js";
  *   GET /api/projects/:projectKey/session-tree
  */
 
-import { access, readFile, readdir } from 'node:fs/promises';
+import { access, readFile, readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -20,6 +20,7 @@ import { listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import type { AgentStatus, SessionNode, SessionNodePresence, SessionNodeType } from '@panopticon/contracts';
+import { deriveSessionPresence } from '../services/session-presence.js';
 import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { getReviewStatus } from '../review-status.js';
@@ -57,10 +58,24 @@ function mapSessionType(type: string): SessionNodeType {
 function mapAgentStatus(status: string): AgentStatus {
   switch (status) {
     case 'running': return 'running';
-    case 'active': return 'running';
-    case 'completed': return 'stopped';
-    case 'failed': return 'error';
-    case 'suspended': return 'stopped';
+    case 'active':
+    case 'reviewing':
+    case 'testing':
+    case 'merging':
+    case 'verifying':
+      return 'running';
+    case 'completed':
+    case 'passed':
+    case 'queued':
+    case 'merged':
+    case 'suspended':
+      return 'stopped';
+    case 'failed':
+    case 'blocked':
+    case 'commented':
+    case 'changes-requested':
+    case 'dispatch_failed':
+      return 'error';
     default: return 'unknown';
   }
 }
@@ -82,19 +97,6 @@ function isStaleLegacySession(s: SessionNode): boolean {
   return (Date.now() - startedAtMs) > LEGACY_SESSION_MAX_AGE_MS;
 }
 
-async function derivePresence(
-  agentId: string,
-  rtState: { state: string } | null,
-  tmuxSessionNames: Set<string>,
-): Promise<SessionNodePresence> {
-  const hasTmux = tmuxSessionNames.has(agentId);
-  if (!hasTmux) return 'ended';
-  if (!rtState) return 'idle';
-  if (rtState.state === 'active') return 'active';
-  if (rtState.state === 'suspended') return 'suspended';
-  if (rtState.state === 'idle' || rtState.state === 'waiting-on-human') return 'idle';
-  return 'ended';
-}
 
 interface SessionTreeContext {
   tmuxSessionNames: Set<string>;
@@ -126,7 +128,7 @@ async function collectSessionTreeNodes(
       const sectionType = isPlanning ? 'planning' : 'work';
       if (isPlanning) hasPlanningSection = true;
       const rtState = await getAgentRuntimeStateAsync(checkId);
-      const presence = await derivePresence(checkId, rtState, context.tmuxSessionNames);
+      const presence = await deriveSessionPresence(checkId, rtState, context.tmuxSessionNames);
       const jsonlPath = await resolveJsonlPath(checkId, workspacePath);
       sections.push({
         type: sectionType,
@@ -159,13 +161,19 @@ async function collectSessionTreeNodes(
   if (!hasPlanningSection) {
     const planningDir = join(workspacePath, '.planning');
     if (await pathExists(planningDir)) {
+      const planningStatePath = join(planningDir, 'STATE.md');
+      const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
+      const planningPathForTimestamp = await pathExists(planningStatePath)
+        ? planningStatePath
+        : planningPromptPath;
+      const planningStat = await stat(planningPathForTimestamp).catch(() => null);
       const sessionId = `planning-${issueLower}-state`;
       const jsonlPath = await resolveJsonlPath(sessionId, workspacePath);
       sections.push({
         type: 'legacy',
         sessionId,
         model: 'unknown',
-        startedAt: new Date().toISOString(),
+        startedAt: planningStat?.mtime.toISOString() ?? new Date(0).toISOString(),
         duration: 0,
         status: 'stopped',
         presence: 'ended',
@@ -203,7 +211,7 @@ async function collectSessionTreeNodes(
         tmuxSessionNames: context.tmuxSessionNames,
         startedAt: latestReview.timestamp,
         endedAt: undefined,
-        status: latestReview.status === 'reviewing' ? 'running' : latestReview.status,
+        status: mapAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
       });
       sections.push(...reviewerNodes);
     }

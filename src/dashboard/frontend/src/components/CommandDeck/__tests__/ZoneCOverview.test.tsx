@@ -109,6 +109,17 @@ describe('ZoneCOverview', () => {
     expect(screen.getByTestId('overview-stage')).toHaveTextContent('idle');
   });
 
+  it('shows loading state for cost when both activity and costs are loading', () => {
+    activityResult.data = undefined;
+    activityResult.isLoading = true;
+    costsResult.data = undefined;
+    costsResult.isLoading = true;
+
+    render(<ZoneCOverview issueId={ISSUE} />);
+    expect(screen.getByTestId('overview-cost-loading')).toHaveTextContent('Loading…');
+    expect(screen.getByTestId('overview-cost-tile-loading')).toHaveTextContent('Loading…');
+  });
+
   it('always renders all 10 tabs, including INFERENCE without planning content', () => {
     planningResult.data = { prd: '# PRD', state: '# STATE' };
     render(<ZoneCOverview issueId={ISSUE} />);

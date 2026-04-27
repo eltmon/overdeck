@@ -55,3 +55,4 @@ Review feedback addressed; resubmitting after removing the tab-strip keyboard fo
 - **[2026-04-27T12:46Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
 - **[2026-04-27T12:55Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/002-review-agent-changes-requested.md`
 - **[2026-04-27T13:00Z] verification-gate → FAILED** — `.planning/feedback/003-verification-gate-failed.md`
+- **[2026-04-27T13:12Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
