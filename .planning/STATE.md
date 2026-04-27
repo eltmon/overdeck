@@ -38,3 +38,4 @@ Resubmitting PAN-859 after tightening the CommandDeck regression tests per revie
 - **[2026-04-27T22:46Z] review-agent → APPROVED** — `.planning/feedback/006-review-agent-approved.md`
 - **[2026-04-27T22:46Z] review-agent → APPROVED** — `.planning/feedback/006-review-agent-approved.md`
 - **[2026-04-27T22:52Z] review-agent → APPROVED** — `.planning/feedback/007-review-agent-approved.md`
+- **[2026-04-27T23:00Z] review-agent → APPROVED** — `.planning/feedback/008-review-agent-approved.md`
