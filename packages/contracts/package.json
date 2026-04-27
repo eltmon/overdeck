@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "effect": "catalog:"
+    "effect": "4.0.0-beta.43"
   },
   "devDependencies": {
     "@effect/language-service": "catalog:",
