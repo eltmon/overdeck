@@ -2,79 +2,84 @@
 specialist: review-agent
 issueId: PAN-879
 outcome: changes-requested
-timestamp: 2026-04-27T14:01:58Z
+timestamp: 2026-04-27T14:22:54Z
 ---
 
 # Verdict: CHANGES_REQUESTED
 
 ## Summary
-PAN-879 implements a canonical stash taxonomy (pre-merge, pre-spawn, review-temp, salvageable) with a janitor that drops stale stashes and a dashboard inspector for salvageable stash recovery. All 12 requirements are implemented and requirements coverage is complete. However, 1 blocker was found: `reconcileAndCheckIfMerged` in deacon.ts conflates tracker "closed" state with "merged" for Linear/GitLab/Rally, which can cause data loss by dropping pre-merge stashes for issues closed as "won't fix", "duplicate", or "cancelled". Two additional should-fix issues (env var zero handling, review-temp regex inconsistency) and 1 performance warning (O(N) subprocess rescans in janitor drop path) also require attention before this can merge.
+
+PAN-879 introduces a canonical stash taxonomy (`pre-merge`, `pre-spawn`, `review-temp`, `salvageable`), a new `stashes.ts` module with parsing/creation/drop operations, stash lifecycle management in merge-agent and review-agent, a deacon stash-janitor sweep, and dashboard/frontend endpoints for viewing and recovering salvageable stashes. The feature is fully implemented (12/12 requirements met). However, a command-injection vulnerability in `createRecoveryBranchFromStash` is a MUST-severity blocker that must be fixed before merge. Two HIGH-severity warnings (stash resolution race, janitor stackRef filter) should also be addressed.
 
 ## Blockers (MUST fix before merge)
 
-### 1. `reconcileAndCheckIfMerged` treats tracker "closed" as "merged" for non-GitHub trackers — `src/lib/cloister/deacon.ts:~2410` — `⊗`
+### 1. Command injection in `createRecoveryBranchFromStash` — `src/lib/stashes.ts:234-235` — `!`
 **Raised by**: correctness
-**Why it blocks**: For Linear/GitLab/Rally, any closed issue (including "won't fix", "duplicate", "cancelled") is treated as merged, causing the janitor to drop pre-merge safety stashes for issues that were never actually merged — irreversible data loss of uncommitted work.
+**Why it blocks**: `issueId.toUpperCase()` is interpolated directly into a shell command via `execAsync` backtick expansion. While the codebase uses `ISSUE_ID_PATTERN` validation elsewhere, `buildStashMessage` does not validate its `issueId` argument, and the recovery branch path (`git branch ${branchName} ${operationRef}`) is not protected by the same quoting as the stash message path.
 
-The function checks `tracker.getIssue(issueId).state === 'closed'` which is only sufficient for GitHub (where `prState.merged` is checked first). For other trackers, closed = merged is wrong.
+```typescript
+// stashes.ts:234-235
+const branchName = `recovery/${issueId.toUpperCase()}-${sanitizeShortDescription(shortDescription)}`;
+await execAsync(`git branch ${JSON.stringify(branchName)} ${JSON.stringify(operationRef)}`, ...);
+```
 
-**Fix**: Check for a merged PR or branch existence before treating non-GitHub tracker issues as merged. Expose a merge-specific field from the tracker abstraction (e.g., `issue.merged` or `issue.closedReason`), or gate the close-as-merged logic on tracker type (GitHub-only).
+`sanitizeShortDescription` strips non-alphanumeric chars, but `issueId.toUpperCase()` is raw. If any caller passes a malformed `issueId` (or a future code path bypasses validation), shell execution is possible.
+
+**Fix:** Add `validateIssueId` at the top of `buildStashMessage` to enforce the `([A-Z]+(?:-[A-Z]+)*-\d+)` pattern before any interpolation:
+
+```typescript
+function validateIssueId(issueId: string): void {
+  if (!/^[A-Z]+(?:-[A-Z]+)*-\d+$/.test(issueId)) {
+    throw new Error(`Invalid issue ID format: ${issueId}`);
+  }
+}
+```
+
+Call `validateIssueId(issueId)` at the top of `buildStashMessage` (line ~49). This provides a hard invariant boundary — any malformed `issueId` throws before it reaches any shell command.
 
 ## High Priority (SHOULD fix; synthesis may still approve if justified)
 
-### 1. `PAN_STASH_JANITOR_CYCLES` env var silently ignores `0` — `src/lib/cloister/config.ts:~391` — `!`
+### 1. Race condition in `resolveStashOperationRef` stack resolution — `src/lib/stashes.ts:177-209` — `~`
 **Raised by**: correctness
-**Why it blocks**: The YAML config correctly accepts `stash_janitor_every_cycles: 0` to disable the janitor (sets interval to Infinity), but the env var override uses `parsed > 0`, silently ignoring `PAN_STASH_JANITOR_CYCLES=0`. This inconsistency means a user cannot disable the janitor via env var.
+**Why it blocks (high, not blocker):** The function resolves a stable SHA to a `stash@{N}` slot, then the caller uses that slot in a `git stash drop/pop`. Between resolution and execution, another process could shift indices. The existing re-validation at lines 188 and 204 catches most drift. The risk is real but limited to concurrent stash operations in the same repo.
 
-**Fix**: Change `parsed > 0` to `parsed >= 0` in config.ts line ~391 to match config file behavior.
+**Fix:** Add a comment at the top of `resolveStashOperationRef` documenting the serialized-invocation requirement (per-workspace stash operations must not run concurrently), and assert the invariant in debug mode. No structural change needed.
 
-### 2. `review-temp` regex uses `\w+-\d+` instead of `ISSUE_ID_PATTERN` — `src/lib/stashes.ts:97` — `!`
+### 2. Janitor silently drops stashes without `stackRef` — `src/lib/cloister/deacon.ts:2570-2582` — `~`
 **Raised by**: correctness
-**Why it blocks**: The `review-temp` parser accepts lowercase issue IDs (e.g., `pan-879`) while all other stash kinds use the stricter uppercase-only `ISSUE_ID_PATTERN`. This latent inconsistency means messages constructed outside `buildStashMessage` would parse differently across stash types.
+**Why it blocks (high, not blocker):** Stashes without a `stackRef` (e.g., from legacy parse paths where `ref === stackRef`) are silently filtered out by `Number.isFinite(entry.stashIndex)` in the janitor's drop pipeline. A stash with a valid SHA ref but no `stackRef` will never be cleaned up.
 
-**Fix**: Use `ISSUE_ID_PATTERN` in the review-temp regex:
-```typescript
-const reviewTempMatch = new RegExp(`^review-temp:${ISSUE_ID_PATTERN}:(\\d+)$`).exec(message);
-```
-
-### 3. Janitor does O(N) repeated `listStashes` rescans while dropping N stashes — `src/lib/cloister/deacon.ts:2569` — `~`
-**Raised by**: performance
-**Why it blocks**: `dropStash()` calls `resolveStashOperationRef()`, which re-invokes `listStashes()` to map SHA→stackRef for every stash being dropped. Dropping N stashes costs 1 initial scan + N rescans + N drops = O(N) extra subprocess calls.
-
-**Fix**: Use the already-known `stackRef` when available, or add a batch drop path that operates on precomputed ordered stash entries directly. The `listStashes` result already contains `stackRef` for each entry — pass it through instead of re-resolving by SHA.
+**Fix:** For entries without `stackRef`, fall back to a SHA-based resolution path instead of silently dropping them. The simplest fix: pass the SHA `ref` directly to `dropStash` when `stackRef` is absent — `dropStash` already handles SHA-only refs via the full list scan path (lines 191-213).
 
 ## Nits (advisory — safe to defer)
 
-- `src/lib/stashes.ts:177–205` — `~` — TOCTOU in `resolveStashOperationRef`. Race window between resolve and operation is acknowledged in code comments. Acceptable since deacon is the only automated stash operator per workspace. (correctness)
-- `src/lib/cloister/review-agent.ts:~1041` — `~` — `cleanupReviewTempStash` in finally block silently swallows errors. Orphaned stash persists until janitor age-based sweep (28 days). Acceptable as safety net. (correctness)
-- `src/lib/cloister/deacon.ts:~2470` — `~` — `cleanupSpawnAndOrphanedStashes` mutates `getAgentState()` result in place before `saveAgentState`. If save fails, in-memory state is already mutated. Established pattern, not a regression. (correctness)
-- `src/lib/stashes.ts:~1230` — `?` — Recover/delete endpoints rescan stash list twice per action (performance optimization). Minor at small stash counts. (performance)
-- `src/lib/cloister/deacon.ts:~2495` — `?` — `listStashes` called per-workspace in a loop. Bounded by janitor cycle cadence (~hourly). Not a correctness issue. (correctness)
+- `src/lib/stashes.ts:152-159` — `?` — Empty stash list handling is correct. No action needed. (correctness)
+- `src/lib/cloister/review-agent.ts:127-145` — `?` — `cleanupReviewTempStash` error handling is already safe (call site wraps it at line 1042-1044). No action needed. (correctness)
 
 ## Cross-cutting groups
 
-**Janitor stash lifecycle** (related by shared drop/list machinery):
-- [blocker-1] C1: `reconcileAndCheckIfMerged` false positive for non-GitHub trackers causes premature stash drops
-- [high-3] Performance warning: O(N) rescans in janitor drop path (same `resolveStashOperationRef` call chain)
-
-**Configuration consistency** (shared root cause: env var vs YAML config file handling):
-- [high-1] C2: `PAN_STASH_JANITOR_CYCLES=0` silently ignored
-- [high-2] C3: `review-temp` regex inconsistency vs other stash kinds
+**Stash index resolution fragility** (related findings that share a root cause — fix together):
+- [high-1] `resolveStashOperationRef` race condition — same index-shift risk as the janitor's stackRef filter
+- [high-2] Janitor silently drops stash entries without `stackRef`
 
 ## What's good
-- All 12 requirements from PAN-879 are implemented; requirements coverage is complete with zero missing or partial items.
-- Canonical stash taxonomy design (canonical prefix format, stable SHA refs, kind-based lifecycle rules) is well-structured and consistent across all four stash types.
-- Test coverage is thorough across canonical format parsing, janitor age cutoff, salvageable preservation, and all drop-on-completion paths.
-- Security review found zero issues — no injection, authz, data exposure, or unsafe command execution risks introduced.
+- All 12 requirements implemented with no missing coverage
+- `stashes.ts` centralizes canonical message construction and correctly uses `JSON.stringify` for the stash `-m` argument (mitigates the injection surface on the main stash push path)
+- Security review found no OWASP-class vulnerabilities
+- `sanitizeShortDescription` correctly strips non-alphanumeric chars from recovery branch names
+- Janitor explicitly preserves `salvageable` stashes from auto-cleanup
+- `stash_janitor_every_cycles` env-var override creates a new config object (no mutation)
 
 ## Review stats
-- Blockers: 1   High: 3   Medium: 0   Nits: 5
-- By reviewer: correctness=10, security=0, performance=2, requirements=0
-- Files touched: 20   Files with findings: 7
+- Blockers: 1   High: 2   Medium: 0   Nits: 2
+- By reviewer: correctness=1 blocker + 3 warnings + 2 suggestions, security=clean, performance=clean, requirements=PASS
+- Files touched: 22   Files with findings: 3 (stashes.ts, deacon.ts, review-agent.ts)
 
 ## Appendix: individual reviews
 
-See individual reviewer output files listed in `## Reviewer Output Files` in the Synthesis Context above. Those files contain full per-reviewer detail; this synthesis is the policy layer.
+See individual reviewer output files listed in `## Reviewer Output Files` in the
+Synthesis Context above. Those files contain full per-reviewer detail; this
+synthesis is the policy layer.
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 
