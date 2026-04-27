@@ -629,7 +629,7 @@ export default function App() {
             </div>
           }>
             <>
-              <div className={`flex-1 overflow-auto p-6 ${selectedIssue ? '' : 'w-full'}`}>
+              <div className="flex-1 overflow-auto p-6 w-full">
                 <MetricsSummaryRow />
                 <KanbanBoard
                   selectedIssue={selectedIssue}
@@ -638,14 +638,25 @@ export default function App() {
                 />
               </div>
               {selectedIssue && selectedIssueData && (
-                <DetailPanelLayout
-                  agent={selectedIssueAgent ?? undefined}
-                  issueId={selectedIssue}
-                  issueUrl={selectedIssueData.url}
-                  issue={selectedIssueData}
-                  onClose={() => setSelectedIssue(null)}
-                  suppressTerminal={planDialogIssueId === selectedIssue}
-                />
+                <div
+                  className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 backdrop-blur-sm p-6"
+                  onClick={() => setSelectedIssue(null)}
+                >
+                  <div
+                    className="h-[min(90vh,1100px)] w-[min(92vw,1400px)] overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <DetailPanelLayout
+                      agent={selectedIssueAgent ?? undefined}
+                      issueId={selectedIssue}
+                      issueUrl={selectedIssueData.url}
+                      issue={selectedIssueData}
+                      onClose={() => setSelectedIssue(null)}
+                      suppressTerminal={planDialogIssueId === selectedIssue}
+                      inline
+                    />
+                  </div>
+                </div>
               )}
             </>
           </BootstrapGate>

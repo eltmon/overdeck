@@ -4088,6 +4088,42 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       return { success: false, statusCode: 500, error };
     }
 
+    // Step 2b: Strip ephemeral `.planning/` from the feature branch BEFORE merge (#888).
+    // `.planning/` is tracked on feature branches for live workspace use, but must not
+    // land on main — otherwise other active workspaces sync-main pull each other's
+    // STATE.md/feedback files and cross-contaminate. The post-merge cleanup
+    // (`cleanPlanningArtifacts`) is a safety net that runs AFTER the squash commit is
+    // already public; this strip is the primary defense and runs BEFORE `gh pr merge`.
+    //
+    // NOTE: `rebaseFeatureBranch()` in merge-rebase.ts ALSO performs an idempotent
+    // `.planning/` strip during its rebase prep. The two are not currently composed
+    // (this route does not call rebaseFeatureBranch), so there's no double-strip
+    // today. If a future caller chains both, the second strip is a no-op (ls-files
+    // returns nothing → skip). Keep the dual-path safety; do not consolidate
+    // without auditing every entry point that triggers a merge.
+    try {
+      const { stripPlanningFromFeatureBranch } = await import(
+        '../../../lib/cloister/strip-planning-from-branch.js'
+      );
+      const stripResult = await stripPlanningFromFeatureBranch(workspacePath, branchName, issueId);
+      if (!stripResult.success) {
+        const error = `Pre-merge .planning/ strip failed: ${stripResult.reason}`;
+        console.error(`[merge] ${error}`);
+        setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error, readyForMerge: false });
+        completePendingOperation(issueId, error);
+        return { success: false, statusCode: 500, error };
+      }
+      if (stripResult.pushed) {
+        console.log(`[merge] Stripped .planning/ from ${branchName} for ${issueId} — new HEAD ${stripResult.newHead?.slice(0, 8)}`);
+      }
+    } catch (stripErr: any) {
+      const error = `Pre-merge .planning/ strip threw: ${stripErr.message}`;
+      console.error(`[merge] ${error}`);
+      setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error, readyForMerge: false });
+      completePendingOperation(issueId, error);
+      return { success: false, statusCode: 500, error };
+    }
+
     // Step 3: Post-rebase verification gate (typecheck, lint, test)
     // Ensures the rebase didn't introduce issues before merging.
     setReviewStatus(issueId, { mergeStatus: 'verifying', mergeNotes: undefined });
