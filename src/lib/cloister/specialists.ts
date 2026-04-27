@@ -1041,6 +1041,13 @@ ${basePrompt}`;
     // Write session file for informational purposes (pan specialists list)
     setSessionId(specialistType, sessionId, projectKey);
 
+    // Pre-write session.id into the agent dir so the dashboard's jsonl-resolver
+    // can locate the JSONL transcript before the heartbeat hook fires. Without
+    // this, hasJsonl is false and the Command Deck conversation panel renders
+    // "No conversation data available" for the entire dispatch lifetime.
+    // (Mirrors the spawnReviewer pre-write in review-agent.ts:556.)
+    writeFileSync(join(agentDir, 'session.id'), sessionId, 'utf-8');
+
     console.log(`[specialist] Dispatching ${specialistType} for ${projectKey}/${task.issueId} (session: ${sessionId.slice(0, 8)}...)`);
 
     // Single launcher script: always try --resume first (normal case).
