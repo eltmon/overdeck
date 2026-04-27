@@ -121,7 +121,13 @@ export function readSpecialistHandoffs(limit?: number): SpecialistHandoff[] {
   const content = readFileSync(getSpecialistHandoffLogFile(), 'utf-8');
   const lines = content.trim().split('\n').filter(line => line.trim());
 
-  const events = lines.map(line => JSON.parse(line) as SpecialistHandoff);
+  const events = lines.flatMap(line => {
+    try {
+      return [JSON.parse(line) as SpecialistHandoff];
+    } catch {
+      return [];
+    }
+  });
 
   // Return most recent first
   events.reverse();

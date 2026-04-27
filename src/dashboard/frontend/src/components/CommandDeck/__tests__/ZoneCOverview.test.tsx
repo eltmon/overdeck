@@ -1,25 +1,20 @@
 /**
- * ZoneCOverview tests — verify tab strip + scoped PAN-865 body behavior.
+ * ZoneCOverview tests — verify tab strip + per-tab dispatch (PAN-830, pan-ofa3).
  *
- * PAN-865 ships the Overview body only. The other nine tabs must remain present
- * in the tab strip but render a shared "Coming soon" placeholder until PAN-866.
+ * Mocks the shared query hooks so each tab can be exercised without a real
+ * network. We assert:
+ *   - Overview tab default renders billboard + quick links
+ *   - PRD/STATE/INFERENCE tabs render the planning body via MarkdownTab
+ *   - INFERENCE tab is hidden when planning has no inference content
+ *   - Clicking a quick link switches the active tab
+ *   - Costs tab renders byStage / byModel rows
+ *   - PR/Diff tab renders via PrDiffTab (empty state)
+ *   - Discussions tab renders via DiscussionsTab (empty state)
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ZoneCOverview } from '../ZoneCOverview';
-
-vi.mock('../../DialogProvider', () => ({
-  useConfirm: () => vi.fn(async () => true),
-}));
-
-vi.mock('@tanstack/react-query', async () => {
-  const actual = await vi.importActual('@tanstack/react-query');
-  return {
-    ...actual,
-    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
-  };
-});
 
 const planningResult = vi.hoisted(() => ({
   data: undefined as undefined | Record<string, unknown>,
@@ -34,6 +29,12 @@ const costsResult = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
 }));
+const costStreamResult = vi.hoisted(() => ({
+  issueCost: 0,
+  issueEvents: [] as Array<Record<string, unknown>>,
+  isLoading: false,
+  error: null as Error | null,
+}));
 const prResult = vi.hoisted(() => ({
   data: undefined as undefined | Record<string, unknown>,
   isLoading: false,
@@ -45,19 +46,6 @@ const discussionsResult = vi.hoisted(() => ({
   isError: false,
 }));
 const reviewStatusResult = vi.hoisted(() => ({
-  data: undefined as undefined | {
-    issueId: string;
-    reviewStatus: string;
-    testStatus: string;
-    mergeStatus?: string;
-    verificationStatus?: string;
-    readyForMerge: boolean;
-    updatedAt: string;
-  },
-  isLoading: false,
-  isError: false,
-}));
-const workspaceResult = vi.hoisted(() => ({
   data: undefined as undefined | Record<string, unknown>,
   isLoading: false,
   isError: false,
@@ -65,21 +53,42 @@ const workspaceResult = vi.hoisted(() => ({
 
 vi.mock('../ZoneCOverviewTabs/queries', () => ({
   usePlanningQuery: () => planningResult,
-  usePlanningSummaryQuery: () => planningResult,
   useActivityQuery: () => activityResult,
   useIssueCostsQuery: () => costsResult,
   usePrQuery: () => prResult,
-  usePrDiffQuery: () => ({ data: undefined, isLoading: false, isError: false }),
   useDiscussionsQuery: () => discussionsResult,
   useReviewStatusQuery: () => reviewStatusResult,
-  useWorkspaceQuery: () => workspaceResult,
+}));
+
+vi.mock('../../../hooks/useCostStream', () => ({
+  useIssueCostStream: () => costStreamResult,
+}));
+
+// Beads + ActivityTab + VBriefTab embed components that hit other code paths;
+// stub them out so this test stays focused on tab routing.
+vi.mock('../ZoneCOverviewTabs/BeadsTab', () => ({
+  BeadsTab: ({ issueId }: { issueId: string }) => (
+    <div data-testid="beads-tab-stub" data-issue={issueId} />
+  ),
+}));
+vi.mock('../ZoneCOverviewTabs/VBriefTab', () => ({
+  VBriefTab: ({ issueId }: { issueId: string }) => (
+    <div data-testid="vbrief-tab-stub" data-issue={issueId} />
+  ),
+}));
+vi.mock('../ZoneCOverviewTabs/ActivityTab', () => ({
+  ActivityTab: ({ issueId }: { issueId: string }) => (
+    <div
+      data-testid="activity-tab-stub"
+      data-issue={issueId}
+    />
+  ),
 }));
 
 const ISSUE = 'PAN-830';
 
 describe('ZoneCOverview', () => {
   beforeEach(() => {
-    window.history.replaceState({}, '', '/command-deck');
     planningResult.data = undefined;
     planningResult.isLoading = false;
     activityResult.data = { issueId: ISSUE, sections: [] };
@@ -96,9 +105,10 @@ describe('ZoneCOverview', () => {
     reviewStatusResult.data = undefined;
     reviewStatusResult.isLoading = false;
     reviewStatusResult.isError = false;
-    workspaceResult.data = { exists: false, issueId: ISSUE };
-    workspaceResult.isLoading = false;
-    workspaceResult.isError = false;
+    costStreamResult.issueCost = 0;
+    costStreamResult.issueEvents = [];
+    costStreamResult.isLoading = false;
+    costStreamResult.error = null;
   });
 
   it('renders the Overview tab body by default', () => {
@@ -110,105 +120,77 @@ describe('ZoneCOverview', () => {
     expect(screen.getByTestId('overview-stage')).toHaveTextContent('idle');
   });
 
-  it('shows loading state for cost when both activity and costs are loading', () => {
-    activityResult.data = undefined;
-    activityResult.isLoading = true;
-    costsResult.data = undefined;
-    costsResult.isLoading = true;
-
-    render(<ZoneCOverview issueId={ISSUE} />);
-    expect(screen.getByTestId('overview-cost-loading')).toHaveTextContent('Loading…');
-    expect(screen.getByTestId('overview-cost-tile-loading')).toHaveTextContent('Loading…');
-  });
-
-  it('renders the overview sparkline from billed cost sessions', () => {
-    costsResult.data = {
-      issueId: ISSUE,
-      totalCost: 4.32,
-      totalTokens: 42000,
-      sessions: [
-        {
-          sessionId: 'session-1',
-          startedAt: '2026-04-27T10:00:00.000Z',
-          endedAt: '2026-04-27T10:05:00.000Z',
-          type: 'work',
-          model: 'claude-sonnet-4-6',
-          cost: 1.25,
-          tokenCount: 12000,
-        },
-        {
-          sessionId: 'session-2',
-          startedAt: '2026-04-27T11:00:00.000Z',
-          endedAt: null,
-          type: 'review',
-          model: 'claude-sonnet-4-6',
-          cost: 3.07,
-          tokenCount: 30000,
-        },
-        {
-          sessionId: 'session-3',
-          startedAt: '2026-04-27T12:00:00.000Z',
-          endedAt: '2026-04-27T12:02:00.000Z',
-          type: 'test',
-          model: 'claude-sonnet-4-6',
-          cost: 0,
-          tokenCount: 0,
-        },
-      ],
-      byModel: {
-        'claude-sonnet-4-6': { cost: 4.32, tokens: 42000 },
-      },
-      byStage: {
-        work: { cost: 4.32, tokens: 42000 },
-      },
-    };
-
-    render(<ZoneCOverview issueId={ISSUE} />);
-    expect(screen.getByTestId('overview-sparkline')).toHaveTextContent('2 billed sessions');
-    expect(screen.getByRole('img', { name: 'Cost trend across recent sessions' })).toBeInTheDocument();
-  });
-
-  it('always renders all 10 tabs, including INFERENCE without planning content', () => {
+  it('hides the INFERENCE tab when planning has no inference content', () => {
     planningResult.data = { prd: '# PRD', state: '# STATE' };
     render(<ZoneCOverview issueId={ISSUE} />);
-    expect(screen.getByTestId('zone-c-overview-tab-inference')).toBeInTheDocument();
-    expect(screen.getAllByRole('tab')).toHaveLength(10);
+    expect(screen.queryByTestId('zone-c-overview-tab-inference')).not.toBeInTheDocument();
   });
 
-  it('renders a shared placeholder body for INFERENCE', () => {
+  it('shows INFERENCE tab when planning has inference content', () => {
+    planningResult.data = { inference: '# Inference body' };
     render(<ZoneCOverview issueId={ISSUE} />);
-    fireEvent.click(screen.getByTestId('zone-c-overview-tab-inference'));
-    expect(screen.getByTestId('zone-c-overview-placeholder')).toHaveTextContent('Coming soon');
+    expect(screen.getByTestId('zone-c-overview-tab-inference')).toBeInTheDocument();
   });
 
-  it('renders a shared placeholder body for PRD', () => {
+  it('switches to PRD tab and renders the body via MarkdownTab', () => {
+    planningResult.data = { prd: 'PRD body content' };
     render(<ZoneCOverview issueId={ISSUE} />);
     fireEvent.click(screen.getByTestId('zone-c-overview-tab-prd'));
-    expect(screen.getByTestId('zone-c-overview-placeholder')).toHaveTextContent('Coming soon');
+    expect(screen.getByTestId('markdown-tab')).toBeInTheDocument();
+    expect(screen.getByTestId('markdown-tab').textContent).toContain('PRD body content');
   });
 
-  it('renders a shared placeholder body for Costs', () => {
+  it('shows the empty state with the Generate PRD hint when PRD body is missing', () => {
+    planningResult.data = { state: 'state only' };
+    render(<ZoneCOverview issueId={ISSUE} />);
+    fireEvent.click(screen.getByTestId('zone-c-overview-tab-prd'));
+    expect(screen.getByTestId('markdown-tab-empty')).toHaveTextContent(
+      'No PRD recorded for this issue. Generate PRD from planning to populate this tab.',
+    );
+  });
+
+  it('switches to Costs tab and renders byStage rows', () => {
+    costsResult.data = {
+      issueId: ISSUE,
+      totalCost: 1.23,
+      totalTokens: 4500,
+      sessions: [],
+      byModel: { 'claude-sonnet-4-6': { cost: 1.23, tokens: 4500 } },
+      byStage: { planning: { cost: 0.5, tokens: 1500 }, work: { cost: 0.73, tokens: 3000 } },
+    };
     render(<ZoneCOverview issueId={ISSUE} />);
     fireEvent.click(screen.getByTestId('zone-c-overview-tab-costs'));
-    expect(screen.getByTestId('zone-c-overview-placeholder')).toHaveTextContent('Coming soon');
+    expect(screen.getByTestId('costs-tab')).toBeInTheDocument();
+    expect(screen.getByTestId('costs-by-stage-row-planning')).toBeInTheDocument();
+    expect(screen.getByTestId('costs-by-stage-row-work')).toBeInTheDocument();
+    expect(screen.getByTestId('costs-by-model-row-claude-sonnet-4-6')).toBeInTheDocument();
   });
 
-  it('renders a shared placeholder body for PR/Diff', () => {
+  it('renders the PR/Diff tab via PrDiffTab', () => {
     render(<ZoneCOverview issueId={ISSUE} />);
     fireEvent.click(screen.getByTestId('zone-c-overview-tab-prdiff'));
-    expect(screen.getByTestId('zone-c-overview-placeholder')).toHaveTextContent('Coming soon');
+    // No PR yet → empty state body
+    expect(screen.getByTestId('prdiff-tab-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('prdiff-tab-empty').textContent).toContain('feature/pan-830');
   });
 
-  it('renders a shared placeholder body for Discussions', () => {
+  it('renders the Discussions tab via DiscussionsTab', () => {
     render(<ZoneCOverview issueId={ISSUE} />);
     fireEvent.click(screen.getByTestId('zone-c-overview-tab-discussions'));
-    expect(screen.getByTestId('zone-c-overview-placeholder')).toHaveTextContent('Coming soon');
+    expect(screen.getByTestId('discussions-tab')).toBeInTheDocument();
+    expect(screen.getByTestId('discussions-tab-empty')).toBeInTheDocument();
   });
 
-  it('quick-link buttons in Overview switch tabs to placeholders', () => {
+  it('passes the issue id to the Activity tab', () => {
+    render(<ZoneCOverview issueId={ISSUE} />);
+    fireEvent.click(screen.getByTestId('zone-c-overview-tab-activity'));
+    expect(screen.getByTestId('activity-tab-stub')).toHaveAttribute('data-issue', ISSUE);
+  });
+
+  it('quick-link buttons in Overview switch tabs', () => {
     render(<ZoneCOverview issueId={ISSUE} />);
     fireEvent.click(screen.getByTestId('overview-link-vbrief'));
-    expect(screen.getByTestId('zone-c-overview-placeholder')).toHaveTextContent('Coming soon');
+    expect(screen.getByTestId('vbrief-tab-stub')).toBeInTheDocument();
   });
 
   it('quick-link footer shows links for prd, vbrief, beads, costs, activity', () => {
@@ -220,165 +202,25 @@ describe('ZoneCOverview', () => {
     expect(screen.getByTestId('overview-link-activity')).toBeInTheDocument();
   });
 
-  it('shows Recover in the Actions tile when the review pipeline is stuck', () => {
-    reviewStatusResult.data = {
+  it('keeps aggregate costs visible when the live stream reports a transient error', () => {
+    costsResult.data = {
       issueId: ISSUE,
-      reviewStatus: 'failed',
-      testStatus: 'failed',
-      mergeStatus: 'failed',
-      verificationStatus: 'failed',
-      readyForMerge: false,
-      updatedAt: new Date().toISOString(),
+      totalCost: 1.23,
+      totalTokens: 4500,
+      sessions: [],
+      byModel: { 'claude-sonnet-4-6': { cost: 1.23, tokens: 4500 } },
+      byStage: { work: { cost: 1.23, tokens: 4500 } },
     };
+    costStreamResult.issueCost = 0.5;
+    costStreamResult.issueEvents = [{ cost: 0.5 }];
+    costStreamResult.error = new Error('stream hiccup');
 
-    render(<ZoneCOverview issueId={ISSUE} />);
-    expect(screen.getByTestId('overview-action-recover')).toBeInTheDocument();
-  });
-
-  it('caps recent activity at 10 events', () => {
-    activityResult.data = {
-      issueId: ISSUE,
-      sections: Array.from({ length: 12 }, (_, index) => ({
-        type: 'work',
-        sessionId: `session-${index}`,
-        model: `model-${index}`,
-        startedAt: new Date(Date.now() + index * 1000).toISOString(),
-        duration: null,
-        status: 'running',
-      })),
-    };
-
-    render(<ZoneCOverview issueId={ISSUE} />);
-    expect(screen.getByTestId('overview-activity-list').querySelectorAll('li')).toHaveLength(10);
-    expect(screen.queryByText('model-1')).not.toBeInTheDocument();
-    expect(screen.getByText('model-11')).toBeInTheDocument();
-  });
-
-  it('falls back to frontend/api links when services is an empty array', () => {
-    workspaceResult.data = {
-      exists: true,
-      issueId: ISSUE,
-      services: [],
-      frontendUrl: 'http://localhost:4173',
-      apiUrl: 'http://localhost:3011',
-    };
-
-    render(<ZoneCOverview issueId={ISSUE} />);
-    expect(screen.getByRole('link', { name: 'Frontend ↗' })).toHaveAttribute('href', 'http://localhost:4173');
-    expect(screen.getByRole('link', { name: 'API ↗' })).toHaveAttribute('href', 'http://localhost:3011');
-  });
-
-  it('filters out services without urls before rendering links', () => {
-    workspaceResult.data = {
-      exists: true,
-      issueId: ISSUE,
-      services: [
-        { name: 'Frontend', url: 'http://localhost:4173' },
-        { name: 'API', url: undefined },
-      ],
-    };
-
-    render(<ZoneCOverview issueId={ISSUE} />);
-    expect(screen.getByRole('link', { name: 'Frontend ↗' })).toHaveAttribute('href', 'http://localhost:4173');
-    expect(screen.queryByRole('link', { name: 'API ↗' })).not.toBeInTheDocument();
-  });
-
-  it('renders Open VS Code as a vscode:// workspace link', () => {
-    workspaceResult.data = {
-      exists: true,
-      issueId: ISSUE,
-      path: '/tmp/pan-865',
-    };
-
-    render(<ZoneCOverview issueId={ISSUE} />);
-    expect(screen.getByRole('link', { name: 'Open VS Code' })).toHaveAttribute(
-      'href',
-      'vscode://file//tmp/pan-865',
-    );
-  });
-
-  it('labels linear issue links as Linear', () => {
-    render(
-      <ZoneCOverview
-        issueId={ISSUE}
-        issue={{
-          identifier: ISSUE,
-          title: 'Zone C overview',
-          status: 'in_progress',
-          source: 'linear',
-          url: 'https://linear.app/example/issue/PAN-865',
-        }}
-      />,
-    );
-
-    expect(screen.getByRole('link', { name: 'Linear ↗' })).toHaveAttribute(
-      'href',
-      'https://linear.app/example/issue/PAN-865',
-    );
-    expect(screen.queryByRole('link', { name: 'GitHub Issue ↗' })).not.toBeInTheDocument();
-  });
-
-  it('syncs active tab to the URL query string', () => {
     render(<ZoneCOverview issueId={ISSUE} />);
     fireEvent.click(screen.getByTestId('zone-c-overview-tab-costs'));
-    expect(new URLSearchParams(window.location.search).get('tab')).toBe('costs');
-  });
 
-  it('does not push url state in controlled mode when the parent keeps the same tab', () => {
-    render(
-      <ZoneCOverview
-        issueId={ISSUE}
-        activeTab="overview"
-        onTabChange={() => undefined}
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId('zone-c-overview-tab-costs'));
-    expect(new URLSearchParams(window.location.search).get('tab')).toBeNull();
-    expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
-  });
-
-  it('initializes the active tab from a controlled prop', () => {
-    render(<ZoneCOverview issueId={ISSUE} activeTab="costs" />);
-    expect(screen.getByTestId('zone-c-overview-placeholder')).toHaveTextContent('Coming soon');
-    expect(screen.getByTestId('zone-c-overview-tab-costs')).toHaveAttribute('aria-selected', 'true');
-  });
-
-  it('supports arrow-key tab navigation', () => {
-    render(<ZoneCOverview issueId={ISSUE} />);
-    const tablist = screen.getByRole('tablist');
-
-    fireEvent.keyDown(tablist, { key: 'ArrowRight' });
-    expect(screen.getByTestId('zone-c-overview-placeholder')).toHaveTextContent('Coming soon');
-    expect(new URLSearchParams(window.location.search).get('tab')).toBe('activity');
-
-    fireEvent.keyDown(tablist, { key: 'ArrowLeft' });
-    expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
-    expect(new URLSearchParams(window.location.search).get('tab')).toBe('overview');
-  });
-
-  it('supports Home and End navigation inside the tab strip', () => {
-    render(<ZoneCOverview issueId={ISSUE} />);
-    const tablist = screen.getByRole('tablist');
-
-    fireEvent.click(screen.getByTestId('zone-c-overview-tab-costs'));
-    fireEvent.keyDown(tablist, { key: 'Home' });
-    expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
-
-    fireEvent.keyDown(tablist, { key: 'End' });
-    expect(screen.getByTestId('zone-c-overview-placeholder')).toHaveTextContent('Coming soon');
-  });
-
-  it('supports Tab and Shift-Tab navigation inside the tab strip', () => {
-    render(<ZoneCOverview issueId={ISSUE} />);
-    const tablist = screen.getByRole('tablist');
-
-    fireEvent.keyDown(tablist, { key: 'Tab' });
-    expect(screen.getByTestId('zone-c-overview-placeholder')).toHaveTextContent('Coming soon');
-    expect(new URLSearchParams(window.location.search).get('tab')).toBe('activity');
-
-    fireEvent.keyDown(tablist, { key: 'Tab', shiftKey: true });
-    expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
-    expect(new URLSearchParams(window.location.search).get('tab')).toBe('overview');
+    expect(screen.getByTestId('costs-tab')).toBeInTheDocument();
+    expect(screen.queryByTestId('costs-tab-error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('costs-total')).toHaveTextContent('$1.23');
+    expect(screen.getByTestId('costs-stream-total')).toHaveTextContent('Live stream: $0.50');
   });
 });

@@ -1,16 +1,11 @@
 /**
  * CostsTab — per-stage and per-model cost breakdown.
  *
- * Pulls from `/api/issues/:issueId/costs` (shared with InspectorPanel via
- * useIssueCostsQuery) and renders two tables:
- *
- *   - Stage breakdown (planning / work / review / etc.)
- *   - Model breakdown (claude-3.7-sonnet, gpt-5, etc.)
- *
- * Bars are scaled against the largest entry in each table so the eye reads the
- * relative weight at a glance without needing a fixed scale.
+ * Reuses the existing issue cost stream hook for live totals while keeping the
+ * aggregate issue-cost endpoint for stage/model rollups.
  */
 
+import { useIssueCostStream } from '../../../hooks/useCostStream';
 import { useIssueCostsQuery, type IssueCostData } from './queries';
 
 interface CostsTabProps {
@@ -155,9 +150,10 @@ function BreakdownTable({
 }
 
 export function CostsTab({ issueId }: CostsTabProps) {
+  const stream = useIssueCostStream(issueId);
   const { data, isLoading, isError } = useIssueCostsQuery(issueId);
 
-  if (isLoading) {
+  if (isLoading || stream.isLoading) {
     return (
       <div
         data-testid="costs-tab-loading"
@@ -196,8 +192,18 @@ export function CostsTab({ issueId }: CostsTabProps) {
           gap: 8,
         }}
       >
-        <div style={{ fontSize: 18, fontWeight: 700 }} data-testid="costs-total">
-          {fmtCost(cost.totalCost)}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ fontSize: 18, fontWeight: 700 }} data-testid="costs-total">
+            {fmtCost(cost.totalCost)}
+          </div>
+          <div
+            data-testid="costs-stream-total"
+            style={{ fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}
+          >
+            Live stream: {fmtCost(stream.issueCost)} · {stream.issueEvents.length} event
+            {stream.issueEvents.length === 1 ? '' : 's'}
+            {stream.error ? ' · live updates temporarily unavailable' : ''}
+          </div>
         </div>
         <div style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
           {fmtTokens(cost.totalTokens)} tokens · {cost.sessions.length} session

@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { GitCommit, TestTube, AlertTriangle, ArrowRightLeft, Activity } from 'lucide-react';
-import { selectGodViewActivityFeed, GodViewActivityEvent } from '../../hooks/useGodViewSocket';
+import type { DashboardState } from '../../lib/store';
+import { selectGodViewActivityFeed, type GodViewActivityEvent } from '../../hooks/useGodViewSocket';
 import { useDashboardStore } from '../../lib/store';
 
 const EVENT_ICONS: Record<string, React.ReactNode> = {
@@ -26,8 +27,24 @@ function timeAgo(ts: string) {
   return `${Math.floor(ms / 3600000)}h`;
 }
 
-export function ActivityFeed() {
-  const events = useDashboardStore(selectGodViewActivityFeed);
+export const selectIssueActivityFeed =
+  (issueId: string) =>
+  (s: DashboardState): GodViewActivityEvent[] =>
+    selectGodViewActivityFeed(s).filter((event) => {
+      if (event.issueId) {
+        return event.issueId.toUpperCase() === issueId.toUpperCase();
+      }
+
+      // Older activity events only carry agentId, so keep the historical fallback.
+      return event.agentId.toLowerCase() === `agent-${issueId.toLowerCase()}`;
+    });
+
+interface ActivityFeedProps {
+  issueId?: string;
+}
+
+export function ActivityFeed({ issueId }: ActivityFeedProps = {}) {
+  const events = useDashboardStore(issueId ? selectIssueActivityFeed(issueId) : selectGodViewActivityFeed);
 
   return (
     <div className="flex flex-col gap-1 overflow-y-auto flex-1">
