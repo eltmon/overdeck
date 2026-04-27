@@ -10,7 +10,7 @@ export default defineConfig({
   sourcemap: true,
   outExtensions: () => ({ js: '.js' }),
   deps: {
-    alwaysBundle: [/^@panopticon\//],
+    alwaysBundle: [/^@panctl\//],
     neverBundle: [
       '@homebridge/node-pty-prebuilt-multiarch',
       'better-sqlite3',

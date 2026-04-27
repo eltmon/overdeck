@@ -209,7 +209,7 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
         return { ok: true, json: async () => ({ issues: [] }) };
       }
       if (url === '/api/version') {
-        return { ok: true, json: async () => ({ version: '0.7.2' }) };
+        return { ok: true, json: async () => ({ version: '0.8.0' }) };
       }
       if (url.startsWith('/api/session-trees')) {
         return {

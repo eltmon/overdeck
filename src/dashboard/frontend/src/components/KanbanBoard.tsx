@@ -39,7 +39,7 @@ import { MergeButton } from './MergeButton';
 import { RecoverButton } from './RecoverButton';
 import { hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
-import type { ReviewStatusSnapshot } from '@panopticon/contracts';
+import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useBulkSelection } from '../hooks/useBulkSelection';
 import { BulkActionBar } from './BulkActionBar';
 import { BulkAgentWarningDialog } from './BulkAgentWarningDialog';

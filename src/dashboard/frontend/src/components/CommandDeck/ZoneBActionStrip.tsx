@@ -15,7 +15,7 @@ import {
   Square, Loader2, Terminal, Pause, Play, MoreHorizontal,
   FolderOpen, FileText, Trash2, RotateCcw, Download, History,
 } from 'lucide-react';
-import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
+import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import { useConfirm } from '../DialogProvider';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 

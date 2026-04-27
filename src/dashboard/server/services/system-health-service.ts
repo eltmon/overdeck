@@ -4,7 +4,7 @@ import { cpus, homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import type { DashboardSnapshot } from '@panopticon/contracts';
+import type { DashboardSnapshot } from '@panctl/contracts';
 
 import { listRunningAgentsAsync, getAgentRuntimeStateAsync, type AgentState } from '../../../lib/agents.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';

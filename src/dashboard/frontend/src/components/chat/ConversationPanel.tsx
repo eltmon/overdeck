@@ -11,7 +11,7 @@ import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, WorkLogEntry } from './chat-types';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
-import type { ReviewerRoundMetadata } from '@panopticon/contracts';
+import type { ReviewerRoundMetadata } from '@panctl/contracts';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Phase icon map ───────────────────────────────────────────────────────────

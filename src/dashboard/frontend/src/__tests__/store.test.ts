@@ -23,7 +23,7 @@ import type {
   DashboardSnapshot,
   DomainEvent,
   SpecialistSnapshot,
-} from '@panopticon/contracts'
+} from '@panctl/contracts'
 
 // ─── Test fixtures ────────────────────────────────────────────────────────────
 

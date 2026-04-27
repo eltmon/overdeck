@@ -15,7 +15,7 @@
 
 import { randomUUID } from 'crypto';
 import { getEventStore } from '../dashboard/server/event-store.js';
-import type { DomainEvent } from '@panopticon/contracts';
+import type { DomainEvent } from '@panctl/contracts';
 
 export type ActivityLevel = 'info' | 'warn' | 'error' | 'success';
 export type ActivitySource = 'merge-agent' | 'cloister' | 'review-specialist' | 'test-specialist' | 'dashboard' | 'deploy-script';

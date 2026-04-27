@@ -20,7 +20,7 @@
  */
 
 import { useMemo } from 'react';
-import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
+import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import {
   useCommandDeckSelection,
   selectSelectedSessionForIssue,
@@ -42,13 +42,14 @@ interface IssueWorkbenchProps {
   source?: string;
   url?: string;
   onOpenBeads?: () => void;
-  /** Forwarded to ZoneCOverview → ActivityTab. */
-  issues?: readonly Issue[];
-  featureData?: ProjectFeature | null;
   /** Work agent for this issue — drives Zone A action strip. */
   agent?: Agent;
   /** Full issue record — forwarded to Zone A for status gating. */
   issue?: Issue;
+  /** Forwarded to Zone C overview so Rally/story rollups still work. */
+  issues?: readonly Issue[];
+  /** Selected feature metadata for issue-level overview/activity content. */
+  featureData?: ProjectFeature | null;
 }
 
 export function IssueWorkbench({
@@ -59,10 +60,10 @@ export function IssueWorkbench({
   source,
   url,
   onOpenBeads,
-  issues,
-  featureData,
   agent,
   issue,
+  issues,
+  featureData,
 }: IssueWorkbenchProps) {
   const selectedSessionId = useCommandDeckSelection(selectSelectedSessionForIssue(issueId));
 

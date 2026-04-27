@@ -11,7 +11,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { Effect, Layer } from 'effect';
-import { HttpRouter } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { httpHandler } from './http-handler.js';
 import { listProjects } from '../../../lib/projects.js';
@@ -19,7 +19,7 @@ import { extractPrefix } from '../../../lib/issue-id.js';
 import { listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
-import type { AgentStatus, SessionNode, SessionNodePresence, SessionNodeType } from '@panopticon/contracts';
+import type { AgentStatus, SessionNode, SessionNodePresence, SessionNodeType } from '@panctl/contracts';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
@@ -264,8 +264,8 @@ const getAllSessionTreesRoute = HttpRouter.add(
   'GET',
   '/api/session-trees',
   httpHandler(Effect.gen(function* () {
-    const request = yield* HttpRouter.request;
-    const url = new URL(request.url);
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const url = new URL(request.url, 'http://localhost');
     const projectsParam = url.searchParams.get('projects') ?? '';
     const projectKeys = projectsParam.split(',').filter(Boolean);
 

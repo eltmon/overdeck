@@ -19,7 +19,7 @@ import { existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getPanopticonHome } from '../../lib/paths.js';
-import type { DomainEvent } from '@panopticon/contracts';
+import type { DomainEvent } from '@panctl/contracts';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

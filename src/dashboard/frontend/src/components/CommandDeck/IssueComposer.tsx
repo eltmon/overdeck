@@ -13,7 +13,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { SendHorizontal, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
+import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { StartAgentResponse } from '../../types';
 
 interface IssueComposerProps {

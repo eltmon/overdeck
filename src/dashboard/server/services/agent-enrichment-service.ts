@@ -16,7 +16,7 @@ import { listRunningAgentsAsync } from '../../../lib/agents.js'
 import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment } from '../../../lib/agent-enrichment.js'
 import { getReviewStatus } from '../../../lib/review-status.js'
 import { getEventStore } from '../event-store.js'
-import type { AgentEnrichmentChangedEvent, AgentCreatedEvent, AgentStatusChangedEvent } from '@panopticon/contracts'
+import type { AgentEnrichmentChangedEvent, AgentCreatedEvent, AgentStatusChangedEvent } from '@panctl/contracts'
 import { toAgentStatus, toAgentPhase, toAgentResolution } from '../read-model.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
