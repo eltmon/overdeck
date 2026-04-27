@@ -31,3 +31,5 @@ None
 
 - **[2026-04-27T01:36Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
 - **[2026-04-27T01:55Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
+- **[2026-04-27T02:01Z] review-agent → COMMENTED** — `.planning/feedback/001-review-agent-commented.md`
+- **[2026-04-27T02:01Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
