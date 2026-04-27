@@ -30,3 +30,4 @@ Quality gates: typecheck, lint, build, full test suite (3889 tests) all passing.
 ## Specialist Feedback
 
 (none yet)
+- **[2026-04-27T00:17Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
