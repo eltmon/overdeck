@@ -73,6 +73,9 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Build contracts
+        run: cd packages/contracts && npm run build
+
       - name: Publish contracts to npm
         run: |
           cd packages/contracts
