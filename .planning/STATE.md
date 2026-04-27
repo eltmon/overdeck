@@ -32,3 +32,5 @@ All beads implemented. Running final quality gates before calling pan done.
 - **[2026-04-27T09:38Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
 - **[2026-04-27T10:10Z] review-agent → COMMENTED** — `.planning/feedback/001-review-agent-commented.md`
 - **[2026-04-27T10:10Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
+- **[2026-04-27T10:21Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-04-27T10:21Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
