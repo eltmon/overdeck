@@ -59,6 +59,17 @@ vi.mock('./SessionView/SessionPanel', () => ({
   ),
 }));
 
+vi.mock('./IssueWorkbench', () => ({
+  IssueWorkbench: (props: any) => (
+    <div data-testid="issue-workbench" data-issue={props.issueId} data-mode={props.sessions?.length > 0 && props.sessions[0]?.presence === 'active' ? 'agent-selected' : 'feature-selected'}>
+      <div data-testid="issue-header" data-issue={props.issueId} data-title={props.title} />
+      {props.sessions?.map((s: any) => (
+        <div key={s.sessionId} data-testid="session-panel" data-session={s.sessionId} data-issue={props.issueId} />
+      ))}
+    </div>
+  ),
+}));
+
 vi.mock('./ProjectTree/ProjectNode', () => ({
   ProjectNode: (props: any) => {
     // Simulate tab switch to projects when rendered
@@ -200,6 +211,35 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
       if (url === '/api/version') {
         return { ok: true, json: async () => ({ version: '0.7.2' }) };
       }
+      if (url.startsWith('/api/session-trees')) {
+        return {
+          ok: true,
+          json: async () => ({
+            trees: [
+              {
+                projectKey: 'test-project',
+                features: [
+                  {
+                    issueId: 'PAN-821',
+                    sessions: [
+                      {
+                        type: 'work',
+                        sessionId: 'agent-pan-821',
+                        tmuxSession: 'agent-pan-821',
+                        model: 'claude-sonnet-4-6',
+                        startedAt: new Date().toISOString(),
+                        duration: 120,
+                        status: 'running',
+                        presence: 'active',
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          }),
+        };
+      }
       if (url.startsWith('/api/projects/')) {
         return {
           ok: true,
@@ -245,11 +285,7 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
   it('renders IssueHeader + SessionPanel when a session is selected', async () => {
     renderCommandDeck();
 
-    // Switch to Projects tab
-    const projectsTab = screen.getByText('Projects');
-    fireEvent.click(projectsTab);
-
-    // Wait for projects to load and project node to render
+    // Projects are visible by default — wait for project node to render
     await screen.findByTestId('project-node');
 
     // Click the session
@@ -268,10 +304,7 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
   it('auto-selects best session when feature is clicked (B5)', async () => {
     renderCommandDeck();
 
-    // Switch to Projects tab
-    const projectsTab = screen.getByText('Projects');
-    fireEvent.click(projectsTab);
-
+    // Projects are visible by default
     await screen.findByTestId('project-node');
 
     // Click feature row — should auto-select the active session
@@ -290,16 +323,14 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
   it('clears session view when switching to a conversation', async () => {
     renderCommandDeck();
 
-    // Switch to Projects tab and select a session
-    fireEvent.click(screen.getByText('Projects'));
+    // Select a session (projects are visible by default)
     await screen.findByTestId('project-node');
     fireEvent.click(screen.getByTestId('session-agent-pan-821'));
 
     // Verify session view is shown
     expect(screen.getByTestId('session-panel')).toBeInTheDocument();
 
-    // Switch to Conversations tab and click a conversation
-    fireEvent.click(screen.getByText('Conversations'));
+    // Click a conversation
     fireEvent.click(screen.getByTestId('conv-test'));
 
     // Session view should be gone

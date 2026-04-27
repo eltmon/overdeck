@@ -1,36 +1,35 @@
-# PAN-858 — Command Deck project tree fit-and-finish
+# PAN-815: Command Deck: unify Conversations and Projects into one filterable list
 
-**Status:** In Progress
-**Current Phase:** Implementation
+## Status: Implementation Complete
+
+## Current Phase
+All work complete. Ready for merge.
 
 ## Completed Work
-
-All six beads merged on this branch:
-
-1. ✓ `pan-x0rp` — backend: skip orphan `feature-<bad>` workspace dirs in `fetchProjectTree` (root cause for phantom 800/800 row).
-2. ✓ `pan-k3w7` — backend: hide stopped legacy sessions older than 24h in `fetchProjectSessionTree`; same orphan-dir validation applied here.
-3. ✓ `pan-l32w` — frontend: chevron indent moved onto `.featureItemRow` so caret sits inside the tree.
-4. ✓ `pan-zrhf` — frontend: derive session label (`Merge agent`, `Tests`, `${Role} reviewer`, `Work agent (${model})`); raw `sessionId` now lives only in the row tooltip.
-5. ✓ `pan-7ekv` — frontend: status pill rendered with semantic colors (running/error/starting/stopped) using existing `--mc-success`/`--mc-error`/`--mc-warning` tokens.
-6. ✓ `pan-yb9y` — frontend: feature label tooltip on truncate, session row indent re-anchored to new feature row indent, tree filter buttons promoted to a CSS class.
-
-Quality gates: typecheck, lint, build, full test suite (3889 tests) all passing.
+- Replaced `SidebarTab` segmented control with independent filter chip toggles (`showConversations` / `showProjects`)
+- Unified sidebar list rendering: both ConversationList and ProjectNodes render together when both filters are active
+- Added localStorage persistence for filter state (`mc-filter-conversations`, `mc-filter-projects`)
+- Fixed content area selection logic: IssueWorkbench renders when `selectedFeature` is set regardless of filter state
+- Removed dead `DetailPanelLayout` fallback branch for selected features
+- Updated CommandDeck tests for new filter chip behavior
+- All 312 test files pass (3889 tests)
+- Typecheck passes
+- Lint passes
+- Frontend build passes
 
 ## Remaining Work
-
-- Capture before/after Playwright screenshots and attach them to the PR description per the issue's acceptance criteria.
-- Then `pan done PAN-858`.
+None
 
 ## Key Decisions
-
-- **`workspaces/feature-800` is NOT deleted.** It is an orphan worktree from prior work (last touched 2026-04-22). Per workspace-isolation rules we never wipe other workspaces. Fix is upstream input validation in `fetchProjectTree`.
-- **Session label derivation is pure client-side.** No backend schema change; `sessionId` already flows through, we just stop rendering it as a column.
-- **Legacy hiding belongs in the backend route**, where `type: 'legacy'` is assigned — not in the renderer (avoids "render-time filter" anti-pattern).
+- Filter chips are independent toggles (both visible by default), not a single-select control
+- Selection state in content area is independent of sidebar filters — detail panels show regardless
+- Tree session filter (all/alive/failed) remains visible whenever projects are shown
+- Model picker and new-conversation button always visible in sidebar header
+- Filter state persisted to localStorage (not URL, to keep scope focused)
 
 ## Specialist Feedback
 
-(none yet)
-- **[2026-04-27T00:17Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-- **[2026-04-27T00:26Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-- **[2026-04-27T00:29Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-- **[2026-04-27T00:34Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-04-27T01:36Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-04-27T01:55Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
+- **[2026-04-27T02:01Z] review-agent → COMMENTED** — `.planning/feedback/001-review-agent-commented.md`
+- **[2026-04-27T02:01Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
