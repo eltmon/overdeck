@@ -413,7 +413,7 @@ describe('specialist-context', () => {
       mockExec.mockImplementation((cmd, options, callback) => {
         execCalled = true;
         if (callback) {
-          callback(null, { stdout: 'scheduled digest', stderr: '' } as any);
+          callback(null, 'scheduled digest', '');
         }
         return {} as any;
       });
@@ -450,7 +450,7 @@ describe('specialist-context', () => {
       const mockExec = vi.mocked(childProcess.exec);
       mockExec.mockImplementation((cmd, options, callback) => {
         if (callback) {
-          callback(new Error('Scheduled generation failed'), { stdout: '', stderr: '' } as any);
+          callback(new Error('Scheduled generation failed'), '', '');
         }
         return {} as any;
       });

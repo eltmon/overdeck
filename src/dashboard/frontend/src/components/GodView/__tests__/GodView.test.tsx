@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 // ─── useGodViewStore (reduced — agent data now lives in DashboardStore) ───────
 
 import { useGodViewStore, selectGodViewAgentOutput, selectGodViewAgentStatuses, selectGodViewActivityFeed } from '../../../hooks/useGodViewSocket';
+import { selectIssueActivityFeed } from '../ActivityFeed';
 
 describe('useGodViewStore', () => {
   beforeEach(() => {
@@ -62,6 +63,22 @@ describe('GodView selectors', () => {
   it('selectGodViewActivityFeed returns recentActivity', () => {
     const events = [{ agentId: 'a', timestamp: 'T', type: 'x', message: 'y' }];
     expect(selectGodViewActivityFeed({ recentActivity: events })).toEqual(events);
+  });
+
+  it('selectIssueActivityFeed filters to the matching issueId', () => {
+    const events = [
+      { agentId: 'agent-pan-866', issueId: 'PAN-866', timestamp: 'T1', type: 'x', message: 'match' },
+      { agentId: 'agent-pan-777', issueId: 'PAN-777', timestamp: 'T2', type: 'x', message: 'other' },
+    ];
+    expect(selectIssueActivityFeed('PAN-866')({ recentActivity: events } as any)).toEqual([events[0]]);
+  });
+
+  it('selectIssueActivityFeed falls back to agentId matching when issueId is absent', () => {
+    const events = [
+      { agentId: 'agent-pan-866', timestamp: 'T1', type: 'x', message: 'match' },
+      { agentId: 'agent-pan-777', timestamp: 'T2', type: 'x', message: 'other' },
+    ];
+    expect(selectIssueActivityFeed('PAN-866')({ recentActivity: events } as any)).toEqual([events[0]]);
   });
 });
 

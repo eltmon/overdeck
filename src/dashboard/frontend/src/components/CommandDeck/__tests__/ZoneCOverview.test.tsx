@@ -178,19 +178,16 @@ describe('ZoneCOverview', () => {
     expect(screen.getByTestId('discussions-tab-empty')).toBeInTheDocument();
   });
 
-  it('passes issue-scoped props to the Activity tab', () => {
-    const issues = [{ id: '1' }, { id: '2' }] as any[];
+  it('passes the issue id to the Activity tab', () => {
     render(
       <ZoneCOverview
         issueId={ISSUE}
-        issues={issues}
+        issues={[{ id: '1' }, { id: '2' }] as any[]}
         featureData={{ issueId: ISSUE } as any}
       />,
     );
     fireEvent.click(screen.getByTestId('zone-c-overview-tab-activity'));
     expect(screen.getByTestId('activity-tab-stub')).toHaveAttribute('data-issue', ISSUE);
-    expect(screen.getByTestId('activity-tab-stub')).toHaveAttribute('data-issues', '2');
-    expect(screen.getByTestId('activity-tab-stub')).toHaveAttribute('data-feature', 'present');
   });
 
   it('quick-link buttons in Overview switch tabs', () => {

@@ -70,8 +70,6 @@ export function ZoneCOverview({
   issueId,
   activeTab,
   onTabChange,
-  issues,
-  featureData,
 }: ZoneCOverviewProps) {
   const [internalTab, setInternalTab] = useState<OverviewTab>('overview');
   const tab = activeTab ?? internalTab;
@@ -152,9 +150,7 @@ export function ZoneCOverview({
         }}
       >
         {tab === 'overview' && <OverviewTab issueId={issueId} onSwitchTab={handleTabClick} />}
-        {tab === 'activity' && (
-          <ActivityTab issueId={issueId} issues={issues} featureData={featureData} />
-        )}
+        {tab === 'activity' && <ActivityTab issueId={issueId} />}
         {tab === 'costs' && <CostsTab issueId={issueId} />}
         {tab === 'prd' && (
           <MarkdownTab

@@ -38,7 +38,7 @@ import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { access, chmod, mkdir, readdir, readFile, stat, symlink, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, join, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { crc32 } from 'node:zlib';
 
@@ -90,7 +90,7 @@ import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
 import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
 import { loadWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
-import { extractPrefix, extractNumber } from '../../../lib/issue-id.js';
+import { extractPrefix, extractNumber, parseIssueId } from '../../../lib/issue-id.js';
 import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
 import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
@@ -98,19 +98,37 @@ import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enric
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
+export function getWorkspacePathForIssue(projectPath: string, rawIssueId: string): { parsedIssueId: string; workspacePath: string } {
+  const parsed = parseIssueId(rawIssueId);
+  if (!parsed) {
+    throw new Error('Invalid issue ID');
+  }
+
+  const workspaceRoot = resolve(join(projectPath, 'workspaces'));
+  const workspacePath = resolve(join(workspaceRoot, `feature-${parsed.normalized}`));
+
+  if (workspacePath !== workspaceRoot && !workspacePath.startsWith(`${workspaceRoot}${sep}`)) {
+    throw new Error('Invalid workspace path');
+  }
+
+  return {
+    parsedIssueId: parsed.raw,
+    workspacePath,
+  };
+}
+
 async function readWorkspacePlanningMarkdown(
   issueId: string,
   fileName: 'STATE.md' | 'INFERENCE.md',
 ): Promise<{ issueId: string; body: string }> {
-  const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
+  const parsed = parseIssueId(issueId);
+  const issuePrefix = parsed?.prefix ?? extractPrefix(issueId) ?? issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
-  const issueLower = issueId.toLowerCase();
-  const workspaceName = `feature-${issueLower}`;
-  const workspacePath = join(projectPath, 'workspaces', workspaceName);
+  const { parsedIssueId, workspacePath } = getWorkspacePathForIssue(projectPath, issueId);
 
   const content = await readFile(join(workspacePath, '.planning', fileName), 'utf-8');
   return {
-    issueId,
+    issueId: parsedIssueId,
     body: content,
   };
 }
@@ -1125,7 +1143,19 @@ const getWorkspaceStateMdRoute = HttpRouter.add(
     return yield* Effect.promise(() =>
       readWorkspacePlanningMarkdown(issueId, 'STATE.md')
         .then((result) => jsonResponse(result))
-        .catch(() => jsonResponse({ error: 'STATE.md not found for this workspace' }, { status: 404 }))
+        .catch((err: unknown) => {
+          if (
+            typeof err === 'object'
+            && err !== null
+            && ('code' in err || 'message' in err)
+            && ((err as { code?: unknown }).code === 'ENOENT'
+              || String((err as { message?: unknown }).message ?? '').includes('Invalid issue ID'))
+          ) {
+            return jsonResponse({ error: 'STATE.md not found for this workspace' }, { status: 404 });
+          }
+          console.error('[workspaces] Failed to read STATE.md:', err);
+          return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+        })
     );
   }))
 );
@@ -1140,7 +1170,19 @@ const getWorkspaceInferenceMdRoute = HttpRouter.add(
     return yield* Effect.promise(() =>
       readWorkspacePlanningMarkdown(issueId, 'INFERENCE.md')
         .then((result) => jsonResponse(result))
-        .catch(() => jsonResponse({ error: 'INFERENCE.md not found for this workspace' }, { status: 404 }))
+        .catch((err: unknown) => {
+          if (
+            typeof err === 'object'
+            && err !== null
+            && ('code' in err || 'message' in err)
+            && ((err as { code?: unknown }).code === 'ENOENT'
+              || String((err as { message?: unknown }).message ?? '').includes('Invalid issue ID'))
+          ) {
+            return jsonResponse({ error: 'INFERENCE.md not found for this workspace' }, { status: 404 });
+          }
+          console.error('[workspaces] Failed to read INFERENCE.md:', err);
+          return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+        })
     );
   }))
 );
