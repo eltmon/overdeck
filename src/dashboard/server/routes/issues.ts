@@ -43,6 +43,7 @@ import { reopenWorkspaceState } from '../../../lib/reopen.js';
 import { getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { IssueDataService } from '../services/issue-data-service.js';
+import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { invalidateAgentsCache } from './agents.js';
@@ -54,7 +55,11 @@ import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../
 import { getAgentStateAsync, normalizeAgentId } from '../../../lib/agents.js';
 import type { LifecycleContext, StepResult } from '../../../lib/lifecycle/types.js';
 import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
-import { getCachedResourceAllocatedIssues, sanitizeResourceAllocatedIssues } from '../services/resource-discovery.js';
+import {
+  getCachedResourceAllocatedIssues,
+  getResourceDetailIdentifiers,
+  sanitizeResourceAllocatedIssues,
+} from '../services/resource-discovery.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -64,8 +69,6 @@ const execFileAsync = promisify(execFile);
 // onIssuesChanged callback → event store → WebSocket RPC.
 
 function getIssueDataService(): IssueDataService {
-  // Use the shared singleton — started by server.ts on boot
-  const { getSharedIssueService } = require('../services/issue-service-singleton.js');
   return getSharedIssueService();
 }
 
@@ -3028,6 +3031,29 @@ const getResourceAllocatedIssuesRoute = HttpRouter.add(
   })),
 );
 
+const getIssueResourceDetailsRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/:id/resource-details',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = (params['id'] ?? '').toUpperCase();
+    if (!id) {
+      return jsonResponse({ error: 'Issue ID is required' }, { status: 400 });
+    }
+
+    const details = yield* Effect.tryPromise({
+      try: () => getResourceDetailIdentifiers(id),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+
+    if (!details) {
+      return jsonResponse({ error: `No resource details found for ${id}` }, { status: 404 });
+    }
+
+    return jsonResponse(details);
+  })),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const issuesRouteLayer = Layer.mergeAll(
@@ -3053,6 +3079,7 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssueGenerateTasksRoute,
   getIssueCostsRoute,
   getResourceAllocatedIssuesRoute,
+  getIssueResourceDetailsRoute,
   getIssuePrRoute,
   getIssueDiscussionsRoute,
 );

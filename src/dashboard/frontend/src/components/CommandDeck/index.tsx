@@ -292,7 +292,7 @@ export function CommandDeck({
         unsubscribe();
       }
     };
-  }, [showProjects, projectNamesKey, queryClient]);
+  }, [showProjects, projectNamesKey, projects, queryClient]);
 
   // Merge session trees into project features, preserving object identity
   // for features whose sessions haven't changed (avoids O(total features)

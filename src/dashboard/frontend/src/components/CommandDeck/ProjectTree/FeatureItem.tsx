@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
 import { Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge, ChevronRight, ChevronDown, FolderOpen, FileText, Trash2, GitBranch, BookText, Bug, Container, Radio, Workflow } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
-import type { ProjectFeature, ResourceSource } from './ProjectNode';
+import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
 import { SessionNode } from './SessionNode';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import styles from '../styles/command-deck.module.css';
@@ -107,28 +107,86 @@ function ResourceStrip({
 }) {
   const resources = RESOURCE_ICON_ORDER.filter((source) => feature.resourceSources?.includes(source) && resourceSummary(feature, source));
   const [popoverOpen, setPopoverOpen] = useState(false);
-  if (resources.length === 0) return null;
+  const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
 
   const details = feature.resourceDetails;
   const orphaned = isOrphanedFeature(feature);
+  if (resources.length === 0) return null;
+
+  useEffect(() => {
+    if (!popoverOpen) return;
+    if (!details) return;
+    if (!feature.issueId) return;
+    if (detailIdentifiers) return;
+
+    let cancelled = false;
+    void fetch(`/api/issues/${feature.issueId}/resource-details`)
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return response.json() as Promise<ProjectFeatureResourceIdentifiers>;
+      })
+      .then((payload) => {
+        if (cancelled || !payload) return;
+        setDetailIdentifiers(payload);
+      })
+      .catch(() => {
+        // Fall back to summary-only rows when detail fetch fails.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [popoverOpen, details, feature.issueId, detailIdentifiers]);
 
   const resourceRows = useMemo(() => {
     if (!details) return [] as Array<{ key: string; label: string }>;
 
+    const identifiers = detailIdentifiers;
     const rows: Array<{ key: string; label: string }> = [];
-    if (details.hasWorkspace) rows.push({ key: 'workspace', label: 'workspace allocated' });
-    if (details.localBranchCount > 0 || details.remoteBranchCount > 0) {
+
+    if ((identifiers?.workspacePaths.length ?? 0) > 0) {
+      for (const workspacePath of identifiers?.workspacePaths ?? []) {
+        rows.push({ key: `workspace-${workspacePath}`, label: `workspace: ${workspacePath}` });
+      }
+    } else if (details.hasWorkspace) {
+      rows.push({ key: 'workspace', label: 'workspace allocated' });
+    }
+
+    if ((identifiers?.localBranchNames.length ?? 0) > 0 || (identifiers?.remoteBranchNames.length ?? 0) > 0) {
+      for (const branchName of identifiers?.localBranchNames ?? []) {
+        rows.push({ key: `local-branch-${branchName}`, label: `branch (local): ${branchName}` });
+      }
+      for (const branchName of identifiers?.remoteBranchNames ?? []) {
+        rows.push({ key: `remote-branch-${branchName}`, label: `branch (remote): ${branchName}` });
+      }
+    } else if (details.localBranchCount > 0 || details.remoteBranchCount > 0) {
       rows.push({ key: 'branch', label: `branches: ${details.localBranchCount} local · ${details.remoteBranchCount} remote` });
     }
-    if (details.tmuxSessionCount > 0) rows.push({ key: 'tmux', label: `tmux: ${details.tmuxSessionCount} active session${details.tmuxSessionCount === 1 ? '' : 's'}` });
+
+    if ((identifiers?.tmuxSessionNames.length ?? 0) > 0) {
+      for (const sessionName of identifiers?.tmuxSessionNames ?? []) {
+        rows.push({ key: `tmux-${sessionName}`, label: `tmux: ${sessionName}` });
+      }
+    } else if (details.tmuxSessionCount > 0) {
+      rows.push({ key: 'tmux', label: `tmux: ${details.tmuxSessionCount} active session${details.tmuxSessionCount === 1 ? '' : 's'}` });
+    }
+
     if (details.hasVbrief) rows.push({ key: 'vbrief', label: 'vBRIEF present' });
     if (details.hasBeads) rows.push({ key: 'beads', label: 'beads present' });
-    for (const pr of details.prs) {
+    for (const pr of identifiers?.prs ?? details.prs) {
       rows.push({ key: `pr-${pr.number}`, label: `PR: #${pr.number} ${pr.title}` });
     }
-    if (details.dockerContainerCount > 0) rows.push({ key: 'docker', label: `docker: ${details.dockerContainerCount} running container${details.dockerContainerCount === 1 ? '' : 's'}` });
+
+    if ((identifiers?.dockerContainerNames.length ?? 0) > 0) {
+      for (const containerName of identifiers?.dockerContainerNames ?? []) {
+        rows.push({ key: `docker-${containerName}`, label: `docker: ${containerName}` });
+      }
+    } else if (details.dockerContainerCount > 0) {
+      rows.push({ key: 'docker', label: `docker: ${details.dockerContainerCount} running container${details.dockerContainerCount === 1 ? '' : 's'}` });
+    }
+
     return rows;
-  }, [details]);
+  }, [details, detailIdentifiers]);
 
   return (
     <span
@@ -150,7 +208,7 @@ function ResourceStrip({
           {resourceRows.map((row) => (
             <span key={row.key} className={styles.featureResourceRow}>
               <span>{row.label}</span>
-              {orphaned && onCleanupOrphanedResources && row.key !== 'pr' && (
+              {orphaned && onCleanupOrphanedResources && !row.key.startsWith('pr-') && (
                 <button
                   type="button"
                   className={styles.featureResourceCleanupButton}

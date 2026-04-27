@@ -8,24 +8,32 @@ export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' 
 
 export interface ProjectFeatureResourceDetails {
   hasWorkspace: boolean;
-  workspacePaths?: string[];
   localBranchCount: number;
-  localBranchNames?: string[];
   remoteBranchCount: number;
-  remoteBranchNames?: string[];
   tmuxSessionCount: number;
-  tmuxSessionNames?: string[];
   prs: Array<{
     number: number;
     title: string;
-    url?: string;
     state: string;
     isDraft: boolean;
   }>;
   hasVbrief: boolean;
   hasBeads: boolean;
   dockerContainerCount: number;
-  dockerContainerNames?: string[];
+}
+
+export interface ProjectFeatureResourceIdentifiers {
+  workspacePaths: string[];
+  localBranchNames: string[];
+  remoteBranchNames: string[];
+  tmuxSessionNames: string[];
+  prs: Array<{
+    number: number;
+    title: string;
+    state: string;
+    isDraft: boolean;
+  }>;
+  dockerContainerNames: string[];
 }
 
 export interface ProjectFeature {

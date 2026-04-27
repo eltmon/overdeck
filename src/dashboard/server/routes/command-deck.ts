@@ -46,6 +46,7 @@ import { getReviewStatus } from '../review-status.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { LinearClient } from '../services/linear-client.js';
 import { IssueDataService } from '../services/issue-data-service.js';
+import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import {
   getCachedResourceAllocatedIssues,
   groupResourceAllocatedIssuesByProject,
@@ -60,8 +61,7 @@ const execFileAsync = promisify(execFile);
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
-async function getIssueDataService(): Promise<IssueDataService> {
-  const { getSharedIssueService } = await import('../services/issue-service-singleton.js');
+function getIssueDataService(): IssueDataService {
   return getSharedIssueService();
 }
 
@@ -81,6 +81,7 @@ async function readOptional(p: string): Promise<string | null> {
 
 /** Cache for resolved project paths to avoid repeated sync FS calls. */
 const projectPathCache = new Map<string, string>();
+const PROJECT_PATH_CACHE_MAX_ENTRIES = 100;
 
 /** TTL cache for closed issues to avoid hammering gh CLI on every poll (~10s).
  *  Keyed by repo string (owner/repo) so multi-repo setups don't cross-pollute. */
@@ -102,6 +103,20 @@ function sweepExpired<T>(cache: Map<string, { timestamp: number; data: T }>, ttl
   }
 }
 
+function setProjectPathCache(issuePrefix: string, path: string): string {
+  if (projectPathCache.has(issuePrefix)) {
+    projectPathCache.delete(issuePrefix);
+  }
+  projectPathCache.set(issuePrefix, path);
+  if (projectPathCache.size > PROJECT_PATH_CACHE_MAX_ENTRIES) {
+    const oldestKey = projectPathCache.keys().next().value;
+    if (oldestKey) {
+      projectPathCache.delete(oldestKey);
+    }
+  }
+  return path;
+}
+
 function getProjectPath(issuePrefix?: string): string {
   if (!issuePrefix) return join(homedir(), 'Projects');
 
@@ -110,8 +125,7 @@ function getProjectPath(issuePrefix?: string): string {
 
   const resolved = resolveProjectFromIssue(`${issuePrefix}-1`);
   if (resolved) {
-    projectPathCache.set(issuePrefix, resolved.projectPath);
-    return resolved.projectPath;
+    return setProjectPathCache(issuePrefix, resolved.projectPath);
   }
 
   const config = getGitHubConfig();
@@ -126,17 +140,14 @@ function getProjectPath(issuePrefix?: string): string {
         ]) {
           // Sync existsSync is acceptable per CLAUDE.md for fast stat checks
           if (existsSync(path)) {
-            projectPathCache.set(issuePrefix, path);
-            return path;
+            return setProjectPathCache(issuePrefix, path);
           }
         }
       }
     }
   }
 
-  const fallback = join(homedir(), 'Projects');
-  projectPathCache.set(issuePrefix, fallback);
-  return fallback;
+  return setProjectPathCache(issuePrefix, join(homedir(), 'Projects'));
 }
 
 /**
@@ -541,6 +552,7 @@ export async function fetchActivityDataWithContext(
   let totalCost = 0;
   try {
     const cacheKey = issueId.toUpperCase();
+    sweepExpired(costCache, COST_CACHE_TTL_MS);
     const cached = costCache.get(cacheKey);
     if (cached && cached.timestamp > Date.now() - COST_CACHE_TTL_MS) {
       totalCost = cached.data.totalCost;

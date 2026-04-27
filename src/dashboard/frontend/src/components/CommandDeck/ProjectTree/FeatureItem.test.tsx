@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
 import { FeatureItem, pickBestSession } from './FeatureItem';
-import type { ProjectFeature } from './ProjectNode';
+import type { ProjectFeature, ProjectFeatureResourceIdentifiers } from './ProjectNode';
 
 vi.mock('lucide-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('lucide-react')>();
@@ -175,10 +175,22 @@ describe('FeatureItem', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        workspacePaths: [],
+        localBranchNames: [],
+        remoteBranchNames: [],
+        tmuxSessionNames: [],
+        prs: [],
+        dockerContainerNames: [],
+      } satisfies ProjectFeatureResourceIdentifiers),
+    })));
   });
 
   afterEach(() => {
     localStorage.clear();
+    vi.unstubAllGlobals();
   });
 
   it('renders feature info without caret when no sessions', () => {
@@ -416,7 +428,27 @@ describe('FeatureItem', () => {
     expect(screen.getByTestId('session-sess-b')).toHaveAttribute('data-selected', 'true');
   });
 
-  it('renders sanitized resource strip details when resource metadata exists', () => {
+  it('renders concrete resource strip details when the popover detail fetch returns identifiers', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        workspacePaths: ['/tmp/workspaces/feature-pan-821'],
+        localBranchNames: ['feature/pan-821'],
+        remoteBranchNames: ['origin/feature/pan-821'],
+        tmuxSessionNames: ['agent-pan-821'],
+        prs: [
+          {
+            number: 123,
+            title: 'Test PR',
+            state: 'OPEN',
+            isDraft: false,
+          },
+        ],
+        dockerContainerNames: ['pan-821-db', 'pan-821-cache'],
+      } satisfies ProjectFeatureResourceIdentifiers),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
     render(
       <FeatureItem
         feature={makeFeature({
@@ -450,13 +482,16 @@ describe('FeatureItem', () => {
     expect(screen.getByTitle('branch: local 1 · remote 1')).toBeInTheDocument();
     expect(screen.getByTitle('tmux: 1 session')).toBeInTheDocument();
     expect(screen.getByTitle('PR: 1 open')).toBeInTheDocument();
-    expect(screen.getByText('workspace allocated')).toBeInTheDocument();
-    expect(screen.getByText('branches: 1 local · 1 remote')).toBeInTheDocument();
-    expect(screen.getByText('tmux: 1 active session')).toBeInTheDocument();
+    expect(await screen.findByText('workspace: /tmp/workspaces/feature-pan-821')).toBeInTheDocument();
+    expect(screen.getByText('branch (local): feature/pan-821')).toBeInTheDocument();
+    expect(screen.getByText('branch (remote): origin/feature/pan-821')).toBeInTheDocument();
+    expect(screen.getByText('tmux: agent-pan-821')).toBeInTheDocument();
     expect(screen.getByText('vBRIEF present')).toBeInTheDocument();
     expect(screen.getByText('beads present')).toBeInTheDocument();
     expect(screen.getByText('PR: #123 Test PR')).toBeInTheDocument();
-    expect(screen.getByText('docker: 2 running containers')).toBeInTheDocument();
+    expect(screen.getByText('docker: pan-821-db')).toBeInTheDocument();
+    expect(screen.getByText('docker: pan-821-cache')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-821/resource-details');
   });
 
   it('shows cleanup affordances for orphaned resources', () => {

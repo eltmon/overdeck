@@ -124,7 +124,7 @@ describe('resource-discovery grouping', () => {
 });
 
 describe('resource-discovery sanitization', () => {
-  it('removes concrete identifiers from the public resource-allocated response', () => {
+  it('strips concrete infrastructure identifiers from the public resource-allocated response', () => {
     const sanitized = sanitizeResourceAllocatedIssues([
       {
         issueId: 'PAN-300',
@@ -140,7 +140,7 @@ describe('resource-discovery sanitization', () => {
         isShadow: false,
         isRally: false,
         readyForMerge: false,
-        resourceSources: ['workspace', 'branch', 'tmux', 'docker'],
+        resourceSources: ['workspace', 'branch', 'tmux', 'docker', 'pr'],
         resourceDetails: {
           hasWorkspace: true,
           workspacePaths: ['/tmp/workspaces/feature-pan-300'],
@@ -150,7 +150,15 @@ describe('resource-discovery sanitization', () => {
           remoteBranchNames: ['origin/feature/pan-300'],
           tmuxSessionCount: 1,
           tmuxSessionNames: ['agent-pan-300'],
-          prs: [],
+          prs: [
+            {
+              number: 300,
+              title: 'PAN-300 PR',
+              url: 'https://example.test/pr/300',
+              state: 'OPEN',
+              isDraft: false,
+            },
+          ],
           hasVbrief: false,
           hasBeads: false,
           dockerContainerCount: 1,
@@ -159,11 +167,17 @@ describe('resource-discovery sanitization', () => {
       },
     ]);
 
-    expect(sanitized[0]?.resourceDetails.workspacePaths).toBeUndefined();
-    expect(sanitized[0]?.resourceDetails.localBranchNames).toBeUndefined();
-    expect(sanitized[0]?.resourceDetails.remoteBranchNames).toBeUndefined();
-    expect(sanitized[0]?.resourceDetails.tmuxSessionNames).toBeUndefined();
-    expect(sanitized[0]?.resourceDetails.dockerContainerNames).toBeUndefined();
+    expect((sanitized[0]?.resourceDetails as Record<string, unknown>).workspacePaths).toBeUndefined();
+    expect((sanitized[0]?.resourceDetails as Record<string, unknown>).localBranchNames).toBeUndefined();
+    expect((sanitized[0]?.resourceDetails as Record<string, unknown>).remoteBranchNames).toBeUndefined();
+    expect((sanitized[0]?.resourceDetails as Record<string, unknown>).tmuxSessionNames).toBeUndefined();
+    expect((sanitized[0]?.resourceDetails as Record<string, unknown>).dockerContainerNames).toBeUndefined();
+    expect(sanitized[0]?.resourceDetails.prs[0]).toEqual({
+      number: 300,
+      title: 'PAN-300 PR',
+      state: 'OPEN',
+      isDraft: false,
+    });
     expect(sanitized[0]?.resourceDetails.localBranchCount).toBe(1);
     expect(sanitized[0]?.resourceDetails.tmuxSessionCount).toBe(1);
   });

@@ -94,3 +94,6 @@ jobs:
         # Root cause (PAN-805): reconciler tests with real async I/O (Retry-After sleeping)
         # exhaust heap when parallelized across many workers.
         run: npm test
+
+      - name: Resource discovery benchmark
+        run: VITEST_INCLUDE_BENCH=1 npx vitest run src/dashboard/server/services/resource-discovery.bench.ts
