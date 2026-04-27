@@ -1,32 +1,27 @@
-# PAN-867: Zone C-3: composer behavior + Phase 5 action-parity smoke test
+# PAN-846: Reviewer and specialist tmux sessions leak after completion (RAM accumulation)
 
-## Status: Complete
+## Status: Implementation Complete
 
 ## Current Phase
-All PAN-867 work complete
+All beads implemented. Running final quality gates before calling pan done.
 
 ## Completed Work
-- [x] Created beads pan-xbtc and pan-dgzs for PAN-867
-- [x] pan-xbtc: Composer behavior in issue-selected mode (commit: 19f4b9c4)
-  - IssueComposer component with disabled/spawn-and-send/spawn-work-and-send modes
-  - Inline notice explaining spawn behavior
-  - Tests for all modes and submit behavior
-- [x] pan-dgzs: Phase 5 action-parity smoke test
-  - Added `syncMain` to Command Deck ActionKey vocabulary and Zone A mapping
-  - Wired Sync action into ZoneActionStrip using existing sync-main mutation
-  - Extended parity smoke tests to cover syncMain and realistic git-backed agent state
-  - Verified focused frontend tests pass via Vitest
+- [x] pan-rnrs: Add reviewer session cleanup in runParallelReview finally block (commit: 61a1d09f)
+- [x] pan-utvf: Add specialist tmux session cleanup after completion signaling (commit: d7839034)
+- [x] pan-gbwm: Add deacon janitor for orphan reviewer/specialist sessions (commit: a3a85e7a)
+- [x] pan-j98b: Integration test asserting reviewer sessions don't outlive runParallelReview (commit: 48da097b)
 
 ## Remaining Work
-- None
+(none)
 
 ## Key Decisions
-- PAN-865 (tab strip) and PAN-866 (tabs) are already implemented — ZoneCOverviewTabs exists with all 10 tabs
-- The current ComposerPlaceholder in IssueWorkbench.tsx will be replaced with a real IssueComposer component
-- Action parity test should verify all KanbanBoard/InspectorPanel actions map to ActionKey vocabulary in commandDeckActions.ts
+- Reviewer sessions are killed when runParallelReview finishes (via finally block). Next dispatch spawns fresh sessions.
+- Specialist sessions are killed in /api/specialists/done after setting state to idle.
+- The deacon janitor is a safety net for crashes where cleanup didn't run.
 
 ## Specialist Feedback
-- None
-- **[2026-04-27T04:50Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-- **[2026-04-27T05:08Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-- **[2026-04-27T05:10Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
+- **[2026-04-26T19:03Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+  - Fixed: narrowed `isSpecialist` prefix match to avoid killing unrelated sessions
+  - Fixed: added NaN guard on `parseInt(session_created)`
+  - Fixed: replaced redundant `sessionExistsAsync` with Set membership check
+  - Fixed: parallelized `killAllReviewerSessions` with `Promise.all`
