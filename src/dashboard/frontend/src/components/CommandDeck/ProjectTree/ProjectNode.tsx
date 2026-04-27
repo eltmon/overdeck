@@ -168,7 +168,7 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
       (feature.sessions ?? []).some((session) => sessionMatchesFilter(session, filter)),
     );
   }, [features, filter]);
-  const [expanded, setExpanded] = useState(features.length > 0);
+  const [expanded, setExpanded] = useState(visibleFeatures.length > 0);
   const [menu, setMenu] = useState<ContextMenuState>({ x: 0, y: 0, open: false });
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {

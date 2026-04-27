@@ -291,12 +291,12 @@ function isWorkOrSpecialistSession(session: SessionNodeType): boolean {
 }
 
 function isErrorSession(session: SessionNodeType): boolean {
-  const status = session.status.toLowerCase();
+  const status = (session.status || '').toLowerCase();
   return status === 'error' || status.includes('fail') || status.includes('stuck');
 }
 
 function isQueuedSession(session: SessionNodeType): boolean {
-  const status = session.status.toLowerCase();
+  const status = (session.status || '').toLowerCase();
   return status === 'starting' || status === 'unknown' || status.includes('queued');
 }
 

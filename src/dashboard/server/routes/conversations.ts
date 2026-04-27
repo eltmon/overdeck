@@ -329,15 +329,11 @@ function validateOrigin(request: HttpServerRequest.HttpServerRequest): { ok: tru
   }
 
   // If no Origin but Referer is present, normalize and check it
-  if (referer) {
-    const normalized = normalizeOrigin(referer);
-    if (normalized && trusted.includes(normalized)) {
-      return { ok: true };
-    }
-    return { ok: false, error: 'Invalid referer' };
+  const normalized = normalizeOrigin(referer);
+  if (normalized && trusted.includes(normalized)) {
+    return { ok: true };
   }
-
-  return { ok: false, error: 'Missing origin' };
+  return { ok: false, error: 'Invalid referer' };
 }
 
 /** Validate a caller-supplied cwd is an existing directory under the user's home. */
