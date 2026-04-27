@@ -206,7 +206,15 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
         };
       }
       if (url === '/api/conversations') {
-        return { ok: true, json: async () => [] };
+        return {
+          ok: true,
+          json: async () => [
+            {
+              id: 1,
+              name: 'test-conv',
+            },
+          ],
+        };
       }
       if (url === '/api/costs/by-issue') {
         return { ok: true, json: async () => ({ issues: [] }) };
@@ -369,8 +377,9 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     // Click a conversation
     fireEvent.click(screen.getByTestId('conv-test'));
 
-    // Session view should be gone
+    // Session view should be gone and conversation view should render
     expect(screen.queryByTestId('session-panel')).not.toBeInTheDocument();
     expect(screen.queryByTestId('issue-header')).not.toBeInTheDocument();
+    expect(screen.getByTestId('conversation-panel')).toBeInTheDocument();
   });
 });

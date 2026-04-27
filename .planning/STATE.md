@@ -3,7 +3,7 @@
 ## Status: Implementation Complete
 
 ## Current Phase
-Resubmitting PAN-859 after tightening the CommandDeck regression tests per review feedback.
+Resubmitting PAN-859 after fixing review nits in conversations origin validation and tightening the CommandDeck conversation-switch assertion.
 
 ## Completed Work
 - [x] context-recovery: Recovered PAN-859 requirements from GitHub because `.planning/` artifacts were missing at workspace start (commit: pending)
@@ -13,6 +13,7 @@ Resubmitting PAN-859 after tightening the CommandDeck regression tests per revie
 - [x] playwright-pan-859: Verified in Playwright that clicking the PAN-859 work-agent row opens the agent pane on the first click and that a second click is idempotent; screenshot saved as `pan-859-first-click.png` (commit: pending)
 - [x] review-nit: Removed the duplicate Google Fonts Material Symbols stylesheet include from `docs/design/mockups/command-deck-terminology-map.html` per approved review feedback (commit: pending)
 - [x] test-hardening: Reset the CommandDeck selection store in `beforeEach` and added an explicit second-click idempotency regression test in `CommandDeck.test.tsx` (commit: pending)
+- [x] review-followup: Removed unreachable origin-validation fallback code in `conversations.ts` and its mirrored test helper, and tightened the CommandDeck conversation-switch test to assert `conversation-panel` renders with real mocked conversation data (commit: pending)
 
 ## Remaining Work
 - [x] cross-session-verification: Verified the same first-click session-row behavior on PAN-855's work session in the live tree; screenshot saved as `pan-859-cross-session-verification.png` (commit: pending)
@@ -39,3 +40,5 @@ Resubmitting PAN-859 after tightening the CommandDeck regression tests per revie
 - **[2026-04-27T22:46Z] review-agent → APPROVED** — `.planning/feedback/006-review-agent-approved.md`
 - **[2026-04-27T22:52Z] review-agent → APPROVED** — `.planning/feedback/007-review-agent-approved.md`
 - **[2026-04-27T23:00Z] review-agent → APPROVED** — `.planning/feedback/008-review-agent-approved.md`
+- **[2026-04-27T23:06Z] review-agent → APPROVED** — `.planning/feedback/009-review-agent-approved.md`
+- **[2026-04-27T23:06Z] review-agent → APPROVED** — `.planning/feedback/009-review-agent-approved.md`

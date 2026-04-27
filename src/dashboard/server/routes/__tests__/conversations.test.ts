@@ -396,15 +396,11 @@ function validateOrigin(
     return { ok: false, error: 'Invalid origin' };
   }
 
-  if (referer) {
-    const normalized = normalizeOrigin(referer);
-    if (normalized && trusted.includes(normalized)) {
-      return { ok: true };
-    }
-    return { ok: false, error: 'Invalid referer' };
+  const normalized = normalizeOrigin(referer);
+  if (normalized && trusted.includes(normalized)) {
+    return { ok: true };
   }
-
-  return { ok: false, error: 'Missing origin' };
+  return { ok: false, error: 'Invalid referer' };
 }
 
 describe('validateOrigin', () => {
