@@ -405,7 +405,22 @@ async function releaseCreateCommand(channel: ReleaseChannel, version?: string): 
   run('bun install', repoRoot);
 
   run('git add package.json apps/desktop/package.json packages/contracts/package.json bun.lock', repoRoot);
-  run(`git commit -m "chore: release ${resolvedVersion}"`, repoRoot);
+  // Idempotent: when retagging the same version after a CI failure, the package
+  // bumps and release notes are already on HEAD. Skip the commit if nothing
+  // staged. Tagging is still meaningful because the tag may have been deleted.
+  const hasStagedChanges = (() => {
+    try {
+      execSync('git diff --cached --quiet', { cwd: repoRoot });
+      return false;
+    } catch {
+      return true;
+    }
+  })();
+  if (hasStagedChanges) {
+    run(`git commit -m "chore: release ${resolvedVersion}"`, repoRoot);
+  } else {
+    console.log(chalk.dim('No version-bump changes to commit — tagging current HEAD.'));
+  }
   run(`git tag -a ${tagName} -m "Release ${resolvedVersion}"`, repoRoot);
 
   console.log(chalk.green('\n✓ Release commit and tag created'));
