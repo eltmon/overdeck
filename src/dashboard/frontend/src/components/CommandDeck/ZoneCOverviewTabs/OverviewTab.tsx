@@ -16,6 +16,7 @@
  */
 
 import { useMemo } from 'react';
+import type { Issue, Agent } from '../../../types';
 import { LiveCounter } from '../LiveCounter';
 import { ActivitySparkline } from '../ActivitySparkline';
 import { RoundCard, type RoundData, type RoundVerdict } from '../RoundCard';
@@ -25,15 +26,18 @@ import {
   usePlanningQuery,
   useReviewStatusQuery,
   usePrQuery,
+  useWorkspaceQuery,
   type ActivitySection,
   type ReviewerRoundMetadata,
 } from './queries';
 import type { OverviewTab as OverviewTabKey } from '../ZoneCOverview';
-import { GitPullRequest, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { GitPullRequest, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Box, Link2, Terminal, Play, Pause, ExternalLink, Code2 } from 'lucide-react';
 
 interface OverviewTabProps {
   issueId: string;
   onSwitchTab?: (tab: OverviewTabKey) => void;
+  issue?: Issue;
+  agent?: Agent;
 }
 
 const REVIEWER_ROLES: readonly string[] = [
@@ -105,6 +109,51 @@ function deriveStageFromSections(sections: readonly ActivitySection[]): string {
   return target.type;
 }
 
+function Tile({
+  title,
+  icon,
+  children,
+  testid,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+  testid?: string;
+}) {
+  return (
+    <div
+      data-testid={testid}
+      style={{
+        background: 'var(--card)',
+        border: '1px solid var(--mc-border, var(--border))',
+        borderRadius: 8,
+        padding: 12,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        minHeight: 0,
+      }}
+    >
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontSize: 11,
+          fontWeight: 600,
+          color: 'var(--mc-text-muted, var(--muted-foreground))',
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+        }}
+      >
+        {icon}
+        <span>{title}</span>
+      </header>
+      <div style={{ flex: 1, minHeight: 0 }}>{children}</div>
+    </div>
+  );
+}
+
 function Section({
   title,
   children,
@@ -146,12 +195,13 @@ function Section({
   );
 }
 
-export function OverviewTab({ issueId, onSwitchTab }: OverviewTabProps) {
+export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabProps) {
   const planning = usePlanningQuery(issueId);
   const activity = useActivityQuery(issueId);
   const costs = useIssueCostsQuery(issueId);
   const reviewStatus = useReviewStatusQuery(issueId);
   const pr = usePrQuery(issueId);
+  const workspace = useWorkspaceQuery(issueId);
 
   const sections = activity.data?.sections ?? [];
   const stage = deriveStageFromSections(sections);
@@ -261,7 +311,398 @@ export function OverviewTab({ issueId, onSwitchTab }: OverviewTabProps) {
         </div>
       </section>
 
-      {/* 2. Reviewer summary */}
+      {/* 2. Tile grid */}
+      <div
+        data-testid="overview-tile-grid"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: 10,
+        }}
+      >
+        {/* AGENT tile */}
+        <Tile title="Agent" icon={<Box size={14} />} testid="overview-tile-agent">
+          {agent ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+              <span><strong>Model:</strong> {agent.model}</span>
+              <span><strong>Status:</strong> {agent.status}</span>
+              {workspace.data?.agentSessionId && (
+                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+                  {workspace.data.agentSessionId}
+                </span>
+              )}
+            </div>
+          ) : workspace.data?.hasAgent ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+              <span><strong>Model:</strong> {workspace.data.agentModelFull || workspace.data.agentModel || 'unknown'}</span>
+              {workspace.data.agentSessionId && (
+                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+                  {workspace.data.agentSessionId}
+                </span>
+              )}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No active agent</span>
+              <button
+                type="button"
+                onClick={() => {
+                  void fetch(`/api/agents/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ issueId }),
+                  }).catch(() => { /* non-fatal */ });
+                }}
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: 'var(--mc-primary, var(--primary))',
+                  color: 'var(--mc-primary-foreground, var(--primary-foreground))',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  alignSelf: 'flex-start',
+                }}
+              >
+                Spawn Work
+              </button>
+            </div>
+          )}
+        </Tile>
+
+        {/* COST tile */}
+        <Tile title="Cost" icon={<Code2 size={14} />} testid="overview-tile-cost">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>
+              <LiveCounter value={totalCost} unit="$" precision={2} />
+            </div>
+            {costs.data?.byModel && Object.keys(costs.data.byModel).length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {Object.entries(costs.data.byModel)
+                  .sort((a, b) => b[1].cost - a[1].cost)
+                  .map(([model, v]) => (
+                    <div key={model} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                      <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))' }}>{model}</span>
+                      <span>${v.cost.toFixed(2)}</span>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </Tile>
+
+        {/* BY STAGE tile */}
+        <Tile title="By Stage" icon={<Clock size={14} />} testid="overview-tile-stage">
+          {costs.data?.byStage && Object.keys(costs.data.byStage).length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {Object.entries(costs.data.byStage)
+                .sort((a, b) => b[1].cost - a[1].cost)
+                .map(([stageName, v]) => (
+                  <div key={stageName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                    <span style={{ textTransform: 'capitalize', color: 'var(--mc-text-muted, var(--muted-foreground))' }}>{stageName}</span>
+                    <span>${v.cost.toFixed(2)}</span>
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No stage data yet</span>
+          )}
+        </Tile>
+
+        {/* SERVICES tile */}
+        <Tile title="Services" icon={<ExternalLink size={14} />} testid="overview-tile-services">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {workspace.data?.services?.map((svc) => (
+              <a
+                key={svc.name}
+                href={svc.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 12,
+                  color: 'var(--mc-primary, var(--primary))',
+                  textDecoration: 'none',
+                }}
+              >
+                {svc.name} ↗
+              </a>
+            )) || (
+              <>
+                {workspace.data?.frontendUrl && (
+                  <a
+                    href={workspace.data.frontendUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: 12, color: 'var(--mc-primary, var(--primary))', textDecoration: 'none' }}
+                  >
+                    Frontend ↗
+                  </a>
+                )}
+                {workspace.data?.apiUrl && (
+                  <a
+                    href={workspace.data.apiUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: 12, color: 'var(--mc-primary, var(--primary))', textDecoration: 'none' }}
+                  >
+                    API ↗
+                  </a>
+                )}
+              </>
+            )}
+            {!workspace.data?.frontendUrl && !workspace.data?.apiUrl && !workspace.data?.services?.length && (
+              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No services configured</span>
+            )}
+          </div>
+        </Tile>
+
+        {/* ATTACH tile */}
+        <Tile title="Attach" icon={<Terminal size={14} />} testid="overview-tile-attach">
+          {workspace.data?.agentSessionId ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: 11,
+                  padding: '6px 8px',
+                  background: 'var(--mc-surface-2, color-mix(in srgb, var(--foreground) 3%, transparent))',
+                  borderRadius: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  tmux attach -t {workspace.data.agentSessionId}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(`tmux attach -t ${workspace.data.agentSessionId}`).catch(() => { /* ignore */ });
+                  }}
+                  style={{
+                    padding: 2,
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    color: 'var(--mc-text-muted, var(--muted-foreground))',
+                    flexShrink: 0,
+                  }}
+                  title="Copy command"
+                >
+                  <Copy size={14} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No active session</span>
+          )}
+        </Tile>
+
+        {/* ACTIONS tile */}
+        <Tile title="Actions" icon={<Play size={14} />} testid="overview-tile-actions">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <button
+              type="button"
+              onClick={() => {
+                void fetch(`/api/review/${issueId}/request`, { method: 'POST' }).catch(() => { /* ignore */ });
+              }}
+              disabled={!reviewStatus.data || reviewStatus.data.reviewStatus === 'reviewing'}
+              style={{
+                padding: '5px 10px',
+                borderRadius: 6,
+                border: '1px solid var(--mc-border, var(--border))',
+                background: 'transparent',
+                fontSize: 11,
+                cursor: 'pointer',
+                opacity: !reviewStatus.data || reviewStatus.data.reviewStatus === 'reviewing' ? 0.5 : 1,
+              }}
+            >
+              Review & Test
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void fetch(`/api/issues/${issueId}/sync-main`, { method: 'POST' }).catch(() => { /* ignore */ });
+              }}
+              style={{
+                padding: '5px 10px',
+                borderRadius: 6,
+                border: '1px solid var(--mc-border, var(--border))',
+                background: 'transparent',
+                fontSize: 11,
+                cursor: 'pointer',
+              }}
+            >
+              Sync
+            </button>
+            {agent && (agent.status === 'running' || agent.status === 'starting' || agent.status === 'healthy') && (
+              <button
+                type="button"
+                onClick={() => {
+                  void fetch(`/api/agents/${agent.id}`, { method: 'DELETE' }).catch(() => { /* ignore */ });
+                }}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: 6,
+                  border: '1px solid var(--mc-error, #ef4444)',
+                  background: 'transparent',
+                  color: 'var(--mc-error, #ef4444)',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                }}
+              >
+                Stop
+              </button>
+            )}
+          </div>
+        </Tile>
+
+        {/* WORKSPACE tile */}
+        <Tile title="Workspace" icon={<Box size={14} />} testid="overview-tile-workspace">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {workspace.data?.containers && workspace.data.containers.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {workspace.data.containers.map((c) => (
+                  <div key={c.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: c.status === 'running' ? 'var(--mc-success, #22c55e)' : 'var(--mc-error, #ef4444)',
+                      }}
+                    />
+                    <span>{c.name}</span>
+                    <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))', marginLeft: 'auto' }}>{c.status}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {workspace.data?.hasDocker && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void fetch(`/api/workspaces/${issueId}/containers/frontend/stop`, { method: 'POST' }).catch(() => { /* ignore */ });
+                  }}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: 6,
+                    border: '1px solid var(--mc-border, var(--border))',
+                    background: 'transparent',
+                    fontSize: 11,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <Pause size={12} /> Stop
+                </button>
+              )}
+              {workspace.data?.path && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void fetch(`/api/workspaces/${issueId}/containerize`, { method: 'POST' }).catch(() => { /* ignore */ });
+                  }}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: 6,
+                    border: '1px solid var(--mc-border, var(--border))',
+                    background: 'transparent',
+                    fontSize: 11,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <ExternalLink size={12} /> Open VS Code
+                </button>
+              )}
+              {workspace.data?.canContainerize && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void fetch(`/api/workspaces/${issueId}/containerize`, { method: 'POST' }).catch(() => { /* ignore */ });
+                  }}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: 6,
+                    border: '1px solid var(--mc-border, var(--border))',
+                    background: 'transparent',
+                    fontSize: 11,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <Play size={12} /> Start Containers
+                </button>
+              )}
+            </div>
+            {!workspace.data?.hasDocker && !workspace.data?.canContainerize && (
+              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No containers</span>
+            )}
+          </div>
+        </Tile>
+
+        {/* LINKS tile */}
+        <Tile title="Links" icon={<Link2 size={14} />} testid="overview-tile-links">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {issue?.url && (
+              <a
+                href={issue.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: 12, color: 'var(--mc-primary, var(--primary))', textDecoration: 'none' }}
+              >
+                GitHub Issue ↗
+              </a>
+            )}
+            {planning.data?.prd && (
+              <button
+                type="button"
+                onClick={() => onSwitchTab?.('prd')}
+                style={{
+                  fontSize: 12,
+                  padding: 0,
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--mc-primary, var(--primary))',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
+                View PRD ↗
+              </button>
+            )}
+            {issue?.source === 'linear' && issue?.url && (
+              <a
+                href={issue.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: 12, color: 'var(--mc-primary, var(--primary))', textDecoration: 'none' }}
+              >
+                Linear ↗
+              </a>
+            )}
+            {!issue?.url && !planning.data?.prd && (
+              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No links available</span>
+            )}
+          </div>
+        </Tile>
+      </div>
+
+      {/* 3. Reviewer summary */}
       {reviewerSections.length > 0 && (
         <Section title="Reviewer summary">
           <div

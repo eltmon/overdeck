@@ -229,3 +229,45 @@ export function useDiscussionsQuery(
     refetchInterval: 30_000,
   });
 }
+
+// ─── Workspace (/api/workspaces/:issueId) ───────────────────────────────────
+
+export interface WorkspaceContainer {
+  name: string;
+  status: string;
+  health?: string;
+  ports?: string;
+}
+
+export interface WorkspaceData {
+  exists: boolean;
+  issueId: string;
+  path?: string;
+  frontendUrl?: string;
+  apiUrl?: string;
+  mrUrl?: string;
+  hasAgent?: boolean;
+  agentSessionId?: string | null;
+  agentModel?: string;
+  agentModelFull?: string;
+  git?: { ahead: number; behind: number; branch: string; dirty: boolean } | null;
+  repoGit?: { ahead: number; behind: number; branch: string; dirty: boolean } | null;
+  services?: Array<{ name: string; url?: string }>;
+  containers?: WorkspaceContainer[] | null;
+  hasDocker?: boolean;
+  canContainerize?: boolean;
+  pendingOperation?: string | null;
+  location?: 'local' | 'remote';
+  isRemote?: boolean;
+  vmName?: string;
+  remotePath?: string;
+  corrupted?: boolean;
+}
+
+export function useWorkspaceQuery(issueId: string): UseQueryResult<WorkspaceData> {
+  return useQuery({
+    queryKey: ['workspace', issueId],
+    queryFn: () => fetchJson<WorkspaceData>(`/api/workspaces/${issueId}`),
+    refetchInterval: 10_000,
+  });
+}

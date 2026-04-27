@@ -14,7 +14,7 @@
  */
 
 import { useState } from 'react';
-import type { Issue } from '../../types';
+import type { Issue, Agent } from '../../types';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 import { OverviewTab } from './ZoneCOverviewTabs/OverviewTab';
 import { ActivityTab } from './ZoneCOverviewTabs/ActivityTab';
@@ -64,6 +64,10 @@ interface ZoneCOverviewProps {
   /** Forwarded to the Activity tab so the Rally / story rollup keeps working. */
   issues?: readonly Issue[];
   featureData?: ProjectFeature | null;
+  /** Forwarded to OverviewTab for tile grid data. */
+  issue?: Issue;
+  /** Work agent for this issue — forwarded to OverviewTab. */
+  agent?: Agent;
 }
 
 export function ZoneCOverview({
@@ -72,6 +76,8 @@ export function ZoneCOverview({
   onTabChange,
   issues,
   featureData,
+  issue,
+  agent,
 }: ZoneCOverviewProps) {
   const [internalTab, setInternalTab] = useState<OverviewTab>('overview');
   const tab = activeTab ?? internalTab;
@@ -151,7 +157,14 @@ export function ZoneCOverview({
           overflow: 'auto',
         }}
       >
-        {tab === 'overview' && <OverviewTab issueId={issueId} onSwitchTab={handleTabClick} />}
+        {tab === 'overview' && (
+          <OverviewTab
+            issueId={issueId}
+            onSwitchTab={handleTabClick}
+            issue={issue}
+            agent={agent}
+          />
+        )}
         {tab === 'activity' && (
           <ActivityTab issueId={issueId} issues={issues} featureData={featureData} />
         )}

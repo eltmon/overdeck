@@ -53,6 +53,7 @@ vi.mock('../ZoneCOverviewTabs/queries', () => ({
   useReviewStatusQuery: () => ({ data: undefined, isLoading: false, isError: false }),
   usePrQuery: () => ({ data: undefined, isLoading: false, isError: false }),
   useDiscussionsQuery: () => ({ data: undefined, isLoading: false, isError: false }),
+  useWorkspaceQuery: () => ({ data: { exists: false, issueId: '' }, isLoading: false, isError: false }),
 }));
 
 function makeSession(sessionId: string): SessionNodeType {

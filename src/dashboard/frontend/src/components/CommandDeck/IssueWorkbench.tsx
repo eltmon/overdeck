@@ -110,7 +110,13 @@ export function IssueWorkbench({
         </>
       ) : (
         <>
-          <ZoneCOverview issueId={issueId} issues={issues} featureData={featureData} />
+          <ZoneCOverview
+            issueId={issueId}
+            issues={issues}
+            featureData={featureData}
+            issue={issue}
+            agent={agent}
+          />
           <IssueComposer issueId={issueId} sessions={sessions} />
         </>
       )}

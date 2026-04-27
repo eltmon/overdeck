@@ -44,6 +44,11 @@ const reviewStatusResult = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
 }));
+const workspaceResult = vi.hoisted(() => ({
+  data: undefined as undefined | Record<string, unknown>,
+  isLoading: false,
+  isError: false,
+}));
 
 vi.mock('../ZoneCOverviewTabs/queries', () => ({
   usePlanningQuery: () => planningResult,
@@ -52,6 +57,7 @@ vi.mock('../ZoneCOverviewTabs/queries', () => ({
   usePrQuery: () => prResult,
   useDiscussionsQuery: () => discussionsResult,
   useReviewStatusQuery: () => reviewStatusResult,
+  useWorkspaceQuery: () => workspaceResult,
 }));
 
 // Beads + ActivityTab + VBriefTab embed components that hit other code paths;
@@ -92,6 +98,9 @@ describe('ZoneCOverview', () => {
     reviewStatusResult.data = undefined;
     reviewStatusResult.isLoading = false;
     reviewStatusResult.isError = false;
+    workspaceResult.data = { exists: false, issueId: ISSUE };
+    workspaceResult.isLoading = false;
+    workspaceResult.isError = false;
   });
 
   it('renders the Overview tab body by default', () => {
