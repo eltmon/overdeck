@@ -30,3 +30,4 @@ None
 ## Specialist Feedback
 
 - **[2026-04-27T01:36Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
+- **[2026-04-27T01:55Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
