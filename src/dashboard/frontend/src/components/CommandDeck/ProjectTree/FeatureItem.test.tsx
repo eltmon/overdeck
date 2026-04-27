@@ -399,24 +399,24 @@ describe('FeatureItem', () => {
     render(
       <FeatureItem
         feature={makeFeature({
-          resourceSources: ['workspace', 'branch', 'tmux', 'pr'],
+          resourceSources: ['workspace', 'branch', 'tmux', 'pr', 'docker', 'vbrief', 'beads'],
           resourceDetails: {
-            tmuxSessions: ['agent-pan-821'],
-            workspacePath: '/tmp/workspaces/feature-pan-821',
-            localBranches: ['feature/pan-821'],
-            remoteBranches: ['origin/feature/pan-821'],
-            pr: {
-              number: 123,
-              title: 'Test PR',
-              url: 'https://example.test/pr/123',
-              state: 'OPEN',
-              isDraft: false,
-              headRefName: 'feature/pan-821',
-              baseRefName: 'main',
-            },
-            vbriefPath: null,
-            beadsPath: null,
-            dockerContainers: [],
+            hasWorkspace: true,
+            localBranchCount: 1,
+            remoteBranchCount: 1,
+            tmuxSessionCount: 1,
+            prs: [
+              {
+                number: 123,
+                title: 'Test PR',
+                url: 'https://example.test/pr/123',
+                state: 'OPEN',
+                isDraft: false,
+              },
+            ],
+            hasVbrief: true,
+            hasBeads: true,
+            dockerContainerCount: 2,
           },
         })}
         isSelected={false}
@@ -424,12 +424,16 @@ describe('FeatureItem', () => {
       />,
     );
 
-    expect(screen.getByTitle('workspace: /tmp/workspaces/feature-pan-821')).toBeInTheDocument();
+    expect(screen.getByTitle('workspace: allocated')).toBeInTheDocument();
     expect(screen.getByTitle('branch: local 1 · remote 1')).toBeInTheDocument();
     expect(screen.getByTitle('tmux: 1 session')).toBeInTheDocument();
-    expect(screen.getByTitle('PR: #123 open')).toBeInTheDocument();
-    expect(screen.getByText('workspace: /tmp/workspaces/feature-pan-821')).toBeInTheDocument();
-    expect(screen.getByText('tmux: agent-pan-821')).toBeInTheDocument();
+    expect(screen.getByTitle('PR: 1 open')).toBeInTheDocument();
+    expect(screen.getByText('workspace allocated')).toBeInTheDocument();
+    expect(screen.getByText('branches: 1 local · 1 remote')).toBeInTheDocument();
+    expect(screen.getByText('tmux: 1 active session')).toBeInTheDocument();
+    expect(screen.getByText('vBRIEF present')).toBeInTheDocument();
+    expect(screen.getByText('beads present')).toBeInTheDocument();
     expect(screen.getByText('PR: #123 Test PR')).toBeInTheDocument();
+    expect(screen.getByText('docker: 2 running containers')).toBeInTheDocument();
   });
 });

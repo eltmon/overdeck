@@ -7,27 +7,26 @@ import styles from '../styles/command-deck.module.css';
 export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker';
 
 export interface ProjectFeatureResourceDetails {
-  tmuxSessions: string[];
-  workspacePath: string | null;
-  localBranches: string[];
-  remoteBranches: string[];
-  pr: {
+  hasWorkspace: boolean;
+  localBranchCount: number;
+  remoteBranchCount: number;
+  tmuxSessionCount: number;
+  prs: Array<{
     number: number;
     title: string;
     url: string;
     state: string;
     isDraft: boolean;
-    headRefName: string;
-    baseRefName: string;
-  } | null;
-  vbriefPath: string | null;
-  beadsPath: string | null;
-  dockerContainers: string[];
+  }>;
+  hasVbrief: boolean;
+  hasBeads: boolean;
+  dockerContainerCount: number;
 }
 
 export interface ProjectFeature {
   issueId: string;
   title: string;
+  projectName: string;
   branch: string;
   status: string;
   stateLabel: string;

@@ -1,45 +1,44 @@
 import { execFile } from 'node:child_process';
-import { access, readdir, readFile, stat } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { access, readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { existsSync } from 'node:fs';
-
+import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
 import { listProjects, resolveProjectFromIssue, type ResolvedProject } from '../../../lib/projects.js';
 import { listSessionNamesAsync } from '../../../lib/tmux.js';
-import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
-import { getGitHubConfig } from './tracker-config.js';
 import { getReviewStatus } from '../review-status.js';
+import { getGitHubConfig } from './tracker-config.js';
 
 const execFileAsync = promisify(execFile);
+const RESOURCE_DISCOVERY_TTL_MS = 30_000;
 
 export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker';
 
+export interface ResourcePullRequest {
+  number: number;
+  title: string;
+  url: string;
+  state: string;
+  isDraft: boolean;
+}
+
 export interface ResourceDetails {
-  tmuxSessions: string[];
-  workspacePath: string | null;
-  localBranches: string[];
-  remoteBranches: string[];
-  pr: {
-    number: number;
-    title: string;
-    url: string;
-    state: string;
-    isDraft: boolean;
-    headRefName: string;
-    baseRefName: string;
-  } | null;
-  vbriefPath: string | null;
-  beadsPath: string | null;
-  dockerContainers: string[];
+  hasWorkspace: boolean;
+  localBranchCount: number;
+  remoteBranchCount: number;
+  tmuxSessionCount: number;
+  prs: ResourcePullRequest[];
+  hasVbrief: boolean;
+  hasBeads: boolean;
+  dockerContainerCount: number;
 }
 
 export interface ResourceAllocatedIssue {
   issueId: string;
   title: string;
   projectName: string;
-  projectPath: string;
   branch: string;
   status: string;
   stateLabel: string;
@@ -52,6 +51,17 @@ export interface ResourceAllocatedIssue {
   rawTrackerState?: string;
   resourceSources: ResourceSource[];
   resourceDetails: ResourceDetails;
+}
+
+interface InternalResourceDetails {
+  tmuxSessions: string[];
+  workspacePath: string | null;
+  localBranches: string[];
+  remoteBranches: string[];
+  prs: GhPullRequest[];
+  vbriefPath: string | null;
+  beadsPath: string | null;
+  dockerContainers: string[];
 }
 
 interface MutableResourceIssue {
@@ -71,7 +81,7 @@ interface MutableResourceIssue {
   readyForMerge: boolean;
   lastActivity: number | null;
   resourceSources: Set<ResourceSource>;
-  resourceDetails: ResourceDetails;
+  resourceDetails: InternalResourceDetails;
 }
 
 interface TrackerIssueRecord {
@@ -102,6 +112,14 @@ interface ProjectRef {
     issue_prefixes?: string[];
   };
 }
+
+interface ResourceDiscoveryCacheEntry {
+  value: ResourceAllocatedIssue[];
+  computedAt: number;
+}
+
+let cachedResourceIssues: ResourceDiscoveryCacheEntry | null = null;
+let resourceIssuesRefreshPromise: Promise<ResourceAllocatedIssue[]> | null = null;
 
 function hasPath(path: string): Promise<boolean> {
   return access(path).then(() => true, () => false);
@@ -134,6 +152,32 @@ function deriveStateLabel(issue: MutableResourceIssue, hasTmux: boolean, hasFres
   if (issue.hasState) return 'Has Context';
   if (issue.resourceSources.has('workspace') || issue.resourceSources.has('branch')) return 'Allocated';
   return 'Idle';
+}
+
+function sortPullRequests(prs: GhPullRequest[]): GhPullRequest[] {
+  return [...prs].sort((a, b) => {
+    if (a.isDraft !== b.isDraft) return a.isDraft ? 1 : -1;
+    return a.number - b.number;
+  });
+}
+
+function summarizeResourceDetails(details: InternalResourceDetails): ResourceDetails {
+  return {
+    hasWorkspace: details.workspacePath !== null,
+    localBranchCount: details.localBranches.length,
+    remoteBranchCount: details.remoteBranches.length,
+    tmuxSessionCount: details.tmuxSessions.length,
+    prs: sortPullRequests(details.prs).map((pr) => ({
+      number: pr.number,
+      title: pr.title,
+      url: pr.url,
+      state: pr.state,
+      isDraft: pr.isDraft,
+    })),
+    hasVbrief: details.vbriefPath !== null,
+    hasBeads: details.beadsPath !== null,
+    dockerContainerCount: details.dockerContainers.length,
+  };
 }
 
 async function loadTrackerIssues(): Promise<Map<string, TrackerIssueRecord>> {
@@ -173,8 +217,8 @@ async function loadDockerContainers(): Promise<string[]> {
   }
 }
 
-async function loadOpenPullRequests(): Promise<Map<string, GhPullRequest>> {
-  const pullRequests = new Map<string, GhPullRequest>();
+async function loadOpenPullRequests(): Promise<Map<string, GhPullRequest[]>> {
+  const pullRequests = new Map<string, GhPullRequest[]>();
   const githubConfig = getGitHubConfig();
   const repos = githubConfig?.repos ?? [];
 
@@ -194,7 +238,10 @@ async function loadOpenPullRequests(): Promise<Map<string, GhPullRequest>> {
       const prs = JSON.parse(stdout) as GhPullRequest[];
       for (const pr of prs) {
         const issueId = parseIssueIdFromText(pr.headRefName);
-        if (issueId) pullRequests.set(issueId, pr);
+        if (!issueId) continue;
+        const existing = pullRequests.get(issueId) ?? [];
+        existing.push(pr);
+        pullRequests.set(issueId, existing);
       }
     } catch {
       // ignore repo-specific failures
@@ -228,7 +275,7 @@ async function loadProjectBranches(projectPath: string): Promise<{ local: string
   }
 }
 
-export async function discoverResourceAllocatedIssues(): Promise<ResourceAllocatedIssue[]> {
+async function computeResourceAllocatedIssues(): Promise<ResourceAllocatedIssue[]> {
   const projects = listProjects() as ProjectRef[];
   const [trackerIssues, tmuxSessions, dockerContainers, pullRequests] = await Promise.all([
     loadTrackerIssues(),
@@ -292,7 +339,7 @@ export async function discoverResourceAllocatedIssues(): Promise<ResourceAllocat
         workspacePath: null,
         localBranches: [],
         remoteBranches: [],
-        pr: null,
+        prs: [],
         vbriefPath: null,
         beadsPath: null,
         dockerContainers: [],
@@ -400,12 +447,13 @@ export async function discoverResourceAllocatedIssues(): Promise<ResourceAllocat
     }
   }));
 
-  for (const [issueId, pr] of pullRequests) {
+  for (const [issueId, prs] of pullRequests) {
     const issue = ensureIssue(issueId);
     if (!issue) continue;
     issue.resourceSources.add('pr');
-    issue.resourceDetails.pr = pr;
-    issue.title = issue.title === issue.issueId && pr.title ? pr.title : issue.title;
+    issue.resourceDetails.prs = sortPullRequests(prs);
+    const bestTitle = issue.resourceDetails.prs.find((pr) => !pr.isDraft)?.title ?? issue.resourceDetails.prs[0]?.title;
+    issue.title = issue.title === issue.issueId && bestTitle ? bestTitle : issue.title;
   }
 
   await Promise.all([...issueMap.values()].map(async (issue) => {
@@ -455,7 +503,6 @@ export async function discoverResourceAllocatedIssues(): Promise<ResourceAllocat
         issueId: issue.issueId,
         title: issue.title,
         projectName: issue.projectName,
-        projectPath: issue.projectPath,
         branch: issue.branch,
         status,
         stateLabel,
@@ -467,14 +514,83 @@ export async function discoverResourceAllocatedIssues(): Promise<ResourceAllocat
         readyForMerge: issue.readyForMerge,
         rawTrackerState: issue.rawTrackerState,
         resourceSources: [...issue.resourceSources].sort(),
-        resourceDetails: {
-          ...issue.resourceDetails,
-          tmuxSessions: [...issue.resourceDetails.tmuxSessions].sort(),
-          localBranches: [...issue.resourceDetails.localBranches].sort(),
-          remoteBranches: [...issue.resourceDetails.remoteBranches].sort(),
-          dockerContainers: [...issue.resourceDetails.dockerContainers].sort(),
-        },
+        resourceDetails: summarizeResourceDetails(issue.resourceDetails),
       } satisfies ResourceAllocatedIssue;
     })
     .sort((a, b) => a.issueId.localeCompare(b.issueId));
+}
+
+function refreshResourceAllocatedIssues(): Promise<ResourceAllocatedIssue[]> {
+  if (resourceIssuesRefreshPromise) return resourceIssuesRefreshPromise;
+
+  resourceIssuesRefreshPromise = computeResourceAllocatedIssues()
+    .then((issues) => {
+      cachedResourceIssues = {
+        value: issues,
+        computedAt: Date.now(),
+      };
+      return issues;
+    })
+    .finally(() => {
+      resourceIssuesRefreshPromise = null;
+    });
+
+  return resourceIssuesRefreshPromise;
+}
+
+export async function getCachedResourceAllocatedIssues(): Promise<ResourceAllocatedIssue[]> {
+  const now = Date.now();
+  if (cachedResourceIssues && now - cachedResourceIssues.computedAt < RESOURCE_DISCOVERY_TTL_MS) {
+    return cachedResourceIssues.value;
+  }
+
+  if (cachedResourceIssues) {
+    void refreshResourceAllocatedIssues().catch(() => {
+      // keep serving the last good snapshot until the next successful refresh
+    });
+    return cachedResourceIssues.value;
+  }
+
+  return refreshResourceAllocatedIssues();
+}
+
+export async function discoverResourceAllocatedIssues(): Promise<ResourceAllocatedIssue[]> {
+  return getCachedResourceAllocatedIssues();
+}
+
+export async function discoverResourceAllocatedIssuesFresh(): Promise<ResourceAllocatedIssue[]> {
+  return computeResourceAllocatedIssues();
+}
+
+export function groupResourceAllocatedIssuesByProject(issues: ResourceAllocatedIssue[]): Array<{
+  name: string;
+  path: string;
+  features: ResourceAllocatedIssue[];
+}> {
+  const projectTree = new Map<string, { name: string; path: string; features: ResourceAllocatedIssue[] }>();
+
+  for (const issue of issues) {
+    const existing = projectTree.get(issue.projectName);
+    if (existing) {
+      existing.features.push(issue);
+      continue;
+    }
+    projectTree.set(issue.projectName, {
+      name: issue.projectName,
+      path: issue.projectName,
+      features: [issue],
+    });
+  }
+
+  return [...projectTree.values()]
+    .map((project) => ({
+      ...project,
+      features: project.features.sort((a, b) => a.issueId.localeCompare(b.issueId)),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export function resetResourceAllocatedIssuesCacheForTests(): void {
+  cachedResourceIssues = null;
+  resourceIssuesRefreshPromise = null;
 }

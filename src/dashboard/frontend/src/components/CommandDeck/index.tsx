@@ -33,9 +33,30 @@ interface ProjectData {
 }
 
 async function fetchProjects(): Promise<ProjectData[]> {
-  const res = await fetch('/api/command-deck/projects');
-  if (!res.ok) throw new Error('Failed to fetch projects');
-  return res.json();
+  const res = await fetch('/api/issues/resource-allocated');
+  if (!res.ok) throw new Error('Failed to fetch resource-allocated issues');
+  const issues = await res.json() as ProjectFeature[];
+
+  const grouped = new Map<string, ProjectData>();
+  for (const issue of issues) {
+    const existing = grouped.get(issue.projectName);
+    if (existing) {
+      existing.features.push(issue);
+      continue;
+    }
+    grouped.set(issue.projectName, {
+      name: issue.projectName,
+      path: issue.projectName,
+      features: [issue],
+    });
+  }
+
+  return [...grouped.values()]
+    .map((project) => ({
+      ...project,
+      features: project.features.sort((a, b) => a.issueId.localeCompare(b.issueId)),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 interface IssueCostEntry {

@@ -172,30 +172,44 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
-      if (url === '/api/command-deck/projects') {
+      if (url === '/api/issues/resource-allocated') {
         return {
           ok: true,
           json: async () => [
             {
-              name: 'test-project',
-              path: '/test',
-              features: [
+              issueId: 'PAN-821',
+              title: 'Test Feature',
+              projectName: 'test-project',
+              branch: 'feature/pan-821',
+              status: 'running',
+              stateLabel: 'In Progress',
+              agentStatus: 'active',
+              hasPlanning: true,
+              hasPrd: true,
+              hasState: true,
+              isShadow: false,
+              readyForMerge: false,
+              resourceSources: [],
+              resourceDetails: {
+                hasWorkspace: false,
+                localBranchCount: 0,
+                remoteBranchCount: 0,
+                tmuxSessionCount: 0,
+                prs: [],
+                hasVbrief: false,
+                hasBeads: false,
+                dockerContainerCount: 0,
+              },
+              sessions: [
                 {
-                  issueId: 'PAN-821',
-                  title: 'Test Feature',
-                  state: 'In Progress',
-                  sessions: [
-                    {
-                      type: 'work',
-                      sessionId: 'agent-pan-821',
-                      tmuxSession: 'agent-pan-821',
-                      model: 'claude-sonnet-4-6',
-                      startedAt: new Date().toISOString(),
-                      duration: 120,
-                      status: 'running',
-                      presence: 'active',
-                    },
-                  ],
+                  type: 'work',
+                  sessionId: 'agent-pan-821',
+                  tmuxSession: 'agent-pan-821',
+                  model: 'claude-sonnet-4-6',
+                  startedAt: new Date().toISOString(),
+                  duration: 120,
+                  status: 'running',
+                  presence: 'active',
                 },
               ],
             },

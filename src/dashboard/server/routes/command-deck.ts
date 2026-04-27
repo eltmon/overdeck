@@ -46,7 +46,7 @@ import { getReviewStatus } from '../review-status.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { LinearClient } from '../services/linear-client.js';
 import { IssueDataService } from '../services/issue-data-service.js';
-import { discoverResourceAllocatedIssues } from '../services/resource-discovery.js';
+import { getCachedResourceAllocatedIssues, groupResourceAllocatedIssuesByProject } from '../services/resource-discovery.js';
 import { httpHandler } from './http-handler.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, type ReviewerRoundMetadata } from './reviewer-tree.js';
@@ -1193,28 +1193,8 @@ const getMissionControlProjectsRoute = HttpRouter.add(
 );
 
 async function fetchProjectTree(): Promise<unknown[]> {
-  const discovered = await discoverResourceAllocatedIssues();
-  const projectTree = new Map<string, { name: string; path: string; features: Array<Record<string, unknown>> }>();
-
-  for (const issue of discovered) {
-    const existing = projectTree.get(issue.projectName);
-    if (existing) {
-      existing.features.push(issue as unknown as Record<string, unknown>);
-      continue;
-    }
-    projectTree.set(issue.projectName, {
-      name: issue.projectName,
-      path: issue.projectPath,
-      features: [issue as unknown as Record<string, unknown>],
-    });
-  }
-
-  return [...projectTree.values()]
-    .map((project) => ({
-      ...project,
-      features: project.features.sort((a, b) => String(a['issueId']).localeCompare(String(b['issueId']))),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const discovered = await getCachedResourceAllocatedIssues();
+  return groupResourceAllocatedIssuesByProject(discovered);
 }
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────

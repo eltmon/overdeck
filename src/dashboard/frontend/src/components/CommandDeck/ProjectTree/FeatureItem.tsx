@@ -50,23 +50,23 @@ function resourceSummary(feature: ProjectFeature, source: ResourceSource): { lab
   if (!details) return null;
   switch (source) {
     case 'workspace':
-      return details.workspacePath ? { label: 'workspace', detail: details.workspacePath } : null;
+      return details.hasWorkspace ? { label: 'workspace', detail: 'allocated' } : null;
     case 'branch': {
       const parts: string[] = [];
-      if (details.localBranches.length > 0) parts.push(`local ${details.localBranches.length}`);
-      if (details.remoteBranches.length > 0) parts.push(`remote ${details.remoteBranches.length}`);
+      if (details.localBranchCount > 0) parts.push(`local ${details.localBranchCount}`);
+      if (details.remoteBranchCount > 0) parts.push(`remote ${details.remoteBranchCount}`);
       return parts.length > 0 ? { label: 'branch', detail: parts.join(' · ') } : null;
     }
     case 'tmux':
-      return details.tmuxSessions.length > 0 ? { label: 'tmux', detail: `${details.tmuxSessions.length} session${details.tmuxSessions.length === 1 ? '' : 's'}` } : null;
+      return details.tmuxSessionCount > 0 ? { label: 'tmux', detail: `${details.tmuxSessionCount} session${details.tmuxSessionCount === 1 ? '' : 's'}` } : null;
     case 'vbrief':
-      return details.vbriefPath ? { label: 'vBRIEF', detail: 'plan.vbrief.json' } : null;
+      return details.hasVbrief ? { label: 'vBRIEF', detail: 'present' } : null;
     case 'beads':
-      return details.beadsPath ? { label: 'beads', detail: 'issues.jsonl' } : null;
+      return details.hasBeads ? { label: 'beads', detail: 'present' } : null;
     case 'pr':
-      return details.pr ? { label: 'PR', detail: `#${details.pr.number} ${details.pr.state.toLowerCase()}` } : null;
+      return details.prs.length > 0 ? { label: 'PR', detail: `${details.prs.length} open` } : null;
     case 'docker':
-      return details.dockerContainers.length > 0 ? { label: 'docker', detail: `${details.dockerContainers.length} container${details.dockerContainers.length === 1 ? '' : 's'}` } : null;
+      return details.dockerContainerCount > 0 ? { label: 'docker', detail: `${details.dockerContainerCount} container${details.dockerContainerCount === 1 ? '' : 's'}` } : null;
     default:
       return null;
   }
@@ -103,14 +103,15 @@ function ResourceStrip({ feature }: { feature: ProjectFeature }) {
       ))}
       {details && (
         <span className={styles.featureResourcePopover}>
-          {details.workspacePath && <span>workspace: {details.workspacePath}</span>}
-          {details.localBranches.map((branch) => <span key={`local-${branch}`}>branch: {branch}</span>)}
-          {details.remoteBranches.map((branch) => <span key={`remote-${branch}`}>remote: {branch}</span>)}
-          {details.tmuxSessions.map((session) => <span key={`tmux-${session}`}>tmux: {session}</span>)}
-          {details.vbriefPath && <span>vBRIEF: {details.vbriefPath}</span>}
-          {details.beadsPath && <span>beads: {details.beadsPath}</span>}
-          {details.pr && <span>PR: #{details.pr.number} {details.pr.title}</span>}
-          {details.dockerContainers.map((container) => <span key={`docker-${container}`}>docker: {container}</span>)}
+          {details.hasWorkspace && <span>workspace allocated</span>}
+          {(details.localBranchCount > 0 || details.remoteBranchCount > 0) && (
+            <span>branches: {details.localBranchCount} local · {details.remoteBranchCount} remote</span>
+          )}
+          {details.tmuxSessionCount > 0 && <span>tmux: {details.tmuxSessionCount} active session{details.tmuxSessionCount === 1 ? '' : 's'}</span>}
+          {details.hasVbrief && <span>vBRIEF present</span>}
+          {details.hasBeads && <span>beads present</span>}
+          {details.prs.map((pr) => <span key={`pr-${pr.number}`}>PR: #{pr.number} {pr.title}</span>)}
+          {details.dockerContainerCount > 0 && <span>docker: {details.dockerContainerCount} running container{details.dockerContainerCount === 1 ? '' : 's'}</span>}
         </span>
       )}
     </span>
@@ -147,7 +148,6 @@ function StatusIcon({ status, agentStatus, stateLabel, isRally, readyForMerge }:
 
 function formatCost(cost: number): string {
   if (cost < 0.01) return '<$0.01';
-  if (cost < 1) return `$${cost.toFixed(2)}`;
   return `$${cost.toFixed(2)}`;
 }
 
@@ -353,7 +353,7 @@ function writeExpanded(issueId: string, expanded: boolean): void {
 /** Default to collapsed for every issue. The session list dominates the
  *  tree height when expanded — collapsed-by-default keeps the tree scannable.
  *  Users can expand individual features; that choice is persisted. */
-function defaultExpandedFromState(_stateLabel: string): boolean {
+function defaultExpandedFromState(): boolean {
   return false;
 }
 
@@ -547,21 +547,26 @@ function FeatureMenu({
 export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl }: FeatureItemProps) {
   const [expanded, setExpanded] = useState(() => {
     const persisted = readExpanded(feature.issueId);
-    return persisted ?? defaultExpandedFromState(feature.stateLabel);
+    return persisted ?? defaultExpandedFromState();
   });
   const [menu, setMenu] = useState<ContextMenuState>({ x: 0, y: 0, open: false });
 
   // Derive best session once per data change instead of on every click (PAN-821 review)
   // Respect the tree filter so auto-select picks a visible session.
-  const visibleSessions = feature.sessions?.filter(s => sessionMatchesFilter(s, filter)) ?? [];
+  const visibleSessions = useMemo(
+    () => feature.sessions?.filter((session) => sessionMatchesFilter(session, filter)) ?? [],
+    [feature.sessions, filter],
+  );
   const hasVisibleSessions = visibleSessions.length > 0;
-  const bestSessionId = useMemo(() =>
-    visibleSessions.length > 0 ? pickBestSession(visibleSessions) : null,
-  [visibleSessions]);
+  const bestSessionId = useMemo(
+    () => (visibleSessions.length > 0 ? pickBestSession(visibleSessions) : null),
+    [visibleSessions],
+  );
 
-  const hasJsonl = useMemo(() =>
-    visibleSessions.some(s => s.hasJsonl),
-  [visibleSessions]);
+  const hasJsonl = useMemo(
+    () => visibleSessions.some((session) => session.hasJsonl),
+    [visibleSessions],
+  );
 
   const aggregateSessions = feature.sessions?.filter(isWorkOrSpecialistSession) ?? [];
   const activityState = getAggregateActivityState(aggregateSessions);
