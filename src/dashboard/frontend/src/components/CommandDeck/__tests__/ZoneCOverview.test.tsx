@@ -29,6 +29,12 @@ const costsResult = vi.hoisted(() => ({
   isLoading: false,
   isError: false,
 }));
+const costStreamResult = vi.hoisted(() => ({
+  issueCost: 0,
+  issueEvents: [] as Array<Record<string, unknown>>,
+  isLoading: false,
+  error: null as Error | null,
+}));
 const prResult = vi.hoisted(() => ({
   data: undefined as undefined | Record<string, unknown>,
   isLoading: false,
@@ -55,12 +61,7 @@ vi.mock('../ZoneCOverviewTabs/queries', () => ({
 }));
 
 vi.mock('../../../hooks/useCostStream', () => ({
-  useIssueCostStream: () => ({
-    issueCost: 0,
-    issueEvents: [],
-    isLoading: false,
-    error: null,
-  }),
+  useIssueCostStream: () => costStreamResult,
 }));
 
 // Beads + ActivityTab + VBriefTab embed components that hit other code paths;
@@ -76,12 +77,10 @@ vi.mock('../ZoneCOverviewTabs/VBriefTab', () => ({
   ),
 }));
 vi.mock('../ZoneCOverviewTabs/ActivityTab', () => ({
-  ActivityTab: ({ issueId, issues, featureData }: { issueId: string; issues?: unknown[]; featureData?: unknown }) => (
+  ActivityTab: ({ issueId }: { issueId: string }) => (
     <div
       data-testid="activity-tab-stub"
       data-issue={issueId}
-      data-issues={issues ? issues.length : 0}
-      data-feature={featureData ? 'present' : 'missing'}
     />
   ),
 }));
@@ -106,6 +105,10 @@ describe('ZoneCOverview', () => {
     reviewStatusResult.data = undefined;
     reviewStatusResult.isLoading = false;
     reviewStatusResult.isError = false;
+    costStreamResult.issueCost = 0;
+    costStreamResult.issueEvents = [];
+    costStreamResult.isLoading = false;
+    costStreamResult.error = null;
   });
 
   it('renders the Overview tab body by default', () => {
@@ -137,12 +140,12 @@ describe('ZoneCOverview', () => {
     expect(screen.getByTestId('markdown-tab').textContent).toContain('PRD body content');
   });
 
-  it('shows the empty state when PRD body is missing', () => {
+  it('shows the empty state with the Generate PRD hint when PRD body is missing', () => {
     planningResult.data = { state: 'state only' };
     render(<ZoneCOverview issueId={ISSUE} />);
     fireEvent.click(screen.getByTestId('zone-c-overview-tab-prd'));
     expect(screen.getByTestId('markdown-tab-empty')).toHaveTextContent(
-      'No PRD recorded',
+      'No PRD recorded for this issue. Generate PRD from planning to populate this tab.',
     );
   });
 
@@ -179,13 +182,7 @@ describe('ZoneCOverview', () => {
   });
 
   it('passes the issue id to the Activity tab', () => {
-    render(
-      <ZoneCOverview
-        issueId={ISSUE}
-        issues={[{ id: '1' }, { id: '2' }] as any[]}
-        featureData={{ issueId: ISSUE } as any}
-      />,
-    );
+    render(<ZoneCOverview issueId={ISSUE} />);
     fireEvent.click(screen.getByTestId('zone-c-overview-tab-activity'));
     expect(screen.getByTestId('activity-tab-stub')).toHaveAttribute('data-issue', ISSUE);
   });
@@ -203,5 +200,27 @@ describe('ZoneCOverview', () => {
     expect(screen.getByTestId('overview-link-beads')).toBeInTheDocument();
     expect(screen.getByTestId('overview-link-costs')).toBeInTheDocument();
     expect(screen.getByTestId('overview-link-activity')).toBeInTheDocument();
+  });
+
+  it('keeps aggregate costs visible when the live stream reports a transient error', () => {
+    costsResult.data = {
+      issueId: ISSUE,
+      totalCost: 1.23,
+      totalTokens: 4500,
+      sessions: [],
+      byModel: { 'claude-sonnet-4-6': { cost: 1.23, tokens: 4500 } },
+      byStage: { work: { cost: 1.23, tokens: 4500 } },
+    };
+    costStreamResult.issueCost = 0.5;
+    costStreamResult.issueEvents = [{ cost: 0.5 }];
+    costStreamResult.error = new Error('stream hiccup');
+
+    render(<ZoneCOverview issueId={ISSUE} />);
+    fireEvent.click(screen.getByTestId('zone-c-overview-tab-costs'));
+
+    expect(screen.getByTestId('costs-tab')).toBeInTheDocument();
+    expect(screen.queryByTestId('costs-tab-error')).not.toBeInTheDocument();
+    expect(screen.getByTestId('costs-total')).toHaveTextContent('$1.23');
+    expect(screen.getByTestId('costs-stream-total')).toHaveTextContent('Live stream: $0.50');
   });
 });

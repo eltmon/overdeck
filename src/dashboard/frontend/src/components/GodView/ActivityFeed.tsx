@@ -31,13 +31,11 @@ export const selectIssueActivityFeed =
   (issueId: string) =>
   (s: DashboardState): GodViewActivityEvent[] =>
     selectGodViewActivityFeed(s).filter((event) => {
-      const eventIssueId = typeof (event as { issueId?: unknown }).issueId === 'string'
-        ? (event as { issueId?: string }).issueId
-        : null;
-      if (eventIssueId) {
-        return eventIssueId.toUpperCase() === issueId.toUpperCase();
+      if (event.issueId) {
+        return event.issueId.toUpperCase() === issueId.toUpperCase();
       }
 
+      // Older activity events only carry agentId, so keep the historical fallback.
       return event.agentId.toLowerCase() === `agent-${issueId.toLowerCase()}`;
     });
 

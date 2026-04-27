@@ -164,7 +164,7 @@ export function CostsTab({ issueId }: CostsTabProps) {
     );
   }
 
-  if (isError || stream.error || !data) {
+  if (isError || !data) {
     return (
       <div
         data-testid="costs-tab-error"
@@ -202,6 +202,7 @@ export function CostsTab({ issueId }: CostsTabProps) {
           >
             Live stream: {fmtCost(stream.issueCost)} · {stream.issueEvents.length} event
             {stream.issueEvents.length === 1 ? '' : 's'}
+            {stream.error ? ' · live updates temporarily unavailable' : ''}
           </div>
         </div>
         <div style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>

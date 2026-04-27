@@ -26,7 +26,6 @@ import {
   selectSelectedSessionForIssue,
 } from '../../lib/commandDeckSelection';
 import type { Agent, Issue } from '../../types';
-import type { ProjectFeature } from './ProjectTree/ProjectNode';
 import type { OverviewTab } from './ZoneCOverview';
 import { ZoneA } from './ZoneA';
 import { ZoneB } from './ZoneB';
@@ -42,9 +41,6 @@ interface IssueWorkbenchProps {
   source?: string;
   url?: string;
   onOpenBeads?: () => void;
-  /** Forwarded to ZoneCOverview → ActivityTab. */
-  issues?: readonly Issue[];
-  featureData?: ProjectFeature | null;
   /** Work agent for this issue — drives Zone A action strip. */
   agent?: Agent;
   /** Full issue record — forwarded to Zone A for status gating. */
@@ -59,8 +55,6 @@ export function IssueWorkbench({
   source,
   url,
   onOpenBeads,
-  issues,
-  featureData,
   agent,
   issue,
 }: IssueWorkbenchProps) {
@@ -109,7 +103,7 @@ export function IssueWorkbench({
         </>
       ) : (
         <>
-          <ZoneCOverview issueId={issueId} issues={issues} featureData={featureData} />
+          <ZoneCOverview issueId={issueId} />
           <IssueComposer issueId={issueId} sessions={sessions} />
         </>
       )}

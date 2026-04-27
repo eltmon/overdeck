@@ -14,8 +14,6 @@
  */
 
 import { useState } from 'react';
-import type { Issue } from '../../types';
-import type { ProjectFeature } from './ProjectTree/ProjectNode';
 import { OverviewTab } from './ZoneCOverviewTabs/OverviewTab';
 import { ActivityTab } from './ZoneCOverviewTabs/ActivityTab';
 import { CostsTab } from './ZoneCOverviewTabs/CostsTab';
@@ -61,9 +59,6 @@ interface ZoneCOverviewProps {
   /** Optional controlled active tab; defaults to 'overview'. */
   activeTab?: OverviewTab;
   onTabChange?: (tab: OverviewTab) => void;
-  /** Forwarded to the Activity tab so the Rally / story rollup keeps working. */
-  issues?: readonly Issue[];
-  featureData?: ProjectFeature | null;
 }
 
 export function ZoneCOverview({
@@ -156,7 +151,7 @@ export function ZoneCOverview({
           <MarkdownTab
             body={planning.data?.prd}
             isLoading={planning.isLoading}
-            emptyLabel="No PRD recorded for this issue."
+            emptyLabel="No PRD recorded for this issue. Generate PRD from planning to populate this tab."
           />
         )}
         {tab === 'state' && (
