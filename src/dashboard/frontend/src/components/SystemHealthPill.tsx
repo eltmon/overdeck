@@ -16,7 +16,7 @@ function formatBytes(bytes: number): string {
 }
 
 function severityClasses(severity: SystemHealthSnapshot['severity'] | undefined): string {
-  if (severity === 'critical') return 'border-destructive/50 bg-destructive/10 text-destructive';
+  if (severity === 'critical') return 'border-destructive/50 bg-destructive/10 text-destructive animate-pulse';
   if (severity === 'warning') return 'border-warning/40 bg-warning/10 text-warning-foreground';
   return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
 }
@@ -181,7 +181,7 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
       </button>
 
       {open && !compact && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 w-[22rem] rounded-xl border border-border bg-popover p-3 text-sm shadow-lg">
+        <div className="absolute top-full right-0 z-[200] mt-2 w-[22rem] rounded-xl border border-border bg-popover p-3 text-sm shadow-lg">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <div className="font-semibold text-foreground">System health</div>
@@ -218,6 +218,7 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
             <div className="rounded-lg border border-border p-2">
               <div className="text-muted-foreground">Swap</div>
               <div className="mt-1 font-semibold text-foreground">{data.summary.swapUsedPercent.toFixed(1)}%</div>
+              <div className="text-muted-foreground">Overcommit {data.summary.overcommitPercent.toFixed(1)}%</div>
             </div>
             <div className="rounded-lg border border-border p-2">
               <div className="text-muted-foreground">Work agents</div>

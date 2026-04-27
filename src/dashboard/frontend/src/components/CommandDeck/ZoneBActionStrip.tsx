@@ -89,18 +89,29 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
       if (session.type !== 'work') throw new Error('Cannot restart non-work sessions');
       await fetch(`/api/agents/${session.sessionId}`, { method: 'DELETE' });
       const targetIssueId = issueId ?? session.sessionId.replace(/^agent-/, '').toUpperCase();
-      const res = await fetch('/api/agents', {
+      const requestBody = { issueId: targetIssueId };
+      let res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId: targetIssueId }),
+        body: JSON.stringify(requestBody),
       });
-      const data = await res.json().catch(() => ({})) as { error?: string; guardrails?: { warnings?: Array<{ message: string }> } };
-      if (!res.ok) throw new Error(data.error || 'Failed to restart agent');
+      let data = await res.json().catch(() => ({})) as { error?: string; hint?: string; requiresAcknowledgement?: boolean; guardrails?: { warnings?: Array<{ message: string }> } };
+      if (res.status === 409 && data.requiresAcknowledgement) {
+        const confirmed = window.confirm((data.guardrails?.warnings ?? []).map((warning) => `• ${warning.message}`).join('\n'));
+        if (!confirmed) throw new Error('Agent start canceled');
+        res = await fetch('/api/agents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...requestBody, guardrailAcknowledged: true }),
+        });
+        data = await res.json().catch(() => ({})) as { error?: string; hint?: string; guardrails?: { warnings?: Array<{ message: string }> } };
+      }
+      if (!res.ok) throw new Error(data.error || data.hint || 'Failed to restart agent');
       return data;
     },
     onSuccess: async (data) => {
-      for (const warning of data.guardrails?.warnings ?? []) {
-        toast.warning(warning.message, { duration: 8000 });
+      if ((data.guardrails?.warnings ?? []).length > 0) {
+        toast.success('Agent started after acknowledging system health warnings.', { duration: 6000 });
       }
       await refreshDashboardState(queryClient);
     },

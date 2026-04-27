@@ -30,6 +30,7 @@ import { UpgradeAnnouncement } from './components/upgrade-announcement/UpgradeAn
 import { StandaloneTerminal } from './components/StandaloneTerminal';
 import { DeaconPauseBanner } from './components/DeaconPauseToggle';
 import { StoppedAgentsBanner } from './components/StoppedAgentsBanner';
+import { SystemHealthPill } from './components/SystemHealthPill';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useDashboardStore, selectAgentList, selectIssues, selectDashboardLifecycle } from './lib/store';
@@ -609,6 +610,14 @@ export default function App() {
             </button>
           </div>
         )}
+
+        <div className="relative z-[200] border-b border-border bg-background/95 px-4 py-2 backdrop-blur shrink-0">
+          <div className="flex items-center justify-end">
+            <div className="w-full max-w-xs">
+              <SystemHealthPill />
+            </div>
+          </div>
+        </div>
 
         <main className="flex-1 flex overflow-hidden">
           {activeTab === 'command-deck' && (

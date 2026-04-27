@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+import App from '../App';
 import { DialogProvider } from './DialogProvider';
 import { SystemHealthPill } from './SystemHealthPill';
 import type { SystemHealthSnapshot } from '../types';
@@ -12,6 +13,10 @@ const { mockToastError, mockUseSystemHealth, hookState } = vi.hoisted(() => ({
   hookState: {
     current: undefined as { data: SystemHealthSnapshot; isLoading: boolean; error: null } | undefined,
   },
+}));
+
+vi.mock('../App', () => ({
+  default: () => null,
 }));
 
 vi.mock('sonner', () => ({
@@ -209,7 +214,16 @@ describe('SystemHealthPill', () => {
     expect(screen.getByText('System health')).toBeInTheDocument();
     expect(screen.getByText('Top consumers')).toBeInTheDocument();
     expect(screen.getByText('Panopticon')).toBeInTheDocument();
+    expect(screen.getByText(/Overcommit 40.0%/)).toBeInTheDocument();
     expect(screen.getByText('Remove')).toBeInTheDocument();
     expect(screen.getAllByText('Kill').length).toBeGreaterThan(0);
+  });
+
+  it('adds a pulse class when severity is critical', () => {
+    hookState.current = { data: createSnapshot('critical'), isLoading: false, error: null };
+
+    renderPill();
+
+    expect(screen.getByTestId('system-health-pill').className).toContain('animate-pulse');
   });
 });

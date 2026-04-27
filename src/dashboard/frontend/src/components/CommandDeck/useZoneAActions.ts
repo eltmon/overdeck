@@ -11,7 +11,7 @@
 import { useCallback, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import type { Agent, Issue, WorkAgentLifecycle } from '../../types';
+import type { Agent, Issue, WorkAgentLifecycle, StartAgentResponse } from '../../types';
 import type { ReviewStatus, WorkspaceInfo } from '../inspector/types';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 
@@ -20,12 +20,6 @@ interface PlanningState {
   hasBeads: boolean;
   beadsCount: number;
   planningComplete: boolean;
-}
-
-interface StartAgentResponse {
-  guardrails?: {
-    warnings?: Array<{ message: string }>;
-  };
 }
 
 export interface ZoneAActionsState {
@@ -109,11 +103,11 @@ export function useZoneAActions(
     staleTime: 15000,
   });
 
-  const showStartGuardrailWarnings = useCallback((data: StartAgentResponse | undefined) => {
+  const acknowledgeGuardrailWarnings = useCallback(async (data: StartAgentResponse | undefined) => {
     const warnings = data?.guardrails?.warnings ?? [];
-    for (const warning of warnings) {
-      toast.warning(warning.message, { duration: 8000 });
-    }
+    if (warnings.length === 0) return false;
+    if (!data?.requiresAcknowledgement) return true;
+    return window.confirm(warnings.map((warning) => `• ${warning.message}`).join('\n'));
   }, []);
 
   const startAgentMutation = useMutation({
@@ -134,21 +128,34 @@ export function useZoneAActions(
         return res.json();
       }
 
-      const res = await fetch('/api/agents', {
+      const requestBody = { issueId, projectId: issue?.project?.id, message: message || undefined };
+      let res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId, projectId: issue?.project?.id, message: message || undefined }),
+        body: JSON.stringify(requestBody),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to start agent');
+      let data = await res.json().catch(() => ({})) as StartAgentResponse;
+      if (res.status === 409 && data.requiresAcknowledgement) {
+        const confirmed = await acknowledgeGuardrailWarnings(data);
+        if (!confirmed) throw new Error('Agent start canceled');
+        res = await fetch('/api/agents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...requestBody, guardrailAcknowledged: true }),
+        });
+        data = await res.json().catch(() => ({})) as StartAgentResponse;
       }
-      return data as StartAgentResponse;
+      if (!res.ok) {
+        throw new Error(data.error || data.hint || 'Failed to start agent');
+      }
+      return data;
     },
     onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['agents'] });
       setTimeout(() => queryClient.invalidateQueries({ queryKey: ['agents'] }), 2000);
-      showStartGuardrailWarnings(data);
+      if (data.guardrails?.warnings?.length) {
+        toast.success('Agent started after acknowledging system health warnings.', { duration: 6000 });
+      }
     },
     onError: (err: Error) => {
       setAgentLaunchState(null);

@@ -2,18 +2,12 @@ import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Play, X, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';
 import { useDashboardStore, selectAgentList } from '../lib/store';
-import { Agent } from '../types';
+import { Agent, type StartAgentResponse } from '../types';
 
 interface RestartResult {
   issueId: string;
   success: boolean;
   error?: string;
-}
-
-interface StartAgentResponse {
-  guardrails?: {
-    warnings?: Array<{ message: string }>;
-  };
 }
 
 export function StoppedAgentsBanner() {
@@ -82,19 +76,33 @@ export function StoppedAgentsBanner() {
     for (const agent of stoppedAgents) {
       if (!agent.issueId) continue;
       try {
-        const res = await fetch('/api/agents', {
+        const requestBody = { issueId: agent.issueId };
+        let res = await fetch('/api/agents', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ issueId: agent.issueId }),
+          body: JSON.stringify(requestBody),
         });
-        const data = await res.json().catch(() => ({})) as StartAgentResponse & { error?: string };
+        let data = await res.json().catch(() => ({})) as StartAgentResponse;
+        if (res.status === 409 && data.requiresAcknowledgement) {
+          const confirmed = window.confirm((data.guardrails?.warnings ?? []).map((warning) => `• ${warning.message}`).join('\n'));
+          if (!confirmed) {
+            restartResults.push({ issueId: agent.issueId, success: false, error: 'Agent start canceled' });
+            continue;
+          }
+          res = await fetch('/api/agents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...requestBody, guardrailAcknowledged: true }),
+          });
+          data = await res.json().catch(() => ({})) as StartAgentResponse;
+        }
         if (res.ok) {
-          for (const warning of data.guardrails?.warnings ?? []) {
-            toast.warning(`${agent.issueId}: ${warning.message}`, { duration: 8000 });
+          if (data.guardrails?.warnings?.length) {
+            toast.success(`${agent.issueId}: started after acknowledging system health warnings`, { duration: 8000 });
           }
           restartResults.push({ issueId: agent.issueId, success: true });
         } else {
-          restartResults.push({ issueId: agent.issueId, success: false, error: data.error || res.statusText });
+          restartResults.push({ issueId: agent.issueId, success: false, error: data.error || data.hint || res.statusText });
         }
       } catch (error) {
         restartResults.push({

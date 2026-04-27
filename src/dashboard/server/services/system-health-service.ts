@@ -1,21 +1,28 @@
 import { exec } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
-import { cpus } from 'node:os';
+import { access, readFile } from 'node:fs/promises';
+import { cpus, homedir } from 'node:os';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import type { DashboardSnapshot } from '@panopticon/contracts';
 
 import { listRunningAgentsAsync, getAgentRuntimeStateAsync, type AgentState } from '../../../lib/agents.js';
-import { loadConfig } from '../../../lib/config-yaml.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { listPaneValuesAsync } from '../../../lib/tmux.js';
 import { DockerStatsCollector, type ContainerStats } from '../../../lib/docker-stats.js';
 import { initEventStore } from '../event-store.js';
 
 const execAsync = promisify(exec);
-const CACHE_TTL_MS = 15_000;
+const DEFAULT_HEALTH_POLL_SECONDS = 15;
+const DEFAULT_RESOURCE_CONFIG = {
+  memoryWarnGb: 4,
+  memoryBlockGb: 2,
+  agentWarnCount: 5,
+  agentBlockCount: 6,
+};
 const KB = 1024;
 const GIB = 1024 ** 3;
+const GLOBAL_CONFIG_PATH = join(homedir(), '.panopticon', 'config.yaml');
 
 type SystemHealthSeverity = 'normal' | 'warning' | 'critical';
 
@@ -129,6 +136,10 @@ let cacheExpiresAt = 0;
 let inflightRefresh: Promise<SystemHealthSnapshot> | null = null;
 let previousSeverity: SystemHealthSeverity | null = null;
 let eventStorePromise: Promise<ReturnType<typeof initEventStore>> | null = null;
+let cachedResourceConfig = DEFAULT_RESOURCE_CONFIG;
+let cachedPollSeconds = DEFAULT_HEALTH_POLL_SECONDS;
+let resourceConfigLoadedAt = 0;
+let resourceConfigInflight: Promise<void> | null = null;
 
 function getDockerStatsCollector(): DockerStatsCollector {
   if (!dockerStatsCollector) {
@@ -162,14 +173,54 @@ function resolveFiniteNumber(value: string | undefined, fallback: number): numbe
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export function getResourceConfig() {
-  const { config } = loadConfig();
-  return {
-    memoryWarnGb: resolveFiniteNumber(process.env['PAN_MEMORY_WARN_GB'], config.resources.memoryWarnGb),
-    memoryBlockGb: resolveFiniteNumber(process.env['PAN_MEMORY_BLOCK_GB'], config.resources.memoryBlockGb),
-    agentWarnCount: Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_AGENT_WARN_COUNT'], config.resources.agentWarnCount))),
-    agentBlockCount: Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_AGENT_BLOCK_COUNT'], config.resources.agentBlockCount))),
+async function readGlobalResourceConfig(): Promise<void> {
+  let next = DEFAULT_RESOURCE_CONFIG;
+  try {
+    await access(GLOBAL_CONFIG_PATH);
+    const raw = await readFile(GLOBAL_CONFIG_PATH, 'utf-8');
+    const memoryWarnMatch = raw.match(/^\s*memory_warn_gb:\s*(\d+(?:\.\d+)?)\s*$/m);
+    const memoryBlockMatch = raw.match(/^\s*memory_block_gb:\s*(\d+(?:\.\d+)?)\s*$/m);
+    const agentWarnMatch = raw.match(/^\s*agent_warn_count:\s*(\d+(?:\.\d+)?)\s*$/m);
+    const agentBlockMatch = raw.match(/^\s*agent_block_count:\s*(\d+(?:\.\d+)?)\s*$/m);
+    const pollSecondsMatch = raw.match(/^\s*poll_seconds:\s*(\d+(?:\.\d+)?)\s*$/m);
+
+    next = {
+      memoryWarnGb: resolveFiniteNumber(memoryWarnMatch?.[1], DEFAULT_RESOURCE_CONFIG.memoryWarnGb),
+      memoryBlockGb: resolveFiniteNumber(memoryBlockMatch?.[1], DEFAULT_RESOURCE_CONFIG.memoryBlockGb),
+      agentWarnCount: Math.max(1, Math.floor(resolveFiniteNumber(agentWarnMatch?.[1], DEFAULT_RESOURCE_CONFIG.agentWarnCount))),
+      agentBlockCount: Math.max(1, Math.floor(resolveFiniteNumber(agentBlockMatch?.[1], DEFAULT_RESOURCE_CONFIG.agentBlockCount))),
+    };
+    cachedPollSeconds = Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_HEALTH_POLL_SECONDS'], resolveFiniteNumber(pollSecondsMatch?.[1], DEFAULT_HEALTH_POLL_SECONDS))));
+  } catch {
+    cachedPollSeconds = Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_HEALTH_POLL_SECONDS'], DEFAULT_HEALTH_POLL_SECONDS)));
+  }
+
+  cachedResourceConfig = {
+    memoryWarnGb: resolveFiniteNumber(process.env['PAN_MEMORY_WARN_GB'], next.memoryWarnGb),
+    memoryBlockGb: resolveFiniteNumber(process.env['PAN_MEMORY_BLOCK_GB'], next.memoryBlockGb),
+    agentWarnCount: Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_AGENT_WARN_COUNT'], next.agentWarnCount))),
+    agentBlockCount: Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_AGENT_BLOCK_COUNT'], next.agentBlockCount))),
   };
+  resourceConfigLoadedAt = Date.now();
+}
+
+async function ensureResourceConfigLoaded(): Promise<void> {
+  const ttl = Math.max(5_000, cachedPollSeconds * 1000);
+  if (resourceConfigLoadedAt > 0 && Date.now() - resourceConfigLoadedAt < ttl) return;
+  if (!resourceConfigInflight) {
+    resourceConfigInflight = readGlobalResourceConfig().finally(() => {
+      resourceConfigInflight = null;
+    });
+  }
+  await resourceConfigInflight;
+}
+
+export function getResourceConfig() {
+  return cachedResourceConfig;
+}
+
+function getHealthPollTtlMs(): number {
+  return Math.max(1, cachedPollSeconds) * 1000;
 }
 
 function defaultThresholds(): SystemHealthThresholds {
@@ -223,7 +274,7 @@ async function readCpuPercent(): Promise<number> {
   const current: CpuSample = { idle, total };
   const now = Date.now();
 
-  if (!previousCpuSample || (previousCpuSampleAt > 0 && now - previousCpuSampleAt > CACHE_TTL_MS * 2)) {
+  if (!previousCpuSample || (previousCpuSampleAt > 0 && now - previousCpuSampleAt > getHealthPollTtlMs() * 2)) {
     previousCpuSample = current;
     previousCpuSampleAt = now;
     const coreCount = Math.max(cpus().length, 1);
@@ -368,13 +419,13 @@ async function collectAgentProcesses(): Promise<HealthAgentProcess[]> {
 
   return Promise.all(
     activeAgents.map(async (agent) => {
-      const panePidValue = (await listPaneValuesAsync(agent.id, '#{pane_pid}'))[0];
+      const runtimeState = await getAgentRuntimeStateAsync(agent.id).catch(() => null);
+      const panePidValue = runtimeState?.panePid != null ? String(runtimeState.panePid) : (await listPaneValuesAsync(agent.id, '#{pane_pid}'))[0];
       const panePid = Number(panePidValue ?? '0');
       const descendants = Number.isFinite(panePid) && panePid > 0
         ? getDescendantPids(panePid, processTable)
         : new Set<number>();
       const memoryBytes = descendants.size > 0 ? sumProcessMemory(descendants, processTable) : 0;
-      const runtimeState = await getAgentRuntimeStateAsync(agent.id).catch(() => null);
 
       return {
         id: agent.id,
@@ -450,6 +501,7 @@ function buildTopConsumers(
 }
 
 async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<SystemHealthSnapshot> {
+  await ensureResourceConfigLoaded();
   const [memory, loadAverage1m, cpuPercent, agents, containers] = await Promise.all([
     readProcMemory(),
     readLoadAverage(),
@@ -481,6 +533,8 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
   const panopticonMemoryBytes = agents.reduce((sum, agent) => sum + agent.memoryBytes, 0) + containerMemoryBytes;
   const panopticonMemoryPercent = toPercent(panopticonMemoryBytes, memory.memTotal);
 
+  const sortedAgents = [...agents].sort((a, b) => b.memoryBytes - a.memoryBytes);
+
   const result: SystemHealthSnapshot = {
     severity: evaluation.severity,
     updatedAt: new Date().toISOString(),
@@ -508,9 +562,9 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
     },
     thresholds,
     reasons: evaluation.reasons,
-    agents: agents.sort((a, b) => b.memoryBytes - a.memoryBytes),
+    agents: sortedAgents,
     leakedSpecialists,
-    topConsumers: buildTopConsumers(agents, containers, leakedSpecialists),
+    topConsumers: buildTopConsumers(sortedAgents, containers, leakedSpecialists),
   };
 
   if (previousSeverity && previousSeverity !== result.severity) {
@@ -533,7 +587,7 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
 
   previousSeverity = result.severity;
   cachedHealth = result;
-  cacheExpiresAt = Date.now() + CACHE_TTL_MS;
+  cacheExpiresAt = Date.now() + getHealthPollTtlMs();
   return result;
 }
 

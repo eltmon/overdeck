@@ -313,6 +313,24 @@ export interface SystemHealthSnapshot {
   topConsumers: SystemHealthConsumer[];
 }
 
+export interface StartAgentGuardrailWarning {
+  severity?: 'warning' | 'critical';
+  code?: string;
+  message: string;
+}
+
+export interface StartAgentResponse {
+  success?: boolean;
+  blocked?: boolean;
+  skipped?: boolean;
+  requiresAcknowledgement?: boolean;
+  error?: string;
+  hint?: string;
+  guardrails?: {
+    warnings?: StartAgentGuardrailWarning[];
+  };
+}
+
 // State transition result
 export interface StateTransitionResult {
   success: boolean;

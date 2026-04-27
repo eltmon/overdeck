@@ -69,21 +69,27 @@ describe('evaluateSpawnGuardrails', () => {
   });
 
   it('does not block exactly at the memory threshold boundary', () => {
+    vi.stubEnv('PAN_MEMORY_WARN_GB', '2');
     vi.stubEnv('PAN_MEMORY_BLOCK_GB', '2');
 
     const decision = evaluateSpawnGuardrails(createHealthSnapshot({
       summary: {
         availableMemoryBytes: 2 * GIB,
       },
+      thresholds: {
+        memoryAvailableWarningBytes: 2 * GIB,
+        memoryAvailableCriticalBytes: 2 * GIB,
+      },
     }));
 
     expect(decision.blocked).toBe(false);
+    expect(decision.requiresAcknowledgement).toBe(false);
     expect(decision.warnings).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'memory_pressure', severity: 'critical' })]),
     );
   });
 
-  it('returns non-blocking warnings when work agent count is high but below the hard limit', () => {
+  it('returns acknowledgement-required warnings when work agent count is high but below the hard limit', () => {
     vi.stubEnv('PAN_AGENT_WARN_COUNT', '5');
     vi.stubEnv('PAN_AGENT_BLOCK_COUNT', '6');
 
@@ -94,7 +100,9 @@ describe('evaluateSpawnGuardrails', () => {
     }));
 
     expect(decision.blocked).toBe(false);
-    expect(decision.status).toBe(200);
+    expect(decision.requiresAcknowledgement).toBe(true);
+    expect(decision.status).toBe(409);
+    expect(decision.hint).toBe('Acknowledge the system health warnings before starting this agent.');
     expect(decision.warnings).toEqual([
       expect.objectContaining({
         severity: 'warning',
@@ -116,6 +124,7 @@ describe('evaluateSpawnGuardrails', () => {
     }));
 
     expect(decision.blocked).toBe(true);
+    expect(decision.requiresAcknowledgement).toBe(false);
     expect(decision.status).toBe(429);
     expect(decision.error).toBe('Available RAM is critically low (1.5 GB).');
     expect(decision.hint).toBe('Reduce memory pressure or active work-agent count before retrying.');
@@ -145,6 +154,7 @@ describe('evaluateSpawnGuardrails', () => {
     }));
 
     expect(decision.blocked).toBe(true);
+    expect(decision.requiresAcknowledgement).toBe(false);
     expect(decision.status).toBe(429);
     expect(decision.hint).toBe('Clean up leaked specialist sessions first, then retry the spawn.');
     expect(decision.warnings).toEqual(

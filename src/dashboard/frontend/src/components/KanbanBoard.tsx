@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { useDashboardStore, selectAgentList, selectSpecialistList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
 /* Drag-and-drop disabled pending rework (PAN-TODO)
 import {
@@ -20,7 +21,7 @@ import {
   useDroppable,
 } from '@dnd-kit/core';
 */
-import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
+import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState, type StartAgentResponse } from '../types';
 import { getFriendlyModelName } from './inspector/utils';
 import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText, Pause } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
@@ -103,12 +104,6 @@ export interface IssueCost {
   sessionCount: number;
   model?: string;
   durationMinutes?: number;
-}
-
-interface StartAgentResponse {
-  guardrails?: {
-    warnings?: Array<{ message: string }>;
-  };
 }
 
 // Fetch costs for all issues
@@ -2673,33 +2668,54 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
   const [isStarting, setIsStarting] = useState(false);
   const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const confirm = useConfirm();
 
-  const showStartGuardrailWarnings = useCallback(async (data: StartAgentResponse | undefined) => {
+  const acknowledgeGuardrailWarnings = useCallback(async (data: StartAgentResponse | undefined) => {
     const warnings = data?.guardrails?.warnings ?? [];
-    if (warnings.length === 0) return;
-    await showAlert({
-      title: 'Agent started with warnings',
+    if (warnings.length === 0) return false;
+    if (!data?.requiresAcknowledgement) return true;
+    return confirm({
+      title: 'Start agent with warnings?',
       message: warnings.map((warning) => `• ${warning.message}`).join('\n'),
-      variant: 'info',
+      variant: 'destructive',
+      confirmLabel: 'Start anyway',
     });
-  }, [showAlert]);
+  }, [confirm]);
 
   const startAgentMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/agents', {
+      const requestBody = { issueId: issue.identifier };
+      let res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId: issue.identifier }),
+        body: JSON.stringify(requestBody),
       });
-      const text = await res.text();
+      let text = await res.text();
       let data: StartAgentResponse = {};
       try {
         data = JSON.parse(text);
       } catch {}
+      if (res.status === 409 && data.requiresAcknowledgement) {
+        const confirmed = await acknowledgeGuardrailWarnings(data);
+        if (!confirmed) throw new Error('Agent start canceled');
+        res = await fetch('/api/agents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...requestBody, guardrailAcknowledged: true }),
+        });
+        text = await res.text();
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = {};
+        }
+      }
       if (!res.ok) {
         let message = `Failed to start agent (${res.status})`;
         if (typeof (data as any).error === 'string' && (data as any).error.length > 0) {
           message = (data as any).error;
+        } else if (typeof data.hint === 'string' && data.hint.length > 0) {
+          message = data.hint;
         } else if (text.length < 200) {
           message = text;
         }
@@ -2712,7 +2728,9 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
       startTimeoutRef.current = setTimeout(() => setIsStarting(false), 60000);
       await refreshDashboardState(queryClient);
-      await showStartGuardrailWarnings(data);
+      if (data.guardrails?.warnings?.length) {
+        toast.success('Agent started after acknowledging system health warnings.', { duration: 6000 });
+      }
     },
     onError: (err: Error) => {
       setIsStarting(false);

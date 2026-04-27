@@ -205,6 +205,7 @@ interface SpawnGuardrailAdvisory {
 
 export interface SpawnGuardrailDecision {
   blocked: boolean;
+  requiresAcknowledgement: boolean;
   status: number;
   error?: string;
   hint?: string;
@@ -258,7 +259,7 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
 
   if (leakedSpecialists.length > 0) {
     warnings.push({
-      severity: workAgentCount >= hardWorkAgentLimit || health.summary.availableMemoryBytes <= health.thresholds.memoryAvailableCriticalBytes ? 'critical' : 'warning',
+      severity: workAgentCount >= hardWorkAgentLimit || health.summary.availableMemoryBytes < health.thresholds.memoryAvailableCriticalBytes ? 'critical' : 'warning',
       code: 'leaked_specialists',
       message: `Leaked specialist sessions detected: ${formatLeakedSpecialistSummary(leakedSpecialists)}${leakedSpecialists.length > 3 ? `, +${leakedSpecialists.length - 3} more` : ''}.`,
     });
@@ -269,6 +270,7 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
     const hasLeakedSpecialists = leakedSpecialists.length > 0;
     return {
       blocked: true,
+      requiresAcknowledgement: false,
       status: 429,
       error: blockingWarnings[0]?.message ?? 'System health is blocking new agent spawns.',
       hint: hasLeakedSpecialists
@@ -286,7 +288,9 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
 
   return {
     blocked: false,
-    status: 200,
+    requiresAcknowledgement: warnings.length > 0,
+    status: warnings.length > 0 ? 409 : 200,
+    hint: warnings.length > 0 ? 'Acknowledge the system health warnings before starting this agent.' : undefined,
     warnings,
     health: {
       severity: health.severity,
@@ -1467,6 +1471,7 @@ const postAgentsRoute = HttpRouter.add(
     const readModel = yield* ReadModelService;
 
     const { issueId, projectId } = body as any;
+    const guardrailAcknowledged = (body as any).guardrailAcknowledged === true;
 
     if (!issueId) {
       return jsonResponse({ error: 'issueId required' }, { status: 400 });
@@ -1665,6 +1670,16 @@ const postAgentsRoute = HttpRouter.add(
         blocked: true,
         skipped: true,
         error: spawnGuardrails.error,
+        hint: spawnGuardrails.hint,
+        guardrails: spawnGuardrails,
+      }, { status: spawnGuardrails.status });
+    }
+    if (spawnGuardrails.requiresAcknowledgement && !guardrailAcknowledged) {
+      return jsonResponse({
+        success: false,
+        blocked: false,
+        skipped: true,
+        requiresAcknowledgement: true,
         hint: spawnGuardrails.hint,
         guardrails: spawnGuardrails,
       }, { status: spawnGuardrails.status });

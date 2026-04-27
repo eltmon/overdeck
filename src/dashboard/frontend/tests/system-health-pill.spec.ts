@@ -125,11 +125,14 @@ test.describe('System health pill (PAN-455)', () => {
 
     const pill = page.getByTestId('system-health-pill').first();
     await expect(pill).toBeVisible();
+    await expect(page.locator('main').getByTestId('system-health-pill')).toHaveCount(0);
+    await expect(pill).toBeVisible();
     await expect(pill).toContainText('critical');
 
     await pill.click();
     await expect(page.getByText('System health', { exact: true })).toBeVisible();
     await expect(page.locator('div').filter({ hasText: /^Panopticon$/ }).first()).toBeVisible();
+    await expect(page.getByText('Overcommit 94.0%')).toBeVisible();
     await expect(page.getByText('specialist-review-agent · PAN-455')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Remove' })).toBeVisible();
 

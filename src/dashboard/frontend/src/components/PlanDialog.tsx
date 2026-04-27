@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, FileText, ExternalLink, List, RefreshCw } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import { useDashboardStore } from '../lib/store';
-import { Issue } from '../types';
+import { Issue, type StartAgentResponse } from '../types';
 import { XTerminal } from './XTerminal';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { useConfirm } from './DialogProvider';
@@ -48,12 +48,6 @@ interface PlanningStatus {
   hasPromptFile?: boolean;
   hasStateFile?: boolean;
   hasCompletionMarker?: boolean;
-}
-
-interface StartAgentResponse {
-  guardrails?: {
-    warnings?: Array<{ message: string }>;
-  };
 }
 
 type Step = 'checking' | 'ready' | 'starting' | 'setting-up' | 'planning' | 'complete' | 'error';
@@ -363,31 +357,49 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     },
   });
 
-  const showStartGuardrailWarnings = useCallback((data: StartAgentResponse | undefined) => {
+  const acknowledgeGuardrailWarnings = useCallback(async (data: StartAgentResponse | undefined) => {
     const warnings = data?.guardrails?.warnings ?? [];
-    for (const warning of warnings) {
-      toast.warning(warning.message, { duration: 8000 });
-    }
-  }, []);
+    if (warnings.length === 0) return false;
+    if (!data?.requiresAcknowledgement) return true;
+    return confirm({
+      title: 'Start agent with warnings?',
+      message: warnings.map((warning) => `• ${warning.message}`).join('\n'),
+      variant: 'destructive',
+      confirmLabel: 'Start anyway',
+    });
+  }, [confirm]);
 
   // Start agent mutation - spawns work agent and updates status to "In Progress"
   const startAgentMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/agents', {
+      const requestBody = { issueId: issue.identifier, phase: 'implementation' };
+      let res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ issueId: issue.identifier, phase: 'implementation' }),
+        body: JSON.stringify(requestBody),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to start agent');
+      let data = await res.json().catch(() => ({})) as StartAgentResponse;
+      if (res.status === 409 && data.requiresAcknowledgement) {
+        const confirmed = await acknowledgeGuardrailWarnings(data);
+        if (!confirmed) throw new Error('Agent start canceled');
+        res = await fetch('/api/agents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...requestBody, guardrailAcknowledged: true }),
+        });
+        data = await res.json().catch(() => ({})) as StartAgentResponse;
       }
-      return data as StartAgentResponse;
+      if (!res.ok) {
+        throw new Error(data.error || data.hint || 'Failed to start agent');
+      }
+      return data;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['agents'] });
       queryClient.invalidateQueries({ queryKey: ['issues'] });
-      showStartGuardrailWarnings(data);
+      if (data.guardrails?.warnings?.length) {
+        toast.success('Agent started after acknowledging system health warnings.', { duration: 6000 });
+      }
       onComplete();
       onClose();
     },
