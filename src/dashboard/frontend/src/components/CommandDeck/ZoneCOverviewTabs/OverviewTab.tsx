@@ -15,7 +15,7 @@
  * sibling tabs reuse the cached responses.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { Issue, Agent } from '../../../types';
 import { LiveCounter } from '../LiveCounter';
 import { ActivitySparkline } from '../ActivitySparkline';
@@ -31,7 +31,11 @@ import {
   type ReviewerRoundMetadata,
 } from './queries';
 import type { OverviewTab as OverviewTabKey } from '../ZoneCOverview';
-import { GitPullRequest, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Box, Link2, Terminal, Play, Pause, ExternalLink, Code2 } from 'lucide-react';
+import { refreshDashboardState } from '../../../lib/refresh-dashboard-state';
+import { isReviewPipelineStuck } from '../../../lib/pipeline-state';
+import { useConfirm } from '../../DialogProvider';
+import { useQueryClient } from '@tanstack/react-query';
+import { GitPullRequest, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Box, Link2, Terminal, Play, Pause, ExternalLink, Code2, Loader2, RotateCcw } from 'lucide-react';
 
 interface OverviewTabProps {
   issueId: string;
@@ -205,6 +209,9 @@ function formatRuntime(startedAt: string): string {
 }
 
 export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabProps) {
+  const confirm = useConfirm();
+  const queryClient = useQueryClient();
+  const [isRecoverPending, setIsRecoverPending] = useState(false);
   const planning = usePlanningQuery(issueId);
   const activity = useActivityQuery(issueId);
   const costs = useIssueCostsQuery(issueId);
@@ -247,7 +254,13 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
     [sections],
   );
 
-  const recentEvents = useMemo(() => sections.slice(-20).reverse(), [sections]);
+  const isRecoverable = isReviewPipelineStuck(reviewStatus.data ? {
+    reviewStatus: reviewStatus.data.reviewStatus as 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked' | undefined,
+    testStatus: reviewStatus.data.testStatus as 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed' | undefined,
+    mergeStatus: reviewStatus.data.mergeStatus as 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed' | undefined,
+    verificationStatus: reviewStatus.data.verificationStatus as 'pending' | 'running' | 'passed' | 'failed' | 'skipped' | undefined,
+  } : undefined);
+  const recentEvents = useMemo(() => sections.slice(-10).reverse(), [sections]);
 
   return (
     <div
@@ -597,10 +610,14 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             <button
               type="button"
+              data-testid="overview-action-review-test"
               onClick={() => {
-                void fetch(`/api/review/${issueId}/request`, { method: 'POST' }).catch(() => { /* ignore */ });
+                void fetch(`/api/review/${issueId}/trigger`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                }).catch(() => { /* ignore */ });
               }}
-              disabled={!reviewStatus.data || reviewStatus.data.reviewStatus === 'reviewing'}
+              disabled={!reviewStatus.data || reviewStatus.data.reviewStatus === 'reviewing' || reviewStatus.data.testStatus === 'testing'}
               style={{
                 padding: '5px 10px',
                 borderRadius: 6,
@@ -608,13 +625,60 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                 background: 'transparent',
                 fontSize: 11,
                 cursor: 'pointer',
-                opacity: !reviewStatus.data || reviewStatus.data.reviewStatus === 'reviewing' ? 0.5 : 1,
+                opacity: !reviewStatus.data || reviewStatus.data.reviewStatus === 'reviewing' || reviewStatus.data.testStatus === 'testing' ? 0.5 : 1,
               }}
             >
-              Review & Test
+              {reviewStatus.data?.readyForMerge ? 'Re-Review' : 'Review & Test'}
             </button>
+            {isRecoverable && (
+              <button
+                type="button"
+                data-testid="overview-action-recover"
+                onClick={() => {
+                  void (async () => {
+                    if (!(await confirm({
+                      title: 'Recover Pipeline',
+                      message: `Recover ${issueId}?\n\nThis will:\n• Clear failed review, test, and merge state\n• Reset circuit breaker counters\n• Remove queued specialist tasks\n• Re-dispatch review and test as needed`,
+                      confirmLabel: 'Recover',
+                    }))) {
+                      return;
+                    }
+                    setIsRecoverPending(true);
+                    try {
+                      await fetch(`/api/review/${issueId}/reset`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ rerun: true }),
+                      });
+                      await refreshDashboardState(queryClient);
+                    } catch {
+                      /* ignore */
+                    } finally {
+                      setIsRecoverPending(false);
+                    }
+                  })();
+                }}
+                disabled={isRecoverPending}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: 6,
+                  border: '1px solid var(--mc-border, var(--border))',
+                  background: 'transparent',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  opacity: isRecoverPending ? 0.5 : 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                {isRecoverPending ? <Loader2 size={12} /> : <RotateCcw size={12} />}
+                {isRecoverPending ? 'Recovering...' : 'Recover'}
+              </button>
+            )}
             <button
               type="button"
+              data-testid="overview-action-sync"
               onClick={() => {
                 void fetch(`/api/issues/${issueId}/sync-main`, { method: 'POST' }).catch(() => { /* ignore */ });
               }}
@@ -632,6 +696,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
             {agent && (agent.status === 'running' || agent.status === 'starting' || agent.status === 'healthy') && (
               <button
                 type="button"
+                data-testid="overview-action-stop"
                 onClick={() => {
                   void fetch(`/api/agents/${agent.id}`, { method: 'DELETE' }).catch(() => { /* ignore */ });
                 }}

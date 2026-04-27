@@ -11,6 +11,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+vi.mock('../../DialogProvider', () => ({
+  useConfirm: () => vi.fn(async () => true),
+}));
+
+vi.mock('@tanstack/react-query', async () => {
+  const actual = await vi.importActual('@tanstack/react-query');
+  return {
+    ...actual,
+    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  };
+});
 import type { ReactNode } from 'react';
 import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
 import { IssueWorkbench } from '../IssueWorkbench';

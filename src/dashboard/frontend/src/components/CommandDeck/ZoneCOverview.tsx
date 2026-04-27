@@ -6,14 +6,11 @@
  * dependencies stay clear and sibling tabs share a query cache via the hooks
  * exported from `./ZoneCOverviewTabs/queries.ts`.
  *
- * INFERENCE tab is hidden when no inference content exists for the issue (the
- * planning endpoint returns it null/empty if no inference.md was generated).
- *
  * The PR/Diff tab pulls from `/api/issues/:issueId/pr` (pan-9yn5) and the
  * Discussions tab pulls from `/api/issues/:issueId/discussions` (pan-1r7j).
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Issue, Agent } from '../../types';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 import { OverviewTab } from './ZoneCOverviewTabs/OverviewTab';
@@ -93,12 +90,8 @@ export function ZoneCOverview({
   const tab = activeTab ?? internalTab;
 
   const planning = usePlanningQuery(issueId);
-  const hasInference = !!(planning.data?.inference && planning.data.inference.trim() !== '');
 
-  const visibleTabs = useMemo(
-    () => ALL_TABS.filter((spec) => spec.key !== 'inference' || hasInference),
-    [hasInference],
-  );
+  const visibleTabs = ALL_TABS;
 
   useEffect(() => {
     if (activeTab) return;

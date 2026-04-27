@@ -5,7 +5,7 @@
  * network. We assert:
  *   - Overview tab default renders billboard + quick links
  *   - PRD/STATE/INFERENCE tabs render the planning body via MarkdownTab
- *   - INFERENCE tab is hidden when planning has no inference content
+ *   - All 10 tabs are always visible, including INFERENCE
  *   - Clicking a quick link switches the active tab
  *   - Costs tab renders byStage / byModel rows
  *   - PR/Diff tab renders via PrDiffTab (empty state)
@@ -15,6 +15,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ZoneCOverview } from '../ZoneCOverview';
+
+vi.mock('../../DialogProvider', () => ({
+  useConfirm: () => vi.fn(async () => true),
+}));
+
+vi.mock('@tanstack/react-query', async () => {
+  const actual = await vi.importActual('@tanstack/react-query');
+  return {
+    ...actual,
+    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  };
+});
 
 const planningResult = vi.hoisted(() => ({
   data: undefined as undefined | Record<string, unknown>,
@@ -40,7 +52,15 @@ const discussionsResult = vi.hoisted(() => ({
   isError: false,
 }));
 const reviewStatusResult = vi.hoisted(() => ({
-  data: undefined as undefined | Record<string, unknown>,
+  data: undefined as undefined | {
+    issueId: string;
+    reviewStatus: string;
+    testStatus: string;
+    mergeStatus?: string;
+    verificationStatus?: string;
+    readyForMerge: boolean;
+    updatedAt: string;
+  },
   isLoading: false,
   isError: false,
 }));
@@ -113,10 +133,20 @@ describe('ZoneCOverview', () => {
     expect(screen.getByTestId('overview-stage')).toHaveTextContent('idle');
   });
 
-  it('hides the INFERENCE tab when planning has no inference content', () => {
+  it('always renders all 10 tabs, including INFERENCE without planning content', () => {
     planningResult.data = { prd: '# PRD', state: '# STATE' };
     render(<ZoneCOverview issueId={ISSUE} />);
-    expect(screen.queryByTestId('zone-c-overview-tab-inference')).not.toBeInTheDocument();
+    expect(screen.getByTestId('zone-c-overview-tab-inference')).toBeInTheDocument();
+    expect(screen.getAllByRole('tab')).toHaveLength(10);
+  });
+
+  it('shows INFERENCE empty state when no inference content exists', () => {
+    planningResult.data = { prd: '# PRD', state: '# STATE' };
+    render(<ZoneCOverview issueId={ISSUE} />);
+    fireEvent.click(screen.getByTestId('zone-c-overview-tab-inference'));
+    expect(screen.getByTestId('markdown-tab-empty')).toHaveTextContent(
+      'No INFERENCE.md recorded',
+    );
   });
 
   it('shows INFERENCE tab when planning has inference content', () => {
@@ -187,6 +217,40 @@ describe('ZoneCOverview', () => {
     expect(screen.getByTestId('overview-link-beads')).toBeInTheDocument();
     expect(screen.getByTestId('overview-link-costs')).toBeInTheDocument();
     expect(screen.getByTestId('overview-link-activity')).toBeInTheDocument();
+  });
+
+  it('shows Recover in the Actions tile when the review pipeline is stuck', () => {
+    reviewStatusResult.data = {
+      issueId: ISSUE,
+      reviewStatus: 'failed',
+      testStatus: 'failed',
+      mergeStatus: 'failed',
+      verificationStatus: 'failed',
+      readyForMerge: false,
+      updatedAt: new Date().toISOString(),
+    };
+
+    render(<ZoneCOverview issueId={ISSUE} />);
+    expect(screen.getByTestId('overview-action-recover')).toBeInTheDocument();
+  });
+
+  it('caps recent activity at 10 events', () => {
+    activityResult.data = {
+      issueId: ISSUE,
+      sections: Array.from({ length: 12 }, (_, index) => ({
+        type: 'work',
+        sessionId: `session-${index}`,
+        model: `model-${index}`,
+        startedAt: new Date(Date.now() + index * 1000).toISOString(),
+        duration: null,
+        status: 'running',
+      })),
+    };
+
+    render(<ZoneCOverview issueId={ISSUE} />);
+    expect(screen.getByTestId('overview-activity-list').querySelectorAll('li')).toHaveLength(10);
+    expect(screen.queryByText('model-1')).not.toBeInTheDocument();
+    expect(screen.getByText('model-11')).toBeInTheDocument();
   });
 
   it('syncs active tab to the URL query string', () => {
