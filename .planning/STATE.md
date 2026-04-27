@@ -1,35 +1,24 @@
-# PAN-815: Command Deck: unify Conversations and Projects into one filterable list
+# PAN-869: Awaiting Merge lane misses PRs with COMMENTED reviews + green CI
 
-## Status: Implementation Complete
+## Status: Ready for Merge
 
 ## Current Phase
-All work complete. Ready for merge.
+Work complete - commits pushed, GitHub PR created
 
 ## Completed Work
-- Replaced `SidebarTab` segmented control with independent filter chip toggles (`showConversations` / `showProjects`)
-- Unified sidebar list rendering: both ConversationList and ProjectNodes render together when both filters are active
-- Added localStorage persistence for filter state (`mc-filter-conversations`, `mc-filter-projects`)
-- Fixed content area selection logic: IssueWorkbench renders when `selectedFeature` is set regardless of filter state
-- Removed dead `DetailPanelLayout` fallback branch for selected features
-- Updated CommandDeck tests for new filter chip behavior
-- All 312 test files pass (3889 tests)
-- Typecheck passes
-- Lint passes
-- Frontend build passes
+- [x] fix reviewResultToReviewStatus in review-agent.ts to return 'passed' for COMMENTED when success=true (commit: 76b35b0a)
+- [x] Update review-run.ts to pass full ReviewResult object instead of just reviewResult string (commit: 76b35b0a)
+- [x] Add backfill function fixStuckCommentedReviews in review-status.ts to fix existing stuck COMMENTED records (commit: 76b35b0a)
+- [x] Call fixStuckCommentedReviews on dashboard startup in main.ts (commit: 76b35b0a)
+- [x] Update tests in review-agent.test.ts to use new function signature (commit: 76b35b0a)
 
 ## Remaining Work
-None
+- None - waiting for review approval
 
 ## Key Decisions
-- Filter chips are independent toggles (both visible by default), not a single-select control
-- Selection state in content area is independent of sidebar filters — detail panels show regardless
-- Tree session filter (all/alive/failed) remains visible whenever projects are shown
-- Model picker and new-conversation button always visible in sidebar header
-- Filter state persisted to localStorage (not URL, to keep scope focused)
+- D1: COMMENTED (success=true) = review passed with no blockers → maps to 'passed' so readyForMerge=true
+- D2: COMMENTED (success=false) = synthesis/protocol failure → keeps as 'failed' so deacon retries
+- D3: Backfill conservative approach: only fix records where last review history entry is 'commented' type
 
 ## Specialist Feedback
-
-- **[2026-04-27T01:36Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`
-- **[2026-04-27T01:55Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
-- **[2026-04-27T02:01Z] review-agent → COMMENTED** — `.planning/feedback/001-review-agent-commented.md`
-- **[2026-04-27T02:01Z] review-agent → COMMENTED** — `.planning/feedback/002-review-agent-commented.md`
+- (none yet)
