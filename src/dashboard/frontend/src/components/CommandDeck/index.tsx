@@ -267,7 +267,7 @@ export function CommandDeck({
 
       const featureSessions = new Map<string, import('@panopticon/contracts').SessionNode[]>();
       for (const feature of tree.features) {
-        featureSessions.set(feature.issueId.toLowerCase(), [...feature.sessions]);
+        featureSessions.set(feature.issueId.toLowerCase(), feature.sessions);
       }
 
       let featuresChanged = false;

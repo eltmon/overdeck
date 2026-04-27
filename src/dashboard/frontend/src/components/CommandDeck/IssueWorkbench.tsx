@@ -19,7 +19,7 @@
  * issue-selected.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { SessionNode as SessionNodeType } from '@panopticon/contracts';
 import {
   useCommandDeckSelection,
@@ -72,11 +72,10 @@ export function IssueWorkbench({
   }, [sessions, selectedSessionId]);
 
   const isAgentSelected = !!selectedSession;
+  const [activeTab, setActiveTab] = useState<OverviewTab>('overview');
 
-  const handleSwitchTab = (_tab: OverviewTab) => {
-    // TODO: propagate to ZoneCOverview via ref or state lift if needed
-    // For now the action strip's tab-switch buttons are visual only;
-    // full wiring can land in a follow-up bead.
+  const handleSwitchTab = (tab: OverviewTab) => {
+    setActiveTab(tab);
   };
 
   return (
@@ -113,6 +112,8 @@ export function IssueWorkbench({
             issueId={issueId}
             issue={issue}
             agent={agent}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
           />
           <IssueComposer issueId={issueId} sessions={sessions} />
         </>

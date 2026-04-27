@@ -211,6 +211,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [isRecoverPending, setIsRecoverPending] = useState(false);
+  const [isSpawnPending, setIsSpawnPending] = useState(false);
   const planning = usePlanningSummaryQuery(issueId);
   const activity = useActivityQuery(issueId);
   const costs = useIssueCostsQuery(issueId);
@@ -442,12 +443,21 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No active agent</span>
               <button
                 type="button"
-                onClick={() => {
-                  void fetch(`/api/agents`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ issueId }),
-                  }).catch(() => { /* non-fatal */ });
+                disabled={isSpawnPending}
+                onClick={async () => {
+                  if (isSpawnPending) return;
+                  setIsSpawnPending(true);
+                  try {
+                    await fetch(`/api/agents`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ issueId }),
+                    });
+                  } catch {
+                    // non-fatal
+                  } finally {
+                    setIsSpawnPending(false);
+                  }
                 }}
                 style={{
                   padding: '6px 10px',
@@ -457,11 +467,12 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   color: 'var(--mc-primary-foreground, var(--primary-foreground))',
                   fontSize: 12,
                   fontWeight: 500,
-                  cursor: 'pointer',
+                  cursor: isSpawnPending ? 'wait' : 'pointer',
+                  opacity: isSpawnPending ? 0.6 : 1,
                   alignSelf: 'flex-start',
                 }}
               >
-                Spawn Work
+                {isSpawnPending ? 'Spawning…' : 'Spawn Work'}
               </button>
             </div>
           )}
