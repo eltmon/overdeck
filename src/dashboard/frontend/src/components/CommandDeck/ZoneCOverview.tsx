@@ -1,27 +1,15 @@
 /**
  * ZoneCOverview — issue-selected Zone C: tab strip + per-tab body.
  *
- * The tab strip is sticky at the top; the body switches based on the selected
- * tab. Each tab is its own component under `./ZoneCOverviewTabs/` so the data
- * dependencies stay clear and sibling tabs share a query cache via the hooks
- * exported from `./ZoneCOverviewTabs/queries.ts`.
- *
- * The PR/Diff tab pulls from `/api/issues/:issueId/pr` (pan-9yn5) and the
- * Discussions tab pulls from `/api/issues/:issueId/discussions` (pan-1r7j).
+ * The tab strip is sticky at the top. PAN-865 only delivers the Overview body;
+ * the other nine tabs intentionally render placeholders so their full content
+ * can land in PAN-866 without expanding this issue's scope.
  */
 
 import { useEffect, useState } from 'react';
 import type { Issue, Agent } from '../../types';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 import { OverviewTab } from './ZoneCOverviewTabs/OverviewTab';
-import { ActivityTab } from './ZoneCOverviewTabs/ActivityTab';
-import { CostsTab } from './ZoneCOverviewTabs/CostsTab';
-import { MarkdownTab } from './ZoneCOverviewTabs/MarkdownTab';
-import { VBriefTab } from './ZoneCOverviewTabs/VBriefTab';
-import { BeadsTab } from './ZoneCOverviewTabs/BeadsTab';
-import { PrDiffTab } from './ZoneCOverviewTabs/PrDiffTab';
-import { DiscussionsTab } from './ZoneCOverviewTabs/DiscussionsTab';
-import { usePlanningQuery } from './ZoneCOverviewTabs/queries';
 
 export type OverviewTab =
   | 'overview'
@@ -57,17 +45,27 @@ function isOverviewTab(value: string | null | undefined): value is OverviewTab {
   return !!value && ALL_TABS.some((tab) => tab.key === value);
 }
 
+function PlaceholderBody() {
+  return (
+    <div
+      data-testid="zone-c-overview-placeholder"
+      style={{
+        padding: '2rem',
+        textAlign: 'center',
+        color: 'var(--mc-text-muted, var(--muted-foreground))',
+      }}
+    >
+      Coming soon
+    </div>
+  );
+}
+
 interface ZoneCOverviewProps {
   issueId: string;
   /** Optional controlled active tab; defaults to 'overview'. */
   activeTab?: OverviewTab;
   onTabChange?: (tab: OverviewTab) => void;
-  /** Forwarded to the Activity tab so the Rally / story rollup keeps working. */
-  issues?: readonly Issue[];
-  featureData?: ProjectFeature | null;
-  /** Forwarded to OverviewTab for tile grid data. */
   issue?: Issue;
-  /** Work agent for this issue — forwarded to OverviewTab. */
   agent?: Agent;
 }
 
@@ -75,8 +73,6 @@ export function ZoneCOverview({
   issueId,
   activeTab,
   onTabChange,
-  issues,
-  featureData,
   issue,
   agent,
 }: ZoneCOverviewProps) {
@@ -88,8 +84,6 @@ export function ZoneCOverview({
 
   const [internalTab, setInternalTab] = useState<OverviewTab>(getInitialTab);
   const tab = activeTab ?? internalTab;
-
-  const planning = usePlanningQuery(issueId);
 
   const visibleTabs = ALL_TABS;
 
@@ -235,35 +229,7 @@ export function ZoneCOverview({
             agent={agent}
           />
         )}
-        {tab === 'activity' && (
-          <ActivityTab issueId={issueId} issues={issues} featureData={featureData} />
-        )}
-        {tab === 'costs' && <CostsTab issueId={issueId} />}
-        {tab === 'prd' && (
-          <MarkdownTab
-            body={planning.data?.prd}
-            isLoading={planning.isLoading}
-            emptyLabel="No PRD recorded for this issue."
-          />
-        )}
-        {tab === 'state' && (
-          <MarkdownTab
-            body={planning.data?.state}
-            isLoading={planning.isLoading}
-            emptyLabel="No STATE.md recorded for this issue."
-          />
-        )}
-        {tab === 'inference' && (
-          <MarkdownTab
-            body={planning.data?.inference}
-            isLoading={planning.isLoading}
-            emptyLabel="No INFERENCE.md recorded for this issue."
-          />
-        )}
-        {tab === 'vbrief' && <VBriefTab issueId={issueId} />}
-        {tab === 'beads' && <BeadsTab issueId={issueId} />}
-        {tab === 'prdiff' && <PrDiffTab issueId={issueId} />}
-        {tab === 'discussions' && <DiscussionsTab issueId={issueId} />}
+        {tab !== 'overview' && <PlaceholderBody />}
       </div>
     </div>
   );
