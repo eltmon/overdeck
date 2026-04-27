@@ -26,3 +26,7 @@ None
 - Tree session filter (all/alive/failed) remains visible whenever projects are shown
 - Model picker and new-conversation button always visible in sidebar header
 - Filter state persisted to localStorage (not URL, to keep scope focused)
+
+## Specialist Feedback
+
+- **[2026-04-27T01:36Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/001-review-agent-changes-requested.md`

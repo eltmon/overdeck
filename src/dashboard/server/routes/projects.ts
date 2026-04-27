@@ -258,10 +258,41 @@ export async function fetchProjectSessionTree(projectKey: string): Promise<unkno
   return { projectKey, features };
 }
 
+// ─── Route: GET /api/session-trees ────────────────────────────────────────────
+
+const getAllSessionTreesRoute = HttpRouter.add(
+  'GET',
+  '/api/session-trees',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpRouter.request;
+    const url = new URL(request.url);
+    const projectsParam = url.searchParams.get('projects') ?? '';
+    const projectKeys = projectsParam.split(',').filter(Boolean);
+
+    if (projectKeys.length === 0) {
+      return jsonResponse({ trees: [] });
+    }
+
+    const results = yield* Effect.tryPromise({
+      try: () =>
+        Promise.all(
+          projectKeys.map(async (projectKey) => {
+            const tree = await fetchProjectSessionTree(projectKey);
+            return tree ?? { projectKey, features: [] };
+          }),
+        ),
+      catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
+    });
+
+    return jsonResponse({ trees: results });
+  })),
+);
+
 // ─── Compose route into a single Layer ────────────────────────────────────────
 
 export const projectsRouteLayer = Layer.mergeAll(
   getProjectSessionTreeRoute,
+  getAllSessionTreesRoute,
 );
 
 export default projectsRouteLayer;

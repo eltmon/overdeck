@@ -211,6 +211,35 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
       if (url === '/api/version') {
         return { ok: true, json: async () => ({ version: '0.7.2' }) };
       }
+      if (url.startsWith('/api/session-trees')) {
+        return {
+          ok: true,
+          json: async () => ({
+            trees: [
+              {
+                projectKey: 'test-project',
+                features: [
+                  {
+                    issueId: 'PAN-821',
+                    sessions: [
+                      {
+                        type: 'work',
+                        sessionId: 'agent-pan-821',
+                        tmuxSession: 'agent-pan-821',
+                        model: 'claude-sonnet-4-6',
+                        startedAt: new Date().toISOString(),
+                        duration: 120,
+                        status: 'running',
+                        presence: 'active',
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          }),
+        };
+      }
       if (url.startsWith('/api/projects/')) {
         return {
           ok: true,
