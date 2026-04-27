@@ -76,8 +76,13 @@ vi.mock('../ZoneCOverviewTabs/VBriefTab', () => ({
   ),
 }));
 vi.mock('../ZoneCOverviewTabs/ActivityTab', () => ({
-  ActivityTab: ({ issueId }: { issueId: string }) => (
-    <div data-testid="activity-tab-stub" data-issue={issueId} />
+  ActivityTab: ({ issueId, issues, featureData }: { issueId: string; issues?: unknown[]; featureData?: unknown }) => (
+    <div
+      data-testid="activity-tab-stub"
+      data-issue={issueId}
+      data-issues={issues ? issues.length : 0}
+      data-feature={featureData ? 'present' : 'missing'}
+    />
   ),
 }));
 
@@ -171,6 +176,21 @@ describe('ZoneCOverview', () => {
     fireEvent.click(screen.getByTestId('zone-c-overview-tab-discussions'));
     expect(screen.getByTestId('discussions-tab')).toBeInTheDocument();
     expect(screen.getByTestId('discussions-tab-empty')).toBeInTheDocument();
+  });
+
+  it('passes issue-scoped props to the Activity tab', () => {
+    const issues = [{ id: '1' }, { id: '2' }] as any[];
+    render(
+      <ZoneCOverview
+        issueId={ISSUE}
+        issues={issues}
+        featureData={{ issueId: ISSUE } as any}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('zone-c-overview-tab-activity'));
+    expect(screen.getByTestId('activity-tab-stub')).toHaveAttribute('data-issue', ISSUE);
+    expect(screen.getByTestId('activity-tab-stub')).toHaveAttribute('data-issues', '2');
+    expect(screen.getByTestId('activity-tab-stub')).toHaveAttribute('data-feature', 'present');
   });
 
   it('quick-link buttons in Overview switch tabs', () => {

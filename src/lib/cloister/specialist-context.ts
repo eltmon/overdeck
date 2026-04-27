@@ -18,26 +18,13 @@ import { getModelId } from '../work-type-router.js';
 
 function execAsync(command: string, options: { encoding: 'utf-8'; maxBuffer: number; timeout: number }): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    exec(command, options, (error, stdoutOrResult, stderr) => {
+    exec(command, options, (error, stdout = '', stderr = '') => {
       if (error) {
         reject(error);
         return;
       }
 
-      if (
-        stdoutOrResult != null
-        && typeof stdoutOrResult === 'object'
-        && 'stdout' in stdoutOrResult
-      ) {
-        const result = stdoutOrResult as { stdout?: string; stderr?: string };
-        resolve({ stdout: result.stdout ?? '', stderr: result.stderr ?? '' });
-        return;
-      }
-
-      resolve({
-        stdout: typeof stdoutOrResult === 'string' ? stdoutOrResult : '',
-        stderr: typeof stderr === 'string' ? stderr : '',
-      });
+      resolve({ stdout, stderr });
     });
   });
 }
