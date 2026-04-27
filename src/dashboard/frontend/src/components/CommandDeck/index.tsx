@@ -241,7 +241,9 @@ export function CommandDeck({
     };
   }, [sidebarTab, projects, queryClient]);
 
-  // Merge session trees into project features
+  // Merge session trees into project features, preserving object identity
+  // for features whose sessions haven't changed (avoids O(total features)
+  // re-renders per delta — only features in the affected project re-render).
   const projectsWithSessions = useMemo(() => {
     return projects.map(project => {
       const tree = sessionTreeMap[project.name];
@@ -252,13 +254,16 @@ export function CommandDeck({
         featureSessions.set(feature.issueId.toLowerCase(), [...feature.sessions]);
       }
 
-      return {
-        ...project,
-        features: project.features.map((feature: ProjectFeature) => ({
-          ...feature,
-          sessions: featureSessions.get(feature.issueId.toLowerCase()) ?? feature.sessions,
-        })),
-      };
+      let featuresChanged = false;
+      const nextFeatures = project.features.map((feature: ProjectFeature) => {
+        const treeSessions = featureSessions.get(feature.issueId.toLowerCase());
+        if (!treeSessions && !feature.sessions) return feature;
+        if (treeSessions === feature.sessions) return feature;
+        featuresChanged = true;
+        return { ...feature, sessions: treeSessions ?? feature.sessions };
+      });
+      if (!featuresChanged) return project;
+      return { ...project, features: nextFeatures };
     });
   }, [projects, sessionTreeMap]);
 
@@ -618,23 +623,12 @@ export function CommandDeck({
 
             {/* Tree session filter (blocker-4) */}
             {sidebarTab === 'projects' && (
-              <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
+              <div className={styles.treeFilterRow}>
                 {(['all', 'alive', 'failed'] as TreeSessionFilter[]).map((f) => (
                   <button
                     key={f}
                     onClick={() => setTreeFilter(f)}
-                    style={{
-                      flex: 1,
-                      padding: '2px 6px',
-                      fontSize: 10,
-                      fontWeight: treeFilter === f ? 600 : 400,
-                      border: '1px solid var(--mc-border)',
-                      borderRadius: 4,
-                      background: treeFilter === f ? 'var(--mc-bg-selected)' : 'transparent',
-                      color: treeFilter === f ? 'var(--mc-text-primary)' : 'var(--mc-text-muted)',
-                      cursor: 'pointer',
-                      textTransform: 'capitalize',
-                    }}
+                    className={`${styles.treeFilterButton} ${treeFilter === f ? styles.treeFilterButtonActive : ''}`}
                   >
                     {f}
                   </button>
