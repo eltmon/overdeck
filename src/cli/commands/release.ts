@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
@@ -257,6 +257,27 @@ function runPreflight(repoRoot: string): PreflightResult[] {
     name: 'Working tree',
     ok: clean,
     detail: clean ? 'clean' : 'dirty',
+  });
+
+  // The CI guardrail (.github/workflows/no-planning-on-main.yml) refuses to
+  // advance main when .planning/ paths are tracked. Mirror that here so we
+  // catch leaks BEFORE tagging, not after the release workflow fails.
+  const trackedPlanning = (() => {
+    try {
+      return execFileSync('git', ['ls-files', '--', '.planning/'], {
+        cwd: repoRoot,
+        encoding: 'utf8',
+      }).trim();
+    } catch {
+      return '';
+    }
+  })();
+  results.push({
+    name: 'No .planning/ tracked',
+    ok: trackedPlanning === '',
+    detail: trackedPlanning === ''
+      ? 'clean'
+      : `${trackedPlanning.split('\n').length} file(s) tracked — strip before tagging`,
   });
 
   try {

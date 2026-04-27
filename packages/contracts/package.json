@@ -2,6 +2,12 @@
   "name": "@panctl/contracts",
   "version": "0.8.0",
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eltmon/panopticon-cli.git",
+    "directory": "packages/contracts"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
