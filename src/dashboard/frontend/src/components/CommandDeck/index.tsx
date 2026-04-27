@@ -265,7 +265,7 @@ export function CommandDeck({
       const tree = sessionTreeMap[project.name];
       if (!tree) return project;
 
-      const featureSessions = new Map<string, import('@panopticon/contracts').SessionNode[]>();
+      const featureSessions = new Map<string, readonly import('@panopticon/contracts').SessionNode[]>();
       for (const feature of tree.features) {
         featureSessions.set(feature.issueId.toLowerCase(), feature.sessions);
       }
