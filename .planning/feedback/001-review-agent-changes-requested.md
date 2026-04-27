@@ -2,69 +2,83 @@
 specialist: review-agent
 issueId: PAN-865
 outcome: changes-requested
-timestamp: 2026-04-27T11:50:21Z
+timestamp: 2026-04-27T11:58:23Z
 ---
 
 # Verdict: CHANGES_REQUESTED
 
 ## Summary
-PAN-865 adds a Zone C tab strip with a sticky 10-tab shell and an Overview tab surface (billboard, tile grid, summaries, trend strip) to the Command Deck. The PR is structurally sound and well-tested — 7 of 9 acceptance criteria are fully implemented. Two findings block merge: (1) the AGENT tile's **Spawn Work** button calls a non-existent endpoint (`POST /api/agents/start` does not exist in the changed routes), making the primary CTA in the Overview surface non-functional; (2) keyboard navigation covers arrow keys but Tab/Shift-Tab is explicitly mentioned in the issue and not implemented. The work agent must wire the button to a working endpoint and decide whether to implement Tab/Shift-Tab or align the spec wording.
+PAN-865 implements the Zone C-1 tab strip skeleton and Overview tab for the Command Deck. All 9 requirements are fully implemented and verified. However, 2 high-priority issues block merge: a keyboard accessibility regression where the `Tab` key traps users in the tab strip, and a hot-path performance concern where the Overview tab's 30-second polling cycle fetches heavyweight planning artifact bodies for a component that only uses lightweight metadata signals.
 
 ## Blockers (MUST fix before merge)
 
-### 1. Spawn Work button calls non-existent endpoint — `OverviewTab.tsx:452-457` — `!`
-**Raised by**: requirements
-**Why it blocks**: The AGENT tile's "Spawn Work" button fires `POST /api/agents/start`, but no such route exists in the changed server code (`agents.ts` only exposes `POST /api/agents`). The button is wired but non-functional — the core spawn-work behavior requested in the issue scope is not delivered.
+### 1. Tab key intercept blocks keyboard focus to tab panel — `ZoneCOverview.tsx:172-177` — `~`
+**Raised by**: correctness
+**Why it blocks**: The `Tab` key handler in the tab strip prevents focus from reaching the tab panel body or any interactive elements below it, trapping keyboard-only and screen-reader users in the tab strip. Arrow keys already provide full tab-strip navigation; `Tab` should let focus pass to the panel.
 
-Fix: Change the fetch URL to target an existing route. If the intent is to use `POST /api/agents` (the start-agent route), update the URL to `/api/agents` and ensure the request body matches the route's expected schema. If the route was renamed or moved, find the correct path.
+Pass `reviewStatus.data` directly to `isReviewPipelineStuck`. The function's `PipelineStateLike` type is already structurally compatible with `ReviewStatusData` — both have optional `reviewStatus`, `testStatus`, `mergeStatus`, `verificationStatus` fields with overlapping string literal types. The manual reconstruction with `as` casts is unnecessary:
 
-### 2. Tab/Shift-Tab keyboard navigation not implemented — `ZoneCOverview.tsx:156-183` — `~`
-**Raised by**: requirements
-**Why it blocks**: The issue text explicitly lists Tab/Shift-Tab as part of the required keyboard navigation behavior. The implementation provides arrow keys, Home/End, and standard browser tab behavior (keys pass through without navigating the strip). The test explicitly asserts Tab/Shift-Tab leaves the active tab unchanged rather than roving the focus. This is a partial implementation of a stated requirement.
+```typescript
+const isRecoverable = isReviewPipelineStuck(reviewStatus.data ?? undefined);
+```
 
-Fix: Either implement roving-tabindex behavior for the tab strip so Tab/Shift-Tab moves focus between tabs, or (if standard browser tab behavior was the intent) update the issue/spec wording to remove "Tab/Shift-Tab" from the requirement text and simplify the test.
+This works because `PipelineStateLike` already accepts all the string values that `ReviewStatusData` uses, and extra properties are harmlessly ignored by structural typing.
+
+Remove the `Tab` key handler entirely. Arrow keys (`ArrowLeft`/`ArrowRight`) and `Home`/`End` already provide full tab-strip navigation. `Tab` should move focus to the first focusable element in the active tab panel, which the browser handles natively when `tabIndex` is set correctly (active tab has `tabIndex={0}`, others have `tabIndex={-1}`).
 
 ## High Priority (SHOULD fix; synthesis may still approve if justified)
 
-### 1. Planning poll shells out to git on every refresh — `command-deck.ts:681` — `~`
+### 1. Overview polling fetches full planning artifacts on every 30s refresh — `queries.ts:98, command-deck.ts:586` — `~`
 **Raised by**: performance
-**Why it blocks**: `fetchPlanningData()` runs `git stash list` synchronously every time `/api/command-deck/planning/:issueId` is called, and the frontend polls this endpoint every 30 seconds. This creates repeated child-process churn on an admin/dashboard path.
+**Why it blocks**: The default issue-selected view mounts `usePlanningQuery(issueId)` which polls the full `/api/command-deck/planning/:issueId` endpoint every 30 seconds. That route eagerly reads and serializes the full PRD, STATE, INFERENCE, transcript, discussion, and notes files. The Overview tab only uses lightweight signals (`planning.data?.prd`, `planning.isLoading`) but pays the full I/O and transfer cost every poll.
 
-Fix: Cache `stashCount` server-side with a TTL (e.g. 60s) similar to the existing `costCache`, or move stash count to a workspace-status endpoint that refreshes on demand rather than on every poll.
+Impact: scales with artifact size, not data actually rendered. Large transcripts/discussions silently degrade default dashboard responsiveness.
+
+Split planning data into two tiers:
+1. A lightweight summary endpoint/query for Overview (`hasPrd`, `hasState`, `acceptanceProgress`, `stashCount`, `statusReviewedAt`).
+2. The full artifact endpoint used only by heavyweight tabs (PRD / STATE / Discussions) when those tabs are actually opened.
+
+Server-side direction (pseudocode):
+```typescript
+if (summaryMode) {
+  return {
+    hasPrd: Boolean(prdExists),
+    hasState: Boolean(stateExists),
+    acceptanceProgress,
+    stashCount,
+    statusReviewedAt,
+  };
+}
+```
 
 ## Nits (advisory — safe to defer)
 
-- `ZoneCOverview.tsx:101-108` — `~` — URL sync effect relies on `window.location` reads inside useEffect with a guard. The guard makes it correct; flagging as SHOULD for awareness. Not a blocker. (correctness)
-- `OverviewTab.tsx:257-262` — `~` — Type assertion widening: `ReviewStatusData` fields are `string` but are cast to specific unions without runtime validation. `isReviewPipelineStuck` handles unknown values safely (returns false). Safe but a code smell — consider updating `ReviewStatusData` to use union types. (correctness)
-- `index.tsx:198` — `?` — Removed `refetchInterval` from session-trees query. WebSocket delta subscription handles updates; a modest `refetchInterval: 30000` would guard against reconnection gaps. (correctness)
-- `OverviewTab.tsx:452-457` — `?` — Fire-and-forget POST swallows all errors silently. Consistent with existing codebase patterns (lines 620, 656, 688, 707, 751, 792), so not a blocker, but a toast on non-2xx would improve UX. (correctness)
-- `OverviewTab.tsx:215` — `?` — Six independent polling queries refresh the same view (5s–30s intervals), creating bursty background traffic. Acceptable for an admin view; relaxation would reduce request volume with no user-visible downside. (performance)
+- `OverviewTab.tsx:257-262` — `~` — Unsafe type narrowing with `as` casts on `isReviewPipelineStuck` input. The `as` casts suppress TypeScript error detection if `ReviewStatusData` changes upstream. Pass `reviewStatus.data` directly. (correctness)
+- `queries.ts:90-96` — `?` — `fetchJson` returns `res.json()` without runtime validation. Acceptable for internal co-developed endpoints; runtime validation (e.g., zod) is a future improvement. (correctness)
+- `OverviewTab.tsx:108-114` — `?` — `deriveStageFromSections` shows completed phase labels (e.g., "merge") even though that phase is done. Cosmetic — appending a "done" suffix is a future improvement. (correctness)
 
 ## Cross-cutting groups
 
-**Endpoint wiring for spawn-work:**
-- [blocker-1] Spawn Work button → non-existent `/api/agents/start`
-- The endpoint `POST /api/agents` exists in `agents.ts` and is the canonical start-agent route. The fix is to redirect the button to that route or confirm the correct URL.
+**Type-safety and performance share a root cause in how the Overview tab consumes planning data** (queries.ts:98, OverviewTab.tsx:215): the tab mounts a heavyweight query even though it only needs a lightweight summary. Separately, the `isReviewPipelineStuck` type narrowing (OverviewTab.tsx:257-262) is a coincidental adjacent code pattern flagged by the same reviewer. Fix the performance tiering first; the type-safety fix is a one-liner that can land alongside it.
 
-**Keyboard navigation scope:**
-- [blocker-2] Tab/Shift-Tab not implemented (partial arrow-key-only coverage)
-- Either implement the full roving-tabindex or revise the spec to match the arrow-key-only implementation.
+**Keyboard accessibility and tab navigation** (ZoneCOverview.tsx:172-177): the `Tab` key interception is unrelated to the performance finding but shares the same file. Both are fixable without touching the performance tiering.
 
 ## What's good
-- Tab strip shell, URL state sync, and keyboard arrow-key nav are well-implemented with good test coverage.
-- Seven of nine acceptance criteria fully met — PR is structurally solid.
-- Visual verification with Playwright provides regression coverage.
-- Security review found no new vulnerabilities introduced by this PR.
-- Type-safe query hooks centralized in `queries.ts` give a clean data layer.
+- All 9 requirements fully implemented with test coverage, including Playwright visual verification.
+- Security review found zero vulnerabilities in the diff — existing endpoint CSRF posture is out of scope for this PR.
+- Server route changes reuse existing endpoint families with no new placeholder-tab endpoints introduced.
+- Unit test coverage for tab strip behavior, URL sync, keyboard navigation, and issue selection arbitration.
 
 ## Review stats
-- Blockers: 1   High: 1   Medium: 0   Nits: 5
-- By reviewer: correctness=2 warnings + 3 suggestions, security=0 findings, performance=1 warning + 1 optimization, requirements=1 blocker + 1 partial
-- Files touched: 14   Files with findings: 6
+- Blockers: 0   High: 2   Medium: 0   Nits: 3
+- By reviewer: correctness=2 (both ~), security=0, performance=1 (~), requirements=0
+- Files touched: 12   Files with findings: 4
 
 ## Appendix: individual reviews
 
-See individual reviewer output files listed in `## Reviewer Output Files` in the Synthesis Context above. Those files contain full per-reviewer detail; this synthesis is the policy layer.
+See individual reviewer output files listed in `## Reviewer Output Files` in the
+Synthesis Context above. Those files contain full per-reviewer detail; this
+synthesis is the policy layer.
 
 ## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill
 
