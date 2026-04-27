@@ -372,10 +372,21 @@ function normalizeOrigin(origin: string): string | null {
   }
 }
 
-function validateOrigin(headers: Record<string, string | undefined>): { ok: true } | { ok: false; error: string } {
+function validateOrigin(
+  headers: Record<string, string | undefined>,
+  method = 'GET',
+): { ok: true } | { ok: false; error: string } {
   const origin = headers['origin'];
   const referer = headers['referer'];
   const trusted = getTrustedOrigins();
+
+  if (!origin && !referer) {
+    const normalizedMethod = method.toUpperCase();
+    if (normalizedMethod === 'GET' || normalizedMethod === 'HEAD') {
+      return { ok: true };
+    }
+    return { ok: false, error: 'Missing origin' };
+  }
 
   if (origin) {
     const normalized = normalizeOrigin(origin);
@@ -417,7 +428,12 @@ describe('validateOrigin', () => {
     expect(validateOrigin({ origin: 'https://evil.com/?origin=http://localhost:3000' })).toEqual({ ok: false, error: 'Invalid origin' });
   });
 
-  it('rejects requests with neither Origin nor Referer', () => {
-    expect(validateOrigin({})).toEqual({ ok: false, error: 'Missing origin' });
+  it('allows same-origin safe reads without Origin or Referer', () => {
+    expect(validateOrigin({})).toEqual({ ok: true });
+    expect(validateOrigin({}, 'HEAD')).toEqual({ ok: true });
+  });
+
+  it('rejects unsafe requests with neither Origin nor Referer', () => {
+    expect(validateOrigin({}, 'POST')).toEqual({ ok: false, error: 'Missing origin' });
   });
 });
