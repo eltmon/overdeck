@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { writeFileSync, mkdirSync, existsSync, readFileSync, unlinkSync } from 'fs';
+import { writeFileSync, mkdirSync, existsSync, readFileSync, unlinkSync, rmSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
@@ -20,18 +20,9 @@ import { homedir } from 'os';
 // vi.hoisted() — must come before vi.mock() calls that reference these fns
 // ---------------------------------------------------------------------------
 
-const {
-  mockExec,
-  mockSendKeysAsync,
-  getMockStateFile,
-  setMockStateFile,
-} = vi.hoisted(() => {
-  let mockStateFile: string | null = null;
+const { testHome, mockExec, mockSendKeysAsync } = vi.hoisted(() => {
+  const testHome = `/tmp/pan-464-container-health-${process.pid}-${Math.random().toString(36).slice(2)}`;
 
-  const getMockStateFile = () => mockStateFile;
-  const setMockStateFile = (value: string | null) => {
-    mockStateFile = value;
-  };
   // Create a callback-style mock.
   // We add util.promisify.custom so that promisify(mockExec) returns a function
   // that resolves with { stdout, stderr } matching the real child_process.exec interface.
@@ -48,60 +39,15 @@ const {
   (mockExec as Record<symbol, unknown>)[Symbol.for('nodejs.util.promisify.custom')] = customPromisify;
 
   return {
+    testHome,
     mockExec,
     mockSendKeysAsync: vi.fn().mockResolvedValue(undefined),
-    getMockStateFile,
-    setMockStateFile,
   };
 });
-
-const STATE_FILE = join(homedir(), '.panopticon', 'deacon', 'health-state.json');
-const DEACON_DIR = join(homedir(), '.panopticon', 'deacon');
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
-
-vi.mock('fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('fs')>();
-
-  return {
-    ...actual,
-    existsSync: vi.fn((path: actual.PathLike) => {
-      if (path === STATE_FILE) return getMockStateFile() !== null;
-      if (path === DEACON_DIR) return true;
-      return actual.existsSync(path);
-    }),
-    mkdirSync: vi.fn((path: actual.PathLike, options?: actual.MakeDirectoryOptions & { recursive?: boolean }) => {
-      if (path === DEACON_DIR) return undefined;
-      return actual.mkdirSync(path, options);
-    }),
-    readFileSync: vi.fn((path: actual.PathOrFileDescriptor, options?: actual.ObjectEncodingOptions | BufferEncoding | null) => {
-      if (path === STATE_FILE) {
-        const content = getMockStateFile();
-        if (content === null) {
-          throw new Error(`ENOENT: no such file or directory, open '${STATE_FILE}'`);
-        }
-        return content;
-      }
-      return actual.readFileSync(path, options as never);
-    }),
-    writeFileSync: vi.fn((path: actual.PathOrFileDescriptor, data: string | NodeJS.ArrayBufferView, options?: actual.WriteFileOptions) => {
-      if (path === STATE_FILE) {
-        setMockStateFile(typeof data === 'string' ? data : Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString('utf-8'));
-        return;
-      }
-      return actual.writeFileSync(path, data, options);
-    }),
-    unlinkSync: vi.fn((path: actual.PathLike) => {
-      if (path === STATE_FILE) {
-        setMockStateFile(null);
-        return;
-      }
-      return actual.unlinkSync(path);
-    }),
-  };
-});
 
 vi.mock('child_process', () => ({
   exec: mockExec,
@@ -133,6 +79,14 @@ vi.mock('../../../src/lib/cloister/specialists.js', () => ({
   wakeSpecialistWithTask: vi.fn(),
   getAllProjectSpecialistStatuses: vi.fn().mockResolvedValue([]),
 }));
+
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>();
+  return {
+    ...actual,
+    homedir: vi.fn(() => testHome),
+  };
+});
 
 vi.mock('../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: vi.fn().mockReturnValue(null),
@@ -168,12 +122,13 @@ import { sessionExistsAsync } from '../../../src/lib/tmux.js';
 // Helpers
 // ---------------------------------------------------------------------------
 
+const STATE_FILE = join(testHome, '.panopticon', 'deacon', 'health-state.json');
 
 const CONTAINER = 'panopticon-feature-pan-464-frontend-1';
 const AGENT_ID = 'agent-pan-464';
 
 function writeState(state: Partial<DeaconState>): void {
-  mkdirSync(join(homedir(), '.panopticon', 'deacon'), { recursive: true });
+  mkdirSync(join(testHome, '.panopticon', 'deacon'), { recursive: true });
   const full: DeaconState = {
     specialists: {} as DeaconState['specialists'],
     patrolCycle: 0,
@@ -270,9 +225,10 @@ describe('checkWorkspaceContainerHealth', () => {
   afterEach(() => {
     if (originalState !== null) {
       writeFileSync(STATE_FILE, originalState, 'utf-8');
-    } else {
-      setMockStateFile(null);
+    } else if (existsSync(STATE_FILE)) {
+      unlinkSync(STATE_FILE);
     }
+    rmSync(testHome, { recursive: true, force: true });
   });
 
   // -------------------------------------------------------------------------

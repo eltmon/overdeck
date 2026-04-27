@@ -224,7 +224,7 @@ describe('specialist-context', () => {
       const mockExec = vi.mocked(childProcess.exec);
       mockExec.mockImplementation((cmd, options, callback) => {
         if (callback) {
-          callback(null, { stdout: '# Generated Digest\n\nTest digest content', stderr: '' } as any);
+          callback(null, '# Generated Digest\n\nTest digest content', '');
         }
         return {} as any;
       });
@@ -238,7 +238,7 @@ describe('specialist-context', () => {
       const mockExec = vi.mocked(childProcess.exec);
       mockExec.mockImplementation((cmd, options, callback) => {
         if (callback) {
-          callback(null, { stdout: '# Test Digest\n\nDigest content here', stderr: '' } as any);
+          callback(null, '# Test Digest\n\nDigest content here', '');
         }
         return {} as any;
       });
@@ -261,7 +261,7 @@ describe('specialist-context', () => {
       const mockExec = vi.mocked(childProcess.exec);
       mockExec.mockImplementation((cmd, options, callback) => {
         if (callback) {
-          callback(null, { stdout: 'digest', stderr: '' } as any);
+          callback(null, 'digest', '');
         }
         return {} as any;
       });
@@ -275,7 +275,7 @@ describe('specialist-context', () => {
       const mockExec = vi.mocked(childProcess.exec);
       mockExec.mockImplementation((cmd, options, callback) => {
         if (callback) {
-          callback(null, { stdout: 'digest', stderr: '' } as any);
+          callback(null, 'digest', '');
         }
         return {} as any;
       });
@@ -293,7 +293,7 @@ describe('specialist-context', () => {
       const mockExec = vi.mocked(childProcess.exec);
       mockExec.mockImplementation((cmd, options, callback) => {
         if (callback) {
-          callback(new Error('Exec failed'), { stdout: '', stderr: 'Error' } as any);
+          callback(new Error('Exec failed'), '', 'Error');
         }
         return {} as any;
       });
@@ -306,7 +306,7 @@ describe('specialist-context', () => {
       const mockExec = vi.mocked(childProcess.exec);
       mockExec.mockImplementation((cmd, options, callback) => {
         if (callback) {
-          callback(null, { stdout: '   \n  ', stderr: '' } as any);
+          callback(null, '   \n  ', '');
         }
         return {} as any;
       });
@@ -322,7 +322,7 @@ describe('specialist-context', () => {
       const mockExec = vi.mocked(childProcess.exec);
       mockExec.mockImplementation((cmd, options, callback) => {
         if (callback) {
-          callback(null, { stdout: 'digest', stderr: '' } as any);
+          callback(null, 'digest', '');
         }
         return {} as any;
       });
@@ -338,7 +338,7 @@ describe('specialist-context', () => {
       const mockExec = vi.mocked(childProcess.exec);
       mockExec.mockImplementation((cmd, options, callback) => {
         if (callback) {
-          callback(null, { stdout: 'digest', stderr: 'some error output' } as any);
+          callback(null, 'digest', 'some error output');
         }
         return {} as any;
       });
@@ -359,7 +359,7 @@ describe('specialist-context', () => {
       const mockExec = vi.mocked(childProcess.exec);
       mockExec.mockImplementation((cmd, options, callback) => {
         if (callback) {
-          callback(null, { stdout: 'digest', stderr: 'warning: something' } as any);
+          callback(null, 'digest', 'warning: something');
         }
         return {} as any;
       });
@@ -379,7 +379,7 @@ describe('specialist-context', () => {
       const mockExec = vi.mocked(childProcess.exec);
       mockExec.mockImplementation((cmd, options, callback) => {
         if (callback) {
-          callback(null, { stdout: 'regenerated digest', stderr: '' } as any);
+          callback(null, 'regenerated digest', '');
         }
         return {} as any;
       });
@@ -413,7 +413,7 @@ describe('specialist-context', () => {
       mockExec.mockImplementation((cmd, options, callback) => {
         execCalled = true;
         if (callback) {
-          callback(null, { stdout: 'scheduled digest', stderr: '' } as any);
+          callback(null, 'scheduled digest', '');
         }
         return {} as any;
       });
@@ -450,7 +450,7 @@ describe('specialist-context', () => {
       const mockExec = vi.mocked(childProcess.exec);
       mockExec.mockImplementation((cmd, options, callback) => {
         if (callback) {
-          callback(new Error('Scheduled generation failed'), { stdout: '', stderr: '' } as any);
+          callback(new Error('Scheduled generation failed'), '', '');
         }
         return {} as any;
       });

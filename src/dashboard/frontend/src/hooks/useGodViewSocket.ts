@@ -16,6 +16,7 @@ import { create } from 'zustand';
 
 export interface GodViewActivityEvent {
   agentId: string;
+  issueId?: string;
   timestamp: string;
   type: string;
   message: string;
