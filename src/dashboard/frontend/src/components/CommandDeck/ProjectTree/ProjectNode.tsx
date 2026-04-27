@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { SessionNode } from '@panctl/contracts';
 import { FeatureItem, type TreeSessionFilter } from './FeatureItem';
@@ -162,6 +162,16 @@ function ProjectNodeMenu({
 }
 
 export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter, onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources }: ProjectNodeProps) {
+  const visibleFeatures = useMemo(() => {
+    if (filter === 'all') return features;
+    return features.filter((feature) =>
+      (feature.sessions ?? []).some((session) =>
+        filter === 'alive'
+          ? session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended'
+          : (session.status || '').toLowerCase().includes('fail') || (session.status || '').toLowerCase().includes('error') || (session.status || '').toLowerCase().includes('stuck'),
+      ),
+    );
+  }, [features, filter]);
   const [expanded, setExpanded] = useState(features.length > 0);
   const [menu, setMenu] = useState<ContextMenuState>({ x: 0, y: 0, open: false });
 
@@ -187,7 +197,7 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
           size={14}
         />
         <span className={styles.projectName}>{name}</span>
-        <span className={styles.featureCount}>{features.length}</span>
+        <span className={styles.featureCount}>{visibleFeatures.length}</span>
       </button>
 
       {menu.open && (
@@ -200,8 +210,8 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
       )}
 
       {expanded && (
-        features.length > 0 ? (
-          features.map(feature => (
+        visibleFeatures.length > 0 ? (
+          visibleFeatures.map(feature => (
             <FeatureItem
               key={feature.issueId}
               feature={feature}
