@@ -11,7 +11,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { Effect, Layer } from 'effect';
-import { HttpRouter } from 'effect/unstable/http';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { httpHandler } from './http-handler.js';
 import { listProjects } from '../../../lib/projects.js';
@@ -264,7 +264,7 @@ const getAllSessionTreesRoute = HttpRouter.add(
   'GET',
   '/api/session-trees',
   httpHandler(Effect.gen(function* () {
-    const request = yield* HttpRouter.request;
+    const request = yield* HttpServerRequest.HttpServerRequest;
     const url = new URL(request.url);
     const projectsParam = url.searchParams.get('projects') ?? '';
     const projectKeys = projectsParam.split(',').filter(Boolean);
