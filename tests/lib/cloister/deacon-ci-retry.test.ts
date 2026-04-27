@@ -304,12 +304,13 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
   let checkFailedMergeRetry: () => Promise<string[]>;
   let ciRetryMap: Map<string, { count: number; lastAttempt: number }>;
   let tempProjectPath: string;
-
-  const DEAD_END_ISSUE_ID = 'PAN-714-DEAD-END-TEST';
-  const issueLower = DEAD_END_ISSUE_ID.toLowerCase();
+  let deadEndIssueId: string;
+  let issueLower: string;
 
   beforeEach(async () => {
     vi.resetModules();
+    deadEndIssueId = `PAN-714-DEAD-END-TEST-${process.pid}-${Date.now()}`;
+    issueLower = deadEndIssueId.toLowerCase();
     mockSetReviewStatus.mockReset();
     mockLoadReviewStatuses.mockReset().mockReturnValue({});
     mockSessionExists.mockReset().mockReturnValue(false);
@@ -359,8 +360,8 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
 
     // Write a CI-blocked merge status that is old enough (> 5 min staleness threshold)
     writeStatusFile({
-      [DEAD_END_ISSUE_ID]: {
-        issueId: DEAD_END_ISSUE_ID,
+      [deadEndIssueId]: {
+        issueId: deadEndIssueId,
         reviewStatus: 'passed',
         testStatus: 'passed',
         mergeStatus: 'failed',
@@ -380,7 +381,7 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
     // Merge status must be reset to allow re-entry into the merge flow
     expect(mockSetReviewStatus).toHaveBeenCalledOnce();
     const [calledId, update] = mockSetReviewStatus.mock.calls[0];
-    expect(calledId).toBe(DEAD_END_ISSUE_ID);
+    expect(calledId).toBe(deadEndIssueId);
     expect(update.mergeStatus).toBe('pending');
     expect(update.readyForMerge).toBe(true);
 
@@ -390,7 +391,7 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
     // Action entry must be recorded for audit/logging
     expect(actions).toHaveLength(1);
     expect(actions[0]).toMatch(/Dead-end recovery/);
-    expect(actions[0]).toContain(DEAD_END_ISSUE_ID);
+    expect(actions[0]).toContain(deadEndIssueId);
   });
 
   it('resets ciRetryMap on dead-end recovery so next CI failure re-enters at attempt 1/5', async () => {
@@ -402,7 +403,7 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
     );
 
     const ciBlockedStatus = {
-      issueId: DEAD_END_ISSUE_ID,
+      issueId: deadEndIssueId,
       reviewStatus: 'passed',
       testStatus: 'passed',
       mergeStatus: 'failed',
@@ -410,28 +411,28 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
       readyForMerge: false,
       updatedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(), // 10 min ago
     };
-    writeStatusFile({ [DEAD_END_ISSUE_ID]: ciBlockedStatus });
+    writeStatusFile({ [deadEndIssueId]: ciBlockedStatus });
 
     mockSessionExists.mockReturnValue(true); // idle agent session
     mockResolveProjectFromIssue.mockReturnValue({ projectPath: tempProjectPath });
 
     // Seed ciRetryMap past exhaustion (count=6)
-    ciRetryMap.set(DEAD_END_ISSUE_ID, { count: 6, lastAttempt: Date.now() - 5 * 60_000 });
-    expect(ciRetryMap.has(DEAD_END_ISSUE_ID)).toBe(true);
+    ciRetryMap.set(deadEndIssueId, { count: 6, lastAttempt: Date.now() - 5 * 60_000 });
+    expect(ciRetryMap.has(deadEndIssueId)).toBe(true);
 
     // Dead-end recovery resets merge status and must clear ciRetryMap
     await checkDeadEndAgents();
 
-    expect(ciRetryMap.has(DEAD_END_ISSUE_ID)).toBe(false);
+    expect(ciRetryMap.has(deadEndIssueId)).toBe(false);
 
     // Now simulate the next CI failure for this issue
-    writeStatusFile({ [DEAD_END_ISSUE_ID]: ciBlockedStatus });
+    writeStatusFile({ [deadEndIssueId]: ciBlockedStatus });
     const retryActions = await checkFailedMergeRetry();
 
     // Should re-enter at attempt 1/5, not silently dead-end
     expect(retryActions).toHaveLength(1);
     expect(retryActions[0]).toMatch(/CI failure notification/);
     expect(retryActions[0]).toMatch(/attempt 1\/5/);
-    expect(ciRetryMap.get(DEAD_END_ISSUE_ID)?.count).toBe(1);
+    expect(ciRetryMap.get(deadEndIssueId)?.count).toBe(1);
   });
 });

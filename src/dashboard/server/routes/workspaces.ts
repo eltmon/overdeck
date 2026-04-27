@@ -327,6 +327,33 @@ function parseGitHubPullRequestUrl(url?: string | null): { owner: string; repo: 
   };
 }
 
+// Exported for unit tests covering late-success merge reconciliation guards.
+export async function reconcileGitHubMergeStatus(issueId: string, status: Pick<ReviewStatus, 'prUrl' | 'mergeStatus' | 'readyForMerge'> | null | undefined): Promise<boolean> {
+  if (!status?.prUrl) return false;
+
+  const prRef = parseGitHubPullRequestUrl(status.prUrl);
+  if (!prRef) return false;
+
+  try {
+    const { getPullRequestState, isGitHubAppConfigured } = await import('../../../lib/github-app.js');
+    if (!isGitHubAppConfigured()) return false;
+
+    const prState = await getPullRequestState(prRef.owner, prRef.repo, prRef.number);
+    if (!prState.merged) return false;
+
+    setReviewStatus(issueId, {
+      mergeStatus: 'merged',
+      mergeNotes: undefined,
+      readyForMerge: false,
+    });
+    completePendingOperation(issueId, null);
+    return true;
+  } catch (err: any) {
+    console.warn(`[merge] Failed to reconcile PR state for ${issueId}: ${err.message}`);
+    return false;
+  }
+}
+
 interface WorkspaceInfo {
   exists: boolean;
   isRemote: boolean;
@@ -1007,6 +1034,15 @@ const getWorkspaceRoute = HttpRouter.add(
 
         const pendingOperation = getPendingOperation(issueId);
         const location = getWorkspaceLocation(issueId);
+        const reviewStatus = getReviewStatus(issueId);
+
+        if (
+          pendingOperation?.type === 'merge' &&
+          pendingOperation.status === 'failed' &&
+          reviewStatus?.mergeStatus !== 'merged'
+        ) {
+          yield* Effect.promise(() => reconcileGitHubMergeStatus(issueId, reviewStatus));
+        }
 
         return jsonResponse({
           exists: true,
@@ -4144,13 +4180,21 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
           prMergeErr.message?.includes('ETIMEDOUT') ||
           prMergeErr.message?.includes('ECONNREFUSED');
         if (isTransient) {
-          setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error });
-          // readyForMerge stays true so the issue remains in Awaiting Merge for retry
+          const reconciled = await reconcileGitHubMergeStatus(issueId, getReviewStatus(issueId));
+          if (reconciled) {
+            artifactMerged = true;
+            console.log(`[merge] Reconciliation confirmed PR merged for ${issueId} after transient error; proceeding to success path`);
+          } else {
+            setReviewStatus(issueId, { mergeStatus: 'verifying', mergeNotes: error });
+            completePendingOperation(issueId, error);
+            return { success: false, statusCode: 500, error };
+          }
+          // readyForMerge stays true while reconciliation catches up or the operator retries.
         } else {
           setReviewStatus(issueId, { mergeStatus: 'failed', readyForMerge: false, mergeNotes: error });
+          completePendingOperation(issueId, error);
+          return { success: false, statusCode: 500, error };
         }
-        completePendingOperation(issueId, error);
-        return { success: false, statusCode: 500, error };
       }
     }
 

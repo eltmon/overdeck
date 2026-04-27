@@ -54,10 +54,11 @@ vi.mock('../../../src/lib/work-type-router.js', () => ({
 }));
 
 describe('specialist-context', () => {
-  const testDir = join(tmpdir(), 'panopticon-test-context');
+  let testDir: string;
   const originalPanopticonHome = process.env.PANOPTICON_HOME;
 
   beforeEach(() => {
+    testDir = join(tmpdir(), `panopticon-test-context-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     process.env.PANOPTICON_HOME = testDir;
     if (existsSync(testDir)) {
       rmSync(testDir, { recursive: true, force: true });
