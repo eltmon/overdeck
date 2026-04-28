@@ -116,7 +116,12 @@ async function main() {
         mkdirSync(APP_DIR, { recursive: true });
         writeFileSync(join(APP_DIR, 'app-id'), String(data.id));
         writeFileSync(join(APP_DIR, 'private-key.pem'), data.pem, { mode: 0o600 });
-        writeFileSync(join(APP_DIR, 'webhook-secret'), data.webhook_secret || '');
+        if (!data.webhook_secret) {
+          res.writeHead(500, { 'Content-Type': 'text/plain' });
+          res.end('GitHub did not return a webhook secret. App creation aborted.');
+          return;
+        }
+        writeFileSync(join(APP_DIR, 'webhook-secret'), data.webhook_secret);
         writeFileSync(join(APP_DIR, 'client-id'), data.client_id || '');
         writeFileSync(join(APP_DIR, 'client-secret'), data.client_secret || '', { mode: 0o600 });
         writeFileSync(join(APP_DIR, 'app-slug'), data.slug || 'panopticon-agent');

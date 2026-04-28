@@ -127,7 +127,7 @@ export function ReviewPipelineSection({ reviewStatus, issueId, onViewLog }: Revi
                 : 'bg-card text-muted-foreground'
             }`}>
               <GitMerge className="w-2.5 h-2.5 inline mr-1" />
-              retry {(reviewStatus.mergeRetryCount ?? 0)}/{DEFAULT_MERGE_RETRY_MAX}
+              Attempt {(reviewStatus.mergeRetryCount ?? 0)}/{DEFAULT_MERGE_RETRY_MAX}
             </span>
           )}
         </div>

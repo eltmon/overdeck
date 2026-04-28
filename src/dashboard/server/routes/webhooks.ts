@@ -10,7 +10,7 @@
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { jsonResponse } from '../http-helpers.js';
@@ -21,19 +21,34 @@ import {
   handlePullRequest,
   handlePullRequestReview,
   handlePullRequestReviewThread,
+  handleStatus,
   type WebhookPayload,
 } from '../../../lib/webhook-handlers.js';
 
 const WEBHOOK_SECRET_PATH = join(homedir(), '.panopticon', 'github-app', 'webhook-secret');
 
-let webhookSecret: string | null | undefined;
-function getWebhookSecret(): string | null {
-  if (webhookSecret !== undefined) return webhookSecret;
+// ─── Async secret loading at module init (never blocks request handlers) ─────
+
+let _cachedWebhookSecret: string | null | undefined;
+
+async function loadWebhookSecret(): Promise<void> {
   try {
-    if (!existsSync(WEBHOOK_SECRET_PATH)) { webhookSecret = null; return null; }
-    webhookSecret = readFileSync(WEBHOOK_SECRET_PATH, 'utf-8').trim();
-    return webhookSecret;
-  } catch { webhookSecret = null; return null; }
+    if (!existsSync(WEBHOOK_SECRET_PATH)) {
+      _cachedWebhookSecret = null;
+      return;
+    }
+    const { readFile } = await import('node:fs/promises');
+    const content = await readFile(WEBHOOK_SECRET_PATH, 'utf-8');
+    _cachedWebhookSecret = content.trim() || null;
+  } catch {
+    _cachedWebhookSecret = null;
+  }
+}
+
+const _secretLoadPromise = loadWebhookSecret();
+
+function getWebhookSecret(): string | null | undefined {
+  return _cachedWebhookSecret;
 }
 
 function verifySignature(body: string, signature: string, secret: string): boolean {
@@ -63,17 +78,24 @@ const postGitHubWebhookRoute = HttpRouter.add(
       return jsonResponse({ error: 'Missing X-GitHub-Event header' }, { status: 400 });
     }
 
-    const secret = getWebhookSecret();
-    if (secret) {
-      if (!signature || typeof signature !== 'string') {
-        return jsonResponse({ error: 'Missing X-Hub-Signature-256 header' }, { status: 400 });
-      }
-      if (!verifySignature(body, signature, secret)) {
-        console.warn('[webhook] Invalid HMAC signature — rejecting');
-        return jsonResponse({ error: 'Invalid signature' }, { status: 401 });
-      }
-    } else {
-      console.warn('[webhook] No webhook secret configured — skipping signature verification');
+    // Fail closed: require a configured webhook secret
+    let secret = getWebhookSecret();
+    if (secret === undefined) {
+      // Still loading — wait for init to complete
+      yield* Effect.promise(() => _secretLoadPromise);
+      secret = getWebhookSecret();
+    }
+    if (!secret) {
+      console.warn('[webhook] No webhook secret configured — rejecting event');
+      return jsonResponse({ error: 'Webhook secret not configured' }, { status: 401 });
+    }
+
+    if (!signature || typeof signature !== 'string') {
+      return jsonResponse({ error: 'Missing X-Hub-Signature-256 header' }, { status: 400 });
+    }
+    if (!verifySignature(body, signature, secret)) {
+      console.warn('[webhook] Invalid HMAC signature — rejecting');
+      return jsonResponse({ error: 'Invalid signature' }, { status: 401 });
     }
 
     let payload: WebhookPayload;
@@ -101,7 +123,7 @@ const postGitHubWebhookRoute = HttpRouter.add(
         handlePullRequestReviewThread(payload);
         break;
       case 'status':
-        // Commit status updates — handled by check_suite/check_run for now
+        handleStatus(payload);
         break;
       default:
         // Unknown events are silently accepted (GitHub expects 200)

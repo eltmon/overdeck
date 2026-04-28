@@ -38,6 +38,8 @@ export interface ReviewStatus {
   queuePosition?: number | null;
   /** PAN-366: Which specialist is active or will handle this issue */
   activeSpecialist?: 'review' | 'test' | 'merge' | null;
+  /** PAN-905: GitHub-native merge blockers preventing merge */
+  blockerReasons?: ReadonlyArray<{ type: string; summary: string; details?: string; detectedAt: string }>;
 }
 
 export interface ContainerStatus {

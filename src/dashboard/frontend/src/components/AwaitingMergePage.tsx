@@ -9,9 +9,9 @@
  * Fix-All flywheel. See FIX-ALL-PRD.md.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
-import { GitMerge, ExternalLink, Loader2, CheckCircle, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { GitMerge, ExternalLink, Loader2, CheckCircle, AlertTriangle, ShieldAlert, XCircle, GitPullRequest, MessageSquare, FilePenLine, PenLine, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDashboardStore, selectAwaitingMerge, selectBlockedFromMerge, selectIssues } from '../lib/store';
 import type { Issue } from '../types';
@@ -325,6 +325,25 @@ function AwaitingMergeRow({
   );
 }
 
+function blockerIcon(type: string) {
+  switch (type) {
+    case 'failing_checks':
+      return <XCircle className="w-3 h-3" />;
+    case 'merge_conflict':
+      return <GitPullRequest className="w-3 h-3" />;
+    case 'unresolved_conversations':
+      return <MessageSquare className="w-3 h-3" />;
+    case 'changes_requested':
+      return <FilePenLine className="w-3 h-3" />;
+    case 'draft_pr':
+      return <PenLine className="w-3 h-3" />;
+    case 'not_mergeable':
+      return <AlertTriangle className="w-3 h-3" />;
+    default:
+      return <ShieldAlert className="w-3 h-3" />;
+  }
+}
+
 interface BlockedRowProps {
   issueId: string;
   identifier: string;
@@ -341,46 +360,70 @@ function BlockedMergeRow({
   blockerReasons,
   updatedAt,
 }: BlockedRowProps) {
+  const [expanded, setExpanded] = useState(false);
   return (
-    <li className="border border-destructive/30 rounded-lg bg-card p-4 flex items-start gap-4 opacity-80">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          {trackerUrl ? (
-            <a
-              href={trackerUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent text-foreground hover:underline"
-            >
-              {identifier}
-            </a>
-          ) : (
-            <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent text-foreground">
-              {identifier}
-            </span>
-          )}
-          {updatedAt && (
-            <span className="text-[11px] text-muted-foreground">
-              ready {formatRelative(updatedAt)}
-            </span>
-          )}
-        </div>
-        <p className="text-sm text-foreground truncate" title={title}>
-          {title}
-        </p>
-        <div className="flex flex-wrap gap-2 mt-2">
-          {blockerReasons.map((br, idx) => (
-            <span
-              key={idx}
-              className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-destructive/15 text-destructive flex items-center gap-1"
-              title={br.details ?? br.summary}
-            >
-              <AlertTriangle className="w-3 h-3" />
-              {br.type}: {br.summary}
-            </span>
-          ))}
+    <li className="border border-destructive/30 rounded-lg bg-card p-4 opacity-80">
+      <div className="flex items-start gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            {trackerUrl ? (
+              <a
+                href={trackerUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent text-foreground hover:underline"
+              >
+                {identifier}
+              </a>
+            ) : (
+              <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent text-foreground">
+                {identifier}
+              </span>
+            )}
+            {updatedAt && (
+              <span className="text-[11px] text-muted-foreground">
+                ready {formatRelative(updatedAt)}
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-foreground truncate" title={title}>
+            {title}
+          </p>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {blockerReasons.map((br, idx) => (
+              <span
+                key={idx}
+                className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-destructive/15 text-destructive flex items-center gap-1"
+                title={br.details ?? br.summary}
+              >
+                {blockerIcon(br.type)}
+                {br.type}: {br.summary}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
+      {blockerReasons.some((br) => br.details) && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          {expanded ? 'Hide details' : 'Show details'}
+        </button>
+      )}
+      {expanded && (
+        <div className="mt-2 space-y-1">
+          {blockerReasons
+            .filter((br) => br.details)
+            .map((br, idx) => (
+              <p key={idx} className="text-[11px] text-muted-foreground">
+                <span className="font-medium text-foreground">{br.type}:</span>{' '}
+                {br.details}
+              </p>
+            ))}
+        </div>
+      )}
     </li>
   );
 }

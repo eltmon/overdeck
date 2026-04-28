@@ -30,6 +30,10 @@ export interface WebhookPayload {
   repository?: { full_name: string };
   review?: { state: string };
   thread?: { resolved?: boolean };
+  // status event payload
+  sha?: string;
+  state?: string;
+  branches?: Array<{ name: string }>;
 }
 
 function issueIdFromBranch(ref: string): string | null {
@@ -37,18 +41,24 @@ function issueIdFromBranch(ref: string): string | null {
   return match ? match[1].toUpperCase() : null;
 }
 
-function addBlocker(issueId: string, blocker: BlockerReason): void {
+// ─── Batched blocker mutation (single read + single write per event) ─────────
+
+function mutateBlockers(issueId: string, fn: (blockers: BlockerReason[]) => BlockerReason[]): void {
   const status = getReviewStatus(issueId);
-  const existing = status?.blockerReasons ?? [];
-  const filtered = existing.filter((b: BlockerReason) => b.type !== blocker.type);
-  setReviewStatus(issueId, { blockerReasons: [...filtered, blocker] });
+  const blockers = status?.blockerReasons ?? [];
+  const updated = fn(blockers);
+  setReviewStatus(issueId, { blockerReasons: updated.length > 0 ? updated : undefined });
+}
+
+function addBlocker(issueId: string, blocker: BlockerReason): void {
+  mutateBlockers(issueId, (blockers) => {
+    const filtered = blockers.filter((b: BlockerReason) => b.type !== blocker.type);
+    return [...filtered, blocker];
+  });
 }
 
 function removeBlocker(issueId: string, type: BlockerReason['type']): void {
-  const status = getReviewStatus(issueId);
-  const existing = status?.blockerReasons ?? [];
-  const filtered = existing.filter((b: BlockerReason) => b.type !== type);
-  setReviewStatus(issueId, { blockerReasons: filtered.length > 0 ? filtered : undefined });
+  mutateBlockers(issueId, (blockers) => blockers.filter((b: BlockerReason) => b.type !== type));
 }
 
 // ─── check_suite / check_run ─────────────────────────────────────────────────
@@ -86,10 +96,10 @@ export function handleCheckRun(payload: WebhookPayload): void {
       summary: 'CI check run failed',
       detectedAt: new Date().toISOString(),
     });
-  } else if (run.conclusion === 'success') {
-    // Only remove if there are no other failing checks — simplified: always try remove
-    removeBlocker(issueId, 'failing_checks');
   }
+  // Do NOT remove failing_checks on individual check_run success —
+  // other runs in the same suite may still be failing. Blocker
+  // removal is handled by check_suite conclusion='success'.
 }
 
 // ─── pull_request ────────────────────────────────────────────────────────────
@@ -100,53 +110,51 @@ export function handlePullRequest(payload: WebhookPayload): void {
   const issueId = issueIdFromBranch(pr.head.ref);
   if (!issueId) return;
 
-  const action = payload.action;
-
-  // Merge conflict detection
-  if (pr.mergeable === false || pr.mergeable_state === 'dirty') {
-    addBlocker(issueId, {
-      type: 'merge_conflict',
-      summary: 'Merge conflict with target branch',
-      detectedAt: new Date().toISOString(),
-    });
-  } else if (pr.mergeable === true) {
-    removeBlocker(issueId, 'merge_conflict');
-  }
-
-  // Draft PR detection
-  if (pr.draft) {
-    addBlocker(issueId, {
-      type: 'draft_pr',
-      summary: 'Pull request is in draft state',
-      detectedAt: new Date().toISOString(),
-    });
-  } else if (!pr.draft) {
-    removeBlocker(issueId, 'draft_pr');
-  }
-
-  // Non-mergeable state
-  if (pr.mergeable_state) {
-    if (pr.mergeable_state !== 'clean' && pr.mergeable_state !== 'unstable' && pr.mergeable_state !== 'dirty' && pr.mergeable_state !== 'unknown') {
-      addBlocker(issueId, {
-        type: 'not_mergeable',
-        summary: `PR not mergeable: ${pr.mergeable_state}`,
+  // Merge conflict detection + draft PR + not_mergeable — batched into one DB write
+  mutateBlockers(issueId, (blockers) => {
+    // Draft PR
+    if (pr.draft) {
+      const draftBlocker: BlockerReason = {
+        type: 'draft_pr',
+        summary: 'Pull request is in draft state',
         detectedAt: new Date().toISOString(),
-      });
-    } else {
-      removeBlocker(issueId, 'not_mergeable');
+      };
+      blockers = blockers.filter((b) => b.type !== 'draft_pr');
+      blockers = [...blockers, draftBlocker];
+    } else if (!pr.draft) {
+      blockers = blockers.filter((b) => b.type !== 'draft_pr');
     }
-  }
 
-  // Merge conflict detection — also clear when mergeable_state is clean
-  if (pr.mergeable === false || pr.mergeable_state === 'dirty') {
-    addBlocker(issueId, {
-      type: 'merge_conflict',
-      summary: 'Merge conflict with target branch',
-      detectedAt: new Date().toISOString(),
-    });
-  } else if (pr.mergeable === true || pr.mergeable_state === 'clean') {
-    removeBlocker(issueId, 'merge_conflict');
-  }
+    // Non-mergeable state
+    if (pr.mergeable_state) {
+      if (pr.mergeable_state !== 'clean' && pr.mergeable_state !== 'unstable' && pr.mergeable_state !== 'dirty' && pr.mergeable_state !== 'unknown') {
+        const notMergeableBlocker: BlockerReason = {
+          type: 'not_mergeable',
+          summary: `PR not mergeable: ${pr.mergeable_state}`,
+          detectedAt: new Date().toISOString(),
+        };
+        blockers = blockers.filter((b) => b.type !== 'not_mergeable');
+        blockers = [...blockers, notMergeableBlocker];
+      } else {
+        blockers = blockers.filter((b) => b.type !== 'not_mergeable');
+      }
+    }
+
+    // Merge conflict detection
+    if (pr.mergeable === false || pr.mergeable_state === 'dirty') {
+      const mergeConflictBlocker: BlockerReason = {
+        type: 'merge_conflict',
+        summary: 'Merge conflict with target branch',
+        detectedAt: new Date().toISOString(),
+      };
+      blockers = blockers.filter((b) => b.type !== 'merge_conflict');
+      blockers = [...blockers, mergeConflictBlocker];
+    } else if (pr.mergeable === true || pr.mergeable_state === 'clean') {
+      blockers = blockers.filter((b) => b.type !== 'merge_conflict');
+    }
+
+    return blockers;
+  });
 }
 
 // ─── pull_request_review ─────────────────────────────────────────────────────
@@ -186,5 +194,31 @@ export function handlePullRequestReviewThread(payload: WebhookPayload): void {
     });
   } else if (thread.resolved === true) {
     removeBlocker(issueId, 'unresolved_conversations');
+  }
+}
+
+// ─── status ──────────────────────────────────────────────────────────────────
+
+export function handleStatus(payload: WebhookPayload): void {
+  const state = payload.state;
+  const branches = payload.branches;
+  if (!state || !branches || branches.length === 0) return;
+
+  // Map commit status to the first matching feature branch
+  for (const branch of branches) {
+    const issueId = issueIdFromBranch(branch.name);
+    if (!issueId) continue;
+
+    if (state === 'failure' || state === 'error') {
+      addBlocker(issueId, {
+        type: 'failing_checks',
+        summary: `Commit status: ${state}`,
+        detectedAt: new Date().toISOString(),
+      });
+    } else if (state === 'success') {
+      removeBlocker(issueId, 'failing_checks');
+    }
+    // Only act on the first feature branch match
+    break;
   }
 }
