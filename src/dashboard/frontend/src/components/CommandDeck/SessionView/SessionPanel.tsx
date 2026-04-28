@@ -38,22 +38,6 @@ function writeView(sessionId: string, view: PanelView): void {
   } catch { /* ignore */ }
 }
 
-function formatDuration(seconds: number | null): string {
-  if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return '—';
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
-  return `${Math.round(seconds / 3600)}h`;
-}
-
-function PresenceDot({ presence }: { presence: SessionNodeType['presence'] }) {
-  const color =
-    presence === 'active'
-      ? 'var(--mc-success)'
-      : presence === 'idle'
-        ? 'var(--mc-warning)'
-        : 'var(--mc-text-muted)';
-  return <span className={styles.sessionPanelPresence} style={{ background: color }} />;
-}
 
 function toRoundVerdict(status?: string): RoundVerdict {
   switch (status) {
@@ -111,28 +95,20 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
 
   const hasJsonl = !!session.hasJsonl;
   const hasTranscript = !!session.transcript;
-  // Only allow terminal for work/planning sessions with a live tmux session
-  const allowTerminal = (session.type === 'work' || session.type === 'planning') &&
-    !!session.tmuxSession &&
-    session.presence === 'active';
-  const hasTerminal = allowTerminal;
+  // Allow terminal for any session with a live tmux session — reviewers and
+  // specialists have attachable tmux sessions too. The tmux session name is
+  // either the explicit tmuxSession field or the sessionId (which is the
+  // canonical tmux name for reviewer/specialist sessions).
+  const tmuxName = session.tmuxSession || (session.presence === 'active' ? session.sessionId : undefined);
+  const hasTerminal = !!tmuxName && session.presence !== 'ended';
   const isEnded = session.presence === 'ended';
   const roundData = useMemo(() => deriveRoundData(session.roundMetadata), [session.roundMetadata]);
   const hasFindings = roundData.length > 0;
 
   return (
     <div className={styles.sessionPanel}>
-      {/* Session info sub-header */}
+      {/* View toggle — slim tab bar (info already shown in ZoneB) */}
       <div className={styles.sessionPanelHeader}>
-        <div className={styles.sessionPanelInfo}>
-          <span className={styles.sessionPanelType}>
-            {session.role ? `${session.type}:${session.role}` : session.type}
-          </span>
-          <PresenceDot presence={session.presence} />
-          <span className={styles.sessionPanelModel}>{session.model}</span>
-          <span className={styles.sessionPanelDuration}>{formatDuration(session.duration)}</span>
-        </div>
-
         <div className={styles.sessionPanelToggle}>
           <button
             className={`${styles.sessionPanelToggleBtn} ${view === 'conversation' ? styles.sessionPanelToggleBtnActive : ''}`}
@@ -166,6 +142,7 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
               viewMode="conversation"
               roundMarkers={roundMarkers}
               roundMetadata={session.roundMetadata}
+              embedded
             />
           ) : hasTranscript ? (
             <div className={styles.sessionPanelTranscript}>
@@ -179,7 +156,7 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
         )}
 
         {view === 'findings' && (
-          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
             {roundData.length === 0 ? (
               <div className={styles.sessionPanelEmpty}>No review rounds recorded.</div>
             ) : (
@@ -192,14 +169,23 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
                     <RoundCard key={r.round} round={r} active={r.round === session.roundMetadata?.latestRound} />
                   ))}
                 </div>
+                {/* Show synthesis summaries for each round */}
+                {session.roundMetadata?.history.map((r) => r.summary ? (
+                  <div key={`summary-${r.round}`} style={{ borderTop: '1px solid var(--mc-border, var(--border))', paddingTop: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mc-text-muted, var(--muted-foreground))', marginBottom: 6 }}>
+                      Round {r.round} — {r.status}
+                    </div>
+                    <ChatMarkdown text={r.summary} isStreaming={false} />
+                  </div>
+                ) : null)}
               </>
             )}
           </div>
         )}
 
         {view === 'terminal' && (
-          hasTerminal ? (
-            <XTerminal sessionName={session.tmuxSession!} />
+          hasTerminal && tmuxName ? (
+            <XTerminal sessionName={tmuxName} />
           ) : (
             <div className={styles.sessionPanelEmpty}>
               {isEnded ? 'Session ended' : 'No terminal session available.'}

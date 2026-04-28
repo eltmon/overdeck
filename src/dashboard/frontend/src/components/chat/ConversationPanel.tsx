@@ -43,6 +43,10 @@ interface ConversationPanelProps {
   roundMarkers?: ReadonlyArray<RoundMarker>;
   /** Reviewer round metadata to derive timeline dividers (PAN-830 high-8). */
   roundMetadata?: ReviewerRoundMetadata;
+  /** When true, hide the header chrome (title, status, toggles) and suppress
+   *  Resume/Archive — used when embedded inside SessionPanel where ZoneB
+   *  already shows session info and specialists can't be resumed. */
+  embedded?: boolean;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -66,6 +70,7 @@ export function ConversationPanel({
   onArchived,
   roundMarkers,
   roundMetadata,
+  embedded = false,
 }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -213,83 +218,85 @@ export function ConversationPanel({
 
   return (
     <div className={styles.conversationTerminal}>
-      {/* Header bar */}
-      <div className={styles.conversationTerminalHeader}>
-        <span className={styles.conversationTerminalTitle}>
-          {isWorking && (
-            <span title={workingLabel} style={{ display: 'contents' }}>
-              <WorkingIcon
-                size={14}
-                className={workingIconClass}
-                aria-label={workingLabel}
-              />
-            </span>
-          )}
-          {editingTitle ? (
-            <input
-              ref={titleInputRef}
-              className={styles.conversationTitleInput}
-              value={draftTitle}
-              onChange={e => { setDraftTitle(e.target.value); draftTitleRef.current = e.target.value; }}
-              onKeyDown={e => {
-                if (e.key === 'Enter') commitTitleRename();
-                if (e.key === 'Escape') cancelTitleEditing();
-              }}
-              onBlur={commitTitleRename}
-              aria-label={`Rename ${conversation.name}`}
-            />
-          ) : (
-            <>
-              {conversation.title ?? conversation.name}
-              <button
-                className={styles.conversationTitleEditBtn}
-                onClick={startEditingTitle}
-                title="Rename conversation"
+      {/* Header bar — hidden in embedded mode (ZoneB already shows session info) */}
+      {!embedded && (
+        <div className={styles.conversationTerminalHeader}>
+          <span className={styles.conversationTerminalTitle}>
+            {isWorking && (
+              <span title={workingLabel} style={{ display: 'contents' }}>
+                <WorkingIcon
+                  size={14}
+                  className={workingIconClass}
+                  aria-label={workingLabel}
+                />
+              </span>
+            )}
+            {editingTitle ? (
+              <input
+                ref={titleInputRef}
+                className={styles.conversationTitleInput}
+                value={draftTitle}
+                onChange={e => { setDraftTitle(e.target.value); draftTitleRef.current = e.target.value; }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') commitTitleRename();
+                  if (e.key === 'Escape') cancelTitleEditing();
+                }}
+                onBlur={commitTitleRename}
                 aria-label={`Rename ${conversation.name}`}
+              />
+            ) : (
+              <>
+                {conversation.title ?? conversation.name}
+                <button
+                  className={styles.conversationTitleEditBtn}
+                  onClick={startEditingTitle}
+                  title="Rename conversation"
+                  aria-label={`Rename ${conversation.name}`}
+                >
+                  <Pencil size={12} />
+                </button>
+              </>
+            )}
+          </span>
+          <span className={styles.conversationTerminalStatus}>
+            <Circle
+              size={7}
+              style={{ fill: statusColor, color: statusColor }}
+            />
+            {statusLabel}
+          </span>
+          <span className={styles.conversationSessionId}>
+            {conversation.sessionFile?.split('/').pop()?.replace('.jsonl', '') ?? conversation.name}
+          </span>
+
+          {/* Copy link button */}
+          <button
+            className={styles.copyLinkButton}
+            onClick={handleCopyLink}
+            title="Copy link to conversation"
+          >
+            {copied ? <Check size={14} /> : <Copy size={14} />}
+          </button>
+
+          {/* View toggle — only show when session is live */}
+          {showTerminal && (
+            <div className={styles.viewToggle}>
+              <button
+                className={`${styles.viewToggleBtn} ${viewMode === 'conversation' ? styles.viewToggleBtnActive : ''}`}
+                onClick={() => handleViewMode('conversation')}
               >
-                <Pencil size={12} />
+                Conversation
               </button>
-            </>
+              <button
+                className={`${styles.viewToggleBtn} ${viewMode === 'terminal' ? styles.viewToggleBtnActive : ''}`}
+                onClick={() => handleViewMode('terminal')}
+              >
+                Terminal
+              </button>
+            </div>
           )}
-        </span>
-        <span className={styles.conversationTerminalStatus}>
-          <Circle
-            size={7}
-            style={{ fill: statusColor, color: statusColor }}
-          />
-          {statusLabel}
-        </span>
-        <span className={styles.conversationSessionId}>
-          {conversation.sessionFile?.split('/').pop()?.replace('.jsonl', '') ?? conversation.name}
-        </span>
-
-        {/* Copy link button */}
-        <button
-          className={styles.copyLinkButton}
-          onClick={handleCopyLink}
-          title="Copy link to conversation"
-        >
-          {copied ? <Check size={14} /> : <Copy size={14} />}
-        </button>
-
-        {/* View toggle — only show when session is live */}
-        {showTerminal && (
-          <div className={styles.viewToggle}>
-            <button
-              className={`${styles.viewToggleBtn} ${viewMode === 'conversation' ? styles.viewToggleBtnActive : ''}`}
-              onClick={() => handleViewMode('conversation')}
-            >
-              Conversation
-            </button>
-            <button
-              className={`${styles.viewToggleBtn} ${viewMode === 'terminal' ? styles.viewToggleBtnActive : ''}`}
-              onClick={() => handleViewMode('terminal')}
-            >
-              Terminal
-            </button>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Body */}
       <div className={styles.conversationTerminalBody}>
@@ -301,12 +308,12 @@ export function ConversationPanel({
         {(viewMode === 'conversation' || !showTerminal) && (
           <ConversationView
             conversation={conversation}
-            onResume={!showTerminal ? handleResume : undefined}
-            onArchive={handleArchive}
+            onResume={!embedded && !showTerminal ? handleResume : undefined}
+            onArchive={!embedded ? handleArchive : undefined}
             resumePending={resumeMutation.isPending}
             roundMarkers={roundMarkers}
             roundMetadata={roundMetadata}
-            modelPicker={
+            modelPicker={!embedded ? (
               <ModelPicker
                 value={selectedModel}
                 onChange={(modelId) => {
@@ -314,7 +321,7 @@ export function ConversationPanel({
                   switchModelMutation.mutate(modelId);
                 }}
               />
-            }
+            ) : undefined}
           />
         )}
       </div>

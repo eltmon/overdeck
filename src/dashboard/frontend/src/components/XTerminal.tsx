@@ -545,11 +545,17 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
         return;
       }
 
-      // Always attempt reconnection when shouldReconnect is true, even for
-      // code 1000 (normal close). The server sends 1000 when the PTY exits,
-      // which can happen if the tmux session is killed and recreated during
-      // workspace setup retries. The session may be alive again by the time
-      // we reconnect.
+      // 4404 = session not found on the server (tmux session doesn't exist).
+      // Do NOT retry — the session is gone. Retrying just hammers the server.
+      if (event.code === 4404) {
+        term!.writeln(`\r\n\x1b[33m● Session \x1b[1m${sessionName}\x1b[0m\x1b[33m has ended.\x1b[0m`);
+        onDisconnectRef.current?.();
+        return;
+      }
+
+      // For normal close (1000) or unexpected close, attempt reconnection.
+      // The server sends 1000 when the PTY exits, which can happen if the
+      // tmux session is killed and recreated during workspace setup retries.
       if (reconnectAttempts.current < maxReconnectAttempts) {
         const delay = getReconnectDelay(reconnectAttempts.current);
         reconnectAttempts.current += 1;

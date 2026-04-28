@@ -239,6 +239,7 @@ export const ReviewerRoundSummary = Schema.Struct({
   durationSec: Schema.optional(Schema.Number),
   cost: Schema.optional(Schema.Number),
   findings: Schema.optional(Schema.Number),
+  summary: Schema.optional(Schema.String),
 })
 export type ReviewerRoundSummary = typeof ReviewerRoundSummary.Type
 

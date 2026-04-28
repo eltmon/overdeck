@@ -58,6 +58,10 @@ The goal is autonomous correctness. Every manual intervention is a system bug.
 - Code that programmatically deletes JSONL files (e.g., `fs.unlinkSync` on a session path) must NEVER be written without explicit user instruction
 - When cleaning up failed forks or orphaned conversations, leave the JSONL files intact
 
+## Commit and Push When Working on Main
+
+When working directly on `main` (not in a Panopticon workspace), commit completed changes and push to `origin` before ending the session. Agent PRs merge to `origin/main` through the pipeline — unpushed local commits cause divergence that requires manual merge resolution. Don't commit half-done work; finish the change, verify it builds, then commit and push.
+
 ## CRITICAL: No Blocking Calls in Dashboard Server Code
 
 **NEVER use `execSync`, `readFileSync`, `writeFileSync`, `readdirSync`, or `statSync` in any code reachable from the dashboard server** (Effect route handlers in `src/dashboard/server/routes/`, services in `src/dashboard/server/services/`, or any module imported by them).

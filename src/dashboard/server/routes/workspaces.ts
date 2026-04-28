@@ -431,6 +431,7 @@ export async function reconcileGitHubMergeStatus(issueId: string, status: Pick<R
     if (!isGitHubAppConfigured()) return false;
 
     const prState = await getPullRequestState(prRef.owner, prRef.repo, prRef.number);
+    console.log(`[merge] reconcileGitHubMergeStatus: ${issueId} PR #${prRef.number} merged=${prState.merged} state=${prState.state}`);
     if (!prState.merged) return false;
 
     setReviewStatus(issueId, {

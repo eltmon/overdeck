@@ -142,27 +142,18 @@ interface CommandDeckProps {
   onConversationViewModeChange?: (mode: ViewMode) => void;
 }
 
-const FILTER_CONVERSATIONS_KEY = 'mc-filter-conversations';
-const FILTER_PROJECTS_KEY = 'mc-filter-projects';
+type SidebarMode = 'projects' | 'conversations';
 
-function loadFilterConversations(): boolean {
+const SIDEBAR_MODE_KEY = 'mc-sidebar-mode';
+
+function loadSidebarMode(): SidebarMode {
   try {
-    const v = localStorage.getItem(FILTER_CONVERSATIONS_KEY);
-    if (v === 'false') return false;
+    const v = localStorage.getItem(SIDEBAR_MODE_KEY);
+    if (v === 'conversations') return 'conversations';
   } catch {
     // ignore
   }
-  return true;
-}
-
-function loadFilterProjects(): boolean {
-  try {
-    const v = localStorage.getItem(FILTER_PROJECTS_KEY);
-    if (v === 'false') return false;
-  } catch {
-    // ignore
-  }
-  return true;
+  return 'projects';
 }
 
 export function CommandDeck({
@@ -177,17 +168,23 @@ export function CommandDeck({
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [isDraft, setIsDraft] = useState(false);
   const [showBeads, setShowBeads] = useState(false);
-  const [showConversations, setShowConversations] = useState(() => loadFilterConversations());
-  const [showProjects, setShowProjects] = useState(() => loadFilterProjects());
+  const [sidebarMode, setSidebarModeState] = useState<SidebarMode>(() => loadSidebarMode());
+  const showConversations = sidebarMode === 'conversations';
+  const showProjects = sidebarMode === 'projects';
+  const setSidebarMode = useCallback((mode: SidebarMode) => {
+    setSidebarModeState(mode);
+    try { localStorage.setItem(SIDEBAR_MODE_KEY, mode); } catch { /* ignore */ }
+  }, []);
   const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
 
   // Per-issue session selection (PAN-830 pan-11sr) — slice keyed by issueId.
   // The tree highlight uses the value for whichever feature is currently active.
   const selectSession = useCommandDeckSelection((s) => s.selectSession);
-  const selectedSessionId = useCommandDeckSelection((s) =>
-    selectedFeature ? s.selectedSessionByIssue[selectedFeature] ?? null : null,
-  );
+  const selectedSessionByIssue = useCommandDeckSelection((s) => s.selectedSessionByIssue);
+  const selectedSessionId = selectedFeature
+    ? selectedSessionByIssue[selectedFeature] ?? null
+    : null;
   // Increments each time + is clicked, forcing DraftConversationPanel to remount and re-read localStorage
   const [draftKey, setDraftKey] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -206,7 +203,6 @@ export function CommandDeck({
     refetchInterval: 30000,
   });
 
-  // Get aggregated cost data for all issues
   const { data: costData } = useQuery({
     queryKey: ['costs-by-issue'],
     queryFn: fetchCostsByIssue,
@@ -312,6 +308,16 @@ export function CommandDeck({
   // Agents from dashboard store (for terminal panel in detail view)
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
 
+  // Map aggregated costs per issue for the project tree sidebar.
+  const issueCosts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const entry of costData?.issues || []) {
+      map[entry.issueId] = entry.totalCost;
+      map[entry.issueId.toLowerCase()] = entry.totalCost;
+    }
+    return map;
+  }, [costData]);
+
   // Build title map from issues (memoized to avoid new object identity per render)
   const issueTitles = useMemo(() => {
     const map: Record<string, string> = {};
@@ -321,16 +327,6 @@ export function CommandDeck({
     }
     return map;
   }, [issues]);
-
-  // Map aggregated costs per issue (memoized to avoid new object identity per render)
-  const issueCosts = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const entry of costData?.issues || []) {
-      map[entry.issueId] = entry.totalCost;
-      map[entry.issueId.toLowerCase()] = entry.totalCost;
-    }
-    return map;
-  }, [costData]);
 
   const { data: conversations = [] } = useQuery({
     queryKey: ['conversations'],
@@ -547,8 +543,8 @@ export function CommandDeck({
     setIsDraft(true);
     setSelectedConversation(null);
     setSelectedFeature(null);
-    setShowConversations(true);
-  }, []);
+    setSidebarMode('conversations');
+  }, [setSidebarMode]);
 
   const handleDraftPromoted = useCallback((conv: Conversation, firstMessage: string) => {
     setDraftKey(0);
@@ -613,6 +609,18 @@ export function CommandDeck({
     };
   }, []);
 
+  // Re-fetch all query caches when the WebSocket transport reconnects after
+  // a dashboard restart. Without this, the Command Deck operates on stale
+  // data — conversations vanish, session trees freeze, costs go stale.
+  useEffect(() => {
+    const handler = () => {
+      console.log('[CommandDeck] transport reconnected — invalidating query caches');
+      queryClient.invalidateQueries();
+    };
+    window.addEventListener('panopticon:reconnected', handler);
+    return () => window.removeEventListener('panopticon:reconnected', handler);
+  }, [queryClient]);
+
   // Find selected feature data (memoized to avoid O(P×F) scan per render)
   const selectedFeatureData = useMemo(() => {
     if (!selectedFeature) return null;
@@ -668,34 +676,22 @@ export function CommandDeck({
             {/* Filter chips */}
             <div className={styles.segmentControl}>
               <button
-                className={`${styles.segmentButton} ${showConversations ? styles.segmentButtonActive : ''}`}
-                onClick={() => {
-                  setShowConversations(v => {
-                    const next = !v;
-                    try { localStorage.setItem(FILTER_CONVERSATIONS_KEY, String(next)); } catch { /* ignore */ }
-                    return next;
-                  });
-                }}
-                aria-pressed={showConversations}
-              >
-                Conversations
-                <span className={styles.segmentCount}>{conversations.length}</span>
-              </button>
-              <button
                 className={`${styles.segmentButton} ${showProjects ? styles.segmentButtonActive : ''}`}
-                onClick={() => {
-                  setShowProjects(v => {
-                    const next = !v;
-                    try { localStorage.setItem(FILTER_PROJECTS_KEY, String(next)); } catch { /* ignore */ }
-                    return next;
-                  });
-                }}
+                onClick={() => setSidebarMode('projects')}
                 aria-pressed={showProjects}
               >
                 Projects
                 <span className={styles.segmentCount}>
                   {projects.reduce((sum, p) => sum + p.features.length, 0)}
                 </span>
+              </button>
+              <button
+                className={`${styles.segmentButton} ${showConversations ? styles.segmentButtonActive : ''}`}
+                onClick={() => setSidebarMode('conversations')}
+                aria-pressed={showConversations}
+              >
+                Conversations
+                <span className={styles.segmentCount}>{conversations.length}</span>
               </button>
             </div>
 
@@ -816,7 +812,6 @@ export function CommandDeck({
               issueId={selectedFeature}
               title={selectedIssueTitle}
               sessions={selectedFeatureData?.sessions ?? []}
-              cost={issueCosts[selectedFeature.toLowerCase()] ?? issueCosts[selectedFeature]}
               source={selectedIssue?.source}
               url={selectedIssue?.url}
               onOpenBeads={() => setShowBeads(true)}

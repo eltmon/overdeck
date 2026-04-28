@@ -15,11 +15,13 @@ import { jsonResponse } from "../http-helpers.js";
 import { randomUUID } from 'node:crypto';
 import { exec, spawn } from 'node:child_process';
 import { existsSync, createReadStream } from 'node:fs';
-import { mkdir, writeFile, readFile, stat, realpath, rename, rm } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, stat, realpath, rename, rm, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { extname, join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
+
+import { resolveClaudeSessionId } from './jsonl-resolver.js';
 
 import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -1238,55 +1240,42 @@ const getConversationMessagesRoute = HttpRouter.add(
           const cached = specialistSessionFileCache.get(name);
           if (cached) {
             sessionFile = cached;
-          } else {
-            const specialistMatch = name.match(/^specialist-(.+)-(review-agent|test-agent|merge-agent)$/);
-            if (specialistMatch) {
-              const [, project, type] = specialistMatch;
-              if (!SAFE_PROJECT_NAME_PATTERN.test(project)) {
-                return jsonResponse({ error: 'Invalid conversation name' }, { status: 400 });
-              }
-              const panHome = process.env['PANOPTICON_HOME'] || join(homedir(), '.panopticon');
-              const sessionIdFile = join(panHome, 'specialists', 'projects', project, `${type}.session`);
-              try {
-                const { readFile, readdir, stat } = await import('node:fs/promises');
-                const sessionId = (await readFile(sessionIdFile, 'utf-8')).trim();
-                if (sessionId && SAFE_SESSION_ID_PATTERN.test(sessionId)) {
-                  const claudeProjects = join(homedir(), '.claude', 'projects');
-                  const dirs = await readdir(claudeProjects);
-                  // Validate directory names to prevent path traversal before
-                  // joining. Only alphanumeric, hyphen, underscore, and dot are
-                  // allowed (encoded CWDs use these characters).
-                  const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
-                  // Check all candidates concurrently with async stat instead of
-                  // synchronous existsSync in a loop (blocks the event loop).
-                  const candidates = dirs
-                    .filter((dir) => SAFE_DIR_PATTERN.test(dir))
-                    .map((dir) => join(claudeProjects, dir, `${sessionId}.jsonl`));
-                  // Batch stat calls to avoid unbounded Promise.all fanout
-                  // when .claude/projects has many directories.
-                  const STAT_BATCH_SIZE = 50;
-                  let found: string | null = null;
-                  for (let i = 0; i < candidates.length && !found; i += STAT_BATCH_SIZE) {
-                    const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
-                    const checks = await Promise.all(
-                      batch.map(async (candidate) => {
-                        try {
-                          await stat(candidate);
-                          return candidate;
-                        } catch {
-                          return null;
-                        }
-                      }),
-                    );
-                    found = checks.find((c): c is string => c !== null) ?? null;
-                  }
-                  if (found) {
-                    sessionFile = found;
-                    setSpecialistSessionCache(name, found);
-                  }
+          } else if (/^(specialist-|agent-|planning-)/.test(name)) {
+            // Resolve JSONL via the unified session-id lookup chain
+            // (session.id file → sessions.json → runtime state) in
+            // ~/.panopticon/agents/<name>/. Covers work agents, planning
+            // agents, and all specialist types (reviewers, test, merge).
+            try {
+              const claudeSessionId = await resolveClaudeSessionId(name);
+              if (claudeSessionId && SAFE_SESSION_ID_PATTERN.test(claudeSessionId)) {
+                const claudeProjects = join(homedir(), '.claude', 'projects');
+                const dirs = await readdir(claudeProjects);
+                const SAFE_DIR_PATTERN = /^[a-zA-Z0-9_.-]+$/;
+                const candidates = dirs
+                  .filter((dir) => SAFE_DIR_PATTERN.test(dir))
+                  .map((dir) => join(claudeProjects, dir, `${claudeSessionId}.jsonl`));
+                const STAT_BATCH_SIZE = 50;
+                let found: string | null = null;
+                for (let i = 0; i < candidates.length && !found; i += STAT_BATCH_SIZE) {
+                  const batch = candidates.slice(i, i + STAT_BATCH_SIZE);
+                  const checks = await Promise.all(
+                    batch.map(async (candidate) => {
+                      try {
+                        await stat(candidate);
+                        return candidate;
+                      } catch {
+                        return null;
+                      }
+                    }),
+                  );
+                  found = checks.find((c): c is string => c !== null) ?? null;
                 }
-              } catch { /* session file not found */ }
-            }
+                if (found) {
+                  sessionFile = found;
+                  setSpecialistSessionCache(name, found);
+                }
+              }
+            } catch { /* session resolution failed */ }
           }
           if (!sessionFile) {
             return jsonResponse({ error: 'Conversation not found' }, { status: 404 });

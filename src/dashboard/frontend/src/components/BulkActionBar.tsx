@@ -17,23 +17,28 @@ export function BulkActionBar({ count, onCloseOut, onCancel }: BulkActionBarProp
           : 'translate-y-8 opacity-0 pointer-events-none'
       }`}
     >
-      <div className="flex items-center gap-4 rounded-2xl border border-border/70 bg-card/95 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.2)] px-5 py-3">
-        <span className="text-sm font-medium text-foreground whitespace-nowrap">
-          {count} {count === 1 ? 'issue' : 'issues'} selected
-        </span>
-        <div className="w-px h-5 bg-divider" />
+      <div className="flex items-center gap-3 rounded-2xl border border-border bg-popover/95 backdrop-blur-md shadow-lg/5 px-4 py-2.5">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center justify-center h-5.5 min-w-5.5 rounded-sm bg-primary/8 border border-primary/32 px-1 text-sm font-medium text-primary tabular-nums">
+            {count}
+          </span>
+          <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">
+            {count === 1 ? 'issue' : 'issues'} selected
+          </span>
+        </div>
+        <div className="w-px h-5 bg-border" />
         <button
           onClick={onCloseOut}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-destructive px-3.5 py-2 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 transition-colors"
+          className="inline-flex items-center gap-1.5 h-9 rounded-lg bg-destructive px-3 text-sm font-medium text-white transition-shadow duration-200 hover:shadow-xs/5 focus-visible:ring-[3px] focus-visible:ring-ring/24 focus-visible:ring-offset-1"
         >
-          <Trash2 className="w-4 h-4" />
+          <Trash2 className="w-[18px] h-[18px] -mx-0.5" />
           Close Out
         </button>
         <button
           onClick={onCancel}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3.5 py-2 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+          className="inline-flex items-center gap-1.5 h-9 rounded-lg bg-transparent px-3 text-sm font-medium text-foreground transition-colors duration-200 hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/24 focus-visible:ring-offset-1"
         >
-          <X className="w-4 h-4" />
+          <X className="w-[18px] h-[18px] -mx-0.5" />
           Cancel
         </button>
       </div>

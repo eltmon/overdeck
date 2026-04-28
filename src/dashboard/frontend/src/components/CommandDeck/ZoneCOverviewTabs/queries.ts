@@ -7,14 +7,29 @@
  * Overview ↔ PRD ↔ Activity, etc.).
  */
 
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import {
+  useQuery,
+  type UseQueryOptions,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 
 export interface PlanningSummaryResponse {
   hasPrd: boolean;
   hasState: boolean;
+  hasInference?: boolean;
   acceptanceProgress?: { completed: number; total: number; percent: number };
   stashCount?: number;
   statusReviewedAt?: string;
+  transcriptCount?: number;
+  discussionCount?: number;
+  noteCount?: number;
+}
+
+export interface PlanningArtifact {
+  filename?: string;
+  content?: string;
+  uploadedAt?: string;
+  syncedAt?: string;
 }
 
 export interface PlanningResponse extends PlanningSummaryResponse {
@@ -22,14 +37,9 @@ export interface PlanningResponse extends PlanningSummaryResponse {
   state?: string;
   inference?: string;
   statusReview?: string;
-  transcripts?: Array<unknown>;
-  discussions?: Array<{
-    file?: string;
-    body?: string;
-    author?: string;
-    createdAt?: string;
-  }>;
-  notes?: Array<unknown>;
+  transcripts?: PlanningArtifact[];
+  discussions?: PlanningArtifact[];
+  notes?: PlanningArtifact[];
 }
 
 export interface ReviewerRoundSummary {
@@ -68,6 +78,9 @@ export interface ActivityResponse {
   sections: ActivitySection[];
   costByStage?: Record<string, { cost: number; tokens: number }>;
   totalCost?: number;
+  aggregateCost?: number | null;
+  liveCost?: number | null;
+  resolvedTotalCost?: number | null;
 }
 
 export interface SessionCost {
@@ -84,6 +97,9 @@ export interface SessionCost {
 export interface IssueCostData {
   issueId: string;
   totalCost: number;
+  resolvedTotalCost?: number | null;
+  aggregateCost?: number | null;
+  liveCost?: number | null;
   totalTokens: number;
   inputTokens?: number;
   outputTokens?: number;
@@ -105,15 +121,32 @@ export function usePlanningSummaryQuery(issueId: string): UseQueryResult<Plannin
   return useQuery({
     queryKey: ['command-deck-planning', issueId, 'summary'],
     queryFn: () => fetchJson<PlanningSummaryResponse>(`/api/command-deck/planning/${issueId}?summary=1`),
-    refetchInterval: 30_000,
+    // Planning data is mostly static — 60s is sufficient
+    refetchInterval: 60_000,
   });
 }
 
-export function usePlanningQuery(issueId: string): UseQueryResult<PlanningResponse> {
+export function usePlanningSummaryWithOverridesQuery(
+  issueId: string,
+  options?: Omit<UseQueryOptions<PlanningSummaryResponse>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<PlanningSummaryResponse> {
+  return useQuery({
+    queryKey: ['command-deck-planning', issueId, 'summary'],
+    queryFn: () => fetchJson<PlanningSummaryResponse>(`/api/command-deck/planning/${issueId}?summary=1`),
+    refetchInterval: 30_000,
+    ...options,
+  });
+}
+
+export function usePlanningQuery(
+  issueId: string,
+  options?: Omit<UseQueryOptions<PlanningResponse>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<PlanningResponse> {
   return useQuery({
     queryKey: ['command-deck-planning', issueId, 'full'],
     queryFn: () => fetchJson<PlanningResponse>(`/api/command-deck/planning/${issueId}`),
     refetchInterval: false,
+    ...options,
   });
 }
 
@@ -121,7 +154,16 @@ export function useActivityQuery(issueId: string): UseQueryResult<ActivityRespon
   return useQuery({
     queryKey: ['command-deck-activity', issueId, 'summary'],
     queryFn: () => fetchJson<ActivityResponse>(`/api/command-deck/activity/${issueId}?summary=1`),
-    refetchInterval: 5_000,
+    // Poll fast (5s) when any session is active; slow (30s) when all ended/idle.
+    // Prevents hammering the server for issues with no live agents.
+    refetchInterval: (query) => {
+      const sections = query.state.data?.sections;
+      if (!sections) return 5_000;
+      const hasActive = sections.some(
+        (s) => s.status === 'running' || s.status === 'active',
+      );
+      return hasActive ? 5_000 : 30_000;
+    },
   });
 }
 

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Command Deck Layout Audit — Current State</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'DM Sans', system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; }
+  .layout { display: flex; height: 100vh; }
+
+  /* ── Sidebar ──────────────────────────────────────────── */
+  .sidebar { width: 320px; min-width: 320px; border-right: 1px solid #333; display: flex; flex-direction: column; background: #16162a; }
+  .sidebar-header { padding: 10px 12px; border-bottom: 1px solid #333; }
+  .sidebar-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .segment-control { display: flex; gap: 4px; margin-bottom: 6px; }
+  .segment-btn { flex: 1; padding: 4px 8px; border: 1px solid #444; border-radius: 6px; background: transparent; color: #aaa; font-size: 11px; cursor: pointer; }
+  .segment-btn.active { background: #2a2a4a; color: #fff; border-color: #667; }
+  .segment-count { font-size: 10px; opacity: 0.6; margin-left: 4px; }
+  .tree-filter { display: flex; gap: 4px; }
+  .tree-filter button { padding: 2px 8px; border: 1px solid #333; border-radius: 4px; background: transparent; color: #888; font-size: 10px; cursor: pointer; }
+  .tree-filter button.active { background: #2a2a4a; color: #ccc; }
+  .tree-content { flex: 1; overflow-y: auto; padding: 4px 0; }
+  .project-node { padding: 2px 12px; }
+  .project-label { font-size: 11px; font-weight: 600; color: #888; padding: 4px 0; }
+  .issue-item { padding: 4px 8px; margin: 1px 0; border-radius: 4px; cursor: pointer; font-size: 11px; display: flex; align-items: center; gap: 6px; }
+  .issue-item:hover { background: #2a2a4a; }
+  .issue-item.selected { background: #2a3a5a; border-left: 2px solid #5588ff; }
+  .issue-id { font-weight: 600; color: #7aa8ff; white-space: nowrap; }
+  .issue-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #ccc; }
+  .session-dots { display: flex; gap: 2px; margin-left: auto; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .dot.active { background: #4ade80; }
+  .dot.idle { background: #f59e0b; }
+  .dot.ended { background: #666; }
+  .dot.error { background: #ef4444; }
+  .sidebar-footer { padding: 8px 12px; border-top: 1px solid #333; font-size: 10px; color: #666; }
+
+  /* ── Content (right panel) ─────────────────────────────── */
+  .content { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+
+  /* Zone A: Issue Header */
+  .zone-a { padding: 10px 16px; border-bottom: 1px solid #333; background: #1e1e38; }
+  .zone-a .issue-header { display: flex; align-items: center; gap: 8px; }
+  .zone-a .issue-key { font-size: 13px; font-weight: 700; color: #7aa8ff; }
+  .zone-a .issue-desc { font-size: 12px; color: #bbb; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .zone-a .action-strip { display: flex; gap: 6px; margin-top: 6px; }
+  .zone-a .action-strip button { padding: 3px 10px; border: 1px solid #444; border-radius: 4px; background: transparent; color: #aaa; font-size: 10px; cursor: pointer; }
+  .zone-a-label { font-size: 9px; color: #666; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; position: absolute; right: 16px; }
+
+  /* Session Strip (horizontal) */
+  .session-strip { display: flex; gap: 4px; padding: 6px 16px; border-bottom: 1px solid #333; background: #1a1a30; overflow-x: auto; }
+  .session-chip { padding: 4px 10px; border-radius: 6px; font-size: 10px; cursor: pointer; display: flex; align-items: center; gap: 4px; border: 1px solid #333; }
+  .session-chip:hover { background: #2a2a4a; }
+  .session-chip.selected { background: #2a3a5a; border-color: #5588ff; }
+
+  /* Zone B: Agent Context */
+  .zone-b { border-bottom: 1px solid #333; background: #1a1a30; font-size: 12px; }
+  .zone-b-main { display: flex; align-items: center; gap: 8px; padding: 6px 12px; }
+  .zone-b-summary { display: flex; gap: 12px; padding: 2px 12px; font-size: 11px; color: #888; border-top: 1px dashed #333; }
+  .zone-b-label { font-size: 9px; color: #666; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
+
+  /* Zone C: Conversation (agent-selected) */
+  .zone-c { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+
+  /* ── BUG: SessionPanel adds FIRST header + toggle ────── */
+  .session-panel-header { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid #333; background: #1e1e38; font-size: 12px; }
+  .session-panel-toggle { display: flex; gap: 2px; margin-left: auto; }
+  .session-panel-toggle button { padding: 3px 10px; border: 1px solid #444; border-radius: 4px; background: transparent; color: #888; font-size: 10px; cursor: pointer; }
+  .session-panel-toggle button.active { background: #2a2a4a; color: #fff; }
+
+  /* ── BUG: ConversationPanel adds SECOND header + toggle ── */
+  .conv-panel-header { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid #333; background: #222240; font-size: 11px; }
+  .conv-panel-toggle { display: flex; gap: 2px; margin-left: 8px; }
+  .conv-panel-toggle button { padding: 2px 8px; border: 1px solid #444; border-radius: 4px; background: transparent; color: #888; font-size: 10px; cursor: pointer; }
+  .conv-panel-toggle button.active { background: #2a2a4a; color: #fff; }
+
+  /* Conversation content area (BROKEN — empty) */
+  .conv-content { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 24px; }
+  .conv-empty { text-align: center; color: #888; font-size: 12px; }
+  .conv-resume-bar { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+  .conv-resume-bar button { padding: 5px 14px; border: 1px solid #444; border-radius: 6px; background: #2a3a5a; color: #7aa8ff; font-size: 11px; cursor: pointer; }
+
+  /* Labels for audit */
+  .audit-label { position: relative; }
+  .audit-label::after { content: attr(data-audit); position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
+  .audit-label[data-audit-type="component"]::after { background: #334; color: #8af; }
+  .audit-label[data-audit-type="bug"]::after { background: #422; color: #f88; }
+  .audit-label[data-audit-type="file"]::after { background: #232; color: #8c8; }
+
+  .resize-handle { width: 3px; background: #333; cursor: col-resize; }
+  .resize-handle:hover { background: #556; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- ════════════════ SIDEBAR ════════════════ -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">
+        Command Deck
+        <span style="font-size:10px;color:#666">[ModelPicker] [+]</span>
+      </div>
+      <div class="segment-control">
+        <button class="segment-btn active">Projects <span class="segment-count">18</span></button>
+        <button class="segment-btn">Conversations <span class="segment-count">117</span></button>
+      </div>
+      <div class="tree-filter">
+        <button class="active">all</button>
+        <button>alive</button>
+        <button>failed</button>
+      </div>
+    </div>
+    <div class="tree-content">
+      <div class="project-node">
+        <div class="project-label">panopticon-cli (14)</div>
+        <div class="issue-item"><span class="issue-id">PAN-103</span> <span class="issue-title">Dashboard UI progressive disclosure</span></div>
+        <div class="issue-item"><span class="issue-id">PAN-349</span> <span class="issue-title">Dashboard merge timeout…</span> <span class="session-dots"><span class="dot ended"></span></span></div>
+        <div class="issue-item selected">
+          <span class="issue-id">PAN-862</span> <span class="issue-title">Tree: resource-view foundation</span>
+          <span class="session-dots"><span class="dot active"></span><span class="dot ended"></span><span class="dot error"></span><span class="dot error"></span></span>
+        </div>
+        <div class="issue-item"><span class="issue-id">PAN-866</span> <span class="issue-title">Zone C-2 tabs</span> <span class="session-dots"><span class="dot active"></span></span></div>
+      </div>
+    </div>
+    <div class="sidebar-footer">v0.8.0</div>
+  </div>
+
+  <div class="resize-handle"></div>
+
+  <!-- ════════════════ CONTENT ════════════════ -->
+  <div class="content">
+    <!-- ── Zone A: IssueHeader + ZoneActionStrip ── -->
+    <!-- File: ZoneA.tsx → IssueHeader.tsx + ZoneActionStrip.tsx -->
+    <div class="zone-a audit-label" data-audit="ZoneA.tsx → IssueHeader + ZoneActionStrip" data-audit-type="file">
+      <div class="issue-header">
+        <span class="zone-a-label">ZONE A</span>
+        <span class="zone-a-key issue-key">PAN-862</span>
+        <span class="zone-a-desc issue-desc">Tree: resource-view foundation (Surface BLI, resource-allocated issues + per-row resource…)</span>
+      </div>
+      <div class="action-strip">
+        <button>▶ Start</button>
+        <button>⏸ Pause</button>
+        <button>■ Stop</button>
+        <button>🔄 Restart</button>
+        <button>📋 Beads</button>
+        <button>PRD</button>
+        <button>vBRIEF</button>
+      </div>
+    </div>
+
+    <!-- ── Session Strip (horizontal strip of session chips) ── -->
+    <!-- Rendered by FeatureItem.tsx sessions inside the tree, OR by IssueWorkbench via sessions prop -->
+    <div class="session-strip audit-label" data-audit="Sessions from IssueWorkbench.sessions" data-audit-type="component">
+      <div class="session-chip"><span class="dot active"></span> work</div>
+      <div class="session-chip"><span class="dot ended"></span> legacy</div>
+      <div class="session-chip selected" style="border-color:#ef4444"><span class="dot error"></span> review</div>
+      <div class="session-chip"><span class="dot error"></span> reviewer:correctness</div>
+      <div class="session-chip"><span class="dot error"></span> reviewer:security</div>
+      <div class="session-chip"><span class="dot error"></span> reviewer:performance</div>
+      <div class="session-chip"><span class="dot error"></span> reviewer:requirements</div>
+      <div class="session-chip"><span class="dot error"></span> reviewer:synthesis</div>
+    </div>
+
+    <!-- ── Zone B: Agent Context Strip ── -->
+    <!-- File: ZoneB.tsx → RoleBadge + StatusDot + ZoneBActionStrip + ToolFlash + RoundCard -->
+    <div class="zone-b audit-label" data-audit="ZoneB.tsx" data-audit-type="file">
+      <div class="zone-b-main">
+        <span class="zone-b-label">ZONE B</span>
+        <span style="background:#422;color:#f88;padding:2px 6px;border-radius:4px;font-size:10px;">review</span>
+        <span style="font-weight:600">review:correctness</span>
+        <span class="dot error" style="display:inline-block"></span>
+        <span style="color:#888">specialist</span>
+        <span style="color:#888;margin-left:auto">—</span>
+      </div>
+      <div class="zone-b-summary">
+        <span>0 rounds</span>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════ -->
+    <!-- ZONE C — THIS IS WHERE THE BUGS ARE                     -->
+    <!-- ════════════════════════════════════════════════════════ -->
+    <div class="zone-c">
+
+      <!-- ─── BUG #1: SessionPanel HEADER (DUPLICATE of ConversationPanel header) ─── -->
+      <!-- File: SessionView/SessionPanel.tsx lines 126-157 -->
+      <div class="session-panel-header audit-label" data-audit="BUG: SessionPanel.tsx — DUPLICATE header" data-audit-type="bug">
+        <span style="color:#888">review:correctness</span>
+        <span class="dot error" style="display:inline-block"></span>
+        <span style="color:#666">specialist</span>
+        <span style="color:#666">—</span>
+        <div class="session-panel-toggle">
+          <button class="active">Conversation</button>
+          <button>Terminal</button>
+        </div>
+      </div>
+
+      <!-- ─── BUG #2: ConversationPanel HEADER (ALSO has its own header + toggle) ─── -->
+      <!-- File: chat/ConversationPanel.tsx lines 217-292 -->
+      <!-- Only renders when synthesizedConversation exists (hasJsonl=true) -->
+      <div class="conv-panel-header audit-label" data-audit="BUG: ConversationPanel.tsx — 2nd header + toggle" data-audit-type="bug">
+        <span style="color:#ccc">specialist-panopticon-cli-PAN-862-review-correctness</span>
+        <span style="color:#ef4444;font-size:10px">● ended</span>
+        <span style="color:#666;font-size:10px">d2df9381-4d86…</span>
+        <span style="color:#666;cursor:pointer">📋</span>
+        <!-- THIS TOGGLE IS HIDDEN when session is ended (showTerminal=false), but the header still renders -->
+      </div>
+
+      <!-- ─── BUG #3: Conversation content EMPTY — messages endpoint returns 404 ─── -->
+      <!-- ConversationView fetches /api/conversations/{sessionId}/messages -->
+      <!-- The regex in conversations.ts line 1236 does NOT match "review-correctness" -->
+      <!-- so it returns 404 → messages=[] → isOrphaned=true → shows empty state -->
+      <div class="conv-content">
+        <div class="conv-empty audit-label" data-audit="BUG: isOrphaned → empty state" data-audit-type="bug">
+          <p>This conversation has no saved history.</p>
+          <p style="font-size:11px;color:#666;margin-top:4px">The session may have ended before any messages were exchanged.</p>
+          <div class="conv-resume-bar">
+            <span style="font-size:10px;color:#666">[ModelPicker]</span>
+            <button>Resume Session</button>
+            <button style="background:transparent;color:#888;border-color:#333">Archive</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── BUG #4: Resume bar at bottom (ALSO shows Resume + Model picker) ─── -->
+      <!-- ConversationPanel.tsx lines 533-543: bottom resume bar when onResume is set -->
+      <div style="padding:8px 12px;border-top:1px solid #333;display:flex;gap:8px;align-items:center;background:#1e1e38" class="audit-label" data-audit="BUG: ConversationPanel bottom resume bar (duplicate)" data-audit-type="bug">
+        <span style="font-size:10px;color:#666">[ModelPicker]</span>
+        <button style="padding:4px 12px;border:1px solid #444;border-radius:4px;background:#2a3a5a;color:#7aa8ff;font-size:11px;cursor:pointer">Resume Session</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+</body>
+</html>

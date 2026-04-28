@@ -162,19 +162,29 @@ const githubForgeAdapter: ForgeAdapter = {
   async mergeReviewArtifact(input) {
     const target = buildGitHubReviewTarget(input);
     const method = input.method || 'squash';
+    console.log(`[forge] mergeReviewArtifact: ${input.forge} ${target} method=${method} repo=${input.repository ?? 'default'}`);
     if (!isGitHubAppConfigured()) {
-      await execAsync(
-        `gh pr merge ${target}${buildRepositoryFlag(input.repository)} --${method}`,
-        { cwd: input.cwd, encoding: 'utf-8' }
-      );
-      return;
+      try {
+        console.log(`[forge] gh pr merge: executing ${method} merge for ${target}`);
+        await execAsync(
+          `gh pr merge ${target}${buildRepositoryFlag(input.repository)} --${method}`,
+          { cwd: input.cwd, encoding: 'utf-8' }
+        );
+        console.log(`[forge] gh pr merge: completed successfully for ${target}`);
+        return;
+      } catch (err: any) {
+        console.error(`[forge] gh pr merge: failed for ${target}: exitCode=${err.code} message=${err.message}`);
+        throw err;
+      }
     }
 
     const ref = parsePullRequestRef(input);
     const deadline = Date.now() + GITHUB_MERGE_TIMEOUT_MS;
+    console.log(`[forge] mergeReviewArtifact: GitHub App path for ${ref.owner}/${ref.repo}#${ref.number}, timeout=${GITHUB_MERGE_TIMEOUT_MS}ms`);
 
     while (Date.now() < deadline) {
       const state = await getPullRequestState(ref.owner, ref.repo, ref.number);
+      console.log(`[forge] mergeReviewArtifact: PR #${ref.number} state=${state.state} merged=${state.merged} draft=${state.draft} checksFailed=${state.checksFailed}`);
 
       if (state.merged) return;
       if (state.state !== 'OPEN') {
@@ -200,9 +210,11 @@ const githubForgeAdapter: ForgeAdapter = {
           method,
           state.headSha || undefined,
         );
+        console.log(`[forge] mergePullRequestWithApp: result merged=${mergeResult.merged} for ${ref.owner}/${ref.repo}#${ref.number}`);
         if (mergeResult.merged) return;
       } catch (err: any) {
         const message = String(err?.message || err);
+        console.error(`[forge] mergePullRequestWithApp: threw for ${ref.number}: ${message}`);
         if (
           message.includes('405') ||
           message.includes('409') ||
