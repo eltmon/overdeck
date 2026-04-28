@@ -46,6 +46,8 @@ import { IssueDataService } from '../services/issue-data-service.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
+import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
+import { getCachedRunningAgents } from '../services/running-agents-cache.js';
 import { invalidateAgentsCache } from './agents.js';
 import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js';
 import { LinearClient } from '../services/linear-client.js';
@@ -3082,13 +3084,21 @@ const getIssueCostsRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    syncCache();
     const issueData = getCostsForIssue(id);
+    const agents = yield* Effect.promise(() => getCachedRunningAgents());
+    const resolvedCost = resolveIssueHeadlineCost({
+      issueId: id,
+      aggregateCost: issueData?.totalCost,
+      agents,
+    });
 
     if (!issueData) {
       return jsonResponse({
         issueId: id.toUpperCase(),
         totalCost: 0,
+        resolvedTotalCost: resolvedCost.resolvedTotalCost,
+        aggregateCost: resolvedCost.aggregateCost,
+        liveCost: resolvedCost.liveCost,
         totalTokens: 0,
         inputTokens: 0,
         outputTokens: 0,
@@ -3107,6 +3117,9 @@ const getIssueCostsRoute = HttpRouter.add(
     return jsonResponse({
       issueId: id.toUpperCase(),
       totalCost: issueData.totalCost,
+      resolvedTotalCost: resolvedCost.resolvedTotalCost,
+      aggregateCost: resolvedCost.aggregateCost,
+      liveCost: resolvedCost.liveCost,
       totalTokens: issueData.inputTokens + issueData.outputTokens + issueData.cacheReadTokens + issueData.cacheWriteTokens,
       inputTokens: issueData.inputTokens,
       outputTokens: issueData.outputTokens,

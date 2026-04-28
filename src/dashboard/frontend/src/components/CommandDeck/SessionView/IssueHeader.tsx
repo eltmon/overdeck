@@ -1,56 +1,25 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { ListTodo, FileText, RefreshCw, ExternalLink, AlertTriangle, ShieldCheck, Package } from 'lucide-react';
-import type { ReviewStatus } from '../../inspector/types';
+import { useAlert } from '../../DialogProvider';
 import { isReviewPipelineStuck } from '../../../lib/pipeline-state';
 import { ActivitySparkline, type SparklineEvent } from '../ActivitySparkline';
+import {
+  useActivityQuery,
+  usePlanningSummaryWithOverridesQuery,
+  useReviewStatusQuery,
+  type PlanningResponse,
+  type PlanningArtifact,
+  type PlanningSummaryResponse,
+  type ReviewStatusData,
+} from '../ZoneCOverviewTabs/queries';
 import styles from '../styles/command-deck.module.css';
 
-interface PlanningData {
-  prd?: string;
-  state?: string;
-  inference?: string;
-  statusReview?: string;
-  statusReviewedAt?: string;
-  transcripts: Array<{ filename: string; content: string; uploadedAt: string }>;
-  discussions: Array<{ filename: string; content: string; syncedAt: string }>;
-  notes: Array<{ filename: string; content: string; uploadedAt: string }>;
-  acceptanceProgress?: { completed: number; total: number; percent: number };
-  stashCount?: number;
-}
-
-interface ActivitySection {
-  type: string;
-  startedAt: string;
-  status: string;
-}
-
-interface ActivityData {
-  sections: ActivitySection[];
-}
-
-async function fetchPlanning(issueId: string): Promise<PlanningData> {
-  const res = await fetch(`/api/command-deck/planning/${issueId}`);
-  if (!res.ok) throw new Error('Failed to fetch planning');
-  return res.json();
-}
-
-async function fetchReviewStatus(issueId: string): Promise<ReviewStatus> {
-  const res = await fetch(`/api/review/${issueId}/status`);
-  if (!res.ok) throw new Error('Failed to fetch review status');
-  return res.json();
-}
-
-async function fetchActivity(issueId: string): Promise<ActivityData> {
-  const res = await fetch(`/api/command-deck/activity/${issueId}`);
-  if (!res.ok) throw new Error('Failed to fetch activity');
-  return res.json();
-}
+type PlanningStageData = Pick<PlanningSummaryResponse, 'hasPrd' | 'hasState'>;
 
 interface IssueHeaderProps {
   issueId: string;
   title: string;
-  cost?: number;
   source?: string;
   url?: string;
   onOpenBeads?: () => void;
@@ -89,11 +58,11 @@ function StageDot({ label, stage }: StageDotProps) {
 
 /** Derive the six stage statuses from review status + planning state (PAN-830 high-2). */
 function deriveStageStatuses(
-  reviewStatus: ReviewStatus | undefined,
-  planning: PlanningData | undefined,
+  reviewStatus: ReviewStatusData | undefined,
+  planning: PlanningStageData | undefined,
 ): Array<{ label: string; stage: StageStatus }> {
   const merged = reviewStatus?.mergeStatus === 'merged';
-  const hasPlan = !!planning?.prd || !!planning?.state;
+  const hasPlan = planning?.hasPrd === true || planning?.hasState === true;
 
   // Planning: done if plan exists, pending otherwise
   const planningStage: StageStatus = merged ? 'done' : hasPlan ? 'done' : 'pending';
@@ -160,30 +129,47 @@ function deriveStageStatuses(
 
 function formatCost(cost: number): string {
   if (cost < 0.01) return '<$0.01';
-  if (cost < 1) return `$${cost.toFixed(2)}`;
   return `$${cost.toFixed(2)}`;
 }
 
-export function IssueHeader({ issueId, title, cost, url, onOpenBeads }: IssueHeaderProps) {
+function formatArtifactDate(value?: string): string {
+  if (!value) return 'unknown time';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'unknown time';
+  return date.toLocaleString();
+}
+
+function formatArtifactCollection(
+  title: string,
+  artifacts: PlanningArtifact[] | undefined,
+  emptyLabel: string,
+): string {
+  if (!artifacts || artifacts.length === 0) {
+    return emptyLabel;
+  }
+
+  return `${title} (${artifacts.length})\n\n${artifacts
+    .map((artifact) => {
+      const timestamp = artifact.uploadedAt ?? artifact.syncedAt;
+      const metaLine = timestamp ? `\n_Last updated: ${formatArtifactDate(timestamp)}_\n` : '';
+      return `## ${artifact.filename ?? title}${metaLine}\n${artifact.content ?? ''}`;
+    })
+    .join('\n\n---\n\n')}`;
+}
+
+export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderProps) {
   const [syncing, setSyncing] = useState(false);
+  const queryClient = useQueryClient();
+  const showAlert = useAlert();
 
-  const { data: planning } = useQuery({
-    queryKey: ['command-deck-planning', issueId],
-    queryFn: () => fetchPlanning(issueId),
-    refetchInterval: 30000,
+  const planningSummary = usePlanningSummaryWithOverridesQuery(issueId, {
+    staleTime: 30_000,
   });
+  const reviewStatusQuery = useReviewStatusQuery(issueId);
+  const activityQuery = useActivityQuery(issueId);
 
-  const { data: reviewStatus } = useQuery({
-    queryKey: ['review-status', issueId],
-    queryFn: () => fetchReviewStatus(issueId),
-    refetchInterval: 10000,
-  });
-
-  const { data: activity } = useQuery({
-    queryKey: ['command-deck-activity', issueId],
-    queryFn: () => fetchActivity(issueId),
-    refetchInterval: 30000,
-  });
+  const reviewStatus = reviewStatusQuery.data;
+  const activity = activityQuery.data;
 
   const handleSync = async () => {
     setSyncing(true);
@@ -200,7 +186,45 @@ export function IssueHeader({ issueId, title, cost, url, onOpenBeads }: IssueHea
     }
   };
 
-  const stageStatuses = useMemo(() => deriveStageStatuses(reviewStatus, planning), [reviewStatus, planning]);
+  const showPlanningArtifact = async (
+    title: string,
+    renderMessage: (planning: PlanningResponse) => string,
+    emptyMessage: string,
+  ) => {
+    try {
+      const planning = await queryClient.fetchQuery({
+        queryKey: ['command-deck-planning', issueId, 'full'],
+        queryFn: async () => {
+          const response = await fetch(`/api/command-deck/planning/${issueId}`);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status} ${response.statusText}`);
+          }
+          return response.json() as Promise<PlanningResponse>;
+        },
+        staleTime: 30_000,
+      });
+
+      const message = renderMessage(planning);
+      await showAlert({
+        title,
+        message: message || emptyMessage,
+      });
+    } catch (error) {
+      console.error(`Failed to load ${title}:`, error);
+      await showAlert({
+        title: `Unable to load ${title}`,
+        message: emptyMessage,
+        variant: 'error',
+      });
+    }
+  };
+
+  const planningForStageStatus = planningSummary.data;
+
+  const stageStatuses = useMemo(
+    () => deriveStageStatuses(reviewStatus, planningForStageStatus),
+    [reviewStatus, planningForStageStatus],
+  );
   const stuck = isReviewPipelineStuck(reviewStatus ?? undefined);
 
   // Activity sparkline events from session sections (PAN-847)
@@ -224,8 +248,9 @@ export function IssueHeader({ issueId, title, cost, url, onOpenBeads }: IssueHea
       .filter((e) => !Number.isNaN(e.timestamp));
   }, [activity]);
 
-  const ac = planning?.acceptanceProgress;
-  const stashCount = planning?.stashCount ?? 0;
+  const ac = planningSummary.data?.acceptanceProgress;
+  const stashCount = planningSummary.data?.stashCount ?? 0;
+  const resolvedTotalCost = activity?.resolvedTotalCost ?? null;
 
   // Quality-gate indicator from verification status (PAN-847)
   const qgStatus = reviewStatus?.verificationStatus;
@@ -239,7 +264,7 @@ export function IssueHeader({ issueId, title, cost, url, onOpenBeads }: IssueHea
           : undefined;
 
   return (
-    <div className={styles.issueHeader}>
+    <div className={styles.issueHeader} data-testid="issue-header" data-issue={issueId}>
       {/* Row 1: ID + title + pipeline + cost + sparkline */}
       <div className={styles.issueHeaderRow}>
         <div className={styles.issueHeaderLeft}>
@@ -337,8 +362,8 @@ export function IssueHeader({ issueId, title, cost, url, onOpenBeads }: IssueHea
               buckets={8}
             />
           )}
-          {cost !== undefined && cost > 0 && (
-            <span className={styles.issueHeaderCost}>{formatCost(cost)}</span>
+          {resolvedTotalCost !== null && (
+            <span className={styles.issueHeaderCost} data-testid="zone-a-cost">{formatCost(resolvedTotalCost)}</span>
           )}
         </div>
       </div>
@@ -390,10 +415,16 @@ export function IssueHeader({ issueId, title, cost, url, onOpenBeads }: IssueHea
         </button>
 
         {/* Density rule: suppress default-value badges (PAN-847 pan-35kn) */}
-        {planning?.state && (
+        {planningSummary.data?.hasState && (
           <button
             className={styles.issueHeaderBtn}
-            onClick={() => alert('STATE.md\n\n' + planning.state)}
+            onClick={() => {
+              void showPlanningArtifact(
+                'STATE.md',
+                (planning) => planning.state ? `STATE.md\n\n${planning.state}` : '',
+                'No STATE.md recorded for this issue.',
+              );
+            }}
             title="View STATE.md"
           >
             <FileText size={11} />
@@ -401,10 +432,16 @@ export function IssueHeader({ issueId, title, cost, url, onOpenBeads }: IssueHea
           </button>
         )}
 
-        {planning?.prd && (
+        {planningSummary.data?.hasPrd && (
           <button
             className={styles.issueHeaderBtn}
-            onClick={() => alert('PRD\n\n' + planning.prd)}
+            onClick={() => {
+              void showPlanningArtifact(
+                'PRD',
+                (planning) => planning.prd ? `PRD\n\n${planning.prd}` : '',
+                'No PRD recorded for this issue.',
+              );
+            }}
             title="View PRD"
           >
             <FileText size={11} />
@@ -412,31 +449,45 @@ export function IssueHeader({ issueId, title, cost, url, onOpenBeads }: IssueHea
           </button>
         )}
 
-        {(planning?.discussions?.length ?? 0) > 0 && (
+        {(planningSummary.data?.discussionCount ?? 0) > 0 && (
           <button
             className={styles.issueHeaderBtn}
             onClick={() => {
-              const content = planning!.discussions.map(d => `## ${d.filename}\n\n${d.content}`).join('\n\n---\n\n');
-              alert(`Discussions (${planning!.discussions.length})\n\n${content}`);
+              void showPlanningArtifact(
+                'Discussions',
+                (planning) => formatArtifactCollection(
+                  'Discussions',
+                  planning.discussions,
+                  'No discussions recorded for this issue.',
+                ),
+                'No discussions recorded for this issue.',
+              );
             }}
             title="View discussions"
           >
             Discussions
-            <span className={styles.issueHeaderBadge}>{planning!.discussions.length}</span>
+            <span className={styles.issueHeaderBadge}>{planningSummary.data?.discussionCount ?? 0}</span>
           </button>
         )}
 
-        {(planning?.transcripts?.length ?? 0) > 0 && (
+        {(planningSummary.data?.transcriptCount ?? 0) > 0 && (
           <button
             className={styles.issueHeaderBtn}
             onClick={() => {
-              const content = planning!.transcripts.map(t => `## ${t.filename}\n\n${t.content}`).join('\n\n---\n\n');
-              alert(`Transcripts (${planning!.transcripts.length})\n\n${content}`);
+              void showPlanningArtifact(
+                'Transcripts',
+                (planning) => formatArtifactCollection(
+                  'Transcripts',
+                  planning.transcripts,
+                  'No transcripts recorded for this issue.',
+                ),
+                'No transcripts recorded for this issue.',
+              );
             }}
             title="View transcripts"
           >
             Transcripts
-            <span className={styles.issueHeaderBadge}>{planning!.transcripts.length}</span>
+            <span className={styles.issueHeaderBadge}>{planningSummary.data?.transcriptCount ?? 0}</span>
           </button>
         )}
 

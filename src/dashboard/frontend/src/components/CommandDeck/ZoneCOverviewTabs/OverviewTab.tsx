@@ -223,10 +223,9 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
   const sections = activity.data?.sections ?? [];
   const stage = deriveStageFromSections(sections);
   const isCostPending = costs.isLoading && activity.isLoading;
-  const totalCost = costs.data?.totalCost
-    ?? (costs.isError ? activity.data?.totalCost : undefined)
-    ?? (!activity.isLoading ? activity.data?.totalCost : undefined)
-    ?? null;
+  const costFromIssues = costs.data?.resolvedTotalCost;
+  const costFromActivity = !activity.isLoading ? activity.data?.resolvedTotalCost : undefined;
+  const totalCost = costFromIssues ?? costFromActivity ?? null;
   const lastLabel = lastActivityLabel(sections);
   const activeAgentCount = sections.filter(
     (s) => s.status === 'running' || s.status === 'active',
@@ -363,9 +362,11 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
             }}
           >
             <span style={{ fontSize: 18, fontWeight: 700 }}>
-              {isCostPending || totalCost === null
+              {isCostPending
                 ? <span data-testid="overview-cost-loading">Loading…</span>
-                : <LiveCounter value={totalCost} unit="$" precision={2} pulseOnIncrement />}
+                : totalCost === null
+                  ? null
+                  : <LiveCounter value={totalCost} unit="$" precision={2} pulseOnIncrement />}
             </span>
             <span style={{ fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
               cost to date
@@ -485,9 +486,11 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         <Tile title="Cost" icon={<Code2 size={14} />} testid="overview-tile-cost">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <div style={{ fontSize: 14, fontWeight: 600 }}>
-              {isCostPending || totalCost === null
+              {isCostPending
                 ? <span data-testid="overview-cost-tile-loading">Loading…</span>
-                : <LiveCounter value={totalCost} unit="$" precision={2} />}
+                : totalCost === null
+                  ? null
+                  : <LiveCounter value={totalCost} unit="$" precision={2} />}
             </div>
             {costs.data?.byModel && Object.keys(costs.data.byModel).length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
