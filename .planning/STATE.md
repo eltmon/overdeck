@@ -33,3 +33,4 @@ All frontend and backend work for PAN-905 is finished. The Awaiting Merge page i
 
 ## Specialist Feedback
 - All feedback files in `.planning/feedback/` are for PAN-854 (approved issue), not PAN-905. No actionable feedback for PAN-905.
+- **[2026-04-28T18:29Z] verification-gate → FAILED** — `.planning/feedback/008-verification-gate-failed.md`
