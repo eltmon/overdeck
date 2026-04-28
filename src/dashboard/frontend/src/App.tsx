@@ -31,6 +31,7 @@ import { StandaloneTerminal } from './components/StandaloneTerminal';
 import { DeaconPauseBanner } from './components/DeaconPauseToggle';
 import { StoppedAgentsBanner } from './components/StoppedAgentsBanner';
 import { CodexAuthBanner } from './components/CodexAuthBanner';
+import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { SystemHealthPill } from './components/SystemHealthPill';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
@@ -233,6 +234,7 @@ export default function App() {
       window.history.replaceState(null, '', window.location.pathname);
     }
   }, []);
+  useCodexAutoRetry();
   // Sync deep-link on hash change (browser back/forward or direct navigation)
   useEffect(() => {
     const onHashChange = () => {

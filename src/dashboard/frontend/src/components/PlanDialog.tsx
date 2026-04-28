@@ -5,6 +5,7 @@ import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square
 import { Rnd } from 'react-rnd';
 import { useDashboardStore } from '../lib/store';
 import { Issue, type StartAgentResponse } from '../types';
+import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
 import { XTerminal } from './XTerminal';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { useConfirm } from './DialogProvider';
@@ -373,23 +374,29 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   const startAgentMutation = useMutation({
     mutationFn: async () => {
       const requestBody = { issueId: issue.identifier, phase: 'implementation' };
+      let lastRequestBody: Record<string, unknown> = requestBody;
       let res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(lastRequestBody),
       });
       let data = await res.json().catch(() => ({})) as StartAgentResponse;
       if (res.status === 409 && data.requiresAcknowledgement) {
         const confirmed = await acknowledgeGuardrailWarnings(data);
         if (!confirmed) throw new Error('Agent start canceled');
+        lastRequestBody = { ...requestBody, guardrailAcknowledged: true };
         res = await fetch('/api/agents', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...requestBody, guardrailAcknowledged: true }),
+          body: JSON.stringify(lastRequestBody),
         });
         data = await res.json().catch(() => ({})) as StartAgentResponse;
       }
       if (!res.ok) {
+        if (isCodexBlockedResponse(res, data)) {
+          setPendingCodexSpawn(lastRequestBody);
+          throw new Error(data.hint || data.error || 'Codex authentication expired — re-authenticate to continue');
+        }
         throw new Error(data.error || data.hint || 'Failed to start agent');
       }
       return data;

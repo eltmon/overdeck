@@ -30,6 +30,7 @@ import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/
 import { SpecialistAgent } from './SpecialistAgentCard';
 import { useConfirm, useAlert } from './DialogProvider';
 import { CostBreakdownModal } from './CostBreakdownModal';
+import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
 import { VBriefDialog } from './vbrief/VBriefDialog';
 import { useUIPreferences } from '../hooks/useUIPreferences';
 import { ResetIssueButton } from './ResetIssueButton';
@@ -2685,10 +2686,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   const startAgentMutation = useMutation({
     mutationFn: async () => {
       const requestBody = { issueId: issue.identifier };
+      let lastRequestBody: Record<string, unknown> = requestBody;
       let res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(lastRequestBody),
       });
       let text = await res.text();
       let data: StartAgentResponse = {};
@@ -2698,10 +2700,11 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
       if (res.status === 409 && data.requiresAcknowledgement) {
         const confirmed = await acknowledgeGuardrailWarnings(data);
         if (!confirmed) throw new Error('Agent start canceled');
+        lastRequestBody = { ...requestBody, guardrailAcknowledged: true };
         res = await fetch('/api/agents', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...requestBody, guardrailAcknowledged: true }),
+          body: JSON.stringify(lastRequestBody),
         });
         text = await res.text();
         try {
@@ -2711,6 +2714,10 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
         }
       }
       if (!res.ok) {
+        if (isCodexBlockedResponse(res, data)) {
+          setPendingCodexSpawn(lastRequestBody);
+          throw new Error(data.hint || data.error || 'Codex authentication expired — re-authenticate to continue');
+        }
         let message = `Failed to start agent (${res.status})`;
         if (typeof (data as any).error === 'string' && (data as any).error.length > 0) {
           message = (data as any).error;

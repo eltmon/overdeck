@@ -348,7 +348,7 @@
       {
         "id": "settings-codex-status",
         "title": "Show Codex auth type and status in Settings page",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -362,7 +362,7 @@
           {
             "id": "settings-codex-status.ac1",
             "title": "Settings page shows 'Subscription OAuth' auth type for the Codex provider",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -370,7 +370,7 @@
           {
             "id": "settings-codex-status.ac2",
             "title": "Settings page shows live status (Valid/Expired) with email and expiry time",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -378,7 +378,7 @@
           {
             "id": "settings-codex-status.ac3",
             "title": "Re-authenticate button in settings triggers the same reauth flow as the banner",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
