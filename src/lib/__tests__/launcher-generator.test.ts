@@ -16,6 +16,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      unset TMUX TMUX_PANE STY
       export CI=1
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
@@ -35,6 +36,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      unset TMUX TMUX_PANE STY
       export CI=1
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
@@ -59,6 +61,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      unset TMUX TMUX_PANE STY
       export CI=1
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
@@ -85,6 +88,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      unset TMUX TMUX_PANE STY
       export CI=1
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export TERM=xterm-256color
@@ -130,6 +134,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      unset TMUX TMUX_PANE STY
       set -o pipefail
       export CI=1
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
@@ -168,6 +173,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
       unset ANTHROPIC_BASE_URL
@@ -195,6 +201,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      unset TMUX TMUX_PANE STY
       set -o pipefail
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
@@ -221,6 +228,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export TERM=xterm-256color
       export COLORTERM=truecolor
@@ -251,6 +259,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export TERM=xterm-256color
       export COLORTERM=truecolor
@@ -278,6 +287,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export PATH="/usr/local/bin:$PATH"
       prompt=$(cat '/workspace/.pan/prompts/agent.md')
@@ -296,6 +306,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
       prompt=$(cat '/tmp/init-prompt.txt')
@@ -314,6 +325,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 'Please read the continuation prompt and continue.'
@@ -350,6 +362,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      unset TMUX TMUX_PANE STY
       export CI=1
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       exec claude --model claude-sonnet-4-6

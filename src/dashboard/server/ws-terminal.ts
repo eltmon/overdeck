@@ -21,6 +21,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
 import { buildTmuxCommandString, buildTmuxArgs, capturePaneAsync, getWindowDimensionsAsync, listSessionNamesAsync, resizeWindowAsync, sessionExistsAsync } from '../../lib/tmux.js';
+import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
 
 type ClientControlMessage =
   | { type: 'attach'; cols: number; rows: number }
@@ -364,13 +365,16 @@ export function setupTerminalWebSocket(server: http.Server): void {
         // Strip TMUX/TMUX_PANE from inherited env so `tmux attach-session` doesn't refuse
         // with "sessions should be nested with care, unset $TMUX to force" when the
         // dashboard server itself was launched from inside a tmux pane.
-        const { TMUX: _tmux, TMUX_PANE: _tmuxPane, ...envWithoutTmux } = process.env;
         ptyProcess = pty.spawn('tmux', buildTmuxArgs(['attach-session', '-t', sessionName]), {
           name: 'xterm-256color',
           cols: hub.cols,
           rows: hub.rows,
           cwd: homedir(),
-          env: { ...envWithoutTmux, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as { [key: string]: string },
+          env: buildChildEnvWithoutTmux(process.env, {
+            TERM: 'xterm-256color',
+            COLORTERM: 'truecolor',
+            LANG: 'en_US.UTF-8',
+          }) as { [key: string]: string },
         });
 
         hub.pty = ptyProcess;
