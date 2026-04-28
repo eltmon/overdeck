@@ -37,7 +37,6 @@ interface IssueWorkbenchProps {
   issueId: string;
   title: string;
   sessions: readonly SessionNodeType[];
-  cost?: number;
   source?: string;
   url?: string;
   onOpenBeads?: () => void;
@@ -51,7 +50,6 @@ export function IssueWorkbench({
   issueId,
   title,
   sessions,
-  cost,
   source,
   url,
   onOpenBeads,
@@ -130,7 +128,6 @@ export function IssueWorkbench({
       <ZoneA
         issueId={issueId}
         title={title}
-        cost={cost}
         source={source}
         url={url}
         onOpenBeads={onOpenBeads}

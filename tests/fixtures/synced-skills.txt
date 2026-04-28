@@ -57,6 +57,7 @@ pan-show
 pan-skill-creator
 pan-start
 pan-status
+pan-stop-all-agents
 pan-subagent-creator
 pan-sync
 pan-sync-main

@@ -7,14 +7,29 @@
  * Overview ↔ PRD ↔ Activity, etc.).
  */
 
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import {
+  useQuery,
+  type UseQueryOptions,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 
 export interface PlanningSummaryResponse {
   hasPrd: boolean;
   hasState: boolean;
+  hasInference?: boolean;
   acceptanceProgress?: { completed: number; total: number; percent: number };
   stashCount?: number;
   statusReviewedAt?: string;
+  transcriptCount?: number;
+  discussionCount?: number;
+  noteCount?: number;
+}
+
+export interface PlanningArtifact {
+  filename?: string;
+  content?: string;
+  uploadedAt?: string;
+  syncedAt?: string;
 }
 
 export interface PlanningResponse extends PlanningSummaryResponse {
@@ -22,14 +37,9 @@ export interface PlanningResponse extends PlanningSummaryResponse {
   state?: string;
   inference?: string;
   statusReview?: string;
-  transcripts?: Array<unknown>;
-  discussions?: Array<{
-    file?: string;
-    body?: string;
-    author?: string;
-    createdAt?: string;
-  }>;
-  notes?: Array<unknown>;
+  transcripts?: PlanningArtifact[];
+  discussions?: PlanningArtifact[];
+  notes?: PlanningArtifact[];
 }
 
 export interface ReviewerRoundSummary {
@@ -68,6 +78,9 @@ export interface ActivityResponse {
   sections: ActivitySection[];
   costByStage?: Record<string, { cost: number; tokens: number }>;
   totalCost?: number;
+  aggregateCost?: number | null;
+  liveCost?: number | null;
+  resolvedTotalCost?: number | null;
 }
 
 export interface SessionCost {
@@ -84,6 +97,9 @@ export interface SessionCost {
 export interface IssueCostData {
   issueId: string;
   totalCost: number;
+  resolvedTotalCost?: number | null;
+  aggregateCost?: number | null;
+  liveCost?: number | null;
   totalTokens: number;
   inputTokens?: number;
   outputTokens?: number;
@@ -110,11 +126,27 @@ export function usePlanningSummaryQuery(issueId: string): UseQueryResult<Plannin
   });
 }
 
-export function usePlanningQuery(issueId: string): UseQueryResult<PlanningResponse> {
+export function usePlanningSummaryWithOverridesQuery(
+  issueId: string,
+  options?: Omit<UseQueryOptions<PlanningSummaryResponse>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<PlanningSummaryResponse> {
+  return useQuery({
+    queryKey: ['command-deck-planning', issueId, 'summary'],
+    queryFn: () => fetchJson<PlanningSummaryResponse>(`/api/command-deck/planning/${issueId}?summary=1`),
+    refetchInterval: 30_000,
+    ...options,
+  });
+}
+
+export function usePlanningQuery(
+  issueId: string,
+  options?: Omit<UseQueryOptions<PlanningResponse>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<PlanningResponse> {
   return useQuery({
     queryKey: ['command-deck-planning', issueId, 'full'],
     queryFn: () => fetchJson<PlanningResponse>(`/api/command-deck/planning/${issueId}`),
     refetchInterval: false,
+    ...options,
   });
 }
 
