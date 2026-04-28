@@ -121,12 +121,15 @@ export function handlePullRequest(payload: WebhookPayload): void {
       };
       blockers = blockers.filter((b) => b.type !== 'draft_pr');
       blockers = [...blockers, draftBlocker];
-    } else if (!pr.draft) {
+    } else {
+      // Covers pr.draft === false and pr.draft === undefined (older payloads)
       blockers = blockers.filter((b) => b.type !== 'draft_pr');
     }
 
-    // Non-mergeable state
-    if (pr.mergeable_state) {
+    // Non-mergeable state — only mutate when GitHub has computed a value.
+    // When mergeable_state is null/undefined, the payload is incomplete;
+    // leave existing blockers untouched to avoid flicker.
+    if (pr.mergeable_state !== null && pr.mergeable_state !== undefined) {
       if (pr.mergeable_state !== 'clean' && pr.mergeable_state !== 'unstable' && pr.mergeable_state !== 'dirty' && pr.mergeable_state !== 'unknown') {
         const notMergeableBlocker: BlockerReason = {
           type: 'not_mergeable',
@@ -140,7 +143,8 @@ export function handlePullRequest(payload: WebhookPayload): void {
       }
     }
 
-    // Merge conflict detection
+    // Merge conflict detection — only mutate on definitive values.
+    // null = GitHub is recomputing; leave blockers untouched.
     if (pr.mergeable === false || pr.mergeable_state === 'dirty') {
       const mergeConflictBlocker: BlockerReason = {
         type: 'merge_conflict',

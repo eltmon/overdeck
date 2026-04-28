@@ -178,7 +178,7 @@ export const ReviewStatusSnapshot = Schema.Struct({
   reviewSubStatuses: Schema.optional(Schema.Record(Schema.String, Schema.Literals(["running", "done"]))),
   /** PAN-905: GitHub-native merge blocker reasons */
   blockerReasons: Schema.optional(Schema.Array(Schema.Struct({
-    type: Schema.String,
+    type: Schema.Literals(['failing_checks', 'merge_conflict', 'unresolved_conversations', 'changes_requested', 'draft_pr', 'not_mergeable']),
     summary: Schema.String,
     details: Schema.optional(Schema.String),
     detectedAt: Schema.String,

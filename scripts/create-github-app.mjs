@@ -121,7 +121,7 @@ async function main() {
           res.end('GitHub did not return a webhook secret. App creation aborted.');
           return;
         }
-        writeFileSync(join(APP_DIR, 'webhook-secret'), data.webhook_secret);
+        writeFileSync(join(APP_DIR, 'webhook-secret'), data.webhook_secret, { mode: 0o600 });
         writeFileSync(join(APP_DIR, 'client-id'), data.client_id || '');
         writeFileSync(join(APP_DIR, 'client-secret'), data.client_secret || '', { mode: 0o600 });
         writeFileSync(join(APP_DIR, 'app-slug'), data.slug || 'panopticon-agent');

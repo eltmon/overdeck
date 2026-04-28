@@ -206,6 +206,7 @@ export function startSmeeProcess(): void {
 
   if (!child.pid) {
     console.error('[smee] Failed to spawn smee process');
+    try { closeSync(logFd); } catch { /* ignore */ }
     return;
   }
 

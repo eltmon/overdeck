@@ -15,6 +15,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
+import { getGitHubConfig } from '../services/tracker-config.js';
 import {
   handleCheckSuite,
   handleCheckRun,
@@ -63,6 +64,36 @@ function verifySignature(body: string, signature: string, secret: string): boole
   }
 }
 
+function dispatchWebhook(eventType: string, payload: WebhookPayload): void {
+  try {
+    switch (eventType) {
+      case 'check_suite':
+        handleCheckSuite(payload);
+        break;
+      case 'check_run':
+        handleCheckRun(payload);
+        break;
+      case 'pull_request':
+        handlePullRequest(payload);
+        break;
+      case 'pull_request_review':
+        handlePullRequestReview(payload);
+        break;
+      case 'pull_request_review_thread':
+        handlePullRequestReviewThread(payload);
+        break;
+      case 'status':
+        handleStatus(payload);
+        break;
+      default:
+        // Unknown events are silently accepted (GitHub expects 200)
+        break;
+    }
+  } catch (err) {
+    console.error(`[webhook] ${eventType} handler failed:`, err);
+  }
+}
+
 const postGitHubWebhookRoute = HttpRouter.add(
   'POST',
   '/api/webhooks/github',
@@ -105,32 +136,24 @@ const postGitHubWebhookRoute = HttpRouter.add(
       return jsonResponse({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
-    // Dispatch to event-specific handlers
-    switch (eventType) {
-      case 'check_suite':
-        handleCheckSuite(payload);
-        break;
-      case 'check_run':
-        handleCheckRun(payload);
-        break;
-      case 'pull_request':
-        handlePullRequest(payload);
-        break;
-      case 'pull_request_review':
-        handlePullRequestReview(payload);
-        break;
-      case 'pull_request_review_thread':
-        handlePullRequestReviewThread(payload);
-        break;
-      case 'status':
-        handleStatus(payload);
-        break;
-      default:
-        // Unknown events are silently accepted (GitHub expects 200)
-        break;
+    // Repository authorization: reject events from unconfigured repos
+    const ghConfig = getGitHubConfig();
+    const allowedRepos = new Set(
+      ghConfig?.repos.map((r) => `${r.owner}/${r.repo}`) ?? [],
+    );
+    const repoFullName = payload.repository?.full_name;
+    if (!repoFullName || !allowedRepos.has(repoFullName)) {
+      console.warn(`[webhook] Repository not allowed: ${repoFullName ?? 'unknown'}`);
+      return jsonResponse({ error: 'Repository not allowed' }, { status: 403 });
     }
 
-    console.log(`[webhook] Received ${eventType} event`);
+    // Dispatch handlers in the background so sync DB work doesn't block
+    // the HTTP response or the Node event loop.
+    yield* Effect.fork(
+      Effect.sync(() => dispatchWebhook(eventType, payload)),
+    );
+
+    console.log(`[webhook] Received ${eventType} event from ${repoFullName}`);
     return jsonResponse({ received: true, event: eventType });
   })),
 );
