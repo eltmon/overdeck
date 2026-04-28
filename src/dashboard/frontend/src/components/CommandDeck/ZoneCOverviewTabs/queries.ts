@@ -178,8 +178,19 @@ export interface ReviewStatusData {
   verificationMaxCycles?: number;
   testNotes?: string;
   reviewNotes?: string;
+  mergeNotes?: string;
+  mergeRetryCount?: number;
   readyForMerge: boolean;
   updatedAt: string;
+  /** PAN-905: GitHub-native merge blocker reasons */
+  blockerReasons?: BlockerReason[];
+}
+
+export interface BlockerReason {
+  type: 'failing_checks' | 'merge_conflict' | 'unresolved_conversations' | 'changes_requested' | 'draft_pr' | 'not_mergeable';
+  summary: string;
+  details?: string;
+  detectedAt: string;
 }
 
 export function useReviewStatusQuery(issueId: string): UseQueryResult<ReviewStatusData> {

@@ -3,15 +3,15 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementation in progress. Completed pan-l4wu (schema) and pan-91h1 (readyForMerge enrichment). Next up: pan-zg92 (webhook route), pan-vwrn (smee client), pan-4c7b (frontend types), pan-vb4m (GitHub app manifest), or pan-8wl8 (vision doc).
+Implementation in progress. Completed pan-l4wu (schema), pan-91h1 (readyForMerge), and pan-zg92 (webhook route). Next up: pan-vwrn (smee client), pan-4c7b (frontend types), pan-vb4m (GitHub app manifest), or pan-8wl8 (vision doc).
 
 ## Completed Work
 - [x] pan-l4wu: Add blockerReasons[] column to review_status SQLite schema (commit: bcb7f958)
 - [x] pan-91h1: Enrich readyForMerge to incorporate blockerReasons (commit: 5fcd1167)
+- [x] pan-zg92: Add POST /api/webhooks/github route with HMAC-SHA256 verification (commit: 57b86e20)
 - [x] Fixed inverted bead dependencies in beads database (all 17 deps reversed)
 
 ## Remaining Work
-- [ ] pan-zg92: Add POST /api/webhooks/github route with HMAC-SHA256 verification
 - [ ] pan-ygsc: Implement check_suite and check_run webhook event handlers
 - [ ] pan-umby: Implement pull_request webhook event handler
 - [ ] pan-kjni: Implement pull_request_review and review_thread webhook handlers

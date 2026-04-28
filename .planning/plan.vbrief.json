@@ -108,7 +108,7 @@
       {
         "id": "webhook-route",
         "title": "Add POST /api/webhooks/github route with HMAC-SHA256 verification",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -122,7 +122,7 @@
           {
             "id": "webhook-route.ac1",
             "title": "POST /api/webhooks/github validates HMAC-SHA256 signature and rejects invalid payloads with 401",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -130,7 +130,7 @@
           {
             "id": "webhook-route.ac2",
             "title": "Route dispatches to event-specific handlers based on X-GitHub-Event header",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -138,7 +138,7 @@
           {
             "id": "webhook-route.ac3",
             "title": "Route gracefully handles missing webhook-secret (logs warning, skips verification in dev)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
