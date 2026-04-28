@@ -42,6 +42,7 @@
 | Document | Description |
 |----------|-------------|
 | [CONFIGURATION.md](./CONFIGURATION.md) | Capability-based model routing, provider auth, subscription vs API-key setup, overrides, and fallback behavior |
+| [CODEX-AUTH.md](./CODEX-AUTH.md) | Codex CLI OAuth authentication: JWT expiry detection, burned-token handling, and the dashboard re-authentication flow |
 | [WORK-TYPES.md](./WORK-TYPES.md) | Router-backed job settings: every work type, when it runs, and what each override controls |
 | [MODEL_RECOMMENDATIONS.md](./MODEL_RECOMMENDATIONS.md) | Practical guidance for choosing model families for implementation, review, planning, helpers, and CLI work |
 | [projects.mdx](../configuration/projects.mdx) | Project registry and configuration fields (tracker, issue_prefixes, progressive) |
@@ -133,6 +134,7 @@
 - **"model routing"** / **"smart selection"** → CONFIGURATION.md, WORK-TYPES.md, MODEL_RECOMMENDATIONS.md
 - **"shadow mode"** / **"pan admin config shadow"** → CONFIGURATION.md, QUICK-REFERENCE.md
 - **"API keys"** / **"environment variables"** / **"subscription auth"** → CONFIGURATION.md
+- **"codex auth"** / **"codex login"** / **"OAuth"** / **"JWT"** / **"re-authenticate"** / **"burned token"** → CODEX-AUTH.md
 - **"providers"** / **"Kimi"** / **"Anthropic"** → CONFIGURATION.md, TESTING-PROVIDERS.md
 - **"work types"** → WORK-TYPES.md
 - **"presets"** / **"overrides"** → CONFIGURATION.md
