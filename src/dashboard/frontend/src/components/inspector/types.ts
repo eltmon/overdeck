@@ -34,6 +34,10 @@ export interface ReviewStatus {
   reviewSessionNames?: string[];
   /** Per-role completion status for parallel review sub-agents */
   reviewSubStatuses?: Record<string, 'running' | 'done'>;
+  /** PAN-366: Queue position — null = not queued, 0 = active, 1+ = position */
+  queuePosition?: number | null;
+  /** PAN-366: Which specialist is active or will handle this issue */
+  activeSpecialist?: 'review' | 'test' | 'merge' | null;
 }
 
 export interface ContainerStatus {

@@ -118,6 +118,34 @@ describe('ReviewPipelineSection', () => {
     expect(screen.getByText('retry 3/3')).toBeInTheDocument();
   });
 
+  it('shows merge queue position when queued and activeSpecialist is merge', () => {
+    render(
+      <ReviewPipelineSection
+        reviewStatus={makeReviewStatus({ mergeStatus: 'queued', queuePosition: 2, activeSpecialist: 'merge' })}
+      />
+    );
+    expect(screen.getByText('Queue position')).toBeInTheDocument();
+    expect(screen.getByText('2')).toBeInTheDocument();
+  });
+
+  it('does not show queue position when queuePosition is 0 (actively processing)', () => {
+    render(
+      <ReviewPipelineSection
+        reviewStatus={makeReviewStatus({ mergeStatus: 'merging', queuePosition: 0, activeSpecialist: 'merge' })}
+      />
+    );
+    expect(screen.queryByText('Queue position')).not.toBeInTheDocument();
+  });
+
+  it('does not show queue position when activeSpecialist is not merge', () => {
+    render(
+      <ReviewPipelineSection
+        reviewStatus={makeReviewStatus({ queuePosition: 2, activeSpecialist: 'review' })}
+      />
+    );
+    expect(screen.queryByText('Queue position')).not.toBeInTheDocument();
+  });
+
   it('shows verification attempts against the configured max cycle count', () => {
     render(
       <ReviewPipelineSection

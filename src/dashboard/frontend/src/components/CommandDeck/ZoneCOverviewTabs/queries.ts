@@ -184,6 +184,10 @@ export interface ReviewStatusData {
   updatedAt: string;
   /** PAN-905: GitHub-native merge blocker reasons */
   blockerReasons?: BlockerReason[];
+  /** PAN-366: Queue position — null = not queued, 0 = active, 1+ = position */
+  queuePosition?: number | null;
+  /** PAN-366: Which specialist is active or will handle this issue */
+  activeSpecialist?: 'review' | 'test' | 'merge' | null;
 }
 
 export interface BlockerReason {

@@ -199,6 +199,15 @@ export function ReviewPipelineSection({ reviewStatus, issueId }: ReviewPipelineS
             })}
           </div>
         )}
+
+        {/* Merge queue position */}
+        {(reviewStatus.queuePosition ?? null) !== null && (reviewStatus.queuePosition ?? 0) > 0 && reviewStatus.activeSpecialist === 'merge' && (
+          <div className="mt-1.5 flex items-center gap-1.5 text-[10px]">
+            <GitMerge className="w-3 h-3 text-muted-foreground" />
+            <span className="text-muted-foreground">Queue position</span>
+            <span className="font-medium text-foreground">{reviewStatus.queuePosition}</span>
+          </div>
+        )}
       </div>
 
       {/* Collapsible details */}
