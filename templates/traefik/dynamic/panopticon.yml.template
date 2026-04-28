@@ -1,6 +1,12 @@
 # Dynamic routing configuration for Panopticon Dashboard
 # Generated from panopticon.yml.template -- do not edit manually
-# Variables: {{TRAEFIK_DOMAIN}}, {{DASHBOARD_PORT}}, {{DASHBOARD_API_PORT}}
+# Variables: {{TRAEFIK_DOMAIN}}, {{DASHBOARD_FRONTEND_PORT}}, {{DASHBOARD_API_PORT}}
+#
+# DASHBOARD_FRONTEND_PORT is resolved at render time (see src/lib/traefik.ts):
+#   - production (default): == DASHBOARD_API_PORT. The bundled Node server serves
+#     static React assets alongside the API on a single port.
+#   - dev (PANOPTICON_DEV=1):  == DASHBOARD_PORT. Vite dev server serves React with
+#     HMR on its own port; the API stays on DASHBOARD_API_PORT.
 
 http:
   routers:
@@ -25,12 +31,11 @@ http:
       tls: {}
 
   services:
-    # Both frontend and API are served by the same Express server on the API port.
-    # The bundled dashboard serves static files alongside the API.
+    # Frontend port differs between production and dev mode — see header comment.
     panopticon-frontend:
       loadBalancer:
         servers:
-          - url: "http://host.docker.internal:{{DASHBOARD_API_PORT}}"
+          - url: "http://host.docker.internal:{{DASHBOARD_FRONTEND_PORT}}"
 
     panopticon-api:
       loadBalancer:

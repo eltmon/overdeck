@@ -14,21 +14,56 @@ import { loadConfig } from './config.js';
 import { loadProjectsConfig } from './projects.js';
 
 /**
+/**
+ * Render mode for the Traefik config.
+ * - 'production': frontend and API both routed to the bundled Node server on
+ *   the API port (the bundled dashboard serves static React assets too).
+ * - 'dev': frontend routed to Vite (DASHBOARD_PORT) for HMR; API stays on
+ *   DASHBOARD_API_PORT. The Vite dev server proxies /api and /ws to the Node
+ *   server, but Traefik routes those paths directly to the API to avoid the
+ *   extra proxy hop.
+ */
+export type TraefikRenderMode = 'production' | 'dev';
+
+/**
+ * Resolve render mode. Explicit param wins; otherwise the PANOPTICON_DEV env
+ * var (truthy = 'dev'); otherwise default to 'production'. This keeps `pan up`
+ * unchanged for the common case while letting dev workflows opt in by exporting
+ * the env var before invoking any code path that regenerates Traefik config.
+ */
+export function resolveTraefikRenderMode(explicit?: TraefikRenderMode): TraefikRenderMode {
+  if (explicit) return explicit;
+  const env = process.env['PANOPTICON_DEV'];
+  if (env && env !== '0' && env.toLowerCase() !== 'false') return 'dev';
+  return 'production';
+}
+
+/**
  * Generate panopticon.yml from template using current config values.
  * Safe to call multiple times (idempotent).
  * Returns true if file was written, false if template not found.
+ *
+ * Pass `mode: 'dev'` to route the frontend to the Vite dev server (DASHBOARD_PORT).
+ * Otherwise the frontend route points to the bundled Node server on the API port,
+ * which is the production layout. See template header for the full rationale.
  */
-export function generatePanopticonTraefikConfig(): boolean {
+export function generatePanopticonTraefikConfig(mode?: TraefikRenderMode): boolean {
   const templatePath = join(SOURCE_TRAEFIK_TEMPLATES, 'dynamic', 'panopticon.yml.template');
   if (!existsSync(templatePath)) {
     return false;
   }
 
   const config = loadConfig();
+  const resolvedMode = resolveTraefikRenderMode(mode);
+  const frontendPort = resolvedMode === 'dev'
+    ? config.dashboard.port
+    : config.dashboard.api_port;
+
   const placeholders: Record<string, string> = {
     TRAEFIK_DOMAIN: config.traefik?.domain || 'pan.localhost',
     DASHBOARD_PORT: String(config.dashboard.port),
     DASHBOARD_API_PORT: String(config.dashboard.api_port),
+    DASHBOARD_FRONTEND_PORT: String(frontendPort),
   };
 
   let content = readFileSync(templatePath, 'utf-8');
