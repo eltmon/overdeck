@@ -84,7 +84,7 @@
       {
         "id": "cliproxy-log-monitor",
         "title": "Add burned refresh token detection from CLIProxy logs",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -98,7 +98,7 @@
           {
             "id": "cliproxy-log-monitor.ac1",
             "title": "Returns {status: 'burned'} when cliproxy.log contains 'refresh token has already been used' in last ~50 lines within the last hour",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -106,7 +106,7 @@
           {
             "id": "cliproxy-log-monitor.ac2",
             "title": "Falls back gracefully to JWT-only status when log file is missing or unreadable",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
