@@ -15,9 +15,9 @@ Implementation in progress. Completed pan-l4wu (schema), pan-91h1 (readyForMerge
 - [x] pan-ygsc: Implement check_suite and check_run webhook event handlers
 - [x] pan-umby: Implement pull_request webhook event handler
 - [x] pan-kjni: Implement pull_request_review and review_thread webhook handlers
+- [x] pan-ktn2: Integrate smee-client lifecycle into pan up / pan down
 
 ## Remaining Work
-- [ ] pan-ktn2: Integrate smee-client lifecycle into pan up / pan down
 - [ ] pan-vb4m: Update GitHub App manifest and create migration script for existing installs
 - [ ] pan-267t: Add 4th Merge step to pipeline stepper in ReviewPipelineSection
 - [ ] pan-2tfi: Show individual CI check sub-statuses in the Merge step
