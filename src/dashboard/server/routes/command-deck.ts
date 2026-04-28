@@ -497,10 +497,11 @@ export async function fetchActivityDataWithContext(
       if (ss.status === 'running') {
         const specialistType = ss.type === 'test' ? 'test-agent' : 'merge-agent';
         const resolved = resolveProjectFromIssue(issueId);
-        tmuxSessionName = getTmuxSessionName(specialistType as never, resolved?.projectKey);
+        tmuxSessionName = getTmuxSessionName(specialistType as never, resolved?.projectKey, issueId);
       }
 
-      const specialistPresence: SessionNodePresence = tmuxSessionName && tmuxSessionNames.has(tmuxSessionName)
+      const specialistIsLive = !!(tmuxSessionName && tmuxSessionNames.has(tmuxSessionName));
+      const specialistPresence: SessionNodePresence = specialistIsLive
         ? (ss.status === 'running' ? 'active' : 'idle')
         : 'ended';
       const specialistSessionId = `specialist-${ss.type}-${ss.startedAt}`;
@@ -514,7 +515,7 @@ export async function fetchActivityDataWithContext(
         model: 'specialist',
         startedAt: ss.startedAt,
         duration,
-        status: ss.status,
+        status: specialistIsLive ? 'running' : ss.status,
         transcript: specialistJsonlPath ? undefined : transcriptParts.join('\n'),
         presence: specialistPresence,
         hasJsonl: !!specialistJsonlPath,

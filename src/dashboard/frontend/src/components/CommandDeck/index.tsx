@@ -185,9 +185,10 @@ export function CommandDeck({
   // Per-issue session selection (PAN-830 pan-11sr) — slice keyed by issueId.
   // The tree highlight uses the value for whichever feature is currently active.
   const selectSession = useCommandDeckSelection((s) => s.selectSession);
-  const selectedSessionId = useCommandDeckSelection((s) =>
-    selectedFeature ? s.selectedSessionByIssue[selectedFeature] ?? null : null,
-  );
+  const selectedSessionByIssue = useCommandDeckSelection((s) => s.selectedSessionByIssue);
+  const selectedSessionId = selectedFeature
+    ? selectedSessionByIssue[selectedFeature] ?? null
+    : null;
   // Increments each time + is clicked, forcing DraftConversationPanel to remount and re-read localStorage
   const [draftKey, setDraftKey] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(() => {

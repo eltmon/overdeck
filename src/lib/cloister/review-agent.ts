@@ -1387,10 +1387,15 @@ export async function spawnReviewCoordinatorSession(opts: {
   workspace: string;
 }): Promise<{ sessionName: string }> {
   const sessionName = `review-coordinator-${opts.issueId}-${Date.now()}`;
+  const logDir = join(opts.workspace, '.pan', 'review', 'coordinator');
+  await mkdir(logDir, { recursive: true });
+  const logStem = `${opts.issueId}-${Date.now()}`;
+  const logFile = join(logDir, `${logStem}.log`);
+  const exitCodeFile = join(logDir, `${logStem}.exit`);
   // `pan review run` is globally installed (via npm link or the release).
-  // We wrap in `bash -lc` so PATH and nvm init run; `|| true` on exit so tmux
-  // does not retain the session with a non-zero exit (keeps teardown clean).
-  const command = `bash -lc 'pan review run ${opts.issueId} || true; exit'`;
+  // Wrap in `bash -lc` so PATH and nvm init run, preserve the real exit code,
+  // and log both streamed output and the terminal status for post-mortem review.
+  const command = `bash -lc 'set -o pipefail; pan review run ${opts.issueId} 2>&1 | tee -a "${logFile}"; status=\${PIPESTATUS[0]}; printf "%s\\n" "$status" > "${exitCodeFile}"; printf "\\n[pan review run exit %s at %s]\\n" "$status" "$(date -Is)" >> "${logFile}"; exit "$status"'`;
   await createSessionAsync(sessionName, opts.workspace, command, {
     env: {
       PANOPTICON_AGENT_ID: '',
@@ -1398,6 +1403,11 @@ export async function spawnReviewCoordinatorSession(opts: {
       PANOPTICON_SESSION_TYPE: '',
     },
   });
+  try {
+    await setOptionAsync(sessionName, 'remain-on-exit', 'on');
+  } catch (err) {
+    console.warn(`[review-agent] Failed to set remain-on-exit on ${sessionName}: ${err instanceof Error ? err.message : err}`);
+  }
   return { sessionName };
 }
 

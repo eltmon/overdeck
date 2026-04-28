@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CommandDeck } from './index';
+import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 
 vi.mock('./styles/command-deck.module.css', () => ({
   default: {
@@ -205,7 +206,15 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
         };
       }
       if (url === '/api/conversations') {
-        return { ok: true, json: async () => [] };
+        return {
+          ok: true,
+          json: async () => [
+            {
+              id: 1,
+              name: 'test-conv',
+            },
+          ],
+        };
       }
       if (url === '/api/costs/by-issue') {
         return { ok: true, json: async () => ({ issues: [] }) };
@@ -281,6 +290,7 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
 describe('CommandDeck — project-selected session view (PAN-821)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useCommandDeckSelection.getState().clearAll();
     localStorage.clear();
   });
 
@@ -301,6 +311,38 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
 
     // Verify DetailPanelLayout is NOT rendered
     expect(screen.queryByTestId('detail-panel')).not.toBeInTheDocument();
+  });
+
+  it('opens the session pane on the first session click when no feature is already selected', async () => {
+    renderCommandDeck();
+
+    await screen.findByTestId('project-node');
+    expect(screen.queryByTestId('issue-workbench')).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByTestId('session-agent-pan-821'));
+
+    const workbench = screen.getByTestId('issue-workbench');
+    expect(workbench).toBeInTheDocument();
+    expect(workbench).toHaveAttribute('data-issue', 'PAN-821');
+    expect(screen.getByTestId('session-panel')).toHaveAttribute('data-session', 'agent-pan-821');
+  });
+
+  it('keeps the same session pane on a second click of the same session row', async () => {
+    renderCommandDeck();
+
+    await screen.findByTestId('project-node');
+
+    const sessionButton = await screen.findByTestId('session-agent-pan-821');
+    fireEvent.click(sessionButton);
+
+    const firstWorkbench = screen.getByTestId('issue-workbench');
+    const firstSessionPanel = screen.getByTestId('session-panel');
+
+    fireEvent.click(sessionButton);
+
+    expect(screen.getByTestId('issue-workbench')).toBe(firstWorkbench);
+    expect(screen.getByTestId('session-panel')).toBe(firstSessionPanel);
+    expect(screen.getByTestId('session-panel')).toHaveAttribute('data-session', 'agent-pan-821');
   });
 
   it('auto-selects best session when feature is clicked (B5)', async () => {
@@ -335,8 +377,9 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     // Click a conversation
     fireEvent.click(screen.getByTestId('conv-test'));
 
-    // Session view should be gone
+    // Session view should be gone and conversation view should render
     expect(screen.queryByTestId('session-panel')).not.toBeInTheDocument();
     expect(screen.queryByTestId('issue-header')).not.toBeInTheDocument();
+    expect(screen.getByTestId('conversation-panel')).toBeInTheDocument();
   });
 });
