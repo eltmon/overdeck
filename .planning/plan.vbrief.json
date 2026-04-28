@@ -4,7 +4,7 @@
     "created": "2026-04-28T18:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-905: Command Deck — make Awaiting Merge the canonical final merge gate",
-    "updated": "2026-04-28T19:13:04.459Z"
+    "updated": "2026-04-28T19:29:09.067Z"
   },
   "plan": {
     "id": "pan-905",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "f3a7c1e8-9d42-4b6f-a815-2e8f0c3d7a19",
     "author": "agent:claude-opus-4-6",
-    "sequence": 112,
+    "sequence": 130,
     "created": "2026-04-28T18:00:00Z",
-    "updated": "2026-04-28T19:13:04.459Z",
+    "updated": "2026-04-28T19:29:09.067Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/905",
@@ -73,7 +73,7 @@
             }
           }
         ],
-        "completed": "2026-04-28T19:13:04.459Z"
+        "completed": "2026-04-28T19:29:09.067Z"
       },
       {
         "id": "enrich-ready-for-merge",
@@ -106,7 +106,7 @@
             }
           }
         ],
-        "completed": "2026-04-28T19:13:04.457Z"
+        "completed": "2026-04-28T19:29:09.065Z"
       },
       {
         "id": "webhook-route",
@@ -147,7 +147,7 @@
             }
           }
         ],
-        "completed": "2026-04-28T19:13:04.459Z"
+        "completed": "2026-04-28T19:29:09.067Z"
       },
       {
         "id": "webhook-ci-handlers",
@@ -191,7 +191,7 @@
             "completed": "2026-04-28T18:28:43.543Z"
           }
         ],
-        "completed": "2026-04-28T19:13:04.458Z"
+        "completed": "2026-04-28T19:29:09.066Z"
       },
       {
         "id": "webhook-pr-handlers",
@@ -235,7 +235,7 @@
             "completed": "2026-04-28T18:28:43.542Z"
           }
         ],
-        "completed": "2026-04-28T19:13:04.457Z"
+        "completed": "2026-04-28T19:29:09.065Z"
       },
       {
         "id": "webhook-review-handlers",
@@ -279,7 +279,7 @@
             "completed": "2026-04-28T18:28:43.541Z"
           }
         ],
-        "completed": "2026-04-28T19:13:04.457Z"
+        "completed": "2026-04-28T19:29:09.065Z"
       },
       {
         "id": "smee-client-integration",
@@ -323,7 +323,7 @@
             "completed": "2026-04-28T18:28:43.545Z"
           }
         ],
-        "completed": "2026-04-28T19:13:04.459Z"
+        "completed": "2026-04-28T19:29:09.066Z"
       },
       {
         "id": "pan-up-smee-lifecycle",
@@ -367,7 +367,7 @@
             "completed": "2026-04-28T18:28:43.541Z"
           }
         ],
-        "completed": "2026-04-28T19:13:04.457Z"
+        "completed": "2026-04-28T19:29:09.065Z"
       },
       {
         "id": "github-app-webhook-config",
@@ -411,7 +411,7 @@
             "completed": "2026-04-28T18:28:43.545Z"
           }
         ],
-        "completed": "2026-04-28T19:13:04.458Z"
+        "completed": "2026-04-28T19:29:09.066Z"
       },
       {
         "id": "stepper-merge-step",
@@ -455,7 +455,7 @@
             "completed": "2026-04-28T18:28:43.539Z"
           }
         ],
-        "completed": "2026-04-28T19:13:04.456Z"
+        "completed": "2026-04-28T19:29:09.064Z"
       },
       {
         "id": "stepper-ci-substatus",
@@ -490,7 +490,7 @@
             "completed": "2026-04-28T18:28:43.538Z"
           }
         ],
-        "completed": "2026-04-28T19:13:04.456Z"
+        "completed": "2026-04-28T19:29:09.064Z"
       },
       {
         "id": "stepper-retry-notes",
@@ -525,7 +525,7 @@
             "completed": "2026-04-28T18:28:43.538Z"
           }
         ],
-        "completed": "2026-04-28T19:13:04.456Z"
+        "completed": "2026-04-28T19:29:09.063Z"
       },
       {
         "id": "stepper-queue-position",
@@ -551,7 +551,7 @@
             "completed": "2026-04-28T18:28:43.537Z"
           }
         ],
-        "completed": "2026-04-28T19:13:04.455Z"
+        "completed": "2026-04-28T19:29:09.063Z"
       },
       {
         "id": "stepper-live-log",
@@ -586,7 +586,7 @@
             "completed": "2026-04-28T18:28:43.536Z"
           }
         ],
-        "completed": "2026-04-28T19:13:04.454Z"
+        "completed": "2026-04-28T19:29:09.062Z"
       },
       {
         "id": "awaiting-merge-blocker-filter",
@@ -621,7 +621,7 @@
             "completed": "2026-04-28T18:28:43.540Z"
           }
         ],
-        "completed": "2026-04-28T19:13:04.456Z"
+        "completed": "2026-04-28T19:29:09.064Z"
       },
       {
         "id": "awaiting-merge-blocker-display",
@@ -656,7 +656,7 @@
             "completed": "2026-04-28T18:28:43.537Z"
           }
         ],
-        "completed": "2026-04-28T19:13:04.455Z"
+        "completed": "2026-04-28T19:29:09.063Z"
       },
       {
         "id": "frontend-types-update",
@@ -689,7 +689,7 @@
             }
           }
         ],
-        "completed": "2026-04-28T19:13:04.458Z"
+        "completed": "2026-04-28T19:29:09.066Z"
       },
       {
         "id": "vision-doc",
@@ -724,7 +724,7 @@
             "completed": "2026-04-28T18:28:43.544Z"
           }
         ],
-        "completed": "2026-04-28T19:13:04.458Z"
+        "completed": "2026-04-28T19:29:09.066Z"
       }
     ],
     "edges": [
