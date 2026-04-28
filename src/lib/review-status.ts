@@ -178,19 +178,24 @@ export function setReviewStatus(
   // is the authoritative signal. The post-rebase gate in triggerMerge() is the real
   // quality check. Blocking readyForMerge on a stale verificationStatus causes issues
   // to get stuck after tests pass (PAN-714).
-  const readyForMerge = update.readyForMerge !== undefined
-    ? update.readyForMerge
-    : (
-        merged.reviewStatus === 'passed' &&
-        merged.testStatus === 'passed' &&
-        merged.mergeStatus !== 'merged' &&
-        // Don't auto-recompute rfm=true when the previous merge attempt failed —
-        // cycling: check-status gate → mergeStatus=failed → deacon restore → rfm=true → retry.
-        // checkFailedMergeRetry() handles transient retries explicitly with readyForMerge: true.
-        merged.mergeStatus !== 'failed' &&
-        // If UAT has been initiated, it must pass too
-        (merged.uatStatus === undefined || merged.uatStatus === 'passed')
-      );
+  // PAN-905: GitHub-native blockers (failing checks, merge conflicts, etc.) always
+  // override readyForMerge to false, even if the caller explicitly passed true.
+  const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
+  const readyForMerge = hasBlockers
+    ? false
+    : (update.readyForMerge !== undefined
+        ? update.readyForMerge
+        : (
+            merged.reviewStatus === 'passed' &&
+            merged.testStatus === 'passed' &&
+            merged.mergeStatus !== 'merged' &&
+            // Don't auto-recompute rfm=true when the previous merge attempt failed —
+            // cycling: check-status gate → mergeStatus=failed → deacon restore → rfm=true → retry.
+            // checkFailedMergeRetry() handles transient retries explicitly with readyForMerge: true.
+            merged.mergeStatus !== 'failed' &&
+            // If UAT has been initiated, it must pass too
+            (merged.uatStatus === undefined || merged.uatStatus === 'passed')
+          ));
 
   const updated: ReviewStatus = normalizeReviewStatus({
     ...merged,

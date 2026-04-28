@@ -3,13 +3,13 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing bead pan-l4wu: Add blockerReasons[] column to review_status SQLite schema
+Implementation in progress. Just completed bead pan-l4wu (schema). Next up: pan-91h1 (enrich readyForMerge) or other ready beads.
 
 ## Completed Work
-_none_
+- [x] pan-l4wu: Add blockerReasons[] column to review_status SQLite schema (commit: bcb7f958)
+- [x] Fixed inverted bead dependencies in beads database (all 17 deps reversed)
 
 ## Remaining Work
-- [ ] pan-l4wu: Add blockerReasons[] column to review_status SQLite schema
 - [ ] pan-91h1: Enrich readyForMerge to incorporate blockerReasons
 - [ ] pan-zg92: Add POST /api/webhooks/github route with HMAC-SHA256 verification
 - [ ] pan-ygsc: Implement check_suite and check_run webhook event handlers

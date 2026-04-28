@@ -15,9 +15,19 @@
     "created": "2026-04-28T18:00:00Z",
     "updated": "2026-04-28T18:00:00Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/905", "label": "PAN-905", "type": "issue" }
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/905",
+        "label": "PAN-905",
+        "type": "issue"
+      }
     ],
-    "tags": ["dashboard", "merge", "webhooks", "awaiting-merge", "pipeline"],
+    "tags": [
+      "dashboard",
+      "merge",
+      "webhooks",
+      "awaiting-merge",
+      "pipeline"
+    ],
     "narratives": {
       "Problem": "After a PR reaches the end of the automated pipeline, the dashboard gives fragmented visibility into whether it's truly ready for the final human merge click. readyForMerge ignores GitHub-native blockers (failing checks, merge conflicts, unresolved conversations), causing false positives on Awaiting Merge. Users must bounce between multiple dashboard panels and GitHub itself.",
       "Proposal": "Three-layer fix: (1) Add real-time GitHub webhook reception via smee.io to get instant blocker updates, (2) Enrich readyForMerge with a typed blockerReasons[] array that captures GitHub-native blockers, (3) Rewrite the Awaiting Merge page and pipeline stepper to surface this data. The pipeline stepper gets a 4th Merge step with CI sub-statuses, queue position, retry history, and live specialist log access."
@@ -26,7 +36,7 @@
       {
         "id": "blocker-schema",
         "title": "Add blockerReasons[] column to review_status SQLite schema",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -40,20 +50,26 @@
           {
             "id": "blocker-schema.ac1",
             "title": "review_status table has blocker_reasons TEXT column with migration",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "blocker-schema.ac2",
             "title": "BlockerReason interface exported from review-status.ts with all 6 blocker types",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "blocker-schema.ac3",
             "title": "getReviewStatus/setReviewStatus serialize/deserialize blockerReasons JSON correctly",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -75,13 +91,17 @@
             "id": "enrich-ready-for-merge.ac1",
             "title": "readyForMerge returns false when blockerReasons is non-empty, even if review+test passed",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "enrich-ready-for-merge.ac2",
             "title": "/api/review/:issueId/status response includes blockerReasons array",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -103,19 +123,25 @@
             "id": "webhook-route.ac1",
             "title": "POST /api/webhooks/github validates HMAC-SHA256 signature and rejects invalid payloads with 401",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "webhook-route.ac2",
             "title": "Route dispatches to event-specific handlers based on X-GitHub-Event header",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "webhook-route.ac3",
             "title": "Route gracefully handles missing webhook-secret (logs warning, skips verification in dev)",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -137,19 +163,25 @@
             "id": "webhook-ci-handlers.ac1",
             "title": "check_suite completed with failure adds failing_checks blocker to the matched issue's blockerReasons",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "webhook-ci-handlers.ac2",
             "title": "check_suite completed with success removes failing_checks blocker",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "webhook-ci-handlers.ac3",
             "title": "Handler maps PR branch to issueId correctly using existing branch naming convention (feature/<issue-id>)",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -171,19 +203,25 @@
             "id": "webhook-pr-handlers.ac1",
             "title": "Merge conflict detected from PR payload adds merge_conflict blocker",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "webhook-pr-handlers.ac2",
             "title": "Draft PR adds draft_pr blocker; ready_for_review removes it",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "webhook-pr-handlers.ac3",
             "title": "Non-mergeable GitHub state surfaces as not_mergeable blocker",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -205,19 +243,25 @@
             "id": "webhook-review-handlers.ac1",
             "title": "Review with changes_requested adds changes_requested blocker",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "webhook-review-handlers.ac2",
             "title": "Approved review removes changes_requested blocker",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "webhook-review-handlers.ac3",
             "title": "Unresolved review thread adds unresolved_conversations blocker; resolved removes it",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -239,19 +283,25 @@
             "id": "smee-client-integration.ac1",
             "title": "smee-client process starts and relays GitHub webhooks to POST /api/webhooks/github",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "smee-client-integration.ac2",
             "title": "Missing smee-url config logs warning and skips without failing pan up",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "smee-client-integration.ac3",
             "title": "Smee process restarts automatically on unexpected exit",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -273,19 +323,25 @@
             "id": "pan-up-smee-lifecycle.ac1",
             "title": "pan up starts smee-client process when smee-url is configured",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "pan-up-smee-lifecycle.ac2",
             "title": "pan down cleanly stops smee-client process",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "pan-up-smee-lifecycle.ac3",
             "title": "pan health shows smee-client status (running/stopped/not configured)",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -307,19 +363,25 @@
             "id": "github-app-webhook-config.ac1",
             "title": "New GitHub App installs (create-github-app.mjs) configure webhook events and smee URL automatically",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "github-app-webhook-config.ac2",
             "title": "Migration script (update-github-app-webhooks.mjs) updates existing GitHub App webhook config via API",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "github-app-webhook-config.ac3",
             "title": "Smee channel URL persisted to ~/.panopticon/github-app/smee-url",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -341,19 +403,25 @@
             "id": "stepper-merge-step.ac1",
             "title": "Pipeline stepper shows 4 steps: Build Gate → Review → Tests → Merge",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "stepper-merge-step.ac2",
             "title": "Merge step correctly reflects all mergeStatus values (pending/queued/merging/verifying/merged/failed)",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "stepper-merge-step.ac3",
             "title": "Existing 3-step behavior unchanged when merge phase hasn't started (Merge shows as pending)",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -375,13 +443,17 @@
             "id": "stepper-ci-substatus.ac1",
             "title": "Individual CI checks (build, lint, test, etc.) shown with pass/fail/running icons during merge phase",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "stepper-ci-substatus.ac2",
             "title": "CI sub-statuses use same data source as PrDiffTab (no duplicate API calls)",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -403,13 +475,17 @@
             "id": "stepper-retry-notes.ac1",
             "title": "Merge retry count displayed as 'Attempt N/3' when mergeRetryCount > 0",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "stepper-retry-notes.ac2",
             "title": "mergeNotes shown as expandable detail section on merge failure",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -431,7 +507,9 @@
             "id": "stepper-queue-position.ac1",
             "title": "Queue position displayed in Merge step when issue is queued behind others",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -453,13 +531,17 @@
             "id": "stepper-live-log.ac1",
             "title": "Live 'View log' link appears in Merge step when merge specialist is actively running",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "stepper-live-log.ac2",
             "title": "Clicking link opens the merge specialist's tmux session in the terminal panel",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -481,13 +563,17 @@
             "id": "awaiting-merge-blocker-filter.ac1",
             "title": "Issues with non-empty blockerReasons do not appear in the ready-to-merge list",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "awaiting-merge-blocker-filter.ac2",
             "title": "Blocked issues shown in a separate section with their specific blocker reason",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -509,13 +595,17 @@
             "id": "awaiting-merge-blocker-display.ac1",
             "title": "Each blocker type has a distinct icon and human-readable summary",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "awaiting-merge-blocker-display.ac2",
             "title": "Blocker details are expandable for additional context",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -537,13 +627,17 @@
             "id": "frontend-types-update.ac1",
             "title": "ReviewStatusData includes blockerReasons array with proper typing",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "frontend-types-update.ac2",
             "title": "mergeRetryCount and mergeNotes fields present in frontend types",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -565,35 +659,107 @@
             "id": "vision-doc.ac1",
             "title": "Vision document exists with the 3-phase product roadmap (local → shared → multi-tenant)",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "vision-doc.ac2",
             "title": "Document notes architectural implications for each phase",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       }
     ],
     "edges": [
-      { "from": "blocker-schema", "to": "enrich-ready-for-merge", "type": "blocks" },
-      { "from": "blocker-schema", "to": "webhook-ci-handlers", "type": "blocks" },
-      { "from": "blocker-schema", "to": "webhook-pr-handlers", "type": "blocks" },
-      { "from": "blocker-schema", "to": "webhook-review-handlers", "type": "blocks" },
-      { "from": "webhook-route", "to": "webhook-ci-handlers", "type": "blocks" },
-      { "from": "webhook-route", "to": "webhook-pr-handlers", "type": "blocks" },
-      { "from": "webhook-route", "to": "webhook-review-handlers", "type": "blocks" },
-      { "from": "smee-client-integration", "to": "pan-up-smee-lifecycle", "type": "blocks" },
-      { "from": "enrich-ready-for-merge", "to": "awaiting-merge-blocker-filter", "type": "blocks" },
-      { "from": "frontend-types-update", "to": "stepper-merge-step", "type": "blocks" },
-      { "from": "frontend-types-update", "to": "awaiting-merge-blocker-filter", "type": "blocks" },
-      { "from": "frontend-types-update", "to": "awaiting-merge-blocker-display", "type": "blocks" },
-      { "from": "stepper-merge-step", "to": "stepper-ci-substatus", "type": "blocks" },
-      { "from": "stepper-merge-step", "to": "stepper-retry-notes", "type": "blocks" },
-      { "from": "stepper-merge-step", "to": "stepper-queue-position", "type": "blocks" },
-      { "from": "stepper-merge-step", "to": "stepper-live-log", "type": "blocks" },
-      { "from": "awaiting-merge-blocker-filter", "to": "awaiting-merge-blocker-display", "type": "blocks" }
+      {
+        "from": "blocker-schema",
+        "to": "enrich-ready-for-merge",
+        "type": "blocks"
+      },
+      {
+        "from": "blocker-schema",
+        "to": "webhook-ci-handlers",
+        "type": "blocks"
+      },
+      {
+        "from": "blocker-schema",
+        "to": "webhook-pr-handlers",
+        "type": "blocks"
+      },
+      {
+        "from": "blocker-schema",
+        "to": "webhook-review-handlers",
+        "type": "blocks"
+      },
+      {
+        "from": "webhook-route",
+        "to": "webhook-ci-handlers",
+        "type": "blocks"
+      },
+      {
+        "from": "webhook-route",
+        "to": "webhook-pr-handlers",
+        "type": "blocks"
+      },
+      {
+        "from": "webhook-route",
+        "to": "webhook-review-handlers",
+        "type": "blocks"
+      },
+      {
+        "from": "smee-client-integration",
+        "to": "pan-up-smee-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "enrich-ready-for-merge",
+        "to": "awaiting-merge-blocker-filter",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-types-update",
+        "to": "stepper-merge-step",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-types-update",
+        "to": "awaiting-merge-blocker-filter",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-types-update",
+        "to": "awaiting-merge-blocker-display",
+        "type": "blocks"
+      },
+      {
+        "from": "stepper-merge-step",
+        "to": "stepper-ci-substatus",
+        "type": "blocks"
+      },
+      {
+        "from": "stepper-merge-step",
+        "to": "stepper-retry-notes",
+        "type": "blocks"
+      },
+      {
+        "from": "stepper-merge-step",
+        "to": "stepper-queue-position",
+        "type": "blocks"
+      },
+      {
+        "from": "stepper-merge-step",
+        "to": "stepper-live-log",
+        "type": "blocks"
+      },
+      {
+        "from": "awaiting-merge-blocker-filter",
+        "to": "awaiting-merge-blocker-display",
+        "type": "blocks"
+      }
     ]
   }
 }
