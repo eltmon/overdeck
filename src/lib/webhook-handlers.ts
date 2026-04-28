@@ -120,19 +120,32 @@ export function handlePullRequest(payload: WebhookPayload): void {
       summary: 'Pull request is in draft state',
       detectedAt: new Date().toISOString(),
     });
-  } else if (action === 'ready_for_review') {
+  } else if (!pr.draft) {
     removeBlocker(issueId, 'draft_pr');
   }
 
   // Non-mergeable state
-  if (pr.mergeable_state && pr.mergeable_state !== 'clean' && pr.mergeable_state !== 'unstable' && pr.mergeable_state !== 'dirty') {
+  if (pr.mergeable_state) {
+    if (pr.mergeable_state !== 'clean' && pr.mergeable_state !== 'unstable' && pr.mergeable_state !== 'dirty' && pr.mergeable_state !== 'unknown') {
+      addBlocker(issueId, {
+        type: 'not_mergeable',
+        summary: `PR not mergeable: ${pr.mergeable_state}`,
+        detectedAt: new Date().toISOString(),
+      });
+    } else {
+      removeBlocker(issueId, 'not_mergeable');
+    }
+  }
+
+  // Merge conflict detection — also clear when mergeable_state is clean
+  if (pr.mergeable === false || pr.mergeable_state === 'dirty') {
     addBlocker(issueId, {
-      type: 'not_mergeable',
-      summary: `PR not mergeable: ${pr.mergeable_state}`,
+      type: 'merge_conflict',
+      summary: 'Merge conflict with target branch',
       detectedAt: new Date().toISOString(),
     });
-  } else {
-    removeBlocker(issueId, 'not_mergeable');
+  } else if (pr.mergeable === true || pr.mergeable_state === 'clean') {
+    removeBlocker(issueId, 'merge_conflict');
   }
 }
 

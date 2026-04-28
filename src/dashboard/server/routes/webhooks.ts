@@ -26,13 +26,14 @@ import {
 
 const WEBHOOK_SECRET_PATH = join(homedir(), '.panopticon', 'github-app', 'webhook-secret');
 
+let webhookSecret: string | null | undefined;
 function getWebhookSecret(): string | null {
+  if (webhookSecret !== undefined) return webhookSecret;
   try {
-    if (!existsSync(WEBHOOK_SECRET_PATH)) return null;
-    return readFileSync(WEBHOOK_SECRET_PATH, 'utf-8').trim();
-  } catch {
-    return null;
-  }
+    if (!existsSync(WEBHOOK_SECRET_PATH)) { webhookSecret = null; return null; }
+    webhookSecret = readFileSync(WEBHOOK_SECRET_PATH, 'utf-8').trim();
+    return webhookSecret;
+  } catch { webhookSecret = null; return null; }
 }
 
 function verifySignature(body: string, signature: string, secret: string): boolean {

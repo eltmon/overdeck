@@ -15,7 +15,7 @@
  *   isSmeeProcessRunning();
  */
 
-import { existsSync, readFileSync, writeFileSync, unlinkSync, openSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, unlinkSync, openSync, closeSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { spawn } from 'node:child_process';
@@ -211,6 +211,7 @@ export function startSmeeProcess(): void {
 
   writeFileSync(SMEE_PID_PATH, String(child.pid));
   child.unref();
+  try { closeSync(logFd); } catch { /* ignore */ }
   console.log(`[smee] Started process (PID ${child.pid}) relaying to ${target}`);
 }
 
