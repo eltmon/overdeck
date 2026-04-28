@@ -2022,26 +2022,27 @@ const postIssueCloseOutRoute = HttpRouter.add(
     const result = yield* Effect.promise(() => closeOut(ctx));
 
     if (result.success) {
-      yield* eventStore.append({
-        type: 'issue.statusChanged',
-        timestamp: new Date().toISOString(),
-        payload: { issueId: id, status: 'Done', canonicalStatus: 'done' },
-      });
-
       // Patch cached labels immediately so the board hides the issue right away
       // without waiting for the background tracker refresh.
+      let newLabels: string[] = ['closed-out'];
       try {
         const cachedIssues = issueDataService.getIssues();
         const cachedIssue = cachedIssues.find(
           (i: any) => (i.identifier || '').toUpperCase() === id.toUpperCase()
         );
         const currentLabels: string[] = cachedIssue?.labels || [];
-        const newLabels = [
+        newLabels = [
           ...currentLabels.filter((l: string) => !['in-review', 'in-progress', 'needs-close-out'].includes(l.toLowerCase())),
           'closed-out',
         ];
         issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done', labels: newLabels });
       } catch { /* non-fatal */ }
+
+      yield* eventStore.append({
+        type: 'issue.statusChanged',
+        timestamp: new Date().toISOString(),
+        payload: { issueId: id, status: 'Done', canonicalStatus: 'done', labels: newLabels },
+      });
 
       // Refresh tracker data in background so cache stays consistent
       issueDataService.invalidateTracker('github').catch(() => {});
@@ -2118,7 +2119,8 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
       return jsonResponse({ error: 'Content-Type must be application/json' }, { status: 400 });
     }
 
-    const body = yield* Effect.promise(() => request.json().catch(() => ({})));
+    const text = yield* request.text;
+    const body: Record<string, unknown> = (() => { try { return text ? JSON.parse(text) : {}; } catch { return {}; } })();
     const rawIssueIds = Array.isArray(body.issueIds) ? body.issueIds : [];
     const issueIds = [...new Set(rawIssueIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0))];
 
@@ -2226,16 +2228,26 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
       });
 
       if (closeResult.success) {
-        yield* eventStore.append({
-          type: 'issue.statusChanged',
-          timestamp: new Date().toISOString(),
-          payload: { issueId: id, status: 'Done', canonicalStatus: 'done' },
-        });
+        let newLabels: string[] = ['closed-out'];
         try {
-          issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done' });
+          const cachedIssues = issueDataService.getIssues();
+          const cachedIssue = cachedIssues.find(
+            (i: any) => (i.identifier || '').toUpperCase() === id.toUpperCase()
+          );
+          const currentLabels: string[] = cachedIssue?.labels || [];
+          newLabels = [
+            ...currentLabels.filter((l: string) => !['in-review', 'in-progress', 'needs-close-out'].includes(l.toLowerCase())),
+            'closed-out',
+          ];
+          issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done', labels: newLabels });
         } catch (e) {
           console.error('Failed to patch issue status:', e);
         }
+        yield* eventStore.append({
+          type: 'issue.statusChanged',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: id, status: 'Done', canonicalStatus: 'done', labels: newLabels },
+        });
       }
 
       const failedStep = closeResult.steps.find((s: StepResult) => !s.success);
