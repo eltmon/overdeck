@@ -40,6 +40,7 @@ import {
 import { useAlert } from '../DialogProvider';
 import { SettingsConfig, Provider, WorkTypeId, ModelId } from './types';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
+import { useCodexAuthStatus } from '../../hooks/useCodexAuthStatus';
 import { OpenRouterPage } from './OpenRouterPage';
 import { DesktopSettingsSection } from './DesktopSettingsSection';
 import {
@@ -266,6 +267,7 @@ export function SettingsPage() {
   const queryClient = useQueryClient();
   const showAlert = useAlert();
   const { prefs: uiPrefs, update: updateUIPrefs } = useUIPreferences();
+  const { data: codexAuth } = useCodexAuthStatus();
   const { data: settings, isLoading, error } = useQuery({
     queryKey: ['settings'],
     queryFn: fetchSettings,
@@ -879,6 +881,45 @@ export function SettingsPage() {
                             <AlertTriangle className="w-3 h-3 shrink-0" />
                             <code className="font-mono">ANTHROPIC_API_KEY</code> overrides subscription for direct API calls
                           </p>
+                        )}
+                      </div>
+                    ) : provider.id === 'openai' ? (
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-muted-foreground mb-1 block">Authentication</label>
+                        {codexAuth?.status === 'valid' ? (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-success/10 border border-success/20">
+                            <div className="w-2 h-2 rounded-full bg-success shrink-0" />
+                            <span className="text-xs text-success font-medium">Subscription OAuth</span>
+                          </div>
+                        ) : codexAuth?.status === 'expired' || codexAuth?.status === 'burned' ? (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-warning/10 border border-warning/20">
+                            <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
+                            <span className="text-xs text-warning font-medium capitalize">{codexAuth.status}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20">
+                            <Key className="w-3.5 h-3.5 text-primary shrink-0" />
+                            <span className="text-xs text-primary font-medium">API Key</span>
+                          </div>
+                        )}
+                        {codexAuth?.email && codexAuth.status !== 'missing' && (
+                          <p className="text-[10px] text-muted-foreground mt-1.5">
+                            {codexAuth.email}
+                            {codexAuth.expiresAt && (
+                              <span className="ml-1">
+                                · Expires {new Date(codexAuth.expiresAt).toLocaleString()}
+                              </span>
+                            )}
+                          </p>
+                        )}
+                        {(codexAuth?.status === 'expired' || codexAuth?.status === 'burned') && (
+                          <button
+                            onClick={() => window.location.href = '/terminal/codex-reauth'}
+                            className="mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 badge-bg-warning hover:bg-warning/20 border badge-border-warning rounded-lg text-xs text-warning transition-colors w-full"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            Re-authenticate
+                          </button>
                         )}
                       </div>
                     ) : (

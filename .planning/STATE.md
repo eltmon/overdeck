@@ -13,9 +13,9 @@ Implementing bead pan-gig7 — Create useCodexAuthStatus polling hook (frontend 
 - [x] pan-7edh: Added Codex auth check to spawn guardrails (commit: 90cb27d)
 - [x] pan-ya4z: Added re-auth completion detection and token re-bridging (commit: adfa9ef)
 - [x] pan-gig7: Created useCodexAuthStatus polling hook (commit: 29534b6)
+- [x] pan-muvx: Created CodexAuthBanner frontend component (commit: b82b0de)
 
 ## Remaining Work
-- [ ] pan-muvx: Create CodexAuthBanner frontend component
 - [ ] pan-k8l7: Show Codex auth type and status in Settings page
 - [ ] pan-30ci: Auto-retry blocked spawn after successful re-auth
 - [ ] pan-ppl8: Document Codex auth requirements and re-auth flow

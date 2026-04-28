@@ -276,7 +276,7 @@
       {
         "id": "codex-auth-banner",
         "title": "Create CodexAuthBanner frontend component",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -290,7 +290,7 @@
           {
             "id": "codex-auth-banner.ac1",
             "title": "Banner appears when codex auth status is 'expired' or 'burned'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -298,7 +298,7 @@
           {
             "id": "codex-auth-banner.ac2",
             "title": "Banner hides when codex auth status is 'valid' or 'missing'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -306,7 +306,7 @@
           {
             "id": "codex-auth-banner.ac3",
             "title": "Re-authenticate button spawns reauth session and opens terminal panel",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
