@@ -4,19 +4,28 @@
  * Manages a singleton smee-client instance that relays GitHub webhooks
  * from smee.io to the local dashboard webhook endpoint.
  *
- * Usage:
- *   await startSmeeClient();  // idempotent
- *   await stopSmeeClient();   // graceful shutdown
- *   isSmeeRunning();          // boolean check
+ * Library mode (in-process):
+ *   await startSmeeClient();
+ *   await stopSmeeClient();
+ *   isSmeeRunning();
+ *
+ * CLI mode (detached subprocess):
+ *   startSmeeProcess();
+ *   stopSmeeProcess();
+ *   isSmeeProcessRunning();
  */
 
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readFileSync, writeFileSync, unlinkSync, openSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import SmeeClient from 'smee-client';
 import { loadConfig } from './config.js';
 
 const SMEE_URL_PATH = join(homedir(), '.panopticon', 'github-app', 'smee-url');
+const SMEE_PID_PATH = join(homedir(), '.panopticon', 'github-app', 'smee.pid');
+const SMEE_LOG_PATH = join(homedir(), '.panopticon', 'logs', 'smee.log');
 const MAX_RESTART_ATTEMPTS = 5;
 const BASE_RESTART_DELAY_MS = 1_000;
 const MAX_RESTART_DELAY_MS = 30_000;
@@ -61,7 +70,7 @@ function scheduleRestart(): void {
   restartTimeout = setTimeout(() => {
     restartTimeout = null;
     startSmeeClient().catch((err) => {
-      console.error('[smee] Restart failed:', err?.message || String(err));
+      console.error('[smee] Restart failed:', (err as Error)?.message || String(err));
     });
   }, delay);
 }
@@ -130,4 +139,96 @@ export async function stopSmeeClient(): Promise<void> {
 
 export function isSmeeRunning(): boolean {
   return activeClient !== null;
+}
+
+// ─── CLI process mode (detached subprocess) ──────────────────────────────────
+
+function getSmeeBinaryPath(): string {
+  const moduleDir = dirname(fileURLToPath(import.meta.url));
+  return join(moduleDir, '..', '..', 'node_modules', 'smee-client', 'bin', 'smee.js');
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readSmeePid(): number | null {
+  try {
+    if (!existsSync(SMEE_PID_PATH)) return null;
+    const pid = parseInt(readFileSync(SMEE_PID_PATH, 'utf-8').trim(), 10);
+    return Number.isFinite(pid) && pid > 0 ? pid : null;
+  } catch {
+    return null;
+  }
+}
+
+export function isSmeeProcessRunning(): boolean {
+  const pid = readSmeePid();
+  if (!pid) return false;
+  if (isProcessAlive(pid)) return true;
+  // Stale pidfile — clean up
+  try { unlinkSync(SMEE_PID_PATH); } catch { /* ignore */ }
+  return false;
+}
+
+export function startSmeeProcess(): void {
+  if (isSmeeProcessRunning()) {
+    console.log('[smee] Process already running');
+    return;
+  }
+
+  const smeeUrl = getSmeeUrl();
+  if (!smeeUrl) {
+    console.warn('[smee] No smee-url configured — skipping webhook relay');
+    return;
+  }
+
+  const target = getWebhookTarget();
+  const smeeBin = getSmeeBinaryPath();
+
+  let logFd: number;
+  try {
+    logFd = openSync(SMEE_LOG_PATH, 'a');
+  } catch {
+    console.warn('[smee] Could not open log file — using ignore stdio');
+    logFd = openSync('/dev/null', 'w');
+  }
+
+  const child = spawn(process.execPath, [smeeBin, '--url', smeeUrl, '--target', target], {
+    detached: true,
+    stdio: ['ignore', logFd, logFd],
+  });
+
+  if (!child.pid) {
+    console.error('[smee] Failed to spawn smee process');
+    return;
+  }
+
+  writeFileSync(SMEE_PID_PATH, String(child.pid));
+  child.unref();
+  console.log(`[smee] Started process (PID ${child.pid}) relaying to ${target}`);
+}
+
+export function stopSmeeProcess(): void {
+  const pid = readSmeePid();
+  if (pid && isProcessAlive(pid)) {
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch {
+      // already dead
+    }
+  }
+
+  try {
+    if (existsSync(SMEE_PID_PATH)) {
+      unlinkSync(SMEE_PID_PATH);
+    }
+  } catch { /* ignore */ }
+
+  console.log('[smee] Process stopped');
 }

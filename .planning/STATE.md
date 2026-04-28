@@ -3,7 +3,7 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementation in progress. Completed pan-l4wu (schema), pan-91h1 (readyForMerge), pan-zg92 (webhook route), and pan-4c7b (frontend types). Next up: pan-vwrn (smee client), pan-vb4m (GitHub app manifest), pan-8wl8 (vision doc), or remaining webhook/frontend beads.
+Implementation in progress. Completed pan-l4wu (schema), pan-91h1 (readyForMerge), pan-zg92 (webhook route), pan-4c7b (frontend types), pan-vwrn (smee client), and webhook handlers (pan-ygsc, pan-umby, pan-kjni). Next up: pan-ktn2 (smee lifecycle integration), pan-vb4m (GitHub app manifest), pan-8wl8 (vision doc), or remaining frontend beads.
 
 ## Completed Work
 - [x] pan-l4wu: Add blockerReasons[] column to review_status SQLite schema (commit: bcb7f958)
@@ -12,11 +12,11 @@ Implementation in progress. Completed pan-l4wu (schema), pan-91h1 (readyForMerge
 - [x] pan-4c7b: Update frontend ReviewStatusData type to include blockerReasons and new fields (commit: 2f430c3c)
 - [x] Fixed inverted bead dependencies in beads database (all 17 deps reversed)
 - [x] pan-vwrn: Add smee-client dependency and process management
+- [x] pan-ygsc: Implement check_suite and check_run webhook event handlers
+- [x] pan-umby: Implement pull_request webhook event handler
+- [x] pan-kjni: Implement pull_request_review and review_thread webhook handlers
 
 ## Remaining Work
-- [ ] pan-ygsc: Implement check_suite and check_run webhook event handlers
-- [ ] pan-umby: Implement pull_request webhook event handler
-- [ ] pan-kjni: Implement pull_request_review and review_thread webhook handlers
 - [ ] pan-ktn2: Integrate smee-client lifecycle into pan up / pan down
 - [ ] pan-vb4m: Update GitHub App manifest and create migration script for existing installs
 - [ ] pan-267t: Add 4th Merge step to pipeline stepper in ReviewPipelineSection

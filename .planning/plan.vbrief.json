@@ -11,9 +11,9 @@
     "status": "approved",
     "uid": "f3a7c1e8-9d42-4b6f-a815-2e8f0c3d7a19",
     "author": "agent:claude-opus-4-6",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-04-28T18:00:00Z",
-    "updated": "2026-04-28T12:48:12.401Z",
+    "updated": "2026-04-28T13:07:06.286Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/905",
@@ -308,7 +308,7 @@
       {
         "id": "pan-up-smee-lifecycle",
         "title": "Integrate smee-client lifecycle into pan up / pan down",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {

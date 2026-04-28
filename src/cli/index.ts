@@ -734,6 +734,16 @@ program
       console.log(chalk.dim('  GPT subscription agents will not work until this is resolved.'));
     }
 
+    // Start smee-client webhook relay (optional — non-fatal)
+    try {
+      const { startSmeeProcess } = await import('../lib/smee.js');
+      console.log(chalk.dim('\nStarting smee-client webhook relay...'));
+      startSmeeProcess();
+    } catch (error: any) {
+      console.log(chalk.yellow('⚠ Failed to start smee-client:'), error?.message || String(error));
+      console.log(chalk.dim('  Webhook relay unavailable — GitHub events will use polling fallback'));
+    }
+
     // Start TLDR daemon on project root (if Python3 and venv available)
     try {
       const { getTldrDaemonService } = await import('../lib/tldr-daemon.js');
@@ -766,6 +776,16 @@ program
     const { parse } = await import('@iarna/toml');
 
     console.log(chalk.bold('Stopping Panopticon...\n'));
+
+    // Stop smee-client webhook relay
+    try {
+      const { stopSmeeProcess } = await import('../lib/smee.js');
+      console.log(chalk.dim('Stopping smee-client webhook relay...'));
+      stopSmeeProcess();
+      console.log(chalk.green('✓ smee-client stopped'));
+    } catch {
+      console.log(chalk.dim('  smee-client not running'));
+    }
 
     // Read config for ports and Traefik settings
     const configFile = join(process.env.HOME || '', '.panopticon', 'config.toml');
