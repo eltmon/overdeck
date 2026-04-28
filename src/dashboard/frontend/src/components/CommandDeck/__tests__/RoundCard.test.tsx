@@ -62,12 +62,12 @@ describe('RoundCard', () => {
     expect(getByTestId('round-card-cost').textContent).toBe('$1.50');
   });
 
-  it('renders em-dash for missing duration and cost', () => {
-    const { getByTestId } = render(
+  it('omits duration and cost spans when values are missing', () => {
+    const { queryByTestId } = render(
       <RoundCard round={{ round: 1, verdict: 'pending' }} />,
     );
-    expect(getByTestId('round-card-duration').textContent).toBe('—');
-    expect(getByTestId('round-card-cost').textContent).toBe('—');
+    expect(queryByTestId('round-card-duration')).toBeNull();
+    expect(queryByTestId('round-card-cost')).toBeNull();
   });
 
   it('calls onClick when clicked', () => {

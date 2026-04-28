@@ -31,12 +31,14 @@ import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 
-import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
+import { getAgentRuntimeStateAsync, listRunningAgentsAsync } from '../../../lib/agents.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { SessionNodePresence } from '@panctl/contracts';
 import { deriveSessionPresence } from '../services/session-presence.js';
+import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
+import { getCachedRunningAgents } from '../services/running-agents-cache.js';
 import { findPrdAtStatus, type PrdLocation } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
 import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
@@ -499,30 +501,21 @@ export async function fetchActivityDataWithContext(
         } catch { /* specialist may not be running */ }
       }
 
-      // Compute the *real* tmux session name (and agent dir) for this specialist.
-      // Specialists write their session.id into ~/.panopticon/agents/<tmuxSession>/
-      // when dispatched (see specialists.ts spawn). Using the synthetic
-      // `specialist-<type>-<startedAt>` ID here meant resolveJsonlPath could never
-      // find the JSONL transcript — the Conversation panel rendered "No
-      // conversation data available" for every specialist click. Use the real
-      // tmux session name so jsonl-resolver lands on the correct agent dir.
       const specialistType = ss.type === 'test' ? 'test-agent' : 'merge-agent';
-      const resolvedProject = resolveProjectFromIssue(issueId);
-      const tmuxSessionName = getTmuxSessionName(
+      const specialistProjectKey = resolveProjectFromIssue(issueId)?.projectKey;
+      const specialistSessionId = getTmuxSessionName(
         specialistType as never,
-        resolvedProject?.projectKey,
+        specialistProjectKey,
         issueId,
       );
+      const tmuxSessionName = specialistSessionId;
 
       const specialistIsLive = tmuxSessionNames.has(tmuxSessionName);
-      // A specialist is a zombie if tmux is alive but the cached status says
-      // completed — the coordinator should have killed it but didn't.
       const specialistIsZombie = specialistIsLive && (ss.status === 'completed' || ss.status === 'failed');
       const specialistPresence: SessionNodePresence = specialistIsLive && !specialistIsZombie
         ? (ss.status === 'running' ? 'active' : 'idle')
         : specialistIsZombie ? 'idle' : 'ended';
-      const specialistSessionId = tmuxSessionName;
-      const specialistJsonlPath = await resolveJsonlPath(specialistSessionId, projectPath);
+      const specialistJsonlPath = await resolveJsonlPath(specialistSessionId, workspacePath);
 
       sections.push({
         type: ss.type,
@@ -546,29 +539,48 @@ export async function fetchActivityDataWithContext(
 
   // Cost breakdown — TTL-cached to avoid re-scanning cost events on every 5s poll (PAN-830 review high-4).
   let costByStage: Record<string, { cost: number; tokens: number }> = {};
-  let totalCost = 0;
+  let totalCost: number | null = null;
   try {
     const cacheKey = issueId.toUpperCase();
     sweepExpired(costCache, COST_CACHE_TTL_MS);
     const cached = costCache.get(cacheKey);
+    let aggregateCost = 0;
     if (cached && cached.timestamp > Date.now() - COST_CACHE_TTL_MS) {
-      totalCost = cached.data.totalCost;
+      aggregateCost = cached.data.totalCost;
       costByStage = cached.data.costByStage;
     } else {
       syncCache();
       const issueData = getCostsForIssue(cacheKey);
       if (issueData) {
-        totalCost = issueData.totalCost;
+        aggregateCost = issueData.totalCost;
         costByStage = Object.fromEntries(
           Object.entries(issueData.stages || {}).map(([stage, stats]) => [stage, { cost: stats.cost, tokens: stats.tokens }])
         );
       }
       sweepExpired(costCache, COST_CACHE_TTL_MS);
-      costCache.set(cacheKey, { timestamp: Date.now(), data: { totalCost, costByStage } });
+      costCache.set(cacheKey, { timestamp: Date.now(), data: { totalCost: aggregateCost, costByStage } });
     }
-  } catch { /* cost data optional */ }
 
-  return { issueId, sections, costByStage, totalCost };
+    const agents = includeTranscripts ? await listRunningAgentsAsync() : await getCachedRunningAgents();
+    const resolvedCost = resolveIssueHeadlineCost({
+      issueId,
+      aggregateCost,
+      agents,
+    });
+    totalCost = resolvedCost.resolvedTotalCost;
+
+    return {
+      issueId,
+      sections,
+      costByStage,
+      totalCost,
+      aggregateCost: resolvedCost.aggregateCost,
+      liveCost: resolvedCost.liveCost,
+      resolvedTotalCost: resolvedCost.resolvedTotalCost,
+    };
+  } catch {
+    return { issueId, sections, costByStage, totalCost, aggregateCost: null, liveCost: null, resolvedTotalCost: null };
+  }
 }
 
 // ─── Route: GET /api/command-deck/planning/:issueId ───────────────────────
@@ -638,9 +650,13 @@ async function fetchPlanningData(
       return {
         hasPrd: result.hasPrd,
         hasState: false,
+        hasInference: false,
         acceptanceProgress: result.acceptanceProgress,
         stashCount: result.stashCount,
         statusReviewedAt: result.statusReviewedAt,
+        transcriptCount: 0,
+        discussionCount: 0,
+        noteCount: 0,
       };
     }
     return result;
@@ -672,24 +688,32 @@ async function fetchPlanningData(
   if (!result.prd && result.state) result.prd = result.state;
   result.hasPrd = Boolean(result.prd);
 
-  const readArtifactDir = async (subdir: string, dateField: string): Promise<Array<{ filename: string; content: string; [key: string]: string }>> => {
+  const listArtifactFiles = async (subdir: string): Promise<Array<{ filename: string; mtime: string }>> => {
     const dirPath = join(planningDir, subdir);
     if (!await pathExists(dirPath)) return [];
-    const files = (await readdir(dirPath).catch(() => [] as string[])).filter(f => f.endsWith('.md') || f.endsWith('.txt'));
+    const files = (await readdir(dirPath).catch(() => [] as string[])).filter(
+      (f) => f.endsWith('.md') || f.endsWith('.txt'),
+    );
     const entries = await Promise.all(files.map(async (filename) => {
       const filePath = join(dirPath, filename);
-      const [content, fileStat] = await Promise.all([
-        readOptional(filePath),
-        stat(filePath).catch(() => null),
-      ]);
-      return { filename, content: content ?? '', [dateField]: fileStat?.mtime.toISOString() ?? new Date().toISOString() };
+      const fileStat = await stat(filePath).catch(() => null);
+      return {
+        filename,
+        mtime: fileStat?.mtime.toISOString() ?? new Date().toISOString(),
+      };
     }));
-    return entries.sort((a, b) => new Date(b[dateField]!).getTime() - new Date(a[dateField]!).getTime());
+    return entries.sort((a, b) => new Date(b.mtime).getTime() - new Date(a.mtime).getTime());
   };
 
-  result.transcripts = await readArtifactDir('transcripts', 'uploadedAt') as typeof result.transcripts;
-  result.discussions = await readArtifactDir('discussions', 'syncedAt') as typeof result.discussions;
-  result.notes = await readArtifactDir('notes', 'uploadedAt') as typeof result.notes;
+  const readArtifactDir = async (subdir: string, dateField: string): Promise<Array<{ filename: string; content: string; [key: string]: string }>> => {
+    const files = await listArtifactFiles(subdir);
+    const entries = await Promise.all(files.map(async ({ filename, mtime }) => {
+      const filePath = join(planningDir, subdir, filename);
+      const content = await readOptional(filePath);
+      return { filename, content: content ?? '', [dateField]: mtime };
+    }));
+    return entries;
+  };
 
   // Acceptance criteria progress from vBRIEF plan (PAN-847)
   try {
@@ -709,32 +733,44 @@ async function fetchPlanningData(
     }
   } catch { /* no vBRIEF plan */ }
 
-  // Stash count for workspace hygiene warning (PAN-847)
-  if (!summaryOnly) {
-    try {
-      const cacheKey = workspacePath;
-      sweepExpired(stashCountCache, STASH_COUNT_CACHE_TTL_MS);
-      const cached = stashCountCache.get(cacheKey);
-      if (cached && cached.timestamp > Date.now() - STASH_COUNT_CACHE_TTL_MS) {
-        result.stashCount = cached.count;
-      } else {
-        const { stdout: stashList } = await execAsync('git stash list', { cwd: workspacePath, encoding: 'utf-8' });
-        const count = stashList.trim() ? stashList.trim().split('\n').length : 0;
-        stashCountCache.set(cacheKey, { timestamp: Date.now(), count });
-        result.stashCount = count;
-      }
-    } catch { /* not a git repo or git unavailable */ }
-  }
-
   if (summaryOnly) {
+    const [transcriptFiles, discussionFiles, noteFiles] = await Promise.all([
+      listArtifactFiles('transcripts'),
+      listArtifactFiles('discussions'),
+      listArtifactFiles('notes'),
+    ]);
+
     return {
       hasPrd: result.hasPrd,
       hasState: result.hasState,
+      hasInference: Boolean(result.inference && result.inference.trim() !== ''),
       acceptanceProgress: result.acceptanceProgress,
       stashCount: result.stashCount,
       statusReviewedAt: result.statusReviewedAt,
+      transcriptCount: transcriptFiles.length,
+      discussionCount: discussionFiles.length,
+      noteCount: noteFiles.length,
     };
   }
+
+  result.transcripts = await readArtifactDir('transcripts', 'uploadedAt') as typeof result.transcripts;
+  result.discussions = await readArtifactDir('discussions', 'syncedAt') as typeof result.discussions;
+  result.notes = await readArtifactDir('notes', 'uploadedAt') as typeof result.notes;
+
+  // Stash count for workspace hygiene warning (PAN-847)
+  try {
+    const cacheKey = workspacePath;
+    sweepExpired(stashCountCache, STASH_COUNT_CACHE_TTL_MS);
+    const cached = stashCountCache.get(cacheKey);
+    if (cached && cached.timestamp > Date.now() - STASH_COUNT_CACHE_TTL_MS) {
+      result.stashCount = cached.count;
+    } else {
+      const { stdout: stashList } = await execAsync('git stash list', { cwd: workspacePath, encoding: 'utf-8' });
+      const count = stashList.trim() ? stashList.trim().split('\n').length : 0;
+      stashCountCache.set(cacheKey, { timestamp: Date.now(), count });
+      result.stashCount = count;
+    }
+  } catch { /* not a git repo or git unavailable */ }
 
   return result;
 }

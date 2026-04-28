@@ -114,7 +114,6 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { id: 'pan-recover', label: 'pan recover', description: 'Recover a crashed agent', insert: 'pan recover ', category: 'Lifecycle' },
   { id: 'pan-sync-main', label: 'pan sync-main', description: 'Sync latest main into feature branch', insert: 'pan sync-main ', category: 'Lifecycle' },
   { id: 'pan-done', label: 'pan done', description: 'Mark agent work complete', insert: 'pan done ', category: 'Lifecycle' },
-  { id: 'pan-approve', label: 'pan approve', description: 'Approve agent work and merge', insert: 'pan approve ', category: 'Lifecycle' },
   { id: 'pan-reopen', label: 'pan reopen', description: 'Reopen a completed issue', insert: 'pan reopen ', category: 'Lifecycle' },
   { id: 'pan-wipe', label: 'pan wipe', description: 'Deep wipe: completely reset all state', insert: 'pan wipe ', category: 'Lifecycle' },
   { id: 'pan-close', label: 'pan close', description: 'Close out a completed issue', insert: 'pan close ', category: 'Lifecycle' },

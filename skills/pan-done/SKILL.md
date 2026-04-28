@@ -34,5 +34,5 @@ The agent's tmux session remains alive for follow-up.
 ## See Also
 
 - `pan review pending` — see what's queued for review
-- `pan approve <id>` — approve and merge after review passes
+- Dashboard MERGE button — merge after review passes
 - `pan show <id>` — inspect the current state before signaling done

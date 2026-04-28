@@ -56,6 +56,12 @@ function mapSessionType(type: string): SessionNodeType {
   return (validTypes.includes(type as SessionNodeType) ? type : 'legacy') as SessionNodeType;
 }
 
+function sanitizeDisplayTitle(title: string): string {
+  return title
+    .replace(/<!--\s*panopticon:[\s\S]*?-->/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 interface ActivityContext {
   tmuxSessionNames?: Set<string>;
@@ -219,13 +225,13 @@ async function resolveFeatureTitle(
       const promptContent = await readOptional(join(planningDir, 'PLANNING_PROMPT.md'));
       if (promptContent) {
         const firstLine = promptContent.split('\n').find(l => l.trim().length > 0) || '';
-        const title = firstLine.replace(/^#+\s*/, '').trim();
+        const title = sanitizeDisplayTitle(firstLine.replace(/^#+\s*/, ''));
         if (title) return title;
       }
     } catch { /* non-fatal */ }
   }
 
-  return issueId;
+  return '';
 }
 
 // ─── Route: GET /api/projects/:projectKey/session-tree ──────────────────────
@@ -264,7 +270,7 @@ async function buildIssueTitleMap(): Promise<ReadonlyMap<string, string>> {
     const allIssues = issueDataService.getIssues() as Array<Record<string, unknown>>;
     for (const issue of allIssues) {
       const identifier = typeof issue['identifier'] === 'string' ? issue['identifier'] : null;
-      const title = typeof issue['title'] === 'string' ? issue['title'].trim() : '';
+      const title = typeof issue['title'] === 'string' ? sanitizeDisplayTitle(issue['title']) : '';
       if (!identifier || !title) continue;
       issueTitles.set(identifier, title);
       issueTitles.set(identifier.toLowerCase(), title);

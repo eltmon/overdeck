@@ -228,7 +228,7 @@ planCmd
   .option('--json', 'Emit JSON result')
   .action(planFinalizeCommand);
 
-// Lifecycle verbs: pan start, pan tell, pan kill, pan fork, pan resume, pan recover, pan sync-main, pan done, pan approve, pan reopen, pan wipe, pan close
+// Lifecycle verbs: pan start, pan tell, pan kill, pan fork, pan resume, pan recover, pan sync-main, pan done, pan reopen, pan wipe, pan close
 program
   .command('tell <id> <message>')
   .description('Send message to running agent')
@@ -280,8 +280,7 @@ program
 
 program
   .command('approve <id>')
-  .description('Approve agent work, merge MR, update tracker')
-  .option('--json', 'Output as JSON')
+  .description('[REMOVED] Use dashboard MERGE button instead')
   .action(approveCommand);
 
 program

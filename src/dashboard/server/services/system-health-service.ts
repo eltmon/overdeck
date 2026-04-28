@@ -17,8 +17,8 @@ const DEFAULT_HEALTH_POLL_SECONDS = 15;
 const DEFAULT_RESOURCE_CONFIG = {
   memoryWarnGb: 4,
   memoryBlockGb: 2,
-  agentWarnCount: 5,
-  agentBlockCount: 6,
+  agentWarnCount: 8,
+  agentBlockCount: 10,
 };
 const KB = 1024;
 const GIB = 1024 ** 3;
