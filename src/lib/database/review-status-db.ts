@@ -36,9 +36,10 @@ export function upsertReviewStatus(status: ReviewStatus): void {
         recovery_started_at,
         deacon_ignored,
         deacon_ignored_at,
-        deacon_ignored_reason
+        deacon_ignored_reason,
+        blocker_reasons
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status         = excluded.review_status,
@@ -67,7 +68,8 @@ export function upsertReviewStatus(status: ReviewStatus): void {
         recovery_started_at   = excluded.recovery_started_at,
         deacon_ignored        = excluded.deacon_ignored,
         deacon_ignored_at     = excluded.deacon_ignored_at,
-        deacon_ignored_reason = excluded.deacon_ignored_reason
+        deacon_ignored_reason = excluded.deacon_ignored_reason,
+        blocker_reasons       = excluded.blocker_reasons
     `).run(
       s.issueId,
       s.reviewStatus,
@@ -97,6 +99,7 @@ export function upsertReviewStatus(status: ReviewStatus): void {
       s.deaconIgnored ? 1 : 0,
       s.deaconIgnoredAt ?? null,
       s.deaconIgnoredReason ?? null,
+      s.blockerReasons ? JSON.stringify(s.blockerReasons) : null,
     );
 
     // Append new history entries (deduplicate by timestamp to avoid re-inserting)
@@ -217,6 +220,8 @@ interface DbReviewStatusRow {
   deacon_ignored: number;
   deacon_ignored_at: string | null;
   deacon_ignored_reason: string | null;
+  // PAN-905: GitHub-native merge blocker reasons (JSON array)
+  blocker_reasons: string | null;
 }
 
 function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]): ReviewStatus {
@@ -249,6 +254,7 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     deaconIgnored: row.deacon_ignored === 1 ? true : undefined,
     deaconIgnoredAt: row.deacon_ignored_at ?? undefined,
     deaconIgnoredReason: row.deacon_ignored_reason ?? undefined,
+    blockerReasons: row.blocker_reasons ? JSON.parse(row.blocker_reasons) : undefined,
     history: history.length > 0 ? history : undefined,
   });
 }

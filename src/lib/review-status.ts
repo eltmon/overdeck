@@ -21,6 +21,13 @@ export interface StatusHistoryEntry {
   notes?: string;
 }
 
+export interface BlockerReason {
+  type: 'failing_checks' | 'merge_conflict' | 'unresolved_conversations' | 'changes_requested' | 'draft_pr' | 'not_mergeable';
+  summary: string;
+  details?: string;
+  detectedAt: string;
+}
+
 export interface ReviewStatus {
   issueId: string;
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
@@ -43,6 +50,8 @@ export interface ReviewStatus {
   mergeRetryCount?: number;
   prUrl?: string;
   history?: StatusHistoryEntry[];
+  /** PAN-905: GitHub-native merge blocker reasons */
+  blockerReasons?: BlockerReason[];
   /** HEAD commit SHA at the time review passed — used to detect new commits after review */
   reviewedAtCommit?: string;
   /** PAN-653: workspace is stuck (e.g. main diverged mid-approve) — Deacon skips it */

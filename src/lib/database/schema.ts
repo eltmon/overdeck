@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 29;
+export const SCHEMA_VERSION = 30;
 
 /**
  * Initialize the complete database schema.
@@ -96,7 +96,9 @@ export function initSchema(db: Database.Database): void {
       -- Human-requested deacon ignore: when set, patrol skips this issue entirely
       deacon_ignored          INTEGER NOT NULL DEFAULT 0,
       deacon_ignored_at       TEXT,
-      deacon_ignored_reason   TEXT
+      deacon_ignored_reason   TEXT,
+      -- PAN-905: GitHub-native merge blocker reasons (JSON array)
+      blocker_reasons         TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -744,6 +746,11 @@ export function runMigrations(db: Database.Database): void {
           ON conversations(status, archived_at, created_at)
       `);
     } catch { /* already exists */ }
+  }
+
+  // v29 → v30: add blocker_reasons column to review_status (PAN-905)
+  if (currentVersion < 30) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN blocker_reasons TEXT`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version
