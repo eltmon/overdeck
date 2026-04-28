@@ -37,6 +37,16 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Verify lockfile integrity
+        run: |
+          if ! git diff --quiet bun.lock; then
+            echo "bun.lock was modified by install. Lockfile is out of sync with package.json."
+            exit 1
+          fi
+
+      - name: Verify Effect API surface
+        run: node scripts/verify-effect-api.mjs
+
       - name: Build
         run: npm run build
 
@@ -124,3 +134,46 @@ jobs:
         env:
           DASHBOARD_URL: http://localhost:3011
         run: cd src/dashboard/frontend && npm run test:playwright
+
+  clean-install:
+    runs-on: ubuntu-latest
+    name: Clean install + server smoke test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Purge caches and install fresh
+        run: |
+          rm -rf node_modules
+          rm -rf src/dashboard/server/node_modules
+          rm -rf packages/contracts/node_modules
+          bun install --frozen-lockfile
+
+      - name: Verify Effect API surface
+        run: node scripts/verify-effect-api.mjs
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke test dashboard server
+        run: |
+          DASHBOARD_URL=http://localhost:3011 nohup node dist/dashboard/server.js > /tmp/pan-dashboard.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3011/api/health > /dev/null; then
+              echo "Dashboard server started successfully"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/pan-dashboard.log
+          exit 1
