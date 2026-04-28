@@ -4,7 +4,7 @@
  * Wraps the GitHub REST API in an Effect service with typed errors.
  */
 
-import { Effect, Layer, ServiceMap } from 'effect';
+import { Effect, Layer, Context } from 'effect';
 import { getGitHubConfig } from './tracker-config.js';
 import {
   IssueNotFound,
@@ -121,7 +121,7 @@ export interface GitHubClientShape {
 
 // ─── Service tag ──────────────────────────────────────────────────────────────
 
-export class GitHubClient extends ServiceMap.Service<GitHubClient, GitHubClientShape>()(
+export class GitHubClient extends Context.Service<GitHubClient, GitHubClientShape>()(
   'panopticon/dashboard/GitHubClient',
 ) {}
 

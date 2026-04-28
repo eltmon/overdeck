@@ -11,7 +11,7 @@
  *   - Issue close with label cleanup
  */
 
-import { Effect, Layer, Option, ServiceMap } from 'effect';
+import { Effect, Layer, Option, Context } from 'effect';
 import { resolveGitHubIssue, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { GitHubClient } from './github-client.js';
 import { GitHubClientOptionalLive } from './github-client.js';
@@ -97,7 +97,7 @@ export interface IssueLifecycleShape {
 
 // ─── Service tag ──────────────────────────────────────────────────────────────
 
-export class IssueLifecycle extends ServiceMap.Service<IssueLifecycle, IssueLifecycleShape>()(
+export class IssueLifecycle extends Context.Service<IssueLifecycle, IssueLifecycleShape>()(
   'panopticon/dashboard/IssueLifecycle',
 ) {}
 

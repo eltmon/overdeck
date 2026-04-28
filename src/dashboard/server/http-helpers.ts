@@ -1,5 +1,5 @@
 /**
- * Workaround for Effect 4.0.0-beta.43 bug where HttpServerResponse.json()
+ * Workaround for Effect 4.0.0-beta.45 bug where HttpServerResponse.json()
  * creates a response without a proper body._tag, causing NodeHttpServer to crash
  * with "undefined is not an object (evaluating 'body._tag')".
  * 

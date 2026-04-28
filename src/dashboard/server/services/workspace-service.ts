@@ -9,7 +9,7 @@ import { existsSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { Effect, Layer, ServiceMap } from 'effect';
+import { Effect, Layer, Context } from 'effect';
 
 const execAsync = promisify(exec);
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
@@ -77,7 +77,7 @@ export interface WorkspaceServiceShape {
 
 // ─── Service tag ──────────────────────────────────────────────────────────────
 
-export class WorkspaceService extends ServiceMap.Service<
+export class WorkspaceService extends Context.Service<
   WorkspaceService,
   WorkspaceServiceShape
 >()('panopticon/dashboard/WorkspaceService') {}

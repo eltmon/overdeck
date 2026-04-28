@@ -21,7 +21,7 @@
  *   `fs.promises.readFile` for the one-time runtime.json migration fallback.
  */
 
-import { Effect, Layer, ServiceMap, Stream, SubscriptionRef } from 'effect';
+import { Effect, Layer, Context, Stream, SubscriptionRef } from 'effect';
 import {
   applyEvent as applyReducerEvent,
   INITIAL_READ_MODEL_STATE,
@@ -82,7 +82,7 @@ export interface AgentStateServiceShape {
   ) => Effect.Effect<void>;
 }
 
-export class AgentStateService extends ServiceMap.Service<
+export class AgentStateService extends Context.Service<
   AgentStateService,
   AgentStateServiceShape
 >()('panopticon/dashboard/AgentStateService') {}
