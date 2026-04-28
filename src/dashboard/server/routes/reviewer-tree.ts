@@ -198,30 +198,37 @@ export async function buildReviewerNodes(
         agentsDirOverride: opts.agentsDirOverride,
       });
 
-      // Presence:
-      //   - live tmux session present → if parent review is running, 'active'; else 'idle'
-      //   - no live tmux session present → 'ended'
+      // Determine if the reviewer is genuinely working or just a zombie session.
+      // A reviewer is a zombie when: tmux is alive, but the latest round artifact
+      // says "completed" — the coordinator was supposed to kill it but crashed.
+      // Treating zombies as "running" causes spinner loops and terminal reconnects.
+      const latestRoundDone = roundMetadata?.latestStatus === 'completed'
+        || roundMetadata?.latestStatus === 'failed';
+      const isZombie = isLive && latestRoundDone;
+
       let presence: SessionNodePresence;
-      if (isLive) {
+      if (isLive && !isZombie) {
         presence = opts.status === 'running' ? 'active' : 'idle';
       } else {
-        presence = 'ended';
+        // Zombie or dead — treat as ended so terminal won't try to connect
+        presence = isZombie ? 'idle' : 'ended';
       }
 
       // Per-role status:
-      //   - if the tmux session is alive, the reviewer is running NOW —
-      //     round artifacts are from PREVIOUS rounds and stale
-      //   - otherwise prefer the latest round artifact's status
-      //   - fall back to the parent review section's status
-      const rawStatus = isLive ? 'running' : (roundMetadata?.latestStatus ?? opts.status);
+      //   - live AND not zombie → running (new round in progress)
+      //   - zombie → use the archived round status (completed/failed)
+      //   - dead → use the archived round status or parent status
+      const rawStatus = (isLive && !isZombie)
+        ? 'running'
+        : (roundMetadata?.latestStatus ?? opts.status);
       const status = normalizeAgentStatus(rawStatus);
 
       const node: ReviewerNode = {
         type: 'reviewer',
         role,
         sessionId,
-        // Expose tmux session name when live so the Terminal tab can attach
-        tmuxSession: isLive ? sessionId : undefined,
+        // Expose tmux session name only when genuinely active (not zombie)
+        tmuxSession: (isLive && !isZombie) ? sessionId : undefined,
         model: 'specialist',
         startedAt: opts.startedAt,
         endedAt: opts.endedAt,

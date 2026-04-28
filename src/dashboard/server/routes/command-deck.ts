@@ -515,28 +515,22 @@ export async function fetchActivityDataWithContext(
       );
 
       const specialistIsLive = tmuxSessionNames.has(tmuxSessionName);
-      const specialistPresence: SessionNodePresence = specialistIsLive
+      // A specialist is a zombie if tmux is alive but the cached status says
+      // completed — the coordinator should have killed it but didn't.
+      const specialistIsZombie = specialistIsLive && (ss.status === 'completed' || ss.status === 'failed');
+      const specialistPresence: SessionNodePresence = specialistIsLive && !specialistIsZombie
         ? (ss.status === 'running' ? 'active' : 'idle')
-        : 'ended';
+        : specialistIsZombie ? 'idle' : 'ended';
       const specialistSessionId = tmuxSessionName;
-      // Specialists cd into the project root (specialists.ts:941 — `cwd = project?.path`),
-      // NOT the workspace dir, so their JSONLs are written to
-      // ~/.claude/projects/<encoded(projectPath)>/<session-uuid>.jsonl. Passing
-      // workspacePath here meant resolveJsonlPath looked in the wrong directory and
-      // returned null — the Conversation panel rendered "No conversation data".
       const specialistJsonlPath = await resolveJsonlPath(specialistSessionId, projectPath);
 
-      // Do NOT expose tmuxSession for specialist sessions — they are autonomous
-      // and should not be interactively attached (PAN-821 review)
       sections.push({
         type: ss.type,
         sessionId: specialistSessionId,
         model: 'specialist',
         startedAt: ss.startedAt,
         duration,
-        // If tmux session is alive, the specialist is running — don't trust
-        // the cached ss.status which may be stale from a previous dispatch.
-        status: specialistIsLive ? 'running' : ss.status,
+        status: (specialistIsLive && !specialistIsZombie) ? 'running' : ss.status,
         transcript: specialistJsonlPath ? undefined : transcriptParts.join('\n'),
         presence: specialistPresence,
         hasJsonl: !!specialistJsonlPath,
