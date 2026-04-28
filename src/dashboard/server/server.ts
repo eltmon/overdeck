@@ -48,6 +48,7 @@ import { projectsRouteLayer } from './routes/projects.js';
 import { adminRouteLayer } from './routes/admin.js';
 import { prereqsRouteLayer } from './routes/prereqs.js';
 import { cliproxyRouteLayer } from './routes/cliproxy.js';
+import { webhooksRouteLayer } from './routes/webhooks.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
@@ -212,6 +213,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   adminRouteLayer,
   prereqsRouteLayer,
   cliproxyRouteLayer,
+  webhooksRouteLayer,
   staticRouteLayer,
 );
 

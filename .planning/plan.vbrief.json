@@ -76,7 +76,7 @@
       {
         "id": "enrich-ready-for-merge",
         "title": "Enrich readyForMerge to incorporate blockerReasons",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -90,7 +90,7 @@
           {
             "id": "enrich-ready-for-merge.ac1",
             "title": "readyForMerge returns false when blockerReasons is non-empty, even if review+test passed",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -98,7 +98,7 @@
           {
             "id": "enrich-ready-for-merge.ac2",
             "title": "/api/review/:issueId/status response includes blockerReasons array",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
