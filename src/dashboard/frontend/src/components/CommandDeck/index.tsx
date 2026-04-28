@@ -609,6 +609,18 @@ export function CommandDeck({
     };
   }, []);
 
+  // Re-fetch all query caches when the WebSocket transport reconnects after
+  // a dashboard restart. Without this, the Command Deck operates on stale
+  // data — conversations vanish, session trees freeze, costs go stale.
+  useEffect(() => {
+    const handler = () => {
+      console.log('[CommandDeck] transport reconnected — invalidating query caches');
+      queryClient.invalidateQueries();
+    };
+    window.addEventListener('panopticon:reconnected', handler);
+    return () => window.removeEventListener('panopticon:reconnected', handler);
+  }, [queryClient]);
+
   // Find selected feature data (memoized to avoid O(P×F) scan per render)
   const selectedFeatureData = useMemo(() => {
     if (!selectedFeature) return null;
