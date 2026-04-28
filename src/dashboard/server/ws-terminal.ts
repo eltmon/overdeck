@@ -361,12 +361,16 @@ export function setupTerminalWebSocket(server: http.Server): void {
 
         ptyStarted = true;
         console.log(`[ws-terminal] Starting local PTY for ${sessionName} at ${hub.cols}x${hub.rows}`);
+        // Strip TMUX/TMUX_PANE from inherited env so `tmux attach-session` doesn't refuse
+        // with "sessions should be nested with care, unset $TMUX to force" when the
+        // dashboard server itself was launched from inside a tmux pane.
+        const { TMUX: _tmux, TMUX_PANE: _tmuxPane, ...envWithoutTmux } = process.env;
         ptyProcess = pty.spawn('tmux', buildTmuxArgs(['attach-session', '-t', sessionName]), {
           name: 'xterm-256color',
           cols: hub.cols,
           rows: hub.rows,
           cwd: homedir(),
-          env: { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as { [key: string]: string },
+          env: { ...envWithoutTmux, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as { [key: string]: string },
         });
 
         hub.pty = ptyProcess;
