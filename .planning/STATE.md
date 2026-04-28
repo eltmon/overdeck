@@ -1,9 +1,9 @@
 # PAN-913: Auto-detect expired Codex auth and spawn re-authentication flow
 
-## Status: In Progress
+## Status: Complete
 
 ## Current Phase
-Implementing bead pan-gig7 — Create useCodexAuthStatus polling hook (frontend React Query hook for polling Codex auth status)
+All beads implemented and committed.
 
 ## Completed Work
 - [x] pan-748p: Created async checkCodexAuthStatus() utility in src/lib/codex-auth.ts (commit: 7df8256)
@@ -15,10 +15,11 @@ Implementing bead pan-gig7 — Create useCodexAuthStatus polling hook (frontend 
 - [x] pan-gig7: Created useCodexAuthStatus polling hook (commit: 29534b6)
 - [x] pan-muvx: Created CodexAuthBanner frontend component (commit: b82b0de)
 - [x] pan-k8l7: Show Codex auth type and status in Settings page (commit: 1e9b68b)
+- [x] pan-30ci: Auto-retry blocked spawn after successful re-auth (commit: aa4fd22cf)
+- [x] pan-ppl8: Document Codex auth requirements and re-auth flow (commit: 4117a42ab)
 
 ## Remaining Work
-- [ ] pan-30ci: Auto-retry blocked spawn after successful re-auth
-- [ ] pan-ppl8: Document Codex auth requirements and re-auth flow
+None.
 
 ## Key Decisions
 - Detection strategy: JWT expiry (primary) + CLIProxy log tailing (secondary, best-effort)
