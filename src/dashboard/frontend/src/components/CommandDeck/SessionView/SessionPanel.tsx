@@ -100,7 +100,7 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
   // either the explicit tmuxSession field or the sessionId (which is the
   // canonical tmux name for reviewer/specialist sessions).
   const tmuxName = session.tmuxSession || (session.presence === 'active' ? session.sessionId : undefined);
-  const hasTerminal = !!tmuxName && session.presence === 'active';
+  const hasTerminal = !!tmuxName && session.presence !== 'ended';
   const isEnded = session.presence === 'ended';
   const roundData = useMemo(() => deriveRoundData(session.roundMetadata), [session.roundMetadata]);
   const hasFindings = roundData.length > 0;
