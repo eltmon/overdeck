@@ -143,8 +143,7 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
   const shouldLoadPlanningDetail =
     (planningSummary.data?.transcriptCount ?? 0) > 0
     || (planningSummary.data?.discussionCount ?? 0) > 0
-    || (planningSummary.data?.noteCount ?? 0) > 0
-    || false;
+    || (planningSummary.data?.noteCount ?? 0) > 0;
 
   const planningDetail = usePlanningQuery(issueId, {
     enabled: shouldLoadPlanningDetail,

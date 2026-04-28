@@ -661,6 +661,7 @@ async function fetchPlanningData(
       return {
         hasPrd: result.hasPrd,
         hasState: false,
+        hasInference: false,
         acceptanceProgress: result.acceptanceProgress,
         stashCount: result.stashCount,
         statusReviewedAt: result.statusReviewedAt,
@@ -756,6 +757,7 @@ async function fetchPlanningData(
     return {
       hasPrd: result.hasPrd,
       hasState: result.hasState,
+      hasInference: Boolean(result.inference && result.inference.trim() !== ''),
       acceptanceProgress: result.acceptanceProgress,
       stashCount: result.stashCount,
       statusReviewedAt: result.statusReviewedAt,

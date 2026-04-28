@@ -16,6 +16,7 @@ import {
 export interface PlanningSummaryResponse {
   hasPrd: boolean;
   hasState: boolean;
+  hasInference?: boolean;
   acceptanceProgress?: { completed: number; total: number; percent: number };
   stashCount?: number;
   statusReviewedAt?: string;
