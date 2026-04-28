@@ -50,6 +50,9 @@ function createPanRpcProtocolLayer(url?: string) {
 
 interface SubscribeOptions {
   readonly retryDelay?: Duration.Input
+  /** Called when the subscription reconnects after a failure. Use this to
+   *  re-bootstrap state (e.g. re-fetch the snapshot from the new server). */
+  readonly onReconnect?: () => void
 }
 
 const DEFAULT_RETRY_DELAY = Duration.millis(250)
@@ -113,6 +116,8 @@ export class WsTransport {
     let active = true
     let currentCancel: (() => void) | null = null
     const retryDelay = options?.retryDelay ?? DEFAULT_RETRY_DELAY
+    const onReconnect = options?.onReconnect
+    let hasConnectedOnce = false
 
     const run = () => {
       if (!active) return
@@ -124,6 +129,13 @@ export class WsTransport {
             Stream.runForEach(connect(client), (value) =>
               Effect.sync(() => {
                 if (!active) return
+                // Fire onReconnect the first time we receive data after a
+                // reconnection. This lets EventRouter re-bootstrap its
+                // snapshot from the new server instance.
+                if (hasConnectedOnce && onReconnect) {
+                  hasConnectedOnce = false // reset so it only fires once per reconnect
+                  try { onReconnect() } catch { /* non-fatal */ }
+                }
                 try {
                   listener(value)
                 } catch {
@@ -138,6 +150,7 @@ export class WsTransport {
           Effect.tapError((err) =>
             Effect.sync(() => {
               if (active) {
+                hasConnectedOnce = true // mark that next successful data = reconnect
                 console.warn('[WsTransport] subscription error, retrying:', formatError(err))
               }
             }),
@@ -148,6 +161,7 @@ export class WsTransport {
         {
           onExit: (exit) => {
             if (active && Exit.isFailure(exit)) {
+              hasConnectedOnce = true
               console.warn('[WsTransport] subscription exited, reconnecting with fresh transport')
               resetTransport()
               setTimeout(run, 1000)

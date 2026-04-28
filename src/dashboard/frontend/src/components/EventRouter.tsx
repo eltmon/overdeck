@@ -120,6 +120,19 @@ export function EventRouter() {
       (client) =>
         (client as PanRpcProtocolClient)[WS_METHODS.subscribeDomainEvents]({}) as unknown as Stream.Stream<DomainEvent, Error>,
       (event) => handleEvent(event as DomainEvent),
+      {
+        // When the WebSocket reconnects after a dashboard restart, re-fetch
+        // the snapshot from the new server instance. Without this, the
+        // frontend operates on a stale snapshot and conversations/sessions
+        // that were being viewed vanish with "no longer exists" errors.
+        onReconnect: () => {
+          console.log('[EventRouter] transport reconnected — re-bootstrapping snapshot')
+          bootstrap()
+          // Broadcast to all useQuery consumers so they re-fetch stale data
+          // (session trees, conversations, costs, etc.)
+          window.dispatchEvent(new CustomEvent('panopticon:reconnected'))
+        },
+      },
     )
 
     bootstrap()
