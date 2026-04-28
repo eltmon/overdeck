@@ -233,8 +233,9 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
   const availableGb = Math.round((health.summary.availableMemoryBytes / (1024 ** 3)) * 10) / 10;
   const workAgentCount = health.summary.workAgentCount;
   const leakedSpecialists = health.leakedSpecialists;
-  const hardWorkAgentLimit = resolveAgentCountEnv('PAN_AGENT_BLOCK_COUNT', 10);
-  const warnWorkAgentLimit = resolveAgentCountEnv('PAN_AGENT_WARN_COUNT', 8);
+  const resourceConfig = getResourceConfig();
+  const hardWorkAgentLimit = resolveAgentCountEnv('PAN_AGENT_BLOCK_COUNT', resourceConfig.agentBlockCount);
+  const warnWorkAgentLimit = resolveAgentCountEnv('PAN_AGENT_WARN_COUNT', resourceConfig.agentWarnCount);
 
   if (health.summary.availableMemoryBytes < health.thresholds.memoryAvailableCriticalBytes) {
     warnings.push({

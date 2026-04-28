@@ -13,7 +13,7 @@ import { useMemo } from 'react';
 import { useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { GitMerge, ExternalLink, Loader2, CheckCircle, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
-import { useDashboardStore, selectAwaitingMerge, selectIssues } from '../lib/store';
+import { useDashboardStore, selectAwaitingMerge, selectBlockedFromMerge, selectIssues } from '../lib/store';
 import type { Issue } from '../types';
 
 interface WorkspaceInfo {
@@ -90,14 +90,7 @@ export function AwaitingMergePage() {
       });
   }, [awaiting, issuesById]);
 
-  // Blocked issues: readyForMerge is false because of GitHub-native blockers.
-  const blocked = useMemo(() => {
-    const all = useDashboardStore.getState().reviewStatusByIssueId;
-    return Object.values(all).filter(
-      (rs) =>
-        (rs.blockerReasons?.length ?? 0) > 0 && rs.mergeStatus !== 'merged',
-    );
-  }, []);
+  const blocked = useDashboardStore(selectBlockedFromMerge);
 
   // One workspace fetch per ready issue (parallel via useQueries)
   const workspaceQueries = useQueries({
