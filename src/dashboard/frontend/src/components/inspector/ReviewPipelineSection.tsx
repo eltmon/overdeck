@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle, XCircle, Loader2, AlertTriangle, ChevronDown, ChevronUp, RotateCcw, Info, GitMerge } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, AlertTriangle, ChevronDown, ChevronUp, RotateCcw, Info, GitMerge, Terminal } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ReviewStatus } from './types';
@@ -16,6 +16,7 @@ const DEFAULT_MERGE_RETRY_MAX = 3;
 interface ReviewPipelineSectionProps {
   reviewStatus: ReviewStatus;
   issueId?: string;
+  onViewLog?: () => void;
 }
 
 void COMMAND_DECK_SURFACE_REGISTRY;
@@ -31,7 +32,7 @@ interface PipelineStep {
   isSkipped: boolean;
 }
 
-export function ReviewPipelineSection({ reviewStatus, issueId }: ReviewPipelineSectionProps) {
+export function ReviewPipelineSection({ reviewStatus, issueId, onViewLog }: ReviewPipelineSectionProps) {
   const [showDetails, setShowDetails] = useState(false);
   const prQuery = usePrQuery(issueId ?? '');
   const verificationMaxCycles = reviewStatus.verificationMaxCycles ?? DEFAULT_VERIFICATION_MAX_CYCLES;
@@ -207,6 +208,18 @@ export function ReviewPipelineSection({ reviewStatus, issueId }: ReviewPipelineS
             <span className="text-muted-foreground">Queue position</span>
             <span className="font-medium text-foreground">{reviewStatus.queuePosition}</span>
           </div>
+        )}
+
+        {/* Live specialist log link during active merge phase */}
+        {onViewLog && (reviewStatus.mergeStatus === 'queued' || reviewStatus.mergeStatus === 'merging' || reviewStatus.mergeStatus === 'verifying') && (
+          <button
+            onClick={onViewLog}
+            className="mt-1.5 flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 transition-colors"
+            data-testid="merge-live-log-link"
+          >
+            <Terminal className="w-3 h-3" />
+            <span>View live specialist log</span>
+          </button>
         )}
       </div>
 

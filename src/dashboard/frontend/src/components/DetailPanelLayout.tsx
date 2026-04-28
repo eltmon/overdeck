@@ -174,6 +174,14 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
     });
   }, [issueId]);
 
+  const onViewMergeLog = useCallback(() => {
+    const mergeTab = availableTerminals.find(t => t.id === 'merging' && !t.disabled);
+    if (!mergeTab?.sessionName) return;
+    openTerminal();
+    handleSelectSession(mergeTab.sessionName);
+    setPinned(true);
+  }, [availableTerminals, openTerminal, handleSelectSession]);
+
   if (panelState.panelMode === 'closed') return null;
 
   const showTerminal = panelState.panelMode === 'inspector+terminal' && !!agent && !suppressTerminal;
@@ -235,6 +243,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
             reviewStatusLoading={reviewStatusLoading}
             onClose={onClose}
             onOpenTerminal={openTerminal}
+            onViewMergeLog={onViewMergeLog}
           />
         </div>
       </Panel>
@@ -308,6 +317,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
         reviewStatusLoading={reviewStatusLoading}
         onClose={onClose}
         onOpenTerminal={agent ? openTerminal : undefined}
+        onViewMergeLog={onViewMergeLog}
       />
     </div>
   );

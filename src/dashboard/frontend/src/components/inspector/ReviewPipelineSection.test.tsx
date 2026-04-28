@@ -146,6 +146,49 @@ describe('ReviewPipelineSection', () => {
     expect(screen.queryByText('Queue position')).not.toBeInTheDocument();
   });
 
+  it('shows live specialist log link when merge is queued and onViewLog is provided', () => {
+    const onViewLog = vi.fn();
+    render(
+      <ReviewPipelineSection
+        reviewStatus={makeReviewStatus({ mergeStatus: 'queued' })}
+        onViewLog={onViewLog}
+      />
+    );
+    const link = screen.getByTestId('merge-live-log-link');
+    expect(link).toBeInTheDocument();
+    fireEvent.click(link);
+    expect(onViewLog).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows live specialist log link when merge is merging', () => {
+    const onViewLog = vi.fn();
+    render(
+      <ReviewPipelineSection
+        reviewStatus={makeReviewStatus({ mergeStatus: 'merging' })}
+        onViewLog={onViewLog}
+      />
+    );
+    expect(screen.getByTestId('merge-live-log-link')).toBeInTheDocument();
+  });
+
+  it('does not show live log link when merge is pending', () => {
+    const onViewLog = vi.fn();
+    render(
+      <ReviewPipelineSection
+        reviewStatus={makeReviewStatus({ mergeStatus: 'pending' })}
+        onViewLog={onViewLog}
+      />
+    );
+    expect(screen.queryByTestId('merge-live-log-link')).not.toBeInTheDocument();
+  });
+
+  it('does not show live log link when onViewLog is not provided', () => {
+    render(
+      <ReviewPipelineSection reviewStatus={makeReviewStatus({ mergeStatus: 'queued' })} />
+    );
+    expect(screen.queryByTestId('merge-live-log-link')).not.toBeInTheDocument();
+  });
+
   it('shows verification attempts against the configured max cycle count', () => {
     render(
       <ReviewPipelineSection

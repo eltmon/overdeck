@@ -47,6 +47,7 @@ interface ActionsSectionProps {
   onKillSuccess?: () => void;
   onViewBeads: () => void;
   onViewVBrief: () => void;
+  onViewLog?: () => void;
   lifecycle?: WorkAgentLifecycle;
   agentLaunchState?: 'starting' | 'resuming' | null;
 }
@@ -80,6 +81,7 @@ export function ActionsSection({
   onKillSuccess,
   onViewBeads,
   onViewVBrief,
+  onViewLog,
   lifecycle,
   agentLaunchState,
 }: ActionsSectionProps) {
@@ -168,7 +170,7 @@ export function ActionsSection({
 
       {/* Review status */}
       {showPipelineStatus && reviewStatus && (
-        <ReviewPipelineSection reviewStatus={reviewStatus} issueId={issueId} />
+        <ReviewPipelineSection reviewStatus={reviewStatus} issueId={issueId} onViewLog={onViewLog} />
       )}
       {reviewActionHint && (
         <div
