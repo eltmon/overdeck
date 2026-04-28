@@ -223,11 +223,9 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
   const sections = activity.data?.sections ?? [];
   const stage = deriveStageFromSections(sections);
   const isCostPending = costs.isLoading && activity.isLoading;
-  const totalCost = costs.data?.resolvedTotalCost !== undefined
-    ? costs.data.resolvedTotalCost
-    : !activity.isLoading
-      ? activity.data?.resolvedTotalCost ?? null
-      : null;
+  const costFromIssues = costs.data?.resolvedTotalCost;
+  const costFromActivity = !activity.isLoading ? activity.data?.resolvedTotalCost : undefined;
+  const totalCost = costFromIssues ?? costFromActivity ?? null;
   const lastLabel = lastActivityLabel(sections);
   const activeAgentCount = sections.filter(
     (s) => s.status === 'running' || s.status === 'active',

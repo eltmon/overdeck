@@ -1,20 +1,23 @@
 import { useState, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ListTodo, FileText, RefreshCw, ExternalLink, AlertTriangle, ShieldCheck, Package } from 'lucide-react';
-import type { ReviewStatus } from '../../inspector/types';
+import { useAlert } from '../../DialogProvider';
 import { isReviewPipelineStuck } from '../../../lib/pipeline-state';
 import { ActivitySparkline, type SparklineEvent } from '../ActivitySparkline';
 import {
   useActivityQuery,
-  usePlanningQuery,
   usePlanningSummaryWithOverridesQuery,
   useReviewStatusQuery,
   type PlanningResponse,
+  type PlanningArtifact,
+  type PlanningSummaryResponse,
+  type ReviewStatusData,
 } from '../ZoneCOverviewTabs/queries';
 import styles from '../styles/command-deck.module.css';
 
 type PlanningData = PlanningResponse;
 
-type PlanningStageData = Pick<PlanningData, 'prd' | 'state'>;
+type PlanningStageData = Pick<PlanningSummaryResponse, 'hasPrd' | 'hasState'>;
 
 interface IssueHeaderProps {
   issueId: string;
@@ -57,11 +60,11 @@ function StageDot({ label, stage }: StageDotProps) {
 
 /** Derive the six stage statuses from review status + planning state (PAN-830 high-2). */
 function deriveStageStatuses(
-  reviewStatus: ReviewStatus | undefined,
+  reviewStatus: ReviewStatusData | undefined,
   planning: PlanningStageData | undefined,
 ): Array<{ label: string; stage: StageStatus }> {
   const merged = reviewStatus?.mergeStatus === 'merged';
-  const hasPlan = !!planning?.prd || !!planning?.state;
+  const hasPlan = planning?.hasPrd === true || planning?.hasState === true;
 
   // Planning: done if plan exists, pending otherwise
   const planningStage: StageStatus = merged ? 'done' : hasPlan ? 'done' : 'pending';
@@ -131,8 +134,35 @@ function formatCost(cost: number): string {
   return `$${cost.toFixed(2)}`;
 }
 
+function formatArtifactDate(value?: string): string {
+  if (!value) return 'unknown time';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'unknown time';
+  return date.toLocaleString();
+}
+
+function formatArtifactCollection(
+  title: string,
+  artifacts: PlanningArtifact[] | undefined,
+  emptyLabel: string,
+): string {
+  if (!artifacts || artifacts.length === 0) {
+    return emptyLabel;
+  }
+
+  return `${title} (${artifacts.length})\n\n${artifacts
+    .map((artifact) => {
+      const timestamp = artifact.uploadedAt ?? artifact.syncedAt;
+      const metaLine = timestamp ? `\n_Last updated: ${formatArtifactDate(timestamp)}_\n` : '';
+      return `## ${artifact.filename ?? title}${metaLine}\n${artifact.content ?? ''}`;
+    })
+    .join('\n\n---\n\n')}`;
+}
+
 export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderProps) {
   const [syncing, setSyncing] = useState(false);
+  const queryClient = useQueryClient();
+  const showAlert = useAlert();
 
   const planningSummary = usePlanningSummaryWithOverridesQuery(issueId, {
     staleTime: 30_000,
@@ -140,17 +170,7 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
   const reviewStatusQuery = useReviewStatusQuery(issueId);
   const activityQuery = useActivityQuery(issueId);
 
-  const shouldLoadPlanningDetail =
-    (planningSummary.data?.transcriptCount ?? 0) > 0
-    || (planningSummary.data?.discussionCount ?? 0) > 0
-    || (planningSummary.data?.noteCount ?? 0) > 0;
-
-  const planningDetail = usePlanningQuery(issueId, {
-    enabled: shouldLoadPlanningDetail,
-  });
-
-  const planning = planningDetail.data;
-  const reviewStatus = reviewStatusQuery.data as ReviewStatus | undefined;
+  const reviewStatus = reviewStatusQuery.data;
   const activity = activityQuery.data;
 
   const handleSync = async () => {
@@ -168,11 +188,40 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
     }
   };
 
-  const planningForStageStatus = planning ?? (
-    planningSummary.data?.hasPrd || planningSummary.data?.hasState
-      ? { prd: planningSummary.data.hasPrd ? 'present' : undefined, state: planningSummary.data.hasState ? 'present' : undefined }
-      : undefined
-  );
+  const showPlanningArtifact = async (
+    title: string,
+    renderMessage: (planning: PlanningResponse) => string,
+    emptyMessage: string,
+  ) => {
+    try {
+      const planning = await queryClient.fetchQuery({
+        queryKey: ['command-deck-planning', issueId, 'full'],
+        queryFn: async () => {
+          const response = await fetch(`/api/command-deck/planning/${issueId}`);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status} ${response.statusText}`);
+          }
+          return response.json() as Promise<PlanningResponse>;
+        },
+        staleTime: 30_000,
+      });
+
+      const message = renderMessage(planning);
+      await showAlert({
+        title,
+        message: message || emptyMessage,
+      });
+    } catch (error) {
+      console.error(`Failed to load ${title}:`, error);
+      await showAlert({
+        title: `Unable to load ${title}`,
+        message: emptyMessage,
+        variant: 'error',
+      });
+    }
+  };
+
+  const planningForStageStatus = planningSummary.data;
 
   const stageStatuses = useMemo(
     () => deriveStageStatuses(reviewStatus, planningForStageStatus),
@@ -368,10 +417,16 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
         </button>
 
         {/* Density rule: suppress default-value badges (PAN-847 pan-35kn) */}
-        {planning?.state && (
+        {planningSummary.data?.hasState && (
           <button
             className={styles.issueHeaderBtn}
-            onClick={() => alert('STATE.md\n\n' + planning.state)}
+            onClick={() => {
+              void showPlanningArtifact(
+                'STATE.md',
+                (planning) => planning.state ? `STATE.md\n\n${planning.state}` : '',
+                'No STATE.md recorded for this issue.',
+              );
+            }}
             title="View STATE.md"
           >
             <FileText size={11} />
@@ -379,10 +434,16 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
           </button>
         )}
 
-        {planning?.prd && (
+        {planningSummary.data?.hasPrd && (
           <button
             className={styles.issueHeaderBtn}
-            onClick={() => alert('PRD\n\n' + planning.prd)}
+            onClick={() => {
+              void showPlanningArtifact(
+                'PRD',
+                (planning) => planning.prd ? `PRD\n\n${planning.prd}` : '',
+                'No PRD recorded for this issue.',
+              );
+            }}
             title="View PRD"
           >
             <FileText size={11} />
@@ -390,37 +451,45 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
           </button>
         )}
 
-        {(planning?.discussions?.length ?? 0) > 0 && (
+        {(planningSummary.data?.discussionCount ?? 0) > 0 && (
           <button
             className={styles.issueHeaderBtn}
             onClick={() => {
-              const discussions = planning?.discussions ?? [];
-              const content = discussions
-                .map((d) => `## ${d.filename ?? 'Discussion'}\n\n${d.content ?? ''}`)
-                .join('\n\n---\n\n');
-              alert(`Discussions (${discussions.length})\n\n${content}`);
+              void showPlanningArtifact(
+                'Discussions',
+                (planning) => formatArtifactCollection(
+                  'Discussions',
+                  planning.discussions,
+                  'No discussions recorded for this issue.',
+                ),
+                'No discussions recorded for this issue.',
+              );
             }}
             title="View discussions"
           >
             Discussions
-            <span className={styles.issueHeaderBadge}>{planning?.discussions?.length ?? 0}</span>
+            <span className={styles.issueHeaderBadge}>{planningSummary.data?.discussionCount ?? 0}</span>
           </button>
         )}
 
-        {(planning?.transcripts?.length ?? 0) > 0 && (
+        {(planningSummary.data?.transcriptCount ?? 0) > 0 && (
           <button
             className={styles.issueHeaderBtn}
             onClick={() => {
-              const transcripts = planning?.transcripts ?? [];
-              const content = transcripts
-                .map((t) => `## ${t.filename ?? 'Transcript'}\n\n${t.content ?? ''}`)
-                .join('\n\n---\n\n');
-              alert(`Transcripts (${transcripts.length})\n\n${content}`);
+              void showPlanningArtifact(
+                'Transcripts',
+                (planning) => formatArtifactCollection(
+                  'Transcripts',
+                  planning.transcripts,
+                  'No transcripts recorded for this issue.',
+                ),
+                'No transcripts recorded for this issue.',
+              );
             }}
             title="View transcripts"
           >
             Transcripts
-            <span className={styles.issueHeaderBadge}>{planning?.transcripts?.length ?? 0}</span>
+            <span className={styles.issueHeaderBadge}>{planningSummary.data?.transcriptCount ?? 0}</span>
           </button>
         )}
 

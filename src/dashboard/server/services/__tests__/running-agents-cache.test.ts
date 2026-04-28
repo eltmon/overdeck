@@ -45,4 +45,24 @@ describe('running-agents-cache', () => {
     expect(refreshed).toBe(secondAgents);
     expect(listAgents).toHaveBeenCalledTimes(2);
   });
+
+  it('coalesces concurrent cache misses into one list call', async () => {
+    let resolveAgents: ((value: Array<{ id: string; issueId: string }>) => void) | undefined;
+    const listAgents = vi.fn(
+      () => new Promise<Array<{ id: string; issueId: string }>>((resolve) => {
+        resolveAgents = resolve;
+      }),
+    );
+
+    const firstPromise = getCachedRunningAgents(listAgents);
+    const secondPromise = getCachedRunningAgents(listAgents);
+
+    expect(listAgents).toHaveBeenCalledTimes(1);
+
+    resolveAgents?.([{ id: 'agent-1', issueId: 'PAN-895' }]);
+
+    const [first, second] = await Promise.all([firstPromise, secondPromise]);
+    expect(first).toEqual([{ id: 'agent-1', issueId: 'PAN-895' }]);
+    expect(second).toEqual(first);
+  });
 });

@@ -7,6 +7,9 @@ const runningAgentsCache = new Map<string, {
   timestamp: number;
   agents: Awaited<ReturnType<typeof listRunningAgentsAsync>>;
 }>();
+let inflightRunningAgents:
+  | Promise<Awaited<ReturnType<typeof listRunningAgentsAsync>>>
+  | null = null;
 
 function sweepExpired<T extends { timestamp: number }>(cache: Map<string, T>, ttlMs: number): void {
   const cutoff = Date.now() - ttlMs;
@@ -26,14 +29,22 @@ export async function getCachedRunningAgents(
     return cached.agents;
   }
 
-  const agents = await listAgents();
-  runningAgentsCache.set(GLOBAL_RUNNING_AGENTS_CACHE_KEY, {
-    timestamp: Date.now(),
-    agents,
-  });
-  return agents;
+  if (!inflightRunningAgents) {
+    inflightRunningAgents = listAgents().then((agents) => {
+      runningAgentsCache.set(GLOBAL_RUNNING_AGENTS_CACHE_KEY, {
+        timestamp: Date.now(),
+        agents,
+      });
+      return agents;
+    }).finally(() => {
+      inflightRunningAgents = null;
+    });
+  }
+
+  return inflightRunningAgents;
 }
 
 export function clearRunningAgentsCache(): void {
   runningAgentsCache.clear();
+  inflightRunningAgents = null;
 }
