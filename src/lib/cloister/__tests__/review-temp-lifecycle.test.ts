@@ -84,6 +84,7 @@ vi.mock('../../tmux.js', () => ({
   listSessionNamesAsync: vi.fn(async () => []),
   capturePaneAsync: vi.fn(async () => ''),
   setOptionAsync: vi.fn(async () => {}),
+  isPaneDeadAsync: vi.fn(async () => false),
 }));
 vi.mock('../../agents.js', () => ({ getProviderExportsForModel: vi.fn(), getAgentRuntimeBaseCommand: vi.fn() }));
 vi.mock('../../launcher-generator.js', () => ({ generateLauncherScript: vi.fn() }));
