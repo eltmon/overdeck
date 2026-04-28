@@ -1284,6 +1284,28 @@ export async function dispatchParallelReview(
     ) => Promise<{ sessionName: string }>;
   } = {},
 ): Promise<{ success: boolean; message: string; error?: string }> {
+  // ── Idempotency guard ────────────────────────────────────────────────────
+  // Check if a review coordinator is already running for this issue. Without
+  // this, multiple dispatch calls (dashboard restart, manual trigger, deacon
+  // patrol) spawn duplicate coordinators, each spawning its own set of
+  // reviewer agents — doubling or tripling the cost.
+  try {
+    const sessions = await listSessionNamesAsync();
+    const existingCoordinator = sessions.find(
+      (s) => s.startsWith(`review-coordinator-${opts.issueId}-`),
+    );
+    if (existingCoordinator) {
+      console.log(`[review-agent] Idempotency guard: coordinator ${existingCoordinator} already running for ${opts.issueId} — skipping dispatch`);
+      return {
+        success: true,
+        message: `Review already in progress: ${existingCoordinator}`,
+      };
+    }
+  } catch (err) {
+    // tmux check failed — proceed with dispatch rather than blocking
+    console.warn(`[review-agent] Idempotency check failed for ${opts.issueId}, proceeding:`, err);
+  }
+
   // Archive feedback from any previous review cycle so the work agent only
   // sees current-cycle feedback when it reads .planning/feedback/.
   try {
