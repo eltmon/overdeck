@@ -4,6 +4,7 @@ import { homedir } from 'node:os';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
+import { bridgeCodexAuthToCliproxyAsync } from '../../../lib/cliproxy.js';
 import { createSessionAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 
 // ─── Route: GET /api/settings/codex-auth ───────────────────────────────────────
@@ -47,7 +48,27 @@ const postCodexReauthRoute = HttpRouter.add(
   ),
 );
 
+// ─── Route: GET /api/settings/codex-reauth/status ──────────────────────────────
+
+const getCodexReauthStatusRoute = HttpRouter.add(
+  'GET',
+  '/api/settings/codex-reauth/status',
+  httpHandler(
+    Effect.gen(function* () {
+      const exists = yield* Effect.promise(() => sessionExistsAsync(REAUTH_SESSION_NAME));
+      if (exists) {
+        return jsonResponse({ completed: false });
+      }
+
+      yield* Effect.promise(() => bridgeCodexAuthToCliproxyAsync());
+      const authStatus = yield* Effect.promise(() => checkCodexAuthStatus());
+      return jsonResponse({ completed: true, authStatus });
+    }),
+  ),
+);
+
 export const codexAuthRouteLayer = Layer.mergeAll(
   getCodexAuthRoute,
   postCodexReauthRoute,
+  getCodexReauthStatusRoute,
 );

@@ -22,6 +22,7 @@ import {
   writeFileSync,
   statSync,
 } from 'fs';
+import { readFile, writeFile } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
 import { spawn, execSync, exec } from 'child_process';
@@ -172,6 +173,74 @@ export function bridgeCodexAuthToCliproxy(): boolean {
   }
 
   writeFileSync(target, serialized, { mode: 0o600 });
+  return true;
+}
+
+/** Async variant of bridgeCodexAuthToCliproxy — safe for the event loop. */
+export async function bridgeCodexAuthToCliproxyAsync(): Promise<boolean> {
+  const codexPath = getCodexAuthPath();
+  if (!existsSync(codexPath)) return false;
+
+  let raw: string;
+  try {
+    raw = await readFile(codexPath, 'utf8');
+  } catch {
+    return false;
+  }
+
+  let parsed: CodexAuthFile;
+  try {
+    parsed = JSON.parse(raw) as CodexAuthFile;
+  } catch {
+    return false;
+  }
+
+  const accessToken = typeof parsed.tokens?.access_token === 'string' ? parsed.tokens.access_token : null;
+  const idToken = typeof parsed.tokens?.id_token === 'string' ? parsed.tokens.id_token : null;
+  const refreshToken = typeof parsed.tokens?.refresh_token === 'string' ? parsed.tokens.refresh_token : null;
+  const accountId = typeof parsed.tokens?.account_id === 'string' ? parsed.tokens.account_id : null;
+  const lastRefresh = typeof parsed.last_refresh === 'string' ? parsed.last_refresh : new Date().toISOString();
+
+  if (!accessToken || !idToken || !refreshToken || !accountId) return false;
+
+  const idClaims = decodeJwtPayload(idToken) ?? {};
+  const email = typeof idClaims.email === 'string' ? idClaims.email : '';
+  const accessClaims = decodeJwtPayload(accessToken) ?? {};
+  const expSec = typeof accessClaims.exp === 'number'
+    ? accessClaims.exp
+    : (typeof idClaims.exp === 'number' ? idClaims.exp : Math.floor(Date.now() / 1000) + 3600);
+  const expiredIso = new Date(expSec * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
+
+  const creds: CliproxyCodexCredentials = {
+    access_token: accessToken,
+    id_token: idToken,
+    refresh_token: refreshToken,
+    account_id: accountId,
+    last_refresh: lastRefresh,
+    email,
+    type: 'codex',
+    expired: expiredIso,
+    disabled: false,
+  };
+
+  ensureDirs();
+  const target = getCliproxyCodexCredPath();
+
+  const serialized = JSON.stringify(creds, null, 2) + '\n';
+  if (existsSync(target)) {
+    try {
+      const existing = await readFile(target, 'utf8');
+      if (existing === serialized) return true;
+    } catch {
+      // fall through and overwrite
+    }
+  }
+
+  try {
+    await writeFile(target, serialized, { mode: 0o600 });
+  } catch {
+    return false;
+  }
   return true;
 }
 

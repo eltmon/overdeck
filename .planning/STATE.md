@@ -10,9 +10,9 @@ Implementing bead pan-748p — Create async checkCodexAuthStatus() utility (back
 - [x] pan-pv1p: Added burned refresh token detection from CLIProxy logs to codex-auth.ts (commit: eb6ea6d)
 - [x] pan-d8lw: Added GET /api/settings/codex-auth endpoint (commit: 764e42f)
 - [x] pan-bkrg: Added POST /api/settings/codex-reauth endpoint (commit: 19c57ba)
+- [x] pan-7edh: Added Codex auth check to spawn guardrails (commit: 90cb27d)
 
 ## Remaining Work
-- [ ] pan-7edh: Add Codex auth check to spawn guardrails
 - [ ] pan-d8lw: Add GET /api/settings/codex-auth endpoint
 - [ ] pan-bkrg: Add POST /api/settings/codex-reauth endpoint
 - [ ] pan-7edh: Add Codex auth check to spawn guardrails

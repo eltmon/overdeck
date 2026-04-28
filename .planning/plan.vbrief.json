@@ -156,7 +156,7 @@
       {
         "id": "spawn-guardrail-codex",
         "title": "Add Codex auth check to spawn guardrails",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -170,7 +170,7 @@
           {
             "id": "spawn-guardrail-codex.ac1",
             "title": "Agent spawn returns 429 with descriptive error when Codex auth is expired/burned and the model requires codex provider",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -178,7 +178,7 @@
           {
             "id": "spawn-guardrail-codex.ac2",
             "title": "Spawn proceeds normally for non-codex models regardless of codex auth state",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -186,7 +186,7 @@
           {
             "id": "spawn-guardrail-codex.ac3",
             "title": "isCliproxyRunning() sync call in spawn path replaced with isCliproxyRunningAsync()",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
