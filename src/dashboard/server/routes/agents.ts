@@ -62,7 +62,10 @@ import {
   listRunningAgents,
   listRunningAgentsAsync,
   getAgentDir,
+  determineModel,
 } from '../../../lib/agents.js';
+import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
+import { getProviderForModel } from '../../../lib/providers.js';
 import { hasPRDDraft } from '../../../lib/prd-draft.js';
 import { findPrdAnywhere } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
@@ -1684,6 +1687,27 @@ const postAgentsRoute = HttpRouter.add(
         hint: spawnGuardrails.hint,
         guardrails: spawnGuardrails,
       }, { status: spawnGuardrails.status });
+    }
+
+    const spawnPhase = (body as any).phase || 'implementation';
+    const spawnModel = determineModel({
+      model: (body as any).model,
+      workType: (body as any).workType,
+      phase: spawnPhase,
+      agentType: (body as any).agentType,
+      difficulty: (body as any).difficulty,
+    });
+    if (getProviderForModel(spawnModel).name === 'openai') {
+      const codexAuth = yield* Effect.promise(() => checkCodexAuthStatus());
+      if (codexAuth.status === 'expired' || codexAuth.status === 'burned') {
+        return jsonResponse({
+          success: false,
+          blocked: true,
+          skipped: true,
+          error: `Codex authentication ${codexAuth.status}. GPT subscription agents cannot spawn with expired/burned tokens.`,
+          hint: 'Click "Re-authenticate" in the Codex auth banner or Settings page to refresh your OpenAI subscription tokens.',
+        }, { status: 429 });
+      }
     }
 
     if (planningDir) {

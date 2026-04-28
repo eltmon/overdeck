@@ -777,7 +777,7 @@ export async function buildCavemanExports(
  * 5. Complexity-based routing (LEGACY - deprecated)
  * 6. Default fallback (claude-sonnet-4-6)
  */
-function determineModel(options: SpawnOptions): string {
+export function determineModel(options: SpawnOptions): string {
   console.log(`[DEBUG] determineModel called with:`, { model: options.model, workType: options.workType, phase: options.phase, agentType: options.agentType, difficulty: options.difficulty });
 
   // Explicit model always wins
@@ -944,8 +944,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     getProviderForModel(selectedModel).name === 'openai'
     && getProviderAuthMode(selectedModel) === 'subscription'
   ) {
-    const { isCliproxyRunning } = await import('./cliproxy.js');
-    if (!isCliproxyRunning()) {
+    const { isCliproxyRunningAsync } = await import('./cliproxy.js');
+    if (!(await isCliproxyRunningAsync())) {
       throw new Error(
         'CLIProxyAPI sidecar is not running. GPT subscription agents route through '
         + 'a local cliproxy process managed by `pan up`. Run `pan up` (or restart the '

@@ -196,7 +196,7 @@
       {
         "id": "reauth-endpoint",
         "title": "Add POST /api/settings/codex-reauth endpoint",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -210,7 +210,7 @@
           {
             "id": "reauth-endpoint.ac1",
             "title": "POST /api/settings/codex-reauth spawns a tmux session running 'codex login'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -218,7 +218,7 @@
           {
             "id": "reauth-endpoint.ac2",
             "title": "Uses --device-auth flag when server has no DISPLAY or WAYLAND_DISPLAY",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -226,7 +226,7 @@
           {
             "id": "reauth-endpoint.ac3",
             "title": "Returns existing session if codex-reauth tmux session is already alive (idempotent)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
