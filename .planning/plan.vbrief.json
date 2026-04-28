@@ -1,0 +1,599 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-28T18:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-905: Command Deck — make Awaiting Merge the canonical final merge gate"
+  },
+  "plan": {
+    "id": "pan-905",
+    "title": "Command Deck: make Awaiting Merge the canonical final merge gate",
+    "status": "approved",
+    "uid": "f3a7c1e8-9d42-4b6f-a815-2e8f0c3d7a19",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-04-28T18:00:00Z",
+    "updated": "2026-04-28T18:00:00Z",
+    "references": [
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/905", "label": "PAN-905", "type": "issue" }
+    ],
+    "tags": ["dashboard", "merge", "webhooks", "awaiting-merge", "pipeline"],
+    "narratives": {
+      "Problem": "After a PR reaches the end of the automated pipeline, the dashboard gives fragmented visibility into whether it's truly ready for the final human merge click. readyForMerge ignores GitHub-native blockers (failing checks, merge conflicts, unresolved conversations), causing false positives on Awaiting Merge. Users must bounce between multiple dashboard panels and GitHub itself.",
+      "Proposal": "Three-layer fix: (1) Add real-time GitHub webhook reception via smee.io to get instant blocker updates, (2) Enrich readyForMerge with a typed blockerReasons[] array that captures GitHub-native blockers, (3) Rewrite the Awaiting Merge page and pipeline stepper to surface this data. The pipeline stepper gets a 4th Merge step with CI sub-statuses, queue position, retry history, and live specialist log access."
+    },
+    "items": [
+      {
+        "id": "blocker-schema",
+        "title": "Add blockerReasons[] column to review_status SQLite schema",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "Add a `blocker_reasons` TEXT column (JSON array) to the `review_status` table in `src/lib/database/schema.ts`. Create a database migration. Define the BlockerReason TypeScript interface in `src/lib/review-status.ts` with types: failing_checks, merge_conflict, unresolved_conversations, changes_requested, draft_pr, not_mergeable. Each entry has type, summary, details?, detectedAt."
+        },
+        "subItems": [
+          {
+            "id": "blocker-schema.ac1",
+            "title": "review_status table has blocker_reasons TEXT column with migration",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "blocker-schema.ac2",
+            "title": "BlockerReason interface exported from review-status.ts with all 6 blocker types",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "blocker-schema.ac3",
+            "title": "getReviewStatus/setReviewStatus serialize/deserialize blockerReasons JSON correctly",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "enrich-ready-for-merge",
+        "title": "Enrich readyForMerge to incorporate blockerReasons",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "Modify the readyForMerge computation in `src/lib/review-status.ts` (currently lines 172-184) to return false when blockerReasons has entries. Update the ReviewStatus interface to include blockerReasons. Ensure the /api/review/:issueId/status endpoint returns blockerReasons in its response."
+        },
+        "subItems": [
+          {
+            "id": "enrich-ready-for-merge.ac1",
+            "title": "readyForMerge returns false when blockerReasons is non-empty, even if review+test passed",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "enrich-ready-for-merge.ac2",
+            "title": "/api/review/:issueId/status response includes blockerReasons array",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "webhook-route",
+        "title": "Add POST /api/webhooks/github route with HMAC-SHA256 verification",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "Create `src/dashboard/server/routes/webhooks.ts` with a POST route that: reads the webhook-secret from ~/.panopticon/github-app/webhook-secret, verifies the X-Hub-Signature-256 HMAC header, parses the X-GitHub-Event header, and dispatches to per-event-type handlers. Return 200 on success, 401 on bad signature, 400 on missing headers. Register the route in the server's route composition."
+        },
+        "subItems": [
+          {
+            "id": "webhook-route.ac1",
+            "title": "POST /api/webhooks/github validates HMAC-SHA256 signature and rejects invalid payloads with 401",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "webhook-route.ac2",
+            "title": "Route dispatches to event-specific handlers based on X-GitHub-Event header",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "webhook-route.ac3",
+            "title": "Route gracefully handles missing webhook-secret (logs warning, skips verification in dev)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "webhook-ci-handlers",
+        "title": "Implement check_suite and check_run webhook event handlers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "Create `src/lib/webhook-handlers.ts` with handlers for check_suite (completed action) and check_run (completed action). Map the PR from the webhook payload to an issueId via branch name. On check failure: add/update a failing_checks blocker to blockerReasons. On all checks passing: remove the failing_checks blocker. Use existing getPullRequestState pattern for the GitHub API shape."
+        },
+        "subItems": [
+          {
+            "id": "webhook-ci-handlers.ac1",
+            "title": "check_suite completed with failure adds failing_checks blocker to the matched issue's blockerReasons",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "webhook-ci-handlers.ac2",
+            "title": "check_suite completed with success removes failing_checks blocker",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "webhook-ci-handlers.ac3",
+            "title": "Handler maps PR branch to issueId correctly using existing branch naming convention (feature/<issue-id>)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "webhook-pr-handlers",
+        "title": "Implement pull_request webhook event handler",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "Add pull_request event handler to webhook-handlers.ts. Handle actions: opened, synchronize, closed, reopened, converted_to_draft, ready_for_review. Detect merge conflicts (mergeable === 'CONFLICTING') and add/remove merge_conflict blocker. Detect draft PRs and add/remove draft_pr blocker. Detect non-mergeable state and add/remove not_mergeable blocker."
+        },
+        "subItems": [
+          {
+            "id": "webhook-pr-handlers.ac1",
+            "title": "Merge conflict detected from PR payload adds merge_conflict blocker",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "webhook-pr-handlers.ac2",
+            "title": "Draft PR adds draft_pr blocker; ready_for_review removes it",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "webhook-pr-handlers.ac3",
+            "title": "Non-mergeable GitHub state surfaces as not_mergeable blocker",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "webhook-review-handlers",
+        "title": "Implement pull_request_review and review_thread webhook handlers",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "Add handlers for pull_request_review (submitted action with state changes_requested → add changes_requested blocker; approved → remove it) and pull_request_review_thread (resolved/unresolved actions → manage unresolved_conversations blocker). Handle status event for commit status updates."
+        },
+        "subItems": [
+          {
+            "id": "webhook-review-handlers.ac1",
+            "title": "Review with changes_requested adds changes_requested blocker",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "webhook-review-handlers.ac2",
+            "title": "Approved review removes changes_requested blocker",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "webhook-review-handlers.ac3",
+            "title": "Unresolved review thread adds unresolved_conversations blocker; resolved removes it",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "smee-client-integration",
+        "title": "Add smee-client dependency and process management",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "Add smee-client as a dependency. Create `src/lib/smee.ts` to manage the smee-client process: start (connects smee channel URL to localhost webhook endpoint), stop, restart on unexpected exit. Smee channel URL stored in ~/.panopticon/github-app/smee-url. If smee-url file doesn't exist, log a warning and skip (webhook reception is optional enhancement)."
+        },
+        "subItems": [
+          {
+            "id": "smee-client-integration.ac1",
+            "title": "smee-client process starts and relays GitHub webhooks to POST /api/webhooks/github",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "smee-client-integration.ac2",
+            "title": "Missing smee-url config logs warning and skips without failing pan up",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "smee-client-integration.ac3",
+            "title": "Smee process restarts automatically on unexpected exit",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "pan-up-smee-lifecycle",
+        "title": "Integrate smee-client lifecycle into pan up / pan down",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "Modify the pan up orchestration to start the smee-client process after the dashboard server. Modify pan down to stop the smee-client process. Add smee process health to pan doctor/pan health output."
+        },
+        "subItems": [
+          {
+            "id": "pan-up-smee-lifecycle.ac1",
+            "title": "pan up starts smee-client process when smee-url is configured",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "pan-up-smee-lifecycle.ac2",
+            "title": "pan down cleanly stops smee-client process",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "pan-up-smee-lifecycle.ac3",
+            "title": "pan health shows smee-client status (running/stopped/not configured)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "github-app-webhook-config",
+        "title": "Update GitHub App manifest and create migration script for existing installs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "Update `scripts/create-github-app.mjs` to configure webhook events (check_suite, check_run, pull_request, pull_request_review, pull_request_review_thread, status) and set active: true with a smee.io URL during app creation. Create `scripts/update-github-app-webhooks.mjs` for existing installs that updates the GitHub App's webhook config via the API. Store smee URL in ~/.panopticon/github-app/smee-url."
+        },
+        "subItems": [
+          {
+            "id": "github-app-webhook-config.ac1",
+            "title": "New GitHub App installs (create-github-app.mjs) configure webhook events and smee URL automatically",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "github-app-webhook-config.ac2",
+            "title": "Migration script (update-github-app-webhooks.mjs) updates existing GitHub App webhook config via API",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "github-app-webhook-config.ac3",
+            "title": "Smee channel URL persisted to ~/.panopticon/github-app/smee-url",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "stepper-merge-step",
+        "title": "Add 4th Merge step to pipeline stepper in ReviewPipelineSection",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "Add a 4th step to the `steps` array in ReviewPipelineSection.tsx: key='merge', label='Merge'. Map mergeStatus values to step states: pending→pending, queued→running, merging→running, verifying→running, merged→passed, failed→failed. Always show 4 steps (Merge shows as pending/grey until merge phase begins)."
+        },
+        "subItems": [
+          {
+            "id": "stepper-merge-step.ac1",
+            "title": "Pipeline stepper shows 4 steps: Build Gate → Review → Tests → Merge",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "stepper-merge-step.ac2",
+            "title": "Merge step correctly reflects all mergeStatus values (pending/queued/merging/verifying/merged/failed)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "stepper-merge-step.ac3",
+            "title": "Existing 3-step behavior unchanged when merge phase hasn't started (Merge shows as pending)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "stepper-ci-substatus",
+        "title": "Show individual CI check sub-statuses in the Merge step",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "When the Merge step is active and CI is running, show individual check statuses (name + pass/fail/running icon) inline below the step. Reuse PR query data from useReviewPrQuery (same data PrDiffTab uses for statusCheckRollup). Reuse the statusColor() mapping pattern from PrDiffTab for consistent visual treatment."
+        },
+        "subItems": [
+          {
+            "id": "stepper-ci-substatus.ac1",
+            "title": "Individual CI checks (build, lint, test, etc.) shown with pass/fail/running icons during merge phase",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "stepper-ci-substatus.ac2",
+            "title": "CI sub-statuses use same data source as PrDiffTab (no duplicate API calls)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "stepper-retry-notes",
+        "title": "Show mergeRetryCount and mergeNotes in the Merge step",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "Display mergeRetryCount as 'Attempt N/3' in the Merge step when retryCount > 0. Show mergeNotes as expandable detail when present (especially on failure). These fields are already returned by /api/review/:issueId/status."
+        },
+        "subItems": [
+          {
+            "id": "stepper-retry-notes.ac1",
+            "title": "Merge retry count displayed as 'Attempt N/3' when mergeRetryCount > 0",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "stepper-retry-notes.ac2",
+            "title": "mergeNotes shown as expandable detail section on merge failure",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "stepper-queue-position",
+        "title": "Show merge queue position in the pipeline stepper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "When queuePosition is returned by /api/review/:issueId/status and is > 0, display 'Position N in merge queue' in the Merge step. Already available in the API response."
+        },
+        "subItems": [
+          {
+            "id": "stepper-queue-position.ac1",
+            "title": "Queue position displayed in Merge step when issue is queued behind others",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "stepper-live-log",
+        "title": "Add live specialist log link during active merge phase",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "When activeSpecialist === 'merge' (returned by review status API), show a 'View live log' link in the Merge step that opens the merge specialist's tmux session in the terminal panel. Use the existing terminal switching mechanism used by specialist log viewing."
+        },
+        "subItems": [
+          {
+            "id": "stepper-live-log.ac1",
+            "title": "Live 'View log' link appears in Merge step when merge specialist is actively running",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "stepper-live-log.ac2",
+            "title": "Clicking link opens the merge specialist's tmux session in the terminal panel",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "awaiting-merge-blocker-filter",
+        "title": "Rewrite Awaiting Merge filtering to exclude blocked issues",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "Modify AwaitingMergePage.tsx to filter out issues with non-empty blockerReasons[]. Issues that have readyForMerge=true but have blockers should not appear in the main 'ready to merge' list. Add a separate 'Blocked' section or visual badge for issues that are close-to-ready but have GitHub-native blockers."
+        },
+        "subItems": [
+          {
+            "id": "awaiting-merge-blocker-filter.ac1",
+            "title": "Issues with non-empty blockerReasons do not appear in the ready-to-merge list",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "awaiting-merge-blocker-filter.ac2",
+            "title": "Blocked issues shown in a separate section with their specific blocker reason",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "awaiting-merge-blocker-display",
+        "title": "Surface exact GitHub-native blockers on Awaiting Merge page",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "For each blocked issue on Awaiting Merge, render the blockerReasons inline with appropriate icons and human-readable summaries. Map blocker types to icons: failing_checks→red X, merge_conflict→git merge icon, unresolved_conversations→chat icon, changes_requested→review icon, draft_pr→draft icon, not_mergeable→warning. Show summary text (e.g., '2/5 checks failed'). Expandable detail for full blocker info."
+        },
+        "subItems": [
+          {
+            "id": "awaiting-merge-blocker-display.ac1",
+            "title": "Each blocker type has a distinct icon and human-readable summary",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "awaiting-merge-blocker-display.ac2",
+            "title": "Blocker details are expandable for additional context",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "frontend-types-update",
+        "title": "Update frontend ReviewStatusData type to include blockerReasons and new fields",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "Update ReviewStatusData interface in queries.ts to include blockerReasons: BlockerReason[]. Add the BlockerReason type to the frontend. Ensure mergeRetryCount and mergeNotes are included in the type (they may already be present in ReviewStatus but not in the frontend type)."
+        },
+        "subItems": [
+          {
+            "id": "frontend-types-update.ac1",
+            "title": "ReviewStatusData includes blockerReasons array with proper typing",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "frontend-types-update.ac2",
+            "title": "mergeRetryCount and mergeNotes fields present in frontend types",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "vision-doc",
+        "title": "Document Panopticon product vision in project docs",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-04-28T18:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-905"
+        },
+        "narrative": {
+          "Action": "Create a vision document at docs/VISION.md or add a section to existing project docs. Document the phased product vision: (1) Current: single-developer local Electron app, (2) Phase 1: shared instance for a development team, (3) Phase 2: multi-tenant SaaS. Note architectural implications for webhooks, networking, auth, and data isolation."
+        },
+        "subItems": [
+          {
+            "id": "vision-doc.ac1",
+            "title": "Vision document exists with the 3-phase product roadmap (local → shared → multi-tenant)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "vision-doc.ac2",
+            "title": "Document notes architectural implications for each phase",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      { "from": "blocker-schema", "to": "enrich-ready-for-merge", "type": "blocks" },
+      { "from": "blocker-schema", "to": "webhook-ci-handlers", "type": "blocks" },
+      { "from": "blocker-schema", "to": "webhook-pr-handlers", "type": "blocks" },
+      { "from": "blocker-schema", "to": "webhook-review-handlers", "type": "blocks" },
+      { "from": "webhook-route", "to": "webhook-ci-handlers", "type": "blocks" },
+      { "from": "webhook-route", "to": "webhook-pr-handlers", "type": "blocks" },
+      { "from": "webhook-route", "to": "webhook-review-handlers", "type": "blocks" },
+      { "from": "smee-client-integration", "to": "pan-up-smee-lifecycle", "type": "blocks" },
+      { "from": "enrich-ready-for-merge", "to": "awaiting-merge-blocker-filter", "type": "blocks" },
+      { "from": "frontend-types-update", "to": "stepper-merge-step", "type": "blocks" },
+      { "from": "frontend-types-update", "to": "awaiting-merge-blocker-filter", "type": "blocks" },
+      { "from": "frontend-types-update", "to": "awaiting-merge-blocker-display", "type": "blocks" },
+      { "from": "stepper-merge-step", "to": "stepper-ci-substatus", "type": "blocks" },
+      { "from": "stepper-merge-step", "to": "stepper-retry-notes", "type": "blocks" },
+      { "from": "stepper-merge-step", "to": "stepper-queue-position", "type": "blocks" },
+      { "from": "stepper-merge-step", "to": "stepper-live-log", "type": "blocks" },
+      { "from": "awaiting-merge-blocker-filter", "to": "awaiting-merge-blocker-display", "type": "blocks" }
+    ]
+  }
+}
