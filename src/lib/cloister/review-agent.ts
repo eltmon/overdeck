@@ -1353,17 +1353,24 @@ export async function dispatchParallelReview(
   // this, multiple dispatch calls (dashboard restart, manual trigger, deacon
   // patrol) spawn duplicate coordinators, each spawning its own set of
   // reviewer agents — doubling or tripling the cost.
+  // PAN-912 follow-up: also check pane_dead — remain-on-exit keeps the session
+  // alive after the coordinator dies, so sessionExists alone is not enough.
   try {
     const sessions = await listSessionNamesAsync();
     const existingCoordinator = sessions.find(
       (s) => s.startsWith(`review-coordinator-${opts.issueId}-`),
     );
     if (existingCoordinator) {
-      console.log(`[review-agent] Idempotency guard: coordinator ${existingCoordinator} already running for ${opts.issueId} — skipping dispatch`);
-      return {
-        success: true,
-        message: `Review already in progress: ${existingCoordinator}`,
-      };
+      if (await isPaneDeadAsync(existingCoordinator)) {
+        console.log(`[review-agent] Idempotency guard: coordinator ${existingCoordinator} pane is dead — killing stale session and proceeding with dispatch`);
+        await killSessionAsync(existingCoordinator).catch(() => {});
+      } else {
+        console.log(`[review-agent] Idempotency guard: coordinator ${existingCoordinator} already running for ${opts.issueId} — skipping dispatch`);
+        return {
+          success: true,
+          message: `Review already in progress: ${existingCoordinator}`,
+        };
+      }
     }
   } catch (err) {
     // tmux check failed — proceed with dispatch rather than blocking
