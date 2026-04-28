@@ -134,7 +134,9 @@ export const selectAwaitingMerge = memoizeArraySelector<DashboardState, 'reviewS
     Object.values(rsMap)
       .filter(
         (rs): rs is ReviewStatusSnapshot =>
-          rs?.readyForMerge === true && rs.mergeStatus !== 'merged',
+          rs?.readyForMerge === true &&
+          rs.mergeStatus !== 'merged' &&
+          (rs.blockerReasons?.length ?? 0) === 0,
       )
       .sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')),
 )

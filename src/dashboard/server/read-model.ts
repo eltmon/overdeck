@@ -106,6 +106,7 @@ export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'r
     reviewCoordinatorSessionName: status.reviewCoordinatorSessionName || undefined,
     reviewSessionNames: status.reviewSessionNames && status.reviewSessionNames.length > 0 ? status.reviewSessionNames : undefined,
     reviewSubStatuses: status.reviewSubStatuses,
+    blockerReasons: status.blockerReasons && status.blockerReasons.length > 0 ? status.blockerReasons : undefined,
   };
 }
 

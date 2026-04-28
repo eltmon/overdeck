@@ -176,6 +176,13 @@ export const ReviewStatusSnapshot = Schema.Struct({
   reviewSessionNames: Schema.optional(Schema.Array(Schema.String)),
   /** Per-role review completion status (keyed by role: 'correctness' | 'security' | ...) */
   reviewSubStatuses: Schema.optional(Schema.Record(Schema.String, Schema.Literals(["running", "done"]))),
+  /** PAN-905: GitHub-native merge blocker reasons */
+  blockerReasons: Schema.optional(Schema.Array(Schema.Struct({
+    type: Schema.String,
+    summary: Schema.String,
+    details: Schema.optional(Schema.String),
+    detectedAt: Schema.String,
+  }))),
 })
 export type ReviewStatusSnapshot = typeof ReviewStatusSnapshot.Type
 

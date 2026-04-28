@@ -77,6 +77,8 @@ export function AwaitingMergePage() {
           if (rs.mergeStatus === 'failed' || issue?.mergeStatus === 'failed') return false;
           if (Array.isArray(issue?.labels) && issue.labels.includes('merged')) return false;
         }
+        // PAN-905: explicit defense-in-depth — exclude anything with GitHub-native blockers.
+        if ((rs.blockerReasons?.length ?? 0) > 0) return false;
         return true;
       })
       .sort((a, b) => {
