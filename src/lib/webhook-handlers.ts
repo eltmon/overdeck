@@ -6,6 +6,7 @@
  */
 
 import { setReviewStatus, getReviewStatus, type BlockerReason } from './review-status.js';
+import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js';
 
 export interface WebhookPayload {
   action?: string;
@@ -41,6 +42,18 @@ function issueIdFromBranch(ref: string): string | null {
   return match ? match[1].toUpperCase() : null;
 }
 
+// ─── Repository authorization (defense-in-depth) ─────────────────────────────
+
+function isTrackedRepository(fullName: string | undefined): boolean {
+  if (!fullName) return false;
+  const config = getGitHubConfig();
+  if (!config) return false;
+  return config.repos.some(
+    ({ owner, repo }) =>
+      `${owner}/${repo}`.toLowerCase() === fullName.toLowerCase(),
+  );
+}
+
 // ─── Batched blocker mutation (single read + single write per event) ─────────
 
 function mutateBlockers(issueId: string, fn: (blockers: BlockerReason[]) => BlockerReason[]): void {
@@ -64,6 +77,7 @@ function removeBlocker(issueId: string, type: BlockerReason['type']): void {
 // ─── check_suite / check_run ─────────────────────────────────────────────────
 
 export function handleCheckSuite(payload: WebhookPayload): void {
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const suite = payload.check_suite;
   if (!suite) return;
   const pr = suite.pull_requests?.[0];
@@ -83,6 +97,7 @@ export function handleCheckSuite(payload: WebhookPayload): void {
 }
 
 export function handleCheckRun(payload: WebhookPayload): void {
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const run = payload.check_run;
   if (!run) return;
   const pr = run.pull_requests?.[0];
@@ -105,6 +120,7 @@ export function handleCheckRun(payload: WebhookPayload): void {
 // ─── pull_request ────────────────────────────────────────────────────────────
 
 export function handlePullRequest(payload: WebhookPayload): void {
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   if (!pr) return;
   const issueId = issueIdFromBranch(pr.head.ref);
@@ -130,6 +146,7 @@ export function handlePullRequest(payload: WebhookPayload): void {
     // When mergeable_state is null/undefined, the payload is incomplete;
     // leave existing blockers untouched to avoid flicker.
     if (pr.mergeable_state !== null && pr.mergeable_state !== undefined) {
+      // 'dirty' is excluded — handled by merge_conflict blocker below
       if (pr.mergeable_state !== 'clean' && pr.mergeable_state !== 'unstable' && pr.mergeable_state !== 'dirty' && pr.mergeable_state !== 'unknown') {
         const notMergeableBlocker: BlockerReason = {
           type: 'not_mergeable',
@@ -164,6 +181,7 @@ export function handlePullRequest(payload: WebhookPayload): void {
 // ─── pull_request_review ─────────────────────────────────────────────────────
 
 export function handlePullRequestReview(payload: WebhookPayload): void {
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   const review = payload.review;
   if (!pr || !review) return;
@@ -184,6 +202,7 @@ export function handlePullRequestReview(payload: WebhookPayload): void {
 // ─── pull_request_review_thread ──────────────────────────────────────────────
 
 export function handlePullRequestReviewThread(payload: WebhookPayload): void {
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   const thread = payload.thread;
   if (!pr || !thread) return;
@@ -196,14 +215,18 @@ export function handlePullRequestReviewThread(payload: WebhookPayload): void {
       summary: 'Unresolved review conversation',
       detectedAt: new Date().toISOString(),
     });
-  } else if (thread.resolved === true) {
-    removeBlocker(issueId, 'unresolved_conversations');
   }
+  // Do NOT auto-remove the blocker on thread.resolved === true.
+  // GitHub sends per-thread webhooks; resolving one of many
+  // unresolved threads would incorrectly clear the blocker.
+  // The blocker is removed when the review is approved
+  // (handlePullRequestReview) or when the PR is otherwise cleared.
 }
 
 // ─── status ──────────────────────────────────────────────────────────────────
 
 export function handleStatus(payload: WebhookPayload): void {
+  if (!isTrackedRepository(payload.repository?.full_name)) return;
   const state = payload.state;
   const branches = payload.branches;
   if (!state || !branches || branches.length === 0) return;

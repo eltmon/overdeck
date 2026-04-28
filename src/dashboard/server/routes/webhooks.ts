@@ -109,24 +109,25 @@ const postGitHubWebhookRoute = HttpRouter.add(
       return jsonResponse({ error: 'Missing X-GitHub-Event header' }, { status: 400 });
     }
 
-    // Fail closed: require a configured webhook secret
+    // Load secret (async init may still be running)
     let secret = getWebhookSecret();
     if (secret === undefined) {
-      // Still loading — wait for init to complete
       yield* Effect.promise(() => _secretLoadPromise);
       secret = getWebhookSecret();
     }
-    if (!secret) {
-      console.warn('[webhook] No webhook secret configured — rejecting event');
-      return jsonResponse({ error: 'Webhook secret not configured' }, { status: 401 });
-    }
 
-    if (!signature || typeof signature !== 'string') {
-      return jsonResponse({ error: 'Missing X-Hub-Signature-256 header' }, { status: 400 });
-    }
-    if (!verifySignature(body, signature, secret)) {
-      console.warn('[webhook] Invalid HMAC signature — rejecting');
-      return jsonResponse({ error: 'Invalid signature' }, { status: 401 });
+    if (secret) {
+      // Production mode: verify HMAC signature
+      if (!signature || typeof signature !== 'string') {
+        return jsonResponse({ error: 'Missing X-Hub-Signature-256 header' }, { status: 400 });
+      }
+      if (!verifySignature(body, signature, secret)) {
+        console.warn('[webhook] Invalid HMAC signature — rejecting');
+        return jsonResponse({ error: 'Invalid signature' }, { status: 401 });
+      }
+    } else {
+      // Dev mode: no webhook secret configured — skip verification per AC3
+      console.warn('[webhook] No webhook secret configured — skipping HMAC verification (dev mode)');
     }
 
     let payload: WebhookPayload;

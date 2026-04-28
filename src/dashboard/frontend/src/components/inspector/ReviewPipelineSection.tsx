@@ -34,7 +34,15 @@ interface PipelineStep {
 
 export function ReviewPipelineSection({ reviewStatus, issueId, onViewLog }: ReviewPipelineSectionProps) {
   const [showDetails, setShowDetails] = useState(false);
-  const prQuery = usePrQuery(issueId ?? '');
+  const mergeStatus = reviewStatus.mergeStatus ?? 'pending';
+  const isMergeActive =
+    mergeStatus === 'queued' ||
+    mergeStatus === 'merging' ||
+    mergeStatus === 'verifying' ||
+    mergeStatus === 'failed';
+  const prQuery = usePrQuery(issueId ?? '', {
+    enabled: isMergeActive && !!issueId,
+  });
   const verificationMaxCycles = reviewStatus.verificationMaxCycles ?? DEFAULT_VERIFICATION_MAX_CYCLES;
   const autoRequeueCount = reviewStatus.autoRequeueCount ?? 0;
 

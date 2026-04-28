@@ -146,16 +146,36 @@ export function getReviewStatusFromDb(issueId: string): ReviewStatus | null {
 
 /**
  * Get all review statuses.
+ *
+ * Loads history in a single query (2 total) to avoid N+1 on bulk reads.
  */
 export function getAllReviewStatusesFromDb(): Record<string, ReviewStatus> {
   const db = getDatabase();
 
   const rows = db.prepare('SELECT * FROM review_status ORDER BY updated_at DESC').all() as DbReviewStatusRow[];
-  const result: Record<string, ReviewStatus> = {};
 
+  // Bulk-load all history rows in one query, then bucket by issue_id
+  const historyRows = db.prepare(`
+    SELECT issue_id, type, status, timestamp, notes
+    FROM status_history
+    ORDER BY issue_id, timestamp ASC
+  `).all() as Array<{ issue_id: string; type: string; status: string; timestamp: string; notes: string | null }>;
+
+  const historyByIssue = new Map<string, StatusHistoryEntry[]>();
+  for (const row of historyRows) {
+    const bucket = historyByIssue.get(row.issue_id) ?? [];
+    bucket.push({
+      type: row.type as StatusHistoryEntry['type'],
+      status: row.status,
+      timestamp: row.timestamp,
+      ...(row.notes ? { notes: row.notes } : {}),
+    });
+    historyByIssue.set(row.issue_id, bucket);
+  }
+
+  const result: Record<string, ReviewStatus> = {};
   for (const row of rows) {
-    const history = getHistoryFromDb(row.issue_id);
-    result[row.issue_id] = rowToReviewStatus(row, history);
+    result[row.issue_id] = rowToReviewStatus(row, historyByIssue.get(row.issue_id) ?? []);
   }
 
   return result;

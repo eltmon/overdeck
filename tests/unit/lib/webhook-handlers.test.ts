@@ -20,6 +20,14 @@ vi.mock('../../../src/lib/review-status.js', () => ({
   setReviewStatus: (...args: any[]) => mockSetReviewStatus(...args),
 }));
 
+// Mock tracker-config so isTrackedRepository passes in tests
+vi.mock('../../../src/dashboard/server/services/tracker-config.js', () => ({
+  getGitHubConfig: () => ({
+    token: 'test-token',
+    repos: [{ owner: 'test-owner', repo: 'test-repo' }],
+  }),
+}));
+
 beforeEach(() => {
   mockGetReviewStatus.mockReturnValue(null);
   mockSetReviewStatus.mockReturnValue(undefined);
@@ -32,6 +40,7 @@ afterEach(() => {
 function makePayload(overrides: Partial<WebhookPayload> = {}): WebhookPayload {
   return {
     action: 'completed',
+    repository: { full_name: 'test-owner/test-repo' },
     ...overrides,
   };
 }
@@ -204,7 +213,10 @@ describe('handlePullRequestReviewThread', () => {
     }));
   });
 
-  it('removes unresolved_conversations blocker on resolve', () => {
+  it('does not remove unresolved_conversations blocker on single thread resolve', () => {
+    // Per-thread webhooks make it impossible to know if other threads
+    // are still unresolved without querying the GitHub API. We keep the
+    // blocker conservative and only clear it on review approval.
     mockGetReviewStatus.mockReturnValue({
       blockerReasons: [{ type: 'unresolved_conversations', summary: 'Unresolved', detectedAt: '2026-04-28T10:00:00Z' }],
     });
@@ -218,6 +230,6 @@ describe('handlePullRequestReviewThread', () => {
       thread: { resolved: true },
     }));
 
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-222', { blockerReasons: undefined });
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
   });
 });
