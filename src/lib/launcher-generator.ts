@@ -80,6 +80,10 @@ export function generateLauncherScript(config: LauncherConfig): string {
   // Shebang
   lines.push('#!/bin/bash');
 
+  // Strip tmux/screen host-shell artifacts so nested tmux operations don't fail
+  // with "sessions should be nested with care" (PAN-912).
+  lines.push('unset TMUX TMUX_PANE STY');
+
   // Pipefail
   if (config.setPipefail) {
     lines.push('set -o pipefail');
