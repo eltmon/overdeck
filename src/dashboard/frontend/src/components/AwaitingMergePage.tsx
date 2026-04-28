@@ -337,7 +337,7 @@ interface BlockedRowProps {
   identifier: string;
   title: string;
   trackerUrl?: string;
-  blockerReasons: Array<{ type: string; summary: string; details?: string; detectedAt: string }>;
+  blockerReasons: ReadonlyArray<{ type: string; summary: string; details?: string; detectedAt: string }>;
   updatedAt?: string;
 }
 
