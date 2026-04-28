@@ -15,8 +15,6 @@ import {
 } from '../ZoneCOverviewTabs/queries';
 import styles from '../styles/command-deck.module.css';
 
-type PlanningData = PlanningResponse;
-
 type PlanningStageData = Pick<PlanningSummaryResponse, 'hasPrd' | 'hasState'>;
 
 interface IssueHeaderProps {
