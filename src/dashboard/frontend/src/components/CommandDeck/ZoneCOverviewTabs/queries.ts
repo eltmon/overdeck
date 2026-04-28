@@ -105,7 +105,8 @@ export function usePlanningSummaryQuery(issueId: string): UseQueryResult<Plannin
   return useQuery({
     queryKey: ['command-deck-planning', issueId, 'summary'],
     queryFn: () => fetchJson<PlanningSummaryResponse>(`/api/command-deck/planning/${issueId}?summary=1`),
-    refetchInterval: 30_000,
+    // Planning data is mostly static — 60s is sufficient
+    refetchInterval: 60_000,
   });
 }
 
@@ -121,7 +122,16 @@ export function useActivityQuery(issueId: string): UseQueryResult<ActivityRespon
   return useQuery({
     queryKey: ['command-deck-activity', issueId, 'summary'],
     queryFn: () => fetchJson<ActivityResponse>(`/api/command-deck/activity/${issueId}?summary=1`),
-    refetchInterval: 5_000,
+    // Poll fast (5s) when any session is active; slow (30s) when all ended/idle.
+    // Prevents hammering the server for issues with no live agents.
+    refetchInterval: (query) => {
+      const sections = query.state.data?.sections;
+      if (!sections) return 5_000;
+      const hasActive = sections.some(
+        (s) => s.status === 'running' || s.status === 'active',
+      );
+      return hasActive ? 5_000 : 30_000;
+    },
   });
 }
 

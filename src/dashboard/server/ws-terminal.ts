@@ -347,12 +347,15 @@ export function setupTerminalWebSocket(server: http.Server): void {
           const exists = await sessionExistsAsync(sessionName);
           if (!exists) {
             console.log(`[ws-terminal] Session ${sessionName} does not exist — closing without PTY spawn`);
-            ws.close(1000, 'session-not-found');
+            // Use 4404 (private-use range) so the client can distinguish
+            // "session doesn't exist" from "normal disconnect". The client
+            // should NOT retry on 4404 — the session is gone.
+            ws.close(4404, 'session-not-found');
             return;
           }
         } catch {
           console.log(`[ws-terminal] Session ${sessionName} does not exist — closing without PTY spawn`);
-          ws.close(1000, 'session-not-found');
+          ws.close(4404, 'session-not-found');
           return;
         }
 
