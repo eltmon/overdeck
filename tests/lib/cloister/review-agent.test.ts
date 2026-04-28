@@ -58,7 +58,7 @@ vi.mock('../../../src/lib/cloister/config.js', () => ({
   loadCloisterConfig: mockLoadCloisterConfig,
 }));
 
-const { mockKillSessionAsync, mockResolveProjectFromIssue, mockListStashes, mockCreateNamedStash, mockDropStash } = vi.hoisted(() => ({
+const { mockKillSessionAsync, mockResolveProjectFromIssue, mockListStashes, mockCreateNamedStash, mockDropStash, mockIsPaneDeadAsync } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockResolveProjectFromIssue: vi.fn().mockReturnValue({
     projectKey: 'panopticon-cli',
@@ -69,6 +69,7 @@ const { mockKillSessionAsync, mockResolveProjectFromIssue, mockListStashes, mock
   mockListStashes: vi.fn().mockResolvedValue([]),
   mockCreateNamedStash: vi.fn().mockResolvedValue(null),
   mockDropStash: vi.fn().mockResolvedValue(undefined),
+  mockIsPaneDeadAsync: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock('../../../src/lib/projects.js', () => ({
@@ -83,6 +84,7 @@ vi.mock('../../../src/lib/tmux.js', async () => {
     sessionExistsAsync: vi.fn().mockResolvedValue(false),
     killSessionAsync: mockKillSessionAsync,
     setOptionAsync: vi.fn().mockResolvedValue(undefined),
+    isPaneDeadAsync: mockIsPaneDeadAsync,
   };
 });
 
@@ -351,6 +353,23 @@ describe('waitForReviewer', () => {
     expect(result).toBe('failed');
     expect(sessionExists).not.toHaveBeenCalled(); // never entered loop
     expect(killSession).toHaveBeenCalledWith('review-PAN-999-ts-correctness');
+  });
+
+  it('returns failed immediately when pane is dead (remain-on-exit keeps session alive)', async () => {
+    mockIsPaneDeadAsync.mockResolvedValueOnce(true);
+    const sessionExists = vi.fn().mockResolvedValue(true); // session still alive due to remain-on-exit
+    const fileExists = vi.fn().mockReturnValue(false);
+    const killSession = vi.fn().mockResolvedValue(undefined);
+    const capturePane = vi.fn().mockResolvedValue('dead pane output');
+
+    const result = await waitForReviewer('review-PAN-999-ts-correctness', '/tmp/out.md', 5000, {
+      sessionExists, fileExists, killSession, capturePane,
+    });
+
+    expect(result).toBe('failed');
+    expect(sessionExists).toHaveBeenCalled();
+    expect(capturePane).toHaveBeenCalledWith('review-PAN-999-ts-correctness');
+    expect(killSession).not.toHaveBeenCalled();
   });
 });
 

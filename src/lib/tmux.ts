@@ -522,6 +522,20 @@ export async function listPaneValuesAsync(target: string, format: string): Promi
 }
 
 /**
+ * Check whether any pane in a tmux session is dead (process exited).
+ * Returns true if the session exists and at least one pane is dead.
+ * Returns false if the session doesn't exist or all panes are alive.
+ */
+export async function isPaneDeadAsync(sessionName: string): Promise<boolean> {
+  try {
+    const values = await listPaneValuesAsync(sessionName, '#{pane_dead}');
+    return values.some(v => v === '1');
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Wait for Claude Code to reach its interactive prompt (❯) in a tmux session.
  * Polls tmux output until the prompt appears or timeout is reached.
  */

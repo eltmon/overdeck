@@ -11,7 +11,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
-import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync } from '../tmux.js';
+import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync, isPaneDeadAsync } from '../tmux.js';
 import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agents.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { getModelId, hasOverride } from '../work-type-router.js';
@@ -670,6 +670,23 @@ export async function waitForReviewer(
       }
       return 'failed';
     }
+
+    // PAN-912 follow-up: detect dead panes even when remain-on-exit keeps the session alive.
+    // Without this check a pane that dies (e.g. API auth error → status 143) burns the full
+    // 30-minute timeout because sessionExistsAsync still returns true.
+    if (await isPaneDeadAsync(sessionName)) {
+      const elapsed = Date.now() - startedAt;
+      console.error(`[review-agent] Reviewer ${sessionName} pane is dead after ${elapsed}ms — capturing pane`);
+      try {
+        const pane = await capturePane(sessionName);
+        if (pane) await writeFile(tmuxLogFile, pane, { flag: 'a' });
+        console.error(`[review-agent] Dead-pane capture written to ${tmuxLogFile}`);
+      } catch (err) {
+        console.error(`[review-agent] Failed to capture pane for dead ${sessionName}:`, err);
+      }
+      return 'failed';
+    }
+
     await new Promise(resolve => setTimeout(resolve, 2000));
   }
 
@@ -716,7 +733,7 @@ async function killAllReviewerSessions(
   );
 }
 
-type ReviewerOutcome = { role: string; status: 'completed' | 'failed'; outputFile: string };
+type ReviewerOutcome = { role: string; status: 'completed' | 'failed'; outputFile: string; sessionName?: string };
 
 /**
  * Returns completed reviewer outputs, or null if any reviewer failed.
@@ -925,12 +942,59 @@ export async function runParallelReview(
   emitActivityEntry({ source: 'review-specialist', level: 'info', message: `${context.issueId} — ${reviewerSessions.length} reviewer(s) ready (spawned=${spawnedCount}, resumed=${resumedCount})`, issueId: context.issueId });
 
   // ── Phase 2: Wait for all reviewers ───────────────────────────────────────
-  const reviewerResults = await Promise.all(
+  let reviewerResults = await Promise.all(
     reviewerSessions.map(({ sessionName, outputFile, role }) =>
       waitFn(sessionName, outputFile, REVIEW_TIMEOUT_MS)
-        .then(status => ({ role, status, outputFile })),
+        .then(status => ({ role, status, outputFile, sessionName })),
     ),
   );
+
+  // ── Phase 2b: One auto-respawn for reviewers that failed with a dead pane.
+  // Transient failures (e.g. 503 auth_unavailable that kills the pane) recover
+  // on respawn ~90% of the time. We retry once to avoid burning a full review
+  // cycle for a blip. We ONLY retry when the pane is dead — if the session is
+  // gone entirely or the pane is still alive, the failure is either legitimate
+  // (timeout, missing output) or the reviewer is still working.
+  const failedReviewerResults = reviewerResults.filter(r => r.status === 'failed');
+  if (failedReviewerResults.length > 0) {
+    const retryable: typeof failedReviewerResults = [];
+    for (const failed of failedReviewerResults) {
+      const paneDead = await isPaneDeadAsync(failed.sessionName);
+      if (!paneDead) continue;
+
+      const agent = agents.find(a => a.name === failed.role);
+      if (!agent) continue;
+      const promptName = `code-review-${agent.name}`;
+      const promptTemplatePath = resolvePromptTemplateFn(promptName, context.projectPath);
+      const template = await parseReviewerTemplate(promptTemplatePath);
+      const model = resolveReviewerModel(agent, template.model);
+      const promptFile = join(outputDir, `${agent.name}-prompt.md`);
+
+      console.log(`[review-agent] Auto-respawning dead reviewer ${failed.sessionName} for retry`);
+      emitActivityEntry({ source: 'review-specialist', level: 'warn', message: `${context.issueId} — auto-respawning dead reviewer ${failed.role}`, issueId: context.issueId });
+
+      // Kill stale session (if any) and respawn fresh
+      try { await killSessionAsync(failed.sessionName); } catch { /* ignore */ }
+      try { await spawnFn(failed.sessionName, model, promptFile, context.projectPath); } catch (err) {
+        console.error(`[review-agent] Respawn of ${failed.sessionName} failed:`, err);
+        continue;
+      }
+      try { await setOptionAsync(failed.sessionName, 'remain-on-exit', 'on'); } catch { /* ignore */ }
+      retryable.push(failed);
+    }
+
+    if (retryable.length > 0) {
+      const retryResults = await Promise.all(
+        retryable.map(({ sessionName, outputFile, role }) =>
+          waitFn(sessionName, outputFile, REVIEW_TIMEOUT_MS)
+            .then(status => ({ role, status, outputFile, sessionName })),
+        ),
+      );
+      // Merge retry results back into the main result set
+      const retryMap = new Map(retryResults.map(r => [r.role, r]));
+      reviewerResults = reviewerResults.map(r => (r.status === 'failed' && retryMap.has(r.role) ? retryMap.get(r.role)! : r));
+    }
+  }
 
   // ── Phase 3: Synthesis ────────────────────────────────────────────────────
   const completedReviewers = selectCompletedReviewers(reviewerResults);

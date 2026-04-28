@@ -15,6 +15,7 @@ import { Cause, Effect, Layer, Queue, Context, Stream } from 'effect';
 import { homedir } from 'node:os';
 import { PanRpcError, TerminalOutput } from '@panctl/contracts';
 import { buildTmuxArgs, resizeWindowAsync, sessionExistsAsync } from '../../../lib/tmux.js';
+import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
 
 // ─── Runtime detection ────────────────────────────────────────────────────────
 
@@ -127,7 +128,11 @@ async function getNodePty() {
 
 /** Spawn PTY immediately — caller must ensure tmux session exists. */
 function spawnPtyImmediate(sessionName: string, cols: number, rows: number): PtyProcess {
-  const env = { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor', LANG: 'en_US.UTF-8' } as Record<string, string>;
+  const env = buildChildEnvWithoutTmux(process.env, {
+    TERM: 'xterm-256color',
+    COLORTERM: 'truecolor',
+    LANG: 'en_US.UTF-8',
+  });
   const cwd = homedir();
 
   if (isBun()) {
