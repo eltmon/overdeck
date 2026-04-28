@@ -47,13 +47,14 @@ import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
+import { getCachedRunningAgents } from '../services/running-agents-cache.js';
 import { invalidateAgentsCache } from './agents.js';
 import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js';
 import { LinearClient } from '../services/linear-client.js';
 import { GitHubClient } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
 import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../../../lib/tmux.js';
-import { getAgentStateAsync, listRunningAgentsAsync, normalizeAgentId } from '../../../lib/agents.js';
+import { getAgentStateAsync, normalizeAgentId } from '../../../lib/agents.js';
 import type { LifecycleContext, StepResult } from '../../../lib/lifecycle/types.js';
 import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
 import {
@@ -3083,9 +3084,8 @@ const getIssueCostsRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    syncCache();
     const issueData = getCostsForIssue(id);
-    const agents = yield* Effect.promise(() => listRunningAgentsAsync());
+    const agents = yield* Effect.promise(() => getCachedRunningAgents());
     const resolvedCost = resolveIssueHeadlineCost({
       issueId: id,
       aggregateCost: issueData?.totalCost,

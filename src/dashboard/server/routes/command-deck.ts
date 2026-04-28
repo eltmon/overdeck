@@ -38,6 +38,7 @@ import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { SessionNodePresence } from '@panctl/contracts';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
+import { getCachedRunningAgents } from '../services/running-agents-cache.js';
 import { findPrdAtStatus, type PrdLocation } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue, listProjects } from '../../../lib/projects.js';
 import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
@@ -96,11 +97,6 @@ const costCache = new Map<string, { timestamp: number; data: { totalCost: number
 const COST_CACHE_TTL_MS = 30_000; // 30 seconds
 const stashCountCache = new Map<string, { timestamp: number; count: number }>();
 const STASH_COUNT_CACHE_TTL_MS = 60_000; // 60 seconds
-const runningAgentsCache = new Map<string, {
-  timestamp: number;
-  agents: Awaited<ReturnType<typeof listRunningAgentsAsync>>;
-}>();
-const RUNNING_AGENTS_CACHE_TTL_MS = 3_000; // 3 seconds
 
 /** Evict expired entries from a TTL cache Map to prevent unbounded growth. */
 function sweepExpired<T extends { timestamp: number }>(cache: Map<string, T>, ttlMs: number): void {
@@ -126,18 +122,6 @@ function setProjectPathCache(issuePrefix: string, path: string): string {
   return path;
 }
 
-async function getCachedRunningAgents(issueId: string): Promise<Awaited<ReturnType<typeof listRunningAgentsAsync>>> {
-  const cacheKey = issueId.toUpperCase();
-  sweepExpired(runningAgentsCache, RUNNING_AGENTS_CACHE_TTL_MS);
-  const cached = runningAgentsCache.get(cacheKey);
-  if (cached && cached.timestamp > Date.now() - RUNNING_AGENTS_CACHE_TTL_MS) {
-    return cached.agents;
-  }
-
-  const agents = await listRunningAgentsAsync();
-  runningAgentsCache.set(cacheKey, { timestamp: Date.now(), agents });
-  return agents;
-}
 
 function getProjectPath(issuePrefix?: string): string {
   if (!issuePrefix) return join(homedir(), 'Projects');
@@ -512,18 +496,19 @@ export async function fetchActivityDataWithContext(
         } catch { /* specialist may not be running */ }
       }
 
-      let tmuxSessionName: string | undefined;
-      if (ss.status === 'running') {
-        const specialistType = ss.type === 'test' ? 'test-agent' : 'merge-agent';
-        const resolved = resolveProjectFromIssue(issueId);
-        tmuxSessionName = getTmuxSessionName(specialistType as never, resolved?.projectKey, issueId);
-      }
+      const specialistType = ss.type === 'test' ? 'test-agent' : 'merge-agent';
+      const specialistProjectKey = resolveProjectFromIssue(issueId)?.projectKey;
+      const specialistSessionId = getTmuxSessionName(
+        specialistType as never,
+        specialistProjectKey,
+        issueId,
+      );
+      const tmuxSessionName = ss.status === 'running' ? specialistSessionId : undefined;
 
       const specialistIsLive = !!(tmuxSessionName && tmuxSessionNames.has(tmuxSessionName));
       const specialistPresence: SessionNodePresence = specialistIsLive
         ? (ss.status === 'running' ? 'active' : 'idle')
         : 'ended';
-      const specialistSessionId = `specialist-${ss.type}-${ss.startedAt}`;
       const specialistJsonlPath = await resolveJsonlPath(specialistSessionId, workspacePath);
 
       // Do NOT expose tmuxSession for specialist sessions — they are autonomous
@@ -572,7 +557,7 @@ export async function fetchActivityDataWithContext(
       costCache.set(cacheKey, { timestamp: Date.now(), data: { totalCost: aggregateCost, costByStage } });
     }
 
-    const agents = includeTranscripts ? await listRunningAgentsAsync() : await getCachedRunningAgents(issueId);
+    const agents = includeTranscripts ? await listRunningAgentsAsync() : await getCachedRunningAgents();
     const resolvedCost = resolveIssueHeadlineCost({
       issueId,
       aggregateCost,
