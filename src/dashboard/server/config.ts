@@ -10,7 +10,7 @@
  */
 
 import { homedir } from 'node:os';
-import { Effect, Layer, ServiceMap } from 'effect';
+import { Effect, Layer, Context } from 'effect';
 import { loadPanopticonEnv } from '../../lib/env-loader.js';
 
 // ─── Config shape ──────────────────────────────────────────────────────────────
@@ -46,7 +46,7 @@ export class ServerConfigError extends Error {
 
 // ─── Service tag ──────────────────────────────────────────────────────────────
 
-export class ServerConfig extends ServiceMap.Service<ServerConfig, ServerConfigShape>()(
+export class ServerConfig extends Context.Service<ServerConfig, ServerConfigShape>()(
   'panopticon/dashboard/ServerConfig',
 ) {}
 

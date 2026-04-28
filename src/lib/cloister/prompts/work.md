@@ -165,6 +165,15 @@ will be rejected.
 to this issue's beads. The shared database contains beads from ALL issues — without the
 label filter you will see irrelevant beads from other workspaces.
 
+**NEVER use these wrong commands (agents frequently hallucinate them):**
+- `bd list --issue {{ISSUE_ID}}` — the `--issue` flag does NOT exist. Use `bd list -l {{ISSUE_ID_LOWER}}` or `bd list --title-contains "{{ISSUE_ID}}"`
+- `bd claim <bead-id>` — this command does NOT exist. Use `bd update <bead-id> --claim`
+- `bd start <bead-id>` — this command does NOT exist. Use `bd update <bead-id> --status in_progress`
+
+**Updating planning files does NOT close the bead.** After updating `.planning/STATE.md`
+and `plan.vbrief.json`, you MUST still run `bd close <bead-id> --reason="..."`.
+The bead is NOT done until `bd close` succeeds.
+
 **Do NOT implement multiple beads before committing and closing.** Each bead must be
 a separate commit with a separate `bd close`. The inspection fires automatically on
 `bd close` — you do not need to call `pan inspect` manually.
@@ -259,6 +268,15 @@ and your work will be rejected.
 **IMPORTANT:** Always use `-l {{ISSUE_ID_LOWER}}` with `bd ready` and `bd list` to scope
 to this issue's beads. The shared database contains beads from ALL issues — without the
 label filter you will see irrelevant beads from other workspaces.
+
+**NEVER use these wrong commands (agents frequently hallucinate them):**
+- `bd list --issue {{ISSUE_ID}}` — the `--issue` flag does NOT exist. Use `bd list -l {{ISSUE_ID_LOWER}}` or `bd list --title-contains "{{ISSUE_ID}}"`
+- `bd claim <bead-id>` — this command does NOT exist. Use `bd update <bead-id> --claim`
+- `bd start <bead-id>` — this command does NOT exist. Use `bd update <bead-id> --status in_progress`
+
+**Updating planning files does NOT close the bead.** After updating `.planning/STATE.md`
+and `plan.vbrief.json`, you MUST still run `bd close <bead-id> --reason="..."`.
+The bead is NOT done until `bd close` succeeds.
 
 **Do NOT implement multiple beads before committing and closing.** Each bead must be
 a separate commit with a separate `bd close`. The inspection fires automatically on

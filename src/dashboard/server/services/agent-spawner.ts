@@ -7,7 +7,7 @@
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { Effect, Layer, ServiceMap } from 'effect';
+import { Effect, Layer, Context } from 'effect';
 import {
   AgentAlreadyRunning,
   AgentStartError,
@@ -115,7 +115,7 @@ export interface AgentSpawnerShape {
 
 // ─── Service tag ──────────────────────────────────────────────────────────────
 
-export class AgentSpawner extends ServiceMap.Service<AgentSpawner, AgentSpawnerShape>()(
+export class AgentSpawner extends Context.Service<AgentSpawner, AgentSpawnerShape>()(
   'panopticon/dashboard/AgentSpawner',
 ) {}
 

@@ -9,7 +9,7 @@
  * projection stays current.
  */
 
-import { Effect, Layer, Queue, ServiceMap, Stream } from 'effect';
+import { Effect, Layer, Queue, Context, Stream } from 'effect';
 import { initEventStore } from '../event-store.js';
 import type { StoredEvent } from '../event-store.js';
 import { ReadModelService } from '../read-model.js';
@@ -31,7 +31,7 @@ export interface EventStoreServiceShape {
   readonly streamEvents: Stream.Stream<StoredEvent>;
 }
 
-export class EventStoreService extends ServiceMap.Service<
+export class EventStoreService extends Context.Service<
   EventStoreService,
   EventStoreServiceShape
 >()('panopticon/dashboard/EventStoreService') {}

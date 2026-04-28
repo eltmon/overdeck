@@ -11,7 +11,7 @@
  *  - On stream/close: do NOT kill the PTY — just remove from tracking.
  */
 
-import { Cause, Effect, Layer, Queue, ServiceMap, Stream } from 'effect';
+import { Cause, Effect, Layer, Queue, Context, Stream } from 'effect';
 import { homedir } from 'node:os';
 import { PanRpcError, TerminalOutput } from '@panctl/contracts';
 import { buildTmuxArgs, resizeWindowAsync, sessionExistsAsync } from '../../../lib/tmux.js';
@@ -183,7 +183,7 @@ export interface TerminalServiceShape {
   streamSession(sessionName: string, cols: number, rows: number): Stream.Stream<TerminalOutput, PanRpcError>;
 }
 
-export class TerminalService extends ServiceMap.Service<TerminalService, TerminalServiceShape>()(
+export class TerminalService extends Context.Service<TerminalService, TerminalServiceShape>()(
   'panopticon/dashboard/TerminalService',
 ) {}
 

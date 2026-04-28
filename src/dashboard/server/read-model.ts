@@ -11,7 +11,7 @@
 
 import { existsSync } from 'fs';
 import { join } from 'path';
-import { Effect, Layer, ServiceMap } from 'effect';
+import { Effect, Layer, Context } from 'effect';
 import type { DashboardSnapshot, DomainEvent } from '@panctl/contracts';
 import { AGENTS_DIR } from '../../lib/paths.js';
 import {
@@ -120,7 +120,7 @@ export interface ReadModelServiceShape {
   readonly bootstrap: Effect.Effect<void>;
 }
 
-export class ReadModelService extends ServiceMap.Service<
+export class ReadModelService extends Context.Service<
   ReadModelService,
   ReadModelServiceShape
 >()('panopticon/dashboard/ReadModelService') {}
