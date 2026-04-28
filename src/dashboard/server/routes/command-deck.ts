@@ -122,7 +122,6 @@ function setProjectPathCache(issuePrefix: string, path: string): string {
   return path;
 }
 
-
 function getProjectPath(issuePrefix?: string): string {
   if (!issuePrefix) return join(homedir(), 'Projects');
 
@@ -684,24 +683,32 @@ async function fetchPlanningData(
   if (!result.prd && result.state) result.prd = result.state;
   result.hasPrd = Boolean(result.prd);
 
-  const readArtifactDir = async (subdir: string, dateField: string): Promise<Array<{ filename: string; content: string; [key: string]: string }>> => {
+  const listArtifactFiles = async (subdir: string): Promise<Array<{ filename: string; mtime: string }>> => {
     const dirPath = join(planningDir, subdir);
     if (!await pathExists(dirPath)) return [];
-    const files = (await readdir(dirPath).catch(() => [] as string[])).filter(f => f.endsWith('.md') || f.endsWith('.txt'));
+    const files = (await readdir(dirPath).catch(() => [] as string[])).filter(
+      (f) => f.endsWith('.md') || f.endsWith('.txt'),
+    );
     const entries = await Promise.all(files.map(async (filename) => {
       const filePath = join(dirPath, filename);
-      const [content, fileStat] = await Promise.all([
-        readOptional(filePath),
-        stat(filePath).catch(() => null),
-      ]);
-      return { filename, content: content ?? '', [dateField]: fileStat?.mtime.toISOString() ?? new Date().toISOString() };
+      const fileStat = await stat(filePath).catch(() => null);
+      return {
+        filename,
+        mtime: fileStat?.mtime.toISOString() ?? new Date().toISOString(),
+      };
     }));
-    return entries.sort((a, b) => new Date(b[dateField]!).getTime() - new Date(a[dateField]!).getTime());
+    return entries.sort((a, b) => new Date(b.mtime).getTime() - new Date(a.mtime).getTime());
   };
 
-  result.transcripts = await readArtifactDir('transcripts', 'uploadedAt') as typeof result.transcripts;
-  result.discussions = await readArtifactDir('discussions', 'syncedAt') as typeof result.discussions;
-  result.notes = await readArtifactDir('notes', 'uploadedAt') as typeof result.notes;
+  const readArtifactDir = async (subdir: string, dateField: string): Promise<Array<{ filename: string; content: string; [key: string]: string }>> => {
+    const files = await listArtifactFiles(subdir);
+    const entries = await Promise.all(files.map(async ({ filename, mtime }) => {
+      const filePath = join(planningDir, subdir, filename);
+      const content = await readOptional(filePath);
+      return { filename, content: content ?? '', [dateField]: mtime };
+    }));
+    return entries;
+  };
 
   // Acceptance criteria progress from vBRIEF plan (PAN-847)
   try {
@@ -721,24 +728,13 @@ async function fetchPlanningData(
     }
   } catch { /* no vBRIEF plan */ }
 
-  // Stash count for workspace hygiene warning (PAN-847)
-  if (!summaryOnly) {
-    try {
-      const cacheKey = workspacePath;
-      sweepExpired(stashCountCache, STASH_COUNT_CACHE_TTL_MS);
-      const cached = stashCountCache.get(cacheKey);
-      if (cached && cached.timestamp > Date.now() - STASH_COUNT_CACHE_TTL_MS) {
-        result.stashCount = cached.count;
-      } else {
-        const { stdout: stashList } = await execAsync('git stash list', { cwd: workspacePath, encoding: 'utf-8' });
-        const count = stashList.trim() ? stashList.trim().split('\n').length : 0;
-        stashCountCache.set(cacheKey, { timestamp: Date.now(), count });
-        result.stashCount = count;
-      }
-    } catch { /* not a git repo or git unavailable */ }
-  }
-
   if (summaryOnly) {
+    const [transcriptFiles, discussionFiles, noteFiles] = await Promise.all([
+      listArtifactFiles('transcripts'),
+      listArtifactFiles('discussions'),
+      listArtifactFiles('notes'),
+    ]);
+
     return {
       hasPrd: result.hasPrd,
       hasState: result.hasState,
@@ -746,11 +742,30 @@ async function fetchPlanningData(
       acceptanceProgress: result.acceptanceProgress,
       stashCount: result.stashCount,
       statusReviewedAt: result.statusReviewedAt,
-      transcriptCount: result.transcripts.length,
-      discussionCount: result.discussions.length,
-      noteCount: result.notes.length,
+      transcriptCount: transcriptFiles.length,
+      discussionCount: discussionFiles.length,
+      noteCount: noteFiles.length,
     };
   }
+
+  result.transcripts = await readArtifactDir('transcripts', 'uploadedAt') as typeof result.transcripts;
+  result.discussions = await readArtifactDir('discussions', 'syncedAt') as typeof result.discussions;
+  result.notes = await readArtifactDir('notes', 'uploadedAt') as typeof result.notes;
+
+  // Stash count for workspace hygiene warning (PAN-847)
+  try {
+    const cacheKey = workspacePath;
+    sweepExpired(stashCountCache, STASH_COUNT_CACHE_TTL_MS);
+    const cached = stashCountCache.get(cacheKey);
+    if (cached && cached.timestamp > Date.now() - STASH_COUNT_CACHE_TTL_MS) {
+      result.stashCount = cached.count;
+    } else {
+      const { stdout: stashList } = await execAsync('git stash list', { cwd: workspacePath, encoding: 'utf-8' });
+      const count = stashList.trim() ? stashList.trim().split('\n').length : 0;
+      stashCountCache.set(cacheKey, { timestamp: Date.now(), count });
+      result.stashCount = count;
+    }
+  } catch { /* not a git repo or git unavailable */ }
 
   return result;
 }

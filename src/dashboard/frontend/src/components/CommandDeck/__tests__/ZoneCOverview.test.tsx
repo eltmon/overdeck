@@ -282,4 +282,21 @@ describe('ZoneCOverview', () => {
     expect(screen.queryByTestId('overview-cost-loading')).not.toBeInTheDocument();
     expect(screen.getByTestId('overview-cost')).not.toHaveTextContent('$0.00');
   });
+
+  it('falls back to the activity headline when the costs endpoint returns null', () => {
+    costsResult.data = {
+      issueId: ISSUE,
+      totalCost: 0,
+      resolvedTotalCost: null,
+      totalTokens: 0,
+      sessions: [],
+      byModel: {},
+      byStage: {},
+    };
+    activityResult.data = { issueId: ISSUE, sections: [], resolvedTotalCost: 2.75 };
+
+    render(<ZoneCOverview issueId={ISSUE} />);
+
+    expect(screen.getByTestId('overview-cost')).toHaveTextContent('$2.75');
+  });
 });
