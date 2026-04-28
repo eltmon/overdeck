@@ -33,6 +33,10 @@ const planningResult = vi.hoisted(() => ({
   data: undefined as undefined | Record<string, unknown>,
   isLoading: false,
 }));
+const planningSummaryResult = vi.hoisted(() => ({
+  data: undefined as undefined | Record<string, unknown>,
+  isLoading: false,
+}));
 const activityResult = vi.hoisted(() => ({
   data: undefined as undefined | Record<string, unknown>,
   isLoading: false,
@@ -66,7 +70,7 @@ const reviewStatusResult = vi.hoisted(() => ({
 
 vi.mock('../ZoneCOverviewTabs/queries', () => ({
   usePlanningQuery: () => planningResult,
-  usePlanningSummaryQuery: () => planningResult,
+  usePlanningSummaryQuery: () => planningSummaryResult,
   useActivityQuery: () => activityResult,
   useIssueCostsQuery: () => costsResult,
   usePrQuery: () => prResult,
@@ -107,6 +111,8 @@ describe('ZoneCOverview', () => {
   beforeEach(() => {
     planningResult.data = undefined;
     planningResult.isLoading = false;
+    planningSummaryResult.data = undefined;
+    planningSummaryResult.isLoading = false;
     activityResult.data = { issueId: ISSUE, sections: [], resolvedTotalCost: null };
     activityResult.isLoading = false;
     costsResult.data = undefined;
@@ -136,14 +142,14 @@ describe('ZoneCOverview', () => {
     expect(screen.getByTestId('overview-stage')).toHaveTextContent('idle');
   });
 
-  it('hides the INFERENCE tab when planning has no inference content', () => {
-    planningResult.data = { prd: '# PRD', state: '# STATE' };
+  it('hides the INFERENCE tab when planning summary reports no inference', () => {
+    planningSummaryResult.data = { hasPrd: true, hasState: true, hasInference: false };
     render(<ZoneCOverview issueId={ISSUE} />);
     expect(screen.queryByTestId('zone-c-overview-tab-inference')).not.toBeInTheDocument();
   });
 
-  it('shows INFERENCE tab when planning has inference content', () => {
-    planningResult.data = { inference: '# Inference body' };
+  it('shows INFERENCE tab when planning summary reports inference', () => {
+    planningSummaryResult.data = { hasInference: true };
     render(<ZoneCOverview issueId={ISSUE} />);
     expect(screen.getByTestId('zone-c-overview-tab-inference')).toBeInTheDocument();
   });
