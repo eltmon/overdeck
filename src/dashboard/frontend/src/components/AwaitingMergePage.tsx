@@ -11,7 +11,7 @@
 
 import { useMemo } from 'react';
 import { useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
-import { GitMerge, ExternalLink, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { GitMerge, ExternalLink, Loader2, CheckCircle, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDashboardStore, selectAwaitingMerge, selectIssues } from '../lib/store';
 import type { Issue } from '../types';
@@ -90,6 +90,15 @@ export function AwaitingMergePage() {
       });
   }, [awaiting, issuesById]);
 
+  // Blocked issues: readyForMerge is false because of GitHub-native blockers.
+  const blocked = useMemo(() => {
+    const all = useDashboardStore.getState().reviewStatusByIssueId;
+    return Object.values(all).filter(
+      (rs) =>
+        (rs.blockerReasons?.length ?? 0) > 0 && rs.mergeStatus !== 'merged',
+    );
+  }, []);
+
   // One workspace fetch per ready issue (parallel via useQueries)
   const workspaceQueries = useQueries({
     queries: sortedAwaiting.map((rs) => ({
@@ -145,6 +154,41 @@ export function AwaitingMergePage() {
               );
             })}
           </ul>
+        )}
+
+        {/* Blocked from merge */}
+        {blocked.length > 0 && (
+          <div className="mt-10">
+            <header className="mb-4">
+              <div className="flex items-center gap-3 mb-1">
+                <ShieldAlert className="w-5 h-5 text-destructive" />
+                <h2 className="text-lg font-semibold text-foreground">Blocked from Merge</h2>
+                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-destructive/15 text-destructive">
+                  {blocked.length}
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                These issues were ready to merge but GitHub is blocking them.
+                Resolve the blocker on GitHub and the issue will re-enter the queue automatically.
+              </p>
+            </header>
+            <ul className="space-y-3">
+              {blocked.map((rs) => {
+                const issue = issuesById.get(rs.issueId.toLowerCase());
+                return (
+                  <BlockedMergeRow
+                    key={rs.issueId}
+                    issueId={rs.issueId}
+                    title={issue?.title ?? rs.issueId}
+                    identifier={issue?.identifier ?? rs.issueId}
+                    trackerUrl={issue?.url}
+                    blockerReasons={rs.blockerReasons ?? []}
+                    updatedAt={rs.updatedAt}
+                  />
+                );
+              })}
+            </ul>
+          </div>
         )}
       </div>
     </div>
@@ -283,6 +327,66 @@ function AwaitingMergeRow({
           )}
           {isMerging ? 'Merging…' : 'Merge'}
         </button>
+      </div>
+    </li>
+  );
+}
+
+interface BlockedRowProps {
+  issueId: string;
+  identifier: string;
+  title: string;
+  trackerUrl?: string;
+  blockerReasons: Array<{ type: string; summary: string; details?: string; detectedAt: string }>;
+  updatedAt?: string;
+}
+
+function BlockedMergeRow({
+  identifier,
+  title,
+  trackerUrl,
+  blockerReasons,
+  updatedAt,
+}: BlockedRowProps) {
+  return (
+    <li className="border border-destructive/30 rounded-lg bg-card p-4 flex items-start gap-4 opacity-80">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          {trackerUrl ? (
+            <a
+              href={trackerUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent text-foreground hover:underline"
+            >
+              {identifier}
+            </a>
+          ) : (
+            <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent text-foreground">
+              {identifier}
+            </span>
+          )}
+          {updatedAt && (
+            <span className="text-[11px] text-muted-foreground">
+              ready {formatRelative(updatedAt)}
+            </span>
+          )}
+        </div>
+        <p className="text-sm text-foreground truncate" title={title}>
+          {title}
+        </p>
+        <div className="flex flex-wrap gap-2 mt-2">
+          {blockerReasons.map((br, idx) => (
+            <span
+              key={idx}
+              className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-destructive/15 text-destructive flex items-center gap-1"
+              title={br.details ?? br.summary}
+            >
+              <AlertTriangle className="w-3 h-3" />
+              {br.type}: {br.summary}
+            </span>
+          ))}
+        </div>
       </div>
     </li>
   );
