@@ -221,6 +221,14 @@ function hasRecentActivity(lastActivity: number | null): boolean {
   return lastActivity !== null && Number.isFinite(lastActivity) && (Date.now() - lastActivity) < RECENT_ACTIVITY_WINDOW_MS;
 }
 
+function isLiveResource(issue: MutableResourceIssue): boolean {
+  return issue.resourceDetails.tmuxSessions.length > 0
+    || issue.resourceDetails.dockerContainers.length > 0
+    || issue.resourceDetails.prs.length > 0
+    || issue.agentStatus === 'active'
+    || hasRecentActivity(issue.lastActivity);
+}
+
 async function loadTrackerIssues(): Promise<Map<string, TrackerIssueRecord>> {
   const map = new Map<string, TrackerIssueRecord>();
   try {
@@ -534,7 +542,13 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   }));
 
   const discoveredIssues = [...issueMap.values()]
-    .filter((issue) => issue.resourceSources.size > 0)
+    .filter((issue) => {
+      if (issue.readyForMerge) return true;
+      if (isLiveResource(issue)) return true;
+      return issue.trackerState === 'in_progress'
+        || issue.trackerState === 'in_review'
+        || issue.trackerState === 'started';
+    })
     .map((issue) => {
         const hasTmux = issue.resourceDetails.tmuxSessions.length > 0;
         const hasRecentHeartbeat = hasRecentActivity(issue.lastActivity);
