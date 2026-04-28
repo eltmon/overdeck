@@ -3,7 +3,8 @@
     "version": "0.5",
     "created": "2026-04-28T18:00:00Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-905: Command Deck — make Awaiting Merge the canonical final merge gate"
+    "description": "Plan for PAN-905: Command Deck — make Awaiting Merge the canonical final merge gate",
+    "updated": "2026-04-28T18:28:43.546Z"
   },
   "plan": {
     "id": "pan-905",
@@ -11,9 +12,9 @@
     "status": "approved",
     "uid": "f3a7c1e8-9d42-4b6f-a815-2e8f0c3d7a19",
     "author": "agent:claude-opus-4-6",
-    "sequence": 6,
+    "sequence": 58,
     "created": "2026-04-28T18:00:00Z",
-    "updated": "2026-04-28T13:22:57.096Z",
+    "updated": "2026-04-28T18:28:43.546Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/905",
@@ -71,7 +72,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.546Z"
       },
       {
         "id": "enrich-ready-for-merge",
@@ -103,7 +105,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.542Z"
       },
       {
         "id": "webhook-route",
@@ -143,12 +146,13 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.546Z"
       },
       {
         "id": "webhook-ci-handlers",
         "title": "Implement check_suite and check_run webhook event handlers",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -162,33 +166,37 @@
           {
             "id": "webhook-ci-handlers.ac1",
             "title": "check_suite completed with failure adds failing_checks blocker to the matched issue's blockerReasons",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.543Z"
           },
           {
             "id": "webhook-ci-handlers.ac2",
             "title": "check_suite completed with success removes failing_checks blocker",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.543Z"
           },
           {
             "id": "webhook-ci-handlers.ac3",
             "title": "Handler maps PR branch to issueId correctly using existing branch naming convention (feature/<issue-id>)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.543Z"
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.543Z"
       },
       {
         "id": "webhook-pr-handlers",
         "title": "Implement pull_request webhook event handler",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -202,33 +210,37 @@
           {
             "id": "webhook-pr-handlers.ac1",
             "title": "Merge conflict detected from PR payload adds merge_conflict blocker",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.542Z"
           },
           {
             "id": "webhook-pr-handlers.ac2",
             "title": "Draft PR adds draft_pr blocker; ready_for_review removes it",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.542Z"
           },
           {
             "id": "webhook-pr-handlers.ac3",
             "title": "Non-mergeable GitHub state surfaces as not_mergeable blocker",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.542Z"
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.542Z"
       },
       {
         "id": "webhook-review-handlers",
         "title": "Implement pull_request_review and review_thread webhook handlers",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -242,28 +254,32 @@
           {
             "id": "webhook-review-handlers.ac1",
             "title": "Review with changes_requested adds changes_requested blocker",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.541Z"
           },
           {
             "id": "webhook-review-handlers.ac2",
             "title": "Approved review removes changes_requested blocker",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.541Z"
           },
           {
             "id": "webhook-review-handlers.ac3",
             "title": "Unresolved review thread adds unresolved_conversations blocker; resolved removes it",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.541Z"
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.541Z"
       },
       {
         "id": "smee-client-integration",
@@ -282,28 +298,32 @@
           {
             "id": "smee-client-integration.ac1",
             "title": "smee-client process starts and relays GitHub webhooks to POST /api/webhooks/github",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.545Z"
           },
           {
             "id": "smee-client-integration.ac2",
             "title": "Missing smee-url config logs warning and skips without failing pan up",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.545Z"
           },
           {
             "id": "smee-client-integration.ac3",
             "title": "Smee process restarts automatically on unexpected exit",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.545Z"
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.545Z"
       },
       {
         "id": "pan-up-smee-lifecycle",
@@ -322,28 +342,32 @@
           {
             "id": "pan-up-smee-lifecycle.ac1",
             "title": "pan up starts smee-client process when smee-url is configured",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.540Z"
           },
           {
             "id": "pan-up-smee-lifecycle.ac2",
             "title": "pan down cleanly stops smee-client process",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.540Z"
           },
           {
             "id": "pan-up-smee-lifecycle.ac3",
             "title": "pan health shows smee-client status (running/stopped/not configured)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.541Z"
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.540Z"
       },
       {
         "id": "github-app-webhook-config",
@@ -362,28 +386,32 @@
           {
             "id": "github-app-webhook-config.ac1",
             "title": "New GitHub App installs (create-github-app.mjs) configure webhook events and smee URL automatically",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.545Z"
           },
           {
             "id": "github-app-webhook-config.ac2",
             "title": "Migration script (update-github-app-webhooks.mjs) updates existing GitHub App webhook config via API",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.545Z"
           },
           {
             "id": "github-app-webhook-config.ac3",
             "title": "Smee channel URL persisted to ~/.panopticon/github-app/smee-url",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.545Z"
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.544Z"
       },
       {
         "id": "stepper-merge-step",
@@ -402,33 +430,37 @@
           {
             "id": "stepper-merge-step.ac1",
             "title": "Pipeline stepper shows 4 steps: Build Gate → Review → Tests → Merge",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.539Z"
           },
           {
             "id": "stepper-merge-step.ac2",
             "title": "Merge step correctly reflects all mergeStatus values (pending/queued/merging/verifying/merged/failed)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.539Z"
           },
           {
             "id": "stepper-merge-step.ac3",
             "title": "Existing 3-step behavior unchanged when merge phase hasn't started (Merge shows as pending)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.539Z"
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.539Z"
       },
       {
         "id": "stepper-ci-substatus",
         "title": "Show individual CI check sub-statuses in the Merge step",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -442,25 +474,28 @@
           {
             "id": "stepper-ci-substatus.ac1",
             "title": "Individual CI checks (build, lint, test, etc.) shown with pass/fail/running icons during merge phase",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.538Z"
           },
           {
             "id": "stepper-ci-substatus.ac2",
             "title": "CI sub-statuses use same data source as PrDiffTab (no duplicate API calls)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.538Z"
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.538Z"
       },
       {
         "id": "stepper-retry-notes",
         "title": "Show mergeRetryCount and mergeNotes in the Merge step",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -474,25 +509,28 @@
           {
             "id": "stepper-retry-notes.ac1",
             "title": "Merge retry count displayed as 'Attempt N/3' when mergeRetryCount > 0",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.538Z"
           },
           {
             "id": "stepper-retry-notes.ac2",
             "title": "mergeNotes shown as expandable detail section on merge failure",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.538Z"
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.538Z"
       },
       {
         "id": "stepper-queue-position",
         "title": "Show merge queue position in the pipeline stepper",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -506,17 +544,19 @@
           {
             "id": "stepper-queue-position.ac1",
             "title": "Queue position displayed in Merge step when issue is queued behind others",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.537Z"
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.537Z"
       },
       {
         "id": "stepper-live-log",
         "title": "Add live specialist log link during active merge phase",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -530,25 +570,28 @@
           {
             "id": "stepper-live-log.ac1",
             "title": "Live 'View log' link appears in Merge step when merge specialist is actively running",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.536Z"
           },
           {
             "id": "stepper-live-log.ac2",
             "title": "Clicking link opens the merge specialist's tmux session in the terminal panel",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.536Z"
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.535Z"
       },
       {
         "id": "awaiting-merge-blocker-filter",
         "title": "Rewrite Awaiting Merge filtering to exclude blocked issues",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -562,25 +605,28 @@
           {
             "id": "awaiting-merge-blocker-filter.ac1",
             "title": "Issues with non-empty blockerReasons do not appear in the ready-to-merge list",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.540Z"
           },
           {
             "id": "awaiting-merge-blocker-filter.ac2",
             "title": "Blocked issues shown in a separate section with their specific blocker reason",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.540Z"
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.539Z"
       },
       {
         "id": "awaiting-merge-blocker-display",
         "title": "Surface exact GitHub-native blockers on Awaiting Merge page",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -594,20 +640,23 @@
           {
             "id": "awaiting-merge-blocker-display.ac1",
             "title": "Each blocker type has a distinct icon and human-readable summary",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.537Z"
           },
           {
             "id": "awaiting-merge-blocker-display.ac2",
             "title": "Blocker details are expandable for additional context",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.537Z"
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.537Z"
       },
       {
         "id": "frontend-types-update",
@@ -639,12 +688,13 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.544Z"
       },
       {
         "id": "vision-doc",
         "title": "Document Panopticon product vision in project docs",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -658,20 +708,23 @@
           {
             "id": "vision-doc.ac1",
             "title": "Vision document exists with the 3-phase product roadmap (local → shared → multi-tenant)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.544Z"
           },
           {
             "id": "vision-doc.ac2",
             "title": "Document notes architectural implications for each phase",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-28T18:28:43.544Z"
           }
-        ]
+        ],
+        "completed": "2026-04-28T18:28:43.544Z"
       }
     ],
     "edges": [
