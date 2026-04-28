@@ -90,6 +90,9 @@ export function generateLauncherScript(config: LauncherConfig): string {
     lines.push('export CI=1');
   }
 
+  // Trust mkcert CA so agent CLI commands can reach https://pan.localhost
+  lines.push('command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"');
+
   // Terminal env (TERM/COLORTERM/LANG/LC_ALL)
   if (config.setTerminalEnv) {
     lines.push('export TERM=xterm-256color');
