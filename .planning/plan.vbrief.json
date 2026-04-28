@@ -116,7 +116,7 @@
       {
         "id": "codex-auth-endpoint",
         "title": "Add GET /api/settings/codex-auth endpoint",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -130,7 +130,7 @@
           {
             "id": "codex-auth-endpoint.ac1",
             "title": "GET /api/settings/codex-auth returns JSON with status field ('valid'|'expired'|'burned'|'missing')",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -138,7 +138,7 @@
           {
             "id": "codex-auth-endpoint.ac2",
             "title": "Route is mounted in server.ts and accessible from the dashboard",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -146,7 +146,7 @@
           {
             "id": "codex-auth-endpoint.ac3",
             "title": "No sync I/O (readFileSync, execSync) in the route handler",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
