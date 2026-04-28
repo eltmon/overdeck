@@ -1,7 +1,28 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ReviewPipelineSection } from './ReviewPipelineSection';
 import type { ReviewStatus } from './types';
+import type { PrEndpointResponse } from '../CommandDeck/ZoneCOverviewTabs/queries';
+
+const prResult = vi.hoisted(() => ({
+  data: undefined as undefined | PrEndpointResponse,
+  isLoading: false,
+  isError: false,
+}));
+
+vi.mock('../CommandDeck/ZoneCOverviewTabs/queries', () => ({
+  usePrQuery: () => prResult,
+}));
+
+vi.mock('../CommandDeck/ZoneCOverviewTabs/PrDiffTab', () => ({
+  statusColor: (check: { state?: string; conclusion?: string; status?: string }) => {
+    const verdict = (check.conclusion || check.state || check.status || '').toUpperCase();
+    if (verdict === 'SUCCESS') return { bg: 'green', fg: 'green', label: 'pass' };
+    if (verdict === 'FAILURE') return { bg: 'red', fg: 'red', label: 'fail' };
+    if (verdict === 'PENDING') return { bg: 'blue', fg: 'blue', label: 'run' };
+    return { bg: 'gray', fg: 'gray', label: 'unknown' };
+  },
+}));
 
 function makeReviewStatus(overrides: Partial<ReviewStatus> = {}): ReviewStatus {
   return {
@@ -14,7 +35,42 @@ function makeReviewStatus(overrides: Partial<ReviewStatus> = {}): ReviewStatus {
   };
 }
 
+function makePrResponse(overrides: Partial<PrEndpointResponse['pr']> = {}): PrEndpointResponse {
+  return {
+    issueId: 'PAN-331',
+    pr: {
+      number: 42,
+      title: 'Test PR',
+      url: 'https://github.com/test/pull/42',
+      state: 'OPEN',
+      isDraft: false,
+      baseRefName: 'main',
+      headRefName: 'feature/pan-331',
+      author: { login: 'test' },
+      createdAt: '2026-04-28T00:00:00Z',
+      updatedAt: '2026-04-28T00:00:00Z',
+      reviewDecision: null,
+      reviewRequests: [],
+      statusCheckRollup: [],
+      additions: 0,
+      deletions: 0,
+      changedFiles: 0,
+      files: [],
+      labels: [],
+      mergeable: null,
+      body: '',
+      ...overrides,
+    } as PrEndpointResponse['pr'],
+  };
+}
+
 describe('ReviewPipelineSection', () => {
+  beforeEach(() => {
+    prResult.data = undefined;
+    prResult.isLoading = false;
+    prResult.isError = false;
+  });
+
   it('shows review passed status', () => {
     render(<ReviewPipelineSection reviewStatus={makeReviewStatus({ reviewStatus: 'passed' })} />);
     expect(screen.getByText('Passed')).toBeInTheDocument();
@@ -122,5 +178,43 @@ describe('ReviewPipelineSection', () => {
     expect(screen.queryByText('Merge conflict detected')).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('Details'));
     expect(screen.getByText('Merge conflict detected')).toBeInTheDocument();
+  });
+
+  it('shows CI check pills when merge is queued and PR has checks', () => {
+    prResult.data = makePrResponse({
+      statusCheckRollup: [
+        { name: 'lint', conclusion: 'SUCCESS' },
+        { name: 'test', conclusion: 'FAILURE' },
+        { name: 'build', status: 'PENDING' },
+      ],
+    });
+    render(<ReviewPipelineSection reviewStatus={makeReviewStatus({ mergeStatus: 'queued' })} issueId="PAN-331" />);
+    expect(screen.getByText('lint')).toBeInTheDocument();
+    expect(screen.getByText('test')).toBeInTheDocument();
+    expect(screen.getByText('build')).toBeInTheDocument();
+  });
+
+  it('shows CI check pills when merge is failed and PR has checks', () => {
+    prResult.data = makePrResponse({
+      statusCheckRollup: [{ name: 'ci', conclusion: 'FAILURE' }],
+    });
+    render(<ReviewPipelineSection reviewStatus={makeReviewStatus({ mergeStatus: 'failed' })} issueId="PAN-331" />);
+    expect(screen.getByText('ci')).toBeInTheDocument();
+  });
+
+  it('does not show CI checks when merge is pending', () => {
+    prResult.data = makePrResponse({
+      statusCheckRollup: [{ name: 'ci', conclusion: 'SUCCESS' }],
+    });
+    render(<ReviewPipelineSection reviewStatus={makeReviewStatus({ mergeStatus: 'pending' })} issueId="PAN-331" />);
+    expect(screen.queryByText('ci')).not.toBeInTheDocument();
+  });
+
+  it('does not show CI checks when no issueId is provided', () => {
+    prResult.data = makePrResponse({
+      statusCheckRollup: [{ name: 'ci', conclusion: 'SUCCESS' }],
+    });
+    render(<ReviewPipelineSection reviewStatus={makeReviewStatus({ mergeStatus: 'queued' })} />);
+    expect(screen.queryByText('ci')).not.toBeInTheDocument();
   });
 });

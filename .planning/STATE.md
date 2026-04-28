@@ -17,9 +17,9 @@ Backend infrastructure complete. Moving to frontend: pipeline stepper (4th Merge
 - [x] pan-kjni: Implement pull_request_review and review_thread webhook handlers
 - [x] pan-ktn2: Integrate smee-client lifecycle into pan up / pan down
 - [x] pan-vb4m: Update GitHub App manifest and create migration script for existing installs
+- [x] pan-267t: Add 4th Merge step to pipeline stepper in ReviewPipelineSection
 
 ## Remaining Work
-- [ ] pan-267t: Add 4th Merge step to pipeline stepper in ReviewPipelineSection
 - [ ] pan-2tfi: Show individual CI check sub-statuses in the Merge step
 - [ ] pan-0pe6: Show mergeRetryCount and mergeNotes in the Merge step
 - [ ] pan-cpp7: Show merge queue position in the pipeline stepper

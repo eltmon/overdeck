@@ -168,7 +168,7 @@ export function ActionsSection({
 
       {/* Review status */}
       {showPipelineStatus && reviewStatus && (
-        <ReviewPipelineSection reviewStatus={reviewStatus} />
+        <ReviewPipelineSection reviewStatus={reviewStatus} issueId={issueId} />
       )}
       {reviewActionHint && (
         <div

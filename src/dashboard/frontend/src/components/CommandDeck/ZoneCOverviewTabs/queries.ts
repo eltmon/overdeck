@@ -258,11 +258,16 @@ export interface PrDetailsResponse extends PrEndpointResponse {
   diff: string | null;
 }
 
-export function usePrQuery(issueId: string): UseQueryResult<PrEndpointResponse> {
+export function usePrQuery(
+  issueId: string,
+  options?: Omit<UseQueryOptions<PrEndpointResponse>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<PrEndpointResponse> {
   return useQuery({
     queryKey: ['issuePr', issueId],
     queryFn: () => fetchJson<PrEndpointResponse>(`/api/issues/${issueId}/pr`),
     refetchInterval: 30_000,
+    enabled: !!issueId,
+    ...options,
   });
 }
 

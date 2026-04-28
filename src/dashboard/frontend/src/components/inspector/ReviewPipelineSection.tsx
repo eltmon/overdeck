@@ -6,12 +6,15 @@ import type { ReviewStatus } from './types';
 import { formatRelativeTime, isStale } from './utils';
 import { StatusHistory } from './StatusHistory';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
+import { usePrQuery } from '../CommandDeck/ZoneCOverviewTabs/queries';
+import { statusColor } from '../CommandDeck/ZoneCOverviewTabs/PrDiffTab';
 
 const DEFAULT_VERIFICATION_MAX_CYCLES = 10;
 const DEFAULT_AUTO_REQUEUE_MAX = 7;
 
 interface ReviewPipelineSectionProps {
   reviewStatus: ReviewStatus;
+  issueId?: string;
 }
 
 void COMMAND_DECK_SURFACE_REGISTRY;
@@ -27,8 +30,9 @@ interface PipelineStep {
   isSkipped: boolean;
 }
 
-export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionProps) {
+export function ReviewPipelineSection({ reviewStatus, issueId }: ReviewPipelineSectionProps) {
   const [showDetails, setShowDetails] = useState(false);
+  const prQuery = usePrQuery(issueId ?? '');
   const verificationMaxCycles = reviewStatus.verificationMaxCycles ?? DEFAULT_VERIFICATION_MAX_CYCLES;
   const autoRequeueCount = reviewStatus.autoRequeueCount ?? 0;
 
@@ -160,6 +164,28 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
             }`}>
               {reviewStatus.verificationCycleCount}/{verificationMaxCycles}
             </span>
+          </div>
+        )}
+
+        {/* CI check sub-statuses during active merge phase */}
+        {issueId && prQuery.data?.pr?.statusCheckRollup && prQuery.data.pr.statusCheckRollup.length > 0 &&
+          (reviewStatus.mergeStatus === 'queued' || reviewStatus.mergeStatus === 'merging' || reviewStatus.mergeStatus === 'verifying' || reviewStatus.mergeStatus === 'failed') && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1">
+            {prQuery.data.pr.statusCheckRollup.map((check, idx) => {
+              const c = statusColor(check);
+              const name = check.name || check.workflowName || check.__typename || `check-${idx}`;
+              return (
+                <span
+                  key={`${name}-${idx}`}
+                  className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap"
+                  style={{ background: c.bg, color: c.fg }}
+                  title={`${name}: ${c.label}`}
+                >
+                  <span className="uppercase tracking-wider" style={{ fontSize: 9 }}>{c.label}</span>
+                  <span style={{ color: 'var(--foreground)', fontWeight: 500 }}>{name}</span>
+                </span>
+              );
+            })}
           </div>
         )}
       </div>
