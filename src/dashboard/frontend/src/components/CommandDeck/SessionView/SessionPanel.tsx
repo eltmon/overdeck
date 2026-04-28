@@ -156,7 +156,7 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
         )}
 
         {view === 'findings' && (
-          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
             {roundData.length === 0 ? (
               <div className={styles.sessionPanelEmpty}>No review rounds recorded.</div>
             ) : (
@@ -169,6 +169,15 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
                     <RoundCard key={r.round} round={r} active={r.round === session.roundMetadata?.latestRound} />
                   ))}
                 </div>
+                {/* Show synthesis summaries for each round */}
+                {session.roundMetadata?.history.map((r) => r.summary ? (
+                  <div key={`summary-${r.round}`} style={{ borderTop: '1px solid var(--mc-border, var(--border))', paddingTop: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mc-text-muted, var(--muted-foreground))', marginBottom: 6 }}>
+                      Round {r.round} — {r.status}
+                    </div>
+                    <ChatMarkdown text={r.summary} isStreaming={false} />
+                  </div>
+                ) : null)}
               </>
             )}
           </div>

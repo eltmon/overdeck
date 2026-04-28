@@ -43,6 +43,9 @@ export interface ReviewerRoundSummary {
   findings?: number;
   /** Round cost in USD; omitted when not yet tracked. */
   cost?: number;
+  /** Summary text from synthesis.md (first ~500 chars). Only populated for
+   *  the synthesis reviewer role. */
+  summary?: string;
 }
 
 export interface ReviewerRoundMetadata {
@@ -133,6 +136,8 @@ export async function readReviewerRounds(
 
   if (roundFiles.length === 0) return undefined;
 
+  const isSynthesis = sessionName.endsWith('-review-synthesis');
+
   const history = (await Promise.all(
     roundFiles.map(async (rf) => {
       const raw = await readFile(join(dir, rf.name), 'utf-8').catch(() => null);
@@ -149,7 +154,22 @@ export async function readReviewerRounds(
           durationSec?: number | null;
           findings?: number;
           cost?: number;
+          outputFile?: string;
         };
+
+        // For synthesis rounds, read the summary from the output .md file
+        // so the Findings tab can show what the review actually found.
+        let summary: string | undefined;
+        if (isSynthesis && parsed.outputFile) {
+          try {
+            const md = await readFile(parsed.outputFile, 'utf-8');
+            // Extract everything up to the first "## Nits" or "## Cross-cutting"
+            // or cap at 1500 chars — enough for verdict + blockers + high-priority.
+            const cutoff = md.search(/^## (Nits|Cross-cutting|Low Priority)/m);
+            summary = cutoff > 0 ? md.slice(0, cutoff).trim() : md.slice(0, 1500).trim();
+          } catch { /* output file may be gone */ }
+        }
+
         return {
           round: parsed.round ?? rf.round,
           status: parsed.status ?? 'unknown',
@@ -161,6 +181,7 @@ export async function readReviewerRounds(
           durationSec: parsed.durationSec,
           findings: parsed.findings,
           cost: parsed.cost,
+          summary,
         };
       } catch { /* skip malformed artifact */ return null; }
     }),
