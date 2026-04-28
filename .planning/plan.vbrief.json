@@ -11,9 +11,9 @@
     "status": "approved",
     "uid": "f3a7c1e8-9d42-4b6f-a815-2e8f0c3d7a19",
     "author": "agent:claude-opus-4-6",
-    "sequence": 1,
+    "sequence": 2,
     "created": "2026-04-28T18:00:00Z",
-    "updated": "2026-04-28T18:00:00Z",
+    "updated": "2026-04-28T12:48:12.401Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/905",
@@ -268,7 +268,7 @@
       {
         "id": "smee-client-integration",
         "title": "Add smee-client dependency and process management",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -612,7 +612,7 @@
       {
         "id": "frontend-types-update",
         "title": "Update frontend ReviewStatusData type to include blockerReasons and new fields",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -626,7 +626,7 @@
           {
             "id": "frontend-types-update.ac1",
             "title": "ReviewStatusData includes blockerReasons array with proper typing",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -634,7 +634,7 @@
           {
             "id": "frontend-types-update.ac2",
             "title": "mergeRetryCount and mergeNotes fields present in frontend types",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

@@ -3,19 +3,20 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementation in progress. Completed pan-l4wu (schema), pan-91h1 (readyForMerge), and pan-zg92 (webhook route). Next up: pan-vwrn (smee client), pan-4c7b (frontend types), pan-vb4m (GitHub app manifest), or pan-8wl8 (vision doc).
+Implementation in progress. Completed pan-l4wu (schema), pan-91h1 (readyForMerge), pan-zg92 (webhook route), and pan-4c7b (frontend types). Next up: pan-vwrn (smee client), pan-vb4m (GitHub app manifest), pan-8wl8 (vision doc), or remaining webhook/frontend beads.
 
 ## Completed Work
 - [x] pan-l4wu: Add blockerReasons[] column to review_status SQLite schema (commit: bcb7f958)
 - [x] pan-91h1: Enrich readyForMerge to incorporate blockerReasons (commit: 5fcd1167)
 - [x] pan-zg92: Add POST /api/webhooks/github route with HMAC-SHA256 verification (commit: 57b86e20)
+- [x] pan-4c7b: Update frontend ReviewStatusData type to include blockerReasons and new fields (commit: 2f430c3c)
 - [x] Fixed inverted bead dependencies in beads database (all 17 deps reversed)
+- [x] pan-vwrn: Add smee-client dependency and process management
 
 ## Remaining Work
 - [ ] pan-ygsc: Implement check_suite and check_run webhook event handlers
 - [ ] pan-umby: Implement pull_request webhook event handler
 - [ ] pan-kjni: Implement pull_request_review and review_thread webhook handlers
-- [ ] pan-vwrn: Add smee-client dependency and process management
 - [ ] pan-ktn2: Integrate smee-client lifecycle into pan up / pan down
 - [ ] pan-vb4m: Update GitHub App manifest and create migration script for existing installs
 - [ ] pan-267t: Add 4th Merge step to pipeline stepper in ReviewPipelineSection
@@ -25,7 +26,6 @@ Implementation in progress. Completed pan-l4wu (schema), pan-91h1 (readyForMerge
 - [ ] pan-3uwo: Add live specialist log link during active merge phase
 - [ ] pan-fxfx: Rewrite Awaiting Merge filtering to exclude blocked issues
 - [ ] pan-o32r: Surface exact GitHub-native blockers on Awaiting Merge page
-- [ ] pan-4c7b: Update frontend ReviewStatusData type to include blockerReasons and new fields
 - [ ] pan-8wl8: Document Panopticon product vision in project docs
 
 ## Key Decisions
