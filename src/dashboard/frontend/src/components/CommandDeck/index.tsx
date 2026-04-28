@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Compass, Plus } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
-import { type TreeSessionFilter } from './ProjectTree/FeatureItem';
+import { sessionMatchesFilter, type TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { DeaconStatus } from './DeaconStatus';
 import { IssueWorkbench } from './IssueWorkbench';
 import { BeadsDialog } from '../BeadsDialog';
@@ -704,7 +704,7 @@ export function CommandDeck({
                     onClick={() => setTreeFilter(f)}
                     className={`${styles.treeFilterButton} ${treeFilter === f ? styles.treeFilterButtonActive : ''}`}
                   >
-                    {f}
+                    {f === 'all' ? 'All' : f === 'alive' ? 'Alive' : 'Failed'}
                   </button>
                 ))}
               </div>
@@ -730,7 +730,14 @@ export function CommandDeck({
               ) : projects.length === 0 ? (
                 <div className={styles.emptyProject}>No projects configured</div>
               ) : (
-                projectsWithSessions.map(project => (
+                projectsWithSessions
+                  .filter((project) => {
+                    if (treeFilter === 'all') return project.features.length > 0;
+                    return project.features.some((feature) =>
+                      (feature.sessions ?? []).some((session) => sessionMatchesFilter(session, treeFilter)),
+                    );
+                  })
+                  .map(project => (
                   <ProjectNode
                     key={project.path}
                     name={project.name}
