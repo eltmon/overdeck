@@ -22,7 +22,7 @@ import { VBriefTab } from './ZoneCOverviewTabs/VBriefTab';
 import { BeadsTab } from './ZoneCOverviewTabs/BeadsTab';
 import { PrDiffTab } from './ZoneCOverviewTabs/PrDiffTab';
 import { DiscussionsTab } from './ZoneCOverviewTabs/DiscussionsTab';
-import { usePlanningQuery } from './ZoneCOverviewTabs/queries';
+import { usePlanningQuery, usePlanningSummaryQuery } from './ZoneCOverviewTabs/queries';
 
 export type OverviewTab =
   | 'overview'
@@ -69,8 +69,10 @@ export function ZoneCOverview({
   const [internalTab, setInternalTab] = useState<OverviewTab>('overview');
   const tab = activeTab ?? internalTab;
 
-  const planning = usePlanningQuery(issueId);
-  const hasInference = !!(planning.data?.inference && planning.data.inference.trim() !== '');
+  const planningSummary = usePlanningSummaryQuery(issueId);
+  const shouldLoadPlanning = tab === 'prd' || tab === 'state' || tab === 'inference';
+  const planning = usePlanningQuery(issueId, { enabled: shouldLoadPlanning });
+  const hasInference = Boolean(planningSummary.data?.hasInference);
 
   const visibleTabs = ALL_TABS.filter((spec) => spec.key !== 'inference' || hasInference);
 

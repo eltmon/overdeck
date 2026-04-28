@@ -375,15 +375,23 @@ export function getAgentDir(agentId: string): string {
   return join(AGENTS_DIR, agentId);
 }
 
+function parseAgentState(content: string, normalizedId: string): AgentState | null {
+  try {
+    const state = JSON.parse(content) as AgentState;
+    if (!state.id) state.id = normalizedId;
+    return state;
+  } catch {
+    return null;
+  }
+}
+
 export function getAgentState(agentId: string): AgentState | null {
   const normalizedId = normalizeAgentId(agentId);
   const stateFile = join(getAgentDir(normalizedId), 'state.json');
   if (!existsSync(stateFile)) return null;
 
   const content = readFileSync(stateFile, 'utf8');
-  const state = JSON.parse(content) as AgentState;
-  if (!state.id) state.id = normalizedId;
-  return state;
+  return parseAgentState(content, normalizedId);
 }
 
 export async function getAgentStateAsync(agentId: string): Promise<AgentState | null> {
@@ -392,9 +400,7 @@ export async function getAgentStateAsync(agentId: string): Promise<AgentState | 
   if (!existsSync(stateFile)) return null;
 
   const content = await readFile(stateFile, 'utf-8');
-  const state = JSON.parse(content) as AgentState;
-  if (!state.id) state.id = normalizedId;
-  return state;
+  return parseAgentState(content, normalizedId);
 }
 
 export function saveAgentState(state: AgentState): void {

@@ -17,6 +17,7 @@ describe('generateLauncherScript', () => {
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       export CI=1
+      command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6
       "
@@ -35,6 +36,7 @@ describe('generateLauncherScript', () => {
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       export CI=1
+      command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       export ANTHROPIC_AUTH_TOKEN="tok"
@@ -58,6 +60,7 @@ describe('generateLauncherScript', () => {
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       export CI=1
+      command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --resume 'sess-123' --model gpt-5.4
@@ -83,6 +86,7 @@ describe('generateLauncherScript', () => {
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       export CI=1
+      command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export TERM=xterm-256color
       export COLORTERM=truecolor
       export LANG=C.UTF-8
@@ -128,6 +132,7 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       set -o pipefail
       export CI=1
+      command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export PANOPTICON_AGENT_ID='spec-123'
       export PANOPTICON_ISSUE_ID='PAN-824'
       export PANOPTICON_SESSION_TYPE='correctness-review'
@@ -163,6 +168,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
       unset ANTHROPIC_BASE_URL
       unset ANTHROPIC_AUTH_TOKEN
@@ -190,6 +196,7 @@ describe('generateLauncherScript', () => {
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       set -o pipefail
+      command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
       unset PANOPTICON_AGENT_ID PANOPTICON_ISSUE_ID PANOPTICON_SESSION_TYPE
@@ -214,6 +221,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export TERM=xterm-256color
       export COLORTERM=truecolor
       export LANG=C.UTF-8
@@ -243,6 +251,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export TERM=xterm-256color
       export COLORTERM=truecolor
       export LANG=C.UTF-8
@@ -269,6 +278,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       export PATH="/usr/local/bin:$PATH"
       prompt=$(cat '/workspace/.pan/prompts/agent.md')
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 "$prompt"
@@ -286,6 +296,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
       prompt=$(cat '/tmp/init-prompt.txt')
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions "$prompt"
@@ -303,6 +314,7 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
+      command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 'Please read the continuation prompt and continue.'
       "
@@ -339,6 +351,7 @@ describe('generateLauncherScript', () => {
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
       export CI=1
+      command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       exec claude --model claude-sonnet-4-6
       "
     `);

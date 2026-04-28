@@ -69,16 +69,10 @@ describe('SessionPanel', () => {
     localStorage.clear();
   });
 
-  it('renders session info sub-header', () => {
+  it('renders toggle bar with Conversation and Terminal tabs', () => {
     render(<SessionPanel session={makeSession()} />);
-    expect(screen.getByText('work')).toBeInTheDocument();
-    expect(screen.getByText('claude-sonnet-4-6')).toBeInTheDocument();
-    expect(screen.getByText('2m')).toBeInTheDocument();
-  });
-
-  it('renders role in type badge when present', () => {
-    render(<SessionPanel session={makeSession({ type: 'reviewer', role: 'correctness' })} />);
-    expect(screen.getByText('reviewer:correctness')).toBeInTheDocument();
+    expect(screen.getByText('Conversation')).toBeInTheDocument();
+    expect(screen.getByText('Terminal')).toBeInTheDocument();
   });
 
   it('defaults to conversation view', () => {
@@ -141,8 +135,14 @@ describe('SessionPanel', () => {
     expect(screen.getByTestId('chat-markdown')).toHaveTextContent('ended transcript');
   });
 
-  it('shows no terminal available when tmuxSession is missing', () => {
-    render(<SessionPanel session={makeSession({ tmuxSession: undefined })} />);
+  it('falls back to sessionId for terminal when tmuxSession is missing but active', () => {
+    render(<SessionPanel session={makeSession({ tmuxSession: undefined, presence: 'active' })} />);
+    fireEvent.click(screen.getByText('Terminal'));
+    expect(screen.getByTestId('x-terminal')).toBeInTheDocument();
+  });
+
+  it('shows no terminal available when tmuxSession is missing and session is idle', () => {
+    render(<SessionPanel session={makeSession({ tmuxSession: undefined, presence: 'idle' })} />);
     fireEvent.click(screen.getByText('Terminal'));
     expect(screen.getByText('No terminal session available.')).toBeInTheDocument();
   });

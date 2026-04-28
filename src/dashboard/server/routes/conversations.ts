@@ -310,6 +310,17 @@ function validateOrigin(request: HttpServerRequest.HttpServerRequest): { ok: tru
   const referer = getHeader(request, 'referer');
   const trusted = getTrustedOrigins();
 
+  // Safe reads can omit both Origin and Referer on same-origin fetches.
+  // Enforce origin checks only when a caller supplies one, or when the
+  // request method can mutate state.
+  if (!origin && !referer) {
+    const method = request.method.toUpperCase();
+    if (method === 'GET' || method === 'HEAD') {
+      return { ok: true };
+    }
+    return { ok: false, error: 'Missing origin' };
+  }
+
   // If Origin is present, it must exactly match a trusted origin
   if (origin) {
     const normalized = normalizeOrigin(origin);
@@ -320,16 +331,11 @@ function validateOrigin(request: HttpServerRequest.HttpServerRequest): { ok: tru
   }
 
   // If no Origin but Referer is present, normalize and check it
-  if (referer) {
-    const normalized = normalizeOrigin(referer);
-    if (normalized && trusted.includes(normalized)) {
-      return { ok: true };
-    }
-    return { ok: false, error: 'Invalid referer' };
+  const normalized = normalizeOrigin(referer);
+  if (normalized && trusted.includes(normalized)) {
+    return { ok: true };
   }
-
-  // Require at least one of Origin or Referer for CSRF protection
-  return { ok: false, error: 'Missing origin' };
+  return { ok: false, error: 'Invalid referer' };
 }
 
 /** Validate a caller-supplied cwd is an existing directory under the user's home. */
