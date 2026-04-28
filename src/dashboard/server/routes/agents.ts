@@ -221,14 +221,20 @@ function formatLeakedSpecialistSummary(leaked: HealthLeakedSpecialist[]): string
     .join(', ');
 }
 
+function resolveAgentCountEnv(varName: string, fallback: number): number {
+  const raw = process.env[varName];
+  if (raw == null || raw.trim() === '') return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? Math.max(1, Math.floor(parsed)) : fallback;
+}
+
 export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuardrailDecision {
   const warnings: SpawnGuardrailAdvisory[] = [];
   const availableGb = Math.round((health.summary.availableMemoryBytes / (1024 ** 3)) * 10) / 10;
   const workAgentCount = health.summary.workAgentCount;
   const leakedSpecialists = health.leakedSpecialists;
-  const resourceConfig = getResourceConfig();
-  const hardWorkAgentLimit = Math.max(1, resourceConfig.agentBlockCount);
-  const warnWorkAgentLimit = Math.max(1, resourceConfig.agentWarnCount);
+  const hardWorkAgentLimit = resolveAgentCountEnv('PAN_AGENT_BLOCK_COUNT', 10);
+  const warnWorkAgentLimit = resolveAgentCountEnv('PAN_AGENT_WARN_COUNT', 8);
 
   if (health.summary.availableMemoryBytes < health.thresholds.memoryAvailableCriticalBytes) {
     warnings.push({
