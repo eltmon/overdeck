@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckCircle, XCircle, Loader2, AlertTriangle, ChevronDown, ChevronUp, RotateCcw, Info } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, AlertTriangle, ChevronDown, ChevronUp, RotateCcw, Info, GitMerge } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ReviewStatus } from './types';
@@ -11,6 +11,7 @@ import { statusColor } from '../CommandDeck/ZoneCOverviewTabs/PrDiffTab';
 
 const DEFAULT_VERIFICATION_MAX_CYCLES = 10;
 const DEFAULT_AUTO_REQUEUE_MAX = 7;
+const DEFAULT_MERGE_RETRY_MAX = 3;
 
 interface ReviewPipelineSectionProps {
   reviewStatus: ReviewStatus;
@@ -116,6 +117,16 @@ export function ReviewPipelineSection({ reviewStatus, issueId }: ReviewPipelineS
           {autoRequeueCount >= DEFAULT_AUTO_REQUEUE_MAX && (
             <span className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-900/20 px-1.5 py-0.5 rounded">
               <AlertTriangle className="w-2.5 h-2.5" />Human review
+            </span>
+          )}
+          {(reviewStatus.mergeRetryCount ?? 0) > 0 && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+              (reviewStatus.mergeRetryCount ?? 0) >= DEFAULT_MERGE_RETRY_MAX
+                ? 'bg-destructive/20 text-destructive'
+                : 'bg-card text-muted-foreground'
+            }`}>
+              <GitMerge className="w-2.5 h-2.5 inline mr-1" />
+              retry {(reviewStatus.mergeRetryCount ?? 0)}/{DEFAULT_MERGE_RETRY_MAX}
             </span>
           )}
         </div>

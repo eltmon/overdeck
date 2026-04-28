@@ -108,6 +108,16 @@ describe('ReviewPipelineSection', () => {
     expect(screen.getByText('Human review')).toBeInTheDocument();
   });
 
+  it('shows merge retry count when mergeRetryCount > 0', () => {
+    render(<ReviewPipelineSection reviewStatus={makeReviewStatus({ mergeRetryCount: 1 })} />);
+    expect(screen.getByText('retry 1/3')).toBeInTheDocument();
+  });
+
+  it('shows merge retry count in destructive color when saturated', () => {
+    render(<ReviewPipelineSection reviewStatus={makeReviewStatus({ mergeRetryCount: 3 })} />);
+    expect(screen.getByText('retry 3/3')).toBeInTheDocument();
+  });
+
   it('shows verification attempts against the configured max cycle count', () => {
     render(
       <ReviewPipelineSection
