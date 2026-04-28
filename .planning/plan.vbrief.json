@@ -236,7 +236,7 @@
       {
         "id": "reauth-completion",
         "title": "Add re-auth completion detection and token re-bridging",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -250,7 +250,7 @@
           {
             "id": "reauth-completion.ac1",
             "title": "GET /api/settings/codex-reauth/status returns {completed: false} while tmux session is alive",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -258,7 +258,7 @@
           {
             "id": "reauth-completion.ac2",
             "title": "Returns {completed: true, authStatus} after session exits, with tokens re-bridged",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -266,7 +266,7 @@
           {
             "id": "reauth-completion.ac3",
             "title": "No sync I/O in the completion check or re-bridge path",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

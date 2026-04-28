@@ -11,6 +11,7 @@ Implementing bead pan-748p — Create async checkCodexAuthStatus() utility (back
 - [x] pan-d8lw: Added GET /api/settings/codex-auth endpoint (commit: 764e42f)
 - [x] pan-bkrg: Added POST /api/settings/codex-reauth endpoint (commit: 19c57ba)
 - [x] pan-7edh: Added Codex auth check to spawn guardrails (commit: 90cb27d)
+- [x] pan-ya4z: Added re-auth completion detection and token re-bridging (commit: adfa9ef)
 
 ## Remaining Work
 - [ ] pan-d8lw: Add GET /api/settings/codex-auth endpoint
