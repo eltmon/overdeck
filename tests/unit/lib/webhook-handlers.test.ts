@@ -8,6 +8,7 @@ import {
   handlePullRequest,
   handlePullRequestReview,
   handlePullRequestReviewThread,
+  handleStatus,
   type WebhookPayload,
 } from '../../../src/lib/webhook-handlers.js';
 
@@ -194,7 +195,7 @@ describe('handlePullRequestReview', () => {
 });
 
 describe('handlePullRequestReviewThread', () => {
-  it('adds unresolved_conversations blocker', () => {
+  it('adds unresolved_conversations blocker with thread id tracking', () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
     handlePullRequestReviewThread(makePayload({
@@ -203,22 +204,80 @@ describe('handlePullRequestReviewThread', () => {
         number: 1,
         head: { ref: 'feature/pan-222' },
       },
-      thread: { resolved: false },
+      thread: { id: 123, resolved: false },
     }));
 
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-222', expect.objectContaining({
       blockerReasons: expect.arrayContaining([
-        expect.objectContaining({ type: 'unresolved_conversations' }),
+        expect.objectContaining({
+          type: 'unresolved_conversations',
+          details: JSON.stringify(['123']),
+        }),
       ]),
     }));
   });
 
-  it('does not remove unresolved_conversations blocker on single thread resolve', () => {
-    // Per-thread webhooks make it impossible to know if other threads
-    // are still unresolved without querying the GitHub API. We keep the
-    // blocker conservative and only clear it on review approval.
+  it('removes unresolved_conversations blocker when all tracked threads are resolved', () => {
     mockGetReviewStatus.mockReturnValue({
-      blockerReasons: [{ type: 'unresolved_conversations', summary: 'Unresolved', detectedAt: '2026-04-28T10:00:00Z' }],
+      blockerReasons: [{
+        type: 'unresolved_conversations',
+        summary: 'Unresolved',
+        details: JSON.stringify(['123']),
+        detectedAt: '2026-04-28T10:00:00Z',
+      }],
+    });
+
+    handlePullRequestReviewThread(makePayload({
+      action: 'resolved',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-222' },
+      },
+      thread: { id: 123, resolved: true },
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-222', { blockerReasons: undefined });
+  });
+
+  it('keeps unresolved_conversations blocker when only one of multiple threads is resolved', () => {
+    mockGetReviewStatus.mockReturnValue({
+      blockerReasons: [{
+        type: 'unresolved_conversations',
+        summary: 'Unresolved',
+        details: JSON.stringify(['123', '456']),
+        detectedAt: '2026-04-28T10:00:00Z',
+      }],
+    });
+
+    handlePullRequestReviewThread(makePayload({
+      action: 'resolved',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-222' },
+      },
+      thread: { id: 123, resolved: true },
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-222', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({
+          type: 'unresolved_conversations',
+          details: JSON.stringify(['456']),
+        }),
+      ]),
+    }));
+  });
+
+  it('does not clear blocker on resolve when thread id is absent', () => {
+    // Without a thread id we cannot determine which thread was resolved,
+    // so we conservatively keep the blocker.
+    mockGetReviewStatus.mockReturnValue({
+      blockerReasons: [{
+        type: 'unresolved_conversations',
+        summary: 'Unresolved',
+        details: JSON.stringify(['123']),
+        detectedAt: '2026-04-28T10:00:00Z',
+      }],
     });
 
     handlePullRequestReviewThread(makePayload({
@@ -228,6 +287,75 @@ describe('handlePullRequestReviewThread', () => {
         head: { ref: 'feature/pan-222' },
       },
       thread: { resolved: true },
+    }));
+
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleStatus', () => {
+  it('adds failing_checks blocker on status failure', () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    handleStatus(makePayload({
+      state: 'failure',
+      branches: [{ name: 'main' }, { name: 'feature/pan-333' }],
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-333', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'failing_checks' }),
+      ]),
+    }));
+  });
+
+  it('adds failing_checks blocker on status error', () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    handleStatus(makePayload({
+      state: 'error',
+      branches: [{ name: 'feature/pan-444' }],
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-444', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'failing_checks' }),
+      ]),
+    }));
+  });
+
+  it('removes failing_checks blocker on status success', () => {
+    mockGetReviewStatus.mockReturnValue({
+      blockerReasons: [{ type: 'failing_checks', summary: 'CI failed', detectedAt: '2026-04-28T10:00:00Z' }],
+    });
+
+    handleStatus(makePayload({
+      state: 'success',
+      branches: [{ name: 'main' }, { name: 'feature/pan-333' }],
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-333', { blockerReasons: undefined });
+  });
+
+  it('skips non-feature branches and acts on the first matching feature branch', () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    handleStatus(makePayload({
+      state: 'failure',
+      branches: [{ name: 'main' }, { name: 'release' }, { name: 'feature/pan-555' }],
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-555', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'failing_checks' }),
+      ]),
+    }));
+  });
+
+  it('ignores status events with no matching feature branches', () => {
+    handleStatus(makePayload({
+      state: 'failure',
+      branches: [{ name: 'main' }, { name: 'release' }],
     }));
 
     expect(mockSetReviewStatus).not.toHaveBeenCalled();

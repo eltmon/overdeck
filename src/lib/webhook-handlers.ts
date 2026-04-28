@@ -30,7 +30,7 @@ export interface WebhookPayload {
   };
   repository?: { full_name: string };
   review?: { state: string };
-  thread?: { resolved?: boolean };
+  thread?: { id?: number; resolved?: boolean };
   // status event payload
   sha?: string;
   state?: string;
@@ -210,17 +210,38 @@ export function handlePullRequestReviewThread(payload: WebhookPayload): void {
   if (!issueId) return;
 
   if (thread.resolved === false) {
-    addBlocker(issueId, {
-      type: 'unresolved_conversations',
-      summary: 'Unresolved review conversation',
-      detectedAt: new Date().toISOString(),
+    mutateBlockers(issueId, (blockers) => {
+      const existing = blockers.find((b) => b.type === 'unresolved_conversations');
+      const threadIds = new Set<string>(JSON.parse(existing?.details ?? '[]') as string[]);
+      if (thread.id != null) threadIds.add(String(thread.id));
+      const updated: BlockerReason = {
+        type: 'unresolved_conversations',
+        summary: 'Unresolved review conversation',
+        details: JSON.stringify([...threadIds]),
+        detectedAt: existing?.detectedAt ?? new Date().toISOString(),
+      };
+      return [...blockers.filter((b) => b.type !== 'unresolved_conversations'), updated];
+    });
+  } else if (thread.resolved === true) {
+    // Without a thread id we cannot determine which thread was resolved.
+    if (thread.id == null) return;
+    mutateBlockers(issueId, (blockers) => {
+      const existing = blockers.find((b) => b.type === 'unresolved_conversations');
+      if (!existing) return blockers;
+      const threadIds = new Set<string>(JSON.parse(existing.details ?? '[]') as string[]);
+      threadIds.delete(String(thread.id));
+      if (threadIds.size === 0) {
+        return blockers.filter((b) => b.type !== 'unresolved_conversations');
+      }
+      const updated: BlockerReason = {
+        type: 'unresolved_conversations',
+        summary: 'Unresolved review conversation',
+        details: JSON.stringify([...threadIds]),
+        detectedAt: existing.detectedAt,
+      };
+      return [...blockers.filter((b) => b.type !== 'unresolved_conversations'), updated];
     });
   }
-  // Do NOT auto-remove the blocker on thread.resolved === true.
-  // GitHub sends per-thread webhooks; resolving one of many
-  // unresolved threads would incorrectly clear the blocker.
-  // The blocker is removed when the review is approved
-  // (handlePullRequestReview) or when the PR is otherwise cleared.
 }
 
 // ─── status ──────────────────────────────────────────────────────────────────
@@ -234,18 +255,18 @@ export function handleStatus(payload: WebhookPayload): void {
   // Map commit status to the first matching feature branch
   for (const branch of branches) {
     const issueId = issueIdFromBranch(branch.name);
-    if (!issueId) continue;
-
-    if (state === 'failure' || state === 'error') {
-      addBlocker(issueId, {
-        type: 'failing_checks',
-        summary: `Commit status: ${state}`,
-        detectedAt: new Date().toISOString(),
-      });
-    } else if (state === 'success') {
-      removeBlocker(issueId, 'failing_checks');
+    if (issueId) {
+      if (state === 'failure' || state === 'error') {
+        addBlocker(issueId, {
+          type: 'failing_checks',
+          summary: `Commit status: ${state}`,
+          detectedAt: new Date().toISOString(),
+        });
+      } else if (state === 'success') {
+        removeBlocker(issueId, 'failing_checks');
+      }
+      // Only act on the first feature branch match
+      break;
     }
-    // Only act on the first feature branch match
-    break;
   }
 }

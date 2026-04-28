@@ -7,7 +7,7 @@
  *   Dispatches to per-event-type handlers.
  */
 
-import { Effect } from 'effect';
+import { Effect, Option } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -126,8 +126,16 @@ const postGitHubWebhookRoute = HttpRouter.add(
         return jsonResponse({ error: 'Invalid signature' }, { status: 401 });
       }
     } else {
-      // Dev mode: no webhook secret configured — skip verification per AC3
-      console.warn('[webhook] No webhook secret configured — skipping HMAC verification (dev mode)');
+      const devBypass = process.env.PANOPTICON_DEV_WEBHOOKS === '1';
+      const remoteAddress = Option.getOrElse(request.remoteAddress, () => 'unknown');
+      const isLocalhost = remoteAddress === '127.0.0.1' || remoteAddress === '::1' || remoteAddress === '::ffff:127.0.0.1';
+      if (!devBypass || !isLocalhost) {
+        return jsonResponse(
+          { error: 'Webhook secret not configured. Run pan auth github to set up.' },
+          { status: 503 },
+        );
+      }
+      console.warn('[webhook] PANOPTICON_DEV_WEBHOOKS=1 — skipping HMAC verification (dev mode)');
     }
 
     let payload: WebhookPayload;
