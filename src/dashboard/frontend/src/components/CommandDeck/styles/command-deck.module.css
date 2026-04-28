@@ -364,6 +364,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  pointer-events: none;
 }
 
 .featureResourcePopover .featureResourceCleanupButton {
