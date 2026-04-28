@@ -425,6 +425,7 @@ export const IssueStatusChangedEvent = Schema.Struct({
     issueId: IssueId,
     status: Schema.String,
     canonicalStatus: Schema.String,
+    labels: Schema.optional(Schema.Array(Schema.String)),
   }),
 })
 export type IssueStatusChangedEvent = typeof IssueStatusChangedEvent.Type

@@ -313,10 +313,12 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 
     case 'issue.statusChanged': {
-      const { issueId, status, canonicalStatus } = event.payload
+      const { issueId, status, canonicalStatus, labels } = event.payload
       const updatedIssues = (state.issuesRaw as Array<Record<string, unknown>>).map(issue => {
         if (issue['identifier'] === issueId || issue['id'] === issueId) {
-          return { ...issue, status, canonicalStatus, state: canonicalStatus }
+          const patch: Record<string, unknown> = { ...issue, status, canonicalStatus, state: canonicalStatus }
+          if (labels) patch.labels = labels
+          return patch
         }
         return issue
       })
