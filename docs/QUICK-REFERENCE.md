@@ -17,7 +17,7 @@ pan status                       # what's running right now?
 pan show <id>                    # everything about one issue
 pan tell <id> "message"          # talk to a running agent
 pan review pending               # what's waiting on me?
-pan done <id> → pan approve <id> # hand off → merge (human clicks)
+pan done <id> → MERGE button     # hand off → merge (human clicks in dashboard)
 pan close <id>                   # close out on the tracker
 ```
 
@@ -39,7 +39,7 @@ Act on an issue. `<id>` is the universal object.
 | `pan kill <id>` | Stop the agent (workspace preserved) |
 | `pan sync-main <id>` | Merge latest `main` into the workspace branch |
 | `pan done <id>` | Mark work complete → tracker "In Review". Agent stays on standby for UAT tweaks via `pan tell`. |
-| `pan approve <id>` | Approve agent work, merge MR, update tracker |
+| Dashboard MERGE | Click MERGE button when review passes (handles rebase, verify, merge, cleanup) |
 | `pan inspect <id>` | Request human inspection before proceeding |
 | `pan close <id>` | Verify, clean up, close on tracker |
 | `pan reopen <id>` | Re-open for rework (resets specialist state) |
