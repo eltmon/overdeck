@@ -30,6 +30,7 @@ import { UpgradeAnnouncement } from './components/upgrade-announcement/UpgradeAn
 import { StandaloneTerminal } from './components/StandaloneTerminal';
 import { DeaconPauseBanner } from './components/DeaconPauseToggle';
 import { StoppedAgentsBanner } from './components/StoppedAgentsBanner';
+import { CodexAuthBanner } from './components/CodexAuthBanner';
 import { SystemHealthPill } from './components/SystemHealthPill';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
@@ -546,6 +547,9 @@ export default function App() {
 
         {/* Stopped Agents Banner — shown when agents are stopped (e.g., after reboot) */}
         <StoppedAgentsBanner />
+
+        {/* Codex Auth Banner — shown when Codex OAuth tokens are expired/burned */}
+        <CodexAuthBanner />
 
         {/* Dashboard Restart Banner — shown during a planned restart (post-merge deploy, pan restart) */}
         {showRestartBanner && (

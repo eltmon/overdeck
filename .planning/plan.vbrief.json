@@ -316,7 +316,7 @@
       {
         "id": "codex-auth-polling",
         "title": "Create useCodexAuthStatus polling hook",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -330,7 +330,7 @@
           {
             "id": "codex-auth-polling.ac1",
             "title": "Hook polls GET /api/settings/codex-auth every ~120 seconds",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -338,7 +338,7 @@
           {
             "id": "codex-auth-polling.ac2",
             "title": "Hook is consumed by both CodexAuthBanner and SettingsPage",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
