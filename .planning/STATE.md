@@ -1,9 +1,9 @@
 # PAN-905: Command Deck — Make Awaiting Merge the Canonical Final Merge Gate
 
-## Status: In Progress
+## Status: Complete
 
 ## Current Phase
-Backend infrastructure complete. Moving to frontend: pipeline stepper (4th Merge step, CI sub-statuses, retry count, queue position), Awaiting Merge filtering, and blocker surfacing.
+All frontend and backend work for PAN-905 is finished. The Awaiting Merge page is now the canonical final merge gate.
 
 ## Completed Work
 - [x] pan-l4wu: Add blockerReasons[] column to review_status SQLite schema (commit: bcb7f958)
@@ -18,18 +18,18 @@ Backend infrastructure complete. Moving to frontend: pipeline stepper (4th Merge
 - [x] pan-ktn2: Integrate smee-client lifecycle into pan up / pan down
 - [x] pan-vb4m: Update GitHub App manifest and create migration script for existing installs
 - [x] pan-267t: Add 4th Merge step to pipeline stepper in ReviewPipelineSection
-
-## Remaining Work
-- [ ] pan-2tfi: Show individual CI check sub-statuses in the Merge step
-- [ ] pan-0pe6: Show mergeRetryCount and mergeNotes in the Merge step
-- [ ] pan-cpp7: Show merge queue position in the pipeline stepper
-- [ ] pan-3uwo: Add live specialist log link during active merge phase
-- [ ] pan-fxfx: Rewrite Awaiting Merge filtering to exclude blocked issues
-- [ ] pan-o32r: Surface exact GitHub-native blockers on Awaiting Merge page
-- [ ] pan-8wl8: Document Panopticon product vision in project docs
+- [x] pan-2tfi: Show individual CI check sub-statuses in the Merge step
+- [x] pan-0pe6: Show mergeRetryCount and mergeNotes in the Merge step
+- [x] pan-cpp7: Show merge queue position in the pipeline stepper
+- [x] pan-3uwo: Add live specialist log link during active merge phase
+- [x] pan-fxfx: Rewrite Awaiting Merge filtering to exclude blocked issues
+- [x] pan-o32r: Surface exact GitHub-native blockers on Awaiting Merge page
+- [x] pan-8wl8: Document Panopticon product vision in project docs
 
 ## Key Decisions
 - Bead dependencies were inverted in the beads database (all dependencies pointing backwards). Fixed by removing all incorrect deps and re-adding per vBRIEF plan edges.
+- Prop drilling for `onViewMergeLog` was chosen over context because `ReviewPipelineSection` is deeply nested inside `ActionsSection` → `InspectorPanel` → `DetailPanelLayout`, and the callback only makes sense at the layout level where terminal state lives.
+- Explicit `blockerReasons` filtering in `selectAwaitingMerge` and `AwaitingMergePage` provides defense-in-depth: even if `readyForMerge` normalization on the server has a bug, the frontend will never show blocked issues in the merge queue.
 
 ## Specialist Feedback
 - All feedback files in `.planning/feedback/` are for PAN-854 (approved issue), not PAN-905. No actionable feedback for PAN-905.
