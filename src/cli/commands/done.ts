@@ -454,8 +454,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     }
     console.log('');
 
-    console.log(chalk.dim('Ready for review. When approved, run:'));
-    console.log(chalk.dim(`  pan approve ${issueId}`));
+    console.log(chalk.dim('Ready for review. When review passes, click MERGE in the dashboard.'));
     console.log('');
 
     // Auto-trigger review & test (respecting circuit breaker)

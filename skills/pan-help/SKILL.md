@@ -54,7 +54,7 @@ Panopticon is a multi-agent orchestration framework for AI coding assistants. Th
 | `pan tell <id> <msg>` | Send message to running agent | `pan tell PAN-3 "Check tests"` |
 | `pan kill <id>` | Stop a running agent | `pan kill PAN-3` |
 | `pan review pending` | Show completed work awaiting review | `pan review pending` |
-| `pan approve <id>` | Approve work, merge MR, update tracker | `pan approve PAN-3` |
+| Dashboard MERGE | Merge reviewed work via dashboard button | Click MERGE when `readyForMerge` |
 | `pan issues` | List issues from configured trackers | `pan issues` |
 | `pan recover <id>` | Recover crashed agent | `pan recover PAN-3` |
 | `pan health check` | Check agent health | `pan health check` |
