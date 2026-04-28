@@ -29,7 +29,7 @@ Display workspace details in this exact format:
 |--------|---------|
 | **Watch agent** | `tmux attach -t agent-{issue-id-lowercase}` |
 | **Send feedback** | `pan tell {ISSUE_ID} "your message"` |
-| **Approve & merge** | `pan approve {ISSUE_ID}` |
+| **Merge** | Dashboard MERGE button |
 | Detach | `Ctrl+b` then `d` |
 | Kill | `tmux kill-session -t agent-{issue-id-lowercase}` |
 | Resources | `htop` or `watch -n 5 'free -h'` |

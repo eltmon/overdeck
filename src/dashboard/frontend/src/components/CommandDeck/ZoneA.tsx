@@ -14,7 +14,6 @@ import { ZoneActionStrip } from './ZoneActionStrip';
 interface ZoneAProps {
   issueId: string;
   title: string;
-  cost?: number;
   source?: string;
   url?: string;
   onOpenBeads?: () => void;
@@ -29,7 +28,6 @@ interface ZoneAProps {
 export function ZoneA({
   issueId,
   title,
-  cost,
   source,
   url,
   onOpenBeads,
@@ -42,7 +40,6 @@ export function ZoneA({
       <IssueHeader
         issueId={issueId}
         title={title}
-        cost={cost}
         source={source}
         url={url}
         onOpenBeads={onOpenBeads}

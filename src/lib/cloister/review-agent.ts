@@ -1284,6 +1284,28 @@ export async function dispatchParallelReview(
     ) => Promise<{ sessionName: string }>;
   } = {},
 ): Promise<{ success: boolean; message: string; error?: string }> {
+  // ── Idempotency guard ────────────────────────────────────────────────────
+  // Check if a review coordinator is already running for this issue. Without
+  // this, multiple dispatch calls (dashboard restart, manual trigger, deacon
+  // patrol) spawn duplicate coordinators, each spawning its own set of
+  // reviewer agents — doubling or tripling the cost.
+  try {
+    const sessions = await listSessionNamesAsync();
+    const existingCoordinator = sessions.find(
+      (s) => s.startsWith(`review-coordinator-${opts.issueId}-`),
+    );
+    if (existingCoordinator) {
+      console.log(`[review-agent] Idempotency guard: coordinator ${existingCoordinator} already running for ${opts.issueId} — skipping dispatch`);
+      return {
+        success: true,
+        message: `Review already in progress: ${existingCoordinator}`,
+      };
+    }
+  } catch (err) {
+    // tmux check failed — proceed with dispatch rather than blocking
+    console.warn(`[review-agent] Idempotency check failed for ${opts.issueId}, proceeding:`, err);
+  }
+
   // Archive feedback from any previous review cycle so the work agent only
   // sees current-cycle feedback when it reads .planning/feedback/.
   try {
@@ -1387,10 +1409,12 @@ export async function spawnReviewCoordinatorSession(opts: {
   workspace: string;
 }): Promise<{ sessionName: string }> {
   const sessionName = `review-coordinator-${opts.issueId}-${Date.now()}`;
-  // `pan review run` is globally installed (via npm link or the release).
-  // We wrap in `bash -lc` so PATH and nvm init run; `|| true` on exit so tmux
-  // does not retain the session with a non-zero exit (keeps teardown clean).
-  const command = `bash -lc 'pan review run ${opts.issueId} || true; exit'`;
+  const logDir = join(opts.workspace, '.pan', 'review', 'coordinator');
+  await mkdir(logDir, { recursive: true });
+  const logStem = `${opts.issueId}-${Date.now()}`;
+  const logFile = join(logDir, `${logStem}.log`);
+  const exitCodeFile = join(logDir, `${logStem}.exit`);
+  const command = `bash -lc 'set -o pipefail; pan review run ${opts.issueId} 2>&1 | tee -a "${logFile}"; status=\${PIPESTATUS[0]}; printf "%s\\n" "$status" > "${exitCodeFile}"; printf "\\n[pan review run exit %s at %s]\\n" "$status" "$(date -Is)" >> "${logFile}"; exit "$status"'`;
   await createSessionAsync(sessionName, opts.workspace, command, {
     env: {
       PANOPTICON_AGENT_ID: '',
@@ -1398,6 +1422,12 @@ export async function spawnReviewCoordinatorSession(opts: {
       PANOPTICON_SESSION_TYPE: '',
     },
   });
+  try {
+    await setOptionAsync(sessionName, 'remain-on-exit', 'on');
+  } catch (err) {
+    console.warn(`[review-agent] Failed to set remain-on-exit on ${sessionName}: ${err instanceof Error ? err.message : err}`);
+  }
+  console.log(`[review-agent] Review coordinator spawned for ${opts.issueId}: ${sessionName}, log=${logFile}`);
   return { sessionName };
 }
 

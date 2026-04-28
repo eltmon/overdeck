@@ -317,10 +317,7 @@ curl -s http://localhost:3011/api/review/PAN-{ID}/status | jq .
 }
 ```
 
-At this point, the user can click "Approve & Merge" in the dashboard or run:
-```bash
-pan approve PAN-{ID}
-```
+At this point, the user clicks **MERGE** in the dashboard.
 
 ## Intervention Protocol
 

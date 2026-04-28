@@ -23,7 +23,7 @@ const MIGRATION_TABLE: Array<{ legacy: string; current: string }> = [
   { legacy: 'pan work resume <id>', current: 'pan resume <id>' },
   { legacy: 'pan work recover <id>', current: 'pan recover <id>' },
   { legacy: 'pan work done <id>', current: 'pan done <id>' },
-  { legacy: 'pan work approve <id>', current: 'pan approve <id>' },
+  { legacy: 'pan work approve <id>', current: 'Dashboard MERGE button' },
   { legacy: 'pan work reopen <id>', current: 'pan reopen <id>' },
   { legacy: 'pan work wipe <id>', current: 'pan wipe <id>' },
   { legacy: 'pan work sync-main <id>', current: 'pan sync-main <id>' },

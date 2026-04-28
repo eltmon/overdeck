@@ -221,6 +221,14 @@ function hasRecentActivity(lastActivity: number | null): boolean {
   return lastActivity !== null && Number.isFinite(lastActivity) && (Date.now() - lastActivity) < RECENT_ACTIVITY_WINDOW_MS;
 }
 
+function isLiveResource(issue: MutableResourceIssue): boolean {
+  return issue.resourceDetails.tmuxSessions.length > 0
+    || issue.resourceDetails.dockerContainers.length > 0
+    || issue.resourceDetails.prs.length > 0
+    || issue.agentStatus === 'active'
+    || hasRecentActivity(issue.lastActivity);
+}
+
 async function loadTrackerIssues(): Promise<Map<string, TrackerIssueRecord>> {
   const map = new Map<string, TrackerIssueRecord>();
   try {
@@ -533,8 +541,23 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
     issue.lastActivity = Number.isFinite(lastActivity) ? lastActivity : null;
   }));
 
+  // PRD acceptance (PAN-862): tree shows ONLY issues that are tracker-active
+  // (in_progress / in_review / ready-for-merge) OR have live runtime resources
+  // (tmux session, docker container, open PR). A lingering feature/* branch or
+  // workspace directory alone is debris from a merged issue — not active work.
+  const isActiveTrackerState = (state: string | null): boolean =>
+    state === 'in_progress' || state === 'in_review' || state === 'started';
+
+  const isLiveResource = (issue: MutableResourceIssue): boolean => {
+    if (issue.resourceDetails.tmuxSessions.length > 0) return true;
+    if (issue.resourceDetails.dockerContainers.length > 0) return true;
+    if (issue.resourceDetails.prs.some((pr) => pr.state === 'OPEN' || pr.state === 'open')) return true;
+    return false;
+  };
+
   const discoveredIssues = [...issueMap.values()]
     .filter((issue) => issue.resourceSources.size > 0)
+    .filter((issue) => issue.readyForMerge || isActiveTrackerState(issue.trackerState) || isLiveResource(issue))
     .map((issue) => {
         const hasTmux = issue.resourceDetails.tmuxSessions.length > 0;
         const hasRecentHeartbeat = hasRecentActivity(issue.lastActivity);

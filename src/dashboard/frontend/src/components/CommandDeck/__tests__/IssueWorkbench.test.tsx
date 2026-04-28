@@ -60,7 +60,7 @@ vi.mock('../IssueComposer', () => ({
 // IssueWorkbench test stays focused on selection arbitration.
 vi.mock('../ZoneCOverviewTabs/queries', () => ({
   usePlanningQuery: () => ({ data: undefined, isLoading: false }),
-  usePlanningSummaryQuery: () => ({ data: { hasPrd: false, hasState: false }, isLoading: false }),
+  usePlanningSummaryQuery: () => ({ data: { hasPrd: false, hasState: false, hasInference: false }, isLoading: false }),
   useActivityQuery: () => ({ data: { issueId: '', sections: [] }, isLoading: false }),
   useIssueCostsQuery: () => ({ data: undefined, isLoading: false, isError: false }),
   useReviewStatusQuery: () => ({ data: undefined, isLoading: false, isError: false }),

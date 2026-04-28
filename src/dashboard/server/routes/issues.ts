@@ -46,6 +46,8 @@ import { IssueDataService } from '../services/issue-data-service.js';
 import { getSharedIssueService } from '../services/issue-service-singleton.js';
 import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
+import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
+import { getCachedRunningAgents } from '../services/running-agents-cache.js';
 import { invalidateAgentsCache } from './agents.js';
 import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js';
 import { LinearClient } from '../services/linear-client.js';
@@ -2022,26 +2024,27 @@ const postIssueCloseOutRoute = HttpRouter.add(
     const result = yield* Effect.promise(() => closeOut(ctx));
 
     if (result.success) {
-      yield* eventStore.append({
-        type: 'issue.statusChanged',
-        timestamp: new Date().toISOString(),
-        payload: { issueId: id, status: 'Done', canonicalStatus: 'done' },
-      });
-
       // Patch cached labels immediately so the board hides the issue right away
       // without waiting for the background tracker refresh.
+      let newLabels: string[] = ['closed-out'];
       try {
         const cachedIssues = issueDataService.getIssues();
         const cachedIssue = cachedIssues.find(
           (i: any) => (i.identifier || '').toUpperCase() === id.toUpperCase()
         );
         const currentLabels: string[] = cachedIssue?.labels || [];
-        const newLabels = [
+        newLabels = [
           ...currentLabels.filter((l: string) => !['in-review', 'in-progress', 'needs-close-out'].includes(l.toLowerCase())),
           'closed-out',
         ];
         issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done', labels: newLabels });
       } catch { /* non-fatal */ }
+
+      yield* eventStore.append({
+        type: 'issue.statusChanged',
+        timestamp: new Date().toISOString(),
+        payload: { issueId: id, status: 'Done', canonicalStatus: 'done', labels: newLabels },
+      });
 
       // Refresh tracker data in background so cache stays consistent
       issueDataService.invalidateTracker('github').catch(() => {});
@@ -2118,7 +2121,8 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
       return jsonResponse({ error: 'Content-Type must be application/json' }, { status: 400 });
     }
 
-    const body = yield* Effect.promise(() => request.json().catch(() => ({})));
+    const text = yield* request.text;
+    const body: Record<string, unknown> = (() => { try { return text ? JSON.parse(text) : {}; } catch { return {}; } })();
     const rawIssueIds = Array.isArray(body.issueIds) ? body.issueIds : [];
     const issueIds = [...new Set(rawIssueIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0))];
 
@@ -2226,16 +2230,26 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
       });
 
       if (closeResult.success) {
-        yield* eventStore.append({
-          type: 'issue.statusChanged',
-          timestamp: new Date().toISOString(),
-          payload: { issueId: id, status: 'Done', canonicalStatus: 'done' },
-        });
+        let newLabels: string[] = ['closed-out'];
         try {
-          issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done' });
+          const cachedIssues = issueDataService.getIssues();
+          const cachedIssue = cachedIssues.find(
+            (i: any) => (i.identifier || '').toUpperCase() === id.toUpperCase()
+          );
+          const currentLabels: string[] = cachedIssue?.labels || [];
+          newLabels = [
+            ...currentLabels.filter((l: string) => !['in-review', 'in-progress', 'needs-close-out'].includes(l.toLowerCase())),
+            'closed-out',
+          ];
+          issueDataService.patchIssue(id, { status: 'Done', canonicalStatus: 'done', labels: newLabels });
         } catch (e) {
           console.error('Failed to patch issue status:', e);
         }
+        yield* eventStore.append({
+          type: 'issue.statusChanged',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: id, status: 'Done', canonicalStatus: 'done', labels: newLabels },
+        });
       }
 
       const failedStep = closeResult.steps.find((s: StepResult) => !s.success);
@@ -3082,13 +3096,21 @@ const getIssueCostsRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    syncCache();
     const issueData = getCostsForIssue(id);
+    const agents = yield* Effect.promise(() => getCachedRunningAgents());
+    const resolvedCost = resolveIssueHeadlineCost({
+      issueId: id,
+      aggregateCost: issueData?.totalCost,
+      agents,
+    });
 
     if (!issueData) {
       return jsonResponse({
         issueId: id.toUpperCase(),
         totalCost: 0,
+        resolvedTotalCost: resolvedCost.resolvedTotalCost,
+        aggregateCost: resolvedCost.aggregateCost,
+        liveCost: resolvedCost.liveCost,
         totalTokens: 0,
         inputTokens: 0,
         outputTokens: 0,
@@ -3107,6 +3129,9 @@ const getIssueCostsRoute = HttpRouter.add(
     return jsonResponse({
       issueId: id.toUpperCase(),
       totalCost: issueData.totalCost,
+      resolvedTotalCost: resolvedCost.resolvedTotalCost,
+      aggregateCost: resolvedCost.aggregateCost,
+      liveCost: resolvedCost.liveCost,
       totalTokens: issueData.inputTokens + issueData.outputTokens + issueData.cacheReadTokens + issueData.cacheWriteTokens,
       inputTokens: issueData.inputTokens,
       outputTokens: issueData.outputTokens,
