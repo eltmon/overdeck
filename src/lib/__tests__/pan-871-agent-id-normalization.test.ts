@@ -89,4 +89,12 @@ describe('agent ID normalization (PAN-871)', () => {
     expect(agents[0].id).toBe('agent-pan-871');
     expect(agents[0].tmuxActive).toBe(true);
   });
+
+  it('treats corrupted state.json as missing', async () => {
+    const { existsSync, readFileSync } = await import('fs');
+    vi.mocked(existsSync).mockImplementation((path: string) => String(path).includes('agent-pan-bad/state.json'));
+    vi.mocked(readFileSync).mockImplementation(() => '{bad json');
+
+    expect(getAgentState('PAN-BAD')).toBeNull();
+  });
 });
