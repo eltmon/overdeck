@@ -449,24 +449,8 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     [handleSubmit],
   );
 
-  const addressingLine = conversation.tmuxSession
-    ? `addressing: ${conversation.tmuxSession}`
-    : `addressing: ${conversation.name}`;
-
   return (
     <div className={styles.composerFooter}>
-      {/* Addressing line (PAN-830 blocker-2) */}
-      <div
-        style={{
-          padding: '2px 8px',
-          fontSize: 11,
-          color: 'var(--mc-text-muted, var(--muted-foreground))',
-          fontFamily: 'var(--font-mono, monospace)',
-          letterSpacing: '-0.02em',
-        }}
-      >
-        {addressingLine}
-      </div>
       {/* Single unified container — T3Chat style */}
       <div className={styles.composerBox} onDrop={handleDrop} onDragOver={handleDragOver}>
         {pendingImages.length > 0 && (
