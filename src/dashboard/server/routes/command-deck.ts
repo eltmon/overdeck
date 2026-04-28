@@ -96,6 +96,11 @@ const costCache = new Map<string, { timestamp: number; data: { totalCost: number
 const COST_CACHE_TTL_MS = 30_000; // 30 seconds
 const stashCountCache = new Map<string, { timestamp: number; count: number }>();
 const STASH_COUNT_CACHE_TTL_MS = 60_000; // 60 seconds
+const runningAgentsCache = new Map<string, {
+  timestamp: number;
+  agents: Awaited<ReturnType<typeof listRunningAgentsAsync>>;
+}>();
+const RUNNING_AGENTS_CACHE_TTL_MS = 3_000; // 3 seconds
 
 /** Evict expired entries from a TTL cache Map to prevent unbounded growth. */
 function sweepExpired<T extends { timestamp: number }>(cache: Map<string, T>, ttlMs: number): void {
@@ -119,6 +124,19 @@ function setProjectPathCache(issuePrefix: string, path: string): string {
     }
   }
   return path;
+}
+
+async function getCachedRunningAgents(issueId: string): Promise<Awaited<ReturnType<typeof listRunningAgentsAsync>>> {
+  const cacheKey = issueId.toUpperCase();
+  sweepExpired(runningAgentsCache, RUNNING_AGENTS_CACHE_TTL_MS);
+  const cached = runningAgentsCache.get(cacheKey);
+  if (cached && cached.timestamp > Date.now() - RUNNING_AGENTS_CACHE_TTL_MS) {
+    return cached.agents;
+  }
+
+  const agents = await listRunningAgentsAsync();
+  runningAgentsCache.set(cacheKey, { timestamp: Date.now(), agents });
+  return agents;
 }
 
 function getProjectPath(issuePrefix?: string): string {
@@ -554,7 +572,7 @@ export async function fetchActivityDataWithContext(
       costCache.set(cacheKey, { timestamp: Date.now(), data: { totalCost: aggregateCost, costByStage } });
     }
 
-    const agents = await listRunningAgentsAsync();
+    const agents = includeTranscripts ? await listRunningAgentsAsync() : await getCachedRunningAgents(issueId);
     const resolvedCost = resolveIssueHeadlineCost({
       issueId,
       aggregateCost,
@@ -646,6 +664,9 @@ async function fetchPlanningData(
         acceptanceProgress: result.acceptanceProgress,
         stashCount: result.stashCount,
         statusReviewedAt: result.statusReviewedAt,
+        transcriptCount: 0,
+        discussionCount: 0,
+        noteCount: 0,
       };
     }
     return result;
@@ -738,6 +759,9 @@ async function fetchPlanningData(
       acceptanceProgress: result.acceptanceProgress,
       stashCount: result.stashCount,
       statusReviewedAt: result.statusReviewedAt,
+      transcriptCount: result.transcripts.length,
+      discussionCount: result.discussions.length,
+      noteCount: result.notes.length,
     };
   }
 

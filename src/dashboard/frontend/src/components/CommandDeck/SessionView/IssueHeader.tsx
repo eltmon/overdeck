@@ -1,52 +1,20 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { ListTodo, FileText, RefreshCw, ExternalLink, AlertTriangle, ShieldCheck, Package } from 'lucide-react';
 import type { ReviewStatus } from '../../inspector/types';
 import { isReviewPipelineStuck } from '../../../lib/pipeline-state';
 import { ActivitySparkline, type SparklineEvent } from '../ActivitySparkline';
+import {
+  useActivityQuery,
+  usePlanningQuery,
+  usePlanningSummaryWithOverridesQuery,
+  useReviewStatusQuery,
+  type PlanningResponse,
+} from '../ZoneCOverviewTabs/queries';
 import styles from '../styles/command-deck.module.css';
 
-interface PlanningData {
-  prd?: string;
-  state?: string;
-  inference?: string;
-  statusReview?: string;
-  statusReviewedAt?: string;
-  transcripts: Array<{ filename: string; content: string; uploadedAt: string }>;
-  discussions: Array<{ filename: string; content: string; syncedAt: string }>;
-  notes: Array<{ filename: string; content: string; uploadedAt: string }>;
-  acceptanceProgress?: { completed: number; total: number; percent: number };
-  stashCount?: number;
-}
+type PlanningData = PlanningResponse;
 
-interface ActivitySection {
-  type: string;
-  startedAt: string;
-  status: string;
-}
-
-interface ActivityData {
-  sections: ActivitySection[];
-  resolvedTotalCost?: number | null;
-}
-
-async function fetchPlanning(issueId: string): Promise<PlanningData> {
-  const res = await fetch(`/api/command-deck/planning/${issueId}`);
-  if (!res.ok) throw new Error('Failed to fetch planning');
-  return res.json();
-}
-
-async function fetchReviewStatus(issueId: string): Promise<ReviewStatus> {
-  const res = await fetch(`/api/review/${issueId}/status`);
-  if (!res.ok) throw new Error('Failed to fetch review status');
-  return res.json();
-}
-
-async function fetchActivity(issueId: string): Promise<ActivityData> {
-  const res = await fetch(`/api/command-deck/activity/${issueId}`);
-  if (!res.ok) throw new Error('Failed to fetch activity');
-  return res.json();
-}
+type PlanningStageData = Pick<PlanningData, 'prd' | 'state'>;
 
 interface IssueHeaderProps {
   issueId: string;
@@ -90,7 +58,7 @@ function StageDot({ label, stage }: StageDotProps) {
 /** Derive the six stage statuses from review status + planning state (PAN-830 high-2). */
 function deriveStageStatuses(
   reviewStatus: ReviewStatus | undefined,
-  planning: PlanningData | undefined,
+  planning: PlanningStageData | undefined,
 ): Array<{ label: string; stage: StageStatus }> {
   const merged = reviewStatus?.mergeStatus === 'merged';
   const hasPlan = !!planning?.prd || !!planning?.state;
@@ -166,23 +134,25 @@ function formatCost(cost: number): string {
 export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderProps) {
   const [syncing, setSyncing] = useState(false);
 
-  const { data: planning } = useQuery({
-    queryKey: ['command-deck-planning', issueId],
-    queryFn: () => fetchPlanning(issueId),
-    refetchInterval: 30000,
+  const planningSummary = usePlanningSummaryWithOverridesQuery(issueId, {
+    staleTime: 30_000,
+  });
+  const reviewStatusQuery = useReviewStatusQuery(issueId);
+  const activityQuery = useActivityQuery(issueId);
+
+  const shouldLoadPlanningDetail =
+    (planningSummary.data?.transcriptCount ?? 0) > 0
+    || (planningSummary.data?.discussionCount ?? 0) > 0
+    || (planningSummary.data?.noteCount ?? 0) > 0
+    || false;
+
+  const planningDetail = usePlanningQuery(issueId, {
+    enabled: shouldLoadPlanningDetail,
   });
 
-  const { data: reviewStatus } = useQuery({
-    queryKey: ['review-status', issueId],
-    queryFn: () => fetchReviewStatus(issueId),
-    refetchInterval: 10000,
-  });
-
-  const { data: activity } = useQuery({
-    queryKey: ['command-deck-activity', issueId],
-    queryFn: () => fetchActivity(issueId),
-    refetchInterval: 30000,
-  });
+  const planning = planningDetail.data;
+  const reviewStatus = reviewStatusQuery.data as ReviewStatus | undefined;
+  const activity = activityQuery.data;
 
   const handleSync = async () => {
     setSyncing(true);
@@ -199,7 +169,16 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
     }
   };
 
-  const stageStatuses = useMemo(() => deriveStageStatuses(reviewStatus, planning), [reviewStatus, planning]);
+  const planningForStageStatus = planning ?? (
+    planningSummary.data?.hasPrd || planningSummary.data?.hasState
+      ? { prd: planningSummary.data.hasPrd ? 'present' : undefined, state: planningSummary.data.hasState ? 'present' : undefined }
+      : undefined
+  );
+
+  const stageStatuses = useMemo(
+    () => deriveStageStatuses(reviewStatus, planningForStageStatus),
+    [reviewStatus, planningForStageStatus],
+  );
   const stuck = isReviewPipelineStuck(reviewStatus ?? undefined);
 
   // Activity sparkline events from session sections (PAN-847)
@@ -223,8 +202,8 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
       .filter((e) => !Number.isNaN(e.timestamp));
   }, [activity]);
 
-  const ac = planning?.acceptanceProgress;
-  const stashCount = planning?.stashCount ?? 0;
+  const ac = planningSummary.data?.acceptanceProgress;
+  const stashCount = planningSummary.data?.stashCount ?? 0;
   const resolvedTotalCost = activity?.resolvedTotalCost ?? null;
 
   // Quality-gate indicator from verification status (PAN-847)
@@ -416,13 +395,16 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
           <button
             className={styles.issueHeaderBtn}
             onClick={() => {
-              const content = planning!.discussions.map(d => `## ${d.filename}\n\n${d.content}`).join('\n\n---\n\n');
-              alert(`Discussions (${planning!.discussions.length})\n\n${content}`);
+              const discussions = planning?.discussions ?? [];
+              const content = discussions
+                .map((d) => `## ${d.filename ?? 'Discussion'}\n\n${d.content ?? ''}`)
+                .join('\n\n---\n\n');
+              alert(`Discussions (${discussions.length})\n\n${content}`);
             }}
             title="View discussions"
           >
             Discussions
-            <span className={styles.issueHeaderBadge}>{planning!.discussions.length}</span>
+            <span className={styles.issueHeaderBadge}>{planning?.discussions?.length ?? 0}</span>
           </button>
         )}
 
@@ -430,13 +412,16 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
           <button
             className={styles.issueHeaderBtn}
             onClick={() => {
-              const content = planning!.transcripts.map(t => `## ${t.filename}\n\n${t.content}`).join('\n\n---\n\n');
-              alert(`Transcripts (${planning!.transcripts.length})\n\n${content}`);
+              const transcripts = planning?.transcripts ?? [];
+              const content = transcripts
+                .map((t) => `## ${t.filename ?? 'Transcript'}\n\n${t.content ?? ''}`)
+                .join('\n\n---\n\n');
+              alert(`Transcripts (${transcripts.length})\n\n${content}`);
             }}
             title="View transcripts"
           >
             Transcripts
-            <span className={styles.issueHeaderBadge}>{planning!.transcripts.length}</span>
+            <span className={styles.issueHeaderBadge}>{planning?.transcripts?.length ?? 0}</span>
           </button>
         )}
 
