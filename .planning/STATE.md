@@ -3,7 +3,7 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementation in progress. Completed pan-l4wu (schema), pan-91h1 (readyForMerge), pan-zg92 (webhook route), pan-4c7b (frontend types), pan-vwrn (smee client), and webhook handlers (pan-ygsc, pan-umby, pan-kjni). Next up: pan-ktn2 (smee lifecycle integration), pan-vb4m (GitHub app manifest), pan-8wl8 (vision doc), or remaining frontend beads.
+Backend infrastructure complete. Moving to frontend: pipeline stepper (4th Merge step, CI sub-statuses, retry count, queue position), Awaiting Merge filtering, and blocker surfacing.
 
 ## Completed Work
 - [x] pan-l4wu: Add blockerReasons[] column to review_status SQLite schema (commit: bcb7f958)
@@ -16,9 +16,9 @@ Implementation in progress. Completed pan-l4wu (schema), pan-91h1 (readyForMerge
 - [x] pan-umby: Implement pull_request webhook event handler
 - [x] pan-kjni: Implement pull_request_review and review_thread webhook handlers
 - [x] pan-ktn2: Integrate smee-client lifecycle into pan up / pan down
+- [x] pan-vb4m: Update GitHub App manifest and create migration script for existing installs
 
 ## Remaining Work
-- [ ] pan-vb4m: Update GitHub App manifest and create migration script for existing installs
 - [ ] pan-267t: Add 4th Merge step to pipeline stepper in ReviewPipelineSection
 - [ ] pan-2tfi: Show individual CI check sub-statuses in the Merge step
 - [ ] pan-0pe6: Show mergeRetryCount and mergeNotes in the Merge step

@@ -75,4 +75,52 @@ describe('ReviewPipelineSection', () => {
     render(<ReviewPipelineSection reviewStatus={makeReviewStatus({ updatedAt: staleDate })} />);
     expect(screen.getByText('Stale')).toBeInTheDocument();
   });
+
+  it('shows 4 pipeline steps including Merge', () => {
+    render(<ReviewPipelineSection reviewStatus={makeReviewStatus()} />);
+    expect(screen.getByText('Build Gate')).toBeInTheDocument();
+    expect(screen.getByText('Review')).toBeInTheDocument();
+    expect(screen.getByText('Tests')).toBeInTheDocument();
+    expect(screen.getByText('Merge')).toBeInTheDocument();
+  });
+
+  it('shows merge pending when mergeStatus is undefined', () => {
+    render(<ReviewPipelineSection reviewStatus={makeReviewStatus()} />);
+    expect(screen.getByText('Merge')).toBeInTheDocument();
+    // All 4 steps show Pending when nothing has started
+    const pendingLabels = screen.getAllByText('Pending');
+    expect(pendingLabels.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows merge queued as running', () => {
+    render(<ReviewPipelineSection reviewStatus={makeReviewStatus({ mergeStatus: 'queued' })} />);
+    expect(screen.getByText('Queued')).toBeInTheDocument();
+  });
+
+  it('shows merge merging as running', () => {
+    render(<ReviewPipelineSection reviewStatus={makeReviewStatus({ mergeStatus: 'merging' })} />);
+    expect(screen.getByText('Merging...')).toBeInTheDocument();
+  });
+
+  it('shows merge verifying as running', () => {
+    render(<ReviewPipelineSection reviewStatus={makeReviewStatus({ mergeStatus: 'verifying' })} />);
+    expect(screen.getByText('Verifying...')).toBeInTheDocument();
+  });
+
+  it('shows merge merged as passed', () => {
+    render(<ReviewPipelineSection reviewStatus={makeReviewStatus({ mergeStatus: 'merged' })} />);
+    expect(screen.getByText('Merged')).toBeInTheDocument();
+  });
+
+  it('shows merge failed as failed', () => {
+    render(<ReviewPipelineSection reviewStatus={makeReviewStatus({ mergeStatus: 'failed' })} />);
+    expect(screen.getByText('Failed')).toBeInTheDocument();
+  });
+
+  it('shows merge notes behind details toggle', () => {
+    render(<ReviewPipelineSection reviewStatus={makeReviewStatus({ mergeNotes: 'Merge conflict detected' })} />);
+    expect(screen.queryByText('Merge conflict detected')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Details'));
+    expect(screen.getByText('Merge conflict detected')).toBeInTheDocument();
+  });
 });

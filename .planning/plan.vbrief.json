@@ -11,9 +11,9 @@
     "status": "approved",
     "uid": "f3a7c1e8-9d42-4b6f-a815-2e8f0c3d7a19",
     "author": "agent:claude-opus-4-6",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-04-28T18:00:00Z",
-    "updated": "2026-04-28T13:14:06.225Z",
+    "updated": "2026-04-28T13:22:57.096Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/905",
@@ -388,7 +388,7 @@
       {
         "id": "stepper-merge-step",
         "title": "Add 4th Merge step to pipeline stepper in ReviewPipelineSection",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {

@@ -22,6 +22,8 @@ export interface ReviewStatus {
   verificationMaxCycles?: number;
   reviewNotes?: string;
   testNotes?: string;
+  mergeNotes?: string;
+  mergeRetryCount?: number;
   updatedAt: string;
   readyForMerge: boolean;
   autoRequeueCount?: number;

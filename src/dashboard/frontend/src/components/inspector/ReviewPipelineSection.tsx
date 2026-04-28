@@ -63,6 +63,16 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
       isPassed: reviewStatus.testStatus === 'passed',
       isSkipped: reviewStatus.testStatus === 'skipped',
     },
+    {
+      key: 'merge',
+      label: 'Merge',
+      status: reviewStatus.mergeStatus ?? 'pending',
+      notes: reviewStatus.mergeNotes,
+      isRunning: reviewStatus.mergeStatus === 'queued' || reviewStatus.mergeStatus === 'merging' || reviewStatus.mergeStatus === 'verifying',
+      isFailed: reviewStatus.mergeStatus === 'failed',
+      isPassed: reviewStatus.mergeStatus === 'merged',
+      isSkipped: false,
+    },
   ];
 
   const hasAnyNotes = steps.some(s => s.notes);
@@ -223,6 +233,10 @@ function StatusLabel({ step }: { step: PipelineStep }) {
       case 'running': return 'Running...';
       case 'skipped': return 'Skipped';
       case 'dispatch_failed': return 'Dispatch Failed';
+      case 'queued': return 'Queued';
+      case 'merging': return 'Merging...';
+      case 'verifying': return 'Verifying...';
+      case 'merged': return 'Merged';
       default: return 'Pending';
     }
   })();
