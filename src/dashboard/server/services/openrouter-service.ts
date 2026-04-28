@@ -5,7 +5,7 @@
  * Fetches the full model catalog from the OpenRouter API and caches it in memory.
  */
 
-import { Effect, Layer, ServiceMap } from 'effect';
+import { Effect, Layer, Context } from 'effect';
 
 // ─── Domain types ─────────────────────────────────────────────────────────────
 
@@ -64,7 +64,7 @@ export interface OpenRouterServiceShape {
 
 // ─── Service tag ──────────────────────────────────────────────────────────────
 
-export class OpenRouterService extends ServiceMap.Service<
+export class OpenRouterService extends Context.Service<
   OpenRouterService,
   OpenRouterServiceShape
 >()('panopticon/dashboard/OpenRouterService') {}

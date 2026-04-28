@@ -5,7 +5,7 @@
  * services can call Linear via the typed-error channel instead of try/catch.
  */
 
-import { Duration, Effect, Layer, Schedule, ServiceMap } from 'effect';
+import { Duration, Effect, Layer, Schedule, Context } from 'effect';
 import { LinearClient as LinearSdkClient } from '@linear/sdk';
 import { getLinearApiKey } from './tracker-config.js';
 import {
@@ -115,7 +115,7 @@ export interface LinearClientShape {
 
 // ─── Service tag ──────────────────────────────────────────────────────────────
 
-export class LinearClient extends ServiceMap.Service<LinearClient, LinearClientShape>()(
+export class LinearClient extends Context.Service<LinearClient, LinearClientShape>()(
   'panopticon/dashboard/LinearClient',
 ) {}
 

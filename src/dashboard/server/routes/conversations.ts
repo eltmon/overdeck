@@ -1342,7 +1342,7 @@ const postConversationUploadImageRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
-    const multipart = yield* Effect.provideServices(
+    const multipart = yield* Effect.provideContext(
       request.multipart,
       Multipart.limitsServices({
         maxFileSize: MAX_UPLOAD_BYTES,

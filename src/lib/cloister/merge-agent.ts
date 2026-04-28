@@ -1786,7 +1786,7 @@ export async function syncMainIntoWorkspace(
   logActivity('sync_main_agent_woken', `Agent resolving ${conflictFiles.length} conflict(s) for ${issueId}`);
 
   // Poll tmux output for MERGE_RESULT markers
-  const tmuxSession = getTmuxSessionName('merge-agent', syncProjectKey ?? undefined);
+  const tmuxSession = syncWakeResult.tmuxSession ?? getTmuxSessionName('merge-agent', syncProjectKey ?? undefined, issueId);
   const startTime = Date.now();
   // Tests override via PANOPTICON_TEST_POLL_MS to avoid real 5-second waits.
   const POLL_INTERVAL = Number(process.env.PANOPTICON_TEST_POLL_MS) || 5000;

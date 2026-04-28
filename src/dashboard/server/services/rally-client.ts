@@ -5,7 +5,7 @@
  * with typed errors, consistent with LinearClient and GitHubClient.
  */
 
-import { Effect, Layer, ServiceMap } from 'effect';
+import { Effect, Layer, Context } from 'effect';
 import { getRallyConfig } from './tracker-config.js';
 import {
   IssueNotFound,
@@ -53,7 +53,7 @@ export interface RallyClientShape {
 
 // ─── Service tag ──────────────────────────────────────────────────────────────
 
-export class RallyClient extends ServiceMap.Service<RallyClient, RallyClientShape>()(
+export class RallyClient extends Context.Service<RallyClient, RallyClientShape>()(
   'panopticon/dashboard/RallyClient',
 ) {}
 
