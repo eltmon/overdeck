@@ -402,8 +402,8 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   resources: {
     memoryWarnGb: 4,
     memoryBlockGb: 2,
-    agentWarnCount: 5,
-    agentBlockCount: 6,
+    agentWarnCount: 8,
+    agentBlockCount: 10,
   },
 };
 
