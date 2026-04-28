@@ -15,9 +15,19 @@
     "created": "2026-04-28T18:00:00Z",
     "updated": "2026-04-28T18:00:00Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/913", "label": "PAN-913", "type": "issue" }
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/913",
+        "label": "PAN-913",
+        "type": "issue"
+      }
     ],
-    "tags": ["auth", "codex", "cliproxy", "dashboard", "ux"],
+    "tags": [
+      "auth",
+      "codex",
+      "cliproxy",
+      "dashboard",
+      "ux"
+    ],
     "narratives": {
       "Problem": "When Codex OAuth tokens expire or refresh tokens get burned, all gpt-5.4 agents fail with 503 auth_unavailable. Users have no visibility until agents start dying — the real cause is buried in cliproxy logs.",
       "Proposal": "Add proactive auth detection (JWT expiry + log monitoring), a dashboard banner with one-click re-auth via terminal panel (supporting both browser and device-auth for headless), spawn guardrails that block before wasting API credits, and auto-retry after successful re-authentication."
@@ -26,7 +36,7 @@
       {
         "id": "codex-auth-check",
         "title": "Create async checkCodexAuthStatus() utility",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -40,26 +50,34 @@
           {
             "id": "codex-auth-check.ac1",
             "title": "checkCodexAuthStatus() returns {status: 'valid', email, expiresAt} when token exp > now",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "codex-auth-check.ac2",
             "title": "checkCodexAuthStatus() returns {status: 'expired'} when token exp <= now",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "codex-auth-check.ac3",
             "title": "checkCodexAuthStatus() returns {status: 'missing'} when codex-primary.json doesn't exist",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "codex-auth-check.ac4",
             "title": "decodeJwtPayload is exported from cliproxy.ts and reused in codex-auth.ts (no duplication)",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -81,13 +99,17 @@
             "id": "cliproxy-log-monitor.ac1",
             "title": "Returns {status: 'burned'} when cliproxy.log contains 'refresh token has already been used' in last ~50 lines within the last hour",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "cliproxy-log-monitor.ac2",
             "title": "Falls back gracefully to JWT-only status when log file is missing or unreadable",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -109,19 +131,25 @@
             "id": "codex-auth-endpoint.ac1",
             "title": "GET /api/settings/codex-auth returns JSON with status field ('valid'|'expired'|'burned'|'missing')",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "codex-auth-endpoint.ac2",
             "title": "Route is mounted in server.ts and accessible from the dashboard",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "codex-auth-endpoint.ac3",
             "title": "No sync I/O (readFileSync, execSync) in the route handler",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -143,19 +171,25 @@
             "id": "spawn-guardrail-codex.ac1",
             "title": "Agent spawn returns 429 with descriptive error when Codex auth is expired/burned and the model requires codex provider",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "spawn-guardrail-codex.ac2",
             "title": "Spawn proceeds normally for non-codex models regardless of codex auth state",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "spawn-guardrail-codex.ac3",
             "title": "isCliproxyRunning() sync call in spawn path replaced with isCliproxyRunningAsync()",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -177,19 +211,25 @@
             "id": "reauth-endpoint.ac1",
             "title": "POST /api/settings/codex-reauth spawns a tmux session running 'codex login'",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "reauth-endpoint.ac2",
             "title": "Uses --device-auth flag when server has no DISPLAY or WAYLAND_DISPLAY",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "reauth-endpoint.ac3",
             "title": "Returns existing session if codex-reauth tmux session is already alive (idempotent)",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -211,19 +251,25 @@
             "id": "reauth-completion.ac1",
             "title": "GET /api/settings/codex-reauth/status returns {completed: false} while tmux session is alive",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "reauth-completion.ac2",
             "title": "Returns {completed: true, authStatus} after session exits, with tokens re-bridged",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "reauth-completion.ac3",
             "title": "No sync I/O in the completion check or re-bridge path",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -245,19 +291,25 @@
             "id": "codex-auth-banner.ac1",
             "title": "Banner appears when codex auth status is 'expired' or 'burned'",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "codex-auth-banner.ac2",
             "title": "Banner hides when codex auth status is 'valid' or 'missing'",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "codex-auth-banner.ac3",
             "title": "Re-authenticate button spawns reauth session and opens terminal panel",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -279,13 +331,17 @@
             "id": "codex-auth-polling.ac1",
             "title": "Hook polls GET /api/settings/codex-auth every ~120 seconds",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "codex-auth-polling.ac2",
             "title": "Hook is consumed by both CodexAuthBanner and SettingsPage",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -307,19 +363,25 @@
             "id": "settings-codex-status.ac1",
             "title": "Settings page shows 'Subscription OAuth' auth type for the Codex provider",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "settings-codex-status.ac2",
             "title": "Settings page shows live status (Valid/Expired) with email and expiry time",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "settings-codex-status.ac3",
             "title": "Re-authenticate button in settings triggers the same reauth flow as the banner",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -341,19 +403,25 @@
             "id": "auto-retry-spawn.ac1",
             "title": "When spawn fails due to codex auth, the original spawn parameters are retained in frontend state",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "auto-retry-spawn.ac2",
             "title": "After successful re-auth, the blocked spawn is automatically retried",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "auto-retry-spawn.ac3",
             "title": "User sees a toast notification about the automatic retry",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -375,31 +443,87 @@
             "id": "documentation.ac1",
             "title": "Documentation explains Codex is required for subscription (not API-key) mode",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "documentation.ac2",
             "title": "cliproxy SKILL.md updated with dashboard re-auth flow",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       }
     ],
     "edges": [
-      { "from": "codex-auth-check", "to": "cliproxy-log-monitor", "type": "blocks" },
-      { "from": "codex-auth-check", "to": "codex-auth-endpoint", "type": "blocks" },
-      { "from": "cliproxy-log-monitor", "to": "codex-auth-endpoint", "type": "blocks" },
-      { "from": "codex-auth-endpoint", "to": "spawn-guardrail-codex", "type": "blocks" },
-      { "from": "codex-auth-endpoint", "to": "reauth-endpoint", "type": "blocks" },
-      { "from": "codex-auth-endpoint", "to": "codex-auth-polling", "type": "blocks" },
-      { "from": "reauth-endpoint", "to": "reauth-completion", "type": "blocks" },
-      { "from": "codex-auth-polling", "to": "codex-auth-banner", "type": "blocks" },
-      { "from": "reauth-endpoint", "to": "codex-auth-banner", "type": "blocks" },
-      { "from": "codex-auth-polling", "to": "settings-codex-status", "type": "blocks" },
-      { "from": "reauth-completion", "to": "auto-retry-spawn", "type": "blocks" },
-      { "from": "spawn-guardrail-codex", "to": "auto-retry-spawn", "type": "blocks" },
-      { "from": "codex-auth-banner", "to": "documentation", "type": "informs" }
+      {
+        "from": "codex-auth-check",
+        "to": "cliproxy-log-monitor",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-auth-check",
+        "to": "codex-auth-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "cliproxy-log-monitor",
+        "to": "codex-auth-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-auth-endpoint",
+        "to": "spawn-guardrail-codex",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-auth-endpoint",
+        "to": "reauth-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-auth-endpoint",
+        "to": "codex-auth-polling",
+        "type": "blocks"
+      },
+      {
+        "from": "reauth-endpoint",
+        "to": "reauth-completion",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-auth-polling",
+        "to": "codex-auth-banner",
+        "type": "blocks"
+      },
+      {
+        "from": "reauth-endpoint",
+        "to": "codex-auth-banner",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-auth-polling",
+        "to": "settings-codex-status",
+        "type": "blocks"
+      },
+      {
+        "from": "reauth-completion",
+        "to": "auto-retry-spawn",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-guardrail-codex",
+        "to": "auto-retry-spawn",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-auth-banner",
+        "to": "documentation",
+        "type": "informs"
+      }
     ]
   }
 }
