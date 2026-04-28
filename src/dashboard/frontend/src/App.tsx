@@ -284,6 +284,15 @@ export default function App() {
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
 
+  useEffect(() => {
+    if (!selectedIssue) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedIssue(null);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [selectedIssue]);
+
   // Dashboard lifecycle state from event store (restart events)
   const dashboardLifecycle = useDashboardStore(selectDashboardLifecycle);
 
