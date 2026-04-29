@@ -34,9 +34,9 @@ vi.mock('../../../../src/lib/webhook-handlers.js', () => ({
   isTrackedRepository: vi.fn(() => true),
 }));
 
-const mockExistsSync = vi.mocked(existsSync);
-const mockReadFile = vi.mocked(readFile);
-const mockIsTrackedRepository = vi.mocked(isTrackedRepository);
+const mockExistsSync = existsSync as unknown as ReturnType<typeof vi.fn>;
+const mockReadFile = readFile as unknown as ReturnType<typeof vi.fn>;
+const mockIsTrackedRepository = isTrackedRepository as unknown as ReturnType<typeof vi.fn>;
 
 describe('verifySignature', () => {
   it('returns true for a valid HMAC-SHA256 signature', () => {

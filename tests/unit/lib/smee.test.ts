@@ -120,7 +120,8 @@ describe('startSmeeClient', () => {
     expect(isSmeeRunning()).toBe(false);
 
     // Advance past first retry delay (1s)
-    await vi.advanceTimersByTimeAsync(1_000);
+    vi.advanceTimersByTime(1_000);
+    await Promise.resolve();
     expect(mockStart).toHaveBeenCalledTimes(2);
 
     errorSpy.mockRestore();
@@ -141,7 +142,8 @@ describe('startSmeeClient', () => {
     expect(isSmeeRunning()).toBe(false);
 
     // Advance past first retry delay
-    await vi.advanceTimersByTimeAsync(1_000);
+    vi.advanceTimersByTime(1_000);
+    await Promise.resolve();
     expect(mockStart).toHaveBeenCalledTimes(2);
 
     logSpy.mockRestore();
@@ -158,7 +160,8 @@ describe('startSmeeClient', () => {
     // Trigger 5 retries
     for (let i = 0; i < 5; i++) {
       const delay = Math.min(1_000 * 2 ** i, 30_000);
-      await vi.advanceTimersByTimeAsync(delay);
+      vi.advanceTimersByTime(delay);
+      await Promise.resolve();
     }
 
     // 1 initial + 5 retries = 6 starts total
@@ -206,7 +209,8 @@ describe('stopSmeeClient', () => {
     await stopSmeeClient();
 
     // Advance time — no restart should fire
-    await vi.advanceTimersByTimeAsync(60_000);
+    vi.advanceTimersByTime(60_000);
+    await Promise.resolve();
     expect(mockStart).toHaveBeenCalledTimes(1);
 
     errorSpy.mockRestore();
