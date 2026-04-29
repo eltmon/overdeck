@@ -17,6 +17,7 @@ import { loadProjectsConfig, getIssuePrefix } from '../../../lib/projects.js';
 
 // ─── In-memory cache (populated at startup) ───────────────────────────────────
 let cachedEnvContent: string | null = null;
+let cachedTrackedRepos: Array<{ owner: string; repo: string; prefix?: string }> | null = null;
 
 export async function initTrackerConfigCache(): Promise<void> {
   try {
@@ -26,6 +27,19 @@ export async function initTrackerConfigCache(): Promise<void> {
     }
   } catch {
     // If read fails, leave cache as null; functions will fallback to env vars
+  }
+
+  try {
+    const projectsConfig = loadProjectsConfig();
+    cachedTrackedRepos = Object.values(projectsConfig.projects)
+      .flatMap((project) => {
+        if (!project.github_repo) return [];
+        const [owner, repo] = project.github_repo.split('/');
+        if (!owner || !repo) return [];
+        return [{ owner, repo, prefix: getIssuePrefix(project) ? getIssuePrefix(project) : undefined }];
+      });
+  } catch {
+    cachedTrackedRepos = null;
   }
 }
 
@@ -162,20 +176,9 @@ export function getGitHubConfig(): GitHubConfig | null {
   // 3. Check environment variable
   if (!token) token = process.env.GITHUB_TOKEN;
 
-  // 4. Auto-derive repos from projects.yaml if none explicitly configured
-  if (repos.length === 0) {
-    try {
-      const { projects } = loadProjectsConfig();
-      for (const [, project] of Object.entries(projects)) {
-        if (project.github_repo) {
-          const [owner, repo] = project.github_repo.split('/');
-          const prefix = getIssuePrefix(project) ? getIssuePrefix(project) : undefined;
-          if (owner && repo) {
-            repos.push({ owner, repo, prefix });
-          }
-        }
-      }
-    } catch { /* ignore — projects.yaml may not exist */ }
+  // 4. Auto-derive repos from startup-cached projects.yaml if none explicitly configured
+  if (repos.length === 0 && cachedTrackedRepos) {
+    repos = [...cachedTrackedRepos];
   }
 
   if (!token || repos.length === 0) return null;
