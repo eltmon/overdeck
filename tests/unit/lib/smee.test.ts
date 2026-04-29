@@ -157,11 +157,13 @@ describe('startSmeeClient', () => {
 
     await startSmeeClient();
 
-    // Trigger 5 retries
+    // Trigger 5 retries and fully drain the async restart chain after each step.
     for (let i = 0; i < 5; i++) {
       const delay = Math.min(1_000 * 2 ** i, 30_000);
       vi.advanceTimersByTime(delay);
-      await Promise.resolve();
+      for (let flush = 0; flush < 5; flush++) {
+        await Promise.resolve();
+      }
     }
 
     // 1 initial + 5 retries = 6 starts total
