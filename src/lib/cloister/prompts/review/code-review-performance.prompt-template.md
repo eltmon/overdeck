@@ -355,6 +355,6 @@ const html = parts.join('');
 
 After writing your review:
 1. Confirm the file was written successfully.
-2. **Display the full review markdown in this conversation.** Read the file you just wrote and paste its entire contents back as a fenced markdown block in your final response. This is required — it lets the work agent, dashboard conversation viewer, and tmux pane history show the findings without anyone having to open the file. Don't summarize; render the whole thing.
+2. **Display the full review markdown in this conversation.** Read the file you just wrote and paste its entire contents back **as plain markdown directly in your response — do NOT wrap it in a fenced code block** (no ```markdown ... ```). The dashboard renders your message as markdown, so the headings, lists, and code blocks inside your review render properly only when they aren't nested inside a code fence. This is required — it lets the work agent, dashboard conversation viewer, and tmux pane history show the findings without anyone having to open the file. Don't summarize; render the whole thing.
 3. Report completion status with issue count.
 4. Wait for synthesis agent to combine all reviews.
