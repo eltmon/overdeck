@@ -1059,12 +1059,18 @@ ${basePrompt}`;
     const innerScript = join(agentDir, 'run-claude.sh');
 
     // Inner script: the actual Claude invocation.
-    // ALL specialists start fresh sessions — no --resume. Reasons:
+    // Non-reviewer specialist dispatches start fresh — no --resume. Reasons:
     // 1. Context compaction corrupts thinking block signatures, making resumed sessions
     //    permanently fail with "Invalid signature in thinking block" (PAN-612)
-    // 2. Specialists are task-based: each dispatch is a new task with a full prompt
+    // 2. These dispatches are task-based: each is a new task with a full prompt
     // 3. Accumulated context caused false-FAILs in test-agent (stale analysis)
-    // Session ID is still deterministic per generation, so JSONL files are predictable.
+    // Session ID is randomized per dispatch so JSONL files don't collide.
+    //
+    // Reviewers (review-correctness/security/performance/requirements/synthesis)
+    // do NOT go through this path. They use PAN-830 canonical sessions in
+    // review-agent.ts that persist across rounds via tmux send-keys delivery
+    // — the Claude process stays alive between rounds so context (codebase
+    // patterns, prior findings, decisions) is preserved without --resume.
 
     // Caveman env exports for this specialist type.
     // inspect-agent is excluded: its INSPECTION PASSED/BLOCKED sentinels are parsed

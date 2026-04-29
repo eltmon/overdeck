@@ -256,6 +256,63 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         },
       }
 
+    // PAN-915 — event-driven reviewer sub-status. Avoids tmux polling in
+    // enrichReviewStatusFromSessions for the common case (reviewer dispatched).
+    case 'review.reviewer_started': {
+      const { issueId, role, sessionName } = event.payload
+      const existing = state.reviewStatusByIssueId[issueId]
+      const prevSubs = existing?.reviewSubStatuses ?? {}
+      const prevNames = existing?.reviewSessionNames ?? []
+      const nextNames = prevNames.includes(sessionName) ? prevNames : [...prevNames, sessionName]
+      const nextStatus: ReviewStatusSnapshot = {
+        ...(existing ?? { issueId }),
+        reviewSubStatuses: { ...prevSubs, [role]: 'running' },
+        reviewSessionNames: nextNames,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        reviewStatusByIssueId: { ...state.reviewStatusByIssueId, [issueId]: nextStatus },
+      }
+    }
+
+    case 'review.reviewer_completed': {
+      const { issueId, role } = event.payload
+      const existing = state.reviewStatusByIssueId[issueId]
+      if (!existing) return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+      const prevSubs = existing.reviewSubStatuses ?? {}
+      const nextStatus: ReviewStatusSnapshot = {
+        ...existing,
+        reviewSubStatuses: { ...prevSubs, [role]: 'done' },
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        reviewStatusByIssueId: { ...state.reviewStatusByIssueId, [issueId]: nextStatus },
+      }
+    }
+
+    case 'review.coordinator_started': {
+      const { issueId, sessionName } = event.payload
+      const existing = state.reviewStatusByIssueId[issueId]
+      const nextStatus: ReviewStatusSnapshot = {
+        ...(existing ?? { issueId }),
+        reviewCoordinatorSessionName: sessionName,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        reviewStatusByIssueId: { ...state.reviewStatusByIssueId, [issueId]: nextStatus },
+      }
+    }
+
+    case 'pipeline.review-started':
+    case 'pipeline.review-completed':
+    case 'pipeline.test-started':
+    case 'pipeline.test-completed':
+      // Handled by review.status_changed; sequence-only update keeps clients in lockstep.
+      return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+
     case 'merge.ready':
       return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 

@@ -936,16 +936,44 @@ export async function runParallelReview(
       }
       spawnedCount++;
     }
+
+    // PAN-915 — event-driven reviewer status. Both spawn and resume paths
+    // emit so the dashboard reflects per-role "running" the instant we
+    // dispatch, without waiting for the next snapshot rebuild or tmux poll.
+    try {
+      const { notifyPipeline } = await import('../pipeline-notifier.js');
+      notifyPipeline({
+        type: 'reviewer_started',
+        issueId: context.issueId,
+        role: agent.name,
+        sessionName,
+      });
+    } catch {
+      // Non-fatal: event emission is best-effort
+    }
   }));
 
   console.log(`[review-agent] Reviewer sessions ready for review ${reviewId} (spawned=${spawnedCount}, resumed=${resumedCount})`);
   emitActivityEntry({ source: 'review-specialist', level: 'info', message: `${context.issueId} — ${reviewerSessions.length} reviewer(s) ready (spawned=${spawnedCount}, resumed=${resumedCount})`, issueId: context.issueId });
 
   // ── Phase 2: Wait for all reviewers ───────────────────────────────────────
+  // PAN-915 — emit reviewer_completed as each reviewer's output file lands
+  // so the dashboard flips that role to 'done' without polling tmux.
+  const emitReviewerCompleted = async (role: string) => {
+    try {
+      const { notifyPipeline } = await import('../pipeline-notifier.js');
+      notifyPipeline({ type: 'reviewer_completed', issueId: context.issueId, role });
+    } catch {
+      // Non-fatal: event emission is best-effort
+    }
+  };
   let reviewerResults = await Promise.all(
     reviewerSessions.map(({ sessionName, outputFile, role }) =>
       waitFn(sessionName, outputFile, REVIEW_TIMEOUT_MS)
-        .then(status => ({ role, status, outputFile, sessionName })),
+        .then(async status => {
+          if (status === 'completed') await emitReviewerCompleted(role);
+          return { role, status, outputFile, sessionName };
+        }),
     ),
   );
 
@@ -980,6 +1008,16 @@ export async function runParallelReview(
         continue;
       }
       try { await setOptionAsync(failed.sessionName, 'remain-on-exit', 'on'); } catch { /* ignore */ }
+      // PAN-915 — respawned reviewer is running again
+      try {
+        const { notifyPipeline } = await import('../pipeline-notifier.js');
+        notifyPipeline({
+          type: 'reviewer_started',
+          issueId: context.issueId,
+          role: failed.role,
+          sessionName: failed.sessionName,
+        });
+      } catch { /* non-fatal */ }
       retryable.push(failed);
     }
 
@@ -987,7 +1025,10 @@ export async function runParallelReview(
       const retryResults = await Promise.all(
         retryable.map(({ sessionName, outputFile, role }) =>
           waitFn(sessionName, outputFile, REVIEW_TIMEOUT_MS)
-            .then(status => ({ role, status, outputFile, sessionName })),
+            .then(async status => {
+              if (status === 'completed') await emitReviewerCompleted(role);
+              return { role, status, outputFile, sessionName };
+            }),
         ),
       );
       // Merge retry results back into the main result set
@@ -1499,6 +1540,15 @@ export async function spawnReviewCoordinatorSession(opts: {
     console.warn(`[review-agent] Failed to set remain-on-exit on ${sessionName}: ${err instanceof Error ? err.message : err}`);
   }
   console.log(`[review-agent] Review coordinator spawned for ${opts.issueId}: ${sessionName}, log=${logFile}`);
+  // PAN-915 — surface coordinator session in the dashboard event-driven so
+  // the kanban card shows "review in progress" the instant the coordinator
+  // starts, without waiting for the next snapshot tmux poll.
+  try {
+    const { notifyPipeline } = await import('../pipeline-notifier.js');
+    notifyPipeline({ type: 'coordinator_started', issueId: opts.issueId, sessionName });
+  } catch {
+    // Non-fatal: event emission is best-effort
+  }
   return { sessionName };
 }
 

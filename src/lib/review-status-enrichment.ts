@@ -62,6 +62,16 @@ export async function enrichReviewStatus(
 /**
  * Batch variant — caller supplies the tmux session list (one tmux call for N issues).
  * Used by the snapshot bootstrap to avoid per-issue tmux calls on client connect.
+ *
+ * PAN-915 — defensive fallback only. Event-driven reducers (`review.reviewer_started`
+ * / `review.reviewer_completed` / `review.coordinator_started`) are now the
+ * primary source of `reviewSubStatuses` and `reviewSessionNames`. This function
+ * runs during snapshot rebuild to backfill state for sessions that pre-date
+ * the events (e.g. server restart with reviewers already running).
+ *
+ * Recognizes two reviewer session naming schemes:
+ *   - PAN-830 canonical:  `specialist-<projectKey>-<issueId>-review-<role>`
+ *   - Legacy (timestamped): `review-<issueId>-<timestamp>-<role>`
  */
 export function enrichReviewStatusFromSessions(
   issueId: string,
@@ -69,37 +79,66 @@ export function enrichReviewStatusFromSessions(
   allSessions: string[],
 ): EnrichedReviewStatus {
   const normalizedIssueId = issueId.toUpperCase();
-  const reviewerPrefix = `review-${normalizedIssueId}-`;
+  const legacyReviewerPrefix = `review-${normalizedIssueId}-`;
   const coordinatorPrefix = `review-coordinator-${normalizedIssueId}-`;
   const reviewCoordinatorSessionName = mostRecentByTimestamp(
     allSessions.filter(s => s.startsWith(coordinatorPrefix)),
     (sessionName) => parseTrailingTimestamp(coordinatorPrefix, sessionName),
   );
 
-  let reviewSessionNames = allSessions.filter(s => s.startsWith(reviewerPrefix));
-  if (reviewSessionNames.length > 0) {
+  // PAN-830 canonical pattern: specialist-<projectKey>-<issueId>-review-<role>
+  // (issueId case is preserved from caller — match case-insensitively)
+  const resolved = resolveProjectFromIssue(issueId);
+  const projectKey = resolved?.projectKey ?? null;
+  const canonicalSessions = projectKey
+    ? allSessions.filter(s => {
+        const lower = s.toLowerCase();
+        const expectedPrefix = `specialist-${projectKey.toLowerCase()}-${issueId.toLowerCase()}-review-`;
+        return lower.startsWith(expectedPrefix);
+      })
+    : [];
+
+  // Legacy pattern (PAN-821 and earlier): review-<issueId>-<timestamp>-<role>
+  // Filter by coordinator-excluded prefix and pick only the most recent round.
+  let legacySessions = allSessions
+    .filter(s => s.startsWith(legacyReviewerPrefix))
+    .filter(s => !s.startsWith(coordinatorPrefix));
+  if (legacySessions.length > 0) {
     const latestReviewerSession = mostRecentByTimestamp(
-      reviewSessionNames,
-      (sessionName) => parseReviewerTimestamp(reviewerPrefix, sessionName),
+      legacySessions,
+      (sessionName) => parseReviewerTimestamp(legacyReviewerPrefix, sessionName),
     );
     const latestTs = latestReviewerSession
-      ? parseReviewerTimestamp(reviewerPrefix, latestReviewerSession)
+      ? parseReviewerTimestamp(legacyReviewerPrefix, latestReviewerSession)
       : null;
     if (latestTs !== null) {
-      reviewSessionNames = reviewSessionNames.filter(
-        s => parseReviewerTimestamp(reviewerPrefix, s) === latestTs,
+      legacySessions = legacySessions.filter(
+        s => parseReviewerTimestamp(legacyReviewerPrefix, s) === latestTs,
       );
     }
   }
+
+  const reviewSessionNames = [...canonicalSessions, ...legacySessions];
   if (reviewSessionNames.length === 0 && !reviewCoordinatorSessionName) return { ...status };
 
   let reviewSubStatuses: Record<string, 'running' | 'done'> | undefined;
   try {
-    const resolved = resolveProjectFromIssue(issueId);
     if (resolved) {
       const workspacePath = join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
       reviewSubStatuses = {};
-      for (const sessionName of reviewSessionNames) {
+      // Canonical sessions: role is the last `-review-<role>` segment. Output
+      // file location for canonical sessions can't be derived here (it's keyed
+      // by the per-round reviewId), so we treat presence-without-event as
+      // 'running' and rely on the event reducer to flip it to 'done'.
+      for (const sessionName of canonicalSessions) {
+        const idx = sessionName.lastIndexOf('-review-');
+        const role = idx >= 0 ? sessionName.slice(idx + '-review-'.length) : 'review';
+        // Don't clobber a 'done' state already set by the event reducer.
+        const existing = (status as EnrichedReviewStatus).reviewSubStatuses?.[role];
+        reviewSubStatuses[role] = existing === 'done' ? 'done' : 'running';
+      }
+      // Legacy sessions: derive output file from session name and check existence.
+      for (const sessionName of legacySessions) {
         const parts = sessionName.split('-');
         const role = parts[parts.length - 1] || 'review';
         const reviewRunId = parts.slice(0, -1).join('-');
@@ -113,7 +152,7 @@ export function enrichReviewStatusFromSessions(
 
   return {
     ...status,
-    reviewCoordinatorSessionName,
+    reviewCoordinatorSessionName: reviewCoordinatorSessionName ?? (status as EnrichedReviewStatus).reviewCoordinatorSessionName,
     reviewSessionNames: reviewSessionNames.length > 0 ? reviewSessionNames : undefined,
     reviewSubStatuses,
   };
