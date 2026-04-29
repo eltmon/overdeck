@@ -604,8 +604,6 @@ program
     }
 
     if (electronAppPath) {
-      await startPostLaunchSidecars();
-
       console.log(chalk.dim(`\nLaunching Panopticon desktop app...`));
       console.log(chalk.dim(`  ${electronAppPath}`));
       const { spawn } = await import('child_process');
@@ -614,13 +612,30 @@ program
         stdio: 'ignore',
         env: process.env,
       });
-      child.on('error', (err) => {
-        console.warn(chalk.yellow(`⚠ Could not launch desktop app: ${err.message}`));
-        console.warn(chalk.dim('  Falling back to bare server mode'));
+
+      const launchSucceeded = await new Promise<boolean>((resolve) => {
+        let settled = false;
+        const settle = (value: boolean) => {
+          if (settled) return;
+          settled = true;
+          resolve(value);
+        };
+
+        child.once('error', (err) => {
+          console.warn(chalk.yellow(`⚠ Could not launch desktop app: ${err.message}`));
+          console.warn(chalk.dim('  Falling back to bare server mode'));
+          settle(false);
+        });
+
+        setTimeout(() => settle(true), 100);
       });
-      child.unref();
-      console.log(chalk.green('✓ Desktop app launched'));
-      return;
+
+      if (launchSucceeded) {
+        child.unref();
+        console.log(chalk.green('✓ Desktop app launched'));
+        await startPostLaunchSidecars();
+        return;
+      }
     }
 
     // Kill any existing dashboard processes before starting a new one.

@@ -545,8 +545,8 @@ export async function handleStatus(payload: WebhookPayload): Promise<void> {
         await setReviewStatusAsync(issueId, update, status);
       }
 
-      // Only act on the first feature branch match
-      break;
+      // Keep scanning in case the payload includes multiple feature branches.
+      continue;
     }
   }
 }

@@ -679,6 +679,24 @@ describe('handleStatus', () => {
     }));
   });
 
+  it('continues scanning after an unmatched feature branch', async () => {
+    mockGetReviewStatus
+      .mockReturnValueOnce(null)
+      .mockReturnValueOnce({ blockerReasons: [] });
+
+    await handleStatus(makePayload({
+      state: 'failure',
+      sha: 'abc123',
+      branches: [{ name: 'feature/pan-111' }, { name: 'feature/pan-222' }],
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-222', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'failing_checks' }),
+      ]),
+    }));
+  });
+
   it('ignores status events with no matching feature branches', async () => {
     await handleStatus(makePayload({
       state: 'failure',
