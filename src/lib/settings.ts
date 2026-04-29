@@ -8,7 +8,8 @@ export type GoogleModel = 'gemini-3.1-pro-preview' | 'gemini-3-flash' | 'gemini-
 export type KimiModel = 'kimi-k2.6' | 'kimi-k2.5' | 'K2.6-code-preview' | 'kimi-k2';
 export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed';
 export type ZAIModel = 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
-export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel;
+export type MimoModel = 'mimo-v2.5-pro' | 'mimo-v2.5';
+export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel;
 
 // Task complexity levels
 export type ComplexityLevel = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
@@ -38,6 +39,7 @@ export interface ApiKeysConfig {
   google?: string;
   kimi?: string;
   minimax?: string;
+  mimo?: string;
 }
 
 // Complete settings structure
@@ -128,6 +130,7 @@ export function loadSettings(): SettingsConfig {
   if (process.env.GOOGLE_API_KEY) envApiKeys.google = process.env.GOOGLE_API_KEY;
   if (process.env.MINIMAX_API_KEY) envApiKeys.minimax = process.env.MINIMAX_API_KEY;
   if (process.env.KIMI_API_KEY) envApiKeys.kimi = process.env.KIMI_API_KEY;
+  if (process.env.MIMO_API_KEY) envApiKeys.mimo = process.env.MIMO_API_KEY;
 
   // Merge env vars as fallback (settings.json takes precedence)
   settings.api_keys = {
@@ -203,6 +206,7 @@ export function getAvailableModels(settings: SettingsConfig): {
   google: GoogleModel[];
   kimi: KimiModel[];
   minimax: MiniMaxModel[];
+  mimo: MimoModel[];
 } {
   const anthropicModels: AnthropicModel[] = [
     'claude-opus-4-6',
@@ -226,12 +230,17 @@ export function getAvailableModels(settings: SettingsConfig): {
     ? ['minimax-m2.7', 'minimax-m2.7-highspeed']
     : [];
 
+  const mimoModels: MimoModel[] = settings.api_keys.mimo
+    ? ['mimo-v2.5-pro', 'mimo-v2.5']
+    : [];
+
   return {
     anthropic: anthropicModels,
     openai: openaiModels,
     google: googleModels,
     kimi: kimiModels,
     minimax: minimaxModels,
+    mimo: mimoModels,
   };
 }
 

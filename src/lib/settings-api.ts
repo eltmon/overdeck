@@ -94,6 +94,7 @@ export interface ApiSettingsConfig {
       minimax: boolean;
       zai: boolean;
       kimi: boolean;
+      mimo: boolean;
       openrouter: boolean;
     };
     overrides: Partial<Record<WorkTypeId, ModelId>>;
@@ -111,6 +112,7 @@ export interface ApiSettingsConfig {
     minimax?: string;
     zai?: string;
     kimi?: string;
+    mimo?: string;
     openrouter?: string;
   };
   openrouter?: {
@@ -143,6 +145,7 @@ export function getDefaultConversationModelApi(): ModelId {
   if (config.enabledProviders.has('google')) return resolveModelId('gemini-3.1-pro-preview');
   if (config.enabledProviders.has('kimi')) return resolveModelId('kimi-k2.5');
   if (config.enabledProviders.has('zai')) return resolveModelId('glm-5.1');
+  if (config.enabledProviders.has('mimo')) return resolveModelId('mimo-v2.5-pro');
   if (config.enabledProviders.has('openrouter')) {
     const fav = config.openrouterFavorites[0];
     if (fav) return resolveModelId(fav);
@@ -193,6 +196,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         minimax: config.enabledProviders.has('minimax'),
         zai: config.enabledProviders.has('zai'),
         kimi: config.enabledProviders.has('kimi'),
+        mimo: config.enabledProviders.has('mimo'),
         openrouter: config.enabledProviders.has('openrouter'),
       },
       overrides: migratedOverrides,
@@ -246,6 +250,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
         minimax: settings.models.providers.minimax,
         zai: settings.models.providers.zai,
         kimi: settings.models.providers.kimi,
+        mimo: settings.models.providers.mimo,
         openrouter: settings.models.providers.openrouter,
       },
       overrides: settings.models.overrides,
@@ -258,6 +263,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
       minimax: settings.api_keys.minimax,
       zai: settings.api_keys.zai,
       kimi: settings.api_keys.kimi,
+      mimo: settings.api_keys.mimo,
       openrouter: settings.api_keys.openrouter,
     },
     openrouter: settings.openrouter,
@@ -331,7 +337,7 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
 }
 
 export async function updateProviderApiKey(
-  provider: 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'openrouter',
+  provider: 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter',
   apiKey?: string
 ): Promise<ApiSettingsConfig> {
   return updateSettingsApi({
@@ -414,6 +420,7 @@ export function getAvailableModelsApi(): {
   minimax: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+  mimo: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
 } {
   const result: {
@@ -423,6 +430,7 @@ export function getAvailableModelsApi(): {
     minimax: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+    mimo: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   } = {
     anthropic: [],
@@ -431,6 +439,7 @@ export function getAvailableModelsApi(): {
     minimax: [],
     zai: [],
     kimi: [],
+    mimo: [],
     openrouter: [],
   };
 
@@ -455,6 +464,9 @@ export function getAvailableModelsApi(): {
       case 'zai':
         result.zai.push(entry);
         break;
+      case 'mimo':
+        result.mimo.push(entry);
+        break;
       case 'openrouter':
         result.openrouter.push(entry);
         break;
@@ -477,6 +489,7 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         minimax: false,
         zai: false,
         kimi: true, // Kimi K2.6 (K2.6-code-preview) used for exploration, testing, and documentation
+        mimo: false,
         openrouter: false,
       },
       overrides: getOptimalModelDefaults(),
@@ -500,6 +513,7 @@ export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
         zai: false,
         kimi: false,
         minimax: true,
+        mimo: false,
         openrouter: false,
       },
       overrides: getMiniMaxModelDefaults(),

@@ -60,6 +60,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   minimax: 'MiniMax',
   zai: 'Z.AI',
   kimi: 'Kimi',
+  mimo: 'Xiaomi MiMo',
   openrouter: 'OpenRouter',
 };
 

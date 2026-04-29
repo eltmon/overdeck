@@ -104,6 +104,7 @@ export interface YamlConfig {
       minimax?: ProviderConfig | boolean;
       zai?: ProviderConfig | boolean;
       kimi?: ProviderConfig | boolean;
+      mimo?: ProviderConfig | boolean;
       openrouter?: ProviderConfig | boolean;
     };
 
@@ -130,6 +131,7 @@ export interface YamlConfig {
     minimax?: string;
     zai?: string;
     kimi?: string;
+    mimo?: string;
     openrouter?: string;
   };
 
@@ -250,6 +252,7 @@ export interface NormalizedConfig {
     minimax?: string;
     zai?: string;
     kimi?: string;
+    mimo?: string;
     openrouter?: string;
   };
 
@@ -702,6 +705,17 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       } else if (providers.openrouter !== undefined) {
         explicitlyDisabled.add('openrouter');
       }
+
+      // MiMo
+      const mimo = normalizeProviderConfig(providers.mimo, legacyKeys.mimo);
+      if (mimo.enabled) {
+        result.enabledProviders.add('mimo');
+        if (mimo.api_key) {
+          result.apiKeys.mimo = resolveEnvVar(mimo.api_key);
+        }
+      } else if (providers.mimo !== undefined) {
+        explicitlyDisabled.add('mimo');
+      }
     }
 
     // Merge tmux configuration
@@ -762,6 +776,12 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
         result.apiKeys.openrouter = resolveEnvVar(config.api_keys.openrouter);
         if (!explicitlyDisabled.has('openrouter')) {
           result.enabledProviders.add('openrouter');
+        }
+      }
+      if (config.api_keys.mimo) {
+        result.apiKeys.mimo = resolveEnvVar(config.api_keys.mimo);
+        if (!explicitlyDisabled.has('mimo')) {
+          result.enabledProviders.add('mimo');
         }
       }
     }
@@ -1073,6 +1093,12 @@ export function loadConfig(): ConfigLoadResult {
     config.apiKeys.openrouter = process.env.OPENROUTER_API_KEY;
     if (!explicitlyDisabled.has('openrouter')) {
       config.enabledProviders.add('openrouter');
+    }
+  }
+  if (process.env.MIMO_API_KEY && !config.apiKeys.mimo) {
+    config.apiKeys.mimo = process.env.MIMO_API_KEY;
+    if (!explicitlyDisabled.has('mimo')) {
+      config.enabledProviders.add('mimo');
     }
   }
 
