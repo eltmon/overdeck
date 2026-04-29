@@ -124,7 +124,7 @@ function ProjectNodeMenu({
         top: y,
         zIndex: 1000,
         background: 'var(--card)',
-        border: '1px solid var(--mc-border, var(--border))',
+        border: '1px solid var(--border)',
         borderRadius: 6,
         boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
         padding: '4px 0',

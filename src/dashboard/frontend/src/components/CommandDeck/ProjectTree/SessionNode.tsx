@@ -1,7 +1,18 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
+import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import styles from '../styles/command-deck.module.css';
+
+function presenceToStatus(presence: SessionNodeType['presence']): StatusDotStatus {
+  switch (presence) {
+    case 'active': return 'active';
+    case 'idle': return 'idle';
+    case 'suspended': return 'waiting';
+    case 'ended': return 'ended';
+    default: return 'ended';
+  }
+}
 
 interface SessionNodeProps {
   session: SessionNodeType;
@@ -16,39 +27,6 @@ interface SessionNodeProps {
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
-}
-
-function PresenceDot({ presence }: { presence: SessionNodeType['presence'] }) {
-  if (presence === 'active') {
-    return (
-      <span className={styles.sessionPresence}>
-        <svg
-          className={styles.sessionPresenceSpinner}
-          width="10"
-          height="10"
-          viewBox="0 0 10 10"
-        >
-          <circle
-            cx="5"
-            cy="5"
-            r="4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeDasharray="16"
-            strokeLinecap="round"
-          />
-        </svg>
-      </span>
-    );
-  }
-
-  const className =
-    presence === 'idle'
-      ? styles.sessionPresenceIdle
-      : styles.sessionPresenceEnded;
-
-  return <span className={`${styles.sessionPresence} ${className}`} />;
 }
 
 function TypeBadge({ type, role }: { type: SessionNodeType['type']; role?: string }) {
@@ -108,7 +86,7 @@ function MenuItem({
         background: 'none',
         textAlign: 'left',
         cursor: 'pointer',
-        color: variant === 'danger' ? 'var(--mc-error, #ef4444)' : 'var(--foreground)',
+        color: variant === 'danger' ? 'var(--destructive)' : 'var(--foreground)',
         fontSize: 12,
       }}
       onMouseEnter={(e) => {
@@ -129,7 +107,7 @@ function MenuDivider() {
     <div
       style={{
         height: 1,
-        background: 'var(--mc-border, var(--border))',
+        background: 'var(--border)',
         margin: '4px 8px',
       }}
     />
@@ -209,7 +187,7 @@ export function SessionNode({
         onClick={onClick}
         onContextMenu={handleContextMenu}
       >
-        <PresenceDot presence={session.presence} />
+        <StatusDot status={presenceToStatus(session.presence)} size="sm" />
         <TypeBadge type={session.type} role={session.role} />
         <span className={styles.sessionLabel} title={session.sessionId}>
           {deriveSessionLabel(session)}
@@ -229,7 +207,7 @@ export function SessionNode({
             top: menu.y,
             zIndex: 1000,
             background: 'var(--card)',
-            border: '1px solid var(--mc-border, var(--border))',
+            border: '1px solid var(--border)',
             borderRadius: 6,
             boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             padding: '4px 0',

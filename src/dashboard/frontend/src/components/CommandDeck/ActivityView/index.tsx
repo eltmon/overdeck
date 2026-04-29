@@ -36,10 +36,10 @@ async function fetchActivity(issueId: string): Promise<{ issueId: string; sectio
 }
 
 function statusDotColor(status: string): string {
-  if (status === 'Done' || status === 'Completed' || status === 'Closed') return 'var(--mc-success)';
-  if (status === 'In Progress' || status === 'Started' || status === 'Active') return 'var(--mc-warning)';
+  if (status === 'Done' || status === 'Completed' || status === 'Closed') return 'var(--success)';
+  if (status === 'In Progress' || status === 'Started' || status === 'Active') return 'var(--warning)';
   if (status === 'In Review' || status === 'Review' || status === 'QA' || status === 'Testing') return '#ec4899';
-  return 'var(--mc-text-muted)';
+  return 'var(--muted-foreground)';
 }
 
 function RallyStoriesSection({ feature, issues }: { feature: ProjectFeature; issues: Issue[] }) {
@@ -61,19 +61,19 @@ function RallyStoriesSection({ feature, issues }: { feature: ProjectFeature; iss
     <div style={{ marginBottom: 16 }}>
       {/* Feature Summary Card */}
       <div style={{
-        background: 'var(--mc-bg-secondary)',
-        border: '1px solid var(--mc-border)',
+        background: 'var(--muted)',
+        border: '1px solid var(--border)',
         borderLeft: '3px solid #6366f1',
         borderRadius: 6,
         padding: '12px 16px',
         marginBottom: 12,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <span style={{ fontWeight: 600, color: 'var(--mc-text-primary)', fontSize: 'var(--mc-font-size-sm)' }}>
+          <span style={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '12px' }}>
             {feature.issueId}
           </span>
           {parentIssue?.url && (
-            <a href={parentIssue.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mc-text-muted)' }}>
+            <a href={parentIssue.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--muted-foreground)' }}>
               <ExternalLink size={12} />
             </a>
           )}
@@ -83,7 +83,7 @@ function RallyStoriesSection({ feature, issues }: { feature: ProjectFeature; iss
               padding: '1px 6px',
               borderRadius: 3,
               background: 'rgba(107,114,128,0.15)',
-              color: 'var(--mc-text-muted)',
+              color: 'var(--muted-foreground)',
             }}>
               Rally: {feature.rawTrackerState}
             </span>
@@ -107,19 +107,19 @@ function RallyStoriesSection({ feature, issues }: { feature: ProjectFeature; iss
             <div style={{
               flex: 1,
               height: 6,
-              background: 'var(--mc-border)',
+              background: 'var(--border)',
               borderRadius: 3,
               overflow: 'hidden',
             }}>
               <div style={{
                 width: `${progressPct}%`,
                 height: '100%',
-                background: progressPct === 100 ? 'var(--mc-success)' : '#6366f1',
+                background: progressPct === 100 ? 'var(--success)' : '#6366f1',
                 borderRadius: 3,
                 transition: 'width 0.3s ease',
               }} />
             </div>
-            <span style={{ fontSize: 11, color: 'var(--mc-text-muted)', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 11, color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
               {completedCount}/{totalCount} done{inProgressCount > 0 ? `, ${inProgressCount} active` : ''}
             </span>
           </div>
@@ -129,17 +129,17 @@ function RallyStoriesSection({ feature, issues }: { feature: ProjectFeature; iss
       {/* Child Stories Table */}
       {childStories.length > 0 && (
         <div style={{
-          background: 'var(--mc-bg-secondary)',
-          border: '1px solid var(--mc-border)',
+          background: 'var(--muted)',
+          border: '1px solid var(--border)',
           borderRadius: 6,
           overflow: 'hidden',
         }}>
           <div style={{
             padding: '8px 12px',
-            borderBottom: '1px solid var(--mc-border)',
-            fontSize: 'var(--mc-font-size-xs)',
+            borderBottom: '1px solid var(--border)',
+            fontSize: '12px',
             fontWeight: 600,
-            color: 'var(--mc-text-muted)',
+            color: 'var(--muted-foreground)',
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
           }}>
@@ -153,8 +153,8 @@ function RallyStoriesSection({ feature, issues }: { feature: ProjectFeature; iss
                 alignItems: 'center',
                 gap: 8,
                 padding: '6px 12px',
-                borderBottom: '1px solid var(--mc-border)',
-                fontSize: 'var(--mc-font-size-sm)',
+                borderBottom: '1px solid var(--border)',
+                fontSize: '12px',
               }}
             >
               {/* Status dot */}
@@ -188,7 +188,7 @@ function RallyStoriesSection({ feature, issues }: { feature: ProjectFeature; iss
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
-                color: 'var(--mc-text-primary)',
+                color: 'var(--foreground)',
               }}>
                 {story.title}
               </span>
@@ -197,7 +197,7 @@ function RallyStoriesSection({ feature, issues }: { feature: ProjectFeature; iss
               {story.assignee?.name && (
                 <span style={{
                   fontSize: 11,
-                  color: 'var(--mc-text-muted)',
+                  color: 'var(--muted-foreground)',
                   flexShrink: 0,
                 }}>
                   {story.assignee.name}
@@ -211,7 +211,7 @@ function RallyStoriesSection({ feature, issues }: { feature: ProjectFeature; iss
                   padding: '1px 5px',
                   borderRadius: 3,
                   background: 'rgba(107,114,128,0.12)',
-                  color: 'var(--mc-text-muted)',
+                  color: 'var(--muted-foreground)',
                   flexShrink: 0,
                 }}>
                   {story.rawTrackerState}
@@ -302,7 +302,7 @@ export function ActivityView({ issueId, issues = [], featureData }: ActivityView
   if (isLoading && sections.length === 0) {
     return (
       <div className={styles.activityContainer}>
-        <div style={{ color: 'var(--mc-text-muted)', fontSize: 'var(--mc-font-size-sm)' }}>
+        <div style={{ color: 'var(--muted-foreground)', fontSize: '12px' }}>
           Loading activity...
         </div>
       </div>
@@ -317,7 +317,7 @@ export function ActivityView({ issueId, issues = [], featureData }: ActivityView
         {isRally && featureData && (
           <RallyStoriesSection feature={featureData} issues={issues} />
         )}
-        <div style={{ color: 'var(--mc-text-muted)', fontSize: 'var(--mc-font-size-sm)' }}>
+        <div style={{ color: 'var(--muted-foreground)', fontSize: '12px' }}>
           No agent activity yet for this feature.
         </div>
       </div>

@@ -192,7 +192,7 @@ export function AgentSection({ section, isUnread, onClick, cost, defaultExpanded
     setExpanded(!expanded);
   };
 
-  const accentColor = TYPE_ACCENT_COLORS[section.type] || 'var(--mc-border)';
+  const accentColor = TYPE_ACCENT_COLORS[section.type] || 'var(--border)';
   const isConstrained = customHeight !== null;
 
   const contentStyle: React.CSSProperties = {};
@@ -216,14 +216,14 @@ export function AgentSection({ section, isUnread, onClick, cost, defaultExpanded
       >
         <span className={styles.sectionChevron}>
           {expanded ? (
-            <ChevronDown size={12} style={{ color: 'var(--mc-text-muted)' }} />
+            <ChevronDown size={12} style={{ color: 'var(--muted-foreground)' }} />
           ) : (
-            <ChevronRight size={12} style={{ color: 'var(--mc-text-muted)' }} />
+            <ChevronRight size={12} style={{ color: 'var(--muted-foreground)' }} />
           )}
         </span>
 
         {section.status === 'running' ? (
-          <Loader2 size={12} className={styles.spinning} style={{ color: 'var(--mc-success)', flexShrink: 0 }} />
+          <Loader2 size={12} className={styles.spinning} style={{ color: 'var(--success)', flexShrink: 0 }} />
         ) : (
           <div className={`${styles.sectionStatus} ${STATUS_STYLES[section.status] || styles.statusCompleted}`} />
         )}
@@ -331,7 +331,7 @@ export function AgentSection({ section, isUnread, onClick, cost, defaultExpanded
             onDoubleClick={handleResizeDoubleClick}
             title={isConstrained ? 'Drag to resize, double-click to unconstrain' : 'Drag to constrain height, double-click to set default'}
           >
-            <GripHorizontal size={12} style={{ color: 'var(--mc-text-muted)', opacity: isConstrained ? 0.8 : 0.4 }} />
+            <GripHorizontal size={12} style={{ color: 'var(--muted-foreground)', opacity: isConstrained ? 0.8 : 0.4 }} />
           </div>
         </>
       )}

@@ -48,7 +48,7 @@ function sourceStyle(source: DiscussionSource, item: DiscussionItem): SourceStyl
     case 'github-issue':
       return {
         bg: 'color-mix(in srgb, var(--muted-foreground) 18%, transparent)',
-        fg: 'var(--mc-text, var(--foreground))',
+        fg: 'var(--foreground)',
         label: 'issue',
       };
     case 'github-pr-conversation':
@@ -142,7 +142,7 @@ function DiscussionRow({ item }: { item: DiscussionItem }) {
       style={{
         listStyle: 'none',
         padding: '12px 14px',
-        borderBottom: '1px solid var(--mc-border, var(--border))',
+        borderBottom: '1px solid var(--border)',
         display: 'flex',
         flexDirection: 'column',
         gap: 6,
@@ -152,10 +152,10 @@ function DiscussionRow({ item }: { item: DiscussionItem }) {
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
         <SourceChip item={item} />
-        <span style={{ fontWeight: 600, color: 'var(--mc-text, var(--foreground))' }}>
+        <span style={{ fontWeight: 600, color: 'var(--foreground)' }}>
           {item.author || 'unknown'}
         </span>
-        <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+        <span style={{ color: 'var(--muted-foreground)' }}>
           {formatRelative(item.createdAt)}
         </span>
         {isInline && item.filePath && (
@@ -165,7 +165,7 @@ function DiscussionRow({ item }: { item: DiscussionItem }) {
               marginLeft: 'auto',
               fontFamily: 'var(--font-mono, ui-monospace)',
               fontSize: 11,
-              color: 'var(--mc-text-muted, var(--muted-foreground))',
+              color: 'var(--muted-foreground)',
             }}
           >
             {item.filePath}
@@ -181,7 +181,7 @@ function DiscussionRow({ item }: { item: DiscussionItem }) {
             style={{
               marginLeft: 'auto',
               fontSize: 11,
-              color: 'var(--mc-text-muted, var(--muted-foreground))',
+              color: 'var(--muted-foreground)',
               textDecoration: 'none',
             }}
           >
@@ -196,7 +196,7 @@ function DiscussionRow({ item }: { item: DiscussionItem }) {
           <span
             style={{
               fontStyle: 'italic',
-              color: 'var(--mc-text-muted, var(--muted-foreground))',
+              color: 'var(--muted-foreground)',
               fontSize: 12,
             }}
           >
@@ -221,7 +221,7 @@ export function DiscussionsTab({ issueId }: DiscussionsTabProps) {
     return (
       <div
         data-testid="discussions-tab-loading"
-        style={{ padding: 16, fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}
+        style={{ padding: 16, fontSize: 12, color: 'var(--muted-foreground)' }}
       >
         Loading discussions…
       </div>
@@ -260,9 +260,9 @@ export function DiscussionsTab({ issueId }: DiscussionsTabProps) {
       <div
         style={{
           padding: '10px 14px',
-          borderBottom: '1px solid var(--mc-border, var(--border))',
+          borderBottom: '1px solid var(--border)',
           fontSize: 12,
-          color: 'var(--mc-text-muted, var(--muted-foreground))',
+          color: 'var(--muted-foreground)',
           display: 'flex',
           alignItems: 'center',
           gap: 8,
@@ -300,7 +300,7 @@ export function DiscussionsTab({ issueId }: DiscussionsTabProps) {
           style={{
             padding: 16,
             fontSize: 12,
-            color: 'var(--mc-text-muted, var(--muted-foreground))',
+            color: 'var(--muted-foreground)',
           }}
         >
           No discussions yet for {issueId}.

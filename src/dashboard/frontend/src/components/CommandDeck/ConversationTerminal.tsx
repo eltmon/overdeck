@@ -46,8 +46,8 @@ export function ConversationTerminal({ conversation }: ConversationTerminalProps
   const showTerminal = conversation.sessionAlive || resumed;
 
   const statusColor = conversation.sessionAlive
-    ? 'var(--mc-success)'
-    : 'var(--mc-text-muted)';
+    ? 'var(--success)'
+    : 'var(--muted-foreground)';
 
   const statusLabel = conversation.sessionAlive ? 'active' : 'ended';
 
@@ -82,7 +82,7 @@ export function ConversationTerminal({ conversation }: ConversationTerminalProps
               {resumeMutation.isPending ? 'Resuming…' : 'Resume Session'}
             </button>
             {resumeMutation.isError && (
-              <p style={{ color: 'var(--mc-error)', fontSize: 12 }}>
+              <p style={{ color: 'var(--destructive)', fontSize: 12 }}>
                 {(resumeMutation.error as Error).message}
               </p>
             )}

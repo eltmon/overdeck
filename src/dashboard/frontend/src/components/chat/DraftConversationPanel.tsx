@@ -173,12 +173,12 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
               </div>
             </div>
             {sending && (
-              <p style={{ color: 'var(--mc-text-muted)', fontSize: 12, padding: '4px 8px' }}>
+              <p style={{ color: 'var(--muted-foreground)', fontSize: 12, padding: '4px 8px' }}>
                 Starting session...
               </p>
             )}
             {error && (
-              <p style={{ color: 'var(--mc-error)', fontSize: 12, padding: '4px 8px' }}>
+              <p style={{ color: 'var(--destructive)', fontSize: 12, padding: '4px 8px' }}>
                 {error}
               </p>
             )}

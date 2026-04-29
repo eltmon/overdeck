@@ -35,12 +35,12 @@ interface StageDotProps {
 function StageDot({ label, stage }: StageDotProps) {
   const color =
     stage === 'done'
-      ? 'var(--mc-success, #22c55e)'
+      ? 'var(--success)'
       : stage === 'current' || stage === 'running'
-        ? 'var(--mc-warning, #f97316)'
+        ? 'var(--warning)'
         : stage === 'failed'
-          ? 'var(--mc-error, #ef4444)'
-          : 'var(--mc-border, var(--border))';
+          ? 'var(--destructive)'
+          : 'var(--border)';
 
   return (
     <span className={styles.pipelineDotGroup} title={`${label}: ${stage}`}>
@@ -256,11 +256,11 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
   const qgStatus = reviewStatus?.verificationStatus;
   const qgColor =
     qgStatus === 'passed'
-      ? 'var(--mc-success, #22c55e)'
+      ? 'var(--success)'
       : qgStatus === 'failed'
-        ? 'var(--mc-error, #ef4444)'
+        ? 'var(--destructive)'
         : qgStatus === 'running'
-          ? 'var(--mc-warning, #f97316)'
+          ? 'var(--warning)'
           : undefined;
 
   return (
@@ -325,7 +325,7 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
                 gap: 4,
                 fontSize: 10,
                 fontWeight: 600,
-                color: ac.percent === 100 ? 'var(--mc-success, #22c55e)' : 'var(--mc-text-muted, var(--muted-foreground))',
+                color: ac.percent === 100 ? 'var(--success)' : 'var(--muted-foreground)',
               }}
             >
               <span
@@ -334,7 +334,7 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
                   width: 32,
                   height: 4,
                   borderRadius: 2,
-                  background: 'var(--mc-border, var(--border))',
+                  background: 'var(--border)',
                   overflow: 'hidden',
                 }}
               >
@@ -343,7 +343,7 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
                     display: 'block',
                     width: `${ac.percent}%`,
                     height: '100%',
-                    background: ac.percent === 100 ? 'var(--mc-success, #22c55e)' : 'var(--mc-primary, var(--primary))',
+                    background: ac.percent === 100 ? 'var(--success)' : 'var(--primary)',
                     borderRadius: 2,
                     transition: 'width 0.3s ease',
                   }}
@@ -377,9 +377,9 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
             gap: 6,
             padding: '3px 12px',
             fontSize: 11,
-            color: 'var(--mc-error, #ef4444)',
-            background: 'color-mix(in srgb, var(--mc-error) 8%, transparent)',
-            borderBottom: '1px dashed var(--mc-border, var(--border))',
+            color: 'var(--destructive)',
+            background: 'color-mix(in srgb, var(--destructive) 8%, transparent)',
+            borderBottom: '1px dashed var(--border)',
           }}
         >
           <AlertTriangle size={12} />
@@ -397,9 +397,9 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
             gap: 6,
             padding: '3px 12px',
             fontSize: 11,
-            color: 'var(--mc-warning, #f97316)',
-            background: 'color-mix(in srgb, var(--mc-warning) 8%, transparent)',
-            borderBottom: '1px dashed var(--mc-border, var(--border))',
+            color: 'var(--warning)',
+            background: 'color-mix(in srgb, var(--warning) 8%, transparent)',
+            borderBottom: '1px dashed var(--border)',
           }}
         >
           <Package size={12} />

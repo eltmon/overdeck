@@ -9,12 +9,13 @@
  * An inline notice explains the spawn behavior before the user clicks Send.
  */
 
-import { useState, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { SendHorizontal, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { StartAgentResponse } from '../../types';
+import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 
 interface IssueComposerProps {
   issueId: string;
@@ -53,7 +54,10 @@ function deriveComposerMode(sessions: readonly SessionNodeType[]): ComposerMode 
 
 export function IssueComposer({ issueId, sessions }: IssueComposerProps) {
   const queryClient = useQueryClient();
-  const [text, setText] = useState('');
+  const text = useCommandDeckSelection((s) => s.draftTexts[issueId] ?? '');
+  const setDraft = useCommandDeckSelection((s) => s.setDraft);
+  const clearDraft = useCommandDeckSelection((s) => s.clearDraft);
+  const setText = useCallback((v: string) => setDraft(issueId, v), [issueId, setDraft]);
 
   const mode = useMemo(() => deriveComposerMode(sessions), [sessions]);
   const isEnabled = mode.kind !== 'disabled';
@@ -83,7 +87,7 @@ export function IssueComposer({ issueId, sessions }: IssueComposerProps) {
       return data;
     },
     onSuccess: () => {
-      setText('');
+      clearDraft(issueId);
       void queryClient.invalidateQueries({ queryKey: ['agents'] });
       setTimeout(() => queryClient.invalidateQueries({ queryKey: ['agents'] }), 2000);
     },
@@ -116,8 +120,8 @@ export function IssueComposer({ issueId, sessions }: IssueComposerProps) {
       data-mode={mode.kind}
       style={{
         padding: '12px 16px',
-        borderTop: '1px solid var(--mc-border, var(--border))',
-        background: 'var(--mc-surface-2, color-mix(in srgb, var(--foreground) 3%, transparent))',
+        borderTop: '1px solid var(--border)',
+        background: 'color-mix(in srgb, var(--foreground) 3%, transparent)',
         display: 'flex',
         flexDirection: 'column',
         gap: 8,
@@ -130,7 +134,7 @@ export function IssueComposer({ issueId, sessions }: IssueComposerProps) {
           data-testid="issue-composer-notice"
           style={{
             fontSize: 11,
-            color: 'var(--mc-text-muted, var(--muted-foreground))',
+            color: 'var(--muted-foreground)',
             padding: '4px 8px',
             background: 'color-mix(in srgb, var(--primary) 6%, transparent)',
             borderRadius: 4,
@@ -158,8 +162,8 @@ export function IssueComposer({ issueId, sessions }: IssueComposerProps) {
             flex: 1,
             padding: '8px 12px',
             borderRadius: 6,
-            border: '1px solid var(--mc-border, var(--border))',
-            background: 'var(--mc-surface, var(--background))',
+            border: '1px solid var(--border)',
+            background: 'var(--background)',
             color: 'var(--foreground)',
             fontSize: 13,
             lineHeight: 1.4,
@@ -180,8 +184,8 @@ export function IssueComposer({ issueId, sessions }: IssueComposerProps) {
             padding: '8px 14px',
             borderRadius: 6,
             border: 'none',
-            background: 'var(--mc-primary, var(--primary))',
-            color: 'var(--mc-primary-foreground, var(--primary-foreground))',
+            background: 'var(--primary)',
+            color: 'var(--primary-foreground)',
             fontSize: 13,
             fontWeight: 500,
             cursor: isEnabled && !isEmpty && !isSending ? 'pointer' : 'not-allowed',

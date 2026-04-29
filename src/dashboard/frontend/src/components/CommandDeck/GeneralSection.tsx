@@ -131,9 +131,9 @@ export function GeneralSection({ selectedConversation, onSelectConversation }: G
             >
               <span className={styles.featureStatus}>
                 {convo.status === 'running' ? (
-                  <MessageSquare size={14} style={{ color: 'var(--mc-success)' }} />
+                  <MessageSquare size={14} style={{ color: 'var(--success)' }} />
                 ) : (
-                  <MessageSquare size={14} style={{ color: 'var(--mc-text-muted)' }} />
+                  <MessageSquare size={14} style={{ color: 'var(--muted-foreground)' }} />
                 )}
               </span>
               <span className={styles.featureLabel}>{convo.name}</span>

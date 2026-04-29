@@ -208,12 +208,12 @@ export function ConversationPanel({
   const isForkingHeader = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailedHeader = conversation.forkStatus === 'failed';
   const statusColor = isForkingHeader
-    ? 'var(--mc-warning)'
+    ? 'var(--warning)'
     : isForkFailedHeader
-    ? 'var(--mc-error)'
+    ? 'var(--destructive)'
     : conversation.sessionAlive
-    ? 'var(--mc-success)'
-    : 'var(--mc-text-muted)';
+    ? 'var(--success)'
+    : 'var(--muted-foreground)';
   const statusLabel = isForkingHeader ? 'forking' : isForkFailedHeader ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
 
   return (

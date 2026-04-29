@@ -423,7 +423,7 @@ export function ZoneActionStrip({
           gap: '6px',
           padding: '6px 12px',
           alignItems: 'center',
-          borderBottom: '1px solid var(--mc-border, var(--border))',
+          borderBottom: '1px solid var(--border)',
         }}
       >
         {displayLayout.primary.map(renderAction)}
@@ -455,8 +455,8 @@ export function ZoneActionStrip({
                     top: '100%',
                     marginTop: 4,
                     minWidth: 180,
-                    background: 'var(--mc-surface, var(--background))',
-                    border: '1px solid var(--mc-border, var(--border))',
+                    background: 'var(--background)',
+                    border: '1px solid var(--border)',
                     borderRadius: 6,
                     padding: 8,
                     display: 'flex',
@@ -466,7 +466,7 @@ export function ZoneActionStrip({
                     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                   }}
                 >
-                  <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--mc-text-muted, var(--muted-foreground))', padding: '0 4px' }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted-foreground)', padding: '0 4px' }}>
                     More actions
                   </div>
                   {displayLayout.overflow.map(renderAction)}

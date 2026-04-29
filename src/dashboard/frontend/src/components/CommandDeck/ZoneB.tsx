@@ -143,10 +143,10 @@ export function ZoneB({ session, issueId, onViewTerminal }: ZoneBProps) {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        borderBottom: '1px solid var(--mc-border, var(--border))',
-        background: 'var(--mc-surface-2, color-mix(in srgb, var(--foreground) 3%, transparent))',
+        borderBottom: '1px solid var(--border)',
+        background: 'color-mix(in srgb, var(--foreground) 3%, transparent)',
         fontSize: 12,
-        color: 'var(--mc-text, var(--foreground))',
+        color: 'var(--foreground)',
       }}
     >
       {/* Main strip */}
@@ -154,19 +154,19 @@ export function ZoneB({ session, issueId, onViewTerminal }: ZoneBProps) {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 'var(--mc-space-3, 8px)',
+          gap: '12px',
           padding: '6px 12px',
         }}
       >
         <RoleBadge role={session.type} role_={reviewerRole} size="sm" />
         <span style={{ fontWeight: 600 }}>{label}</span>
         <StatusDot status={status} title={`presence: ${session.presence}`} />
-        <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+        <span style={{ color: 'var(--muted-foreground)' }}>
           {session.model}
         </span>
         {/* Phase + tool inline — wired to runtime currentTool for motion catalog (PAN-847) */}
         <ToolFlash currentTool={currentTool} />
-        <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))', marginLeft: 'auto' }}>
+        <span style={{ color: 'var(--muted-foreground)', marginLeft: 'auto' }}>
           {formatDuration(session.duration)}
         </span>
         <ZoneBActionStrip session={session} issueId={issueId} onViewTerminal={onViewTerminal} />
@@ -181,8 +181,8 @@ export function ZoneB({ session, issueId, onViewTerminal }: ZoneBProps) {
           gap: 12,
           padding: '2px 12px',
           fontSize: 11,
-          color: 'var(--mc-text-muted, var(--muted-foreground))',
-          borderTop: '1px dashed var(--mc-border, var(--border))',
+          color: 'var(--muted-foreground)',
+          borderTop: '1px dashed var(--border)',
         }}
       >
         {costSoFar !== undefined && costSoFar > 0 && (
@@ -212,9 +212,9 @@ export function ZoneB({ session, issueId, onViewTerminal }: ZoneBProps) {
           style={{
             padding: '2px 12px',
             fontSize: 11,
-            color: 'var(--mc-warning, #f97316)',
-            background: 'color-mix(in srgb, var(--mc-warning) 8%, transparent)',
-            borderTop: '1px dashed var(--mc-border, var(--border))',
+            color: 'var(--warning)',
+            background: 'color-mix(in srgb, var(--warning) 8%, transparent)',
+            borderTop: '1px dashed var(--border)',
           }}
         >
           {runtime?.waiting?.message ?? 'Agent waiting for permission…'}
@@ -228,9 +228,9 @@ export function ZoneB({ session, issueId, onViewTerminal }: ZoneBProps) {
           style={{
             padding: '2px 12px',
             fontSize: 11,
-            color: 'var(--mc-primary, var(--primary))',
+            color: 'var(--primary)',
             background: 'color-mix(in srgb, var(--primary) 8%, transparent)',
-            borderTop: '1px dashed var(--mc-border, var(--border))',
+            borderTop: '1px dashed var(--border)',
           }}
         >
           Thinking…
@@ -244,9 +244,9 @@ export function ZoneB({ session, issueId, onViewTerminal }: ZoneBProps) {
           style={{
             padding: '2px 12px',
             fontSize: 11,
-            color: 'var(--mc-warning, #f97316)',
-            background: 'color-mix(in srgb, var(--mc-warning) 8%, transparent)',
-            borderTop: '1px dashed var(--mc-border, var(--border))',
+            color: 'var(--warning)',
+            background: 'color-mix(in srgb, var(--warning) 8%, transparent)',
+            borderTop: '1px dashed var(--border)',
           }}
         >
           Session idle — agent waiting for next turn
@@ -260,7 +260,7 @@ export function ZoneB({ session, issueId, onViewTerminal }: ZoneBProps) {
             display: 'flex',
             gap: 8,
             padding: '6px 12px',
-            borderTop: '1px dashed var(--mc-border, var(--border))',
+            borderTop: '1px dashed var(--border)',
             overflowX: 'auto',
           }}
         >

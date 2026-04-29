@@ -89,7 +89,7 @@ export function ZoneCOverview({
         flexDirection: 'column',
         flex: 1,
         minHeight: 0,
-        background: 'var(--mc-surface, var(--background))',
+        background: 'var(--background)',
       }}
     >
       <div
@@ -99,7 +99,7 @@ export function ZoneCOverview({
           display: 'flex',
           gap: 4,
           padding: '6px 12px',
-          borderBottom: '1px solid var(--mc-border, var(--border))',
+          borderBottom: '1px solid var(--border)',
           overflowX: 'auto',
           flexShrink: 0,
         }}
@@ -118,8 +118,8 @@ export function ZoneCOverview({
                 fontSize: 12,
                 fontWeight: active ? 600 : 500,
                 color: active
-                  ? 'var(--mc-text, var(--foreground))'
-                  : 'var(--mc-text-muted, var(--muted-foreground))',
+                  ? 'var(--foreground)'
+                  : 'var(--muted-foreground)',
                 background: active
                   ? 'color-mix(in srgb, var(--primary) 8%, transparent)'
                   : 'transparent',

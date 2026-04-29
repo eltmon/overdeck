@@ -39,11 +39,11 @@ const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'v
 
 function resourceColor(feature: ProjectFeature): string {
   const state = feature.stateLabel.toLowerCase();
-  if (state.includes('closed') || state.includes('done')) return 'var(--mc-text-muted)';
-  if (state.includes('review')) return 'var(--mc-accent)';
-  if (state.includes('progress')) return 'var(--mc-success)';
-  if (state.includes('suspend')) return 'var(--mc-warning)';
-  return 'var(--mc-text-secondary)';
+  if (state.includes('closed') || state.includes('done')) return 'var(--muted-foreground)';
+  if (state.includes('review')) return 'var(--primary)';
+  if (state.includes('progress')) return 'var(--success)';
+  if (state.includes('suspend')) return 'var(--warning)';
+  return 'var(--muted-foreground)';
 }
 
 function formatPrState(pr: { number: number; title: string; state: string; isDraft: boolean }): string {
@@ -244,29 +244,29 @@ function ResourceStrip({
 function StatusIcon({ status, agentStatus, stateLabel, isRally, readyForMerge }: { status: string; agentStatus: string | null; stateLabel: string; isRally?: boolean; readyForMerge?: boolean }) {
   // Merge-ready takes precedence — human action needed
   if (readyForMerge) {
-    return <GitMerge size={14} style={{ color: 'var(--mc-accent)' }} />;
+    return <GitMerge size={14} style={{ color: 'var(--primary)' }} />;
   }
   // Rally feature: layers icon with color based on state
   if (isRally) {
-    const color = stateLabel === 'Done' ? 'var(--mc-success)'
-      : stateLabel === 'In Progress' ? 'var(--mc-warning)'
-      : 'var(--mc-text-muted)';
+    const color = stateLabel === 'Done' ? 'var(--success)'
+      : stateLabel === 'In Progress' ? 'var(--warning)'
+      : 'var(--muted-foreground)';
     return <Layers size={14} style={{ color }} />;
   }
   // Green spinner: only when agent is truly actively running
   if (status === 'running') {
-    return <Loader2 size={14} className={styles.spinning} style={{ color: 'var(--mc-success)' }} />;
+    return <Loader2 size={14} className={styles.spinning} style={{ color: 'var(--success)' }} />;
   }
   // Yellow triangle: agent exists but not actively working (suspended, idle with session, needs attention)
   if (agentStatus === 'suspended' || stateLabel === 'In Progress' || stateLabel === 'Suspended') {
-    return <AlertTriangle size={14} style={{ color: 'var(--mc-warning)' }} />;
+    return <AlertTriangle size={14} style={{ color: 'var(--warning)' }} />;
   }
   // Check: has planning context
   if (status === 'has_state') {
-    return <CheckCircle2 size={14} style={{ color: 'var(--mc-text-muted)' }} />;
+    return <CheckCircle2 size={14} style={{ color: 'var(--muted-foreground)' }} />;
   }
   // Default: empty circle
-  return <Circle size={14} style={{ color: 'var(--mc-text-muted)' }} />;
+  return <Circle size={14} style={{ color: 'var(--muted-foreground)' }} />;
 }
 
 function formatCost(cost: number): string {
@@ -476,11 +476,12 @@ function writeExpanded(issueId: string, expanded: boolean): void {
   } catch { /* ignore */ }
 }
 
-/** Default to collapsed for every issue. The session list dominates the
- *  tree height when expanded — collapsed-by-default keeps the tree scannable.
- *  Users can expand individual features; that choice is persisted. */
-function defaultExpandedFromState(): boolean {
-  return false;
+/** In-flight issues (In Progress, In Review, Testing) default expanded so
+ *  active work is visible at a glance. Done/closed issues default collapsed
+ *  to keep the tree scannable. Users can override; that choice is persisted. */
+function defaultExpandedFromState(stateLabel: string): boolean {
+  const s = stateLabel.toLowerCase();
+  return s.includes('progress') || s.includes('review') || s.includes('testing');
 }
 
 /** Compute the dominant session presence for the feature row StatusDot.
@@ -560,7 +561,7 @@ function FeatureMenu({
         top: y,
         zIndex: 1000,
         background: 'var(--card)',
-        border: '1px solid var(--mc-border, var(--border))',
+        border: '1px solid var(--border)',
         borderRadius: 6,
         boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
         padding: '4px 0',
@@ -630,7 +631,7 @@ function FeatureMenu({
       )}
       {onDeepWipe && (
         <>
-          <div style={{ height: 1, background: 'var(--mc-border, var(--border))', margin: '4px 8px' }} />
+          <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
           <button
             style={{
               display: 'flex',
@@ -642,7 +643,7 @@ function FeatureMenu({
               background: 'none',
               textAlign: 'left',
               cursor: 'pointer',
-              color: 'var(--mc-error, #ef4444)',
+              color: 'var(--destructive)',
               fontSize: 12,
             }}
             onMouseEnter={(e) => {
@@ -679,7 +680,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
 
   const [expanded, setExpanded] = useState(() => {
     const persisted = readExpanded(feature.issueId);
-    return persisted ?? defaultExpandedFromState();
+    return persisted ?? defaultExpandedFromState(feature.stateLabel);
   });
   const [menu, setMenu] = useState<ContextMenuState>({ x: 0, y: 0, open: false });
 
@@ -766,7 +767,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
         >
           <span className={styles.featureStatus}>
             {feature.isShadow ? (
-              <Eye size={14} style={{ color: 'var(--mc-accent)' }} />
+              <Eye size={14} style={{ color: 'var(--primary)' }} />
             ) : feature.isRally ? (
               <StatusIcon status={feature.status} agentStatus={feature.agentStatus} stateLabel={feature.stateLabel} isRally={feature.isRally} readyForMerge={feature.readyForMerge} />
             ) : aggregateSessions.length > 0 ? (
@@ -802,7 +803,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                   width: 24,
                   height: 4,
                   marginLeft: 4,
-                  background: 'var(--mc-border)',
+                  background: 'var(--border)',
                   borderRadius: 2,
                   overflow: 'hidden',
                   verticalAlign: 'middle',
@@ -811,7 +812,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                     display: 'block',
                     width: `${progressPct}%`,
                     height: '100%',
-                    background: progressPct === 100 ? 'var(--mc-success)' : 'var(--mc-warning)',
+                    background: progressPct === 100 ? 'var(--success)' : 'var(--warning)',
                     borderRadius: 2,
                   }} />
                 </span>

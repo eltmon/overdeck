@@ -129,7 +129,7 @@ function Tile({
       data-testid={testid}
       style={{
         background: 'var(--card)',
-        border: '1px solid var(--mc-border, var(--border))',
+        border: '1px solid var(--border)',
         borderRadius: 8,
         padding: 12,
         display: 'flex',
@@ -145,7 +145,7 @@ function Tile({
           gap: 6,
           fontSize: 11,
           fontWeight: 600,
-          color: 'var(--mc-text-muted, var(--muted-foreground))',
+          color: 'var(--muted-foreground)',
           textTransform: 'uppercase',
           letterSpacing: '0.04em',
         }}
@@ -171,7 +171,7 @@ function Section({
     <section
       style={{
         background: 'var(--card)',
-        border: '1px solid var(--mc-border, var(--border))',
+        border: '1px solid var(--border)',
         borderRadius: 8,
         padding: 12,
         display: 'flex',
@@ -186,7 +186,7 @@ function Section({
           justifyContent: 'space-between',
           fontSize: 12,
           fontWeight: 600,
-          color: 'var(--mc-text-muted, var(--muted-foreground))',
+          color: 'var(--muted-foreground)',
           textTransform: 'uppercase',
           letterSpacing: '0.04em',
         }}
@@ -278,7 +278,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
           borderRadius: 10,
           background:
             'linear-gradient(135deg, color-mix(in srgb, var(--primary) 8%, transparent), transparent)',
-          border: '1px solid var(--mc-border, var(--border))',
+          border: '1px solid var(--border)',
           display: 'flex',
           flexDirection: 'column',
           gap: 10,
@@ -337,15 +337,15 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   fontWeight: 600,
                   padding: '2px 8px',
                   borderRadius: 999,
-                  background: 'var(--mc-surface-2, color-mix(in srgb, var(--foreground) 5%, transparent))',
-                  color: 'var(--mc-text-muted, var(--muted-foreground))',
+                  background: 'color-mix(in srgb, var(--foreground) 5%, transparent)',
+                  color: 'var(--muted-foreground)',
                   textTransform: 'uppercase',
                   letterSpacing: '0.03em',
                 }}
               >
                 {stage}
               </span>
-              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+              <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
                 {issueId}
               </span>
             </div>
@@ -368,7 +368,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   ? null
                   : <LiveCounter value={totalCost} unit="$" precision={2} pulseOnIncrement />}
             </span>
-            <span style={{ fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+            <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
               cost to date
             </span>
           </div>
@@ -381,7 +381,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
             alignItems: 'center',
             gap: 16,
             fontSize: 12,
-            color: 'var(--mc-text-muted, var(--muted-foreground))',
+            color: 'var(--muted-foreground)',
             flexWrap: 'wrap',
           }}
         >
@@ -428,7 +428,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               <span><strong>Runtime:</strong> {formatRuntime(agent.startedAt)}</span>
               <span><strong>Status:</strong> {agent.status}</span>
               {workspace.data?.agentSessionId && (
-                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted-foreground)' }}>
                   {workspace.data.agentSessionId}
                 </span>
               )}
@@ -437,14 +437,14 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
               <span><strong>Model:</strong> {workspace.data.agentModelFull || workspace.data.agentModel || 'unknown'}</span>
               {workspace.data.agentSessionId && (
-                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted-foreground)' }}>
                   {workspace.data.agentSessionId}
                 </span>
               )}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No active agent</span>
+              <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No active agent</span>
               <button
                 type="button"
                 disabled={isSpawnPending}
@@ -467,8 +467,8 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   padding: '6px 10px',
                   borderRadius: 6,
                   border: 'none',
-                  background: 'var(--mc-primary, var(--primary))',
-                  color: 'var(--mc-primary-foreground, var(--primary-foreground))',
+                  background: 'var(--primary)',
+                  color: 'var(--primary-foreground)',
                   fontSize: 12,
                   fontWeight: 500,
                   cursor: isSpawnPending ? 'wait' : 'pointer',
@@ -498,7 +498,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   .sort((a, b) => b[1].cost - a[1].cost)
                   .map(([model, v]) => (
                     <div key={model} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                      <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))' }}>{model}</span>
+                      <span style={{ color: 'var(--muted-foreground)' }}>{model}</span>
                       <span>${v.cost.toFixed(2)}</span>
                     </div>
                   ))}
@@ -515,13 +515,13 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                 .sort((a, b) => b[1].cost - a[1].cost)
                 .map(([stageName, v]) => (
                   <div key={stageName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                    <span style={{ textTransform: 'capitalize', color: 'var(--mc-text-muted, var(--muted-foreground))' }}>{stageName}</span>
+                    <span style={{ textTransform: 'capitalize', color: 'var(--muted-foreground)' }}>{stageName}</span>
                     <span>${v.cost.toFixed(2)}</span>
                   </div>
                 ))}
             </div>
           ) : (
-            <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No stage data yet</span>
+            <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No stage data yet</span>
           )}
         </Tile>
 
@@ -542,7 +542,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                       alignItems: 'center',
                       gap: 6,
                       fontSize: 12,
-                      color: 'var(--mc-primary, var(--primary))',
+                      color: 'var(--primary)',
                       textDecoration: 'none',
                     }}
                   >
@@ -556,7 +556,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                     href={workspace.data.frontendUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ fontSize: 12, color: 'var(--mc-primary, var(--primary))', textDecoration: 'none' }}
+                    style={{ fontSize: 12, color: 'var(--primary)', textDecoration: 'none' }}
                   >
                     Frontend ↗
                   </a>
@@ -566,7 +566,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                     href={workspace.data.apiUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ fontSize: 12, color: 'var(--mc-primary, var(--primary))', textDecoration: 'none' }}
+                    style={{ fontSize: 12, color: 'var(--primary)', textDecoration: 'none' }}
                   >
                     API ↗
                   </a>
@@ -574,7 +574,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               </>
             )}
             {!workspace.data?.frontendUrl && !workspace.data?.apiUrl && !workspace.data?.services?.length && (
-              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No services configured</span>
+              <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No services configured</span>
             )}
           </div>
         </Tile>
@@ -588,7 +588,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   fontFamily: 'monospace',
                   fontSize: 11,
                   padding: '6px 8px',
-                  background: 'var(--mc-surface-2, color-mix(in srgb, var(--foreground) 3%, transparent))',
+                  background: 'color-mix(in srgb, var(--foreground) 3%, transparent)',
                   borderRadius: 4,
                   display: 'flex',
                   alignItems: 'center',
@@ -609,7 +609,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                     border: 'none',
                     background: 'transparent',
                     cursor: 'pointer',
-                    color: 'var(--mc-text-muted, var(--muted-foreground))',
+                    color: 'var(--muted-foreground)',
                     flexShrink: 0,
                   }}
                   title="Copy command"
@@ -619,7 +619,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               </div>
             </div>
           ) : (
-            <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No active session</span>
+            <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No active session</span>
           )}
         </Tile>
 
@@ -639,7 +639,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               style={{
                 padding: '5px 10px',
                 borderRadius: 6,
-                border: '1px solid var(--mc-border, var(--border))',
+                border: '1px solid var(--border)',
                 background: 'transparent',
                 fontSize: 11,
                 cursor: 'pointer',
@@ -680,7 +680,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                 style={{
                   padding: '5px 10px',
                   borderRadius: 6,
-                  border: '1px solid var(--mc-border, var(--border))',
+                  border: '1px solid var(--border)',
                   background: 'transparent',
                   fontSize: 11,
                   cursor: 'pointer',
@@ -703,7 +703,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               style={{
                 padding: '5px 10px',
                 borderRadius: 6,
-                border: '1px solid var(--mc-border, var(--border))',
+                border: '1px solid var(--border)',
                 background: 'transparent',
                 fontSize: 11,
                 cursor: 'pointer',
@@ -721,9 +721,9 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                 style={{
                   padding: '5px 10px',
                   borderRadius: 6,
-                  border: '1px solid var(--mc-error, #ef4444)',
+                  border: '1px solid var(--destructive)',
                   background: 'transparent',
-                  color: 'var(--mc-error, #ef4444)',
+                  color: 'var(--destructive)',
                   fontSize: 11,
                   cursor: 'pointer',
                 }}
@@ -746,11 +746,11 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                         width: 6,
                         height: 6,
                         borderRadius: '50%',
-                        background: c.status === 'running' ? 'var(--mc-success, #22c55e)' : 'var(--mc-error, #ef4444)',
+                        background: c.status === 'running' ? 'var(--success)' : 'var(--destructive)',
                       }}
                     />
                     <span>{c.name}</span>
-                    <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))', marginLeft: 'auto' }}>{c.status}</span>
+                    <span style={{ color: 'var(--muted-foreground)', marginLeft: 'auto' }}>{c.status}</span>
                   </div>
                 ))}
               </div>
@@ -765,7 +765,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   style={{
                     padding: '5px 10px',
                     borderRadius: 6,
-                    border: '1px solid var(--mc-border, var(--border))',
+                    border: '1px solid var(--border)',
                     background: 'transparent',
                     fontSize: 11,
                     cursor: 'pointer',
@@ -783,7 +783,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   style={{
                     padding: '5px 10px',
                     borderRadius: 6,
-                    border: '1px solid var(--mc-border, var(--border))',
+                    border: '1px solid var(--border)',
                     background: 'transparent',
                     fontSize: 11,
                     cursor: 'pointer',
@@ -806,7 +806,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   style={{
                     padding: '5px 10px',
                     borderRadius: 6,
-                    border: '1px solid var(--mc-border, var(--border))',
+                    border: '1px solid var(--border)',
                     background: 'transparent',
                     fontSize: 11,
                     cursor: 'pointer',
@@ -820,7 +820,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               )}
             </div>
             {!workspace.data?.hasDocker && !workspace.data?.canContainerize && (
-              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No containers</span>
+              <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No containers</span>
             )}
           </div>
         </Tile>
@@ -833,7 +833,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                 href={issue.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ fontSize: 12, color: 'var(--mc-primary, var(--primary))', textDecoration: 'none' }}
+                style={{ fontSize: 12, color: 'var(--primary)', textDecoration: 'none' }}
               >
                 {issue.source === 'linear' ? 'Linear' : 'GitHub Issue'} ↗
               </a>
@@ -847,7 +847,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   padding: 0,
                   border: 'none',
                   background: 'transparent',
-                  color: 'var(--mc-primary, var(--primary))',
+                  color: 'var(--primary)',
                   cursor: 'pointer',
                   textAlign: 'left',
                 }}
@@ -856,7 +856,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               </button>
             )}
             {!issue?.url && !planning.data?.hasPrd && (
-              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No links available</span>
+              <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No links available</span>
             )}
           </div>
         </Tile>
@@ -898,9 +898,9 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                         width: '100%',
                         padding: '8px 10px',
                         borderRadius: 8,
-                        border: '1px dashed var(--mc-border, var(--border))',
+                        border: '1px dashed var(--border)',
                         fontSize: 11,
-                        color: 'var(--mc-text-muted, var(--muted-foreground))',
+                        color: 'var(--muted-foreground)',
                       }}
                     >
                       no rounds yet
@@ -916,39 +916,39 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
       {/* 3. Test summary (PAN-847) */}
       <Section title="Tests">
         {reviewStatus.isLoading ? (
-          <div style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>Loading…</div>
+          <div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>Loading…</div>
         ) : (
           <div data-testid="overview-tests" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
               {reviewStatus.data?.testStatus === 'passed' || reviewStatus.data?.verificationStatus === 'passed' ? (
                 <>
-                  <CheckCircle2 size={14} style={{ color: 'var(--mc-success, #22c55e)' }} />
-                  <span style={{ color: 'var(--mc-success, #22c55e)', fontWeight: 600 }}>Tests passed</span>
+                  <CheckCircle2 size={14} style={{ color: 'var(--success)' }} />
+                  <span style={{ color: 'var(--success)', fontWeight: 600 }}>Tests passed</span>
                 </>
               ) : reviewStatus.data?.testStatus === 'failed' || reviewStatus.data?.verificationStatus === 'failed' ? (
                 <>
-                  <XCircle size={14} style={{ color: 'var(--mc-error, #ef4444)' }} />
-                  <span style={{ color: 'var(--mc-error, #ef4444)', fontWeight: 600 }}>Tests failed</span>
+                  <XCircle size={14} style={{ color: 'var(--destructive)' }} />
+                  <span style={{ color: 'var(--destructive)', fontWeight: 600 }}>Tests failed</span>
                 </>
               ) : reviewStatus.data?.testStatus === 'testing' || reviewStatus.data?.verificationStatus === 'running' ? (
                 <>
-                  <Clock size={14} style={{ color: 'var(--mc-warning, #f97316)' }} />
-                  <span style={{ color: 'var(--mc-warning, #f97316)', fontWeight: 600 }}>Tests running…</span>
+                  <Clock size={14} style={{ color: 'var(--warning)' }} />
+                  <span style={{ color: 'var(--warning)', fontWeight: 600 }}>Tests running…</span>
                 </>
               ) : (
                 <>
-                  <AlertCircle size={14} style={{ color: 'var(--mc-text-muted, var(--muted-foreground))' }} />
-                  <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No test results yet</span>
+                  <AlertCircle size={14} style={{ color: 'var(--muted-foreground)' }} />
+                  <span style={{ color: 'var(--muted-foreground)' }}>No test results yet</span>
                 </>
               )}
               {reviewStatus.data?.verificationCycleCount !== undefined && reviewStatus.data?.verificationMaxCycles !== undefined && (
-                <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))', marginLeft: 'auto' }}>
+                <span style={{ color: 'var(--muted-foreground)', marginLeft: 'auto' }}>
                   cycle {reviewStatus.data.verificationCycleCount}/{reviewStatus.data.verificationMaxCycles}
                 </span>
               )}
             </div>
             {(reviewStatus.data?.testNotes || reviewStatus.data?.verificationNotes) && (
-              <div style={{ fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))', padding: '4px 8px', background: 'var(--mc-surface-2, color-mix(in srgb, var(--foreground) 3%, transparent))', borderRadius: 4 }}>
+              <div style={{ fontSize: 11, color: 'var(--muted-foreground)', padding: '4px 8px', background: 'color-mix(in srgb, var(--foreground) 3%, transparent)', borderRadius: 4 }}>
                 {reviewStatus.data.testNotes || reviewStatus.data.verificationNotes}
               </div>
             )}
@@ -959,19 +959,19 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
       {/* 4. PR summary (PAN-847) */}
       <Section title="Pull request">
         {pr.isLoading ? (
-          <div style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>Loading…</div>
+          <div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>Loading…</div>
         ) : pr.data?.pr ? (
           <div data-testid="overview-pr" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-              <GitPullRequest size={14} style={{ color: 'var(--mc-primary, var(--primary))' }} />
-              <a href={pr.data.pr.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mc-primary, var(--primary))', fontWeight: 600 }}>
+              <GitPullRequest size={14} style={{ color: 'var(--primary)' }} />
+              <a href={pr.data.pr.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', fontWeight: 600 }}>
                 #{pr.data.pr.number} {pr.data.pr.title}
               </a>
-              <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))', marginLeft: 'auto' }}>
+              <span style={{ color: 'var(--muted-foreground)', marginLeft: 'auto' }}>
                 {pr.data.pr.state}
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11, color: 'var(--muted-foreground)' }}>
               <span>+{pr.data.pr.additions} -{pr.data.pr.deletions}</span>
               <span>{pr.data.pr.changedFiles} file{pr.data.pr.changedFiles === 1 ? '' : 's'}</span>
               {pr.data.pr.reviewDecision && (
@@ -985,9 +985,9 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   fontSize: 11,
                   padding: '2px 8px',
                   borderRadius: 6,
-                  border: '1px solid var(--mc-border, var(--border))',
+                  border: '1px solid var(--border)',
                   background: 'transparent',
-                  color: 'var(--mc-text-muted, var(--muted-foreground))',
+                  color: 'var(--muted-foreground)',
                   cursor: 'pointer',
                   marginLeft: 'auto',
                 }}
@@ -997,7 +997,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
             </div>
           </div>
         ) : (
-          <div data-testid="overview-pr" style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+          <div data-testid="overview-pr" style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
             No PR found for this issue.
           </div>
         )}
@@ -1015,9 +1015,9 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               fontSize: 11,
               padding: '2px 8px',
               borderRadius: 6,
-              border: '1px solid var(--mc-border, var(--border))',
+              border: '1px solid var(--border)',
               background: 'transparent',
-              color: 'var(--mc-text-muted, var(--muted-foreground))',
+              color: 'var(--muted-foreground)',
               cursor: 'pointer',
             }}
           >
@@ -1030,7 +1030,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
           style={{ display: 'flex', alignItems: 'center', gap: 12 }}
         >
           <ActivitySparkline events={costSparklineEvents} ariaLabel="Cost trend across recent sessions" />
-          <span style={{ fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+          <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
             {costSparklineEvents.length} billed session{costSparklineEvents.length === 1 ? '' : 's'}
           </span>
         </div>
@@ -1041,7 +1041,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         {recentEvents.length === 0 ? (
           <div
             data-testid="overview-activity-empty"
-            style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}
+            style={{ fontSize: 12, color: 'var(--muted-foreground)' }}
           >
             No activity yet — sessions will appear here as they start.
           </div>
@@ -1069,14 +1069,14 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                     fontWeight: 600,
-                    color: 'var(--mc-text-muted, var(--muted-foreground))',
+                    color: 'var(--muted-foreground)',
                     minWidth: 64,
                   }}
                 >
                   {s.role ?? s.type}
                 </span>
                 <span style={{ flex: 1, color: 'var(--foreground)' }}>{s.model || s.sessionId}</span>
-                <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))', fontSize: 11 }}>
+                <span style={{ color: 'var(--muted-foreground)', fontSize: 11 }}>
                   {s.status}
                 </span>
               </li>
@@ -1113,7 +1113,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               fontSize: 11,
               padding: '4px 10px',
               borderRadius: 999,
-              border: '1px solid var(--mc-border, var(--border))',
+              border: '1px solid var(--border)',
               background: 'transparent',
               color: 'var(--foreground)',
               cursor: 'pointer',
@@ -1127,7 +1127,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
       {planning.isLoading && (
         <div
           data-testid="overview-planning-loading"
-          style={{ fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}
+          style={{ fontSize: 11, color: 'var(--muted-foreground)' }}
         >
           Loading planning context…
         </div>
