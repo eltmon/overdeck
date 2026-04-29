@@ -34,7 +34,7 @@ export function VBriefTab({ issueId }: VBriefTabProps) {
     return (
       <div
         data-testid="vbrief-tab-loading"
-        style={{ padding: 16, fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}
+        style={{ padding: 16, fontSize: 12, color: 'var(--muted-foreground)' }}
       >
         Loading plan…
       </div>

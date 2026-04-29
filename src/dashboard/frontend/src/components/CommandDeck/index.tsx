@@ -821,7 +821,7 @@ export function CommandDeck({
           ) : (
             <div className={styles.contentEmpty}>
               <div style={{ textAlign: 'center' }}>
-                <Compass size={48} style={{ marginBottom: 'var(--mc-space-4)', opacity: 0.3 }} />
+                <Compass size={48} style={{ marginBottom: '16px', opacity: 0.3 }} />
                 <p>Select a feature to view activity</p>
               </div>
             </div>

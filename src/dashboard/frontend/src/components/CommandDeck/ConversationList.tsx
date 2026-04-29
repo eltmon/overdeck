@@ -459,7 +459,7 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                   <Loader2
                     size={12}
                     className={styles.conversationWorkingSpinner}
-                    style={{ color: 'var(--mc-warning)' }}
+                    style={{ color: 'var(--warning)' }}
                     aria-label={`Forking ${conv.name}`}
                   />
                 ) : conv.isWorking ? (
@@ -473,8 +473,8 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                     size={7}
                     className={styles.conversationDot}
                     style={{
-                      fill: conv.sessionAlive ? 'var(--mc-success)' : 'var(--mc-text-muted)',
-                      color: conv.sessionAlive ? 'var(--mc-success)' : 'var(--mc-text-muted)',
+                      fill: conv.sessionAlive ? 'var(--success)' : 'var(--muted-foreground)',
+                      color: conv.sessionAlive ? 'var(--success)' : 'var(--muted-foreground)',
                     }}
                   />
                 )}

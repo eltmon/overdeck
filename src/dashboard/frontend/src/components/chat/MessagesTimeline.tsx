@@ -339,7 +339,7 @@ function UserMessageRow({ message }: { message: ChatMessage }) {
         <span className={styles.messageTimestamp}>
           {isPending ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-              <svg style={{ width: '10px', height: '10px', animation: 'spin 1s linear infinite', color: 'var(--mc-accent)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg style={{ width: '10px', height: '10px', animation: 'spin 1s linear infinite', color: 'var(--primary)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 12a9 9 0 11-6.219-8.56" />
               </svg>
               Sending…
@@ -457,10 +457,10 @@ const TERMINAL_TOOLS = new Set(['Bash', 'bash', 'terminal', 'shell']);
 function WorkLogEntryRow({ entry }: { entry: WorkLogEntry }) {
   const [showResult, setShowResult] = useState(false);
   const toneColor: Record<WorkLogEntry['tone'], string> = {
-    thinking: 'var(--mc-text-secondary)',
-    tool: 'var(--mc-accent)',
-    info: 'var(--mc-success)',
-    error: 'var(--mc-error)',
+    thinking: 'var(--muted-foreground)',
+    tool: 'var(--primary)',
+    info: 'var(--success)',
+    error: 'var(--destructive)',
   };
 
   const isTerminal = TERMINAL_TOOLS.has(entry.toolTitle ?? entry.label);
@@ -506,7 +506,7 @@ function WorkLogEntryRow({ entry }: { entry: WorkLogEntry }) {
               marginLeft: 'auto',
               transition: 'transform 0.15s',
               transform: showResult ? 'rotate(90deg)' : 'none',
-              color: 'var(--mc-text-muted)',
+              color: 'var(--muted-foreground)',
             }}
           />
         )}
@@ -554,10 +554,10 @@ function WorkingIndicator({ startedAt }: { startedAt: string | null }) {
 // ─── Round divider ────────────────────────────────────────────────────────────
 
 const ROUND_VERDICT_COLOR: Record<RoundVerdict, string> = {
-  pending: 'var(--mc-text-muted, var(--muted-foreground))',
-  passed: 'var(--mc-success, var(--success))',
-  failed: 'var(--mc-error, var(--destructive))',
-  running: 'var(--mc-accent, var(--primary))',
+  pending: 'var(--muted-foreground)',
+  passed: 'var(--success)',
+  failed: 'var(--destructive)',
+  running: 'var(--primary)',
 };
 
 const ROUND_VERDICT_LABEL: Record<RoundVerdict, string> = {
@@ -589,7 +589,7 @@ function RoundDivider({ marker }: { marker: RoundMarker }) {
         style={{
           flex: 1,
           height: 1,
-          background: 'var(--mc-border, var(--border))',
+          background: 'var(--border)',
         }}
       />
       <span
@@ -613,7 +613,7 @@ function RoundDivider({ marker }: { marker: RoundMarker }) {
         style={{
           flex: 1,
           height: 1,
-          background: 'var(--mc-border, var(--border))',
+          background: 'var(--border)',
         }}
       />
     </div>

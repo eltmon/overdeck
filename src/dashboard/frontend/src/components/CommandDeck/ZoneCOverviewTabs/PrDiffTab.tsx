@@ -46,7 +46,7 @@ export function statusColor(check: { state?: string; conclusion?: string; status
 }
 
 function diffLineColor(line: string): string | undefined {
-  if (line.startsWith('+++ ') || line.startsWith('--- ')) return 'var(--mc-text-muted, var(--muted-foreground))';
+  if (line.startsWith('+++ ') || line.startsWith('--- ')) return 'var(--muted-foreground)';
   if (line.startsWith('+')) return 'var(--success, #10b981)';
   if (line.startsWith('-')) return 'var(--destructive)';
   if (line.startsWith('@@')) return 'var(--primary)';
@@ -124,7 +124,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
     return (
       <div
         data-testid="prdiff-tab-loading"
-        style={{ padding: 16, fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}
+        style={{ padding: 16, fontSize: 12, color: 'var(--muted-foreground)' }}
       >
         Loading pull request…
       </div>
@@ -146,7 +146,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
         style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 6 }}
       >
         <div style={{ fontSize: 14, fontWeight: 600 }}>No pull request yet</div>
-        <div style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+        <div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
           No PR found for branch <code>feature/{issueId.toLowerCase()}</code>.
           {data.error ? (
             <>
@@ -186,7 +186,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
           </a>
           <StateBadge pr={pr} />
         </div>
-        <div style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+        <div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
           <code>{pr.headRefName}</code> → <code>{pr.baseRefName}</code>
           {pr.author?.login ? <> · @{pr.author.login}</> : null}
           {' · '}
@@ -201,7 +201,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
         data-testid="prdiff-tab-checks"
         style={{
           background: 'var(--card)',
-          border: '1px solid var(--mc-border, var(--border))',
+          border: '1px solid var(--border)',
           borderRadius: 8,
           padding: 12,
           display: 'flex',
@@ -213,7 +213,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
           style={{
             fontSize: 12,
             fontWeight: 600,
-            color: 'var(--mc-text-muted, var(--muted-foreground))',
+            color: 'var(--muted-foreground)',
             textTransform: 'uppercase',
             letterSpacing: '0.04em',
           }}
@@ -231,7 +231,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
         {checks.length === 0 ? (
           <div
             data-testid="prdiff-tab-checks-empty"
-            style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}
+            style={{ fontSize: 12, color: 'var(--muted-foreground)' }}
           >
             No checks reported.
           </div>
@@ -279,7 +279,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
           data-testid="prdiff-tab-reviewers"
           style={{
             background: 'var(--card)',
-            border: '1px solid var(--mc-border, var(--border))',
+            border: '1px solid var(--border)',
             borderRadius: 8,
             padding: 12,
             display: 'flex',
@@ -291,7 +291,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
             style={{
               fontSize: 12,
               fontWeight: 600,
-              color: 'var(--mc-text-muted, var(--muted-foreground))',
+              color: 'var(--muted-foreground)',
               textTransform: 'uppercase',
               letterSpacing: '0.04em',
             }}
@@ -321,7 +321,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
         data-testid="prdiff-tab-files"
         style={{
           background: 'var(--card)',
-          border: '1px solid var(--mc-border, var(--border))',
+          border: '1px solid var(--border)',
           borderRadius: 8,
           padding: 12,
           display: 'flex',
@@ -333,7 +333,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
           style={{
             fontSize: 12,
             fontWeight: 600,
-            color: 'var(--mc-text-muted, var(--muted-foreground))',
+            color: 'var(--muted-foreground)',
             textTransform: 'uppercase',
             letterSpacing: '0.04em',
           }}
@@ -343,7 +343,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
         {pr.files.length === 0 ? (
           <div
             data-testid="prdiff-tab-files-empty"
-            style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}
+            style={{ fontSize: 12, color: 'var(--muted-foreground)' }}
           >
             No file metadata returned.
           </div>
@@ -403,7 +403,7 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
           data-testid="prdiff-tab-diff"
           style={{
             background: 'var(--card)',
-            border: '1px solid var(--mc-border, var(--border))',
+            border: '1px solid var(--border)',
             borderRadius: 8,
             padding: 0,
             overflow: 'hidden',
@@ -414,10 +414,10 @@ export function PrDiffTab({ issueId }: PrDiffTabProps) {
               padding: '8px 12px',
               fontSize: 12,
               fontWeight: 600,
-              color: 'var(--mc-text-muted, var(--muted-foreground))',
+              color: 'var(--muted-foreground)',
               textTransform: 'uppercase',
               letterSpacing: '0.04em',
-              borderBottom: '1px solid var(--mc-border, var(--border))',
+              borderBottom: '1px solid var(--border)',
             }}
           >
             Patch ({diffLines.length} line{diffLines.length === 1 ? '' : 's'})

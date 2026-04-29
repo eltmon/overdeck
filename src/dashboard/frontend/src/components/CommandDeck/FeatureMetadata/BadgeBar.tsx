@@ -255,7 +255,7 @@ export function BadgeBar({ issueId, source, onOpenBeads }: BadgeBarProps) {
           <span
             className={styles.badge}
             style={{
-              color: syncResult.isError ? 'var(--mc-error, #ef4444)' : 'var(--mc-success, #22c55e)',
+              color: syncResult.isError ? 'var(--destructive)' : 'var(--success)',
               fontSize: '0.7rem',
               opacity: 0.9,
             }}

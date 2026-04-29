@@ -81,17 +81,17 @@ export function TranscriptUpload({ issueId, onClose }: TranscriptUploadProps) {
         </div>
         <div className={styles.modalBody}>
           {/* Type selection */}
-          <div style={{ display: 'flex', gap: 'var(--mc-space-2)', marginBottom: 'var(--mc-space-4)' }}>
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
             <button
               className={styles.badge}
-              style={uploadType === 'transcript' ? { borderColor: 'var(--mc-accent)', color: 'var(--mc-accent)' } : {}}
+              style={uploadType === 'transcript' ? { borderColor: 'var(--primary)', color: 'var(--primary)' } : {}}
               onClick={() => setUploadType('transcript')}
             >
               Transcript
             </button>
             <button
               className={styles.badge}
-              style={uploadType === 'note' ? { borderColor: 'var(--mc-accent)', color: 'var(--mc-accent)' } : {}}
+              style={uploadType === 'note' ? { borderColor: 'var(--primary)', color: 'var(--primary)' } : {}}
               onClick={() => setUploadType('note')}
             >
               Note
@@ -129,9 +129,9 @@ export function TranscriptUpload({ issueId, onClose }: TranscriptUploadProps) {
 
           {uploadResult && (
             <p style={{
-              fontSize: 'var(--mc-font-size-sm)',
-              marginTop: 'var(--mc-space-3)',
-              color: uploadResult.startsWith('Error') ? 'var(--mc-error)' : 'var(--mc-success)',
+              fontSize: '12px',
+              marginTop: '12px',
+              color: uploadResult.startsWith('Error') ? 'var(--destructive)' : 'var(--success)',
             }}>
               {uploadResult}
             </p>

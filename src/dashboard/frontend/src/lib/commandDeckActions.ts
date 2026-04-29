@@ -67,7 +67,11 @@ export type ActionKey =
   | 'cancel'
   // Session-scoped actions (Zone B)
   | 'stopSession'
-  | 'viewTerminal';
+  | 'viewTerminal'
+  | 'viewState'
+  | 'viewVbrief'
+  | 'copySessionId'
+  | 'copyTmuxCommand';
 
 /** Partitioned action lists. `primary` always renders inline; `overflow` folds. */
 export interface ActionLayout {
@@ -305,6 +309,11 @@ export function getZoneBActions(input: ZoneBInput): ActionLayout {
   }
   if (input.hasTerminal) {
     secondary.push('viewTerminal');
+  }
+
+  overflow.push('viewState', 'viewVbrief', 'copySessionId');
+  if (input.hasTerminal) {
+    overflow.push('copyTmuxCommand');
   }
 
   return { primary, secondary, overflow };

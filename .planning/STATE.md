@@ -1,70 +1,79 @@
-# PAN-905: Command Deck — Make Awaiting Merge the Canonical Final Merge Gate
+# PAN-923: Command Deck v0.8 Completion
 
-## Status: Complete
+**Status:** In Progress (fast-track on main)
+**Planned by:** Claude Opus 4.6
+**Date:** 2026-04-29
 
-## Current Phase
-All frontend and backend work for PAN-905 is finished. The Awaiting Merge page is now the canonical final merge gate.
+---
 
-## Completed Work
-- [x] pan-l4wu: Add blockerReasons[] column to review_status SQLite schema (commit: bcb7f958)
-- [x] pan-91h1: Enrich readyForMerge to incorporate blockerReasons (commit: 5fcd1167)
-- [x] pan-zg92: Add POST /api/webhooks/github route with HMAC-SHA256 verification (commit: 57b86e20)
-- [x] pan-4c7b: Update frontend ReviewStatusData type to include blockerReasons and new fields (commit: 2f430c3c)
-- [x] Fixed inverted bead dependencies in beads database (all 17 deps reversed)
-- [x] pan-vwrn: Add smee-client dependency and process management
-- [x] pan-ygsc: Implement check_suite and check_run webhook event handlers
-- [x] pan-umby: Implement pull_request webhook event handler
-- [x] pan-kjni: Implement pull_request_review and review_thread webhook handlers
-- [x] pan-ktn2: Integrate smee-client lifecycle into pan up / pan down
-- [x] pan-vb4m: Update GitHub App manifest and create migration script for existing installs
-- [x] pan-267t: Add 4th Merge step to pipeline stepper in ReviewPipelineSection
-- [x] pan-2tfi: Show individual CI check sub-statuses in the Merge step
-- [x] pan-0pe6: Show mergeRetryCount and mergeNotes in the Merge step
-- [x] pan-cpp7: Show merge queue position in the pipeline stepper
-- [x] pan-3uwo: Add live specialist log link during active merge phase
-- [x] pan-fxfx: Rewrite Awaiting Merge filtering to exclude blocked issues
-- [x] pan-o32r: Surface exact GitHub-native blockers on Awaiting Merge page
-- [x] pan-8wl8: Document Panopticon product vision in project docs
+## Discovery Summary
 
-## Key Decisions
-- Bead dependencies were inverted in the beads database (all dependencies pointing backwards). Fixed by removing all incorrect deps and re-adding per vBRIEF plan edges.
-- Prop drilling for `onViewMergeLog` was chosen over context because `ReviewPipelineSection` is deeply nested inside `ActionsSection` → `InspectorPanel` → `DetailPanelLayout`, and the callback only makes sense at the layout level where terminal state lives.
-- Explicit `blockerReasons` filtering in `selectAwaitingMerge` and `AwaitingMergePage` provides defense-in-depth: even if `readyForMerge` normalization on the server has a bug, the frontend will never show blocked issues in the merge queue.
+PAN-923 consolidates remaining PAN-830 phases (3-6), PAN-831 (rebrand refinish), and PAN-548 (draft persistence) into one sprint on `main`.
 
-## Specialist Feedback
-- All feedback files in `.planning/feedback/` are for PAN-854 (approved issue), not PAN-905. No actionable feedback for PAN-905.
-- **[2026-04-28T18:29Z] verification-gate → FAILED** — `.planning/feedback/008-verification-gate-failed.md`
-- **[2026-04-28T18:31Z] verification-gate → FAILED** — `.planning/feedback/009-verification-gate-failed.md`
-- **[2026-04-28T19:05Z] review-agent → COMMENTED** — `.planning/feedback/010-review-agent-commented.md`
-- **[2026-04-28T19:26Z] verification-gate → FAILED** — `.planning/feedback/011-verification-gate-failed.md`
-- **[2026-04-28T20:16Z] review-agent → COMMENTED** — `.planning/feedback/012-review-agent-commented.md`
-- **[2026-04-28T22:33Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/013-review-agent-changes-requested.md`
-- **[2026-04-28T23:10Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/014-review-agent-changes-requested.md`
-- **[2026-04-28T23:39Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/015-review-agent-changes-requested.md`
-- **[2026-04-28T23:57Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/016-review-agent-changes-requested.md`
-- **[2026-04-29T00:15Z] verification-gate → FAILED** — `.planning/feedback/017-verification-gate-failed.md`
-- **[2026-04-29T00:17Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/018-review-agent-changes-requested.md`
-- **[2026-04-29T00:37Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/019-review-agent-changes-requested.md`
-- **[2026-04-29T01:27Z] review-agent → COMMENTED** — `.planning/feedback/020-review-agent-commented.md`
-- **[2026-04-29T02:11Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/021-review-agent-changes-requested.md`
-- **[2026-04-29T02:32Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/022-review-agent-changes-requested.md`
-- **[2026-04-29T02:36Z] verification-gate → FAILED** — `.planning/feedback/023-verification-gate-failed.md`
-- **[2026-04-29T02:38Z] verification-gate → FAILED** — `.planning/feedback/024-verification-gate-failed.md`
-- **[2026-04-29T03:24Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/025-review-agent-changes-requested.md`
-- **[2026-04-29T03:42Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/026-review-agent-changes-requested.md`
-- **[2026-04-29T03:49Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/027-review-agent-changes-requested.md`
-- **[2026-04-29T04:25Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/028-review-agent-changes-requested.md`
-- **[2026-04-29T15:09Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/029-review-agent-changes-requested.md`
-- **[2026-04-29T15:47Z] review-agent → COMMENTED** — `.planning/feedback/030-review-agent-commented.md`
-- **[2026-04-29T15:51Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/031-review-agent-changes-requested.md`
-- **[2026-04-29T16:29Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/032-review-agent-changes-requested.md`
-- **[2026-04-29T16:40Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/033-review-agent-changes-requested.md`
-- **[2026-04-29T17:09Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/034-review-agent-changes-requested.md`
-- **[2026-04-29T17:26Z] verification-gate → FAILED** — `.planning/feedback/035-verification-gate-failed.md`
-- **[2026-04-29T17:59Z] review-agent → COMMENTED** — `.planning/feedback/036-review-agent-commented.md`
-- **[2026-04-29T18:31Z] review-agent → COMMENTED** — `.planning/feedback/037-review-agent-commented.md`
-- **[2026-04-29T19:03Z] review-agent → COMMENTED** — `.planning/feedback/038-review-agent-commented.md`
-- **[2026-04-29T19:36Z] review-agent → COMMENTED** — `.planning/feedback/039-review-agent-commented.md`
-- **[2026-04-29T19:46Z] verification-gate → FAILED** — `.planning/feedback/040-verification-gate-failed.md`
-- **[2026-04-29T19:52Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/041-review-agent-changes-requested.md`
-- **[2026-04-29T20:02Z] review-agent → COMMENTED** — `.planning/feedback/042-review-agent-commented.md`
+### Already Completed (skip in vBRIEF)
+- **Tree state filter** (item 2): `[All] [Alive] [Failed]` toggle exists at `CommandDeck/index.tsx:698-711`
+- **PR/Diff tab** (item 6): `PrDiffTab.tsx` fully implemented (475 lines), backend at `/api/issues/:id/pr/details`
+- **Discussions tab** (item 7): `DiscussionsTab.tsx` fully implemented (327 lines), backend at `/api/issues/:id/discussions`
+- **Directory rename** (item 8a): `MissionControl/` → `CommandDeck/` already done
+- **Old CSS delete** (item 8b): `mission-control.module.css` already deleted
+- **DeferredTab** is dead code — no imports reference it
+
+### Key Touch Points
+
+| Component | File | What Changes |
+|-----------|------|-------------|
+| PresenceDot → StatusDot | `ProjectTree/SessionNode.tsx:21-52` | Replace inline SVG spinner + CSS classes with `<StatusDot>` |
+| Collapse logic | `ProjectTree/FeatureItem.tsx:479-484` | `defaultExpandedFromState()` becomes state-aware |
+| ZoneBActionStrip | `CommandDeck/ZoneBActionStrip.tsx:291-369` | Add overflow items from PRD spec |
+| getZoneBActions | `lib/commandDeckActions.ts:298-311` | Add overflow action keys |
+| mc- tokens (249 usages) | Many `.tsx` files | Replace `var(--mc-X, var(--Y))` → `var(--Y)` |
+| mc- definitions | `styles/command-deck.module.css:4-35` | Remove alias layer after migration |
+| text-white | `BulkActionBar.tsx` | Replace with semantic foreground token |
+| DialogProvider | `components/DialogProvider.tsx` | Backdrop blur, panel styling, animation |
+| Draft persistence | `CommandDeck/IssueComposer.tsx:56` | `useState('')` → Zustand-backed state |
+| Liveness motions | Various CommandDeck components | Verify animations fire on real events |
+
+### mc- Token Mapping (from command-deck.module.css)
+
+| mc- token | Canonical replacement |
+|-----------|---------------------|
+| `--mc-text-muted` (101 uses) | `--muted-foreground` |
+| `--mc-border` (53 uses) | `--border` |
+| `--mc-success` (25 uses) | `--success` |
+| `--mc-error` (21 uses) | `--destructive` |
+| `--mc-warning` (20 uses) | `--warning` |
+| `--mc-primary` (11 uses) | `--primary` |
+| `--mc-accent` (11 uses) | `--primary` |
+| `--mc-surface-2` (5 uses) | `color-mix(in srgb, var(--foreground) 3%, transparent)` |
+| `--mc-surface` (3 uses) | `--background` |
+| `--mc-text-secondary` (2 uses) | `--muted-foreground` |
+| `--mc-text-primary` (2 uses) | `--foreground` |
+| `--mc-primary-foreground` (2 uses) | `--primary-foreground` |
+| `--mc-bg-secondary` (2 uses) | `--muted` |
+
+Pattern: most inline styles use `var(--mc-X, var(--canonical))` with fallbacks. Replace entire expression with just `var(--canonical)`.
+
+## Key Architectural Decisions
+
+### D1: StatusDot mapping for SessionNode
+**Decision:** Map session `presence` field to StatusDot `status` prop: `active→active`, `idle→idle`, `suspended→waiting`, `ended→ended`. No `thinking` state at session level (that's a status sub-state).
+**Rationale:** StatusDot already handles these states with correct animations. The PresenceDot inline SVG duplicates this without animation consistency.
+
+### D2: Done-issue collapse default
+**Decision:** Pass feature state to `defaultExpandedFromState()`. In-flight states (stateLabel contains "progress", "review", "testing") → expanded=true with auto-select of best alive session. Done/closed → collapsed.
+**Rationale:** Users want to see active work at a glance but not be overwhelmed by completed issues.
+
+### D3: mc- token elimination approach
+**Decision:** Batch find-replace across all `.tsx` files. Replace `var(--mc-X, var(--Y))` patterns with `var(--Y)`. For bare `var(--mc-X)` without fallback, replace with canonical equivalent from mapping table. Then remove definitions from `command-deck.module.css`.
+**Rationale:** The mc- layer is 1:1 with canonical tokens — it adds indirection without value.
+
+### D4: Draft persistence via Zustand
+**Decision:** Add a `draftTexts: Record<string, string>` map to the existing dashboard Zustand store, keyed by issueId. Cleared on page refresh (not persisted to localStorage). Wire into IssueComposer via store selector.
+**Rationale:** Simplest approach that survives navigation within the SPA but doesn't persist stale drafts across sessions.
+
+### D5: Zone B overflow additions
+**Decision:** Add to getZoneBActions overflow: `viewState`, `viewVbrief`, `copySessionId`, `copyTmuxCommand`. Add corresponding ActionKey entries and ZoneBActionStrip overflow items.
+**Rationale:** PRD specifies these actions. They're utility/debug actions that belong in overflow, not primary.
+
+## Remaining Work
+See plan.vbrief.json for the complete bead breakdown.

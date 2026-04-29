@@ -161,7 +161,7 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
               <div className={styles.sessionPanelEmpty}>No review rounds recorded.</div>
             ) : (
               <>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--mc-text-muted, var(--muted-foreground))', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   Review rounds
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
@@ -171,8 +171,8 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
                 </div>
                 {/* Show synthesis summaries for each round */}
                 {session.roundMetadata?.history.map((r) => r.summary ? (
-                  <div key={`summary-${r.round}`} style={{ borderTop: '1px solid var(--mc-border, var(--border))', paddingTop: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mc-text-muted, var(--muted-foreground))', marginBottom: 6 }}>
+                  <div key={`summary-${r.round}`} style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>
                       Round {r.round} — {r.status}
                     </div>
                     <ChatMarkdown text={r.summary} isStreaming={false} />
