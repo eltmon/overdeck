@@ -265,9 +265,10 @@ export async function buildReviewerNodes(
       const sessionId = getReviewerSessionName(role, opts.projectKey, opts.issueId);
       const isLive = opts.tmuxSessionNames.has(sessionId);
       const roundMetadata = await readReviewerRounds(sessionId, agentsRoot);
-      // Reviewer sessions are spawned from the project root, not the workspace,
-      // so JSONL resolution must use the project path (PAN-830 review high-7).
-      const jsonlCwd = opts.projectPath ?? opts.workspacePath;
+      // Reviewers run inside the workspace (pan review run sets cwd to workspace),
+      // so JSONL files land in the workspace-encoded Claude projects dir.
+      // Fall back to projectPath only if workspacePath is unavailable.
+      const jsonlCwd = opts.workspacePath ?? opts.projectPath;
       const jsonlPath = await resolveJsonlPath(sessionId, jsonlCwd, {
         agentsDirOverride: opts.agentsDirOverride,
       });
