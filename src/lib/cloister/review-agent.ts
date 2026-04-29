@@ -912,6 +912,7 @@ export async function runParallelReview(
     `**Issue ID**: ${context.issueId}`,
     `**Workspace Path**: ${context.projectPath}`,
     absoluteFilesChanged.length > 0 ? `**Files changed**: ${absoluteFilesChanged.join(', ')}` : '',
+    `> **CRITICAL: Re-read every file listed above before analyzing it. Sessions are resumed across review rounds, so you may have stale cached file contents. Do NOT rely on memory — open each file with the Read tool before commenting on it.**`,
   ].filter(Boolean).join('\n');
 
   const reviewerSessions: Array<{ sessionName: string; outputFile: string; role: string }> = [];
