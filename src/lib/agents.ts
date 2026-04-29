@@ -65,7 +65,7 @@ async function hasAgentRuntimeInSubtree(rootPid: string): Promise<boolean> {
   return false;
 }
 
-function getProviderAuthMode(model: string): string | undefined {
+export function getProviderAuthMode(model: string): string | undefined {
   const provider = getProviderForModel(model);
   if (provider.name === 'openai') {
     const { config } = loadYamlConfig();

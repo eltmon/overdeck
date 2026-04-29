@@ -914,7 +914,19 @@ export function SettingsPage() {
                         )}
                         {(codexAuth?.status === 'expired' || codexAuth?.status === 'burned') && (
                           <button
-                            onClick={() => window.location.href = '/terminal/codex-reauth'}
+                            onClick={async () => {
+                              try {
+                                const res = await fetch('/api/settings/codex-reauth', { method: 'POST' });
+                                if (!res.ok) {
+                                  const body = await res.json().catch(() => ({}));
+                                  throw new Error(body.error || `Failed to spawn re-auth session (${res.status})`);
+                                }
+                                const { sessionName, token } = await res.json() as { sessionName: string; token: string };
+                                window.location.href = `/terminal/${sessionName}?token=${encodeURIComponent(token)}`;
+                              } catch (err) {
+                                toast.error(err instanceof Error ? err.message : 'Failed to start re-authentication');
+                              }
+                            }}
                             className="mt-2 flex items-center justify-center gap-1.5 px-3 py-1.5 badge-bg-warning hover:bg-warning/20 border badge-border-warning rounded-lg text-xs text-warning transition-colors w-full"
                           >
                             <RefreshCw className="w-3.5 h-3.5" />

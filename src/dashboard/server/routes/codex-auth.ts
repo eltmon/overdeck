@@ -1,15 +1,61 @@
-import { Effect, Layer } from 'effect';
-import { HttpRouter } from 'effect/unstable/http';
+import { Effect, Layer, Option } from 'effect';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { homedir } from 'node:os';
+import { randomUUID } from 'node:crypto';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
 import { bridgeCodexAuthToCliproxyAsync } from '../../../lib/cliproxy.js';
 import { createSessionAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 
-// ─── Route: GET /api/settings/codex-auth ───────────────────────────────────────
+// ─── Re-auth session registry ──────────────────────────────────────────────────
 
-const REAUTH_SESSION_NAME = 'codex-reauth';
+interface ReauthSession {
+  token: string;
+  createdAt: number;
+}
+
+const reauthSessions = new Map<string, ReauthSession>();
+const SESSION_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
+
+function generateReauthSession(): { sessionName: string; token: string } {
+  const sessionName = `reauth-${randomUUID()}`;
+  const token = randomUUID();
+  reauthSessions.set(sessionName, { token, createdAt: Date.now() });
+  return { sessionName, token };
+}
+
+function validateReauthToken(sessionName: string, token: string): boolean {
+  const session = reauthSessions.get(sessionName);
+  if (!session) return false;
+  if (session.token !== token) return false;
+  if (Date.now() - session.createdAt > SESSION_MAX_AGE_MS) {
+    reauthSessions.delete(sessionName);
+    return false;
+  }
+  return true;
+}
+
+function cleanupExpiredReauthSessions(): void {
+  const now = Date.now();
+  for (const [name, session] of reauthSessions.entries()) {
+    if (now - session.createdAt > SESSION_MAX_AGE_MS) {
+      reauthSessions.delete(name);
+    }
+  }
+}
+
+export function getReauthSessionToken(sessionName: string): string | undefined {
+  const session = reauthSessions.get(sessionName);
+  if (!session) return undefined;
+  if (Date.now() - session.createdAt > SESSION_MAX_AGE_MS) {
+    reauthSessions.delete(sessionName);
+    return undefined;
+  }
+  return session.token;
+}
+
+// ─── Route: GET /api/settings/codex-auth ───────────────────────────────────────
 
 const getCodexAuthRoute = HttpRouter.add(
   'GET',
@@ -29,21 +75,19 @@ const postCodexReauthRoute = HttpRouter.add(
   '/api/settings/codex-reauth',
   httpHandler(
     Effect.gen(function* () {
-      const exists = yield* Effect.promise(() => sessionExistsAsync(REAUTH_SESSION_NAME));
-      if (exists) {
-        return jsonResponse({ sessionName: REAUTH_SESSION_NAME, headless: false });
-      }
+      cleanupExpiredReauthSessions();
+      const { sessionName, token } = generateReauthSession();
 
       const headless = !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
       const command = headless ? 'codex login --device-auth' : 'codex login';
 
       yield* Effect.promise(() =>
-        createSessionAsync(REAUTH_SESSION_NAME, homedir(), command, {
+        createSessionAsync(sessionName, homedir(), command, {
           env: { PATH: process.env.PATH || '' },
         }),
       );
 
-      return jsonResponse({ sessionName: REAUTH_SESSION_NAME, headless });
+      return jsonResponse({ sessionName, token, headless });
     }),
   ),
 );
@@ -55,13 +99,21 @@ const getCodexReauthStatusRoute = HttpRouter.add(
   '/api/settings/codex-reauth/status',
   httpHandler(
     Effect.gen(function* () {
-      const exists = yield* Effect.promise(() => sessionExistsAsync(REAUTH_SESSION_NAME));
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const urlOpt = HttpServerRequest.toURL(request);
+      const searchParams = Option.isSome(urlOpt)
+        ? urlOpt.value.searchParams
+        : new URLSearchParams();
+      const sessionName = searchParams.get('session') ?? '';
+
+      const exists = yield* Effect.promise(() => sessionExistsAsync(sessionName));
       if (exists) {
         return jsonResponse({ completed: false });
       }
 
       yield* Effect.promise(() => bridgeCodexAuthToCliproxyAsync());
       const authStatus = yield* Effect.promise(() => checkCodexAuthStatus());
+      reauthSessions.delete(sessionName);
       return jsonResponse({ completed: true, authStatus });
     }),
   ),

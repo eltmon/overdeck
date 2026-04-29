@@ -3,6 +3,7 @@ import type { StartAgentResponse } from '../types';
 interface PendingSpawn {
   requestBody: Record<string, unknown>;
   timestamp: number;
+  reauthSessionName?: string;
 }
 
 let pendingSpawn: PendingSpawn | null = null;
@@ -11,6 +12,11 @@ const MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
 
 export function setPendingCodexSpawn(requestBody: Record<string, unknown>) {
   pendingSpawn = { requestBody, timestamp: Date.now() };
+}
+
+export function setReauthSessionName(sessionName: string) {
+  if (!pendingSpawn) return;
+  pendingSpawn.reauthSessionName = sessionName;
 }
 
 export function getPendingCodexSpawn(): PendingSpawn | null {

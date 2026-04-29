@@ -212,10 +212,11 @@ export default function App() {
     const sessionName = terminalPath.startsWith('/terminal/')
       ? terminalPath.replace('/terminal/', '')
       : terminalSession!;
+    const token = new URLSearchParams(window.location.search).get('token') ?? undefined;
     return (
       <div className="h-screen overflow-hidden bg-[#0d1117]">
         <EventRouter />
-        <StandaloneTerminal sessionName={sessionName} />
+        <StandaloneTerminal sessionName={sessionName} token={token} />
       </div>
     );
   }

@@ -63,6 +63,7 @@ import {
   listRunningAgentsAsync,
   getAgentDir,
   determineModel,
+  getProviderAuthMode,
 } from '../../../lib/agents.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
 import { getProviderForModel } from '../../../lib/providers.js';
@@ -1697,7 +1698,7 @@ const postAgentsRoute = HttpRouter.add(
       agentType: (body as any).agentType,
       difficulty: (body as any).difficulty,
     });
-    if (getProviderForModel(spawnModel).name === 'openai') {
+    if (getProviderForModel(spawnModel).name === 'openai' && getProviderAuthMode(spawnModel) === 'subscription') {
       const codexAuth = yield* Effect.promise(() => checkCodexAuthStatus());
       if (codexAuth.status === 'expired' || codexAuth.status === 'burned') {
         return jsonResponse({
