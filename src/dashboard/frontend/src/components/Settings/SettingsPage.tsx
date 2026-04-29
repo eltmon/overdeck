@@ -164,6 +164,7 @@ const PROVIDERS: { id: Provider; name: string; icon: any; placeholder: string }[
   { id: 'kimi', name: 'Kimi (Moonshot)', icon: Zap, placeholder: 'sk-kimi-...' },
   { id: 'zai', name: 'Zhipu (GLM)', icon: Brain, placeholder: 'sk-zai-...' },
   { id: 'minimax', name: 'MiniMax', icon: Zap, placeholder: 'eyJ...' },
+  { id: 'mimo', name: 'Xiaomi MiMo', icon: Zap, placeholder: 'sk-... or tp-...' },
 ];
 
 // Tracker definitions

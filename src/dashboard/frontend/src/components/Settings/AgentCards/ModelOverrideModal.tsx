@@ -94,6 +94,13 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
       { id: 'minimax-m2.7' as ModelId, name: 'M2.7', icon: Layers, tier: 'balanced', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 10B active params, 204K context' },
     ],
   },
+  mimo: {
+    name: 'Xiaomi MiMo',
+    models: [
+      { id: 'mimo-v2.5-pro' as ModelId, name: 'MiMo V2.5 Pro', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Flagship reasoning model, 1M context, enhanced agent efficiency' },
+      { id: 'mimo-v2.5' as ModelId, name: 'MiMo V2.5', icon: Zap, tier: 'balanced', capabilities: ['code', 'agentic', 'fast'], description: 'Multimodal model, 262K context, strong agentic coding' },
+    ],
+  },
 };
 
 // Work type to required capabilities mapping
