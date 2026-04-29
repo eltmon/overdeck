@@ -4,7 +4,7 @@
     "created": "2026-04-28T18:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-913: Auto-detect expired Codex auth and spawn re-authentication flow",
-    "updated": "2026-04-29T00:19:17.508Z"
+    "updated": "2026-04-29T01:10:53.497Z"
   },
   "plan": {
     "id": "pan-913",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "40c9183c-d3c9-4f28-ba43-2eb1ae4b4287",
     "author": "agent:claude-opus-4-6",
-    "sequence": 28,
+    "sequence": 39,
     "created": "2026-04-28T18:00:00Z",
-    "updated": "2026-04-29T00:19:17.508Z",
+    "updated": "2026-04-29T01:10:53.497Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/913",
@@ -81,7 +81,7 @@
             }
           }
         ],
-        "completed": "2026-04-29T00:19:17.508Z"
+        "completed": "2026-04-29T01:10:53.497Z"
       },
       {
         "id": "cliproxy-log-monitor",
@@ -114,7 +114,7 @@
             }
           }
         ],
-        "completed": "2026-04-29T00:19:17.507Z"
+        "completed": "2026-04-29T01:10:53.496Z"
       },
       {
         "id": "codex-auth-endpoint",
@@ -155,7 +155,7 @@
             }
           }
         ],
-        "completed": "2026-04-29T00:19:17.507Z"
+        "completed": "2026-04-29T01:10:53.496Z"
       },
       {
         "id": "spawn-guardrail-codex",
@@ -196,7 +196,7 @@
             }
           }
         ],
-        "completed": "2026-04-29T00:19:17.506Z"
+        "completed": "2026-04-29T01:10:53.495Z"
       },
       {
         "id": "reauth-endpoint",
@@ -237,7 +237,7 @@
             }
           }
         ],
-        "completed": "2026-04-29T00:19:17.507Z"
+        "completed": "2026-04-29T01:10:53.495Z"
       },
       {
         "id": "reauth-completion",
@@ -278,7 +278,7 @@
             }
           }
         ],
-        "completed": "2026-04-29T00:19:17.506Z"
+        "completed": "2026-04-29T01:10:53.495Z"
       },
       {
         "id": "codex-auth-banner",
@@ -319,7 +319,7 @@
             }
           }
         ],
-        "completed": "2026-04-29T00:19:17.506Z"
+        "completed": "2026-04-29T01:10:53.495Z"
       },
       {
         "id": "codex-auth-polling",
@@ -352,7 +352,7 @@
             }
           }
         ],
-        "completed": "2026-04-29T00:19:17.506Z"
+        "completed": "2026-04-29T01:10:53.494Z"
       },
       {
         "id": "settings-codex-status",
@@ -393,7 +393,7 @@
             }
           }
         ],
-        "completed": "2026-04-29T00:19:17.505Z"
+        "completed": "2026-04-29T01:10:53.494Z"
       },
       {
         "id": "auto-retry-spawn",
@@ -437,7 +437,7 @@
             "completed": "2026-04-29T00:00:03.403Z"
           }
         ],
-        "completed": "2026-04-29T00:19:17.505Z"
+        "completed": "2026-04-29T01:10:53.493Z"
       },
       {
         "id": "documentation",
@@ -472,7 +472,7 @@
             "completed": "2026-04-29T00:00:03.406Z"
           }
         ],
-        "completed": "2026-04-29T00:19:17.507Z"
+        "completed": "2026-04-29T01:10:53.496Z"
       }
     ],
     "edges": [
