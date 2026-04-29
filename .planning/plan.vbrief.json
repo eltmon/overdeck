@@ -3,7 +3,8 @@
     "version": "0.5",
     "created": "2026-04-28T18:00:00Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-913: Auto-detect expired Codex auth and spawn re-authentication flow"
+    "description": "Plan for PAN-913: Auto-detect expired Codex auth and spawn re-authentication flow",
+    "updated": "2026-04-29T00:00:03.406Z"
   },
   "plan": {
     "id": "pan-913",
@@ -11,9 +12,9 @@
     "status": "approved",
     "uid": "40c9183c-d3c9-4f28-ba43-2eb1ae4b4287",
     "author": "agent:claude-opus-4-6",
-    "sequence": 1,
+    "sequence": 17,
     "created": "2026-04-28T18:00:00Z",
-    "updated": "2026-04-28T18:00:00Z",
+    "updated": "2026-04-29T00:00:03.406Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/913",
@@ -79,7 +80,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-04-29T00:00:03.406Z"
       },
       {
         "id": "cliproxy-log-monitor",
@@ -111,7 +113,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-04-29T00:00:03.406Z"
       },
       {
         "id": "codex-auth-endpoint",
@@ -151,7 +154,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-04-29T00:00:03.405Z"
       },
       {
         "id": "spawn-guardrail-codex",
@@ -191,7 +195,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-04-29T00:00:03.405Z"
       },
       {
         "id": "reauth-endpoint",
@@ -231,7 +236,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-04-29T00:00:03.405Z"
       },
       {
         "id": "reauth-completion",
@@ -271,7 +277,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-04-29T00:00:03.405Z"
       },
       {
         "id": "codex-auth-banner",
@@ -311,7 +318,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-04-29T00:00:03.404Z"
       },
       {
         "id": "codex-auth-polling",
@@ -343,7 +351,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-04-29T00:00:03.404Z"
       },
       {
         "id": "settings-codex-status",
@@ -383,12 +392,13 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-04-29T00:00:03.404Z"
       },
       {
         "id": "auto-retry-spawn",
         "title": "Auto-retry blocked spawn after successful re-auth",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -402,33 +412,37 @@
           {
             "id": "auto-retry-spawn.ac1",
             "title": "When spawn fails due to codex auth, the original spawn parameters are retained in frontend state",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-29T00:00:03.403Z"
           },
           {
             "id": "auto-retry-spawn.ac2",
             "title": "After successful re-auth, the blocked spawn is automatically retried",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-29T00:00:03.403Z"
           },
           {
             "id": "auto-retry-spawn.ac3",
             "title": "User sees a toast notification about the automatic retry",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-29T00:00:03.403Z"
           }
-        ]
+        ],
+        "completed": "2026-04-29T00:00:03.403Z"
       },
       {
         "id": "documentation",
         "title": "Document Codex auth requirements and re-auth flow",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-04-28T18:00:00Z",
         "metadata": {
@@ -442,20 +456,23 @@
           {
             "id": "documentation.ac1",
             "title": "Documentation explains Codex is required for subscription (not API-key) mode",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-29T00:00:03.406Z"
           },
           {
             "id": "documentation.ac2",
             "title": "cliproxy SKILL.md updated with dashboard re-auth flow",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-04-29T00:00:03.406Z"
           }
-        ]
+        ],
+        "completed": "2026-04-29T00:00:03.405Z"
       }
     ],
     "edges": [
