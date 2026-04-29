@@ -13,6 +13,7 @@
  *
  * Async-only (fs/promises); safe to call from the dashboard server.
  */
+import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -199,6 +200,49 @@ export async function readReviewerRounds(
 }
 
 /**
+ * Find the most-recent `.pan/review/review-<ISSUEID>-<TIMESTAMP>/` directory
+ * for an issue. Returns the absolute path or null if none exist.
+ *
+ * Used to disambiguate between "round just completed (output file present)" and
+ * "new round in progress (output file not yet written)" when the canonical
+ * reviewer tmux session is alive across rounds (PAN-915).
+ */
+async function findLatestReviewRunDir(
+  workspacePath: string,
+  issueId: string,
+): Promise<string | null> {
+  try {
+    const reviewRoot = join(workspacePath, '.pan', 'review');
+    const entries = await readdir(reviewRoot);
+    const upper = issueId.toUpperCase();
+    const lower = issueId.toLowerCase();
+    let bestDir: string | null = null;
+    let bestTs = -Infinity;
+    for (const entry of entries) {
+      // Pattern: review-<ISSUEID>-<unixMillis>
+      // Tolerant of either case in the prefix segment
+      const upperPrefix = `review-${upper}-`;
+      const lowerPrefix = `review-${lower}-`;
+      const trailing = entry.startsWith(upperPrefix)
+        ? entry.slice(upperPrefix.length)
+        : entry.startsWith(lowerPrefix)
+          ? entry.slice(lowerPrefix.length)
+          : null;
+      if (trailing === null) continue;
+      const ts = Number(trailing);
+      if (!Number.isFinite(ts)) continue;
+      if (ts > bestTs) {
+        bestTs = ts;
+        bestDir = join(reviewRoot, entry);
+      }
+    }
+    return bestDir;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Build exactly five canonical reviewer nodes for an issue. Order matches
  * REVIEWER_ROLES so synthesis is always last.
  */
@@ -206,6 +250,15 @@ export async function buildReviewerNodes(
   opts: BuildReviewerNodesOptions,
 ): Promise<ReviewerNode[]> {
   const agentsRoot = opts.agentsDirOverride ?? join(homedir(), '.panopticon', 'agents');
+
+  // PAN-915 — current-round output dir disambiguates "zombie session from prior
+  // round" vs "alive session for the round currently in progress". When the
+  // canonical session is reused (sendKeys delivers a new prompt to the same
+  // tmux pane), `readReviewerRounds` still reports the previous round's
+  // archived status because the new round hasn't archived yet. Without this
+  // check, an in-progress round looks like a completed-zombie and renders as
+  // stopped in the dashboard.
+  const latestReviewRunDir = await findLatestReviewRunDir(opts.workspacePath, opts.issueId);
 
   const nodes = await Promise.all(
     REVIEWER_ROLES.map(async (role) => {
@@ -219,24 +272,34 @@ export async function buildReviewerNodes(
         agentsDirOverride: opts.agentsDirOverride,
       });
 
+      // PAN-915 — definitive "this round is in progress" signal: the latest
+      // review-run dir exists but this role's output file hasn't landed yet.
+      const latestRunOutputExists = latestReviewRunDir
+        ? existsSync(join(latestReviewRunDir, `${role}.md`))
+        : false;
+      const inProgressThisRound = isLive && latestReviewRunDir !== null && !latestRunOutputExists;
+
       // Determine if the reviewer is genuinely working or just a zombie session.
-      // A reviewer is a zombie when: tmux is alive, but the latest round artifact
-      // says "completed" — the coordinator was supposed to kill it but crashed.
-      // Treating zombies as "running" causes spinner loops and terminal reconnects.
+      // A reviewer is a zombie when: tmux is alive, the latest archived round
+      // artifact says completed/failed, AND no newer round directory has
+      // appeared in the workspace (i.e. the coordinator was supposed to kill
+      // the pane but didn't). Treating zombies as "running" causes spinner
+      // loops and terminal reconnects.
       const latestRoundDone = roundMetadata?.latestStatus === 'completed'
         || roundMetadata?.latestStatus === 'failed';
-      const isZombie = isLive && latestRoundDone;
+      const isZombie = isLive && latestRoundDone && !inProgressThisRound;
 
       let presence: SessionNodePresence;
       if (isLive && !isZombie) {
-        presence = opts.status === 'running' ? 'active' : 'idle';
+        presence = (opts.status === 'running' || inProgressThisRound) ? 'active' : 'idle';
       } else {
         // Zombie or dead — treat as ended so terminal won't try to connect
         presence = isZombie ? 'idle' : 'ended';
       }
 
       // Per-role status:
-      //   - live AND not zombie → running (new round in progress)
+      //   - live AND running this round → running
+      //   - live AND not zombie (parent says running) → running
       //   - zombie → use the archived round status (completed/failed)
       //   - dead → use the archived round status or parent status
       const rawStatus = (isLive && !isZombie)
