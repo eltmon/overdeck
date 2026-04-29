@@ -96,6 +96,7 @@ export function createClaudeAdapter(): RuntimeAdapter {
           generateLauncherScript({
             agentType: 'runtime',
             workingDir: options.workingDir,
+            setTerminalEnv: true,
             promptFile,
             baseCommand: 'claude',
             extraArgs: args.length > 0 ? args.join(' ') : undefined,

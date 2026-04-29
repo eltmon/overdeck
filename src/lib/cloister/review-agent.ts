@@ -566,6 +566,7 @@ async function spawnReviewer(
     agentType: 'review',
     workingDir: packageRoot,
     setPipefail: true,
+    setTerminalEnv: true,
     unsetPanopticonEnv: true,
     panopticonEnv: { agentId: sessionName },
     providerExports: providerExports.trimEnd(),
@@ -579,6 +580,7 @@ async function spawnReviewer(
 
   await createSessionAsync(sessionName, packageRoot, `bash ${launcherPath}`, {
     env: {
+      TERM: 'xterm-256color',
       // Mirror the launcher's PANOPTICON_AGENT_ID into the tmux session env so
       // the value is visible to processes that inspect the env-from-tmux path
       // (not just the launcher exec chain).
