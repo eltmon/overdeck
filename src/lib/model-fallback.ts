@@ -13,7 +13,7 @@ import type { SubscriptionPlan } from './subscription-types.js';
 /**
  * AI model provider types
  */
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo';
 
 /**
  * Map of model ID to provider
@@ -69,6 +69,10 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'glm-5.1': 'zai',
   'glm-4.7': 'zai',
   'glm-4.7-flash': 'zai',
+
+  // MiMo models
+  'mimo-v2.5-pro': 'mimo',
+  'mimo-v2.5': 'mimo',
 } as Record<ModelId | string, ModelProvider>;
 
 /**
@@ -129,6 +133,10 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // and direct FALLBACK_MAP lookup; explicit entries make the result deterministic).
   'glm-4.7': 'claude-sonnet-4-6', // strong-tier → Sonnet
   'glm-4.7-flash': 'claude-haiku-4-5', // economy-tier → Haiku
+
+  // MiMo → Anthropic
+  'mimo-v2.5-pro': 'claude-sonnet-4-6', // Flagship reasoning → Sonnet
+  'mimo-v2.5': 'claude-sonnet-4-6', // Multimodal → Sonnet
 };
 
 /**
@@ -189,6 +197,7 @@ export function getModelProvider(modelId: ModelId | string): ModelProvider {
   if (modelId.startsWith('gemini-')) return 'google';
   if (modelId.startsWith('kimi-')) return 'kimi';
   if (modelId.toLowerCase().startsWith('minimax')) return 'minimax';
+  if (modelId.startsWith('mimo-')) return 'mimo';
   return 'anthropic';
 }
 

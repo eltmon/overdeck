@@ -8,9 +8,9 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, KimiModel } from './settings.js';
+import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, KimiModel, MimoModel } from './settings.js';
 
-export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'openrouter';
+export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter';
 
 /**
  * Provider compatibility types
@@ -105,6 +105,17 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     description: 'Anthropic-compatible API via Z.AI GLM models',
   },
 
+  mimo: {
+    name: 'mimo',
+    displayName: 'Xiaomi MiMo',
+    compatibility: 'direct',
+    baseUrl: 'https://api.xiaomimimo.com/anthropic',
+    authType: 'static',
+    models: ['mimo-v2.5-pro', 'mimo-v2.5'],
+    tested: true,
+    description: 'Anthropic-compatible API via Xiaomi MiMo (pay-as-you-go or Token Plan)',
+  },
+
   openrouter: {
     name: 'openrouter',
     displayName: 'OpenRouter',
@@ -153,6 +164,11 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   // Check Z.AI models
   if (['glm-5.1', 'glm-4.7', 'glm-4.7-flash'].includes(modelId)) {
     return PROVIDERS.zai;
+  }
+
+  // Check MiMo models
+  if (['mimo-v2.5-pro', 'mimo-v2.5'].includes(modelId)) {
+    return PROVIDERS.mimo;
   }
 
   // Default to Anthropic if unknown
@@ -216,8 +232,8 @@ export function getProviderEnv(
       }
     }
 
-    // MiniMax and Z.AI recommend longer timeouts
-    if (provider.name === 'minimax' || provider.name === 'zai') {
+    // MiniMax, Z.AI, and MiMo recommend longer timeouts
+    if (provider.name === 'minimax' || provider.name === 'zai' || provider.name === 'mimo') {
       env.API_TIMEOUT_MS = '300000';
     }
 
