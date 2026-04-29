@@ -28,9 +28,10 @@ import {
 
 const WEBHOOK_SECRET_PATH = join(homedir(), '.panopticon', 'github-app', 'webhook-secret');
 
-// ─── Async secret loading at module init (never blocks request handlers) ─────
+// ─── Lazy async secret loading (defers to first request so tests can mock fs) ─
 
-let _cachedWebhookSecret: string | null | undefined;
+let _cachedWebhookSecret: string | null | undefined = undefined;
+let _secretLoadPromise: Promise<void> | null = null;
 
 async function loadWebhookSecret(): Promise<void> {
   try {
@@ -46,13 +47,24 @@ async function loadWebhookSecret(): Promise<void> {
   }
 }
 
-const _secretLoadPromise = loadWebhookSecret();
+function ensureSecretLoaded(): Promise<void> {
+  if (!_secretLoadPromise) {
+    _secretLoadPromise = loadWebhookSecret();
+  }
+  return _secretLoadPromise;
+}
 
 function getWebhookSecret(): string | null | undefined {
   return _cachedWebhookSecret;
 }
 
-function verifySignature(body: string, signature: string, secret: string): boolean {
+/** Reset secret cache — called by tests between cases. */
+export function _resetWebhookSecretForTests(): void {
+  _cachedWebhookSecret = undefined;
+  _secretLoadPromise = null;
+}
+
+export function verifySignature(body: string, signature: string, secret: string): boolean {
   const expected = `sha256=${createHmac('sha256', secret).update(body, 'utf-8').digest('hex')}`;
   try {
     const expectedBuf = Buffer.from(expected);
@@ -90,14 +102,16 @@ async function dispatchWebhook(eventType: string, payload: WebhookPayload): Prom
   }
 }
 
-const postGitHubWebhookRoute = HttpRouter.add(
-  'POST',
-  '/api/webhooks/github',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const body = yield* request.text;
-    const headers = request.headers;
-
+/**
+ * Core webhook handler logic — extracted for testability.
+ * Takes the raw body and headers directly so tests don't need to mock
+ * Effect's HttpServerRequest service.
+ */
+export function runWebhookHandler(
+  body: string,
+  headers: Record<string, string | string[] | undefined>,
+): Effect.Effect<ReturnType<typeof jsonResponse>, never, never> {
+  return httpHandler(Effect.gen(function* () {
     const eventType = headers['x-github-event'];
     const signature = headers['x-hub-signature-256'];
 
@@ -105,10 +119,10 @@ const postGitHubWebhookRoute = HttpRouter.add(
       return jsonResponse({ error: 'Missing X-GitHub-Event header' }, { status: 400 });
     }
 
-    // Load secret (async init may still be running)
+    // Load secret on first request (lazy so tests can mock fs before import)
     let secret = getWebhookSecret();
     if (secret === undefined) {
-      yield* Effect.promise(() => _secretLoadPromise);
+      yield* Effect.promise(() => ensureSecretLoaded());
       secret = getWebhookSecret();
     }
 
@@ -146,10 +160,10 @@ const postGitHubWebhookRoute = HttpRouter.add(
 
     // Dispatch handlers asynchronously so DB work (deferred via setImmediate)
     // does not block the HTTP response or the Node event loop.
-    const fiber = yield* Effect.fork(
+    const fiber = yield* Effect.forkChild(
       Effect.promise(() => dispatchWebhook(eventType, payload)),
     );
-    yield* Effect.fork(
+    yield* Effect.forkChild(
       Effect.gen(function* () {
         const exit = yield* Fiber.await(fiber);
         if (Exit.isFailure(exit)) {
@@ -160,6 +174,17 @@ const postGitHubWebhookRoute = HttpRouter.add(
 
     console.log(`[webhook] Received ${eventType} event from ${repoFullName}`);
     return jsonResponse({ received: true, event: eventType });
+  }));
+}
+
+const postGitHubWebhookRoute = HttpRouter.add(
+  'POST',
+  '/api/webhooks/github',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const body = yield* request.text;
+    const headers = request.headers;
+    return yield* runWebhookHandler(body, headers);
   })),
 );
 

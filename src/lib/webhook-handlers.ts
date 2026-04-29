@@ -168,14 +168,26 @@ const KNOWN_NON_BLOCKING_STATES = new Set(['clean', 'unstable']);
 const KNOWN_NOT_MERGEABLE_STATES = new Set(['blocked', 'behind']);
 
 const pendingReconciliation = new Set<string>();
+const reconciliationTimeouts = new Map<string, NodeJS.Timeout>();
+
+export function clearAllReconciliationTimeouts(): void {
+  for (const timeout of reconciliationTimeouts.values()) {
+    clearTimeout(timeout);
+  }
+  reconciliationTimeouts.clear();
+  pendingReconciliation.clear();
+}
 
 function scheduleMergeStateReconciliation(issueId: string, repo: string, prNumber: number): void {
   if (pendingReconciliation.has(issueId)) return;
   pendingReconciliation.add(issueId);
-  setTimeout(() => {
+  const timeout = setTimeout(() => {
     pendingReconciliation.delete(issueId);
+    reconciliationTimeouts.delete(issueId);
     refreshMergeStateFromGitHub(issueId, repo, prNumber).catch(() => {});
   }, 30000);
+  timeout.unref();
+  reconciliationTimeouts.set(issueId, timeout);
 }
 
 async function refreshMergeStateFromGitHub(issueId: string, repo: string, prNumber: number): Promise<void> {

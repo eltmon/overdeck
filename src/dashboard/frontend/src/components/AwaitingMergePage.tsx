@@ -390,9 +390,9 @@ function BlockedMergeRow({
             {title}
           </p>
           <div className="flex flex-wrap gap-2 mt-2">
-            {blockerReasons.map((br, idx) => (
+            {blockerReasons.map((br) => (
               <span
-                key={idx}
+                key={br.type}
                 className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-destructive/15 text-destructive flex items-center gap-1"
                 title={br.details ?? br.summary}
               >
@@ -416,8 +416,8 @@ function BlockedMergeRow({
         <div className="mt-2 space-y-1">
           {blockerReasons
             .filter((br) => br.details)
-            .map((br, idx) => (
-              <p key={idx} className="text-[11px] text-muted-foreground">
+            .map((br) => (
+              <p key={br.type} className="text-[11px] text-muted-foreground">
                 <span className="font-medium text-foreground">{br.type}:</span>{' '}
                 {br.details}
               </p>

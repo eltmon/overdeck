@@ -17,11 +17,11 @@ const mockUnlinkSync = vi.fn();
 const mockOpenSync = vi.fn();
 
 vi.mock('node:fs', () => ({
-  existsSync: (...args: any[]) => mockExistsSync(...args),
-  readFileSync: (...args: any[]) => mockReadFileSync(...args),
-  writeFileSync: (...args: any[]) => mockWriteFileSync(...args),
-  unlinkSync: (...args: any[]) => mockUnlinkSync(...args),
-  openSync: (...args: any[]) => mockOpenSync(...args),
+  existsSync: (...args: Parameters<typeof mockExistsSync>) => mockExistsSync(...args),
+  readFileSync: (...args: Parameters<typeof mockReadFileSync>) => mockReadFileSync(...args),
+  writeFileSync: (...args: Parameters<typeof mockWriteFileSync>) => mockWriteFileSync(...args),
+  unlinkSync: (...args: Parameters<typeof mockUnlinkSync>) => mockUnlinkSync(...args),
+  openSync: (...args: Parameters<typeof mockOpenSync>) => mockOpenSync(...args),
 }));
 
 const mockSpawnReturn = {
@@ -32,7 +32,7 @@ const mockSpawnReturn = {
 const mockSpawn = vi.fn(() => mockSpawnReturn);
 
 vi.mock('node:child_process', () => ({
-  spawn: (...args: any[]) => mockSpawn(...args),
+  spawn: (...args: Parameters<typeof mockSpawn>) => mockSpawn(...args),
 }));
 
 vi.mock('node:url', () => ({
@@ -44,7 +44,7 @@ const mockLoadConfig = vi.fn(() => ({
 }));
 
 vi.mock('../../../src/lib/config.js', () => ({
-  loadConfig: (...args: any[]) => mockLoadConfig(...args),
+  loadConfig: (...args: Parameters<typeof mockLoadConfig>) => mockLoadConfig(...args),
 }));
 
 beforeEach(() => {

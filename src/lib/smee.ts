@@ -57,6 +57,7 @@ function computeRestartDelay(attempt: number): number {
 
 function scheduleRestart(): void {
   if (isShuttingDown) return;
+  if (restartTimeout !== null) return; // Already scheduled
   if (restartAttempt >= MAX_RESTART_ATTEMPTS) {
     console.error('[smee] Max restart attempts reached — giving up');
     activeClient = null;
@@ -96,20 +97,22 @@ export async function startSmeeClient(): Promise<void> {
     logger: console,
   });
 
-  client.onerror = (_ev) => {
-    // The error event itself is logged by the logger above.
-    // Schedule a restart unless we're intentionally shutting down.
-    if (!isShuttingDown) {
-      activeClient = null;
-      scheduleRestart();
-    }
-  };
-
   try {
     await client.start();
     activeClient = client;
     restartAttempt = 0;
     console.log(`[smee] Relaying ${smeeUrl} → ${target}`);
+
+    // Only wire onerror AFTER start succeeds — pre-start errors are handled
+    // by the catch block. Post-start onerror handles runtime disconnects.
+    client.onerror = (_ev) => {
+      // The error event itself is logged by the logger above.
+      // Schedule a restart unless we're intentionally shutting down.
+      if (!isShuttingDown) {
+        activeClient = null;
+        scheduleRestart();
+      }
+    };
   } catch (err) {
     console.error('[smee] Failed to start:', (err as Error)?.message || String(err));
     scheduleRestart();

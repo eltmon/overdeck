@@ -37,8 +37,8 @@ const mockExistsSync = vi.fn();
 const mockReadFileSync = vi.fn();
 
 vi.mock('node:fs', () => ({
-  existsSync: (...args: any[]) => mockExistsSync(...args),
-  readFileSync: (...args: any[]) => mockReadFileSync(...args),
+  existsSync: (...args: Parameters<typeof mockExistsSync>) => mockExistsSync(...args),
+  readFileSync: (...args: Parameters<typeof mockReadFileSync>) => mockReadFileSync(...args),
 }));
 
 const mockLoadConfig = vi.fn(() => ({
@@ -46,7 +46,7 @@ const mockLoadConfig = vi.fn(() => ({
 }));
 
 vi.mock('../../../src/lib/config.js', () => ({
-  loadConfig: (...args: any[]) => mockLoadConfig(...args),
+  loadConfig: (...args: Parameters<typeof mockLoadConfig>) => mockLoadConfig(...args),
 }));
 
 beforeEach(() => {
