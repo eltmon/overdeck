@@ -302,10 +302,12 @@ export async function buildReviewerNodes(
       //   - live AND running this round → running
       //   - live AND not zombie (parent says running) → running
       //   - zombie → use the archived round status (completed/failed)
-      //   - dead → use the archived round status or parent status
+      //   - dead with round metadata → use archived round status
+      //   - dead without round metadata but has JSONL → completed (ran but no round artifact)
+      //   - dead without round metadata or JSONL → parent status fallback
       const rawStatus = (isLive && !isZombie)
         ? 'running'
-        : (roundMetadata?.latestStatus ?? opts.status);
+        : (roundMetadata?.latestStatus ?? (jsonlPath ? 'completed' : opts.status));
       const status = normalizeAgentStatus(rawStatus);
 
       const node: ReviewerNode = {

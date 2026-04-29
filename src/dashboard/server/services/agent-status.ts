@@ -14,13 +14,17 @@ export function normalizeAgentStatus(status: string): AgentStatus {
     case 'queued':
     case 'merged':
     case 'suspended':
+    case 'stopped':
       return 'stopped';
     case 'failed':
     case 'blocked':
     case 'commented':
     case 'changes-requested':
     case 'dispatch_failed':
+    case 'error':
       return 'error';
+    case 'unknown':
+      return 'unknown';
     default:
       return 'unknown';
   }
