@@ -4955,18 +4955,23 @@ const getMergeQueueRoute = HttpRouter.add(
 
 // ─── Route: POST /api/internal/pipeline/notify ────────────────────────────────
 //
-// Cross-process bridge for `notifyPipeline()` (PAN-891).
+// Cross-process bridge for `notifyPipeline()` (PAN-891, expanded in PAN-915).
 //
 // `notifyPipeline` is an in-process handler registry; only the dashboard server
-// registers a handler. CLI processes (e.g. `pan review run`) write to the
-// shared SQLite review-status table but their `notifyPipeline()` calls are
-// no-ops in their own process. This endpoint lets them poke the dashboard so
-// it re-emits the `review.status_changed` domain event with the latest DB
-// snapshot (which the in-process handler enriches from live tmux sessions).
+// registers a handler. CLI processes (e.g. `pan review run`) write to shared
+// state and call `notifyPipeline()`, which is a no-op in their own process.
+// This endpoint lets them poke the dashboard so it re-emits the corresponding
+// domain event into the live event stream.
 //
-// Body: `{ type: 'status_changed', issueId: string }`. The body intentionally
-// does NOT carry a status payload — the server re-reads from SQLite to avoid
-// stale snapshots and races between writers.
+// Accepted bodies (PAN-915):
+//   { type: 'status_changed', issueId }
+//     — Server re-reads ReviewStatus from SQLite (avoids stale snapshots) and
+//       dispatches via in-process handler.
+//   { type: 'task_queued', specialist, issueId }
+//   { type: 'reviewer_started', issueId, role, sessionName }
+//   { type: 'reviewer_completed', issueId, role }
+//   { type: 'coordinator_started', issueId, sessionName }
+//     — Forwarded verbatim to the in-process handler.
 
 const postInternalPipelineNotifyRoute = HttpRouter.add(
   'POST',
@@ -4991,24 +4996,66 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
     }
 
     const body = yield* readJsonBody;
-    const { type, issueId } = body as { type?: string; issueId?: string };
+    const event = body as Record<string, unknown>;
+    const type = event.type as string | undefined;
 
-    if (type !== 'status_changed' || !issueId) {
-      return jsonResponse({ ok: false, error: 'expected { type: "status_changed", issueId }' }, 400);
-    }
-
-    const status = getReviewStatus(issueId);
-    if (!status) {
-      return jsonResponse({ ok: false, error: `no review status found for ${issueId}` }, 404);
-    }
-
-    // Re-enter the in-process pipeline handler — this triggers the same
-    // enrichment + event-store append path as direct in-process calls.
     const { notifyPipeline } = yield* Effect.promise(() =>
       import('../../../lib/pipeline-notifier.js'),
     );
-    notifyPipeline({ type: 'status_changed', issueId, status });
-    return jsonResponse({ ok: true });
+
+    switch (type) {
+      case 'status_changed': {
+        const issueId = event.issueId as string | undefined;
+        if (!issueId) {
+          return jsonResponse({ ok: false, error: 'status_changed requires issueId' }, 400);
+        }
+        const status = getReviewStatus(issueId);
+        if (!status) {
+          return jsonResponse({ ok: false, error: `no review status found for ${issueId}` }, 404);
+        }
+        notifyPipeline({ type: 'status_changed', issueId, status });
+        return jsonResponse({ ok: true });
+      }
+      case 'task_queued': {
+        const issueId = event.issueId as string | undefined;
+        const specialist = event.specialist as string | undefined;
+        if (!issueId || !specialist) {
+          return jsonResponse({ ok: false, error: 'task_queued requires issueId and specialist' }, 400);
+        }
+        notifyPipeline({ type: 'task_queued', specialist, issueId });
+        return jsonResponse({ ok: true });
+      }
+      case 'reviewer_started': {
+        const issueId = event.issueId as string | undefined;
+        const role = event.role as string | undefined;
+        const sessionName = event.sessionName as string | undefined;
+        if (!issueId || !role || !sessionName) {
+          return jsonResponse({ ok: false, error: 'reviewer_started requires issueId, role, sessionName' }, 400);
+        }
+        notifyPipeline({ type: 'reviewer_started', issueId, role, sessionName });
+        return jsonResponse({ ok: true });
+      }
+      case 'reviewer_completed': {
+        const issueId = event.issueId as string | undefined;
+        const role = event.role as string | undefined;
+        if (!issueId || !role) {
+          return jsonResponse({ ok: false, error: 'reviewer_completed requires issueId, role' }, 400);
+        }
+        notifyPipeline({ type: 'reviewer_completed', issueId, role });
+        return jsonResponse({ ok: true });
+      }
+      case 'coordinator_started': {
+        const issueId = event.issueId as string | undefined;
+        const sessionName = event.sessionName as string | undefined;
+        if (!issueId || !sessionName) {
+          return jsonResponse({ ok: false, error: 'coordinator_started requires issueId, sessionName' }, 400);
+        }
+        notifyPipeline({ type: 'coordinator_started', issueId, sessionName });
+        return jsonResponse({ ok: true });
+      }
+      default:
+        return jsonResponse({ ok: false, error: `unknown pipeline event type: ${type}` }, 400);
+    }
   })),
 );
 

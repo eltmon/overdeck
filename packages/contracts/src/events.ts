@@ -339,6 +339,54 @@ export const PipelineTestCompletedEvent = Schema.Struct({
 })
 export type PipelineTestCompletedEvent = typeof PipelineTestCompletedEvent.Type
 
+/**
+ * PAN-915 — reviewer session received a new prompt (spawn or resume of a
+ * canonical PAN-830 session). Drives event-driven `reviewSubStatuses[role] =
+ * 'running'` and tracking of `reviewSessionNames` without polling tmux.
+ */
+export const ReviewReviewerStartedEvent = Schema.Struct({
+  type: Schema.Literal("review.reviewer_started"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    role: Schema.String,
+    sessionName: Schema.String,
+  }),
+})
+export type ReviewReviewerStartedEvent = typeof ReviewReviewerStartedEvent.Type
+
+/**
+ * PAN-915 — reviewer wrote its output file (round complete for that role).
+ * Updates `reviewSubStatuses[role] = 'done'` event-driven.
+ */
+export const ReviewReviewerCompletedEvent = Schema.Struct({
+  type: Schema.Literal("review.reviewer_completed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    role: Schema.String,
+  }),
+})
+export type ReviewReviewerCompletedEvent = typeof ReviewReviewerCompletedEvent.Type
+
+/**
+ * PAN-915 — review coordinator session spawned. Surfaces in the dashboard so
+ * the kanban card can show "review in progress" the instant the coordinator
+ * starts, not after the first reviewer finishes.
+ */
+export const ReviewCoordinatorStartedEvent = Schema.Struct({
+  type: Schema.Literal("review.coordinator_started"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    sessionName: Schema.String,
+  }),
+})
+export type ReviewCoordinatorStartedEvent = typeof ReviewCoordinatorStartedEvent.Type
+
 // ─── Specialist Events ────────────────────────────────────────────────────────
 
 /** New — specialist became active */
@@ -636,6 +684,9 @@ export const DomainEvent = Schema.Union([
   PipelineReviewCompletedEvent,
   PipelineTestStartedEvent,
   PipelineTestCompletedEvent,
+  ReviewReviewerStartedEvent,
+  ReviewReviewerCompletedEvent,
+  ReviewCoordinatorStartedEvent,
   SpecialistStartedEvent,
   SpecialistCompletedEvent,
   SpecialistFailedEvent,
