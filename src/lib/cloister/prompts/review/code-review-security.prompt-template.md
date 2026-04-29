@@ -139,14 +139,32 @@ Only review files that were changed in this PR (listed in **Files changed** in t
 - If a security pattern is missing in unchanged files that were not part of this PR, do NOT flag it as a blocker.
 - Blocker severity (`!`) is reserved for vulnerabilities introduced BY this PR.
 
-## Review Process
+## Review Process (Multi-Pass)
 
-1. **Identify the attack surface** - Find user input points, external integrations
-2. **Trace data flow** - Follow user input from entry to storage/output
-3. **Check authentication/authorization** - Verify all protected endpoints
-4. **Review cryptography usage** - Check encryption, hashing, randomness
-5. **Examine dependencies** - Look for outdated or vulnerable libraries
-6. **Document findings** - Write to the path specified in `**Output file**` in the Review Context
+You MUST complete 3 review passes. Each pass deepens your analysis. This catches vulnerabilities that a single pass misses.
+
+### Pass 1: Attack surface mapping
+1. Read all changed files and identify user input points, external integrations, and trust boundaries
+2. Trace data flow from entry to storage/output for the most obvious paths
+3. Find your **top 3 most critical security findings**
+4. Write them to the output file immediately (don't wait until the end)
+
+### Pass 2: Pattern-adjacent search
+1. For each finding from Pass 1, **grep for the same vulnerability pattern in OTHER changed files** — if you found unsanitized input in one handler, check ALL handlers; if you found a missing auth check, check all routes
+2. Check authentication/authorization on every protected endpoint in the changed files
+3. Review cryptography usage — encryption, hashing, randomness, key management
+4. Find **3 more findings** and append to your output
+
+### Pass 3: Threat model deep dive
+1. Pick the 3 highest-risk changed files and **re-read them line by line**
+2. Focus specifically on: injection vectors, privilege escalation, data exposure, SSRF, deserialization, race conditions in auth flows
+3. Examine dependencies for known vulnerabilities
+4. Append any remaining findings to your output
+
+### Consolidate
+- Re-read your complete output file
+- Remove duplicates, adjust severities based on the full picture
+- Finalize the output
 
 ## Output Format
 

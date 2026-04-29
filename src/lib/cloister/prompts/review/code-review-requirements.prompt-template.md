@@ -67,9 +67,11 @@ Only review files that were changed in this PR (listed in **Files changed** in t
 - Scope creep observations (new features beyond what was asked) should be noted but NOT blocked on.
 - Blocker severity (`!`) is reserved for requirements introduced BY this PR that are unfulfilled.
 
-## Review Process
+## Review Process (Multi-Pass)
 
-### Step 1: Load the Requirements
+You MUST complete 3 review passes. Each pass deepens your analysis. This catches missed requirements that a single pass overlooks.
+
+### Pass 1: Requirements loading and first mapping
 
 **A. Read the vBRIEF plan** (primary source of truth):
 
@@ -106,11 +108,11 @@ gh pr view <PR_URL> --json body,title
 gh pr diff <PR_URL> --name-only 2>/dev/null || git diff --name-only HEAD~1 HEAD
 ```
 
-Then read the actual changed files to understand the implementation.
+Then read the actual changed files and map your **top 3 most critical requirement gaps** (missing, partial, or incorrectly implemented). Write them to the output file immediately.
 
-### Step 2: Map Requirements to Code
+### Pass 2: Deep verification of each requirement
 
-For each requirement/AC you found:
+For EVERY requirement/AC you found (not just the top 3):
 
 1. **Identify the expected change** — what file, component, or behavior would need to change?
 2. **Search the diff** — did that change happen?
@@ -121,22 +123,24 @@ For each requirement/AC you found:
    - ⚠️ **Partial** — some implementation present but incomplete
    - ❌ **Missing** — no evidence this requirement was addressed
    - ℹ️ **N/A** — requirement not applicable to this PR (e.g., deferred to another issue)
+4. For any ⚠️ or ❌, **read the relevant code more carefully** — trace through the implementation to confirm it's truly missing, not just implemented differently than expected
 
-### Step 3: Check for Scope Creep
+Append any new findings to your output.
 
-Also look for changes that are NOT in the requirements:
-- Files changed that seem unrelated to the issue
-- New features added beyond what was asked
-- Refactors that weren't specified
+### Pass 3: Completeness and scope check
 
-Note these but don't block on them — scope creep is a discussion item, not necessarily a blocker.
+1. **Re-read all ⚠️ (Partial) items** — for each, identify EXACTLY what's missing and whether it's a blocker or a minor gap
+2. **Check for scope creep** — look for changes NOT in the requirements (files changed that seem unrelated, new features beyond what was asked, refactors that weren't specified). Note these but don't block on them.
+3. **Check vBRIEF item status** — if `.planning/plan.vbrief.json` exists:
+   - Items with `status: "completed"` should have corresponding code
+   - Items with `status: "in_progress"` or `status: "pending"` that are NOT in the diff may indicate unfinished work
+   - Flag any item that appears to be work-in-progress with no corresponding code change
+4. Append any remaining findings to your output
 
-### Step 4: Check vBRIEF Item Status
-
-If `.planning/plan.vbrief.json` exists:
-- Items with `status: "completed"` should have corresponding code
-- Items with `status: "in_progress"` or `status: "pending"` that are NOT in the diff may indicate unfinished work
-- Flag any item that appears to be work-in-progress with no corresponding code change
+### Consolidate
+- Re-read your complete output file
+- Remove duplicates, adjust severities based on the full picture
+- Finalize the output
 
 ## Output Format
 
