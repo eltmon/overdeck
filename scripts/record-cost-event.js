@@ -389,6 +389,9 @@ function initSchema(db) {
       auto_requeue_count    INTEGER DEFAULT 0,
       merge_retry_count     INTEGER DEFAULT 0,
       pr_url                TEXT,
+      -- PAN-905: tracked PR identity for webhook correlation
+      pr_head_sha           TEXT,
+      pr_number             INTEGER,
       -- PAN-653: persistent stuck state (set when main diverges mid-approve)
       stuck                 INTEGER NOT NULL DEFAULT 0,
       stuck_reason          TEXT,
@@ -407,7 +410,9 @@ function initSchema(db) {
       -- Human-requested deacon ignore: when set, patrol skips this issue entirely
       deacon_ignored          INTEGER NOT NULL DEFAULT 0,
       deacon_ignored_at       TEXT,
-      deacon_ignored_reason   TEXT
+      deacon_ignored_reason   TEXT,
+      -- PAN-905: GitHub-native merge blocker reasons (JSON array)
+      blocker_reasons         TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -628,7 +633,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
       ON git_operations(operation, ts);
   `);
-	db.pragma(`user_version = 29`);
+	db.pragma(`user_version = 31`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -636,7 +641,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 29) return;
+	if (currentVersion === 31) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -930,7 +935,18 @@ function runMigrations(db) {
           ON conversations(status, archived_at, created_at)
       `);
 	} catch {}
-	db.pragma(`user_version = 29`);
+	if (currentVersion < 30) try {
+		db.exec(`ALTER TABLE review_status ADD COLUMN blocker_reasons TEXT`);
+	} catch {}
+	if (currentVersion < 31) {
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN pr_head_sha TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN pr_number INTEGER`);
+		} catch {}
+	}
+	db.pragma(`user_version = 31`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts

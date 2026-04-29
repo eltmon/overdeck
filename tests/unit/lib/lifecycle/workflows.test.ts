@@ -21,14 +21,18 @@ vi.mock('util', async (importOriginal) => {
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
   sessionExists: vi.fn().mockReturnValue(false),
+  killSessionAsync: vi.fn().mockResolvedValue(undefined),
+  listSessionNamesAsync: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../../../src/lib/paths.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../src/lib/paths.js')>();
+  const testHome = join(tmpdir(), 'panopticon-wf-test-home');
   return {
     ...actual,
-    AGENTS_DIR: join(tmpdir(), 'panopticon-wf-test-agents'),
-    PANOPTICON_HOME: join(tmpdir(), 'panopticon-wf-test-home'),
+    PANOPTICON_HOME: testHome,
+    AGENTS_DIR: join(testHome, 'agents'),
+    ARCHIVES_DIR: join(testHome, 'archives'),
   };
 });
 

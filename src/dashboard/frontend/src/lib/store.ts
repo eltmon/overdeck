@@ -134,7 +134,27 @@ export const selectAwaitingMerge = memoizeArraySelector<DashboardState, 'reviewS
     Object.values(rsMap)
       .filter(
         (rs): rs is ReviewStatusSnapshot =>
-          rs?.readyForMerge === true && rs.mergeStatus !== 'merged',
+          rs?.readyForMerge === true &&
+          rs.mergeStatus !== 'merged' &&
+          (rs.blockerReasons?.length ?? 0) === 0,
+      )
+      .sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')),
+)
+
+/**
+ * Issues blocked from merge by GitHub-native blockers.
+ * Shows issues with blockerReasons that haven't been merged yet.
+ */
+export const selectBlockedFromMerge = memoizeArraySelector<DashboardState, 'reviewStatusByIssueId', ReviewStatusSnapshot[]>(
+  'reviewStatusByIssueId',
+  (rsMap) =>
+    Object.values(rsMap)
+      .filter(
+        (rs): rs is ReviewStatusSnapshot =>
+          (rs?.blockerReasons?.length ?? 0) > 0 &&
+          rs.mergeStatus !== 'merged' &&
+          rs.reviewStatus === 'passed' &&
+          (rs.testStatus === 'passed' || rs.testStatus === 'skipped'),
       )
       .sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')),
 )

@@ -173,6 +173,39 @@ export async function doctorCommand(): Promise<void> {
     });
   }
 
+  // Check smee-client webhook relay
+  try {
+    const { isSmeeProcessRunning } = await import('../../lib/smee.js');
+    const smeeUrlPath = join(homedir(), '.panopticon', 'github-app', 'smee-url');
+    if (!existsSync(smeeUrlPath)) {
+      checks.push({
+        name: 'smee-client Webhook Relay',
+        status: 'warn',
+        message: 'Not configured (optional)',
+        fix: 'Create ~/.panopticon/github-app/smee-url with your smee.io channel URL',
+      });
+    } else if (isSmeeProcessRunning()) {
+      checks.push({
+        name: 'smee-client Webhook Relay',
+        status: 'ok',
+        message: 'Running',
+      });
+    } else {
+      checks.push({
+        name: 'smee-client Webhook Relay',
+        status: 'warn',
+        message: 'Configured but not running',
+        fix: 'Run `pan up` to start the webhook relay',
+      });
+    }
+  } catch {
+    checks.push({
+      name: 'smee-client Webhook Relay',
+      status: 'warn',
+      message: 'Status check failed',
+    });
+  }
+
   // Check for legacy command invocations in shell rc files (PAN-705)
   const legacyPatterns = [
     'pan work ',

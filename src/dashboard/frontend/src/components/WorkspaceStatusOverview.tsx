@@ -160,7 +160,7 @@ export function WorkspaceStatusOverview({
         {/* Pipeline status */}
         {showPipelineStatus && reviewStatus && (
           <div className="mt-2">
-            <ReviewPipelineSection reviewStatus={reviewStatus} />
+            <ReviewPipelineSection reviewStatus={reviewStatus} issueId={issue.id} />
           </div>
         )}
         {reviewActionHint && (

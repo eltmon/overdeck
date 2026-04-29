@@ -11,6 +11,8 @@ import {
   markWorkspaceStuck as dbMarkStuck,
   clearWorkspaceStuck as dbClearStuck,
   setDeaconIgnored as dbSetDeaconIgnored,
+  upsertReviewStatusAsync as dbUpsertAsync,
+  getReviewStatusFromDbAsync,
 } from './database/review-status-db.js';
 import { normalizeReviewStatus } from './review-status-normalize.js';
 
@@ -19,6 +21,13 @@ export interface StatusHistoryEntry {
   status: string;
   timestamp: string;
   notes?: string;
+}
+
+export interface BlockerReason {
+  type: 'failing_checks' | 'merge_conflict' | 'unresolved_conversations' | 'changes_requested' | 'draft_pr' | 'not_mergeable';
+  summary: string;
+  details?: string;
+  detectedAt: string;
 }
 
 export interface ReviewStatus {
@@ -42,7 +51,13 @@ export interface ReviewStatus {
   autoRequeueCount?: number;
   mergeRetryCount?: number;
   prUrl?: string;
+  /** PAN-905: HEAD commit SHA of the tracked PR for webhook identity validation */
+  prHeadSha?: string;
+  /** PAN-905: GitHub PR number of the tracked PR for webhook identity validation */
+  prNumber?: number;
   history?: StatusHistoryEntry[];
+  /** PAN-905: GitHub-native merge blocker reasons */
+  blockerReasons?: BlockerReason[];
   /** HEAD commit SHA at the time review passed — used to detect new commits after review */
   reviewedAtCommit?: string;
   /** PAN-653: workspace is stuck (e.g. main diverged mid-approve) — Deacon skips it */
@@ -124,10 +139,13 @@ export function saveReviewStatuses(statuses: Record<string, ReviewStatus>, fileP
 export function setReviewStatus(
   issueId: string,
   update: Partial<ReviewStatus>,
+  existing?: ReviewStatus,
 ): ReviewStatus {
   // Read only the single row we're updating (avoids TOCTOU: bulk read-modify-write
   // races when two concurrent calls for different issue IDs run concurrently).
-  const existing: ReviewStatus = getReviewStatusFromDb(issueId) ?? {
+  // If `existing` is provided (e.g. from mutateBlockers), skip the DB read to
+  // avoid double-read on the webhook ingestion path (PAN-905).
+  const status: ReviewStatus = existing ?? getReviewStatusFromDb(issueId) ?? {
     issueId,
     reviewStatus: 'pending' as const,
     testStatus: 'pending' as const,
@@ -138,26 +156,27 @@ export function setReviewStatus(
   // Guard: reject reviewStatus regression from 'passed' to 'reviewing' unless the caller
   // is explicitly resetting the merge lifecycle (update includes mergeStatus).
   // This is belt-and-suspenders — endpoint-level guards should catch this first.
-  if (update.reviewStatus === 'reviewing' && existing.reviewStatus === 'passed' && update.mergeStatus === undefined) {
+  if (update.reviewStatus === 'reviewing' && status.reviewStatus === 'passed' && update.mergeStatus === undefined) {
     console.warn(`[review-status] Rejecting reviewStatus regression from 'passed' to 'reviewing' for ${issueId} (mergeStatus not being reset)`);
-    return existing as ReviewStatus;
+    notifyPipeline({ type: 'status_changed', issueId, status: status as ReviewStatus });
+    return status as ReviewStatus;
   }
 
-  const merged = { ...existing, ...update };
+  const merged = { ...status, ...update };
 
   // Track status transitions in history (last 10 entries)
-  const history = [...(existing.history || [])];
+  const history = [...(status.history || [])];
   const now = new Date().toISOString();
-  if (update.reviewStatus && update.reviewStatus !== existing.reviewStatus) {
+  if (update.reviewStatus && update.reviewStatus !== status.reviewStatus) {
     history.push({ type: 'review', status: update.reviewStatus, timestamp: now, notes: update.reviewNotes });
   }
-  if (update.testStatus && update.testStatus !== existing.testStatus) {
+  if (update.testStatus && update.testStatus !== status.testStatus) {
     history.push({ type: 'test', status: update.testStatus, timestamp: now, notes: update.testNotes });
   }
-  if (update.uatStatus && update.uatStatus !== existing.uatStatus) {
+  if (update.uatStatus && update.uatStatus !== status.uatStatus) {
     history.push({ type: 'uat', status: update.uatStatus, timestamp: now, notes: update.uatNotes });
   }
-  if (update.mergeStatus && update.mergeStatus !== existing.mergeStatus) {
+  if (update.mergeStatus && update.mergeStatus !== status.mergeStatus) {
     history.push({ type: 'merge', status: update.mergeStatus, timestamp: now });
   }
   while (history.length > 10) history.shift();
@@ -169,19 +188,24 @@ export function setReviewStatus(
   // is the authoritative signal. The post-rebase gate in triggerMerge() is the real
   // quality check. Blocking readyForMerge on a stale verificationStatus causes issues
   // to get stuck after tests pass (PAN-714).
-  const readyForMerge = update.readyForMerge !== undefined
-    ? update.readyForMerge
-    : (
-        merged.reviewStatus === 'passed' &&
-        merged.testStatus === 'passed' &&
-        merged.mergeStatus !== 'merged' &&
-        // Don't auto-recompute rfm=true when the previous merge attempt failed —
-        // cycling: check-status gate → mergeStatus=failed → deacon restore → rfm=true → retry.
-        // checkFailedMergeRetry() handles transient retries explicitly with readyForMerge: true.
-        merged.mergeStatus !== 'failed' &&
-        // If UAT has been initiated, it must pass too
-        (merged.uatStatus === undefined || merged.uatStatus === 'passed')
-      );
+  // PAN-905: GitHub-native blockers (failing checks, merge conflicts, etc.) always
+  // override readyForMerge to false, even if the caller explicitly passed true.
+  const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
+  const readyForMerge = hasBlockers
+    ? false
+    : (update.readyForMerge !== undefined
+        ? update.readyForMerge
+        : (
+            merged.reviewStatus === 'passed' &&
+            merged.testStatus === 'passed' &&
+            merged.mergeStatus !== 'merged' &&
+            // Don't auto-recompute rfm=true when the previous merge attempt failed —
+            // cycling: check-status gate → mergeStatus=failed → deacon restore → rfm=true → retry.
+            // checkFailedMergeRetry() handles transient retries explicitly with readyForMerge: true.
+            merged.mergeStatus !== 'failed' &&
+            // If UAT has been initiated, it must pass too
+            (merged.uatStatus === undefined || merged.uatStatus === 'passed')
+          ));
 
   const updated: ReviewStatus = normalizeReviewStatus({
     ...merged,
@@ -192,7 +216,7 @@ export function setReviewStatus(
   });
 
   // Report commit statuses to GitHub when readyForMerge transitions to true (PAN-536)
-  if (readyForMerge && !existing.readyForMerge && updated.prUrl) {
+  if (readyForMerge && !status.readyForMerge && updated.prUrl) {
     (async () => {
       try {
         const { isGitHubAppConfigured, reportCommitStatus } = await import('./github-app.js');
@@ -227,7 +251,7 @@ export function setReviewStatus(
 
   // Emit activity log entries for meaningful pipeline state transitions.
   // Each transition produces one entry so the ActivityPanel shows live pipeline progress.
-  if (update.verificationStatus && update.verificationStatus !== existing.verificationStatus) {
+  if (update.verificationStatus && update.verificationStatus !== status.verificationStatus) {
     const vMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
       running:  { level: 'info',    msg: `${issueId} — verification running`, tts: `${issueId} verification running` },
       passed:   { level: 'success', msg: `${issueId} — verification passed`, tts: `${issueId} verification passed` },
@@ -238,7 +262,7 @@ export function setReviewStatus(
     if (entry) emitActivityEntry({ source: 'cloister', level: entry.level, message: entry.msg, details: update.verificationNotes, issueId });
     if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
-  if (update.reviewStatus && update.reviewStatus !== existing.reviewStatus) {
+  if (update.reviewStatus && update.reviewStatus !== status.reviewStatus) {
     const rMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
       reviewing: { level: 'info',    msg: `${issueId} — review started`, tts: `${issueId} review started` },
       passed:    { level: 'success', msg: `${issueId} — review passed`, tts: `${issueId} review passed` },
@@ -249,7 +273,7 @@ export function setReviewStatus(
     if (entry) emitActivityEntry({ source: 'review-specialist', level: entry.level, message: entry.msg, details: update.reviewNotes, issueId });
     if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
-  if (update.testStatus && update.testStatus !== existing.testStatus) {
+  if (update.testStatus && update.testStatus !== status.testStatus) {
     const tMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
       testing:         { level: 'info',    msg: `${issueId} — tests running` },
       passed:          { level: 'success', msg: `${issueId} — tests passed`, tts: `${issueId} tests passed` },
@@ -261,7 +285,7 @@ export function setReviewStatus(
     if (entry) emitActivityEntry({ source: 'test-specialist', level: entry.level, message: entry.msg, details: update.testNotes, issueId });
     if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
-  if (update.mergeStatus && update.mergeStatus !== existing.mergeStatus) {
+  if (update.mergeStatus && update.mergeStatus !== status.mergeStatus) {
     const mMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
       queued:    { level: 'info',    msg: `${issueId} — queued for merge` },
       merging:   { level: 'info',    msg: `${issueId} — merge in progress` },
@@ -273,7 +297,7 @@ export function setReviewStatus(
     if (entry) emitActivityEntry({ source: 'merge-agent', level: entry.level, message: entry.msg, details: update.mergeNotes, issueId });
     if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
-  if (update.readyForMerge === true && !existing.readyForMerge) {
+  if (update.readyForMerge === true && !status.readyForMerge) {
     emitActivityEntry({ source: 'cloister', level: 'success', message: `${issueId} — ready for merge`, issueId });
     emitActivityTts({ utterance: `${issueId} ready for merge`, priority: 1, issueId });
   }
@@ -284,7 +308,7 @@ export function setReviewStatus(
   // dispatch endpoint.
   if (
     update.reviewStatus === 'passed' &&
-    existing.reviewStatus !== 'passed' &&
+    status.reviewStatus !== 'passed' &&
     updated.testStatus === 'pending'
   ) {
     (async () => {
@@ -331,6 +355,26 @@ export function setReviewStatus(
 
 export function getReviewStatus(issueId: string): ReviewStatus | null {
   return getReviewStatusFromDb(issueId) ?? null;
+}
+
+export async function setReviewStatusAsync(
+  issueId: string,
+  update: Partial<ReviewStatus>,
+  existing?: ReviewStatus,
+): Promise<ReviewStatus> {
+  return new Promise((resolve, reject) => {
+    setImmediate(() => {
+      try {
+        resolve(setReviewStatus(issueId, update, existing));
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
+}
+
+export async function getReviewStatusAsync(issueId: string): Promise<ReviewStatus | null> {
+  return getReviewStatusFromDbAsync(issueId);
 }
 
 /**

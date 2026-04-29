@@ -220,7 +220,7 @@ describe('shadow-state', () => {
   describe('listShadowedIssues', () => {
     it('should return empty array when no issues are shadowed', async () => {
       const issues = await listShadowedIssues();
-      const testIssues = issues.filter(i => i.issueId.includes('TEST-'));
+      const testIssues = issues.filter(i => i.issueId.includes('TEST-SSTATE'));
       expect(testIssues).toEqual([]);
     });
 
@@ -231,7 +231,7 @@ describe('shadow-state', () => {
       await createShadowState(id2, 'open');
 
       const issues = await listShadowedIssues();
-      const testIssues = issues.filter(i => i.issueId.includes('TEST-'));
+      const testIssues = issues.filter(i => i.issueId.includes('TEST-SSTATE'));
 
       expect(testIssues.length).toBeGreaterThanOrEqual(2);
       // Should be sorted by shadowedAt descending (newest first)

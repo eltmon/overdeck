@@ -9,11 +9,11 @@
  * Fix-All flywheel. See FIX-ALL-PRD.md.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
-import { GitMerge, ExternalLink, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { GitMerge, ExternalLink, Loader2, CheckCircle, AlertTriangle, ShieldAlert, XCircle, GitPullRequest, MessageSquare, FilePenLine, PenLine, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
-import { useDashboardStore, selectAwaitingMerge, selectIssues } from '../lib/store';
+import { useDashboardStore, selectAwaitingMerge, selectBlockedFromMerge, selectIssues } from '../lib/store';
 import type { Issue } from '../types';
 
 interface WorkspaceInfo {
@@ -77,6 +77,8 @@ export function AwaitingMergePage() {
           if (rs.mergeStatus === 'failed' || issue?.mergeStatus === 'failed') return false;
           if (Array.isArray(issue?.labels) && issue.labels.includes('merged')) return false;
         }
+        // PAN-905: explicit defense-in-depth — exclude anything with GitHub-native blockers.
+        if ((rs.blockerReasons?.length ?? 0) > 0) return false;
         return true;
       })
       .sort((a, b) => {
@@ -87,6 +89,8 @@ export function AwaitingMergePage() {
         return (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '');
       });
   }, [awaiting, issuesById]);
+
+  const blocked = useDashboardStore(selectBlockedFromMerge);
 
   // One workspace fetch per ready issue (parallel via useQueries)
   const workspaceQueries = useQueries({
@@ -143,6 +147,41 @@ export function AwaitingMergePage() {
               );
             })}
           </ul>
+        )}
+
+        {/* Blocked from merge */}
+        {blocked.length > 0 && (
+          <div className="mt-10">
+            <header className="mb-4">
+              <div className="flex items-center gap-3 mb-1">
+                <ShieldAlert className="w-5 h-5 text-destructive" />
+                <h2 className="text-lg font-semibold text-foreground">Blocked from Merge</h2>
+                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-destructive/15 text-destructive">
+                  {blocked.length}
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                These issues were ready to merge but GitHub is blocking them.
+                Resolve the blocker on GitHub and the issue will re-enter the queue automatically.
+              </p>
+            </header>
+            <ul className="space-y-3">
+              {blocked.map((rs) => {
+                const issue = issuesById.get(rs.issueId.toLowerCase());
+                return (
+                  <BlockedMergeRow
+                    key={rs.issueId}
+                    issueId={rs.issueId}
+                    title={issue?.title ?? rs.issueId}
+                    identifier={issue?.identifier ?? rs.issueId}
+                    trackerUrl={issue?.url}
+                    blockerReasons={rs.blockerReasons ?? []}
+                    updatedAt={rs.updatedAt}
+                  />
+                );
+              })}
+            </ul>
+          </div>
         )}
       </div>
     </div>
@@ -282,6 +321,109 @@ function AwaitingMergeRow({
           {isMerging ? 'Merging…' : 'Merge'}
         </button>
       </div>
+    </li>
+  );
+}
+
+function blockerIcon(type: string) {
+  switch (type) {
+    case 'failing_checks':
+      return <XCircle className="w-3 h-3" />;
+    case 'merge_conflict':
+      return <GitPullRequest className="w-3 h-3" />;
+    case 'unresolved_conversations':
+      return <MessageSquare className="w-3 h-3" />;
+    case 'changes_requested':
+      return <FilePenLine className="w-3 h-3" />;
+    case 'draft_pr':
+      return <PenLine className="w-3 h-3" />;
+    case 'not_mergeable':
+      return <AlertTriangle className="w-3 h-3" />;
+    default:
+      return <ShieldAlert className="w-3 h-3" />;
+  }
+}
+
+interface BlockedRowProps {
+  issueId: string;
+  identifier: string;
+  title: string;
+  trackerUrl?: string;
+  blockerReasons: ReadonlyArray<{ type: string; summary: string; details?: string; detectedAt: string }>;
+  updatedAt?: string;
+}
+
+function BlockedMergeRow({
+  identifier,
+  title,
+  trackerUrl,
+  blockerReasons,
+  updatedAt,
+}: BlockedRowProps) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <li className="border border-destructive/30 rounded-lg bg-card p-4 opacity-80">
+      <div className="flex items-start gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            {trackerUrl ? (
+              <a
+                href={trackerUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent text-foreground hover:underline"
+              >
+                {identifier}
+              </a>
+            ) : (
+              <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent text-foreground">
+                {identifier}
+              </span>
+            )}
+            {updatedAt && (
+              <span className="text-[11px] text-muted-foreground">
+                ready {formatRelative(updatedAt)}
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-foreground truncate" title={title}>
+            {title}
+          </p>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {blockerReasons.map((br) => (
+              <span
+                key={br.type}
+                className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-destructive/15 text-destructive flex items-center gap-1"
+                title={br.details ?? br.summary}
+              >
+                {blockerIcon(br.type)}
+                {br.type}: {br.summary}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      {blockerReasons.some((br) => br.details) && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="mt-2 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          {expanded ? 'Hide details' : 'Show details'}
+        </button>
+      )}
+      {expanded && (
+        <div className="mt-2 space-y-1">
+          {blockerReasons
+            .filter((br) => br.details)
+            .map((br) => (
+              <p key={br.type} className="text-[11px] text-muted-foreground">
+                <span className="font-medium text-foreground">{br.type}:</span>{' '}
+                {br.details}
+              </p>
+            ))}
+        </div>
+      )}
     </li>
   );
 }

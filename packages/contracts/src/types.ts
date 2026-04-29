@@ -176,6 +176,21 @@ export const ReviewStatusSnapshot = Schema.Struct({
   reviewSessionNames: Schema.optional(Schema.Array(Schema.String)),
   /** Per-role review completion status (keyed by role: 'correctness' | 'security' | ...) */
   reviewSubStatuses: Schema.optional(Schema.Record(Schema.String, Schema.Literals(["running", "done"]))),
+  /** PAN-905: queue position in the merge queue */
+  queuePosition: Schema.optional(Schema.Number),
+  /** PAN-905: currently active specialist (e.g. 'merge-agent') */
+  activeSpecialist: Schema.optional(Schema.String),
+  /** PAN-905: number of merge retries attempted */
+  mergeRetryCount: Schema.optional(Schema.Number),
+  /** PAN-905: free-form notes about the merge attempt */
+  mergeNotes: Schema.optional(Schema.String),
+  /** PAN-905: GitHub-native merge blocker reasons */
+  blockerReasons: Schema.optional(Schema.Array(Schema.Struct({
+    type: Schema.Literals(['failing_checks', 'merge_conflict', 'unresolved_conversations', 'changes_requested', 'draft_pr', 'not_mergeable']),
+    summary: Schema.String,
+    details: Schema.optional(Schema.String),
+    detectedAt: Schema.String,
+  }))),
 })
 export type ReviewStatusSnapshot = typeof ReviewStatusSnapshot.Type
 

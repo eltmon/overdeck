@@ -64,6 +64,7 @@ import { registerInstallCommand } from './commands/install.js';
 import { registerAdminCommands } from './commands/admin/index.js';
 import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
+import { systemHealthCommand } from './commands/system-health.js';
 import { updateCommand } from './commands/update.js';
 import { restartCommand } from './commands/restart.js';
 import { registerInspectCommand } from './commands/inspect.js';
@@ -556,10 +557,12 @@ program
       return candidates.find((p) => existsSync(p)) ?? null;
     })();
 
-    if (electronAppPath) {
-      // Start shared sidecars BEFORE launching the Electron app — otherwise
-      // `pan up` would return early and leave CLIProxy/TLDR down, which is
-      // exactly the "restart did not bring the system back up" failure mode.
+    // Shared post-launch sidecars (CLIProxy, smee, TLDR) — must run for
+    // every launch mode so the Electron fast-path does not skip them.
+    async function startPostLaunchSidecars(): Promise<void> {
+      // Start CLIProxyAPI sidecar for ChatGPT subscription → GPT agent routing.
+      // Idempotent + non-fatal: if the user isn't logged into Codex yet, the
+      // sidecar still comes up and will pick up credentials once they log in.
       try {
         const { startCliproxy, CLIPROXY_PORT } = await import('../lib/cliproxy.js');
         console.log(chalk.dim('Starting CLIProxyAPI sidecar (GPT subscription router)...'));
@@ -567,21 +570,40 @@ program
         console.log(chalk.green(`✓ CLIProxyAPI listening on http://127.0.0.1:${CLIPROXY_PORT}`));
       } catch (error: any) {
         console.log(chalk.yellow('⚠ Failed to start CLIProxyAPI sidecar:'), error?.message || String(error));
+        console.log(chalk.dim('  GPT subscription agents will not work until this is resolved.'));
       }
 
+      // Start smee-client webhook relay (optional — non-fatal)
+      try {
+        const { startSmeeProcess } = await import('../lib/smee.js');
+        console.log(chalk.dim('\nStarting smee-client webhook relay...'));
+        startSmeeProcess();
+      } catch (error: any) {
+        console.log(chalk.yellow('⚠ Failed to start smee-client:'), error?.message || String(error));
+        console.log(chalk.dim('  Webhook relay unavailable — GitHub events will use polling fallback'));
+      }
+
+      // Start TLDR daemon on project root (if Python3 and venv available)
       try {
         const { getTldrDaemonService } = await import('../lib/tldr-daemon.js');
         const projectRoot = process.cwd();
         const venvPath = join(projectRoot, '.venv');
         if (existsSync(venvPath)) {
+          console.log(chalk.dim('\nStarting TLDR daemon for project root...'));
           const tldrService = getTldrDaemonService(projectRoot, venvPath);
-          await tldrService.start(true);
+          await tldrService.start(true);  // background mode
           console.log(chalk.green('✓ TLDR daemon started'));
+        } else {
+          console.log(chalk.dim('\nSkipping TLDR daemon (no .venv found)'));
+          console.log(chalk.dim('  Run setup to create venv with llm-tldr'));
         }
       } catch (error: any) {
         console.log(chalk.yellow('⚠ Failed to start TLDR daemon:'), error?.message || String(error));
+        console.log(chalk.dim('  TLDR will be unavailable but dashboard will work normally'));
       }
+    }
 
+    if (electronAppPath) {
       console.log(chalk.dim(`\nLaunching Panopticon desktop app...`));
       console.log(chalk.dim(`  ${electronAppPath}`));
       const { spawn } = await import('child_process');
@@ -590,13 +612,30 @@ program
         stdio: 'ignore',
         env: process.env,
       });
-      child.on('error', (err) => {
-        console.warn(chalk.yellow(`⚠ Could not launch desktop app: ${err.message}`));
-        console.warn(chalk.dim('  Falling back to bare server mode'));
+
+      const launchSucceeded = await new Promise<boolean>((resolve) => {
+        let settled = false;
+        const settle = (value: boolean) => {
+          if (settled) return;
+          settled = true;
+          resolve(value);
+        };
+
+        child.once('error', (err) => {
+          console.warn(chalk.yellow(`⚠ Could not launch desktop app: ${err.message}`));
+          console.warn(chalk.dim('  Falling back to bare server mode'));
+          settle(false);
+        });
+
+        setTimeout(() => settle(true), 100);
       });
-      child.unref();
-      console.log(chalk.green('✓ Desktop app launched'));
-      return;
+
+      if (launchSucceeded) {
+        child.unref();
+        console.log(chalk.green('✓ Desktop app launched'));
+        await startPostLaunchSidecars();
+        return;
+      }
     }
 
     // Kill any existing dashboard processes before starting a new one.
@@ -721,38 +760,7 @@ program
       });
     }
 
-    // Start CLIProxyAPI sidecar for ChatGPT subscription → GPT agent routing.
-    // Idempotent + non-fatal: if the user isn't logged into Codex yet, the
-    // sidecar still comes up and will pick up credentials once they log in.
-    try {
-      const { startCliproxy, CLIPROXY_PORT } = await import('../lib/cliproxy.js');
-      console.log(chalk.dim('\nStarting CLIProxyAPI sidecar (GPT subscription router)...'));
-      startCliproxy();
-      console.log(chalk.green(`✓ CLIProxyAPI listening on http://127.0.0.1:${CLIPROXY_PORT}`));
-    } catch (error: any) {
-      console.log(chalk.yellow('⚠ Failed to start CLIProxyAPI sidecar:'), error?.message || String(error));
-      console.log(chalk.dim('  GPT subscription agents will not work until this is resolved.'));
-    }
-
-    // Start TLDR daemon on project root (if Python3 and venv available)
-    try {
-      const { getTldrDaemonService } = await import('../lib/tldr-daemon.js');
-      const projectRoot = process.cwd();
-      const venvPath = join(projectRoot, '.venv');
-
-      if (existsSync(venvPath)) {
-        console.log(chalk.dim('\nStarting TLDR daemon for project root...'));
-        const tldrService = getTldrDaemonService(projectRoot, venvPath);
-        await tldrService.start(true);  // background mode
-        console.log(chalk.green('✓ TLDR daemon started'));
-      } else {
-        console.log(chalk.dim('\nSkipping TLDR daemon (no .venv found)'));
-        console.log(chalk.dim('  Run setup to create venv with llm-tldr'));
-      }
-    } catch (error: any) {
-      console.log(chalk.yellow('⚠ Failed to start TLDR daemon:'), error?.message || String(error));
-      console.log(chalk.dim('  TLDR will be unavailable but dashboard will work normally'));
-    }
+    await startPostLaunchSidecars();
   });
 
 program
@@ -766,6 +774,16 @@ program
     const { parse } = await import('@iarna/toml');
 
     console.log(chalk.bold('Stopping Panopticon...\n'));
+
+    // Stop smee-client webhook relay
+    try {
+      const { stopSmeeProcess } = await import('../lib/smee.js');
+      console.log(chalk.dim('Stopping smee-client webhook relay...'));
+      stopSmeeProcess();
+      console.log(chalk.green('✓ smee-client stopped'));
+    } catch {
+      console.log(chalk.dim('  smee-client not running'));
+    }
 
     // Read config for ports and Traefik settings
     const configFile = join(process.env.HOME || '', '.panopticon', 'config.toml');
@@ -897,6 +915,12 @@ project
   .command('init')
   .description('Initialize projects.yaml with example configuration')
   .action(projectInitCommand);
+
+// Health command
+program
+  .command('health')
+  .description('Show runtime health of Panopticon services')
+  .action(systemHealthCommand);
 
 // Doctor command
 program
