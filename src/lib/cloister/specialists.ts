@@ -1088,6 +1088,7 @@ ${basePrompt}`;
         agentType: 'specialist-dispatch',
         workingDir: cwd,
         setPipefail: true,
+        setTerminalEnv: true,
         unsetProviderEnv: true,
         providerExports: providerExportLines,
         setCi: true,
@@ -2517,7 +2518,13 @@ export async function wakeSpecialist(
       if (issueId) {
         wakePanEnv.PANOPTICON_ISSUE_ID = issueId;
       }
-      const envFlags = buildTmuxEnvFlags({ ...providerEnv, ...wakePanEnv });
+      const terminalEnv: Record<string, string> = {
+        TERM: 'xterm-256color',
+        COLORTERM: 'truecolor',
+        LANG: 'C.UTF-8',
+        LC_ALL: 'C.UTF-8',
+      };
+      const envFlags = buildTmuxEnvFlags({ ...terminalEnv, ...providerEnv, ...wakePanEnv });
 
       // For credential-file providers (e.g. Kimi), configure apiKeyHelper for token refresh.
       // For all other providers, clear stale apiKeyHelper from previous runs.
@@ -2540,7 +2547,7 @@ export async function wakeSpecialist(
         .map(([k, v]) => `export ${k}="${v}"`)
         .join('; ');
       const providerSetupCmd = providerExportCmd ? `${providerExportCmd}; ` : '';
-      const claudeCmd = `${PROVIDER_UNSET_CMD}; ${providerSetupCmd}exec claude --session-id "${effectiveSessionId}" ${modelFlag} ${permissionFlags}`;
+      const claudeCmd = `${PROVIDER_UNSET_CMD}; ${providerSetupCmd}export TERM=xterm-256color; export COLORTERM=truecolor; exec claude --session-id "${effectiveSessionId}" ${modelFlag} ${permissionFlags}`;
 
       // Kill stale session first to prevent "duplicate session" error (PAN-430)
       await killSessionAsync(tmuxSession).catch(() => { /* no stale session */ });

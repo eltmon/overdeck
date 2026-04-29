@@ -404,12 +404,17 @@ export function setupTerminalWebSocket(server: http.Server): void {
 
       const snapshot = await captureFreshSnapshot(sessionName, requestedCols, requestedRows);
       sendControl(ws, { type: 'snapshot', cols: snapshot.cols, rows: snapshot.rows, data: snapshot.data });
+      // Start PTY immediately — don't wait for client 'ready'. The hub buffers
+      // live data for not-yet-ready clients (pty-hub.ts broadcastToHub), so data
+      // that arrives before the client finishes processing its snapshot is queued
+      // and flushed when setClientReady fires. This eliminates the visible black
+      // screen gap between snapshot delivery and first live byte.
+      void startLocalPty();
 
       const handleLocalMessage = (message: string) => {
         const parsed = parseControlMessage(message);
         if (parsed?.type === 'ready') {
           setClientReady(hub, ws);
-          void startLocalPty();
           return;
         }
         if (parsed?.type === 'resize') {

@@ -1060,6 +1060,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     workingDir: options.workspace,
     changeDir: false,
     setCi: true,
+    setTerminalEnv: true,
     providerExports,
     cavemanExports,
     baseCommand: getAgentRuntimeBaseCommand(state.model),
@@ -1123,6 +1124,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   await createSessionAsync(agentId, options.workspace, claudeCmd, {
     env: {
+      TERM: 'xterm-256color',
       PANOPTICON_AGENT_ID: agentId,
       PANOPTICON_ISSUE_ID: options.issueId,
       PANOPTICON_SESSION_TYPE: options.phase || 'implementation',
