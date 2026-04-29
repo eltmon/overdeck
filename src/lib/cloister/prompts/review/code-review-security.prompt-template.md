@@ -299,6 +299,7 @@ You MUST use the **Write** tool to write your review to the output file path spe
 - If the file is missing, your review is treated as a failure and the entire review cycle aborts
 
 After writing your review:
-1. Confirm the file was written successfully
-2. Report completion status with severity summary
-3. Wait for synthesis agent to combine all reviews
+1. Confirm the file was written successfully.
+2. **Display the full review markdown in this conversation.** Read the file you just wrote and paste its entire contents back as a fenced markdown block in your final response. This is required — it lets the work agent, dashboard conversation viewer, and tmux pane history show the findings without anyone having to open the file. Don't summarize; render the whole thing.
+3. Report completion status with severity summary.
+4. Wait for synthesis agent to combine all reviews.

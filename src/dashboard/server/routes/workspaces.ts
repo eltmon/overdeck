@@ -3426,16 +3426,30 @@ const postWorkspaceAbortReviewRoute = HttpRouter.add(
     }
 
     // Kill all reviewer AND coordinator tmux sessions for this issue.
-    // Session name patterns (see docs/REVIEW-AGENT-ARCHITECTURE.md):
-    //   review-<issueId>-<ts>-<role>         (per-reviewer session)
-    //   review-<issueId>-<ts>-synthesis      (synthesis session)
-    //   review-coordinator-<issueId>-<ts>    (detached `pan review run` orchestrator)
-    const reviewerPrefix = `review-${issueId}-`;
+    // Session name patterns:
+    //   specialist-<projectKey>-<issueId>-review-<role>  (PAN-830 canonical reviewer / synthesis)
+    //   review-<issueId>-<ts>-<role>                     (legacy timestamped reviewer)
+    //   review-<issueId>-<ts>-synthesis                  (legacy timestamped synthesis)
+    //   review-coordinator-<issueId>-<ts>                (detached `pan review run` orchestrator)
+    const legacyReviewerPrefix = `review-${issueId}-`;
     const coordinatorPrefix = `review-coordinator-${issueId}-`;
-    const allSessions = yield* Effect.promise(() => listSessionNamesAsync());
-    const reviewSessions = allSessions.filter(
-      s => s.startsWith(reviewerPrefix) || s.startsWith(coordinatorPrefix),
+    const { resolveProjectFromIssue } = yield* Effect.promise(() =>
+      import('../../../lib/projects.js'),
     );
+    const resolved = resolveProjectFromIssue(issueId);
+    const projectKey = resolved?.projectKey;
+    // Canonical PAN-830 reviewer/synthesis sessions (PAN-915). Match
+    // case-insensitively on the issueId portion since session names are
+    // composed with the caller-supplied case.
+    const canonicalPrefix = projectKey
+      ? `specialist-${projectKey.toLowerCase()}-${issueId.toLowerCase()}-review-`
+      : null;
+    const allSessions = yield* Effect.promise(() => listSessionNamesAsync());
+    const reviewSessions = allSessions.filter(s => {
+      if (s.startsWith(legacyReviewerPrefix) || s.startsWith(coordinatorPrefix)) return true;
+      if (canonicalPrefix && s.toLowerCase().startsWith(canonicalPrefix)) return true;
+      return false;
+    });
 
     const killed: string[] = [];
     const failed: string[] = [];

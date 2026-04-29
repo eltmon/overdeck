@@ -19,7 +19,7 @@ import { AGENTS_DIR, CACHE_AGENTS_DIR, CACHE_REVIEW_PROMPTS_DIR, PANOPTICON_HOME
 import { writeFeedbackFile } from './feedback-writer.js';
 import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
 import { resolveProjectFromIssue } from '../projects.js';
-import { getReviewerSessionName, type ReviewerRole } from './specialists.js';
+import { getReviewerSessionName, REVIEWER_ROLES, type ReviewerRole } from './specialists.js';
 import { buildStashMessage, createNamedStash, dropStash, getNextReviewTempSequence, listStashes } from '../stashes.js';
 import { getReviewStatus, setReviewStatus } from '../review-status.js';
 
@@ -708,29 +708,39 @@ export async function waitForReviewer(
 
 /**
  * Kill all canonical reviewer and synthesis sessions for an issue.
- * Called in a `finally` block so cleanup always runs regardless of outcome.
+ *
+ * PAN-915: this is no longer called per-round. Canonical reviewer sessions
+ * persist across review rounds via PAN-830's `remain-on-exit on` so each round
+ * resumes the same Claude process via `sendKeysAsync` — preserving the
+ * reviewer's accumulated context (codebase patterns, prior findings, decisions
+ * made during earlier rounds). This function is now invoked from terminal
+ * lifecycle events: merge complete, reset, cancel, deep-wipe, and explicit
+ * `pan review abort`.
+ *
+ * Iterates the canonical REVIEWER_ROLES set so callers don't need a
+ * `ReviewAgentConfig[]` — every issue has the same five role slots.
  */
-async function killAllReviewerSessions(
+export async function killAllReviewerSessions(
   projectKey: string,
   issueId: string,
-  agents: ReviewAgentConfig[],
-): Promise<void> {
-  const roles: ReviewerRole[] = [
-    ...agents.map(a => a.name as ReviewerRole),
-    'synthesis',
-  ];
+): Promise<{ killed: string[]; failed: string[] }> {
+  const killed: string[] = [];
+  const failed: string[] = [];
   await Promise.all(
-    roles.map(async (role) => {
+    REVIEWER_ROLES.map(async (role) => {
       const sessionName = getReviewerSessionName(role, projectKey, issueId);
       try {
         await killSessionAsync(sessionName);
         console.log(`[review-agent] Killed reviewer session ${sessionName}`);
+        killed.push(sessionName);
       } catch (err) {
-        // Session may not exist (e.g., never spawned, or already killed on timeout)
+        // Session may not exist (e.g., never spawned, or already killed)
         console.log(`[review-agent] Session ${sessionName} already gone or failed to kill: ${err instanceof Error ? err.message : String(err)}`);
+        failed.push(sessionName);
       }
     }),
   );
+  return { killed, failed };
 }
 
 type ReviewerOutcome = { role: string; status: 'completed' | 'failed'; outputFile: string; sessionName?: string };
@@ -835,9 +845,12 @@ export async function runParallelReview(
   }
 
   // `reviewId` is used for output dirs (.pan/review/<reviewId>/) and history
-  // records only. Tmux sessions are canonical during the round but killed in
-  // the finally block when runParallelReview exits (PAN-846). Next round spawns
-  // fresh sessions.
+  // records only. Tmux sessions are canonical (PAN-830) and persist across
+  // rounds via `remain-on-exit on`; next round resumes the same Claude
+  // process via `sendKeysAsync` so reviewer context (codebase patterns, prior
+  // findings, decisions) carries over (PAN-915). Sessions are torn down on
+  // terminal lifecycle events: merge complete, reset, cancel, deep-wipe, and
+  // explicit `pan review abort`.
   const reviewId = `review-${context.issueId}-${Date.now()}`;
   // Capture wall-clock start so we can persist accurate per-round timing into
   // round-N.json artifacts (consumed by Command Deck round dividers).
@@ -876,9 +889,13 @@ export async function runParallelReview(
   const outputDir = join(context.projectPath, '.pan', 'review', reviewId);
   await mkdir(outputDir, { recursive: true });
 
-  // PAN-846: Ensure reviewer/synthesis sessions are always killed when this
-  // round ends, regardless of outcome. Without this, canonical sessions with
-  // `remain-on-exit on` linger indefinitely, leaking ~500–700 MB RSS each.
+  // PAN-915: Canonical reviewer sessions persist across rounds. Cleanup at the
+  // end of each round was removed because it discarded the reviewer's
+  // accumulated context (which is the whole point of PAN-830). Sessions are
+  // torn down by terminal lifecycle events instead — see killAllReviewerSessions
+  // callers (postMergeLifecycle, runDestructiveIssueLifecycle, abort route).
+  // The `try` here remains to scope the per-round work that follows; no
+  // matching `finally` is needed since the cleanup moved upstream.
   try {
 
   // ── Phase 1: Spawn all reviewers in parallel ──────────────────────────────
@@ -1125,7 +1142,8 @@ export async function runParallelReview(
   // file, timestamps). The dashboard reads these to render the per-round
   // timeline in Command Deck. State directories themselves are never deleted
   // while the issue is alive; deep-wipe handles final teardown. Tmux sessions
-  // are killed in the finally block (PAN-846) so they don't leak RAM.
+  // persist across rounds (PAN-915) and are killed by terminal lifecycle
+  // events (merge, reset, cancel, deep-wipe, explicit abort).
   try {
     await archiveReviewerRound({
       projectKey,
@@ -1148,7 +1166,7 @@ export async function runParallelReview(
     } catch (err) {
       console.error(`[review-agent] Failed to clean review-temp stash for ${context.issueId}:`, err);
     }
-    await killAllReviewerSessions(projectKey, context.issueId, agents);
+    // PAN-915: canonical reviewer sessions intentionally survive across rounds.
   }
 }
 

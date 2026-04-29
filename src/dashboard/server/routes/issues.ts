@@ -274,6 +274,25 @@ async function runDestructiveIssueLifecycle(
 
   cleanupLog.push(...result.steps.flatMap((step: any) => step.details || [step.error].filter(Boolean)));
 
+  // Kill canonical reviewer/synthesis tmux sessions (PAN-915). They persist
+  // across review rounds to preserve context, so reset/cancel/deep-wipe is the
+  // right place to tear them down — the issue is going back to Todo or being
+  // canceled outright.
+  try {
+    const { killAllReviewerSessions } = await import('../../../lib/cloister/review-agent.js');
+    const { resolveProjectFromIssue } = await import('../../../lib/projects.js');
+    const resolved = resolveProjectFromIssue(id);
+    const projectKey = resolved?.projectKey;
+    if (projectKey) {
+      const { killed } = await killAllReviewerSessions(projectKey, id.toUpperCase());
+      if (killed.length > 0) {
+        cleanupLog.push(`Killed ${killed.length} reviewer session(s)`);
+      }
+    }
+  } catch (err) {
+    cleanupLog.push(`Reviewer session cleanup failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   try {
     clearReviewStatus(id.toUpperCase());
     cleanupLog.push('Cleared review status');
