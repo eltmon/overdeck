@@ -705,4 +705,13 @@ describe('handleStatus', () => {
 
     expect(mockSetReviewStatus).not.toHaveBeenCalled();
   });
+
+  it('does not partial-match branches with alphanumeric suffixes', async () => {
+    await handleStatus(makePayload({
+      state: 'failure',
+      branches: [{ name: 'feature/pan-3uwo' }],
+    }));
+
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
 });

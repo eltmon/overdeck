@@ -42,7 +42,7 @@ export interface WebhookPayload {
 }
 
 function issueIdFromBranch(ref: string): string | null {
-  const match = ref.match(/feature\/([a-z]+-\d+)/i);
+  const match = ref.match(/feature\/([a-z]+-\d+)$/i);
   return match ? match[1].toUpperCase() : null;
 }
 
@@ -192,11 +192,12 @@ function scheduleMergeStateReconciliation(issueId: string, repo: string, prNumbe
 
 async function refreshMergeStateFromGitHub(issueId: string, repo: string, prNumber: number): Promise<void> {
   try {
-    const { exec } = await import('child_process');
+    const { execFile } = await import('child_process');
     const { promisify } = await import('util');
-    const execAsync = promisify(exec);
-    const { stdout } = await execAsync(
-      `gh pr view ${prNumber} --repo ${repo} --json mergeable,mergeableState,draft --jq '[.mergeable,.mergeableState,.draft]'`,
+    const execFileAsync = promisify(execFile);
+    const { stdout } = await execFileAsync(
+      'gh',
+      ['pr', 'view', String(prNumber), '--repo', repo, '--json', 'mergeable,mergeableState,draft', '--jq', '[.mergeable,.mergeableState,.draft]'],
       { encoding: 'utf-8', timeout: 15000 },
     );
     const [mergeable, mergeableState, draft] = JSON.parse(stdout) as [boolean | null, string | null, boolean];
