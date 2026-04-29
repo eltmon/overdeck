@@ -112,6 +112,7 @@ export interface ApiSettingsConfig {
     minimax?: string;
     zai?: string;
     kimi?: string;
+    mimo?: string;
     openrouter?: string;
   };
   openrouter?: {
@@ -249,6 +250,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
         minimax: settings.models.providers.minimax,
         zai: settings.models.providers.zai,
         kimi: settings.models.providers.kimi,
+        mimo: settings.models.providers.mimo,
         openrouter: settings.models.providers.openrouter,
       },
       overrides: settings.models.overrides,
@@ -261,6 +263,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
       minimax: settings.api_keys.minimax,
       zai: settings.api_keys.zai,
       kimi: settings.api_keys.kimi,
+      mimo: settings.api_keys.mimo,
       openrouter: settings.api_keys.openrouter,
     },
     openrouter: settings.openrouter,

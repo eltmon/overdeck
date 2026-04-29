@@ -350,14 +350,15 @@ const postTestApiKeyRoute = HttpRouter.add(
             const resp = await fetch('https://api.xiaomimimo.com/anthropic/v1/messages', {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
-              body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
+              body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 128 }),
             });
             latencyMs = Date.now() - startTime;
             const responseText = await resp.text();
             if (resp.ok) {
               try {
-                const data = JSON.parse(responseText) as { content?: Array<{ text?: string }> };
-                response = data.content?.[0]?.text?.trim() || '';
+                const data = JSON.parse(responseText) as { content?: Array<{ type?: string; text?: string }> };
+                const textBlock = data.content?.find(b => b.type === 'text');
+                response = textBlock?.text?.trim() || '';
                 success = response.includes(expectedAnswer);
                 if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
               } catch {
