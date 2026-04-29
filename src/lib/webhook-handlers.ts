@@ -156,15 +156,12 @@ export function handlePullRequest(payload: WebhookPayload): void {
     }
 
     // Merge state — classify into exactly one mutually-exclusive bucket.
-    // dirty / mergeable===false  → merge_conflict (highest precedence)
-    // clean / unstable / mergeable===true → clear both blockers
-    // other definitive states      → not_mergeable
-    // null/undefined/unknown       → leave untouched (GitHub computing)
-    const hasMergeableState = pr.mergeable_state !== null && pr.mergeable_state !== undefined;
-    const isDirty = pr.mergeable_state === 'dirty' || pr.mergeable === false;
-    const isClean = pr.mergeable_state === 'clean' || pr.mergeable === true || pr.mergeable_state === 'unstable';
+    // Only known states get blockers; unknown/future states are left untouched.
+    const KNOWN_CONFLICT_STATES = new Set(['dirty']);
+    const KNOWN_NON_BLOCKING_STATES = new Set(['clean', 'unstable']);
+    const KNOWN_NOT_MERGEABLE_STATES = new Set(['blocked', 'behind']);
 
-    if (isDirty) {
+    if (pr.mergeable_state && KNOWN_CONFLICT_STATES.has(pr.mergeable_state)) {
       const mergeConflictBlocker: BlockerReason = {
         type: 'merge_conflict',
         summary: 'Merge conflict with target branch',
@@ -172,7 +169,18 @@ export function handlePullRequest(payload: WebhookPayload): void {
       };
       blockers = blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable');
       blockers = [...blockers, mergeConflictBlocker];
-    } else if (hasMergeableState && !isClean && pr.mergeable_state !== 'unknown') {
+    } else if (pr.mergeable === false && (pr.mergeable_state === null || pr.mergeable_state === undefined)) {
+      // Fallback: mergeable is explicitly false but mergeable_state is unavailable
+      const mergeConflictBlocker: BlockerReason = {
+        type: 'merge_conflict',
+        summary: 'Merge conflict with target branch',
+        detectedAt: new Date().toISOString(),
+      };
+      blockers = blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable');
+      blockers = [...blockers, mergeConflictBlocker];
+    } else if ((pr.mergeable_state && KNOWN_NON_BLOCKING_STATES.has(pr.mergeable_state)) || pr.mergeable === true) {
+      blockers = blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable');
+    } else if (pr.mergeable_state && KNOWN_NOT_MERGEABLE_STATES.has(pr.mergeable_state)) {
       const notMergeableBlocker: BlockerReason = {
         type: 'not_mergeable',
         summary: `PR not mergeable: ${pr.mergeable_state}`,
@@ -180,8 +188,6 @@ export function handlePullRequest(payload: WebhookPayload): void {
       };
       blockers = blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable');
       blockers = [...blockers, notMergeableBlocker];
-    } else if (isClean) {
-      blockers = blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable');
     }
 
     return blockers;

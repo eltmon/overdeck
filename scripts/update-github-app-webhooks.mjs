@@ -17,6 +17,12 @@ import SmeeClient from 'smee-client';
 
 const APP_DIR = join(homedir(), '.panopticon', 'github-app');
 
+if (process.env.PANOPTICON_DEV_WEBHOOKS !== '1') {
+  console.error('Refusing to configure a third-party webhook relay outside dev mode.');
+  console.error('Set PANOPTICON_DEV_WEBHOOKS=1 to enable smee.io for local development.');
+  process.exit(1);
+}
+
 const WEBHOOK_EVENTS = [
   'check_suite',
   'check_run',

@@ -125,17 +125,13 @@ const postGitHubWebhookRoute = HttpRouter.add(
         console.warn('[webhook] Invalid HMAC signature — rejecting');
         return jsonResponse({ error: 'Invalid signature' }, { status: 401 });
       }
-    } else {
-      const devBypass = process.env.PANOPTICON_DEV_WEBHOOKS === '1';
-      const remoteAddress = Option.getOrElse(request.remoteAddress, () => 'unknown');
-      const isLocalhost = remoteAddress === '127.0.0.1' || remoteAddress === '::1' || remoteAddress === '::ffff:127.0.0.1';
-      if (!devBypass || !isLocalhost) {
-        return jsonResponse(
-          { error: 'Webhook secret not configured. Run pan auth github to set up.' },
-          { status: 503 },
-        );
-      }
+    } else if (process.env.PANOPTICON_DEV_WEBHOOKS === '1') {
       console.warn('[webhook] PANOPTICON_DEV_WEBHOOKS=1 — skipping HMAC verification (dev mode)');
+    } else {
+      return jsonResponse(
+        { error: 'Webhook secret not configured. Run pan auth github to set up.' },
+        { status: 503 },
+      );
     }
 
     let payload: WebhookPayload;

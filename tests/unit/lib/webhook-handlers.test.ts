@@ -135,7 +135,7 @@ describe('handlePullRequest', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-456', { blockerReasons: undefined });
   });
 
-  it('adds merge_conflict blocker when mergeable is false', () => {
+  it('adds merge_conflict blocker when mergeable_state is dirty', () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
     handlePullRequest(makePayload({
@@ -153,6 +153,130 @@ describe('handlePullRequest', () => {
         expect.objectContaining({ type: 'merge_conflict' }),
       ]),
     }));
+  });
+
+  it('adds merge_conflict fallback when mergeable is false and mergeable_state is unavailable', () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    handlePullRequest(makePayload({
+      action: 'synchronize',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-789' },
+        mergeable: false,
+        mergeable_state: null,
+      },
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'merge_conflict' }),
+      ]),
+    }));
+  });
+
+  it('adds not_mergeable blocker for behind state', () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    handlePullRequest(makePayload({
+      action: 'synchronize',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-789' },
+        mergeable: false,
+        mergeable_state: 'behind',
+      },
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'not_mergeable' }),
+      ]),
+    }));
+  });
+
+  it('adds not_mergeable blocker for blocked state', () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    handlePullRequest(makePayload({
+      action: 'synchronize',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-789' },
+        mergeable: false,
+        mergeable_state: 'blocked',
+      },
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'not_mergeable' }),
+      ]),
+    }));
+  });
+
+  it('does not add merge_conflict for behind state', () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    handlePullRequest(makePayload({
+      action: 'synchronize',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-789' },
+        mergeable: false,
+        mergeable_state: 'behind',
+      },
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'not_mergeable' }),
+      ]),
+    }));
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', expect.not.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'merge_conflict' }),
+      ]),
+    }));
+  });
+
+  it('leaves blockers unchanged when mergeable_state is unknown', () => {
+    const existingBlockers = [{ type: 'merge_conflict', summary: 'Conflict', detectedAt: '2026-04-28T10:00:00Z' }];
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: existingBlockers });
+
+    handlePullRequest(makePayload({
+      action: 'synchronize',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-789' },
+        mergeable: null,
+        mergeable_state: 'unknown',
+      },
+    }));
+
+    // Unknown state is left untouched — mutateBlockers writes the same array back
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', { blockerReasons: existingBlockers });
+  });
+
+  it('clears merge and not_mergeable blockers on clean state', () => {
+    mockGetReviewStatus.mockReturnValue({
+      blockerReasons: [
+        { type: 'merge_conflict', summary: 'Conflict', detectedAt: '2026-04-28T10:00:00Z' },
+        { type: 'not_mergeable', summary: 'Behind', detectedAt: '2026-04-28T10:00:00Z' },
+      ],
+    });
+
+    handlePullRequest(makePayload({
+      action: 'synchronize',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-789' },
+        mergeable: true,
+        mergeable_state: 'clean',
+      },
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', { blockerReasons: undefined });
   });
 });
 
