@@ -442,7 +442,7 @@ describe('handlePullRequestReview', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-111', { blockerReasons: undefined });
   });
 
-  it('removes changes_requested blocker on dismissed', async () => {
+  it('ignores dismissed review state (handled by pull_request review_dismissed action)', async () => {
     mockGetReviewStatus.mockReturnValue({
       blockerReasons: [{ type: 'changes_requested', summary: 'Changes', detectedAt: '2026-04-28T10:00:00Z' }],
     });
@@ -456,7 +456,7 @@ describe('handlePullRequestReview', () => {
       review: { state: 'dismissed' },
     }));
 
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-111', { blockerReasons: undefined });
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
   });
 });
 

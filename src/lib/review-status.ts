@@ -154,6 +154,7 @@ export function setReviewStatus(
   // This is belt-and-suspenders — endpoint-level guards should catch this first.
   if (update.reviewStatus === 'reviewing' && status.reviewStatus === 'passed' && update.mergeStatus === undefined) {
     console.warn(`[review-status] Rejecting reviewStatus regression from 'passed' to 'reviewing' for ${issueId} (mergeStatus not being reset)`);
+    notifyPipeline({ type: 'status_changed', issueId, status: status as ReviewStatus });
     return status as ReviewStatus;
   }
 
@@ -357,7 +358,15 @@ export async function setReviewStatusAsync(
   update: Partial<ReviewStatus>,
   existing?: ReviewStatus,
 ): Promise<ReviewStatus> {
-  return setReviewStatus(issueId, update, existing);
+  return new Promise((resolve, reject) => {
+    setImmediate(() => {
+      try {
+        resolve(setReviewStatus(issueId, update, existing));
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
 }
 
 export async function getReviewStatusAsync(issueId: string): Promise<ReviewStatus | null> {

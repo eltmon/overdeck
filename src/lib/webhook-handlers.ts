@@ -222,7 +222,7 @@ export async function handlePullRequestReview(payload: WebhookPayload): Promise<
       summary: 'Changes requested on pull request',
       detectedAt: new Date().toISOString(),
     });
-  } else if (review.state === 'approved' || review.state === 'dismissed') {
+  } else if (review.state === 'approved') {
     await removeBlocker(issueId, 'changes_requested');
   }
 }
@@ -243,7 +243,12 @@ export async function handlePullRequestReviewThread(payload: WebhookPayload): Pr
     }
     await mutateBlockers(issueId, (blockers) => {
       const existing = blockers.find((b) => b.type === 'unresolved_conversations');
-      const threadIds = new Set<string>(JSON.parse(existing?.details ?? '[]') as string[]);
+      let threadIds: Set<string>;
+      try {
+        threadIds = new Set<string>(JSON.parse(existing?.details ?? '[]') as string[]);
+      } catch {
+        threadIds = new Set<string>();
+      }
       if (thread.id != null) threadIds.add(String(thread.id));
       const updated: BlockerReason = {
         type: 'unresolved_conversations',
@@ -259,7 +264,12 @@ export async function handlePullRequestReviewThread(payload: WebhookPayload): Pr
     await mutateBlockers(issueId, (blockers) => {
       const existing = blockers.find((b) => b.type === 'unresolved_conversations');
       if (!existing) return blockers;
-      const threadIds = new Set<string>(JSON.parse(existing.details ?? '[]') as string[]);
+      let threadIds: Set<string>;
+      try {
+        threadIds = new Set<string>(JSON.parse(existing.details ?? '[]') as string[]);
+      } catch {
+        threadIds = new Set<string>();
+      }
       threadIds.delete(String(thread.id));
       if (threadIds.size === 0) {
         return blockers.filter((b) => b.type !== 'unresolved_conversations');

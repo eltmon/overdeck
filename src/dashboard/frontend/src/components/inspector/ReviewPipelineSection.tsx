@@ -194,6 +194,7 @@ export function ReviewPipelineSection({ reviewStatus, issueId, onViewLog }: Revi
             {prQuery.data.pr.statusCheckRollup.map((check, idx) => {
               const c = statusColor(check);
               const name = check.name || check.workflowName || check.__typename || `check-${idx}`;
+              const StatusIcon = c.label === 'pass' ? CheckCircle : c.label === 'fail' ? XCircle : c.label === 'run' ? Loader2 : null;
               return (
                 <span
                   key={`${name}-${idx}`}
@@ -201,6 +202,7 @@ export function ReviewPipelineSection({ reviewStatus, issueId, onViewLog }: Revi
                   style={{ background: c.bg, color: c.fg }}
                   title={`${name}: ${c.label}`}
                 >
+                  {StatusIcon && <StatusIcon className={`w-3 h-3 ${c.label === 'run' ? 'animate-spin' : ''}`} />}
                   <span className="uppercase tracking-wider" style={{ fontSize: 9 }}>{c.label}</span>
                   <span style={{ color: 'var(--foreground)', fontWeight: 500 }}>{name}</span>
                 </span>
