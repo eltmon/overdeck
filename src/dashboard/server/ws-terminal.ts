@@ -21,7 +21,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
 import { buildTmuxCommandString, buildTmuxArgs, capturePaneAsync, getWindowDimensionsAsync, listSessionNamesAsync, resizeWindowAsync, sessionExistsAsync } from '../../lib/tmux.js';
-import { getReauthSessionToken } from './codex-auth.js';
+import { getReauthSessionToken } from './routes/codex-auth.js';
 import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
 
 type ClientControlMessage =
