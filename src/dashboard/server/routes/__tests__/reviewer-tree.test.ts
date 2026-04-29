@@ -320,4 +320,100 @@ describe('buildReviewerNodes (PAN-830)', () => {
 
     expect(nodes.every(n => n.hasJsonl === false)).toBe(true);
   });
+
+  // ─── PAN-915: in-progress round disambiguates from completed-zombie ─────
+  describe('PAN-915 in-progress round detection', () => {
+    it('reports running when session is alive, prior round archived as completed, AND a newer review-run dir exists with no output file yet', async () => {
+      const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
+      // Archive a prior round as completed (would normally trigger zombie)
+      await mkdir(join(agentsDir, correctness), { recursive: true });
+      await writeFile(
+        join(agentsDir, correctness, 'round-1.json'),
+        JSON.stringify({ round: 1, status: 'completed', success: true }),
+      );
+
+      // Spin up a workspace dir with a NEW round folder but no <role>.md yet
+      const workspacePath = join(testDir, 'workspaces', `feature-${ISSUE_ID}`);
+      const reviewRunDir = join(workspacePath, '.pan', 'review', `review-${ISSUE_ID.toUpperCase()}-1700000099999`);
+      await mkdir(reviewRunDir, { recursive: true });
+
+      const liveSet = new Set<string>([correctness]);
+
+      const nodes = await buildReviewerNodes({
+        issueId: ISSUE_ID,
+        projectKey: PROJECT_KEY,
+        workspacePath,
+        tmuxSessionNames: liveSet,
+        startedAt: '2026-01-01T00:00:00Z',
+        status: 'completed',
+        agentsDirOverride: agentsDir,
+      });
+
+      const node = nodes.find(n => n.role === 'correctness')!;
+      expect(node.status).toBe('running');
+      expect(node.presence).toBe('active');
+      expect(node.tmuxSession).toBe(correctness);
+    });
+
+    it('reports zombie (idle) when session alive, prior round completed, AND output file already exists in latest run dir', async () => {
+      const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
+      await mkdir(join(agentsDir, correctness), { recursive: true });
+      await writeFile(
+        join(agentsDir, correctness, 'round-1.json'),
+        JSON.stringify({ round: 1, status: 'completed', success: true }),
+      );
+
+      const workspacePath = join(testDir, 'workspaces', `feature-${ISSUE_ID}`);
+      const reviewRunDir = join(workspacePath, '.pan', 'review', `review-${ISSUE_ID.toUpperCase()}-1700000099999`);
+      await mkdir(reviewRunDir, { recursive: true });
+      // Output file exists — round done, session is a zombie
+      await writeFile(join(reviewRunDir, 'correctness.md'), '# done');
+
+      const liveSet = new Set<string>([correctness]);
+
+      const nodes = await buildReviewerNodes({
+        issueId: ISSUE_ID,
+        projectKey: PROJECT_KEY,
+        workspacePath,
+        tmuxSessionNames: liveSet,
+        startedAt: '2026-01-01T00:00:00Z',
+        status: 'completed',
+        agentsDirOverride: agentsDir,
+      });
+
+      const node = nodes.find(n => n.role === 'correctness')!;
+      // Falls back to archived round status (completed → 'stopped' via normalizeAgentStatus)
+      expect(node.status).toBe('stopped');
+      expect(node.presence).toBe('idle');
+      expect(node.tmuxSession).toBeUndefined();
+    });
+
+    it('falls back to legacy zombie detection when no review-run dir exists in workspace', async () => {
+      const correctness = getReviewerSessionName('correctness', PROJECT_KEY, ISSUE_ID);
+      await mkdir(join(agentsDir, correctness), { recursive: true });
+      await writeFile(
+        join(agentsDir, correctness, 'round-1.json'),
+        JSON.stringify({ round: 1, status: 'completed', success: true }),
+      );
+
+      const liveSet = new Set<string>([correctness]);
+
+      // No .pan/review dir exists — workspacePath has no review history.
+      // The role should still be treated as a zombie (matches pre-PAN-915 behavior).
+      const nodes = await buildReviewerNodes({
+        issueId: ISSUE_ID,
+        projectKey: PROJECT_KEY,
+        workspacePath: join(testDir, 'workspaces', 'no-review-history'),
+        tmuxSessionNames: liveSet,
+        startedAt: '2026-01-01T00:00:00Z',
+        status: 'completed',
+        agentsDirOverride: agentsDir,
+      });
+
+      const node = nodes.find(n => n.role === 'correctness')!;
+      expect(node.status).toBe('stopped');
+      expect(node.presence).toBe('idle');
+      expect(node.tmuxSession).toBeUndefined();
+    });
+  });
 });
