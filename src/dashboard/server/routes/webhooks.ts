@@ -7,7 +7,7 @@
  *   Dispatches to per-event-type handlers.
  */
 
-import { Effect, Option } from 'effect';
+import { Effect, Exit, Fiber, Option } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -65,32 +65,28 @@ function verifySignature(body: string, signature: string, secret: string): boole
 }
 
 async function dispatchWebhook(eventType: string, payload: WebhookPayload): Promise<void> {
-  try {
-    switch (eventType) {
-      case 'check_suite':
-        await handleCheckSuite(payload);
-        break;
-      case 'check_run':
-        await handleCheckRun(payload);
-        break;
-      case 'pull_request':
-        await handlePullRequest(payload);
-        break;
-      case 'pull_request_review':
-        await handlePullRequestReview(payload);
-        break;
-      case 'pull_request_review_thread':
-        await handlePullRequestReviewThread(payload);
-        break;
-      case 'status':
-        await handleStatus(payload);
-        break;
-      default:
-        // Unknown events are silently accepted (GitHub expects 200)
-        break;
-    }
-  } catch (err) {
-    console.error(`[webhook] ${eventType} handler failed:`, err);
+  switch (eventType) {
+    case 'check_suite':
+      await handleCheckSuite(payload);
+      break;
+    case 'check_run':
+      await handleCheckRun(payload);
+      break;
+    case 'pull_request':
+      await handlePullRequest(payload);
+      break;
+    case 'pull_request_review':
+      await handlePullRequestReview(payload);
+      break;
+    case 'pull_request_review_thread':
+      await handlePullRequestReviewThread(payload);
+      break;
+    case 'status':
+      await handleStatus(payload);
+      break;
+    default:
+      // Unknown events are silently accepted (GitHub expects 200)
+      break;
   }
 }
 
@@ -150,8 +146,16 @@ const postGitHubWebhookRoute = HttpRouter.add(
 
     // Dispatch handlers asynchronously so DB work (deferred via setImmediate)
     // does not block the HTTP response or the Node event loop.
-    yield* Effect.fork(
+    const fiber = yield* Effect.fork(
       Effect.promise(() => dispatchWebhook(eventType, payload)),
+    );
+    yield* Effect.fork(
+      Effect.gen(function* () {
+        const exit = yield* Fiber.await(fiber);
+        if (Exit.isFailure(exit)) {
+          console.error(`[webhook] Forked dispatch failed for ${eventType}:`, exit.cause);
+        }
+      }),
     );
 
     console.log(`[webhook] Received ${eventType} event from ${repoFullName}`);

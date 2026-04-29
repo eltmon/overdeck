@@ -127,6 +127,78 @@ describe('handleCheckSuite', () => {
       ]),
     }));
   });
+
+  it('processes all PRs in check_suite, not just the first', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    await handleCheckSuite(makePayload({
+      check_suite: {
+        status: 'completed',
+        conclusion: 'failure',
+        pull_requests: [
+          { number: 1, head: { ref: 'feature/pan-100' } },
+          { number: 2, head: { ref: 'feature/pan-200' } },
+        ],
+      },
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-100', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'failing_checks' }),
+      ]),
+    }));
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-200', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'failing_checks' }),
+      ]),
+    }));
+  });
+});
+
+describe('handleCheckRun', () => {
+  it('adds failing_checks blocker on check run failure', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    await handleCheckRun(makePayload({
+      check_run: {
+        status: 'completed',
+        conclusion: 'failure',
+        pull_requests: [{ number: 1, head: { ref: 'feature/pan-123' } }],
+      },
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-123', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'failing_checks' }),
+      ]),
+    }));
+  });
+
+  it('processes all PRs in check_run, not just the first', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    await handleCheckRun(makePayload({
+      check_run: {
+        status: 'completed',
+        conclusion: 'failure',
+        pull_requests: [
+          { number: 1, head: { ref: 'feature/pan-100' } },
+          { number: 2, head: { ref: 'feature/pan-200' } },
+        ],
+      },
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-100', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'failing_checks' }),
+      ]),
+    }));
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-200', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'failing_checks' }),
+      ]),
+    }));
+  });
 });
 
 describe('handlePullRequest', () => {
@@ -313,6 +385,24 @@ describe('handlePullRequest', () => {
 
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', { blockerReasons: undefined });
   });
+
+  it('removes changes_requested blocker on review_dismissed action', async () => {
+    mockGetReviewStatus.mockReturnValue({
+      blockerReasons: [{ type: 'changes_requested', summary: 'Changes', detectedAt: '2026-04-28T10:00:00Z' }],
+    });
+
+    await handlePullRequest(makePayload({
+      action: 'review_dismissed',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-789' },
+        mergeable: true,
+        mergeable_state: 'clean',
+      },
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', { blockerReasons: undefined });
+  });
 });
 
 describe('handlePullRequestReview', () => {
@@ -466,6 +556,23 @@ describe('handlePullRequestReviewThread', () => {
     }));
 
     expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
+
+  it('warns when unresolved thread has no id', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    await handlePullRequestReviewThread(makePayload({
+      action: 'unresolved',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-222' },
+      },
+      thread: { resolved: false },
+    }));
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Unresolved review thread without id'));
+    warnSpy.mockRestore();
   });
 });
 

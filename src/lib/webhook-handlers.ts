@@ -94,19 +94,21 @@ export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepository(payload.repository?.full_name)) return;
   const suite = payload.check_suite;
   if (!suite) return;
-  const pr = suite.pull_requests?.[0];
-  if (!pr) return;
-  const issueId = issueIdFromBranch(pr.head.ref);
-  if (!issueId) return;
+  if (!suite.pull_requests || suite.pull_requests.length === 0) return;
 
-  if (suite.conclusion === 'failure') {
-    await addBlocker(issueId, {
-      type: 'failing_checks',
-      summary: 'CI check suite failed',
-      detectedAt: new Date().toISOString(),
-    });
-  } else if (suite.conclusion === 'success') {
-    await removeBlocker(issueId, 'failing_checks');
+  for (const pr of suite.pull_requests) {
+    const issueId = issueIdFromBranch(pr.head.ref);
+    if (!issueId) continue;
+
+    if (suite.conclusion === 'failure') {
+      await addBlocker(issueId, {
+        type: 'failing_checks',
+        summary: 'CI check suite failed',
+        detectedAt: new Date().toISOString(),
+      });
+    } else if (suite.conclusion === 'success') {
+      await removeBlocker(issueId, 'failing_checks');
+    }
   }
 }
 
@@ -114,21 +116,23 @@ export async function handleCheckRun(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepository(payload.repository?.full_name)) return;
   const run = payload.check_run;
   if (!run) return;
-  const pr = run.pull_requests?.[0];
-  if (!pr) return;
-  const issueId = issueIdFromBranch(pr.head.ref);
-  if (!issueId) return;
+  if (!run.pull_requests || run.pull_requests.length === 0) return;
 
-  if (run.conclusion === 'failure') {
-    await addBlocker(issueId, {
-      type: 'failing_checks',
-      summary: 'CI check run failed',
-      detectedAt: new Date().toISOString(),
-    });
+  for (const pr of run.pull_requests) {
+    const issueId = issueIdFromBranch(pr.head.ref);
+    if (!issueId) continue;
+
+    if (run.conclusion === 'failure') {
+      await addBlocker(issueId, {
+        type: 'failing_checks',
+        summary: 'CI check run failed',
+        detectedAt: new Date().toISOString(),
+      });
+    }
+    // Do NOT remove failing_checks on individual check_run success —
+    // other runs in the same suite may still be failing. Blocker
+    // removal is handled by check_suite conclusion='success'.
   }
-  // Do NOT remove failing_checks on individual check_run success —
-  // other runs in the same suite may still be failing. Blocker
-  // removal is handled by check_suite conclusion='success'.
 }
 
 // ─── pull_request ────────────────────────────────────────────────────────────
@@ -139,6 +143,13 @@ export async function handlePullRequest(payload: WebhookPayload): Promise<void> 
   if (!pr) return;
   const issueId = issueIdFromBranch(pr.head.ref);
   if (!issueId) return;
+
+  // Dismissed reviews arrive primarily via pull_request_review (state='dismissed'),
+  // but GitHub also sends pull_request action='review_dismissed' in some paths.
+  if (payload.action === 'review_dismissed') {
+    await removeBlocker(issueId, 'changes_requested');
+    return;
+  }
 
   // Merge conflict detection + draft PR + not_mergeable — batched into one DB write
   await mutateBlockers(issueId, (blockers) => {
@@ -227,6 +238,9 @@ export async function handlePullRequestReviewThread(payload: WebhookPayload): Pr
   if (!issueId) return;
 
   if (thread.resolved === false) {
+    if (thread.id == null) {
+      console.warn(`[webhook] Unresolved review thread without id for ${issueId} — cannot track conversation`);
+    }
     await mutateBlockers(issueId, (blockers) => {
       const existing = blockers.find((b) => b.type === 'unresolved_conversations');
       const threadIds = new Set<string>(JSON.parse(existing?.details ?? '[]') as string[]);
