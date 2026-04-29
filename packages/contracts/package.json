@@ -20,7 +20,6 @@
     }
   },
   "scripts": {
-    "prepare": "npm run build",
     "dev": "tsdown --watch",
     "build": "tsdown",
     "typecheck": "tsc --noEmit"

@@ -77,6 +77,7 @@
     "build:desktop:win": "cd apps/desktop && bun run build && bun run dist:win",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
+    "pretest": "npm run build:contracts",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
