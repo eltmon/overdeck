@@ -122,11 +122,13 @@ export interface InspectorPanelProps {
   reviewStatusLoading?: boolean;
   onClose: () => void;
   onOpenTerminal?: () => void;
+  /** Open the terminal and select the active merge session (PAN-905) */
+  onViewMergeLog?: () => void;
   /** When true, render without sidebar chrome (border-r, close btn) for embedded use */
   embedded?: boolean;
 }
 
-export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewStatus: reviewStatusProp, reviewStatusLoading: reviewStatusLoadingProp, onClose, onOpenTerminal, embedded }: InspectorPanelProps) {
+export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewStatus: reviewStatusProp, reviewStatusLoading: reviewStatusLoadingProp, onClose, onOpenTerminal, onViewMergeLog, embedded }: InspectorPanelProps) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const showAlert = useAlert();
@@ -1064,6 +1066,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           onReopen={handleReopen}
           onViewBeads={() => setShowBeads(true)}
           onViewVBrief={() => setShowVBrief(true)}
+          onViewLog={onViewMergeLog}
           lifecycle={agentLifecycle}
           agentLaunchState={agentLaunchState}
         />

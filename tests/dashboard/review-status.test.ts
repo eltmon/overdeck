@@ -185,6 +185,41 @@ describe('setReviewStatus', () => {
 
     expect(result.readyForMerge).toBe(true);
   });
+
+  it('blocks readyForMerge when blockerReasons is non-empty (PAN-905)', () => {
+    const result = setReviewStatus('PAN-114', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: true,
+      blockerReasons: [{ type: 'failing_checks', summary: 'CI failed', detectedAt: '2026-04-28T10:00:00Z' }],
+    }, statusFile);
+
+    expect(result.readyForMerge).toBe(false);
+  });
+
+  it('allows readyForMerge when blockerReasons is empty (PAN-905)', () => {
+    const result = setReviewStatus('PAN-115', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      blockerReasons: [],
+    }, statusFile);
+
+    expect(result.readyForMerge).toBe(true);
+  });
+
+  it('round-trips blockerReasons through getReviewStatus (PAN-905)', () => {
+    const blockers = [
+      { type: 'merge_conflict' as const, summary: 'Conflict with main', detectedAt: '2026-04-28T10:00:00Z' },
+    ];
+    setReviewStatus('PAN-116', {
+      reviewStatus: 'passed',
+      blockerReasons: blockers,
+    }, statusFile);
+
+    const result = getReviewStatus('PAN-116', statusFile);
+    expect(result!.blockerReasons).toHaveLength(1);
+    expect(result!.blockerReasons![0].type).toBe('merge_conflict');
+  });
 });
 
 describe('getReviewStatus', () => {

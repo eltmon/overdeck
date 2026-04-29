@@ -24,7 +24,7 @@ interface PrDiffTabProps {
   issueId: string;
 }
 
-function statusColor(check: { state?: string; conclusion?: string; status?: string }): {
+export function statusColor(check: { state?: string; conclusion?: string; status?: string }): {
   bg: string;
   fg: string;
   label: string;

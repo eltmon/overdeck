@@ -1,17 +1,22 @@
 import { useState } from 'react';
-import { CheckCircle, XCircle, Loader2, AlertTriangle, ChevronDown, ChevronUp, RotateCcw, Info } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, AlertTriangle, ChevronDown, ChevronUp, RotateCcw, Info, GitMerge, Terminal } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ReviewStatus } from './types';
 import { formatRelativeTime, isStale } from './utils';
 import { StatusHistory } from './StatusHistory';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
+import { usePrQuery } from '../CommandDeck/ZoneCOverviewTabs/queries';
+import { statusColor } from '../CommandDeck/ZoneCOverviewTabs/PrDiffTab';
 
 const DEFAULT_VERIFICATION_MAX_CYCLES = 10;
 const DEFAULT_AUTO_REQUEUE_MAX = 7;
+const DEFAULT_MERGE_RETRY_MAX = 3;
 
 interface ReviewPipelineSectionProps {
   reviewStatus: ReviewStatus;
+  issueId?: string;
+  onViewLog?: () => void;
 }
 
 void COMMAND_DECK_SURFACE_REGISTRY;
@@ -27,8 +32,17 @@ interface PipelineStep {
   isSkipped: boolean;
 }
 
-export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionProps) {
+export function ReviewPipelineSection({ reviewStatus, issueId, onViewLog }: ReviewPipelineSectionProps) {
   const [showDetails, setShowDetails] = useState(false);
+  const mergeStatus = reviewStatus.mergeStatus ?? 'pending';
+  const isMergeActive =
+    mergeStatus === 'queued' ||
+    mergeStatus === 'merging' ||
+    mergeStatus === 'verifying' ||
+    mergeStatus === 'failed';
+  const prQuery = usePrQuery(issueId ?? '', {
+    enabled: isMergeActive && !!issueId,
+  });
   const verificationMaxCycles = reviewStatus.verificationMaxCycles ?? DEFAULT_VERIFICATION_MAX_CYCLES;
   const autoRequeueCount = reviewStatus.autoRequeueCount ?? 0;
 
@@ -62,6 +76,16 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
       isFailed: reviewStatus.testStatus === 'failed' || reviewStatus.testStatus === 'dispatch_failed',
       isPassed: reviewStatus.testStatus === 'passed',
       isSkipped: reviewStatus.testStatus === 'skipped',
+    },
+    {
+      key: 'merge',
+      label: 'Merge',
+      status: reviewStatus.mergeStatus ?? 'pending',
+      notes: reviewStatus.mergeNotes,
+      isRunning: reviewStatus.mergeStatus === 'queued' || reviewStatus.mergeStatus === 'merging' || reviewStatus.mergeStatus === 'verifying',
+      isFailed: reviewStatus.mergeStatus === 'failed',
+      isPassed: reviewStatus.mergeStatus === 'merged',
+      isSkipped: false,
     },
   ];
 
@@ -102,6 +126,16 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
           {autoRequeueCount >= DEFAULT_AUTO_REQUEUE_MAX && (
             <span className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-900/20 px-1.5 py-0.5 rounded">
               <AlertTriangle className="w-2.5 h-2.5" />Human review
+            </span>
+          )}
+          {(reviewStatus.mergeRetryCount ?? 0) > 0 && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+              (reviewStatus.mergeRetryCount ?? 0) >= DEFAULT_MERGE_RETRY_MAX
+                ? 'bg-destructive/20 text-destructive'
+                : 'bg-card text-muted-foreground'
+            }`}>
+              <GitMerge className="w-2.5 h-2.5 inline mr-1" />
+              Attempt {(reviewStatus.mergeRetryCount ?? 0)}/{DEFAULT_MERGE_RETRY_MAX}
             </span>
           )}
         </div>
@@ -151,6 +185,51 @@ export function ReviewPipelineSection({ reviewStatus }: ReviewPipelineSectionPro
               {reviewStatus.verificationCycleCount}/{verificationMaxCycles}
             </span>
           </div>
+        )}
+
+        {/* CI check sub-statuses during active merge phase */}
+        {issueId && prQuery.data?.pr?.statusCheckRollup && prQuery.data.pr.statusCheckRollup.length > 0 &&
+          (reviewStatus.mergeStatus === 'queued' || reviewStatus.mergeStatus === 'merging' || reviewStatus.mergeStatus === 'verifying' || reviewStatus.mergeStatus === 'failed') && (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1">
+            {prQuery.data.pr.statusCheckRollup.map((check, idx) => {
+              const c = statusColor(check);
+              const name = check.name || check.workflowName || check.__typename || `check-${idx}`;
+              const StatusIcon = c.label === 'pass' ? CheckCircle : c.label === 'fail' ? XCircle : c.label === 'run' ? Loader2 : null;
+              return (
+                <span
+                  key={`${name}-${idx}`}
+                  className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap"
+                  style={{ background: c.bg, color: c.fg }}
+                  title={`${name}: ${c.label}`}
+                >
+                  {StatusIcon && <StatusIcon className={`w-3 h-3 ${c.label === 'run' ? 'animate-spin' : ''}`} />}
+                  <span className="uppercase tracking-wider" style={{ fontSize: 9 }}>{c.label}</span>
+                  <span style={{ color: 'var(--foreground)', fontWeight: 500 }}>{name}</span>
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Merge queue position */}
+        {(reviewStatus.queuePosition ?? null) !== null && (reviewStatus.queuePosition ?? 0) > 0 && reviewStatus.activeSpecialist === 'merge' && (
+          <div className="mt-1.5 flex items-center gap-1.5 text-[10px]">
+            <GitMerge className="w-3 h-3 text-muted-foreground" />
+            <span className="text-muted-foreground">Queue position</span>
+            <span className="font-medium text-foreground">{reviewStatus.queuePosition}</span>
+          </div>
+        )}
+
+        {/* Live specialist log link during active merge phase */}
+        {onViewLog && (reviewStatus.mergeStatus === 'queued' || reviewStatus.mergeStatus === 'merging' || reviewStatus.mergeStatus === 'verifying') && (
+          <button
+            onClick={onViewLog}
+            className="mt-1.5 flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 transition-colors"
+            data-testid="merge-live-log-link"
+          >
+            <Terminal className="w-3 h-3" />
+            <span>View live specialist log</span>
+          </button>
         )}
       </div>
 
@@ -223,6 +302,10 @@ function StatusLabel({ step }: { step: PipelineStep }) {
       case 'running': return 'Running...';
       case 'skipped': return 'Skipped';
       case 'dispatch_failed': return 'Dispatch Failed';
+      case 'queued': return 'Queued';
+      case 'merging': return 'Merging...';
+      case 'verifying': return 'Verifying...';
+      case 'merged': return 'Merged';
       default: return 'Pending';
     }
   })();

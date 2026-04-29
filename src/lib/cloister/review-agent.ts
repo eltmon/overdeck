@@ -523,9 +523,9 @@ export function resolveReviewerModel(agent: ReviewAgentConfig, defaultModel: str
 }
 
 /** Spawn a single reviewer tmux session and send its prompt.
- *  Runs from the main Panopticon codebase (packageRoot), not the workspace,
- *  so reviewers use main's .claude/rules/ and CLAUDE.md instead of the workspace's.
- *  The workspace path is passed in the prompt so the reviewer knows where to read files.
+ *  Runs from the workspace (projectPath) so relative paths and git commands
+ *  resolve to the correct checkout. The workspace is a git worktree, so it
+ *  shares .claude/rules/ and CLAUDE.md with the main repo.
  */
 async function spawnReviewer(
   sessionName: string,
@@ -564,7 +564,7 @@ async function spawnReviewer(
   const launcherPath = join(tmpdir(), `pan-reviewer-${sessionName}.sh`);
   const launcherContent = generateLauncherScript({
     agentType: 'review',
-    workingDir: packageRoot,
+    workingDir: projectPath,
     setPipefail: true,
     setTerminalEnv: true,
     unsetPanopticonEnv: true,
@@ -912,6 +912,7 @@ export async function runParallelReview(
     `**Issue ID**: ${context.issueId}`,
     `**Workspace Path**: ${context.projectPath}`,
     absoluteFilesChanged.length > 0 ? `**Files changed**: ${absoluteFilesChanged.join(', ')}` : '',
+    `> **CRITICAL: Re-read every file listed above before analyzing it. Sessions are resumed across review rounds, so you may have stale cached file contents. Do NOT rely on memory — open each file with the Read tool before commenting on it.**`,
   ].filter(Boolean).join('\n');
 
   const reviewerSessions: Array<{ sessionName: string; outputFile: string; role: string }> = [];
