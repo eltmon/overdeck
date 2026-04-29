@@ -39,9 +39,9 @@ async function main() {
     mkdirSync(APP_DIR, { recursive: true });
     writeFileSync(join(APP_DIR, 'smee-url'), smeeUrl);
   } catch (err) {
-    console.warn('\n⚠ Failed to create smee.io channel:', err.message);
-    console.warn('  You can set up webhooks manually later.');
-    smeeUrl = 'https://example.com/hook';
+    console.error('Failed to create smee.io channel:', err.message);
+    console.error('Refusing to create GitHub App without a trusted webhook URL.');
+    process.exit(1);
   }
 
   const manifest = {
@@ -52,11 +52,10 @@ async function main() {
     callback_urls: [CALLBACK_URL],
     public: false,
     default_permissions: {
-      contents: 'write',
-      pull_requests: 'write',
       metadata: 'read',
-      checks: 'write',
+      checks: 'read',
       statuses: 'write',
+      pull_requests: 'read',
     },
     default_events: WEBHOOK_EVENTS,
   };

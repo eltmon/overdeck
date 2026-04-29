@@ -44,14 +44,27 @@ function issueIdFromBranch(ref: string): string | null {
 
 // ─── Repository authorization (defense-in-depth) ─────────────────────────────
 
+// ─── Cached repository allowlist (refreshed every 5 min) ─────────────────────
+
+let cachedTrackedRepos: Set<string> | null = null;
+let cachedTrackedReposAt = 0;
+const REPO_CACHE_TTL_MS = 5 * 60 * 1000;
+
+function getTrackedRepos(): Set<string> {
+  const now = Date.now();
+  if (!cachedTrackedRepos || now - cachedTrackedReposAt > REPO_CACHE_TTL_MS) {
+    const config = getGitHubConfig();
+    cachedTrackedRepos = config
+      ? new Set(config.repos.map(({ owner, repo }) => `${owner}/${repo}`.toLowerCase()))
+      : new Set();
+    cachedTrackedReposAt = now;
+  }
+  return cachedTrackedRepos;
+}
+
 function isTrackedRepository(fullName: string | undefined): boolean {
   if (!fullName) return false;
-  const config = getGitHubConfig();
-  if (!config) return false;
-  return config.repos.some(
-    ({ owner, repo }) =>
-      `${owner}/${repo}`.toLowerCase() === fullName.toLowerCase(),
-  );
+  return getTrackedRepos().has(fullName.toLowerCase());
 }
 
 // ─── Batched blocker mutation (single read + single write per event) ─────────
