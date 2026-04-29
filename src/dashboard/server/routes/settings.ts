@@ -80,6 +80,9 @@ const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string }> = {
   'glm-5.1': { apiModel: 'glm-5.1' },
   'glm-4.7': { apiModel: 'glm-4.7' },
   'glm-4.7-flash': { apiModel: 'glm-4.7-flash' },
+  // MiMo models
+  'mimo-v2.5-pro': { apiModel: 'mimo-v2.5-pro' },
+  'mimo-v2.5': { apiModel: 'mimo-v2.5' },
 };
 
 // ─── Route: GET /api/settings ─────────────────────────────────────────────────
@@ -341,6 +344,38 @@ const postTestApiKeyRoute = HttpRouter.add(
           break;
         }
 
+        case 'mimo': {
+          const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'mimo-v2.5-pro') : 'mimo-v2.5-pro';
+          try {
+            const resp = await fetch('https://api.xiaomimimo.com/anthropic/v1/messages', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+              body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
+            });
+            latencyMs = Date.now() - startTime;
+            const responseText = await resp.text();
+            if (resp.ok) {
+              try {
+                const data = JSON.parse(responseText) as { content?: Array<{ text?: string }> };
+                response = data.content?.[0]?.text?.trim() || '';
+                success = response.includes(expectedAnswer);
+                if (!success) error = `Model returned: ${response} (expected ${expectedAnswer})`;
+              } catch {
+                error = `MiMo returned non-JSON response: ${responseText.slice(0, 100)}`;
+              }
+            } else if (resp.status === 401) {
+              error = 'Invalid API key';
+            } else if (resp.status === 404) {
+              error = `Model not found: ${apiModel}`;
+            } else {
+              error = `HTTP ${resp.status}: ${responseText.slice(0, 100)}`;
+            }
+          } catch (err) {
+            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
+          }
+          break;
+        }
+
         default:
           error = `Unknown provider: ${provider}`;
       }
@@ -363,7 +398,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
       return jsonResponse({ error: 'Provider and apiKey are required' }, { status: 400 });
     }
 
-    if (!['openai', 'google', 'kimi', 'minimax', 'zai'].includes(provider)) {
+    if (!['openai', 'google', 'kimi', 'minimax', 'zai', 'mimo'].includes(provider)) {
       return jsonResponse({ error: `Unsupported provider: ${provider}` }, { status: 400 });
     }
 
@@ -474,6 +509,28 @@ const postValidateApiKeyRoute = HttpRouter.add(
               const data = await resp.json() as { data?: Array<{ id: string }> };
               valid = true;
               models = data.data?.map(m => m.id) || ['glm-5.1'];
+            } else if (resp.status === 401) {
+              error = 'Invalid API key';
+            } else if (resp.status === 429) {
+              error = 'Rate limit exceeded';
+            } else {
+              error = `HTTP error: ${resp.status}`;
+            }
+          } catch (err) {
+            error = `Network error: ${err instanceof Error ? err.message : String(err)}`;
+          }
+          break;
+        }
+
+        case 'mimo': {
+          try {
+            const resp = await fetch('https://api.xiaomimimo.com/anthropic/v1/models', {
+              headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01' },
+            });
+            if (resp.ok) {
+              const data = await resp.json() as { data?: Array<{ id: string }> };
+              valid = true;
+              models = data.data?.map(m => m.id) || ['mimo-v2.5-pro', 'mimo-v2.5'];
             } else if (resp.status === 401) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {
