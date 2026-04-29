@@ -1,12 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
-const alertSpy = vi.fn(async () => undefined);
-
-vi.mock('../../DialogProvider', () => ({
-  useAlert: () => alertSpy,
-}));
 
 vi.mock('../../../hooks/useCostStream', () => ({
   useIssueCostStream: () => ({
@@ -69,7 +63,6 @@ function renderHeader() {
 
 describe('IssueHeader', () => {
   beforeEach(() => {
-    alertSpy.mockClear();
     planningSummaryResult.data = {
       hasPrd: true,
       hasState: true,
@@ -89,50 +82,33 @@ describe('IssueHeader', () => {
       readyForMerge: false,
       updatedAt: '2026-04-28T00:00:00Z',
     };
-
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) => {
-        if (url === '/api/command-deck/planning/PAN-895') {
-          return {
-            ok: true,
-            json: async () => ({
-              prd: 'PRD body',
-              state: 'STATE body',
-              discussions: [{ filename: 'discussion.md', content: 'Discussion body', syncedAt: '2026-04-28T01:00:00Z' }],
-              transcripts: [{ filename: 'transcript.md', content: 'Transcript body', uploadedAt: '2026-04-28T01:05:00Z' }],
-            }),
-          };
-        }
-        if (url === '/api/command-deck/planning/PAN-895/sync-discussions') {
-          return { ok: true, json: async () => ({ success: true }) };
-        }
-        throw new Error(`Unexpected fetch: ${url}`);
-      }),
-    );
   });
 
-  it('renders artifact buttons from summary counts without fetching the full planning payload', () => {
+  it('renders issue id, title, and cost', () => {
     renderHeader();
 
-    expect(screen.getByText('PRD')).toBeInTheDocument();
-    expect(screen.getByText('STATE')).toBeInTheDocument();
-    expect(screen.getByText('Discussions')).toBeInTheDocument();
-    expect(screen.getByText('Transcripts')).toBeInTheDocument();
-    expect(fetch).not.toHaveBeenCalledWith('/api/command-deck/planning/PAN-895');
+    expect(screen.getByText('PAN-895')).toBeInTheDocument();
+    expect(screen.getByText('Test issue')).toBeInTheDocument();
+    expect(screen.getByTestId('zone-a-cost')).toHaveTextContent('$4.20');
   });
 
-  it('lazy-loads the full planning payload when opening an artifact', async () => {
+  it('renders acceptance progress bar', () => {
     renderHeader();
 
-    fireEvent.click(screen.getByText('PRD'));
+    const ac = screen.getByTestId('zone-a-ac-progress');
+    expect(ac).toBeInTheDocument();
+    expect(ac).toHaveTextContent('50%');
+  });
 
-    await waitFor(() => {
-      expect(fetch).toHaveBeenCalledWith('/api/command-deck/planning/PAN-895');
-    });
-    expect(alertSpy).toHaveBeenCalledWith({
-      title: 'PRD',
-      message: 'PRD\n\nPRD body',
-    });
+  it('renders stash warning when stashCount > 0', () => {
+    planningSummaryResult.data = {
+      ...planningSummaryResult.data,
+      stashCount: 3,
+    };
+    renderHeader();
+
+    const warning = screen.getByTestId('zone-a-stash-warning');
+    expect(warning).toBeInTheDocument();
+    expect(warning).toHaveTextContent('3 stashes');
   });
 });
