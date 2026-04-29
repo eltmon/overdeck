@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 30;
+export const SCHEMA_VERSION = 31;
 
 /**
  * Initialize the complete database schema.
@@ -78,6 +78,9 @@ export function initSchema(db: Database.Database): void {
       auto_requeue_count    INTEGER DEFAULT 0,
       merge_retry_count     INTEGER DEFAULT 0,
       pr_url                TEXT,
+      -- PAN-905: tracked PR identity for webhook correlation
+      pr_head_sha           TEXT,
+      pr_number             INTEGER,
       -- PAN-653: persistent stuck state (set when main diverges mid-approve)
       stuck                 INTEGER NOT NULL DEFAULT 0,
       stuck_reason          TEXT,
@@ -751,6 +754,12 @@ export function runMigrations(db: Database.Database): void {
   // v29 → v30: add blocker_reasons column to review_status (PAN-905)
   if (currentVersion < 30) {
     try { db.exec(`ALTER TABLE review_status ADD COLUMN blocker_reasons TEXT`); } catch { /* already exists */ }
+  }
+
+  // v30 → v31: add pr_head_sha and pr_number for webhook PR identity validation (PAN-905)
+  if (currentVersion < 31) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN pr_head_sha TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN pr_number INTEGER`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

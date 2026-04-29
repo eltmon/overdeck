@@ -28,6 +28,7 @@ export function upsertReviewStatus(status: ReviewStatus): void {
         verification_cycle_count, verification_max_cycles,
         review_notes, test_notes, merge_notes,
         updated_at, ready_for_merge, auto_requeue_count, merge_retry_count, pr_url,
+        pr_head_sha, pr_number,
         stuck, stuck_reason, stuck_at, stuck_details,
         reviewed_at_commit,
         review_spawned_at,
@@ -39,7 +40,7 @@ export function upsertReviewStatus(status: ReviewStatus): void {
         deacon_ignored_reason,
         blocker_reasons
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status         = excluded.review_status,
@@ -57,6 +58,8 @@ export function upsertReviewStatus(status: ReviewStatus): void {
         auto_requeue_count    = excluded.auto_requeue_count,
         merge_retry_count     = excluded.merge_retry_count,
         pr_url                = excluded.pr_url,
+        pr_head_sha           = excluded.pr_head_sha,
+        pr_number             = excluded.pr_number,
         stuck                 = excluded.stuck,
         stuck_reason          = excluded.stuck_reason,
         stuck_at              = excluded.stuck_at,
@@ -87,6 +90,8 @@ export function upsertReviewStatus(status: ReviewStatus): void {
       s.autoRequeueCount ?? null,
       s.mergeRetryCount ?? null,
       s.prUrl ?? null,
+      s.prHeadSha ?? null,
+      s.prNumber ?? null,
       s.stuck ? 1 : 0,
       s.stuckReason ?? null,
       s.stuckAt ?? null,
@@ -268,6 +273,9 @@ interface DbReviewStatusRow {
   deacon_ignored: number;
   deacon_ignored_at: string | null;
   deacon_ignored_reason: string | null;
+  // PAN-905: tracked PR identity for webhook correlation
+  pr_head_sha: string | null;
+  pr_number: number | null;
   // PAN-905: GitHub-native merge blocker reasons (JSON array)
   blocker_reasons: string | null;
 }
@@ -290,6 +298,8 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     autoRequeueCount: row.auto_requeue_count ?? undefined,
     mergeRetryCount: row.merge_retry_count ?? undefined,
     prUrl: row.pr_url ?? undefined,
+    prHeadSha: row.pr_head_sha ?? undefined,
+    prNumber: row.pr_number ?? undefined,
     stuck: row.stuck === 1 ? true : undefined,
     stuckReason: row.stuck_reason ?? undefined,
     stuckAt: row.stuck_at ?? undefined,

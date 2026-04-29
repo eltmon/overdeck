@@ -4,7 +4,7 @@
     "created": "2026-04-28T18:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-905: Command Deck — make Awaiting Merge the canonical final merge gate",
-    "updated": "2026-04-29T15:00:11.502Z"
+    "updated": "2026-04-29T15:40:00.000Z"
   },
   "plan": {
     "id": "pan-905",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "f3a7c1e8-9d42-4b6f-a815-2e8f0c3d7a19",
     "author": "agent:claude-opus-4-6",
-    "sequence": 472,
+    "sequence": 473,
     "created": "2026-04-28T18:00:00Z",
-    "updated": "2026-04-29T15:00:11.502Z",
+    "updated": "2026-04-29T15:40:00.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/905",
@@ -140,7 +140,7 @@
           },
           {
             "id": "webhook-route.ac3",
-            "title": "Route gracefully handles missing webhook-secret (logs warning, skips verification in dev)",
+            "title": "Route gracefully handles missing webhook-secret (logs warning, skips verification when PANOPTICON_DEV_WEBHOOKS=1)",
             "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"

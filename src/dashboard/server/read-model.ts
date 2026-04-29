@@ -159,43 +159,6 @@ export const ReadModelServiceLive = Layer.effect(
     };
 
     const getSnapshot: Effect.Effect<DashboardSnapshot> = Effect.gen(function* () {
-      // Refresh review statuses from DB before building snapshot.
-      // Defensive: the event-driven path should keep these in sync, but if an
-      // event is lost (e.g. pipeline notifier throws silently) the read model
-      // can drift. Reloading from SQLite guarantees the snapshot is authoritative.
-      try {
-        const { loadReviewStatuses: loadStatuses } = yield* Effect.promise(
-          () => import('../../lib/review-status.js'),
-        );
-        const { enrichReviewStatusFromSessions } = yield* Effect.promise(
-          () => import('../../lib/review-status-enrichment.js'),
-        );
-        const { listSessionNamesAsync } = yield* Effect.promise(
-          () => import('../../lib/tmux.js'),
-        );
-        const statusMap = loadStatuses();
-        // One tmux call for all issues — O(1) tmux cost per snapshot build.
-        // Keep tmux failures non-fatal; Effect's static catchAll is not available
-        // in the dashboard runtime version.
-        let allSessions: string[] = [];
-        try {
-          allSessions = yield* Effect.promise(() => listSessionNamesAsync());
-        } catch {
-          allSessions = [];
-        }
-        state = {
-          ...state,
-          reviewStatusByIssueId: Object.fromEntries(
-            Object.values(statusMap).map((status) => {
-              const enriched = enrichReviewStatusFromSessions(status.issueId, status, allSessions);
-              return [status.issueId, toReviewStatusSnapshot(enriched)];
-            }),
-          ),
-        };
-      } catch (err) {
-        console.error('[ReadModel] Failed to refresh review statuses for snapshot:', err);
-      }
-
       // Refresh issues from the shared issue service before building snapshot.
       // IssueDataService polls trackers in the background; its cached issues are
       // the freshest available without blocking on API calls.

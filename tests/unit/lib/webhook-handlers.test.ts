@@ -239,7 +239,7 @@ describe('handlePullRequest', () => {
       },
     }));
 
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-456', { blockerReasons: undefined });
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-456', expect.objectContaining({ blockerReasons: undefined }));
   });
 
   it('adds merge_conflict blocker when mergeable_state is dirty', async () => {
@@ -361,8 +361,8 @@ describe('handlePullRequest', () => {
       },
     }));
 
-    // Unknown state is left untouched — mutateBlockers writes the same array back
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', { blockerReasons: existingBlockers });
+    // Unknown state is left untouched — blockers are written back as-is
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', expect.objectContaining({ blockerReasons: existingBlockers }));
   });
 
   it('clears merge and not_mergeable blockers on clean state', async () => {
@@ -383,7 +383,7 @@ describe('handlePullRequest', () => {
       },
     }));
 
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', { blockerReasons: undefined });
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', expect.objectContaining({ blockerReasons: undefined }));
   });
 
   it('removes changes_requested blocker on review_dismissed action', async () => {
@@ -401,7 +401,7 @@ describe('handlePullRequest', () => {
       },
     }));
 
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', { blockerReasons: undefined });
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', expect.objectContaining({ blockerReasons: undefined }));
   });
 });
 

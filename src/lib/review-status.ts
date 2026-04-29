@@ -51,6 +51,10 @@ export interface ReviewStatus {
   autoRequeueCount?: number;
   mergeRetryCount?: number;
   prUrl?: string;
+  /** PAN-905: HEAD commit SHA of the tracked PR for webhook identity validation */
+  prHeadSha?: string;
+  /** PAN-905: GitHub PR number of the tracked PR for webhook identity validation */
+  prNumber?: number;
   history?: StatusHistoryEntry[];
   /** PAN-905: GitHub-native merge blocker reasons */
   blockerReasons?: BlockerReason[];

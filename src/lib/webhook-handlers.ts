@@ -5,14 +5,15 @@
  * review_status blockerReasons based on GitHub-native merge blockers.
  */
 
-import { setReviewStatusAsync, getReviewStatusAsync, type BlockerReason } from './review-status.js';
+import { setReviewStatusAsync, getReviewStatusAsync, type BlockerReason, type ReviewStatus } from './review-status.js';
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js';
 
 export interface WebhookPayload {
   action?: string;
   pull_request?: {
     number: number;
-    head: { ref: string };
+    head: { ref: string; sha?: string };
+    html_url?: string;
     mergeable?: boolean | null;
     mergeable_state?: string;
     draft?: boolean;
@@ -21,12 +22,14 @@ export interface WebhookPayload {
   check_suite?: {
     status?: string;
     conclusion?: string | null;
-    pull_requests?: Array<{ number: number; head: { ref: string } }>;
+    pull_requests?: Array<{ number: number; head: { ref: string; sha?: string } }>;
   };
   check_run?: {
+    id?: number;
+    name?: string;
     status?: string;
     conclusion?: string | null;
-    pull_requests?: Array<{ number: number; head: { ref: string } }>;
+    pull_requests?: Array<{ number: number; head: { ref: string; sha?: string } }>;
   };
   repository?: { full_name: string };
   review?: { state: string };
@@ -34,6 +37,7 @@ export interface WebhookPayload {
   // status event payload
   sha?: string;
   state?: string;
+  context?: string;
   branches?: Array<{ name: string }>;
 }
 
@@ -67,25 +71,174 @@ export function isTrackedRepository(fullName: string | undefined): boolean {
   return getTrackedRepos().has(fullName.toLowerCase());
 }
 
-// ─── Batched blocker mutation (single read + single write per event) ─────────
+// ─── PR identity validation ──────────────────────────────────────────────────
 
-async function mutateBlockers(issueId: string, fn: (blockers: BlockerReason[]) => BlockerReason[]): Promise<void> {
+function getRepoFromPrUrl(prUrl: string): string | null {
+  const m = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+/i);
+  return m ? `${m[1]}/${m[2]}`.toLowerCase() : null;
+}
+
+async function loadAndValidateStatus(
+  issueId: string,
+  repo: string,
+  prNumber?: number,
+  headSha?: string,
+): Promise<ReviewStatus | null> {
   const status = await getReviewStatusAsync(issueId);
-  const blockers = status?.blockerReasons ?? [];
-  const updated = fn(blockers);
-  // Pass the already-loaded status to skip the second DB read inside setReviewStatus.
-  await setReviewStatusAsync(issueId, { blockerReasons: updated.length > 0 ? updated : undefined }, status ?? undefined);
+  if (!status) return null;
+
+  // If no PR identity is stored yet, allow the event (identity will be populated lazily).
+  if (!status.prUrl && !status.prNumber && !status.prHeadSha) {
+    return status;
+  }
+
+  const storedRepo = status.prUrl ? getRepoFromPrUrl(status.prUrl) : null;
+  if (storedRepo && storedRepo !== repo.toLowerCase()) {
+    console.warn(`[webhook] Repo mismatch for ${issueId}: stored=${storedRepo} event=${repo}`);
+    return null;
+  }
+
+  if (prNumber != null && status.prNumber != null && prNumber !== status.prNumber) {
+    console.warn(`[webhook] PR number mismatch for ${issueId}: stored=${status.prNumber} event=${prNumber}`);
+    return null;
+  }
+
+  if (headSha && status.prHeadSha && headSha !== status.prHeadSha) {
+    console.warn(`[webhook] Head SHA mismatch for ${issueId}: stored=${status.prHeadSha} event=${headSha}`);
+    return null;
+  }
+
+  return status;
 }
 
-async function addBlocker(issueId: string, blocker: BlockerReason): Promise<void> {
-  await mutateBlockers(issueId, (blockers) => {
-    const filtered = blockers.filter((b: BlockerReason) => b.type !== blocker.type);
-    return [...filtered, blocker];
-  });
+// ─── Per-source failing_checks tracking ──────────────────────────────────────
+
+function getFailingChecksBlocker(blockers: BlockerReason[]): BlockerReason | undefined {
+  return blockers.find((b) => b.type === 'failing_checks');
 }
 
-async function removeBlocker(issueId: string, type: BlockerReason['type']): Promise<void> {
-  await mutateBlockers(issueId, (blockers) => blockers.filter((b: BlockerReason) => b.type !== type));
+function parseFailingSources(details?: string): Record<string, string> {
+  if (!details) return {};
+  try {
+    const parsed = JSON.parse(details) as { sources?: Record<string, string> };
+    return parsed.sources ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function serializeFailingSources(sources: Record<string, string>): string {
+  return JSON.stringify({ sources });
+}
+
+function addFailingSource(blockers: BlockerReason[], sourceKey: string, summary: string): BlockerReason[] {
+  const existing = getFailingChecksBlocker(blockers);
+  const sources = parseFailingSources(existing?.details);
+  sources[sourceKey] = summary;
+  const updated: BlockerReason = {
+    type: 'failing_checks',
+    summary: Object.values(sources).join('; '),
+    details: serializeFailingSources(sources),
+    detectedAt: existing?.detectedAt ?? new Date().toISOString(),
+  };
+  return [...blockers.filter((b) => b.type !== 'failing_checks'), updated];
+}
+
+function removeFailingSource(blockers: BlockerReason[], sourceKey: string): BlockerReason[] {
+  const existing = getFailingChecksBlocker(blockers);
+  if (!existing) return blockers;
+  const sources = parseFailingSources(existing.details);
+  delete sources[sourceKey];
+  if (Object.keys(sources).length === 0) {
+    return blockers.filter((b) => b.type !== 'failing_checks');
+  }
+  const updated: BlockerReason = {
+    type: 'failing_checks',
+    summary: Object.values(sources).join('; '),
+    details: serializeFailingSources(sources),
+    detectedAt: existing.detectedAt,
+  };
+  return [...blockers.filter((b) => b.type !== 'failing_checks'), updated];
+}
+
+// ─── Merge state reconciliation for unknown mergeable_state ──────────────────
+
+const KNOWN_CONFLICT_STATES = new Set(['dirty']);
+const KNOWN_NON_BLOCKING_STATES = new Set(['clean', 'unstable']);
+const KNOWN_NOT_MERGEABLE_STATES = new Set(['blocked', 'behind']);
+
+const pendingReconciliation = new Set<string>();
+
+function scheduleMergeStateReconciliation(issueId: string, repo: string, prNumber: number): void {
+  if (pendingReconciliation.has(issueId)) return;
+  pendingReconciliation.add(issueId);
+  setTimeout(() => {
+    pendingReconciliation.delete(issueId);
+    refreshMergeStateFromGitHub(issueId, repo, prNumber).catch(() => {});
+  }, 30000);
+}
+
+async function refreshMergeStateFromGitHub(issueId: string, repo: string, prNumber: number): Promise<void> {
+  try {
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+    const { stdout } = await execAsync(
+      `gh pr view ${prNumber} --repo ${repo} --json mergeable,mergeableState,draft --jq '[.mergeable,.mergeableState,.draft]'`,
+      { encoding: 'utf-8', timeout: 15000 },
+    );
+    const [mergeable, mergeableState, draft] = JSON.parse(stdout) as [boolean | null, string | null, boolean];
+    const status = await getReviewStatusAsync(issueId);
+    if (!status) return;
+
+    const update: Partial<ReviewStatus> = {};
+    let blockers = [...(status.blockerReasons ?? [])];
+
+    if (draft) {
+      const draftBlocker: BlockerReason = {
+        type: 'draft_pr',
+        summary: 'Pull request is in draft state',
+        detectedAt: new Date().toISOString(),
+      };
+      blockers = [...blockers.filter((b) => b.type !== 'draft_pr'), draftBlocker];
+    } else {
+      blockers = blockers.filter((b) => b.type !== 'draft_pr');
+    }
+
+    if (mergeableState && KNOWN_CONFLICT_STATES.has(mergeableState)) {
+      const mergeConflictBlocker: BlockerReason = {
+        type: 'merge_conflict',
+        summary: 'Merge conflict with target branch',
+        detectedAt: new Date().toISOString(),
+      };
+      blockers = [...blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable'), mergeConflictBlocker];
+    } else if (mergeable === false && (mergeableState == null || mergeableState === undefined)) {
+      const mergeConflictBlocker: BlockerReason = {
+        type: 'merge_conflict',
+        summary: 'Merge conflict with target branch',
+        detectedAt: new Date().toISOString(),
+      };
+      blockers = [...blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable'), mergeConflictBlocker];
+    } else if ((mergeableState && KNOWN_NON_BLOCKING_STATES.has(mergeableState)) || mergeable === true) {
+      blockers = blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable');
+    } else if (mergeableState && KNOWN_NOT_MERGEABLE_STATES.has(mergeableState)) {
+      const notMergeableBlocker: BlockerReason = {
+        type: 'not_mergeable',
+        summary: `PR not mergeable: ${mergeableState}`,
+        detectedAt: new Date().toISOString(),
+      };
+      blockers = [...blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable'), notMergeableBlocker];
+    }
+
+    if (blockers.length > 0) update.blockerReasons = blockers;
+    else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
+
+    if (Object.keys(update).length > 0) {
+      await setReviewStatusAsync(issueId, update, status);
+    }
+  } catch (err) {
+    console.warn(`[webhook] Merge state reconciliation failed for ${issueId}:`, err);
+  }
 }
 
 // ─── check_suite / check_run ─────────────────────────────────────────────────
@@ -96,18 +249,30 @@ export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
   if (!suite) return;
   if (!suite.pull_requests || suite.pull_requests.length === 0) return;
 
+  const repo = payload.repository!.full_name;
+
   for (const pr of suite.pull_requests) {
     const issueId = issueIdFromBranch(pr.head.ref);
     if (!issueId) continue;
 
-    if (suite.conclusion === 'failure') {
-      await addBlocker(issueId, {
-        type: 'failing_checks',
-        summary: 'CI check suite failed',
-        detectedAt: new Date().toISOString(),
-      });
-    } else if (suite.conclusion === 'success') {
-      await removeBlocker(issueId, 'failing_checks');
+    const status = await loadAndValidateStatus(issueId, repo, pr.number, pr.head.sha);
+    if (!status) continue;
+
+    let blockers = [...(status.blockerReasons ?? [])];
+
+    if (suite.conclusion === 'success') {
+      blockers = removeFailingSource(blockers, 'check_suite');
+    } else if (suite.conclusion) {
+      // Any terminal conclusion other than success is blocking
+      blockers = addFailingSource(blockers, 'check_suite', `CI check suite ${suite.conclusion}`);
+    }
+
+    const update: Partial<ReviewStatus> = {};
+    if (blockers.length > 0) update.blockerReasons = blockers;
+    else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
+
+    if (Object.keys(update).length > 0) {
+      await setReviewStatusAsync(issueId, update, status);
     }
   }
 }
@@ -118,20 +283,31 @@ export async function handleCheckRun(payload: WebhookPayload): Promise<void> {
   if (!run) return;
   if (!run.pull_requests || run.pull_requests.length === 0) return;
 
+  const repo = payload.repository!.full_name;
+  const sourceKey = `check_run:${run.name ?? String(run.id ?? 'unknown')}`;
+
   for (const pr of run.pull_requests) {
     const issueId = issueIdFromBranch(pr.head.ref);
     if (!issueId) continue;
 
-    if (run.conclusion === 'failure') {
-      await addBlocker(issueId, {
-        type: 'failing_checks',
-        summary: 'CI check run failed',
-        detectedAt: new Date().toISOString(),
-      });
+    const status = await loadAndValidateStatus(issueId, repo, pr.number, pr.head.sha);
+    if (!status) continue;
+
+    let blockers = [...(status.blockerReasons ?? [])];
+
+    if (run.conclusion === 'success') {
+      blockers = removeFailingSource(blockers, sourceKey);
+    } else if (run.conclusion) {
+      blockers = addFailingSource(blockers, sourceKey, `CI check run ${run.conclusion}: ${run.name ?? 'unknown'}`);
     }
-    // Do NOT remove failing_checks on individual check_run success —
-    // other runs in the same suite may still be failing. Blocker
-    // removal is handled by check_suite conclusion='success'.
+
+    const update: Partial<ReviewStatus> = {};
+    if (blockers.length > 0) update.blockerReasons = blockers;
+    else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
+
+    if (Object.keys(update).length > 0) {
+      await setReviewStatusAsync(issueId, update, status);
+    }
   }
 }
 
@@ -144,66 +320,71 @@ export async function handlePullRequest(payload: WebhookPayload): Promise<void> 
   const issueId = issueIdFromBranch(pr.head.ref);
   if (!issueId) return;
 
-  // Dismissed reviews arrive primarily via pull_request_review (state='dismissed'),
-  // but GitHub also sends pull_request action='review_dismissed' in some paths.
-  if (payload.action === 'review_dismissed') {
-    await removeBlocker(issueId, 'changes_requested');
-    return;
+  const repo = payload.repository!.full_name;
+  const status = await loadAndValidateStatus(issueId, repo, pr.number, pr.head.sha);
+  if (!status) return;
+
+  const update: Partial<ReviewStatus> = {};
+  let blockers = [...(status.blockerReasons ?? [])];
+
+  // Populate missing PR identity and keep head SHA in sync on synchronize
+  if (!status.prUrl) update.prUrl = pr.html_url ?? `https://github.com/${repo}/pull/${pr.number}`;
+  if (!status.prNumber) update.prNumber = pr.number;
+  if (pr.head.sha && (!status.prHeadSha || payload.action === 'synchronize')) {
+    update.prHeadSha = pr.head.sha;
   }
 
-  // Merge conflict detection + draft PR + not_mergeable — batched into one DB write
-  await mutateBlockers(issueId, (blockers) => {
-    // Draft PR
-    if (pr.draft) {
-      const draftBlocker: BlockerReason = {
-        type: 'draft_pr',
-        summary: 'Pull request is in draft state',
-        detectedAt: new Date().toISOString(),
-      };
-      blockers = blockers.filter((b) => b.type !== 'draft_pr');
-      blockers = [...blockers, draftBlocker];
-    } else {
-      // Covers pr.draft === false and pr.draft === undefined (older payloads)
-      blockers = blockers.filter((b) => b.type !== 'draft_pr');
-    }
+  // Dismissed reviews
+  if (payload.action === 'review_dismissed') {
+    blockers = blockers.filter((b) => b.type !== 'changes_requested');
+  }
 
-    // Merge state — classify into exactly one mutually-exclusive bucket.
-    // Only known states get blockers; unknown/future states are left untouched.
-    const KNOWN_CONFLICT_STATES = new Set(['dirty']);
-    const KNOWN_NON_BLOCKING_STATES = new Set(['clean', 'unstable']);
-    const KNOWN_NOT_MERGEABLE_STATES = new Set(['blocked', 'behind']);
+  // Draft PR
+  if (pr.draft) {
+    const draftBlocker: BlockerReason = {
+      type: 'draft_pr',
+      summary: 'Pull request is in draft state',
+      detectedAt: new Date().toISOString(),
+    };
+    blockers = [...blockers.filter((b) => b.type !== 'draft_pr'), draftBlocker];
+  } else {
+    blockers = blockers.filter((b) => b.type !== 'draft_pr');
+  }
 
-    if (pr.mergeable_state && KNOWN_CONFLICT_STATES.has(pr.mergeable_state)) {
-      const mergeConflictBlocker: BlockerReason = {
-        type: 'merge_conflict',
-        summary: 'Merge conflict with target branch',
-        detectedAt: new Date().toISOString(),
-      };
-      blockers = blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable');
-      blockers = [...blockers, mergeConflictBlocker];
-    } else if (pr.mergeable === false && (pr.mergeable_state === null || pr.mergeable_state === undefined)) {
-      // Fallback: mergeable is explicitly false but mergeable_state is unavailable
-      const mergeConflictBlocker: BlockerReason = {
-        type: 'merge_conflict',
-        summary: 'Merge conflict with target branch',
-        detectedAt: new Date().toISOString(),
-      };
-      blockers = blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable');
-      blockers = [...blockers, mergeConflictBlocker];
-    } else if ((pr.mergeable_state && KNOWN_NON_BLOCKING_STATES.has(pr.mergeable_state)) || pr.mergeable === true) {
-      blockers = blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable');
-    } else if (pr.mergeable_state && KNOWN_NOT_MERGEABLE_STATES.has(pr.mergeable_state)) {
-      const notMergeableBlocker: BlockerReason = {
-        type: 'not_mergeable',
-        summary: `PR not mergeable: ${pr.mergeable_state}`,
-        detectedAt: new Date().toISOString(),
-      };
-      blockers = blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable');
-      blockers = [...blockers, notMergeableBlocker];
-    }
+  // Merge state
+  if (pr.mergeable_state === 'unknown') {
+    scheduleMergeStateReconciliation(issueId, repo, pr.number);
+  } else if (pr.mergeable_state && KNOWN_CONFLICT_STATES.has(pr.mergeable_state)) {
+    const mergeConflictBlocker: BlockerReason = {
+      type: 'merge_conflict',
+      summary: 'Merge conflict with target branch',
+      detectedAt: new Date().toISOString(),
+    };
+    blockers = [...blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable'), mergeConflictBlocker];
+  } else if (pr.mergeable === false && (pr.mergeable_state === null || pr.mergeable_state === undefined)) {
+    const mergeConflictBlocker: BlockerReason = {
+      type: 'merge_conflict',
+      summary: 'Merge conflict with target branch',
+      detectedAt: new Date().toISOString(),
+    };
+    blockers = [...blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable'), mergeConflictBlocker];
+  } else if ((pr.mergeable_state && KNOWN_NON_BLOCKING_STATES.has(pr.mergeable_state)) || pr.mergeable === true) {
+    blockers = blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable');
+  } else if (pr.mergeable_state && KNOWN_NOT_MERGEABLE_STATES.has(pr.mergeable_state)) {
+    const notMergeableBlocker: BlockerReason = {
+      type: 'not_mergeable',
+      summary: `PR not mergeable: ${pr.mergeable_state}`,
+      detectedAt: new Date().toISOString(),
+    };
+    blockers = [...blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable'), notMergeableBlocker];
+  }
 
-    return blockers;
-  });
+  if (blockers.length > 0) update.blockerReasons = blockers;
+  else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
+
+  if (Object.keys(update).length > 0) {
+    await setReviewStatusAsync(issueId, update, status);
+  }
 }
 
 // ─── pull_request_review ─────────────────────────────────────────────────────
@@ -216,14 +397,31 @@ export async function handlePullRequestReview(payload: WebhookPayload): Promise<
   const issueId = issueIdFromBranch(pr.head.ref);
   if (!issueId) return;
 
+  const repo = payload.repository!.full_name;
+  const status = await loadAndValidateStatus(issueId, repo, pr.number);
+  if (!status) return;
+
+  // Dismissed reviews are handled by the pull_request review_dismissed action.
+  if (review.state === 'dismissed') return;
+
+  let blockers = [...(status.blockerReasons ?? [])];
+
   if (review.state === 'changes_requested') {
-    await addBlocker(issueId, {
+    blockers = [...blockers.filter((b) => b.type !== 'changes_requested'), {
       type: 'changes_requested',
       summary: 'Changes requested on pull request',
       detectedAt: new Date().toISOString(),
-    });
+    }];
   } else if (review.state === 'approved') {
-    await removeBlocker(issueId, 'changes_requested');
+    blockers = blockers.filter((b) => b.type !== 'changes_requested');
+  }
+
+  const update: Partial<ReviewStatus> = {};
+  if (blockers.length > 0) update.blockerReasons = blockers;
+  else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
+
+  if (Object.keys(update).length > 0) {
+    await setReviewStatusAsync(issueId, update, status);
   }
 }
 
@@ -237,51 +435,61 @@ export async function handlePullRequestReviewThread(payload: WebhookPayload): Pr
   const issueId = issueIdFromBranch(pr.head.ref);
   if (!issueId) return;
 
+  const repo = payload.repository!.full_name;
+  const status = await loadAndValidateStatus(issueId, repo, pr.number);
+  if (!status) return;
+
+  let blockers = [...(status.blockerReasons ?? [])];
+
   if (thread.resolved === false) {
     if (thread.id == null) {
       console.warn(`[webhook] Unresolved review thread without id for ${issueId} — cannot track conversation`);
     }
-    await mutateBlockers(issueId, (blockers) => {
-      const existing = blockers.find((b) => b.type === 'unresolved_conversations');
-      let threadIds: Set<string>;
-      try {
-        threadIds = new Set<string>(JSON.parse(existing?.details ?? '[]') as string[]);
-      } catch {
-        threadIds = new Set<string>();
-      }
-      if (thread.id != null) threadIds.add(String(thread.id));
-      const updated: BlockerReason = {
-        type: 'unresolved_conversations',
-        summary: 'Unresolved review conversation',
-        details: JSON.stringify([...threadIds]),
-        detectedAt: existing?.detectedAt ?? new Date().toISOString(),
-      };
-      return [...blockers.filter((b) => b.type !== 'unresolved_conversations'), updated];
-    });
+    const existing = blockers.find((b) => b.type === 'unresolved_conversations');
+    let threadIds: Set<string>;
+    try {
+      threadIds = new Set<string>(JSON.parse(existing?.details ?? '[]') as string[]);
+    } catch {
+      threadIds = new Set<string>();
+    }
+    if (thread.id != null) threadIds.add(String(thread.id));
+    const updated: BlockerReason = {
+      type: 'unresolved_conversations',
+      summary: 'Unresolved review conversation',
+      details: JSON.stringify([...threadIds]),
+      detectedAt: existing?.detectedAt ?? new Date().toISOString(),
+    };
+    blockers = [...blockers.filter((b) => b.type !== 'unresolved_conversations'), updated];
   } else if (thread.resolved === true) {
-    // Without a thread id we cannot determine which thread was resolved.
     if (thread.id == null) return;
-    await mutateBlockers(issueId, (blockers) => {
-      const existing = blockers.find((b) => b.type === 'unresolved_conversations');
-      if (!existing) return blockers;
-      let threadIds: Set<string>;
-      try {
-        threadIds = new Set<string>(JSON.parse(existing.details ?? '[]') as string[]);
-      } catch {
-        threadIds = new Set<string>();
-      }
-      threadIds.delete(String(thread.id));
-      if (threadIds.size === 0) {
-        return blockers.filter((b) => b.type !== 'unresolved_conversations');
-      }
+    const existing = blockers.find((b) => b.type === 'unresolved_conversations');
+    if (!existing) return;
+    let threadIds: Set<string>;
+    try {
+      threadIds = new Set<string>(JSON.parse(existing.details ?? '[]') as string[]);
+    } catch {
+      threadIds = new Set<string>();
+    }
+    threadIds.delete(String(thread.id));
+    if (threadIds.size === 0) {
+      blockers = blockers.filter((b) => b.type !== 'unresolved_conversations');
+    } else {
       const updated: BlockerReason = {
         type: 'unresolved_conversations',
         summary: 'Unresolved review conversation',
         details: JSON.stringify([...threadIds]),
         detectedAt: existing.detectedAt,
       };
-      return [...blockers.filter((b) => b.type !== 'unresolved_conversations'), updated];
-    });
+      blockers = [...blockers.filter((b) => b.type !== 'unresolved_conversations'), updated];
+    }
+  }
+
+  const update: Partial<ReviewStatus> = {};
+  if (blockers.length > 0) update.blockerReasons = blockers;
+  else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
+
+  if (Object.keys(update).length > 0) {
+    await setReviewStatusAsync(issueId, update, status);
   }
 }
 
@@ -293,19 +501,35 @@ export async function handleStatus(payload: WebhookPayload): Promise<void> {
   const branches = payload.branches;
   if (!state || !branches || branches.length === 0) return;
 
-  // Map commit status to the first matching feature branch
+  const repo = payload.repository!.full_name;
+  const context = payload.context ?? 'default';
+  const sourceKey = `status:${context}`;
+
   for (const branch of branches) {
     const issueId = issueIdFromBranch(branch.name);
     if (issueId) {
-      if (state === 'failure' || state === 'error') {
-        await addBlocker(issueId, {
-          type: 'failing_checks',
-          summary: `Commit status: ${state}`,
-          detectedAt: new Date().toISOString(),
-        });
-      } else if (state === 'success') {
-        await removeBlocker(issueId, 'failing_checks');
+      const status = await loadAndValidateStatus(issueId, repo, undefined, payload.sha);
+      if (!status) break;
+
+      let blockers = [...(status.blockerReasons ?? [])];
+
+      if (state === 'success') {
+        blockers = removeFailingSource(blockers, sourceKey);
+      } else if (state === 'failure' || state === 'error') {
+        blockers = addFailingSource(blockers, sourceKey, `Commit status: ${state}`);
       }
+
+      const update: Partial<ReviewStatus> = {};
+      if (blockers.length > 0) update.blockerReasons = blockers;
+      else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
+
+      // Do NOT populate prHeadSha from status events — we don't have the PR number
+      // to construct a prUrl, and the SHA alone isn't enough to bind identity.
+
+      if (Object.keys(update).length > 0) {
+        await setReviewStatusAsync(issueId, update, status);
+      }
+
       // Only act on the first feature branch match
       break;
     }
