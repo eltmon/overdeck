@@ -86,7 +86,7 @@ export interface ModelCapability {
   /** Model identifier */
   model: ModelId;
   /** Provider for this model */
-  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai';
+  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo';
   /** Display name */
   displayName: string;
   /** Cost per 1M tokens (average of input/output) in USD */
@@ -728,6 +728,54 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
       'context-length': 92,
     },
     notes: 'Fast and affordable GLM model for quick iterations. 200K context.',
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // XIAOMI MIMO MODELS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  'mimo-v2.5-pro': {
+    model: 'mimo-v2.5-pro',
+    provider: 'mimo',
+    displayName: 'MiMo V2.5 Pro',
+    costPer1MTokens: 2.0,
+    contextWindow: 1048576,
+    skills: {
+      'code-generation': 88,
+      'code-review': 86,
+      debugging: 86,
+      planning: 84,
+      documentation: 84,
+      testing: 84,
+      security: 80,
+      performance: 82,
+      synthesis: 88,
+      speed: 78,
+      'context-length': 100,
+    },
+    notes: 'Xiaomi MiMo flagship reasoning model. Enhanced agent efficiency, 1M context window.',
+  },
+
+  'mimo-v2.5': {
+    model: 'mimo-v2.5',
+    provider: 'mimo',
+    displayName: 'MiMo V2.5',
+    costPer1MTokens: 1.0,
+    contextWindow: 262144,
+    skills: {
+      'code-generation': 82,
+      'code-review': 80,
+      debugging: 80,
+      planning: 78,
+      documentation: 78,
+      testing: 78,
+      security: 74,
+      performance: 76,
+      synthesis: 82,
+      speed: 85,
+      'context-length': 96,
+    },
+    notes: 'Xiaomi MiMo multimodal model. 262K context, strong agentic and coding capabilities.',
   },
 };
 
