@@ -70,24 +70,101 @@ console.log('[panopticon] AgentEnrichmentService started');
 // Library code (review-status.ts) calls notifyPipeline() on every status change.
 // This handler converts those into domain events so the frontend Zustand store updates.
 setPipelineHandler((event) => {
-  if (event.type === 'status_changed') {
-    // Enrich async — fire-and-forget so the notifier stays sync.
-    // Session-name discovery needs tmux, which is async; appending the event
-    // is delayed by <1 tick which is fine because reviewSessionNames are only
-    // needed for the TerminalTabs UI, not for DB state transitions.
-    void (async () => {
+  switch (event.type) {
+    case 'status_changed': {
+      // Enrich async — fire-and-forget so the notifier stays sync.
+      // Session-name discovery needs tmux, which is async; appending the event
+      // is delayed by <1 tick which is fine because reviewSessionNames are only
+      // needed for the TerminalTabs UI, not for DB state transitions.
+      void (async () => {
+        try {
+          const enriched = await enrichReviewStatus(event.issueId, event.status);
+          const es = getEventStore();
+          es.append({
+            type: 'review.status_changed',
+            timestamp: new Date().toISOString(),
+            payload: { issueId: event.issueId, status: enriched },
+          } as any);
+        } catch (err) {
+          console.error('[pipeline] Failed to append status_changed event:', err);
+        }
+      })();
+      return;
+    }
+
+    // PAN-915 — task_queued surfaces "review-agent dispatched" before the
+    // first SQLite mutation lands. Maps to pipeline.review-started so the
+    // kanban card flips to "review in progress" immediately.
+    case 'task_queued': {
       try {
-        const enriched = await enrichReviewStatus(event.issueId, event.status);
+        const es = getEventStore();
+        if (event.specialist === 'review-agent') {
+          es.append({
+            type: 'pipeline.review-started',
+            timestamp: new Date().toISOString(),
+            payload: { issueId: event.issueId },
+          } as any);
+        } else if (event.specialist === 'test-agent') {
+          es.append({
+            type: 'pipeline.test-started',
+            timestamp: new Date().toISOString(),
+            payload: { issueId: event.issueId },
+          } as any);
+        }
+      } catch (err) {
+        console.error('[pipeline] Failed to append task_queued event:', err);
+      }
+      return;
+    }
+
+    // PAN-915 — reviewer-level lifecycle events. Drives event-driven
+    // reviewSubStatuses in the read model so the dashboard reflects per-role
+    // status the instant a reviewer is dispatched or finishes.
+    case 'reviewer_started': {
+      try {
         const es = getEventStore();
         es.append({
-          type: 'review.status_changed',
+          type: 'review.reviewer_started',
           timestamp: new Date().toISOString(),
-          payload: { issueId: event.issueId, status: enriched },
+          payload: {
+            issueId: event.issueId,
+            role: event.role,
+            sessionName: event.sessionName,
+          },
         } as any);
       } catch (err) {
-        console.error('[pipeline] Failed to append status_changed event:', err);
+        console.error('[pipeline] Failed to append reviewer_started event:', err);
       }
-    })();
+      return;
+    }
+
+    case 'reviewer_completed': {
+      try {
+        const es = getEventStore();
+        es.append({
+          type: 'review.reviewer_completed',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: event.issueId, role: event.role },
+        } as any);
+      } catch (err) {
+        console.error('[pipeline] Failed to append reviewer_completed event:', err);
+      }
+      return;
+    }
+
+    case 'coordinator_started': {
+      try {
+        const es = getEventStore();
+        es.append({
+          type: 'review.coordinator_started',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: event.issueId, sessionName: event.sessionName },
+        } as any);
+      } catch (err) {
+        console.error('[pipeline] Failed to append coordinator_started event:', err);
+      }
+      return;
+    }
   }
 });
 console.log('[panopticon] Pipeline notifier → domain events wired');

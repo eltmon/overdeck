@@ -483,9 +483,46 @@ auto_wake = true
 
 ## Session Lifecycle
 
-Each specialist dispatch spawns a fresh ephemeral Claude Code session (random `--session-id`, no `--resume`). This is intentional: context compaction corrupts thinking block signatures when sessions are resumed with `--resume` (PAN-612). Fresh-session-per-dispatch avoids this class of failures at the cost of each cycle starting without prior conversation context.
+There are **two specialist session strategies** in the system, and they apply to
+different specialists:
 
-A preamble is injected at the start of every task prompt to handle the case where a session has run before:
+### 1. Reviewer canonical sessions (PAN-830) — persistent across rounds
+
+Per-issue reviewer specialists (`review-correctness`, `review-security`,
+`review-performance`, `review-requirements`, `review-synthesis`) use canonical
+tmux sessions named:
+
+```
+specialist-<projectKey>-<issueId>-review-<role>
+```
+
+These sessions are **kept alive between review rounds** with `remain-on-exit on`.
+On each new round, `dispatchParallelReview` checks whether the canonical session
+already exists. If it does, the new round's prompt is delivered into the running
+Claude Code process via `sendKeysAsync` (tmux `load-buffer`/`paste-buffer`/`C-m`)
+rather than spawning a fresh process.
+
+Why this is safe vs PAN-612: the corruption case in PAN-612 is specifically
+about resuming a serialized session via `claude --resume`, which re-parses the
+JSONL and trips the thinking-block-signature check. The canonical pattern never
+serializes/resumes — the Claude process stays alive in tmux across rounds, so
+the corruption path doesn't exist. Reviewers retain their accumulated
+understanding of the issue (codebase patterns, prior findings, decisions made)
+without paying the corruption tax.
+
+### 2. Other specialist dispatches (test-agent, merge-agent, etc.) — fresh per dispatch
+
+Non-reviewer specialist dispatches spawn a fresh ephemeral Claude Code session
+each time (random `--session-id`, no `--resume`). Reasons:
+
+1. Context compaction corrupts thinking block signatures, making `--resume`
+   permanently fail with "Invalid signature in thinking block" (PAN-612).
+2. These dispatches are task-based: each is a new task with a full prompt.
+3. For test-agent specifically, accumulated context caused false-FAILs from
+   stale analysis.
+
+A preamble is injected at the start of every task prompt to handle the case
+where a session has run before:
 
 ```
 IMPORTANT: This is a NEW task dispatch. You may have context from prior runs in this session —
@@ -494,11 +531,15 @@ that is useful background knowledge, but you MUST execute this task fresh RIGHT 
 
 ### Context Digest (cross-dispatch memory)
 
-Specialists write a **context digest** after each run (`specialist-context.ts`). This structured summary is injected into the next dispatch's prompt as background knowledge. It provides the specialist's accumulated understanding of the codebase without requiring session resume:
+For specialists that don't use canonical sessions, a **context digest** is
+written after each run (`specialist-context.ts`) and injected into the next
+dispatch's prompt as background knowledge. It provides accumulated
+understanding without requiring session resume:
 
-- **review-agent**: Patterns found, past decisions, recurring issues
 - **test-agent**: Known flaky tests, test runner quirks, infrastructure notes
 - **merge-agent**: Conflict patterns, resolution strategies
+
+Reviewers don't need a digest since their sessions persist (PAN-830).
 
 ### Resetting a Specialist
 
@@ -507,9 +548,25 @@ Specialists write a **context digest** after each run (`specialist-context.ts`).
 pan specialists reset review-agent
 ```
 
-### Future: Persistent Sessions (tracked in PAN-722)
+For canonical reviewer sessions, reset additionally kills the per-issue tmux
+sessions so the next round spawns fresh.
 
-Keeping specialist processes alive between dispatch cycles (so Claude's conversation context is preserved across review/test cycles for the same issue) is a planned enhancement. The tmux session should persist until the issue is merged; the specialist should receive new tasks into the existing session rather than being killed and re-spawned. This requires a launcher architecture change (interactive mode + task delivery via `sendKeysAsync`) and is tracked separately.
+### Event-driven status (PAN-915)
+
+Reviewer status (`reviewSubStatuses[role]`, `reviewSessionNames`,
+`reviewCoordinatorSessionName`) is now driven by domain events rather than tmux
+polling:
+
+- `review.coordinator_started` — emitted when `pan review run` is dispatched
+- `review.reviewer_started` — emitted when each reviewer session is spawned
+  or has a new prompt sent into an existing canonical session
+- `review.reviewer_completed` — emitted when a reviewer's output file is
+  written
+
+The dashboard's read model applies these events directly, so the kanban card
+reflects per-role status the instant a reviewer is dispatched. Snapshot rebuild
+still falls back to `enrichReviewStatusFromSessions()` (which reads tmux) for
+recovery from server restarts mid-review.
 
 ## Review Cycle Circuit Breaker
 

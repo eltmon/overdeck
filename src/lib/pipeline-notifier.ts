@@ -19,7 +19,10 @@ import { getInternalToken, INTERNAL_TOKEN_HEADER } from './internal-token.js';
 
 export type PipelineEvent =
   | { type: 'status_changed'; issueId: string; status: ReviewStatus }
-  | { type: 'task_queued'; specialist: string; issueId: string };
+  | { type: 'task_queued'; specialist: string; issueId: string }
+  | { type: 'reviewer_started'; issueId: string; role: string; sessionName: string }
+  | { type: 'reviewer_completed'; issueId: string; role: string }
+  | { type: 'coordinator_started'; issueId: string; sessionName: string };
 
 type Handler = (event: PipelineEvent) => void;
 let handler: Handler | null = null;
@@ -41,9 +44,8 @@ export function notifyPipeline(event: PipelineEvent): void {
   // No in-process handler — we are not the dashboard server (typically a CLI
   // process such as `pan review run`). Forward to the dashboard so the live
   // event stream stays in sync. Best-effort: fail silently if the dashboard
-  // is offline. The DB write that triggered this notification is durable.
+  // is offline. The DB write (when applicable) is durable.
   // Tests can opt out with `PANOPTICON_PIPELINE_NOTIFY=off`.
-  if (event.type !== 'status_changed') return;
   if (process.env.PANOPTICON_PIPELINE_NOTIFY === 'off') return;
   // Skip in test environments — Vitest/Jest set NODE_ENV=test and there's no
   // dashboard at localhost:3011 to receive the POST.
@@ -54,6 +56,13 @@ export function notifyPipeline(event: PipelineEvent): void {
   const token = getInternalToken();
   if (!token) return;
 
+  // PAN-915 — forward the full event. status_changed intentionally omits the
+  // `status` field because the server re-reads from SQLite to avoid stale
+  // snapshots; other types carry their own payload.
+  const body = event.type === 'status_changed'
+    ? { type: 'status_changed', issueId: event.issueId }
+    : event;
+
   const baseUrl = process.env.DASHBOARD_URL || 'http://localhost:3011';
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 1000);
@@ -63,7 +72,7 @@ export function notifyPipeline(event: PipelineEvent): void {
       'content-type': 'application/json',
       [INTERNAL_TOKEN_HEADER]: token,
     },
-    body: JSON.stringify({ type: 'status_changed', issueId: event.issueId }),
+    body: JSON.stringify(body),
     signal: ctrl.signal,
   })
     .catch(() => {
