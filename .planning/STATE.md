@@ -60,3 +60,4 @@ All frontend and backend work for PAN-905 is finished. The Awaiting Merge page i
 - **[2026-04-29T16:29Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/032-review-agent-changes-requested.md`
 - **[2026-04-29T16:40Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/033-review-agent-changes-requested.md`
 - **[2026-04-29T17:09Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/034-review-agent-changes-requested.md`
+- **[2026-04-29T17:26Z] verification-gate → FAILED** — `.planning/feedback/035-verification-gate-failed.md`
