@@ -226,6 +226,12 @@ the verdict:
 
 1. Confirm both `synthesis.md` and `synthesis.json` were written to the paths
    given in the Synthesis Context.
-2. Print the verdict and blocker count on a single console line, e.g.:
+2. **Display the full synthesis.md in this conversation.** Read the file you
+   just wrote and paste its entire contents back as a fenced markdown block in
+   your final response. This is required — it lets the work agent, dashboard
+   conversation viewer, and tmux pane history show the unified verdict
+   without anyone having to open the file. Don't summarize; render the whole
+   thing.
+3. Print the verdict and blocker count on a single console line, e.g.:
    `Verdict: CHANGES_REQUESTED (2 blockers, 3 high, 4 nits)`
-3. Exit.
+4. Exit.

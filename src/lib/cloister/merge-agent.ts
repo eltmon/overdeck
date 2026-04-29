@@ -335,6 +335,27 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     console.warn(`[merge-agent] Could not kill agent sessions: ${err}`);
   }
 
+  // 5a. Kill canonical reviewer/synthesis sessions (PAN-915).
+  // Sessions persist across review rounds to preserve reviewer context, so the
+  // merge is the right moment to tear them down. Issue is done — context value
+  // is zero, RSS leak risk is non-zero. Resolve projectKey from the project
+  // path so we don't depend on caller-supplied config.
+  try {
+    const { killAllReviewerSessions } = await import('./review-agent.js');
+    const { resolveProjectFromIssue } = await import('../projects.js');
+    const resolved = resolveProjectFromIssue(issueId);
+    const projectKey = resolved?.projectKey;
+    if (projectKey) {
+      const { killed } = await killAllReviewerSessions(projectKey, issueId);
+      if (killed.length > 0) {
+        console.log(`[merge-agent] ✓ Killed ${killed.length} canonical reviewer session(s) for ${issueId}`);
+        logActivity('reviewer_sessions_killed', `Killed ${killed.length} reviewer session(s) for ${issueId} on merge`);
+      }
+    }
+  } catch (err) {
+    console.warn(`[merge-agent] Could not kill canonical reviewer sessions: ${err}`);
+  }
+
   // 5b. Delete work agent + planning state dirs from ~/.panopticon/agents/ (non-fatal)
   // Event-driven cleanup — the merge is the moment the agent state becomes useless.
   // See docs/REVIEW-AGENT-ARCHITECTURE.md "Dispatch mechanics" for the broader rule:

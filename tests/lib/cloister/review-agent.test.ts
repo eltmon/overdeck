@@ -1002,7 +1002,13 @@ describe('runParallelReview', () => {
     expect(result.notes).toContain('correctness');
   });
 
-  it('PAN-846: kills reviewer and synthesis sessions in finally after returning', async () => {
+  // PAN-915 supersedes PAN-846. Canonical reviewer sessions are now intended to
+  // PERSIST across rounds so reviewers retain accumulated context (codebase
+  // patterns, prior findings, decisions). Sessions are torn down by terminal
+  // lifecycle events (merge complete, reset, cancel, deep-wipe, explicit
+  // abort), not by the per-round finally block.
+
+  it('PAN-915: does NOT kill canonical reviewer sessions on successful round (cross-round persistence)', async () => {
     mockKillSessionAsync.mockClear();
 
     const spawnFn = vi.fn().mockResolvedValue(undefined);
@@ -1022,17 +1028,18 @@ describe('runParallelReview', () => {
 
     expect(result.reviewResult).toBe('APPROVED');
 
-    // killSessionAsync must be called for the reviewer AND synthesis sessions
-    expect(mockKillSessionAsync).toHaveBeenCalledTimes(2);
-    expect(mockKillSessionAsync).toHaveBeenCalledWith(
+    // killSessionAsync must NOT be called for the canonical reviewer / synthesis
+    // sessions on a successful round — they live on for the next round to
+    // resume into the same Claude process via sendKeysAsync.
+    expect(mockKillSessionAsync).not.toHaveBeenCalledWith(
       'specialist-panopticon-cli-PAN-999-review-correctness',
     );
-    expect(mockKillSessionAsync).toHaveBeenCalledWith(
+    expect(mockKillSessionAsync).not.toHaveBeenCalledWith(
       'specialist-panopticon-cli-PAN-999-review-synthesis',
     );
   });
 
-  it('PAN-846: kills reviewer sessions in finally even when reviewers fail', async () => {
+  it('PAN-915: does NOT kill canonical reviewer sessions on aborted round (cross-round persistence)', async () => {
     mockKillSessionAsync.mockClear();
 
     const spawnFn = vi.fn().mockResolvedValue(undefined);
@@ -1050,12 +1057,11 @@ describe('runParallelReview', () => {
 
     expect(result.reviewResult).toBe('COMMENTED');
 
-    // Even on abort, reviewer and synthesis sessions are killed
-    expect(mockKillSessionAsync).toHaveBeenCalledTimes(2);
-    expect(mockKillSessionAsync).toHaveBeenCalledWith(
-      'specialist-panopticon-cli-PAN-999-review-correctness',
-    );
-    expect(mockKillSessionAsync).toHaveBeenCalledWith(
+    // Even when the round aborts, canonical sessions persist — the next round
+    // can resume into the same Claude process. Auto-respawn within the round
+    // may still call killSessionAsync (when isPaneDeadAsync says the pane is
+    // dead), but on a clean failure with a live pane, no kill happens.
+    expect(mockKillSessionAsync).not.toHaveBeenCalledWith(
       'specialist-panopticon-cli-PAN-999-review-synthesis',
     );
   });
