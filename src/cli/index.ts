@@ -64,6 +64,7 @@ import { registerInstallCommand } from './commands/install.js';
 import { registerAdminCommands } from './commands/admin/index.js';
 import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
+import { systemHealthCommand } from './commands/system-health.js';
 import { updateCommand } from './commands/update.js';
 import { restartCommand } from './commands/restart.js';
 import { registerInspectCommand } from './commands/inspect.js';
@@ -917,6 +918,12 @@ project
   .command('init')
   .description('Initialize projects.yaml with example configuration')
   .action(projectInitCommand);
+
+// Health command
+program
+  .command('health')
+  .description('Show runtime health of Panopticon services')
+  .action(systemHealthCommand);
 
 // Doctor command
 program

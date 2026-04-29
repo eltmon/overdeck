@@ -11,6 +11,8 @@ import {
   markWorkspaceStuck as dbMarkStuck,
   clearWorkspaceStuck as dbClearStuck,
   setDeaconIgnored as dbSetDeaconIgnored,
+  upsertReviewStatusAsync as dbUpsertAsync,
+  getReviewStatusFromDbAsync,
 } from './database/review-status-db.js';
 import { normalizeReviewStatus } from './review-status-normalize.js';
 
@@ -345,6 +347,17 @@ export function setReviewStatus(
 
 export function getReviewStatus(issueId: string): ReviewStatus | null {
   return getReviewStatusFromDb(issueId) ?? null;
+}
+
+export async function setReviewStatusAsync(
+  issueId: string,
+  update: Partial<ReviewStatus>,
+): Promise<ReviewStatus> {
+  return setReviewStatus(issueId, update);
+}
+
+export async function getReviewStatusAsync(issueId: string): Promise<ReviewStatus | null> {
+  return getReviewStatusFromDbAsync(issueId);
 }
 
 /**

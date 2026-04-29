@@ -64,26 +64,26 @@ function verifySignature(body: string, signature: string, secret: string): boole
   }
 }
 
-function dispatchWebhook(eventType: string, payload: WebhookPayload): void {
+async function dispatchWebhook(eventType: string, payload: WebhookPayload): Promise<void> {
   try {
     switch (eventType) {
       case 'check_suite':
-        handleCheckSuite(payload);
+        await handleCheckSuite(payload);
         break;
       case 'check_run':
-        handleCheckRun(payload);
+        await handleCheckRun(payload);
         break;
       case 'pull_request':
-        handlePullRequest(payload);
+        await handlePullRequest(payload);
         break;
       case 'pull_request_review':
-        handlePullRequestReview(payload);
+        await handlePullRequestReview(payload);
         break;
       case 'pull_request_review_thread':
-        handlePullRequestReviewThread(payload);
+        await handlePullRequestReviewThread(payload);
         break;
       case 'status':
-        handleStatus(payload);
+        await handleStatus(payload);
         break;
       default:
         // Unknown events are silently accepted (GitHub expects 200)
@@ -148,10 +148,10 @@ const postGitHubWebhookRoute = HttpRouter.add(
       return jsonResponse({ error: 'Repository not allowed' }, { status: 403 });
     }
 
-    // Dispatch handlers in the background so sync DB work doesn't block
-    // the HTTP response or the Node event loop.
+    // Dispatch handlers asynchronously so DB work (deferred via setImmediate)
+    // does not block the HTTP response or the Node event loop.
     yield* Effect.fork(
-      Effect.sync(() => dispatchWebhook(eventType, payload)),
+      Effect.promise(() => dispatchWebhook(eventType, payload)),
     );
 
     console.log(`[webhook] Received ${eventType} event from ${repoFullName}`);

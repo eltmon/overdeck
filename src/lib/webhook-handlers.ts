@@ -5,7 +5,7 @@
  * review_status blockerReasons based on GitHub-native merge blockers.
  */
 
-import { setReviewStatus, getReviewStatus, type BlockerReason } from './review-status.js';
+import { setReviewStatusAsync, getReviewStatusAsync, type BlockerReason } from './review-status.js';
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js';
 
 export interface WebhookPayload {
@@ -69,27 +69,27 @@ export function isTrackedRepository(fullName: string | undefined): boolean {
 
 // ─── Batched blocker mutation (single read + single write per event) ─────────
 
-function mutateBlockers(issueId: string, fn: (blockers: BlockerReason[]) => BlockerReason[]): void {
-  const status = getReviewStatus(issueId);
+async function mutateBlockers(issueId: string, fn: (blockers: BlockerReason[]) => BlockerReason[]): Promise<void> {
+  const status = await getReviewStatusAsync(issueId);
   const blockers = status?.blockerReasons ?? [];
   const updated = fn(blockers);
-  setReviewStatus(issueId, { blockerReasons: updated.length > 0 ? updated : undefined });
+  await setReviewStatusAsync(issueId, { blockerReasons: updated.length > 0 ? updated : undefined });
 }
 
-function addBlocker(issueId: string, blocker: BlockerReason): void {
-  mutateBlockers(issueId, (blockers) => {
+async function addBlocker(issueId: string, blocker: BlockerReason): Promise<void> {
+  await mutateBlockers(issueId, (blockers) => {
     const filtered = blockers.filter((b: BlockerReason) => b.type !== blocker.type);
     return [...filtered, blocker];
   });
 }
 
-function removeBlocker(issueId: string, type: BlockerReason['type']): void {
-  mutateBlockers(issueId, (blockers) => blockers.filter((b: BlockerReason) => b.type !== type));
+async function removeBlocker(issueId: string, type: BlockerReason['type']): Promise<void> {
+  await mutateBlockers(issueId, (blockers) => blockers.filter((b: BlockerReason) => b.type !== type));
 }
 
 // ─── check_suite / check_run ─────────────────────────────────────────────────
 
-export function handleCheckSuite(payload: WebhookPayload): void {
+export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepository(payload.repository?.full_name)) return;
   const suite = payload.check_suite;
   if (!suite) return;
@@ -99,17 +99,17 @@ export function handleCheckSuite(payload: WebhookPayload): void {
   if (!issueId) return;
 
   if (suite.conclusion === 'failure') {
-    addBlocker(issueId, {
+    await addBlocker(issueId, {
       type: 'failing_checks',
       summary: 'CI check suite failed',
       detectedAt: new Date().toISOString(),
     });
   } else if (suite.conclusion === 'success') {
-    removeBlocker(issueId, 'failing_checks');
+    await removeBlocker(issueId, 'failing_checks');
   }
 }
 
-export function handleCheckRun(payload: WebhookPayload): void {
+export async function handleCheckRun(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepository(payload.repository?.full_name)) return;
   const run = payload.check_run;
   if (!run) return;
@@ -119,7 +119,7 @@ export function handleCheckRun(payload: WebhookPayload): void {
   if (!issueId) return;
 
   if (run.conclusion === 'failure') {
-    addBlocker(issueId, {
+    await addBlocker(issueId, {
       type: 'failing_checks',
       summary: 'CI check run failed',
       detectedAt: new Date().toISOString(),
@@ -132,7 +132,7 @@ export function handleCheckRun(payload: WebhookPayload): void {
 
 // ─── pull_request ────────────────────────────────────────────────────────────
 
-export function handlePullRequest(payload: WebhookPayload): void {
+export async function handlePullRequest(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepository(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   if (!pr) return;
@@ -140,7 +140,7 @@ export function handlePullRequest(payload: WebhookPayload): void {
   if (!issueId) return;
 
   // Merge conflict detection + draft PR + not_mergeable — batched into one DB write
-  mutateBlockers(issueId, (blockers) => {
+  await mutateBlockers(issueId, (blockers) => {
     // Draft PR
     if (pr.draft) {
       const draftBlocker: BlockerReason = {
@@ -196,7 +196,7 @@ export function handlePullRequest(payload: WebhookPayload): void {
 
 // ─── pull_request_review ─────────────────────────────────────────────────────
 
-export function handlePullRequestReview(payload: WebhookPayload): void {
+export async function handlePullRequestReview(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepository(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   const review = payload.review;
@@ -205,19 +205,19 @@ export function handlePullRequestReview(payload: WebhookPayload): void {
   if (!issueId) return;
 
   if (review.state === 'changes_requested') {
-    addBlocker(issueId, {
+    await addBlocker(issueId, {
       type: 'changes_requested',
       summary: 'Changes requested on pull request',
       detectedAt: new Date().toISOString(),
     });
   } else if (review.state === 'approved') {
-    removeBlocker(issueId, 'changes_requested');
+    await removeBlocker(issueId, 'changes_requested');
   }
 }
 
 // ─── pull_request_review_thread ──────────────────────────────────────────────
 
-export function handlePullRequestReviewThread(payload: WebhookPayload): void {
+export async function handlePullRequestReviewThread(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepository(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   const thread = payload.thread;
@@ -226,7 +226,7 @@ export function handlePullRequestReviewThread(payload: WebhookPayload): void {
   if (!issueId) return;
 
   if (thread.resolved === false) {
-    mutateBlockers(issueId, (blockers) => {
+    await mutateBlockers(issueId, (blockers) => {
       const existing = blockers.find((b) => b.type === 'unresolved_conversations');
       const threadIds = new Set<string>(JSON.parse(existing?.details ?? '[]') as string[]);
       if (thread.id != null) threadIds.add(String(thread.id));
@@ -241,7 +241,7 @@ export function handlePullRequestReviewThread(payload: WebhookPayload): void {
   } else if (thread.resolved === true) {
     // Without a thread id we cannot determine which thread was resolved.
     if (thread.id == null) return;
-    mutateBlockers(issueId, (blockers) => {
+    await mutateBlockers(issueId, (blockers) => {
       const existing = blockers.find((b) => b.type === 'unresolved_conversations');
       if (!existing) return blockers;
       const threadIds = new Set<string>(JSON.parse(existing.details ?? '[]') as string[]);
@@ -262,7 +262,7 @@ export function handlePullRequestReviewThread(payload: WebhookPayload): void {
 
 // ─── status ──────────────────────────────────────────────────────────────────
 
-export function handleStatus(payload: WebhookPayload): void {
+export async function handleStatus(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepository(payload.repository?.full_name)) return;
   const state = payload.state;
   const branches = payload.branches;
@@ -273,13 +273,13 @@ export function handleStatus(payload: WebhookPayload): void {
     const issueId = issueIdFromBranch(branch.name);
     if (issueId) {
       if (state === 'failure' || state === 'error') {
-        addBlocker(issueId, {
+        await addBlocker(issueId, {
           type: 'failing_checks',
           summary: `Commit status: ${state}`,
           detectedAt: new Date().toISOString(),
         });
       } else if (state === 'success') {
-        removeBlocker(issueId, 'failing_checks');
+        await removeBlocker(issueId, 'failing_checks');
       }
       // Only act on the first feature branch match
       break;

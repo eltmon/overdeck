@@ -19,6 +19,8 @@ const mockSetReviewStatus = vi.fn();
 vi.mock('../../../src/lib/review-status.js', () => ({
   getReviewStatus: (...args: any[]) => mockGetReviewStatus(...args),
   setReviewStatus: (...args: any[]) => mockSetReviewStatus(...args),
+  getReviewStatusAsync: async (...args: any[]) => mockGetReviewStatus(...args),
+  setReviewStatusAsync: async (...args: any[]) => mockSetReviewStatus(...args),
 }));
 
 // Mock tracker-config so isTrackedRepository passes in tests
@@ -47,10 +49,10 @@ function makePayload(overrides: Partial<WebhookPayload> = {}): WebhookPayload {
 }
 
 describe('handleCheckSuite', () => {
-  it('adds failing_checks blocker on check suite failure', () => {
+  it('adds failing_checks blocker on check suite failure', async () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
-    handleCheckSuite(makePayload({
+    await handleCheckSuite(makePayload({
       check_suite: {
         status: 'completed',
         conclusion: 'failure',
@@ -65,12 +67,12 @@ describe('handleCheckSuite', () => {
     }));
   });
 
-  it('removes failing_checks blocker on check suite success', () => {
+  it('removes failing_checks blocker on check suite success', async () => {
     mockGetReviewStatus.mockReturnValue({
       blockerReasons: [{ type: 'failing_checks', summary: 'CI failed', detectedAt: '2026-04-28T10:00:00Z' }],
     });
 
-    handleCheckSuite(makePayload({
+    await handleCheckSuite(makePayload({
       check_suite: {
         status: 'completed',
         conclusion: 'success',
@@ -81,8 +83,8 @@ describe('handleCheckSuite', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-123', { blockerReasons: undefined });
   });
 
-  it('ignores check suite with no pull requests', () => {
-    handleCheckSuite(makePayload({
+  it('ignores check suite with no pull requests', async () => {
+    await handleCheckSuite(makePayload({
       check_suite: {
         status: 'completed',
         conclusion: 'failure',
@@ -95,10 +97,10 @@ describe('handleCheckSuite', () => {
 });
 
 describe('handlePullRequest', () => {
-  it('adds draft_pr blocker when PR is draft', () => {
+  it('adds draft_pr blocker when PR is draft', async () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
-    handlePullRequest(makePayload({
+    await handlePullRequest(makePayload({
       action: 'opened',
       pull_request: {
         number: 1,
@@ -116,12 +118,12 @@ describe('handlePullRequest', () => {
     }));
   });
 
-  it('removes draft_pr blocker on ready_for_review', () => {
+  it('removes draft_pr blocker on ready_for_review', async () => {
     mockGetReviewStatus.mockReturnValue({
       blockerReasons: [{ type: 'draft_pr', summary: 'Draft', detectedAt: '2026-04-28T10:00:00Z' }],
     });
 
-    handlePullRequest(makePayload({
+    await handlePullRequest(makePayload({
       action: 'ready_for_review',
       pull_request: {
         number: 1,
@@ -135,10 +137,10 @@ describe('handlePullRequest', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-456', { blockerReasons: undefined });
   });
 
-  it('adds merge_conflict blocker when mergeable_state is dirty', () => {
+  it('adds merge_conflict blocker when mergeable_state is dirty', async () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
-    handlePullRequest(makePayload({
+    await handlePullRequest(makePayload({
       action: 'synchronize',
       pull_request: {
         number: 1,
@@ -155,10 +157,10 @@ describe('handlePullRequest', () => {
     }));
   });
 
-  it('adds merge_conflict fallback when mergeable is false and mergeable_state is unavailable', () => {
+  it('adds merge_conflict fallback when mergeable is false and mergeable_state is unavailable', async () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
-    handlePullRequest(makePayload({
+    await handlePullRequest(makePayload({
       action: 'synchronize',
       pull_request: {
         number: 1,
@@ -175,10 +177,10 @@ describe('handlePullRequest', () => {
     }));
   });
 
-  it('adds not_mergeable blocker for behind state', () => {
+  it('adds not_mergeable blocker for behind state', async () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
-    handlePullRequest(makePayload({
+    await handlePullRequest(makePayload({
       action: 'synchronize',
       pull_request: {
         number: 1,
@@ -195,10 +197,10 @@ describe('handlePullRequest', () => {
     }));
   });
 
-  it('adds not_mergeable blocker for blocked state', () => {
+  it('adds not_mergeable blocker for blocked state', async () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
-    handlePullRequest(makePayload({
+    await handlePullRequest(makePayload({
       action: 'synchronize',
       pull_request: {
         number: 1,
@@ -215,10 +217,10 @@ describe('handlePullRequest', () => {
     }));
   });
 
-  it('does not add merge_conflict for behind state', () => {
+  it('does not add merge_conflict for behind state', async () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
-    handlePullRequest(makePayload({
+    await handlePullRequest(makePayload({
       action: 'synchronize',
       pull_request: {
         number: 1,
@@ -240,11 +242,11 @@ describe('handlePullRequest', () => {
     }));
   });
 
-  it('leaves blockers unchanged when mergeable_state is unknown', () => {
+  it('leaves blockers unchanged when mergeable_state is unknown', async () => {
     const existingBlockers = [{ type: 'merge_conflict', summary: 'Conflict', detectedAt: '2026-04-28T10:00:00Z' }];
     mockGetReviewStatus.mockReturnValue({ blockerReasons: existingBlockers });
 
-    handlePullRequest(makePayload({
+    await handlePullRequest(makePayload({
       action: 'synchronize',
       pull_request: {
         number: 1,
@@ -258,7 +260,7 @@ describe('handlePullRequest', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', { blockerReasons: existingBlockers });
   });
 
-  it('clears merge and not_mergeable blockers on clean state', () => {
+  it('clears merge and not_mergeable blockers on clean state', async () => {
     mockGetReviewStatus.mockReturnValue({
       blockerReasons: [
         { type: 'merge_conflict', summary: 'Conflict', detectedAt: '2026-04-28T10:00:00Z' },
@@ -266,7 +268,7 @@ describe('handlePullRequest', () => {
       ],
     });
 
-    handlePullRequest(makePayload({
+    await handlePullRequest(makePayload({
       action: 'synchronize',
       pull_request: {
         number: 1,
@@ -281,10 +283,10 @@ describe('handlePullRequest', () => {
 });
 
 describe('handlePullRequestReview', () => {
-  it('adds changes_requested blocker', () => {
+  it('adds changes_requested blocker', async () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
-    handlePullRequestReview(makePayload({
+    await handlePullRequestReview(makePayload({
       action: 'submitted',
       pull_request: {
         number: 1,
@@ -300,12 +302,12 @@ describe('handlePullRequestReview', () => {
     }));
   });
 
-  it('removes changes_requested blocker on approval', () => {
+  it('removes changes_requested blocker on approval', async () => {
     mockGetReviewStatus.mockReturnValue({
       blockerReasons: [{ type: 'changes_requested', summary: 'Changes', detectedAt: '2026-04-28T10:00:00Z' }],
     });
 
-    handlePullRequestReview(makePayload({
+    await handlePullRequestReview(makePayload({
       action: 'submitted',
       pull_request: {
         number: 1,
@@ -319,10 +321,10 @@ describe('handlePullRequestReview', () => {
 });
 
 describe('handlePullRequestReviewThread', () => {
-  it('adds unresolved_conversations blocker with thread id tracking', () => {
+  it('adds unresolved_conversations blocker with thread id tracking', async () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
-    handlePullRequestReviewThread(makePayload({
+    await handlePullRequestReviewThread(makePayload({
       action: 'unresolved',
       pull_request: {
         number: 1,
@@ -341,7 +343,7 @@ describe('handlePullRequestReviewThread', () => {
     }));
   });
 
-  it('removes unresolved_conversations blocker when all tracked threads are resolved', () => {
+  it('removes unresolved_conversations blocker when all tracked threads are resolved', async () => {
     mockGetReviewStatus.mockReturnValue({
       blockerReasons: [{
         type: 'unresolved_conversations',
@@ -351,7 +353,7 @@ describe('handlePullRequestReviewThread', () => {
       }],
     });
 
-    handlePullRequestReviewThread(makePayload({
+    await handlePullRequestReviewThread(makePayload({
       action: 'resolved',
       pull_request: {
         number: 1,
@@ -363,7 +365,7 @@ describe('handlePullRequestReviewThread', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-222', { blockerReasons: undefined });
   });
 
-  it('keeps unresolved_conversations blocker when only one of multiple threads is resolved', () => {
+  it('keeps unresolved_conversations blocker when only one of multiple threads is resolved', async () => {
     mockGetReviewStatus.mockReturnValue({
       blockerReasons: [{
         type: 'unresolved_conversations',
@@ -373,7 +375,7 @@ describe('handlePullRequestReviewThread', () => {
       }],
     });
 
-    handlePullRequestReviewThread(makePayload({
+    await handlePullRequestReviewThread(makePayload({
       action: 'resolved',
       pull_request: {
         number: 1,
@@ -392,7 +394,7 @@ describe('handlePullRequestReviewThread', () => {
     }));
   });
 
-  it('does not clear blocker on resolve when thread id is absent', () => {
+  it('does not clear blocker on resolve when thread id is absent', async () => {
     // Without a thread id we cannot determine which thread was resolved,
     // so we conservatively keep the blocker.
     mockGetReviewStatus.mockReturnValue({
@@ -404,7 +406,7 @@ describe('handlePullRequestReviewThread', () => {
       }],
     });
 
-    handlePullRequestReviewThread(makePayload({
+    await handlePullRequestReviewThread(makePayload({
       action: 'resolved',
       pull_request: {
         number: 1,
@@ -418,10 +420,10 @@ describe('handlePullRequestReviewThread', () => {
 });
 
 describe('handleStatus', () => {
-  it('adds failing_checks blocker on status failure', () => {
+  it('adds failing_checks blocker on status failure', async () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
-    handleStatus(makePayload({
+    await handleStatus(makePayload({
       state: 'failure',
       branches: [{ name: 'main' }, { name: 'feature/pan-333' }],
     }));
@@ -433,10 +435,10 @@ describe('handleStatus', () => {
     }));
   });
 
-  it('adds failing_checks blocker on status error', () => {
+  it('adds failing_checks blocker on status error', async () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
-    handleStatus(makePayload({
+    await handleStatus(makePayload({
       state: 'error',
       branches: [{ name: 'feature/pan-444' }],
     }));
@@ -448,12 +450,12 @@ describe('handleStatus', () => {
     }));
   });
 
-  it('removes failing_checks blocker on status success', () => {
+  it('removes failing_checks blocker on status success', async () => {
     mockGetReviewStatus.mockReturnValue({
       blockerReasons: [{ type: 'failing_checks', summary: 'CI failed', detectedAt: '2026-04-28T10:00:00Z' }],
     });
 
-    handleStatus(makePayload({
+    await handleStatus(makePayload({
       state: 'success',
       branches: [{ name: 'main' }, { name: 'feature/pan-333' }],
     }));
@@ -461,10 +463,10 @@ describe('handleStatus', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-333', { blockerReasons: undefined });
   });
 
-  it('skips non-feature branches and acts on the first matching feature branch', () => {
+  it('skips non-feature branches and acts on the first matching feature branch', async () => {
     mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
 
-    handleStatus(makePayload({
+    await handleStatus(makePayload({
       state: 'failure',
       branches: [{ name: 'main' }, { name: 'release' }, { name: 'feature/pan-555' }],
     }));
@@ -476,8 +478,8 @@ describe('handleStatus', () => {
     }));
   });
 
-  it('ignores status events with no matching feature branches', () => {
-    handleStatus(makePayload({
+  it('ignores status events with no matching feature branches', async () => {
+    await handleStatus(makePayload({
       state: 'failure',
       branches: [{ name: 'main' }, { name: 'release' }],
     }));

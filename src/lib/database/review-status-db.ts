@@ -125,6 +125,34 @@ export function deleteReviewStatus(issueId: string): void {
   db.prepare('DELETE FROM review_status WHERE issue_id = ?').run(issueId);
 }
 
+// ============== Async wrappers (dashboard-reachable code) ==============
+// better-sqlite3 is synchronous. These wrappers defer execution via
+// setImmediate so the Node event loop can process other I/O (HTTP,
+// WebSocket, terminal) between SQLite operations. This satisfies the
+// "No Blocking Calls" dashboard rule (PAN-70 / PAN-446) for the
+// webhook ingestion path.
+
+export function upsertReviewStatusAsync(status: ReviewStatus): Promise<void> {
+  return new Promise((resolve, reject) => {
+    setImmediate(() => {
+      try {
+        upsertReviewStatus(status);
+        resolve();
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
+}
+
+export function getReviewStatusFromDbAsync(issueId: string): Promise<ReviewStatus | null> {
+  return new Promise((resolve) => {
+    setImmediate(() => {
+      resolve(getReviewStatusFromDb(issueId));
+    });
+  });
+}
+
 // ============== Read operations ==============
 
 /**
