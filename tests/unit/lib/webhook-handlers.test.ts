@@ -20,7 +20,8 @@ vi.mock('../../../src/lib/review-status.js', () => ({
   getReviewStatus: (...args: any[]) => mockGetReviewStatus(...args),
   setReviewStatus: (...args: any[]) => mockSetReviewStatus(...args),
   getReviewStatusAsync: async (...args: any[]) => mockGetReviewStatus(...args),
-  setReviewStatusAsync: async (...args: any[]) => mockSetReviewStatus(...args),
+  // Strip the optional third arg (existing status) so test assertions stay clean.
+  setReviewStatusAsync: async (...args: any[]) => mockSetReviewStatus(args[0], args[1]),
 }));
 
 // Mock tracker-config so isTrackedRepository passes in tests
@@ -93,6 +94,38 @@ describe('handleCheckSuite', () => {
     }));
 
     expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
+
+  it('matches non-PAN project prefixes (MIN, KRUX, AUR, MYN)', async () => {
+    mockGetReviewStatus.mockReturnValue({ blockerReasons: [] });
+
+    await handleCheckSuite(makePayload({
+      check_suite: {
+        status: 'completed',
+        conclusion: 'failure',
+        pull_requests: [{ number: 1, head: { ref: 'feature/min-42' } }],
+      },
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('MIN-42', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'failing_checks' }),
+      ]),
+    }));
+
+    await handleCheckSuite(makePayload({
+      check_suite: {
+        status: 'completed',
+        conclusion: 'failure',
+        pull_requests: [{ number: 2, head: { ref: 'feature/krux-7' } }],
+      },
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('KRUX-7', expect.objectContaining({
+      blockerReasons: expect.arrayContaining([
+        expect.objectContaining({ type: 'failing_checks' }),
+      ]),
+    }));
   });
 });
 
@@ -314,6 +347,23 @@ describe('handlePullRequestReview', () => {
         head: { ref: 'feature/pan-111' },
       },
       review: { state: 'approved' },
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-111', { blockerReasons: undefined });
+  });
+
+  it('removes changes_requested blocker on dismissed', async () => {
+    mockGetReviewStatus.mockReturnValue({
+      blockerReasons: [{ type: 'changes_requested', summary: 'Changes', detectedAt: '2026-04-28T10:00:00Z' }],
+    });
+
+    await handlePullRequestReview(makePayload({
+      action: 'submitted',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-111' },
+      },
+      review: { state: 'dismissed' },
     }));
 
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-111', { blockerReasons: undefined });

@@ -38,7 +38,7 @@ export interface WebhookPayload {
 }
 
 function issueIdFromBranch(ref: string): string | null {
-  const match = ref.match(/feature\/(pan-\d+)/i);
+  const match = ref.match(/feature\/([a-z]+-\d+)/i);
   return match ? match[1].toUpperCase() : null;
 }
 
@@ -73,7 +73,8 @@ async function mutateBlockers(issueId: string, fn: (blockers: BlockerReason[]) =
   const status = await getReviewStatusAsync(issueId);
   const blockers = status?.blockerReasons ?? [];
   const updated = fn(blockers);
-  await setReviewStatusAsync(issueId, { blockerReasons: updated.length > 0 ? updated : undefined });
+  // Pass the already-loaded status to skip the second DB read inside setReviewStatus.
+  await setReviewStatusAsync(issueId, { blockerReasons: updated.length > 0 ? updated : undefined }, status ?? undefined);
 }
 
 async function addBlocker(issueId: string, blocker: BlockerReason): Promise<void> {
@@ -210,7 +211,7 @@ export async function handlePullRequestReview(payload: WebhookPayload): Promise<
       summary: 'Changes requested on pull request',
       detectedAt: new Date().toISOString(),
     });
-  } else if (review.state === 'approved') {
+  } else if (review.state === 'approved' || review.state === 'dismissed') {
     await removeBlocker(issueId, 'changes_requested');
   }
 }
