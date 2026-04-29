@@ -333,7 +333,10 @@ export async function handlePullRequest(payload: WebhookPayload): Promise<void> 
   if (!issueId) return;
 
   const repo = payload.repository!.full_name;
-  const status = await loadAndValidateStatus(issueId, repo, pr.number, pr.head.sha);
+  // For synchronize/opened/reopened the head SHA may have changed — skip SHA
+  // validation so the handler can refresh prHeadSha and recompute blockers.
+  const headMayHaveMoved = ['synchronize', 'opened', 'reopened'].includes(payload.action ?? '');
+  const status = await loadAndValidateStatus(issueId, repo, pr.number, headMayHaveMoved ? undefined : pr.head.sha);
   if (!status) return;
 
   const update: Partial<ReviewStatus> = {};
@@ -521,7 +524,7 @@ export async function handleStatus(payload: WebhookPayload): Promise<void> {
     const issueId = issueIdFromBranch(branch.name);
     if (issueId) {
       const status = await loadAndValidateStatus(issueId, repo, undefined, payload.sha);
-      if (!status) break;
+      if (!status) continue;
 
       let blockers = [...(status.blockerReasons ?? [])];
 

@@ -403,6 +403,50 @@ describe('handlePullRequest', () => {
 
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', expect.objectContaining({ blockerReasons: undefined }));
   });
+
+  it('tolerates head SHA mismatch on synchronize and refreshes prHeadSha', async () => {
+    mockGetReviewStatus.mockReturnValue({
+      blockerReasons: [],
+      prUrl: 'https://github.com/test-owner/test-repo/pull/1',
+      prNumber: 1,
+      prHeadSha: 'old-sha-123',
+    });
+
+    await handlePullRequest(makePayload({
+      action: 'synchronize',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-789', sha: 'new-sha-456' },
+        mergeable: true,
+        mergeable_state: 'clean',
+      },
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-789', expect.objectContaining({
+      prHeadSha: 'new-sha-456',
+    }));
+  });
+
+  it('rejects non-synchronize events with head SHA mismatch', async () => {
+    mockGetReviewStatus.mockReturnValue({
+      blockerReasons: [],
+      prUrl: 'https://github.com/test-owner/test-repo/pull/1',
+      prNumber: 1,
+      prHeadSha: 'old-sha-123',
+    });
+
+    await handlePullRequest(makePayload({
+      action: 'labeled',
+      pull_request: {
+        number: 1,
+        head: { ref: 'feature/pan-789', sha: 'new-sha-456' },
+        mergeable: true,
+        mergeable_state: 'clean',
+      },
+    }));
+
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
 });
 
 describe('handlePullRequestReview', () => {
