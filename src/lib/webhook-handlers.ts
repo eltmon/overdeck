@@ -62,7 +62,7 @@ function getTrackedRepos(): Set<string> {
   return cachedTrackedRepos;
 }
 
-function isTrackedRepository(fullName: string | undefined): boolean {
+export function isTrackedRepository(fullName: string | undefined): boolean {
   if (!fullName) return false;
   return getTrackedRepos().has(fullName.toLowerCase());
 }
@@ -155,36 +155,33 @@ export function handlePullRequest(payload: WebhookPayload): void {
       blockers = blockers.filter((b) => b.type !== 'draft_pr');
     }
 
-    // Non-mergeable state — only mutate when GitHub has computed a value.
-    // When mergeable_state is null/undefined, the payload is incomplete;
-    // leave existing blockers untouched to avoid flicker.
-    if (pr.mergeable_state !== null && pr.mergeable_state !== undefined) {
-      // 'dirty' is excluded — handled by merge_conflict blocker below
-      if (pr.mergeable_state !== 'clean' && pr.mergeable_state !== 'unstable' && pr.mergeable_state !== 'dirty' && pr.mergeable_state !== 'unknown') {
-        const notMergeableBlocker: BlockerReason = {
-          type: 'not_mergeable',
-          summary: `PR not mergeable: ${pr.mergeable_state}`,
-          detectedAt: new Date().toISOString(),
-        };
-        blockers = blockers.filter((b) => b.type !== 'not_mergeable');
-        blockers = [...blockers, notMergeableBlocker];
-      } else {
-        blockers = blockers.filter((b) => b.type !== 'not_mergeable');
-      }
-    }
+    // Merge state — classify into exactly one mutually-exclusive bucket.
+    // dirty / mergeable===false  → merge_conflict (highest precedence)
+    // clean / unstable / mergeable===true → clear both blockers
+    // other definitive states      → not_mergeable
+    // null/undefined/unknown       → leave untouched (GitHub computing)
+    const hasMergeableState = pr.mergeable_state !== null && pr.mergeable_state !== undefined;
+    const isDirty = pr.mergeable_state === 'dirty' || pr.mergeable === false;
+    const isClean = pr.mergeable_state === 'clean' || pr.mergeable === true || pr.mergeable_state === 'unstable';
 
-    // Merge conflict detection — only mutate on definitive values.
-    // null = GitHub is recomputing; leave blockers untouched.
-    if (pr.mergeable === false || pr.mergeable_state === 'dirty') {
+    if (isDirty) {
       const mergeConflictBlocker: BlockerReason = {
         type: 'merge_conflict',
         summary: 'Merge conflict with target branch',
         detectedAt: new Date().toISOString(),
       };
-      blockers = blockers.filter((b) => b.type !== 'merge_conflict');
+      blockers = blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable');
       blockers = [...blockers, mergeConflictBlocker];
-    } else if (pr.mergeable === true || pr.mergeable_state === 'clean') {
-      blockers = blockers.filter((b) => b.type !== 'merge_conflict');
+    } else if (hasMergeableState && !isClean && pr.mergeable_state !== 'unknown') {
+      const notMergeableBlocker: BlockerReason = {
+        type: 'not_mergeable',
+        summary: `PR not mergeable: ${pr.mergeable_state}`,
+        detectedAt: new Date().toISOString(),
+      };
+      blockers = blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable');
+      blockers = [...blockers, notMergeableBlocker];
+    } else if (isClean) {
+      blockers = blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable');
     }
 
     return blockers;

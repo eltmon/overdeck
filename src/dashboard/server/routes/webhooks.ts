@@ -15,7 +15,6 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
-import { getGitHubConfig } from '../services/tracker-config.js';
 import {
   handleCheckSuite,
   handleCheckRun,
@@ -23,6 +22,7 @@ import {
   handlePullRequestReview,
   handlePullRequestReviewThread,
   handleStatus,
+  isTrackedRepository,
   type WebhookPayload,
 } from '../../../lib/webhook-handlers.js';
 
@@ -146,12 +146,8 @@ const postGitHubWebhookRoute = HttpRouter.add(
     }
 
     // Repository authorization: reject events from unconfigured repos
-    const ghConfig = getGitHubConfig();
-    const allowedRepos = new Set(
-      ghConfig?.repos.map((r) => `${r.owner}/${r.repo}`) ?? [],
-    );
     const repoFullName = payload.repository?.full_name;
-    if (!repoFullName || !allowedRepos.has(repoFullName)) {
+    if (!repoFullName || !isTrackedRepository(repoFullName)) {
       console.warn(`[webhook] Repository not allowed: ${repoFullName ?? 'unknown'}`);
       return jsonResponse({ error: 'Repository not allowed' }, { status: 403 });
     }
