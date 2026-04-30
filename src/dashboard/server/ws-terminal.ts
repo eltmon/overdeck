@@ -191,7 +191,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
       try {
         const sessions = await listSessionNamesAsync();
         if (!sessions.includes(sessionName)) {
-          ws.close(1008, `Session ${sessionName} not found`);
+          ws.close(4404, 'session-not-found');
           return;
         }
       } catch (err) {

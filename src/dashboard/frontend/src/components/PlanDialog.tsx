@@ -470,13 +470,6 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
             // Planning was done but not marked complete - go directly to complete step
             // This allows user to click "Done Planning" without restarting
             setStep('complete');
-          } else if (data.sessionName && data.hasPromptFile && (['In Planning', 'Planning', 'Discovery'].includes(issue.status) || issue.labels?.some(l => l.toLowerCase() === 'planning'))) {
-            // Issue is in planning state with a known session that actually started work
-            // (hasPromptFile confirms workspace was created successfully)
-            if (!watchPlanningRef.current) { onClose(); return; }
-            if (data.sessionName) setSetupSessionName(data.sessionName);
-            hasConnectedToSession.current = true;
-            setStep('planning');
           } else {
             // No active session and no completed planning - show ready step
             setStep('ready');

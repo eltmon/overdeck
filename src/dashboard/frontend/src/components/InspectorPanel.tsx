@@ -36,6 +36,8 @@ import { AgentInfoSection } from './inspector/AgentInfoSection';
 import { ContainerSection } from './inspector/ContainerSection';
 import { ActionsSection } from './inspector/ActionsSection';
 import { PHASE_CHIP_COLORS, PHASE_LABELS, type PipelinePhase } from './inspector/TerminalTabs';
+import { SwitchModelModal } from './SwitchModelModal';
+import { useSwitchModel } from '../hooks/useSwitchModel';
 
 interface SessionCost {
   id: string;
@@ -141,6 +143,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
   const [containersStarting, setContainersStarting] = useState(false);
   const [containersStartedAt, setContainersStartedAt] = useState(0);
   const [agentLaunchState, setAgentLaunchState] = useState<'starting' | 'resuming' | null>(null);
+  const [showSwitchModel, setShowSwitchModel] = useState(false);
   const [containerMenu, setContainerMenu] = useState<{
     x: number; y: number; containerName: string; isRunning: boolean;
   } | null>(null);
@@ -502,6 +505,8 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       toast.error(err.message, { duration: 8000 });
     },
   });
+
+  const { switchMutation, isPending: isSwitchPending } = useSwitchModel(agent?.id, issueId);
 
   const dismissPendingMutation = useMutation({
     mutationFn: async () => {
@@ -1074,6 +1079,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           onViewBeads={() => setShowBeads(true)}
           onViewVBrief={() => setShowVBrief(true)}
           onViewLog={onViewMergeLog}
+          onSwitchModel={() => setShowSwitchModel(true)}
           lifecycle={agentLifecycle}
           agentLaunchState={agentLaunchState}
         />
@@ -1093,6 +1099,30 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
 
         <div className="flex-1" />
       </div>
+
+      {/* Switch Model modal */}
+      {showSwitchModel && agent && (
+        <SwitchModelModal
+          currentModel={agent.model}
+          agentId={agent.id}
+          issueId={issueId}
+          agentStatus={agent.status}
+          hasResumableSession={agentLifecycle?.canResumeSession ?? false}
+          onClose={() => setShowSwitchModel(false)}
+          onSwitch={(model, message) => {
+            switchMutation.mutate({ model, message }, {
+              onSuccess: () => {
+                setShowSwitchModel(false);
+                toast.success(`Agent restarted on ${model}`);
+              },
+              onError: (err) => {
+                toast.error(err.message, { duration: 8000 });
+              },
+            });
+          }}
+          isPending={isSwitchPending}
+        />
+      )}
 
       {/* Beads dialog */}
       {showBeads && <BeadsDialog issueId={issueId} isOpen={showBeads} onClose={() => setShowBeads(false)} />}
