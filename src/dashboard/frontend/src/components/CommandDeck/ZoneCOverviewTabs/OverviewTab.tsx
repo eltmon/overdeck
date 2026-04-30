@@ -797,7 +797,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   <ExternalLink size={12} /> Open VS Code
                 </a>
               )}
-              {workspace.data?.canContainerize && (
+              {workspace.data?.canContainerize && !workspace.data?.hasAgent && (
                 <button
                   type="button"
                   onClick={() => {
@@ -815,7 +815,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                     gap: 4,
                   }}
                 >
-                  <Play size={12} /> Start Containers
+                  <Box size={12} /> Containerize
                 </button>
               )}
             </div>
