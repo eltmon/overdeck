@@ -208,9 +208,17 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   // dynamic imports already resolve correctly and spawning again would create an infinite loop.
   if (!options?.skipDeploy) {
     const pendingFile = join(PANOPTICON_HOME, 'pending-post-merge.json');
-    const repoRoot = __dirname.includes('/src/')
+    let repoRoot = __dirname.includes('/src/')
       ? __dirname.replace(/\/src\/.*$/, '')
       : __dirname.replace(/\/dist\/.*$/, '').replace(/\/lib\/.*$/, '');
+    // If running from a workspace (workspaces/feature-*/), resolve to the main repo root.
+    // Without this, the deploy script builds and npm-links from the workspace, hijacking
+    // the global `pan` CLI to point at stale workspace code.
+    const wsMatch = repoRoot.match(/^(.+)\/workspaces\/feature-[^/]+$/);
+    if (wsMatch) {
+      repoRoot = wsMatch[1];
+      console.log(`[merge-agent] Resolved workspace repoRoot to main repo: ${repoRoot}`);
+    }
     const deployScript = join(repoRoot, 'scripts', 'post-merge-deploy.sh');
 
     try {
