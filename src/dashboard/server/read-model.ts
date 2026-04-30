@@ -79,7 +79,7 @@ export function toVerificationStatus(v: unknown): VerificationStatusValue | unde
   return v && VALID_VERIFICATION_STATUSES.has(v as VerificationStatusValue) ? v as VerificationStatusValue : undefined;
 }
 
-export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails' | 'reviewedAtCommit' | 'reviewSpawnedAt' | 'testRetryCount' | 'reviewRetryCount' | 'recoveryStartedAt' | 'deaconIgnored' | 'deaconIgnoredAt' | 'deaconIgnoredReason' | 'blockerReasons' | 'queuePosition' | 'mergeRetryCount' | 'mergeNotes'> & { reviewCoordinatorSessionName?: string; reviewSessionNames?: string[]; reviewSubStatuses?: Record<string, 'running' | 'done'>; activeSpecialist?: string }): ReviewStatusSnapshot {
+export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails' | 'reviewedAtCommit' | 'reviewSpawnedAt' | 'testRetryCount' | 'reviewRetryCount' | 'recoveryStartedAt' | 'deaconIgnored' | 'deaconIgnoredAt' | 'deaconIgnoredReason' | 'blockerReasons' | 'queuePosition' | 'mergeRetryCount' | 'mergeNotes' | 'autoRequeueCount'> & { reviewCoordinatorSessionName?: string; reviewSessionNames?: string[]; reviewSubStatuses?: Record<string, 'running' | 'done'>; activeSpecialist?: string }): ReviewStatusSnapshot {
   return {
     issueId: status.issueId,
     reviewStatus: toReviewStatus(status.reviewStatus),
@@ -111,6 +111,7 @@ export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'r
     mergeRetryCount: typeof status.mergeRetryCount === 'number' ? status.mergeRetryCount : undefined,
     mergeNotes: status.mergeNotes || undefined,
     blockerReasons: status.blockerReasons && status.blockerReasons.length > 0 ? status.blockerReasons : undefined,
+    autoRequeueCount: typeof status.autoRequeueCount === 'number' ? status.autoRequeueCount : undefined,
   };
 }
 

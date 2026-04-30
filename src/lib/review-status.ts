@@ -162,6 +162,17 @@ export function setReviewStatus(
     return status as ReviewStatus;
   }
 
+  // PAN-424: Reject testStatus regression from 'passed' to 'dispatch_failed' or 'failed'.
+  // Once tests pass, duplicate dispatch failures must not overwrite the result.
+  if (
+    (update.testStatus === 'dispatch_failed' || update.testStatus === 'failed') &&
+    status.testStatus === 'passed'
+  ) {
+    console.warn(`[review-status] Rejecting testStatus regression from 'passed' to '${update.testStatus}' for ${issueId}`);
+    delete update.testStatus;
+    delete update.testNotes;
+  }
+
   const merged = { ...status, ...update };
 
   // Track status transitions in history (last 10 entries)

@@ -164,6 +164,8 @@ export const ReviewStatusSnapshot = Schema.Struct({
   testRetryCount: Schema.optional(Schema.Number),
   /** PAN-794: parallel-review re-dispatch retry counter (current recovery cycle) */
   reviewRetryCount: Schema.optional(Schema.Number),
+  /** PAN-796: review auto-requeue count (circuit breaker threshold) */
+  autoRequeueCount: Schema.optional(Schema.Number),
   /** PAN-794: ISO timestamp marking the start of the current recovery cycle */
   recoveryStartedAt: Schema.optional(Schema.String),
   /** Human-requested patrol opt-out — when true, Deacon ignores this issue. */
