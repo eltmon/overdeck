@@ -422,17 +422,23 @@ program
       }
     }
 
-    // Restart tmux server with clean env — the server inherits the parent's
-    // environment at startup and persists it. If the user had provider env vars
-    // (e.g. ANTHROPIC_BASE_URL for OpenRouter), the stale values leak into
-    // every session even after the parent env is fixed. Kill + restart ensures
-    // the server picks up the current (clean) environment.
+    // Flush stale provider env vars from the tmux server's global environment.
+    // The server inherits the parent's env at startup and persists it — stale
+    // ANTHROPIC_BASE_URL etc. would leak into new sessions. Use set-environment
+    // -gu to unset them without killing existing sessions.
     {
       const { execSync } = await import('child_process');
-      try {
-        execSync('tmux -L panopticon kill-server', { stdio: 'ignore' });
-      } catch {
-        // No server running — fine
+      const providerVars = [
+        'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN',
+        'OPENAI_API_KEY', 'GEMINI_API_KEY', 'API_TIMEOUT_MS',
+        'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
+      ];
+      for (const varName of providerVars) {
+        try {
+          execSync(`tmux -L panopticon set-environment -gu ${varName}`, { stdio: 'ignore' });
+        } catch {
+          // No server running or var not set — fine
+        }
       }
     }
 
