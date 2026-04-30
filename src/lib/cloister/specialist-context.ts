@@ -171,7 +171,7 @@ export async function generateContextDigest(
 
     // Run Claude Code with the prompt (include provider env vars for non-Anthropic models)
     const { getProviderEnvForModel } = await import('../agents.js');
-    const providerEnv = getProviderEnvForModel(model);
+    const providerEnv = await getProviderEnvForModel(model);
     const envPrefix = Object.entries(providerEnv).map(([k, v]) => `${k}="${v}"`).join(' ');
     const { stdout, stderr } = await execAsync(
       `${envPrefix ? envPrefix + ' ' : ''}claude --dangerously-skip-permissions --permission-mode bypassPermissions --model ${model} "$(cat '${promptFile}')"`,

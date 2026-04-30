@@ -690,14 +690,14 @@ async function spawnConversationSession(
     if (!SAFE_MODEL_PATTERN.test(model)) {
       throw new Error('Invalid model name');
     }
-    runtimeCommand = getAgentRuntimeBaseCommand(model);
+    runtimeCommand = await getAgentRuntimeBaseCommand(model);
     if (!runtimeCommand.includes('--dangerously-skip-permissions')) {
       runtimeCommand = `${runtimeCommand} --dangerously-skip-permissions`;
     }
     if (!runtimeCommand.includes('--permission-mode')) {
       runtimeCommand = `${runtimeCommand} --permission-mode bypassPermissions`;
     }
-    const providerExports = getProviderExportsForModel(model).trim();
+    const providerExports = (await getProviderExportsForModel(model)).trim();
     if (providerExports) {
       providerEnvExports.push(...providerExports.split('\n').filter(Boolean));
     }

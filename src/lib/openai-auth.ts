@@ -8,7 +8,8 @@
  * works without falling back to an API key.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'fs';
+import { readFile, writeFile, access, mkdir } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
 import { bridgeCodexAuthToCliproxy } from './cliproxy.js';
@@ -91,12 +92,16 @@ function getJwtExpiry(token: string | null): number | null {
   return typeof payload?.exp === 'number' ? payload.exp * 1000 : null;
 }
 
-function readClaudishCredentials(): CodexOAuthCredentials | null {
+async function readClaudishCredentialsAsync(): Promise<CodexOAuthCredentials | null> {
   const credPath = getClaudishCodexPath();
-  if (!existsSync(credPath)) return null;
+  try {
+    await access(credPath);
+  } catch {
+    return null;
+  }
 
   try {
-    const raw = JSON.parse(readFileSync(credPath, 'utf8')) as Partial<CodexOAuthCredentials>;
+    const raw = JSON.parse(await readFile(credPath, 'utf8')) as Partial<CodexOAuthCredentials>;
     if (
       typeof raw.access_token !== 'string'
       || typeof raw.refresh_token !== 'string'
@@ -116,12 +121,16 @@ function readClaudishCredentials(): CodexOAuthCredentials | null {
   }
 }
 
-function deriveClaudishCredentialsFromCodex(): CodexOAuthCredentials | null {
+async function deriveClaudishCredentialsFromCodexAsync(): Promise<CodexOAuthCredentials | null> {
   const authPath = getCodexAuthPath();
-  if (!existsSync(authPath)) return null;
+  try {
+    await access(authPath);
+  } catch {
+    return null;
+  }
 
   try {
-    const raw = JSON.parse(readFileSync(authPath, 'utf8')) as RawAuthFile;
+    const raw = JSON.parse(await readFile(authPath, 'utf8')) as RawAuthFile;
     const accessToken = typeof raw.tokens?.access_token === 'string' ? raw.tokens.access_token : null;
     const refreshToken = typeof raw.tokens?.refresh_token === 'string' ? raw.tokens.refresh_token : null;
     const idToken = typeof raw.tokens?.id_token === 'string' ? raw.tokens.id_token : null;
@@ -146,16 +155,93 @@ function deriveClaudishCredentialsFromCodex(): CodexOAuthCredentials | null {
   }
 }
 
-function ensureClaudishCredentialsFile(credentials: CodexOAuthCredentials): void {
+async function ensureClaudishCredentialsFileAsync(credentials: CodexOAuthCredentials): Promise<void> {
   const credPath = getClaudishCodexPath();
   const claudishDir = join(homedir(), '.claudish');
-  if (!existsSync(claudishDir)) {
-    mkdirSync(claudishDir, { recursive: true });
+  try {
+    await access(claudishDir);
+  } catch {
+    await mkdir(claudishDir, { recursive: true });
   }
 
-  writeFileSync(credPath, `${JSON.stringify(credentials, null, 2)}\n`, { mode: 0o600 });
+  await writeFile(credPath, `${JSON.stringify(credentials, null, 2)}\n`, { mode: 0o600 });
 }
 
+export async function getOpenAIAuthStatus(): Promise<OpenAIAuthStatus> {
+  const codexDir = join(homedir(), '.codex');
+  const authPath = getCodexAuthPath();
+  const claudishCredPath = getClaudishCodexPath();
+  const installed = existsSync(codexDir) || existsSync(claudishCredPath);
+
+  const defaultStatus: OpenAIAuthStatus = {
+    installed,
+    loggedIn: false,
+    expired: false,
+    authMode: null,
+    accountId: null,
+    lastRefresh: null,
+    accessTokenExpiresAt: null,
+    hasOpenAIApiKey: !!process.env.OPENAI_API_KEY,
+    bridgedFromCodex: false,
+  };
+
+  let raw: RawAuthFile | null = null;
+  if (existsSync(authPath)) {
+    try {
+      raw = JSON.parse(await readFile(authPath, 'utf8')) as RawAuthFile;
+    } catch {
+      raw = null;
+    }
+  }
+
+  const authMode = typeof raw?.auth_mode === 'string' ? raw.auth_mode : null;
+  const lastRefresh = typeof raw?.last_refresh === 'string' ? raw.last_refresh : null;
+  const codexAccessToken = typeof raw?.tokens?.access_token === 'string' ? raw.tokens.access_token : null;
+  const codexRefreshToken = typeof raw?.tokens?.refresh_token === 'string' ? raw.tokens.refresh_token : null;
+  const codexIdToken = typeof raw?.tokens?.id_token === 'string' ? raw.tokens.id_token : null;
+  const codexAccountId = typeof raw?.tokens?.account_id === 'string' ? raw.tokens.account_id : null;
+  const hasOpenAIApiKey = defaultStatus.hasOpenAIApiKey
+    || (typeof raw?.OPENAI_API_KEY === 'string' && raw.OPENAI_API_KEY.trim().length > 0);
+
+  let claudishCreds = await readClaudishCredentialsAsync();
+  let bridgedFromCodex = false;
+
+  if (!claudishCreds) {
+    const derivedCreds = await deriveClaudishCredentialsFromCodexAsync();
+    if (derivedCreds) {
+      await ensureClaudishCredentialsFileAsync(derivedCreds);
+      claudishCreds = derivedCreds;
+      bridgedFromCodex = true;
+    }
+  }
+
+  // Also keep the CLIProxyAPI credential file in sync so GPT agents routed
+  // through the local cliproxy sidecar pick up fresh ChatGPT subscription
+  // tokens without a restart. Non-fatal if this fails.
+  try {
+    if (bridgeCodexAuthToCliproxy()) {
+      bridgedFromCodex = true;
+    }
+  } catch { /* non-fatal — cliproxy bridge is best-effort */ }
+
+  const accessTokenExpiresAt = claudishCreds?.expires_at
+    ?? getJwtExpiry(codexAccessToken) ?? getJwtExpiry(codexIdToken);
+  const expired = !!(accessTokenExpiresAt && accessTokenExpiresAt < Date.now());
+
+  return {
+    installed,
+    loggedIn: !!(claudishCreds?.refresh_token),
+    expired,
+    authMode,
+    accountId: claudishCreds?.account_id ?? codexAccountId,
+    lastRefresh,
+    accessTokenExpiresAt,
+    hasOpenAIApiKey,
+    bridgedFromCodex,
+  };
+}
+
+/** Synchronous variant for CLI-side code. Dashboard server routes should use {@link getOpenAIAuthStatus}. */
 export function getOpenAIAuthStatusSync(): OpenAIAuthStatus {
   const codexDir = join(homedir(), '.codex');
   const authPath = getCodexAuthPath();
@@ -192,26 +278,66 @@ export function getOpenAIAuthStatusSync(): OpenAIAuthStatus {
   const hasOpenAIApiKey = defaultStatus.hasOpenAIApiKey
     || (typeof raw?.OPENAI_API_KEY === 'string' && raw.OPENAI_API_KEY.trim().length > 0);
 
-  let claudishCreds = readClaudishCredentials();
+  // Synchronous helpers (local scope, not exported)
+  function readClaudishCredentialsSync(): CodexOAuthCredentials | null {
+    if (!existsSync(claudishCredPath)) return null;
+    try {
+      const rawCred = JSON.parse(readFileSync(claudishCredPath, 'utf8')) as Partial<CodexOAuthCredentials>;
+      if (
+        typeof rawCred.access_token !== 'string'
+        || typeof rawCred.refresh_token !== 'string'
+        || typeof rawCred.expires_at !== 'number'
+      ) {
+        return null;
+      }
+      return {
+        access_token: rawCred.access_token,
+        refresh_token: rawCred.refresh_token,
+        expires_at: rawCred.expires_at,
+        account_id: typeof rawCred.account_id === 'string' ? rawCred.account_id : undefined,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function deriveClaudishFromCodexSync(): CodexOAuthCredentials | null {
+    if (!existsSync(authPath)) return null;
+    try {
+      const rawFile = JSON.parse(readFileSync(authPath, 'utf8')) as RawAuthFile;
+      const accessToken = typeof rawFile.tokens?.access_token === 'string' ? rawFile.tokens.access_token : null;
+      const refreshToken = typeof rawFile.tokens?.refresh_token === 'string' ? rawFile.tokens.refresh_token : null;
+      const idToken = typeof rawFile.tokens?.id_token === 'string' ? rawFile.tokens.id_token : null;
+      const accountId = typeof rawFile.tokens?.account_id === 'string' ? rawFile.tokens.account_id : undefined;
+      const expiresAt = getJwtExpiry(accessToken) ?? getJwtExpiry(idToken);
+      if (!accessToken || !refreshToken || !expiresAt) return null;
+      return { access_token: accessToken, refresh_token: refreshToken, expires_at: 0, account_id: accountId };
+    } catch {
+      return null;
+    }
+  }
+
+  let claudishCreds = readClaudishCredentialsSync();
   let bridgedFromCodex = false;
 
   if (!claudishCreds) {
-    const derivedCreds = deriveClaudishCredentialsFromCodex();
-    if (derivedCreds) {
-      ensureClaudishCredentialsFile(derivedCreds);
-      claudishCreds = derivedCreds;
+    const derived = deriveClaudishFromCodexSync();
+    if (derived) {
+      const claudishDir = join(homedir(), '.claudish');
+      if (!existsSync(claudishDir)) {
+        mkdirSync(claudishDir, { recursive: true });
+      }
+      writeFileSync(claudishCredPath, `${JSON.stringify(derived, null, 2)}\n`, { mode: 0o600 });
+      claudishCreds = derived;
       bridgedFromCodex = true;
     }
   }
 
-  // Also keep the CLIProxyAPI credential file in sync so GPT agents routed
-  // through the local cliproxy sidecar pick up fresh ChatGPT subscription
-  // tokens without a restart. Non-fatal if this fails.
   try {
     if (bridgeCodexAuthToCliproxy()) {
       bridgedFromCodex = true;
     }
-  } catch { /* non-fatal — cliproxy bridge is best-effort */ }
+  } catch { /* non-fatal */ }
 
   const accessTokenExpiresAt = claudishCreds?.expires_at
     ?? getJwtExpiry(codexAccessToken) ?? getJwtExpiry(codexIdToken);
@@ -230,6 +356,3 @@ export function getOpenAIAuthStatusSync(): OpenAIAuthStatus {
   };
 }
 
-export async function getOpenAIAuthStatus(): Promise<OpenAIAuthStatus> {
-  return getOpenAIAuthStatusSync();
-}

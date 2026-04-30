@@ -261,7 +261,7 @@ export async function handleStuckAgent(
 
   // Attempt recovery
   try {
-    const recovered = recoverAgent(agentId);
+    const recovered = await recoverAgent(agentId);
     if (recovered) {
       health.status = 'healthy';
       health.recoveryCount++;

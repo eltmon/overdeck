@@ -19,6 +19,7 @@ import {
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import { useConfirm } from '../DialogProvider';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
+import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
 
 interface ZoneBActionStripProps {
   session: SessionNodeType;
@@ -91,23 +92,31 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
       await fetch(`/api/agents/${session.sessionId}`, { method: 'DELETE' });
       const targetIssueId = issueId ?? session.sessionId.replace(/^agent-/, '').toUpperCase();
       const requestBody = { issueId: targetIssueId };
+      let lastRequestBody: Record<string, unknown> = requestBody;
       let res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(lastRequestBody),
       });
-      let data = await res.json().catch(() => ({})) as { error?: string; hint?: string; requiresAcknowledgement?: boolean; guardrails?: { warnings?: Array<{ message: string }> } };
+      let data = await res.json().catch(() => ({})) as { error?: string; hint?: string; blocked?: boolean; requiresAcknowledgement?: boolean; guardrails?: { warnings?: Array<{ message: string }> } };
       if (res.status === 409 && data.requiresAcknowledgement) {
         const confirmed = window.confirm((data.guardrails?.warnings ?? []).map((warning) => `• ${warning.message}`).join('\n'));
         if (!confirmed) throw new Error('Agent start canceled');
+        lastRequestBody = { ...requestBody, guardrailAcknowledged: true };
         res = await fetch('/api/agents', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...requestBody, guardrailAcknowledged: true }),
+          body: JSON.stringify(lastRequestBody),
         });
-        data = await res.json().catch(() => ({})) as { error?: string; hint?: string; guardrails?: { warnings?: Array<{ message: string }> } };
+        data = await res.json().catch(() => ({})) as { error?: string; hint?: string; blocked?: boolean; guardrails?: { warnings?: Array<{ message: string }> } };
       }
-      if (!res.ok) throw new Error(data.error || data.hint || 'Failed to restart agent');
+      if (!res.ok) {
+        if (isCodexBlockedResponse(res, data)) {
+          setPendingCodexSpawn(lastRequestBody);
+          throw new Error(data.hint || data.error || 'Codex authentication expired — re-authenticate to continue');
+        }
+        throw new Error(data.error || data.hint || 'Failed to restart agent');
+      }
       return data;
     },
     onSuccess: async (data) => {

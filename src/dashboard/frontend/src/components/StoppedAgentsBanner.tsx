@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { Play, X, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';
 import { useDashboardStore, selectAgentList } from '../lib/store';
 import { Agent, type StartAgentResponse } from '../types';
+import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
 
 interface RestartResult {
   issueId: string;
@@ -77,10 +78,11 @@ export function StoppedAgentsBanner() {
       if (!agent.issueId) continue;
       try {
         const requestBody = { issueId: agent.issueId };
+        let lastRequestBody: Record<string, unknown> = requestBody;
         let res = await fetch('/api/agents', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
+          body: JSON.stringify(lastRequestBody),
         });
         let data = await res.json().catch(() => ({})) as StartAgentResponse;
         if (res.status === 409 && data.requiresAcknowledgement) {
@@ -89,10 +91,11 @@ export function StoppedAgentsBanner() {
             restartResults.push({ issueId: agent.issueId, success: false, error: 'Agent start canceled' });
             continue;
           }
+          lastRequestBody = { ...requestBody, guardrailAcknowledged: true };
           res = await fetch('/api/agents', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...requestBody, guardrailAcknowledged: true }),
+            body: JSON.stringify(lastRequestBody),
           });
           data = await res.json().catch(() => ({})) as StartAgentResponse;
         }
@@ -102,6 +105,11 @@ export function StoppedAgentsBanner() {
           }
           restartResults.push({ issueId: agent.issueId, success: true });
         } else {
+          if (isCodexBlockedResponse(res, data)) {
+            setPendingCodexSpawn(lastRequestBody);
+            restartResults.push({ issueId: agent.issueId, success: false, error: data.hint || data.error || 'Codex authentication expired — re-authenticate to continue' });
+            continue;
+          }
           restartResults.push({ issueId: agent.issueId, success: false, error: data.error || data.hint || res.statusText });
         }
       } catch (error) {

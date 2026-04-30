@@ -173,7 +173,7 @@ function resolveFiniteNumber(value: string | undefined, fallback: number): numbe
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-async function readGlobalResourceConfig(): Promise<void> {
+export async function readGlobalResourceConfig(): Promise<void> {
   let next = DEFAULT_RESOURCE_CONFIG;
   try {
     await access(GLOBAL_CONFIG_PATH);

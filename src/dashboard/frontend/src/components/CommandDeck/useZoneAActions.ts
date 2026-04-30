@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import type { Agent, Issue, WorkAgentLifecycle, StartAgentResponse } from '../../types';
 import type { ReviewStatus, WorkspaceInfo } from '../inspector/types';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
+import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
 
 interface PlanningState {
   hasPlan: boolean;
@@ -129,23 +130,29 @@ export function useZoneAActions(
       }
 
       const requestBody = { issueId, projectId: issue?.project?.id, message: message || undefined };
+      let lastRequestBody: Record<string, unknown> = requestBody;
       let res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(lastRequestBody),
       });
       let data = await res.json().catch(() => ({})) as StartAgentResponse;
       if (res.status === 409 && data.requiresAcknowledgement) {
         const confirmed = await acknowledgeGuardrailWarnings(data);
         if (!confirmed) throw new Error('Agent start canceled');
+        lastRequestBody = { ...requestBody, guardrailAcknowledged: true };
         res = await fetch('/api/agents', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...requestBody, guardrailAcknowledged: true }),
+          body: JSON.stringify(lastRequestBody),
         });
         data = await res.json().catch(() => ({})) as StartAgentResponse;
       }
       if (!res.ok) {
+        if (isCodexBlockedResponse(res, data)) {
+          setPendingCodexSpawn(lastRequestBody);
+          throw new Error(data.hint || data.error || 'Codex authentication expired — re-authenticate to continue');
+        }
         throw new Error(data.error || data.hint || 'Failed to start agent');
       }
       return data;

@@ -21,6 +21,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
 import { buildTmuxCommandString, buildTmuxArgs, capturePaneAsync, getWindowDimensionsAsync, listSessionNamesAsync, resizeWindowAsync, sessionExistsAsync } from '../../lib/tmux.js';
+import { getReauthSessionToken, invalidateReauthToken } from './routes/codex-auth.js';
 import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
 
 type ClientControlMessage =
@@ -146,6 +147,17 @@ export function setupTerminalWebSocket(server: http.Server): void {
     if (!sessionName) {
       ws.close(1008, 'Session name required');
       return;
+    }
+
+    // Re-auth sessions require a valid one-time token to prevent hijacking.
+    if (sessionName.startsWith('reauth-')) {
+      const token = url.searchParams.get('token');
+      const expected = getReauthSessionToken(sessionName);
+      if (!token || !expected || expected !== token) {
+        ws.close(1008, 'Invalid or missing re-auth token');
+        return;
+      }
+      invalidateReauthToken(sessionName);
     }
 
     console.log(`[ws-terminal] WebSocket connected for session: ${sessionName}`);

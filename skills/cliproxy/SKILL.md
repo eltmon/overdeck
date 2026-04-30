@@ -109,6 +109,61 @@ cat ~/.codex/auth.json | python3 -c "import sys,json; d=json.load(sys.stdin); pr
 # This is done automatically by pan up — or run pan install to re-authenticate
 ```
 
+## Dashboard Re-Auth Flow (PAN-913)
+
+The Panopticon dashboard can trigger interactive Codex re-authentication when
+ChatGPT subscription tokens expire. This avoids requiring the user to run
+`codex login` manually in a terminal.
+
+### Flow
+
+1. **Detection** — Dashboard polls `GET /api/settings/codex-auth` every 2 min.
+   Status can be `valid`, `expired`, `burned`, `missing`, or `unknown`.
+2. **Initiation** — User clicks **Re-authenticate** in Settings or the top banner.
+   Dashboard calls `POST /api/settings/codex-reauth` (idempotent — returns an
+   existing live session if one is already running).
+3. **Terminal login** — Backend spawns a tmux session named `reauth-<uuid>`
+   running `codex login` (or `codex login --device-auth` when headless). The
+   frontend opens `/terminal/<sessionName>?token=<token>` so the user can
+   complete OAuth in a live terminal panel.
+4. **Polling** — Frontend polls `GET /api/settings/codex-reauth/status?session=<name>`
+   every 3 s. The session is considered complete when the tmux pane exits.
+5. **Bridge** — On completion, the backend calls `bridgeCodexAuthToCliproxyAsync()`
+   to rewrite `~/.panopticon/cliproxy/auth/codex-primary.json` from the fresh
+   `~/.codex/auth.json`, then returns the updated auth status.
+6. **Auto-retry** — If an agent spawn was blocked by expired auth, the frontend
+   automatically retries `POST /api/agents` once auth becomes valid.
+
+### Security
+
+- Re-auth session tokens are single-use UUIDs invalidated on the first
+  WebSocket attach (`/ws/terminal?session=reauth-xxx&token=...`).
+- Sessions expire from the in-memory registry after 1 hour.
+- The tmux session name is a random UUID — not guessable.
+
+### API Endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/settings/codex-auth` | Current auth status (`valid`/`expired`/etc.) |
+| `POST` | `/api/settings/codex-reauth` | Spawn (or reuse) a re-auth tmux session |
+| `GET` | `/api/settings/codex-reauth/status?session=<name>` | Poll for completion |
+
+### Manual Fallback
+
+If the dashboard re-auth flow fails, fall back to terminal login:
+
+```bash
+# Interactive login
+codex login
+
+# Headless / device-auth flow
+codex login --device-auth
+
+# Re-bridge into cliproxy format
+node -e "require('./src/lib/cliproxy.js').bridgeCodexAuthToCliproxyAsync().then(console.log)"
+```
+
 ## See Also
 
 - `src/lib/cliproxy.ts` — full lifecycle implementation in Panopticon
