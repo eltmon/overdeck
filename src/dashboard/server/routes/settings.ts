@@ -347,7 +347,7 @@ const postTestApiKeyRoute = HttpRouter.add(
         case 'mimo': {
           const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'mimo-v2.5-pro') : 'mimo-v2.5-pro';
           try {
-            const resp = await fetch('https://api.xiaomimimo.com/anthropic/v1/messages', {
+            const resp = await fetch('https://token-plan-sgp.xiaomimimo.com/anthropic/v1/messages', {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
               body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 128 }),
@@ -524,14 +524,16 @@ const postValidateApiKeyRoute = HttpRouter.add(
         }
 
         case 'mimo': {
+          // MiMo subscription endpoint does not expose /v1/models; validate via a lightweight messages request
           try {
-            const resp = await fetch('https://api.xiaomimimo.com/anthropic/v1/models', {
-              headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01' },
+            const resp = await fetch('https://token-plan-sgp.xiaomimimo.com/anthropic/v1/messages', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${apiKey}`, 'anthropic-version': '2023-06-01', 'Content-Type': 'application/json' },
+              body: JSON.stringify({ model: 'mimo-v2.5-pro', messages: [{ role: 'user', content: 'Hi' }], max_tokens: 1 }),
             });
             if (resp.ok) {
-              const data = await resp.json() as { data?: Array<{ id: string }> };
               valid = true;
-              models = data.data?.map(m => m.id) || ['mimo-v2.5-pro', 'mimo-v2.5'];
+              models = ['mimo-v2.5-pro', 'mimo-v2.5'];
             } else if (resp.status === 401) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {
