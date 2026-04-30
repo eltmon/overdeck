@@ -1943,6 +1943,66 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
   return actions;
 }
 
+/**
+ * Detect issues whose feature branch is merged to main but mergeStatus is stale.
+ * Happens when a merge bypasses the dashboard (manual git merge, direct push, or
+ * deploy script crash). Sets mergeStatus='merged' so the dashboard shows the
+ * correct state and close-out can proceed.
+ */
+const staleMergeReconciled = new Set<string>();
+
+export async function reconcileStaleMergeStatus(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const statuses = loadReviewStatuses();
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if (status.mergeStatus === 'merged') continue;
+      if (staleMergeReconciled.has(issueId)) continue;
+
+      const project = resolveProjectFromIssue(issueId);
+      if (!project) continue;
+
+      const branch = `feature/${issueId.toLowerCase()}`;
+      let isMerged = false;
+
+      // Check 1: regular merge — branch tip is an ancestor of main
+      try {
+        await execFileAsync('git', ['merge-base', '--is-ancestor', branch, 'main'], {
+          cwd: project.projectPath,
+        });
+        isMerged = true;
+      } catch {
+        // Not a regular merge ancestor — try squash-merge detection
+      }
+
+      // Check 2: squash merge — main has a commit referencing the issue ID
+      if (!isMerged) {
+        try {
+          const { stdout } = await execFileAsync(
+            'git', ['log', 'main', '--oneline', '--grep', issueId.toUpperCase(), '-1'],
+            { cwd: project.projectPath },
+          );
+          if (stdout.trim()) isMerged = true;
+        } catch {
+          // git log failed — skip
+        }
+      }
+
+      if (isMerged) {
+        setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
+        staleMergeReconciled.add(issueId);
+        const msg = `Reconciled stale mergeStatus for ${issueId} — branch ${branch} is merged to main`;
+        actions.push(msg);
+        console.log(`[deacon] ${msg}`);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[deacon] Error in reconcileStaleMergeStatus: ${err.message}`);
+  }
+  return actions;
+}
+
 // Track per-issue cooldowns for failed-merge retry to avoid rapid re-queuing
 const failedMergeRetryCooldowns = new Map<string, number>();
 // Track per-issue cooldowns for timeout nudges to avoid spamming the work agent
@@ -3292,6 +3352,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   const failedMergeRetryActions = await checkFailedMergeRetry();
   actions.push(...failedMergeRetryActions);
   for (const a of failedMergeRetryActions) addLog('action', a, state.patrolCycle);
+
+  // Reconcile stale merge status: detect branches merged to main outside the dashboard
+  const staleMergeActions = await reconcileStaleMergeStatus();
+  actions.push(...staleMergeActions);
+  for (const a of staleMergeActions) addLog('action', a, state.patrolCycle);
 
   // Dead-end agent recovery: nudge agents stuck with reviewStatus=blocked/failed after
   // fixing review issues but not re-requesting review. Has 10-min per-issue cooldown and
