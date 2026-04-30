@@ -1073,7 +1073,7 @@ const getWorkspaceRoute = HttpRouter.add(
           existsSync(join(devcontainerPath, 'compose.infra.yml')) ||
           existsSync(devcontainerPath);
 
-        const canContainerize = !hasDocker && existsSync(join(projectPath, 'infra', 'new-feature'));
+        const canContainerize = false;
 
         const agentSession = `agent-${issueLower}`;
         const [git, repoGit, containers, mrUrl, sessionNames, paneOutput] = yield* Effect.promise(() => Promise.all([
