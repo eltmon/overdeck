@@ -686,7 +686,7 @@ async function spawnConversationSession(
 
   const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
   let runtimeCommand = `claude ${permissionFlags}`;
-  const providerEnvExports: string[] = [];
+  let providerExportsStr = '';
   if (model) {
     if (!SAFE_MODEL_PATTERN.test(model)) {
       throw new Error('Invalid model name');
@@ -698,10 +698,7 @@ async function spawnConversationSession(
     if (!runtimeCommand.includes('--permission-mode')) {
       runtimeCommand = `${runtimeCommand} --permission-mode bypassPermissions`;
     }
-    const providerExports = (await getProviderExportsForModel(model)).trim();
-    if (providerExports) {
-      providerEnvExports.push(...providerExports.split('\n').filter(Boolean));
-    }
+    providerExportsStr = (await getProviderExportsForModel(model)).trim();
   }
 
   if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
@@ -716,7 +713,7 @@ async function spawnConversationSession(
       setTerminalEnv: true,
       unsetProviderEnv: true,
       panopticonEnv: issueId ? { issueId } : undefined,
-      extraEnvExports: providerEnvExports,
+      providerExports: providerExportsStr || undefined,
       trapHup: true,
       baseCommand: runtimeCommand,
       resumeSessionId: resume ? claudeSessionId : undefined,
