@@ -1070,11 +1070,10 @@ export async function runParallelReview(
       notes: `Review aborted: reviewer(s) failed or timed out (${failed.join(', ')}). Resubmit to retry.`,
       output: `Review ${reviewId}`,
     };
-    try {
-      await sendFeedbackToWorkAgent(context, abortResult);
-    } catch (err) {
-      console.error(`[review-agent] Failed to send abort feedback to work agent for ${context.issueId} (non-fatal):`, err);
-    }
+    // PAN-918: Do NOT send feedback to the work agent on abort — there are no
+    // actual review findings, only infrastructure failures. Sending "fix ALL
+    // issues" with an empty feedback file causes the work agent to make random
+    // changes. The deacon will re-trigger the review automatically.
     return { result: abortResult, reviewId };
   }
 

@@ -1,4 +1,5 @@
 import { jsonResponse } from "../http-helpers.js";
+import { buildChildEnv } from '../../../lib/child-env.js';
 /**
  * Command Deck route module — Effect HttpRouter.Layer (PAN-428 B13)
  *
@@ -970,7 +971,7 @@ Be specific: reference actual file names, function names, requirement text, disc
   console.log(`[status-review] ${issueId}: generating with ${providerEnvStr}${cliCmd}${modelFlag}`);
 
   try {
-    const env = { ...process.env, ...providerEnv };
+    const env = buildChildEnv(process.env, providerEnv);
     const promptContent = await readFile(promptFile, 'utf-8');
     const { stdout: aiReview } = await execAsync(
       `${cliCmd} -p${modelFlag} --no-session-persistence`,

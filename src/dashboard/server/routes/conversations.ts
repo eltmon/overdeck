@@ -1,4 +1,5 @@
 import { jsonResponse } from "../http-helpers.js";
+import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
 /**
  * Conversations route module — Effect HttpRouter.Layer (PAN-416)
  *
@@ -778,7 +779,7 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
         '--json-schema', schema,
         '--model', 'claude-haiku-4-5-20251001',
       ],
-      { env: { ...process.env, PATH: process.env.PATH } },
+      { env: buildChildEnvWithoutTmux() },
     );
     let out = '';
     let errOut = '';

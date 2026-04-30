@@ -1,6 +1,7 @@
 import { jsonResponse } from "../http-helpers.js";
 import { httpHandler } from "./http-handler.js";
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
 /**
  * Agents route module — Effect HttpRouter.Layer (PAN-428 B7)
  *
@@ -1548,7 +1549,7 @@ const postAgentsRoute = HttpRouter.add(
         const nodeDir = dirname(process.execPath);
         yield* Effect.promise(() => execAsync(
           `pan workspace create ${issueId} --local`,
-          { cwd: projectPath, encoding: 'utf-8', timeout: 60000, env: { ...process.env, PATH: `${nodeDir}:${process.env.PATH}` } }
+          { cwd: projectPath, encoding: 'utf-8', timeout: 60000, env: buildChildEnvWithoutTmux(process.env, { PATH: `${nodeDir}:${process.env.PATH ?? ''}` }) }
         ));
       } catch (wsErr) {
         return jsonResponse({
@@ -2048,7 +2049,7 @@ const postAgentsRoute = HttpRouter.add(
                   const containerChild = spawn('./dev', ['all'], {
                     cwd: workspacePath,
                     stdio: 'ignore',
-                    env: { ...process.env, UID: String(containerUid), GID: String(containerGid), DOCKER_USER: `${containerUid}:${containerGid}` },
+                    env: buildChildEnvWithoutTmux(process.env, { UID: String(containerUid), GID: String(containerGid), DOCKER_USER: `${containerUid}:${containerGid}` }),
                     detached: true,
                   });
                   containerChild.unref();
