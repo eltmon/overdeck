@@ -135,6 +135,9 @@ let cachedHealth: SystemHealthSnapshot | null = null;
 let cacheExpiresAt = 0;
 let inflightRefresh: Promise<SystemHealthSnapshot> | null = null;
 let previousSeverity: SystemHealthSeverity | null = null;
+let candidateSeverity: SystemHealthSeverity | null = null;
+let candidateCount = 0;
+const HYSTERESIS_POLLS = 3;
 let eventStorePromise: Promise<ReturnType<typeof initEventStore>> | null = null;
 let cachedResourceConfig = DEFAULT_RESOURCE_CONFIG;
 let cachedPollSeconds = DEFAULT_HEALTH_POLL_SECONDS;
@@ -573,7 +576,7 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
   const loadPerCore1m = Math.round((loadAverage1m / coreCount) * 100) / 100;
   const usedMemoryBytes = Math.max(memory.memTotal - memory.memAvailable, 0);
   const swapUsedBytes = Math.max(memory.swapTotal - memory.swapFree, 0);
-  const overcommitPercent = toPercent(memory.committedAs, memory.commitLimit);
+  const overcommitPercent = toPercent(memory.committedAs, memory.memTotal);
   const leakedSpecialists = buildLeakedSpecialists(snapshot, agents);
   const evaluation = evaluateSeverity(thresholds, {
     availableMemoryBytes: memory.memAvailable,
@@ -593,8 +596,30 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
 
   const sortedAgents = [...agents].sort((a, b) => b.memoryBytes - a.memoryBytes);
 
+  // Hysteresis: require HYSTERESIS_POLLS consecutive polls at a new severity
+  // before actually transitioning. Prevents flapping when metrics hover near thresholds.
+  let effectiveSeverity: SystemHealthSeverity;
+  if (previousSeverity == null) {
+    effectiveSeverity = evaluation.severity;
+  } else if (evaluation.severity === previousSeverity) {
+    candidateSeverity = null;
+    candidateCount = 0;
+    effectiveSeverity = previousSeverity;
+  } else if (evaluation.severity === candidateSeverity) {
+    candidateCount++;
+    effectiveSeverity = candidateCount >= HYSTERESIS_POLLS ? evaluation.severity : previousSeverity;
+    if (effectiveSeverity !== previousSeverity) {
+      candidateSeverity = null;
+      candidateCount = 0;
+    }
+  } else {
+    candidateSeverity = evaluation.severity;
+    candidateCount = 1;
+    effectiveSeverity = previousSeverity;
+  }
+
   const result: SystemHealthSnapshot = {
-    severity: evaluation.severity,
+    severity: effectiveSeverity,
     updatedAt: new Date().toISOString(),
     summary: {
       cpuPercent,
