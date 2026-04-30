@@ -1,5 +1,5 @@
 import { jsonResponse } from "../http-helpers.js";
-import { buildChildEnv, buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
+import { buildChildEnvWithoutTmux, BLANKED_PROVIDER_ENV } from '../../../lib/child-env.js';
 /**
  * Conversations route module — Effect HttpRouter.Layer (PAN-416)
  *
@@ -734,14 +734,17 @@ async function spawnConversationSession(
     // ignore missing stale session
   }
 
-  // Spawn the session — strip inherited provider env vars (ANTHROPIC_BASE_URL,
-  // OPENAI_API_KEY, etc.) so the launcher script's exports are the sole source
-  // of provider configuration. Without this, a globally-configured provider
-  // (e.g. OpenRouter via ANTHROPIC_BASE_URL) leaks into the session and
-  // conflicts with the model-specific config the launcher sets.
+  // Spawn the session — blank out provider env vars (ANTHROPIC_BASE_URL,
+  // ANTHROPIC_API_KEY, etc.) via tmux -e flags so the launcher script's
+  // exports are the sole source of provider configuration. The tmux server
+  // inherits the parent's env and -e can only SET, not UNSET, so we set
+  // provider vars to empty strings to override stale inherited values.
   try {
     await createSessionAsync(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
-      env: buildChildEnv(process.env, { TERM: 'xterm-256color' }),
+      env: {
+        ...BLANKED_PROVIDER_ENV,
+        TERM: 'xterm-256color',
+      },
     });
   } catch (err) {
     if ((err as { code?: string })?.code === 'ENOENT') {

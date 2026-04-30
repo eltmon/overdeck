@@ -59,6 +59,19 @@ export function buildChildEnv(
 }
 
 /**
+ * Provider env vars set to empty strings — for tmux -e overrides.
+ *
+ * tmux -e can only SET vars, not UNSET inherited ones. The tmux server
+ * inherits the parent's env (including stale provider vars like
+ * ANTHROPIC_BASE_URL). Passing these as empty via -e overrides the
+ * server's inherited values. The launcher script's `unset` + `export`
+ * then sets the correct values for the child process.
+ */
+export const BLANKED_PROVIDER_ENV: Record<string, string> = Object.fromEntries(
+  [...PROVIDER_ENV_KEYS].map(k => [k, '']),
+);
+
+/**
  * Variant that strips ONLY tmux/screen artifacts (not provider keys).
  * Use this when the caller will handle provider env separately (e.g. launcher scripts).
  */

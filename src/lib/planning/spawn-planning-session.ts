@@ -27,6 +27,7 @@ import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
 import { getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../agents.js';
 import { generateLauncherScript } from '../launcher-generator.js';
+import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -454,6 +455,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     await ensureTmuxRunning();
     await createSessionAsync(sessionName, workspacePath, `bash '${launcherScript}'`, {
       env: {
+        ...BLANKED_PROVIDER_ENV,
         TERM: 'xterm-256color',
       },
     });

@@ -7,6 +7,7 @@ import { tmpdir } from 'os';
 import { randomUUID } from 'node:crypto';
 import { getPanopticonHome } from './paths.js';
 import { loadConfig, type TmuxConfigMode } from './config-yaml.js';
+import { buildChildEnv } from './child-env.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -79,7 +80,12 @@ async function ensureManagedTmuxDirAsync(): Promise<void> {
 
 function reloadManagedTmuxConfigSync(): void {
   try {
-    execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { stdio: 'ignore' });
+    // Strip provider env vars (ANTHROPIC_BASE_URL, ANTHROPIC_API_KEY, etc.) so
+    // the tmux server doesn't inherit stale provider config. Without this,
+    // every session spawned by the server inherits the parent's env — and tmux
+    // -e can only override, not unset, so stale vars leak through.
+    const cleanEnv = buildChildEnv();
+    execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { stdio: 'ignore', env: cleanEnv });
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { stdio: 'ignore' });
   } catch {
     // If tmux isn't available or the server can't be started yet, callers will
@@ -89,7 +95,8 @@ function reloadManagedTmuxConfigSync(): void {
 
 async function reloadManagedTmuxConfigAsync(): Promise<void> {
   try {
-    await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { encoding: 'utf-8' });
+    const cleanEnv = buildChildEnv();
+    await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { encoding: 'utf-8', env: cleanEnv });
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { encoding: 'utf-8' });
   } catch {
     // If tmux isn't available or the server can't be started yet, callers will

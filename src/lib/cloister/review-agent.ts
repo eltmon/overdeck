@@ -12,6 +12,7 @@ import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
 import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync, isPaneDeadAsync } from '../tmux.js';
+import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agents.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { getModelId, hasOverride } from '../work-type-router.js';
@@ -580,6 +581,7 @@ async function spawnReviewer(
 
   await createSessionAsync(sessionName, packageRoot, `bash ${launcherPath}`, {
     env: {
+      ...BLANKED_PROVIDER_ENV,
       TERM: 'xterm-256color',
       // Mirror the launcher's PANOPTICON_AGENT_ID into the tmux session env so
       // the value is visible to processes that inspect the env-from-tmux path
@@ -1550,6 +1552,7 @@ export async function spawnReviewCoordinatorSession(opts: {
   const command = `bash -lc 'set -o pipefail; ${panBin} review run ${opts.issueId} 2>&1 | tee -a "${logFile}"; status=\${PIPESTATUS[0]}; printf "%s\\n" "$status" > "${exitCodeFile}"; printf "\\n[pan review run exit %s at %s]\\n" "$status" "$(date -Is)" >> "${logFile}"; exit "$status"'`;
   await createSessionAsync(sessionName, opts.workspace, command, {
     env: {
+      ...BLANKED_PROVIDER_ENV,
       PANOPTICON_AGENT_ID: '',
       PANOPTICON_ISSUE_ID: '',
       PANOPTICON_SESSION_TYPE: '',
