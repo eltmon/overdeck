@@ -353,7 +353,7 @@ async function scanWorkspace(workspacesDir: string, workspaceName: string): Prom
     hasPrd: planningEntries.has('PLANNING_PROMPT.md'),
     hasState: planningEntries.has('STATE.md'),
     hasVbrief: planningEntries.has('plan.vbrief.json'),
-    hasBeads: beadsEntries.has('issues.jsonl'),
+    hasBeads: beadsEntries.has('issues.jsonl') || beadsEntries.has('redirect'),
   };
 }
 
@@ -479,8 +479,6 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       const workspace = await scanWorkspace(workspacesDir, entry.name);
       const planningDir = join(workspace.workspacePath, '.planning');
       const planPath = join(planningDir, 'plan.vbrief.json');
-      const beadsPath = join(workspace.workspacePath, '.beads', 'issues.jsonl');
-
       issue.resourceSources.add('workspace');
       issue.resourceDetails.workspacePath = workspace.workspacePath;
       issue.hasPlanning = workspace.hasPlanning;
@@ -492,7 +490,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       }
       if (workspace.hasBeads) {
         issue.resourceSources.add('beads');
-        issue.resourceDetails.beadsPath = beadsPath;
+        issue.resourceDetails.beadsPath = join(workspace.workspacePath, '.beads');
       }
     }));
 

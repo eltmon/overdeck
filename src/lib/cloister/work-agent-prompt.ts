@@ -8,6 +8,7 @@ import { loadConfig } from '../config.js';
 import { createTrackerFromConfig } from '../tracker/factory.js';
 import { NotImplementedError } from '../tracker/interface.js';
 import type { TrackerType } from '../tracker/interface.js';
+import { queryBeadsForIssue } from '../beads-query.js';
 
 export interface WorkAgentPromptContext {
   issueId: string;
@@ -20,7 +21,7 @@ export interface WorkAgentPromptContext {
   trackerContext?: string;
 }
 
-export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
+export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise<string> {
   let beadsTasksStr = '';
   let stitchDesignsStr = '';
   let polyrepoContextStr = '';
@@ -29,7 +30,7 @@ export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
   if (!ctx.skipDynamicContext && ctx.projectRoot) {
     const planningContent = readPlanningContext(ctx.workspacePath);
 
-    const beadsTasks = readBeadsTasks(ctx.workspacePath, ctx.projectRoot, ctx.issueId);
+    const beadsTasks = await readBeadsTasks(ctx.workspacePath, ctx.projectRoot, ctx.issueId);
     if (beadsTasks.length > 0) {
       beadsTasksStr = beadsTasks.join('\n');
     }
@@ -328,65 +329,27 @@ export function extractBeadsIdsFromState(stateContent: string): string[] {
 }
 
 /**
- * Read beads tasks for an issue from both workspace and project root.
- * Uses STATE.md to find the associated beads IDs.
+ * Read beads tasks for an issue from the live Dolt database via `bd list`.
+ * Falls back gracefully to an empty array if bd CLI is unavailable.
  */
-export function readBeadsTasks(
+export async function readBeadsTasks(
   workspacePath: string,
-  projectRoot: string,
+  _projectRoot: string,
   issueId: string
-): string[] {
+): Promise<string[]> {
   const tasks: string[] = [];
-  const normalizedId = issueId.toLowerCase();
 
-  const stateContent = readPlanningContext(workspacePath);
-  const beadsIds = stateContent ? extractBeadsIdsFromState(stateContent) : [];
-
-  // Load vBRIEF AC indexed by item title (lowercase) for per-bead injection
   const acByTitle = buildACLookupByTitle(workspacePath);
 
-  const beadsPaths = [
-    join(workspacePath, '.beads', 'issues.jsonl'),
-    join(projectRoot, '.beads', 'issues.jsonl'),
-  ];
+  const beads = await queryBeadsForIssue(workspacePath, issueId);
 
-  const seenIds = new Set<string>();
+  for (const bead of beads) {
+    tasks.push(`- [${bead.status || 'open'}] ${bead.title} (${bead.id})`);
 
-  for (const beadsPath of beadsPaths) {
-    if (!existsSync(beadsPath)) continue;
-
-    try {
-      const content = readFileSync(beadsPath, 'utf-8');
-      const lines = content.split('\n').filter((line) => line.trim());
-
-      for (const line of lines) {
-        try {
-          const task = JSON.parse(line);
-          if (seenIds.has(task.id)) continue;
-
-          const labels = task.labels || task.tags || [];
-          const isMatch =
-            beadsIds.includes(task.id) ||
-            labels.some((t: string) => t.toLowerCase().includes(normalizedId)) ||
-            task.title?.toLowerCase().includes(normalizedId);
-
-          if (isMatch) {
-            seenIds.add(task.id);
-            tasks.push(`- [${task.status || 'open'}] ${task.title} (${task.id})`);
-
-            // Inject per-bead AC from vBRIEF plan
-            const beadAC = matchBeadToAC(task.title, acByTitle);
-            for (const ac of beadAC) {
-              const check = ac.status === 'completed' ? 'x' : ' ';
-              tasks.push(`  - [${check}] AC: ${ac.title}`);
-            }
-          }
-        } catch {
-          // Skip malformed lines
-        }
-      }
-    } catch {
-      // Skip unreadable files
+    const beadAC = matchBeadToAC(bead.title, acByTitle);
+    for (const ac of beadAC) {
+      const check = ac.status === 'completed' ? 'x' : ' ';
+      tasks.push(`  - [${check}] AC: ${ac.title}`);
     }
   }
 

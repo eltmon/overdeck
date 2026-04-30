@@ -980,6 +980,15 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   saveAgentState(state);
 
+  // Transition issue tracker to "in progress" immediately so Linear reflects reality
+  // while workspace setup continues. Best-effort, don't block agent spawn.
+  // Only for work agents, not planning/specialist agents.
+  if (!options.agentType || options.agentType === 'work-agent') {
+    transitionIssueToInProgress(options.issueId, options.workspace).catch((err) => {
+      console.warn(`[agents] Could not transition ${options.issueId} to in_progress: ${err.message}`);
+    });
+  }
+
   // Build prompt with FPP work if available
   let prompt = options.prompt || '';
 
@@ -1177,14 +1186,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   // Track work in CV
   startWork(agentId, options.issueId);
-
-  // Transition issue tracker to "in progress" (best-effort, don't block agent spawn)
-  // Only for work agents, not planning/specialist agents
-  if (!options.agentType || options.agentType === 'work-agent') {
-    transitionIssueToInProgress(options.issueId, options.workspace).catch((err) => {
-      console.warn(`[agents] Could not transition ${options.issueId} to in_progress: ${err.message}`);
-    });
-  }
 
   // For planner agents, capture SageOx session path after it becomes available
   if (sageoxEnabled && options.phase === 'planning') {

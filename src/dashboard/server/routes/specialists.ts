@@ -65,6 +65,7 @@ import {
 } from '../../../lib/agents.js';
 import { calculateCost, getPricing, type TokenUsage } from '../../../lib/cost.js';
 import { normalizeModelName } from '../../../lib/cost-parsers/jsonl-parser.js';
+import { queryBeadById } from '../../../lib/beads-query.js';
 import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { readWorkspacePlan } from '../../../lib/vbrief/io.js';
 import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
@@ -426,7 +427,8 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
               // Sync bead completion to vBRIEF plan
               try {
-                const updatedItemId = syncBeadStatusToVBrief(beadId, workspacePath, 'completed');
+                const beadData = await queryBeadById(workspacePath, beadId);
+                const updatedItemId = syncBeadStatusToVBrief(beadId, workspacePath, 'completed', beadData?.title);
                 if (updatedItemId) {
                   // Check which tasks are now unblocked and wake the work agent
                   try {

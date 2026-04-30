@@ -89,6 +89,7 @@ import { findPlan, readPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js
 import { criticalPath } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
 import { capturePaneAsync, killSessionAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
+import { queryBeadsForIssue } from '../../../lib/beads-query.js';
 import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
@@ -653,39 +654,17 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
     // No vBRIEF plan — omit checklist
   }
 
-  // Beads task summary from .beads/issues.jsonl (if available)
+  // Beads task summary from live Dolt database via bd CLI
   try {
-    let beadsPath: string | null = null;
-    const workspaceBeadsRedirect = join(workspacePath, '.beads', 'redirect');
-    if (existsSync(workspaceBeadsRedirect)) {
-      const redirectTarget = (await readFile(workspaceBeadsRedirect, 'utf-8')).trim();
-      const resolvedPath = redirectTarget.startsWith('/')
-        ? redirectTarget
-        : join(workspacePath, '.beads', redirectTarget);
-      beadsPath = join(resolvedPath, 'issues.jsonl');
-    }
-    const localBeadsPath = join(workspacePath, '.beads', 'issues.jsonl');
-    if (!beadsPath && existsSync(localBeadsPath)) beadsPath = localBeadsPath;
-
-    if (beadsPath && existsSync(beadsPath)) {
-      const issueLower = issueId.toLowerCase();
-      const beads = (await readFile(beadsPath, 'utf-8'))
-        .split('\n')
-        .filter(l => l.trim())
-        .map(l => {
-          try { return JSON.parse(l); } catch { return null; }
-        })
-        .filter(b => b && b.labels?.some((lbl: string) => lbl.toLowerCase() === issueLower));
-
-      if (beads.length > 0) {
-        lines.push('## Implementation Tasks');
-        lines.push('');
-        for (const bead of beads) {
-          const checked = bead.status === 'closed' ? 'x' : ' ';
-          lines.push(`- [${checked}] ${bead.title.replace(/^[^:]+:\s*/, '')}`);
-        }
-        lines.push('');
+    const beads = await queryBeadsForIssue(workspacePath, issueId);
+    if (beads.length > 0) {
+      lines.push('## Implementation Tasks');
+      lines.push('');
+      for (const bead of beads) {
+        const checked = bead.status === 'closed' ? 'x' : ' ';
+        lines.push(`- [${checked}] ${bead.title.replace(/^[^:]+:\s*/, '')}`);
       }
+      lines.push('');
     }
   } catch {
     // No beads — omit task list

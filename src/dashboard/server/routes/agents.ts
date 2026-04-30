@@ -1767,13 +1767,13 @@ const postAgentsRoute = HttpRouter.add(
 
       const { buildWorkAgentPrompt, getTrackerContext } = yield* Effect.promise(() => import('../../../lib/cloister/work-agent-prompt.js'));
       const trackerContext = yield* Effect.promise(() => getTrackerContext(issueId, workspacePath));
-      const agentPrompt = buildWorkAgentPrompt({
+      const agentPrompt = yield* Effect.promise(() => buildWorkAgentPrompt({
         issueId,
         env: 'REMOTE',
         workspacePath: '/workspace',
         skipDynamicContext: true,
         trackerContext,
-      });
+      }));
 
       const state = yield* Effect.promise(() => spawnRemoteAgent({
         issueId,
