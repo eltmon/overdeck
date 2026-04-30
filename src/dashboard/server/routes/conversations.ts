@@ -714,6 +714,7 @@ async function spawnConversationSession(
       agentType: 'conversation',
       workingDir: cwd,
       setTerminalEnv: true,
+      unsetProviderEnv: true,
       panopticonEnv: issueId ? { issueId } : undefined,
       extraEnvExports: providerEnvExports,
       trapHup: true,
