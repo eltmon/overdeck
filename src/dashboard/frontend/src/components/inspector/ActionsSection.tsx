@@ -48,6 +48,7 @@ interface ActionsSectionProps {
   onViewBeads: () => void;
   onViewVBrief: () => void;
   onViewLog?: () => void;
+  onSwitchModel?: () => void;
   lifecycle?: WorkAgentLifecycle;
   agentLaunchState?: 'starting' | 'resuming' | null;
 }
@@ -82,6 +83,7 @@ export function ActionsSection({
   onViewBeads,
   onViewVBrief,
   onViewLog,
+  onSwitchModel,
   lifecycle,
   agentLaunchState,
 }: ActionsSectionProps) {
@@ -229,6 +231,19 @@ export function ActionsSection({
                 <LayoutGrid className="w-3 h-3 text-muted-foreground opacity-40 self-center" />
               </span>
             </div>
+          )}
+
+          {/* Switch Model — only for work agents with an active/stopped agent */}
+          {agent && onSwitchModel && (
+            <button
+              onClick={onSwitchModel}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent"
+              title="Restart agent with a different model"
+              data-testid="inspector-switch-model"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Switch Model
+            </button>
           )}
 
           {/* Recover failed review/test/merge pipeline */}
