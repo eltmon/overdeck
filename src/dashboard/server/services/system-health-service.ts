@@ -1,6 +1,6 @@
 import { exec } from 'node:child_process';
 import { access, readFile } from 'node:fs/promises';
-import { cpus, homedir } from 'node:os';
+import { cpus, freemem, loadavg, totalmem, homedir, platform } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -237,7 +237,7 @@ function defaultThresholds(): SystemHealthThresholds {
   };
 }
 
-async function readProcMemory(): Promise<ProcMemorySnapshot> {
+async function readProcMemoryLinux(): Promise<ProcMemorySnapshot> {
   const content = await readFile('/proc/meminfo', 'utf-8');
   const values = new Map<string, number>();
 
@@ -257,13 +257,71 @@ async function readProcMemory(): Promise<ProcMemorySnapshot> {
   };
 }
 
+async function readProcMemoryDarwin(): Promise<ProcMemorySnapshot> {
+  const memTotal = totalmem();
+  let memAvailable = freemem();
+  let memFree = freemem();
+
+  try {
+    const { stdout } = await execAsync('vm_stat', { encoding: 'utf-8', timeout: 5_000 });
+    const pageSizeMatch = stdout.match(/page size of (\d+) bytes/);
+    const pageSize = pageSizeMatch ? Number(pageSizeMatch[1]) : 16384;
+
+    const pages = new Map<string, number>();
+    for (const line of stdout.split('\n')) {
+      const m = line.match(/^(.+?):\s+(\d+)\./);
+      if (m) pages.set(m[1]!.trim(), Number(m[2]));
+    }
+
+    const free = (pages.get('Pages free') ?? 0) * pageSize;
+    const inactive = (pages.get('Pages inactive') ?? 0) * pageSize;
+    const speculative = (pages.get('Pages speculative') ?? 0) * pageSize;
+    memFree = free;
+    memAvailable = free + inactive + speculative;
+  } catch { /* fall back to os.freemem() values set above */ }
+
+  let swapTotal = 0;
+  let swapFree = 0;
+  try {
+    const { stdout } = await execAsync('sysctl -n vm.swapusage', { encoding: 'utf-8', timeout: 5_000 });
+    const totalMatch = stdout.match(/total\s*=\s*([\d.]+)M/);
+    const usedMatch = stdout.match(/used\s*=\s*([\d.]+)M/);
+    if (totalMatch) swapTotal = parseFloat(totalMatch[1] ?? '0') * 1024 * KB;
+    if (totalMatch && usedMatch) swapFree = swapTotal - parseFloat(usedMatch[1] ?? '0') * 1024 * KB;
+  } catch { /* swap stats unavailable */ }
+
+  return {
+    memTotal,
+    memAvailable,
+    memFree,
+    swapTotal,
+    swapFree,
+    committedAs: 0,
+    commitLimit: 0,
+  };
+}
+
+async function readProcMemory(): Promise<ProcMemorySnapshot> {
+  return platform() === 'darwin' ? readProcMemoryDarwin() : readProcMemoryLinux();
+}
+
 async function readLoadAverage(): Promise<number> {
+  if (platform() === 'darwin') {
+    const load = loadavg()[0] ?? 0;
+    return Number.isFinite(load) ? load : 0;
+  }
   const content = await readFile('/proc/loadavg', 'utf-8');
   const load = Number((content.trim().split(/\s+/)[0] ?? '0').trim());
   return Number.isFinite(load) ? load : 0;
 }
 
 async function readCpuPercent(): Promise<number> {
+  if (platform() === 'darwin') {
+    const coreCount = Math.max(cpus().length, 1);
+    const load = loadavg()[0] ?? 0;
+    return Math.round(Math.min(load / coreCount, 1) * 1000) / 10;
+  }
+
   const content = await readFile('/proc/stat', 'utf-8');
   const cpuLine = content.split('\n').find((line) => line.startsWith('cpu '));
   if (!cpuLine) return 0;

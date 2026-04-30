@@ -4,6 +4,7 @@ import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import {
   isCliproxyRunningAsync,
+  isCliproxyInstalled,
   restartCliproxyAsync,
   readPidFile,
 } from '../../../lib/cliproxy.js';
@@ -30,15 +31,26 @@ async function refreshStatus(): Promise<void> {
 
 // ─── Watchdog ─────────────────────────────────────────────────────────────────
 
+const INSTALL_RETRY_COOLDOWN_MS = 5 * 60_000;
+
 /** Start a background interval that checks CLIProxy health every 30s and
  *  auto-restarts it if it went down. */
 export function startCliproxyWatchdog(): void {
   const intervalMs = 30_000;
+  let lastInstallAttemptAt = 0;
+  let tickInFlight = false;
 
   async function tick(): Promise<void> {
+    if (tickInFlight) return;
+    tickInFlight = true;
     try {
       await refreshStatus();
       if (!lastStatus?.running) {
+        const now = Date.now();
+        if (!isCliproxyInstalled() && now - lastInstallAttemptAt < INSTALL_RETRY_COOLDOWN_MS) {
+          return;
+        }
+        if (!isCliproxyInstalled()) lastInstallAttemptAt = now;
         console.log('[cliproxy-watchdog] CLIProxy is down, attempting auto-restart...');
         await restartCliproxyAsync();
         await refreshStatus();
@@ -50,6 +62,8 @@ export function startCliproxyWatchdog(): void {
       }
     } catch (err) {
       console.error('[cliproxy-watchdog] Error during health check:', err);
+    } finally {
+      tickInFlight = false;
     }
   }
 

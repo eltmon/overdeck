@@ -337,6 +337,42 @@ export function installCliproxy(force = false): void {
   } catch { /* non-fatal */ }
 }
 
+/**
+ * Async variant of installCliproxy — safe for the event loop.
+ * Uses execAsync instead of execSync so it won't block the dashboard server.
+ */
+export async function installCliproxyAsync(force = false): Promise<void> {
+  ensureDirs();
+  if (!force && isCliproxyInstalled()) return;
+
+  const asset = detectPlatformAsset();
+  if (!asset) {
+    throw new Error(
+      `CLIProxyAPI does not publish a prebuilt binary for ${process.platform}/${process.arch}. `
+      + `GPT subscription routing is currently supported on linux and darwin (amd64/arm64) only.`,
+    );
+  }
+
+  const url = `https://github.com/router-for-me/CLIProxyAPI/releases/download/${CLIPROXY_RELEASE_VERSION}/${asset.archive}`;
+  const tmpDir = join(getCliproxyDir(), 'tmp');
+  if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
+  const archivePath = join(tmpDir, asset.archive);
+
+  await execAsync(`curl -sSL -o "${archivePath}" "${url}"`, { timeout: 60_000 });
+  await execAsync(`tar -xzf "${archivePath}" -C "${tmpDir}"`, { timeout: 10_000 });
+
+  const extracted = join(tmpDir, 'cli-proxy-api');
+  if (!existsSync(extracted)) {
+    throw new Error(`cliproxy archive did not contain expected cli-proxy-api binary`);
+  }
+
+  const target = getCliproxyBinary();
+  await execAsync(`install -m 0755 "${extracted}" "${target}"`, { timeout: 10_000 });
+  try {
+    await execAsync(`rm -rf "${tmpDir}"`, { timeout: 10_000 });
+  } catch { /* non-fatal */ }
+}
+
 export function readPidFile(): number | null {
   const pidPath = getCliproxyPidPath();
   if (!existsSync(pidPath)) return null;
@@ -495,7 +531,7 @@ export async function stopCliproxyAsync(): Promise<void> {
 }
 
 /** Async variant of startCliproxy — safe for the event loop.
- *  Throws if cliproxy is not installed (does not perform blocking install). */
+ *  Auto-installs cliproxy if missing (non-blocking download). */
 export async function startCliproxyAsync(): Promise<void> {
   ensureDirs();
   ensureConfigFile();
@@ -504,9 +540,7 @@ export async function startCliproxyAsync(): Promise<void> {
   if (await isCliproxyRunningAsync()) return;
 
   if (!isCliproxyInstalled()) {
-    throw new Error(
-      'CLIProxy is not installed. Run `pan up` from the CLI to install it.',
-    );
+    await installCliproxyAsync();
   }
 
   const bin = getCliproxyBinary();
