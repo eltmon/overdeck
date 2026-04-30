@@ -253,21 +253,20 @@ const gitlabForgeAdapter: ForgeAdapter = {
     const existing = await getExistingGitLabArtifact(input.sourceBranch, input.cwd, input.repository);
     if (existing) return existing;
 
-    return withBodyFile(input.body, 'pan-gl-mr-body', async (bodyFile) => {
-      const bodyFlag = bodyFile ? ` --description-file "${bodyFile}"` : '';
-      const { stdout } = await execAsync(
-        `glab mr create --source-branch ${input.sourceBranch} --target-branch ${input.targetBranch} --title "${input.title}"${bodyFlag}${buildRepositoryFlag(input.repository)}`,
-        { cwd: input.cwd, encoding: 'utf-8' }
-      );
-      const url = stdout.trim().split('\n').pop()?.trim() || stdout.trim();
-      const created = await getExistingGitLabArtifact(input.sourceBranch, input.cwd, input.repository);
-      return {
-        forge: 'gitlab',
-        created: true,
-        url,
-        id: created?.id,
-      };
-    });
+    const bodyEnv = input.body ? { PAN_MR_BODY: input.body } : {};
+    const bodyFlag = input.body ? ' --description "$PAN_MR_BODY"' : '';
+    const { stdout } = await execAsync(
+      `glab mr create --source-branch ${input.sourceBranch} --target-branch ${input.targetBranch} --title "${input.title}"${bodyFlag}${buildRepositoryFlag(input.repository)}`,
+      { cwd: input.cwd, encoding: 'utf-8', env: { ...process.env, ...bodyEnv }, shell: '/bin/bash' }
+    );
+    const url = stdout.trim().split('\n').pop()?.trim() || stdout.trim();
+    const created = await getExistingGitLabArtifact(input.sourceBranch, input.cwd, input.repository);
+    return {
+      forge: 'gitlab',
+      created: true,
+      url,
+      id: created?.id,
+    };
   },
 
   async mergeReviewArtifact(input) {

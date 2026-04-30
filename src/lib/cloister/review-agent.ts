@@ -1546,7 +1546,8 @@ export async function spawnReviewCoordinatorSession(opts: {
   const logStem = `${opts.issueId}-${Date.now()}`;
   const logFile = join(logDir, `${logStem}.log`);
   const exitCodeFile = join(logDir, `${logStem}.exit`);
-  const command = `bash -lc 'set -o pipefail; pan review run ${opts.issueId} 2>&1 | tee -a "${logFile}"; status=\${PIPESTATUS[0]}; printf "%s\\n" "$status" > "${exitCodeFile}"; printf "\\n[pan review run exit %s at %s]\\n" "$status" "$(date -Is)" >> "${logFile}"; exit "$status"'`;
+  const panBin = join(dirname(process.execPath), 'pan');
+  const command = `bash -lc 'set -o pipefail; ${panBin} review run ${opts.issueId} 2>&1 | tee -a "${logFile}"; status=\${PIPESTATUS[0]}; printf "%s\\n" "$status" > "${exitCodeFile}"; printf "\\n[pan review run exit %s at %s]\\n" "$status" "$(date -Is)" >> "${logFile}"; exit "$status"'`;
   await createSessionAsync(sessionName, opts.workspace, command, {
     env: {
       PANOPTICON_AGENT_ID: '',
