@@ -23,7 +23,7 @@ import {
 */
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState, type StartAgentResponse } from '../types';
 import { getFriendlyModelName } from './inspector/utils';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText, Pause } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText, Pause, RefreshCw} from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
@@ -2327,11 +2327,19 @@ export function DivergedBadge({ issueIdentifier, stuckReason, stuckDetails }: { 
  * endpoint, which skips the git-safe-state check for this reason and opens a
  * fresh recovery cycle.
  */
-export function ReviewInfraStuckBadge({ issueIdentifier, retries }: { issueIdentifier: string; retries: number }) {
+export function ReviewInfraStuckBadge({ issueIdentifier, retries, recoveryStartedAt }: { issueIdentifier: string; retries: number; recoveryStartedAt?: string }) {
   const [unstickError, setUnstickError] = useState<string | null>(null);
+
+  const recoveryAge = recoveryStartedAt
+    ? Math.floor((Date.now() - new Date(recoveryStartedAt).getTime()) / 60_000)
+    : undefined;
+  const recoveryAgeLabel = recoveryAge != null
+    ? recoveryAge >= 60 ? `${Math.floor(recoveryAge / 60)}h ${recoveryAge % 60}m` : `${recoveryAge}m`
+    : undefined;
 
   const titleText =
     `Review infrastructure failed after ${retries} retries (spawn/dispatch issue). ` +
+    (recoveryAgeLabel ? `Recovery cycle running for ${recoveryAgeLabel}. ` : '') +
     `Parallel review is paused — click Retry to open a fresh recovery cycle.`;
 
   return (
@@ -2341,7 +2349,7 @@ export function ReviewInfraStuckBadge({ issueIdentifier, retries }: { issueIdent
         title={titleText}
       >
         <XCircle className="w-3 h-3" />
-        Review stuck
+        Review stuck{recoveryAgeLabel && <span className="text-amber-400/80 ml-0.5">({recoveryAgeLabel})</span>}
         <button
           className="ml-1 underline text-amber-100 hover:text-foreground text-xs leading-none"
           onClick={async (e) => {
@@ -2532,6 +2540,29 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   const reviewStatus = useDashboardStore(selectReviewStatus(issue.identifier || ''));
   const isMerged = reviewStatus?.mergeStatus === 'merged' || issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged');
   const isReadyToMerge = !isMerged && reviewStatus?.readyForMerge === true;
+
+  // PAN-796: toast on pipeline recovery events
+  const prevStuckRef = useRef(reviewStatus?.stuck);
+  const prevAutoRequeueRef = useRef(reviewStatus?.autoRequeueCount);
+  useEffect(() => {
+    const id = issue.identifier || '';
+    if (!id) return;
+    const wasStuck = prevStuckRef.current;
+    const prevRequeue = prevAutoRequeueRef.current ?? 0;
+    const nowStuck = reviewStatus?.stuck;
+    const nowRequeue = reviewStatus?.autoRequeueCount ?? 0;
+    prevStuckRef.current = nowStuck;
+    prevAutoRequeueRef.current = nowRequeue;
+    if (!wasStuck && nowStuck && reviewStatus?.stuckReason === 'review_infrastructure_failure') {
+      toast.error(`${id}: Review circuit breaker tripped after ${reviewStatus.reviewRetryCount ?? 0} retries`, { duration: 8000 });
+    }
+    if (wasStuck && !nowStuck) {
+      toast.success(`${id}: Review pipeline recovered`, { duration: 5000 });
+    }
+    if (nowRequeue > prevRequeue && nowRequeue > 0 && !nowStuck) {
+      toast.warning(`${id}: Auto-requeued (${nowRequeue}/7)`, { duration: 5000 });
+    }
+  }, [reviewStatus?.stuck, reviewStatus?.autoRequeueCount, reviewStatus?.stuckReason, reviewStatus?.reviewRetryCount, issue.identifier]);
 
   // Determine which agent is relevant based on issue status
   const activeAgent = workAgent;
@@ -3165,7 +3196,42 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               <ReviewInfraStuckBadge
                 issueIdentifier={issue.identifier || ''}
                 retries={reviewStatus.reviewRetryCount ?? 0}
+                recoveryStartedAt={reviewStatus.recoveryStartedAt}
               />
+            )}
+            {/* PAN-796: per-role review sub-status dots during active review */}
+            {reviewStatus?.reviewStatus === 'reviewing' && reviewStatus.reviewSubStatuses && Object.keys(reviewStatus.reviewSubStatuses).length > 0 && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-blue-900/50 text-blue-200 border border-blue-500/40"
+                title={Object.entries(reviewStatus.reviewSubStatuses).map(([role, st]) => `${role}: ${st}`).join(', ')}
+              >
+                {Object.entries(reviewStatus.reviewSubStatuses).map(([role, st]) => (
+                  <span key={role} className="flex items-center gap-0.5" title={`${role}: ${st}`}>
+                    <span className={`w-2 h-2 rounded-full ${st === 'done' ? 'bg-green-400' : 'bg-blue-400 animate-pulse'}`} />
+                    <span className="text-[10px]">{role.slice(0, 3)}</span>
+                  </span>
+                ))}
+              </span>
+            )}
+            {/* PAN-796: auto-requeue count badge (shown during active recovery, not when stuck — stuck has its own badge) */}
+            {!reviewStatus?.stuck && (reviewStatus?.autoRequeueCount ?? 0) > 0 && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-orange-900/50 text-orange-200 border border-orange-500/40"
+                title={`Auto-requeued ${reviewStatus!.autoRequeueCount} time(s) — circuit breaker at 7`}
+              >
+                <RefreshCw className="w-3 h-3" />
+                {reviewStatus!.autoRequeueCount}/7
+              </span>
+            )}
+            {/* PAN-796: test retry count badge */}
+            {(reviewStatus?.testRetryCount ?? 0) > 0 && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-orange-900/50 text-orange-200 border border-orange-500/40"
+                title={`Test dispatch retried ${reviewStatus!.testRetryCount} time(s)`}
+              >
+                <RotateCcw className="w-3 h-3" />
+                Tests: {reviewStatus!.testRetryCount}
+              </span>
             )}
             {/* Diverged / stuck badge — shown when gitPush threw MainDivergedError */}
             {reviewStatus?.stuck && reviewStatus.stuckReason !== 'review_infrastructure_failure' && (
