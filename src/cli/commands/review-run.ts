@@ -16,8 +16,8 @@
  */
 
 import chalk from 'chalk';
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync, readdirSync } from 'fs';
+import { basename, join } from 'path';
 import { promisify } from 'util';
 import { exec } from 'child_process';
 import {
@@ -27,6 +27,7 @@ import {
   type ReviewContext,
 } from '../../lib/cloister/review-agent.js';
 import { setReviewStatus } from '../../lib/review-status.js';
+import { findProjectByPath } from '../../lib/projects.js';
 
 const execAsync = promisify(exec);
 
@@ -37,41 +38,118 @@ interface ReviewRunOptions {
   filesChanged?: string;
 }
 
+function resolvePolyrepoGitDirs(workspacePath: string): string[] {
+  const gitDirs: string[] = [];
+  try {
+    const entries = readdirSync(workspacePath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && !entry.name.startsWith('.') && existsSync(join(workspacePath, entry.name, '.git'))) {
+        gitDirs.push(join(workspacePath, entry.name));
+      }
+    }
+  } catch {}
+  return gitDirs;
+}
+
+async function detectPrUrlForRepo(repoDir: string): Promise<string | null> {
+  // Try GitHub
+  try {
+    const { stdout } = await execAsync('gh pr view --json url -q .url', { cwd: repoDir });
+    if (stdout.trim()) return stdout.trim();
+  } catch {}
+
+  // Try GitLab
+  try {
+    const { stdout } = await execAsync("glab mr view --output json | jq -r '.web_url'", { cwd: repoDir });
+    if (stdout.trim() && stdout.trim() !== 'null') return stdout.trim();
+  } catch {}
+
+  return null;
+}
+
 export async function reviewRunCommand(
   id: string,
   opts: ReviewRunOptions = {},
 ): Promise<void> {
   const issueId = id.toUpperCase();
   const cwd = opts.cwd ?? process.cwd();
-
-  if (!existsSync(join(cwd, '.git'))) {
-    console.error(chalk.red(`\nError: ${cwd} is not a git repo.`));
-    console.error(chalk.dim('`pan review run` must be invoked inside the workspace directory.'));
-    process.exit(2);
-  }
+  const projectConfig = findProjectByPath(cwd);
+  const isPolyrepo = projectConfig?.workspace?.type === 'polyrepo';
 
   console.log(chalk.cyan(`\n▶ pan review run ${issueId}`));
   console.log(chalk.dim(`  workspace: ${cwd}`));
+  if (isPolyrepo) console.log(chalk.dim(`  type:      polyrepo`));
 
-  const branch = opts.branch ?? (await detectBranch(cwd));
-  if (!branch) {
-    console.error(chalk.red('\nError: could not detect current git branch.'));
-    process.exit(2);
+  let branch: string | null;
+  let prUrl: string | null;
+  let filesChanged: string[];
+
+  if (isPolyrepo) {
+    const gitDirs = resolvePolyrepoGitDirs(cwd);
+    if (gitDirs.length === 0) {
+      console.error(chalk.red('\nError: polyrepo workspace has no code repos with .git'));
+      process.exit(2);
+    }
+
+    branch = opts.branch ?? (await detectBranch(gitDirs[0]));
+    if (!branch) {
+      console.error(chalk.red('\nError: could not detect git branch from code repos.'));
+      process.exit(2);
+    }
+    console.log(chalk.dim(`  branch:    ${branch}`));
+
+    prUrl = opts.prUrl ?? null;
+    if (!prUrl) {
+      for (const dir of gitDirs) {
+        prUrl = await detectPrUrlForRepo(dir);
+        if (prUrl) break;
+      }
+    }
+    if (!prUrl) {
+      console.error(chalk.red('\nError: could not detect PR/MR URL from any code repo.'));
+      console.error(chalk.dim('Open a PR/MR first, then retry.'));
+      process.exit(2);
+    }
+    console.log(chalk.dim(`  PR:        ${prUrl}`));
+
+    if (opts.filesChanged) {
+      filesChanged = opts.filesChanged.split(',').map(s => s.trim()).filter(Boolean);
+    } else {
+      filesChanged = [];
+      for (const dir of gitDirs) {
+        const repoFiles = await detectFilesChanged(dir);
+        const repoName = basename(dir);
+        filesChanged.push(...repoFiles.map(f => `${repoName}/${f}`));
+      }
+    }
+    console.log(chalk.dim(`  files:     ${filesChanged.length} changed across ${gitDirs.length} repos`));
+  } else {
+    if (!existsSync(join(cwd, '.git'))) {
+      console.error(chalk.red(`\nError: ${cwd} is not a git repo.`));
+      console.error(chalk.dim('`pan review run` must be invoked inside the workspace directory.'));
+      process.exit(2);
+    }
+
+    branch = opts.branch ?? (await detectBranch(cwd));
+    if (!branch) {
+      console.error(chalk.red('\nError: could not detect current git branch.'));
+      process.exit(2);
+    }
+    console.log(chalk.dim(`  branch:    ${branch}`));
+
+    prUrl = opts.prUrl ?? (await detectPrUrl(cwd));
+    if (!prUrl) {
+      console.error(chalk.red('\nError: could not detect PR URL for the current branch.'));
+      console.error(chalk.dim('Open a PR first (gh pr create), then retry.'));
+      process.exit(2);
+    }
+    console.log(chalk.dim(`  PR:        ${prUrl}`));
+
+    filesChanged = opts.filesChanged
+      ? opts.filesChanged.split(',').map(s => s.trim()).filter(Boolean)
+      : await detectFilesChanged(cwd);
+    console.log(chalk.dim(`  files:     ${filesChanged.length} changed`));
   }
-  console.log(chalk.dim(`  branch:    ${branch}`));
-
-  const prUrl = opts.prUrl ?? (await detectPrUrl(cwd));
-  if (!prUrl) {
-    console.error(chalk.red('\nError: could not detect PR URL for the current branch.'));
-    console.error(chalk.dim('Open a PR first (gh pr create), then retry.'));
-    process.exit(2);
-  }
-  console.log(chalk.dim(`  PR:        ${prUrl}`));
-
-  const filesChanged = opts.filesChanged
-    ? opts.filesChanged.split(',').map(s => s.trim()).filter(Boolean)
-    : await detectFilesChanged(cwd);
-  console.log(chalk.dim(`  files:     ${filesChanged.length} changed`));
 
   const agents = getReviewAgents();
   console.log(chalk.dim(`  reviewers: ${agents.map(a => a.name).join(', ')}`));
