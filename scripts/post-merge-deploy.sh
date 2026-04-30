@@ -33,6 +33,17 @@ if ! flock -x -n 9; then
 fi
 
 log "Starting post-merge deploy for issue=$ISSUE_ID branch=$SOURCE_BRANCH reason=$REASON"
+log "Repo root (raw): $REPO_ROOT"
+
+# If REPO_ROOT points inside a workspace, resolve to the main repo.
+# Workspace paths look like: /path/to/repo/workspaces/feature-pan-123
+# Without this, the build and npm link run from the workspace, hijacking
+# the global `pan` CLI to point at stale workspace code.
+if [[ "$REPO_ROOT" =~ (.+)/workspaces/feature-[^/]+$ ]]; then
+  REPO_ROOT="${BASH_REMATCH[1]}"
+  log "Resolved workspace path to main repo: $REPO_ROOT"
+fi
+
 log "Repo root: $REPO_ROOT"
 
 cd "$REPO_ROOT"
