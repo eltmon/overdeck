@@ -406,6 +406,22 @@ program
       }
     }
 
+    // Ensure tmux is installed — required for all agent/conversation sessions
+    {
+      const { isToolInstalled, installTool } = await import('../lib/prereqs/registry.js');
+      if (!(await isToolInstalled('tmux'))) {
+        console.log(chalk.yellow('  tmux is required but not found. Installing...'));
+        const result = await installTool('tmux');
+        if (result.success) {
+          console.log(chalk.green(`  ✓ ${result.message}`));
+        } else {
+          console.error(chalk.red(`  ✗ Failed to install tmux: ${result.message}`));
+          console.error(chalk.dim('  Install manually: brew install tmux (macOS) or sudo apt-get install tmux (Linux)'));
+          process.exit(1);
+        }
+      }
+    }
+
     // Regenerate Traefik dynamic config and ensure DNS
     if (traefikEnabled && !options.skipTraefik) {
       try {

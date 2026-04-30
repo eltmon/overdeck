@@ -1,5 +1,5 @@
 import { jsonResponse } from "../http-helpers.js";
-import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
+import { buildChildEnv, buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
 /**
  * Conversations route module — Effect HttpRouter.Layer (PAN-416)
  *
@@ -734,12 +734,23 @@ async function spawnConversationSession(
     // ignore missing stale session
   }
 
-  // Spawn the session
-  await createSessionAsync(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
-    env: {
-      TERM: 'xterm-256color',
-    },
-  });
+  // Spawn the session — strip inherited provider env vars (ANTHROPIC_BASE_URL,
+  // OPENAI_API_KEY, etc.) so the launcher script's exports are the sole source
+  // of provider configuration. Without this, a globally-configured provider
+  // (e.g. OpenRouter via ANTHROPIC_BASE_URL) leaks into the session and
+  // conflicts with the model-specific config the launcher sets.
+  try {
+    await createSessionAsync(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
+      env: buildChildEnv(process.env, { TERM: 'xterm-256color' }),
+    });
+  } catch (err) {
+    if ((err as { code?: string })?.code === 'ENOENT') {
+      throw new Error(
+        'tmux is not installed. Install it with: brew install tmux (macOS) or sudo apt-get install tmux (Linux)',
+      );
+    }
+    throw err;
+  }
 
   // Keep session alive when clients disconnect
   await setOptionAsync(tmuxSession, 'destroy-unattached', 'off');
@@ -1013,7 +1024,7 @@ const postConversationRoute = HttpRouter.add(
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] create conversation failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+        return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -1129,7 +1140,7 @@ const postConversationResumeRoute = HttpRouter.add(
       }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] resume conversation failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+        return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
         }})
   }),
 );
@@ -1197,7 +1208,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] switch model failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+        return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
       }
     });
   }),

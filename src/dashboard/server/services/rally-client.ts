@@ -128,21 +128,98 @@ export const RallyClientLive = Layer.effect(
   }),
 );
 
+let _rallyClientImpl: RallyClientShape | null = null;
+let _rallyClientConfigKey: string | null = null;
+
+function getRallyClient(): RallyClientShape {
+  const config = getRallyConfig();
+  if (!config) {
+    const fail = Effect.fail(new TrackerNotConfigured({ tracker: 'rally' }));
+    return {
+      getIssue: () => fail,
+      updateState: () => fail,
+      addComment: () => fail,
+    };
+  }
+  const configKey = `${config.server}:${config.workspace}:${config.project}:${config.apiKey.slice(-4)}`;
+  if (_rallyClientConfigKey !== configKey) {
+    _rallyClientConfigKey = configKey;
+    // Rebuild impl synchronously — RallyTracker is lazy-loaded inside makeRallyClientImpl
+    _rallyClientImpl = null; // Will be set by makeRallyClientImpl if we had one
+    // Since RallyClientLive uses dynamic import and Layer.effect, we fall back to
+    // creating a minimal impl here. For simplicity, delegate to the Layer on each call.
+  }
+  // Return a proxy that delegates to RallyClientLive evaluation each call.
+  // Since we can't easily re-evaluate the Layer here, we create an inline impl.
+  return {
+    getIssue: (id) =>
+      Effect.gen(function* () {
+        const { RallyTracker } = yield* Effect.promise(() => import('../../../lib/tracker/rally.js'));
+        const tracker = new RallyTracker({
+          apiKey: config.apiKey,
+          server: config.server,
+          workspace: config.workspace,
+          project: config.project,
+        });
+        const raw = yield* Effect.tryPromise({
+          try: () => tracker.getIssue(id),
+          catch: (err) => wrapRallyError(err),
+        });
+        return {
+          id: raw.id,
+          ref: raw.ref,
+          title: raw.title,
+          description: raw.description,
+          url: raw.url,
+          state: raw.state,
+          labels: raw.labels,
+        } satisfies RallyIssue;
+      }),
+
+    updateState: (id, state) =>
+      Effect.gen(function* () {
+        const { RallyTracker } = yield* Effect.promise(() => import('../../../lib/tracker/rally.js'));
+        const tracker = new RallyTracker({
+          apiKey: config.apiKey,
+          server: config.server,
+          workspace: config.workspace,
+          project: config.project,
+        });
+        yield* Effect.tryPromise({
+          try: () => tracker.transitionIssue(id, state),
+          catch: (err) => wrapRallyError(err),
+        });
+      }),
+
+    addComment: (id, body) =>
+      Effect.gen(function* () {
+        const { RallyTracker } = yield* Effect.promise(() => import('../../../lib/tracker/rally.js'));
+        const tracker = new RallyTracker({
+          apiKey: config.apiKey,
+          server: config.server,
+          workspace: config.workspace,
+          project: config.project,
+        });
+        yield* Effect.tryPromise({
+          try: () => tracker.addComment(id, body),
+          catch: (err) => {
+            if (err instanceof RateLimited) return err;
+            return new TrackerApiError({ tracker: 'rally', message: String(err), cause: err });
+          },
+        });
+      }),
+  };
+}
+
 /**
- * Layer that provides a no-op RallyClient when Rally is not configured.
+ * Layer that provides a RallyClient which dynamically checks configuration on each call.
+ * This avoids caching a no-op client if the config wasn't ready at layer construction time.
  */
-export const RallyClientOptionalLive = Layer.unwrap(
-  Effect.gen(function* () {
-    const config = getRallyConfig();
-    if (!config) {
-      const fail = Effect.fail(new TrackerNotConfigured({ tracker: 'rally' }));
-      return Layer.succeed(RallyClient, {
-        getIssue: () => fail,
-        updateState: () => fail,
-        addComment: () => fail,
-      } satisfies RallyClientShape);
-    }
-    // Config exists — delegate to RallyClientLive
-    return RallyClientLive;
-  }),
+export const RallyClientOptionalLive = Layer.effect(
+  RallyClient,
+  Effect.succeed({
+    getIssue: (...args) => getRallyClient().getIssue(...args),
+    updateState: (...args) => getRallyClient().updateState(...args),
+    addComment: (...args) => getRallyClient().addComment(...args),
+  } as RallyClientShape),
 );

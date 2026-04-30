@@ -564,21 +564,15 @@ const postIssueStartPlanningRoute = HttpRouter.add(
 
     if (trackerTypeForIssue === 'github' && githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
       const { owner, repo, number } = githubCheck as { owner: string; repo: string; number: number };
-      const ghIssue = yield* Effect.promise(() =>
-        Effect.runPromise(github.getIssue(owner, repo, number).pipe(Effect.catch((e) => Effect.fail(e)))),
-      );
+      const ghIssue = yield* github.getIssue(owner, repo, number);
 
       const ghConfig = getGitHubConfig();
       const repoConfig = ghConfig?.repos.find((r: any) => r.owner === owner && r.repo === repo);
       const prefix = repoConfig?.prefix || repo.toUpperCase();
 
-      const ghComments = yield* Effect.promise(() =>
-        Effect.runPromise(
-          github.getComments(owner, repo, number, 50).pipe(
-            Effect.map((cs) => cs.map((c) => ({ author: c.user, body: c.body, createdAt: c.createdAt }))),
-            Effect.catch(() => Effect.succeed([] as Array<{ author: string; body: string; createdAt: string }>)),
-          ),
-        ),
+      const ghComments = yield* github.getComments(owner, repo, number, 50).pipe(
+        Effect.map((cs) => cs.map((c) => ({ author: c.user, body: c.body, createdAt: c.createdAt }))),
+        Effect.catch(() => Effect.succeed([] as Array<{ author: string; body: string; createdAt: string }>)),
       );
 
       issue = {
@@ -592,20 +586,10 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       };
 
       // Add "planning" label (ensure it exists, then apply to issue)
-      yield* Effect.promise(() =>
-        Effect.runPromise(lifecycle.addLabel(id, 'planning').pipe(Effect.catch(() => Effect.void))),
-      );
+      yield* lifecycle.addLabel(id, 'planning').pipe(Effect.catch(() => Effect.void));
 
     } else if (trackerTypeForIssue === 'rally') {
-      const rallyIssue = yield* Effect.promise(() =>
-        Effect.runPromise(
-          rally.getIssue(id).pipe(
-            Effect.catchTag('TrackerNotConfigured', () =>
-              Effect.fail(new Error('RALLY_API_KEY not configured. Set it in ~/.panopticon.env')),
-            ),
-          ),
-        ),
-      );
+      const rallyIssue = yield* rally.getIssue(id);
 
       issue = {
         id: rallyIssue.id,
@@ -618,15 +602,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
 
     } else {
       // Linear
-      const linearIssue = yield* Effect.promise(() =>
-        Effect.runPromise(
-          linear.getIssue(id).pipe(
-            Effect.catchTag('TrackerNotConfigured', () =>
-              Effect.fail(new Error('LINEAR_API_KEY not configured')),
-            ),
-          ),
-        ),
-      );
+      const linearIssue = yield* linear.getIssue(id);
 
       issue = {
         id: linearIssue.id,
@@ -638,9 +614,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       };
 
       // Transition to "In Planning" state
-      yield* Effect.promise(() =>
-        Effect.runPromise(lifecycle.transitionTo(id, 'in_planning').pipe(Effect.catch(() => Effect.void))),
-      );
+      yield* lifecycle.transitionTo(id, 'in_planning').pipe(Effect.catch(() => Effect.void));
     }
 
     const issuePrefix = extractPrefix(issue.identifier) ?? issue.identifier.split('-')[0];
@@ -789,7 +763,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
       sessionName = `planning-${id.toLowerCase()}`;
       // Remove planning label via IssueLifecycle
       yield* lifecycle.removeLabel(id, 'planning').pipe(Effect.catch(() => Effect.void));
-      revertedState = 'Todo (label removed)';
+      revertedState = 'Todo';
     } else {
       // Resolve issue identifier and session name via LinearClient, then transition to 'open' (Todo)
       const linearIssue = yield* linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null)));

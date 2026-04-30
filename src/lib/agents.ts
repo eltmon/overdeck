@@ -175,6 +175,7 @@ export async function getProviderEnvForModel(model: string): Promise<Record<stri
  * Returns empty string for Anthropic models.
  */
 const PROVIDER_ENV_KEYS = [
+  'ANTHROPIC_API_KEY',
   'ANTHROPIC_BASE_URL',
   'ANTHROPIC_AUTH_TOKEN',
   'OPENAI_API_KEY',

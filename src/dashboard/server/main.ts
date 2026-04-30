@@ -49,7 +49,7 @@ ensureInternalToken();
 // and agent message delivery (PAN-785).
 await ensureManagedTmuxContextOnce();
 // Cache .panopticon.env content at startup to avoid blocking FS reads during request handling (PAN-70)
-void initTrackerConfigCache().catch(err => {
+await initTrackerConfigCache().catch(err => {
   console.log('[tracker-config] Warning: failed to cache .panopticon.env:', err.message);
 });
 
