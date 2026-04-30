@@ -21,6 +21,7 @@ const LEAKED_ENV_KEYS = new Set([
 
 /** Provider-specific keys that must be cleared before re-routing a child. */
 const PROVIDER_ENV_KEYS = new Set([
+  'ANTHROPIC_API_KEY',
   'ANTHROPIC_BASE_URL',
   'ANTHROPIC_AUTH_TOKEN',
   'OPENAI_API_KEY',

@@ -54,3 +54,5 @@
 # - github.repo
 
 export.git-add: false
+
+sync.remote: "git+ssh://git@github.com/eltmon/panopticon-cli.git"

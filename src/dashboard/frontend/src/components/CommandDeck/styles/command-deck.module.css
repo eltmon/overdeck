@@ -1801,7 +1801,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px 4px 24px;
+  padding: 4px 30px 4px 24px;
   position: relative;
   cursor: pointer;
   transition: background 0.1s;
@@ -1928,8 +1928,11 @@
   letter-spacing: 0;
 }
 
-/* Star / favorite button (in-group, only rendered when NOT favorited) */
 .conversationStarBtn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1938,16 +1941,24 @@
   border: none;
   background: none;
   cursor: pointer;
-  color: var(--muted-foreground);
   border-radius: 4px;
   line-height: 1;
-  transition: background 0.1s, color 0.1s;
-  flex-shrink: 0;
   padding: 0;
+  color: var(--muted-foreground);
+  opacity: 0;
+  transition: background 0.1s, color 0.1s, opacity 0.15s ease;
 }
 
-/* Persistent favorited star — always visible (not collapsed by .conversationActions) */
+.conversationItem:hover .conversationStarBtn,
+.conversationItem:focus-within .conversationStarBtn {
+  opacity: 1;
+}
+
 .conversationStarPersistent {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1956,12 +1967,11 @@
   border: none;
   background: none;
   cursor: pointer;
-  color: var(--primary);
   border-radius: 4px;
   line-height: 1;
-  transition: background 0.1s, color 0.1s;
-  flex-shrink: 0;
   padding: 0;
+  color: var(--primary);
+  transition: background 0.1s, color 0.1s;
 }
 
 .conversationStarPersistent:hover {
@@ -2537,6 +2547,21 @@
   line-height: 1.4;
 }
 
+.workLogThinkingResult {
+  margin: 2px 0 4px 18px;
+  padding: 6px 8px;
+  background: color-mix(in srgb, var(--muted) 60%, transparent);
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 300px;
+  overflow-y: auto;
+  line-height: 1.5;
+  font-style: italic;
+}
+
 .workLogExpandBtn {
   background: none;
   border: none;
@@ -2548,6 +2573,62 @@
   gap: 4px;
   padding: 2px 0;
   align-self: flex-start;
+}
+
+.failedPromptList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 16px;
+}
+
+.failedPromptCard {
+  border: 1px solid var(--destructive);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--destructive) 6%, var(--background));
+}
+
+.failedPromptHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--destructive);
+  margin-bottom: 4px;
+}
+
+.failedPromptText {
+  font-size: 13px;
+  color: var(--foreground);
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.failedPromptActions {
+  display: flex;
+  gap: 8px;
+}
+
+.failedPromptActions button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--muted-foreground);
+  transition: background 0.1s, color 0.1s;
+}
+
+.failedPromptActions button:hover {
+  background: var(--accent);
+  color: var(--foreground);
 }
 
 /* Working indicator */

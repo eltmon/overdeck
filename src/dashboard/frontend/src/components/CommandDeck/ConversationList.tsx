@@ -48,9 +48,6 @@ export interface Conversation {
   forkError?: string | null;
 }
 
-/** Marker that we're in draft mode — no session spawned yet. */
-export type DraftSession = true;
-
 // ─── Sort types ───────────────────────────────────────────────────────────────
 
 export type SortOption = 'lastActivity' | 'lastAccessed' | 'created' | 'alphabetical';
@@ -523,32 +520,8 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                     {conv.totalCost < 0.01 ? '<$0.01' : `$${conv.totalCost.toFixed(2)}`}
                   </span>
                 )}
-                {/* Persistent favorited star — visible in both hover and non-hover states */}
-                {conv.isFavorited && (
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    className={styles.conversationStarPersistent}
-                    onClick={e => {
-                      e.stopPropagation();
-                      favoriteMutation.mutate({ name: conv.name, favorited: true });
-                    }}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' || e.key === ' ' || e.key === 'f') {
-                        e.stopPropagation();
-                        favoriteMutation.mutate({ name: conv.name, favorited: true });
-                      }
-                    }}
-                    title="Remove from favorites"
-                    aria-label={`Unfavorite ${conv.title ?? conv.name}`}
-                    aria-pressed={true}
-                  >
-                    <Star size={11} style={{ fill: 'currentColor' }} />
-                  </span>
-                )}
-                {/* Hover-only action group — collapses when row is not hovered */}
+                {/* Action group — collapses when row is not hovered */}
                 <span className={styles.conversationActions}>
-                  {/* Rename button */}
                   <span
                     role="button"
                     tabIndex={0}
@@ -560,29 +533,6 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                   >
                     <Pencil size={11} />
                   </span>
-                  {/* Star / favorite button (only when NOT favorited; favorited state shown by persistent star above) */}
-                  {!conv.isFavorited && (
-                    <span
-                      role="button"
-                      tabIndex={0}
-                      className={styles.conversationStarBtn}
-                      onClick={e => {
-                        e.stopPropagation();
-                        favoriteMutation.mutate({ name: conv.name, favorited: false });
-                      }}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' || e.key === ' ' || e.key === 'f') {
-                          e.stopPropagation();
-                          favoriteMutation.mutate({ name: conv.name, favorited: false });
-                        }
-                      }}
-                      title="Add to favorites"
-                      aria-label={`Favorite ${conv.title ?? conv.name}`}
-                      aria-pressed={false}
-                    >
-                      <Star size={11} style={{ fill: 'none' }} />
-                    </span>
-                  )}
                   {(conv.sessionFile || conv.claudeSessionId) && !conv.forkStatus && (
                     <span
                       role="button"
@@ -628,6 +578,27 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                   >
                     {copiedId === conv.id ? <Check size={11} /> : <Copy size={11} />}
                   </span>
+                </span>
+                {/* Star — pinned far right, same column for favorited and hover-to-favorite */}
+                <span
+                  role="button"
+                  tabIndex={0}
+                  className={conv.isFavorited ? styles.conversationStarPersistent : styles.conversationStarBtn}
+                  onClick={e => {
+                    e.stopPropagation();
+                    favoriteMutation.mutate({ name: conv.name, favorited: !!conv.isFavorited });
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ' || e.key === 'f') {
+                      e.stopPropagation();
+                      favoriteMutation.mutate({ name: conv.name, favorited: !!conv.isFavorited });
+                    }
+                  }}
+                  title={conv.isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                  aria-label={conv.isFavorited ? `Unfavorite ${conv.title ?? conv.name}` : `Favorite ${conv.title ?? conv.name}`}
+                  aria-pressed={!!conv.isFavorited}
+                >
+                  <Star size={11} style={{ fill: conv.isFavorited ? 'currentColor' : 'none' }} />
                 </span>
               </motion.button>
             ))}
