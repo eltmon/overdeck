@@ -1619,10 +1619,10 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
     }
 
     if (existsSync(workspacePath)) {
-      yield* Effect.promise(() => execAsync(`pan workspace destroy ${issueId} --force 2>/dev/null || true`, {
-        cwd: projectPath,
-        encoding: 'utf-8',
-      }));
+      return jsonResponse(
+        { error: 'Workspace already exists. Use the workspace inspector to manage it, or remove it first with: pan workspace destroy ' + issueId },
+        { status: 409 }
+      );
     }
 
     const featureName = issueLower;
