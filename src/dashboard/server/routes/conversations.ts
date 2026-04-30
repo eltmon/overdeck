@@ -62,7 +62,9 @@ import {
 import {
   getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
+  getProviderEnvForModel,
 } from '../../../lib/agents.js';
+import { injectProviderEnvOverlay } from '../../../lib/claude-settings-overlay.js';
 import { generateLauncherScript } from '../../../lib/launcher-generator.js';
 import {
   parseConversationMessages,
@@ -97,7 +99,7 @@ function shellQuote(str: string): string {
   return "'" + str.replace(/'/g, "'\"'\"'") + "'";
 }
 
-const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.-]+$/;
+const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
 const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
 const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
@@ -687,6 +689,7 @@ async function spawnConversationSession(
   const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
   let runtimeCommand = `claude ${permissionFlags}`;
   let providerExportsStr = '';
+  let providerEnv: Record<string, string> = {};
   if (model) {
     if (!SAFE_MODEL_PATTERN.test(model)) {
       throw new Error('Invalid model name');
@@ -699,6 +702,7 @@ async function spawnConversationSession(
       runtimeCommand = `${runtimeCommand} --permission-mode bypassPermissions`;
     }
     providerExportsStr = (await getProviderExportsForModel(model)).trim();
+    providerEnv = await getProviderEnvForModel(model);
   }
 
   if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
@@ -953,6 +957,7 @@ const postConversationRoute = HttpRouter.add(
         const model = typeof body['model'] === 'string' ? body['model'].trim() : undefined;
         const effort = typeof body['effort'] === 'string' ? body['effort'].trim() : undefined;
         const issueId = typeof body['issueId'] === 'string' ? body['issueId'] : undefined;
+        const applyProviderOverride = body['applyProviderOverride'] === true;
         if (issueId && !SAFE_ISSUE_ID_PATTERN.test(issueId)) {
           return jsonResponse({ error: 'Invalid issueId' }, { status: 400 });
         }
@@ -984,6 +989,17 @@ const postConversationRoute = HttpRouter.add(
         const claudeSessionId = randomUUID();
 
         console.log(`[conversations] Creating conversation "${name}" with model=${model ?? 'default'} effort=${effort ?? 'default'}`);
+
+        // Apply provider env overlay if user consented via the conflict dialog
+        if (applyProviderOverride && model) {
+          try {
+            const providerEnv = await getProviderEnvForModel(model);
+            const overlayResult = await injectProviderEnvOverlay(cwd, providerEnv);
+            console.log(`[conversations] Provider env overlay applied: ${overlayResult.keysInjected.join(', ')}`);
+          } catch (err) {
+            console.error('[conversations] Provider env overlay failed:', err);
+          }
+        }
 
         // Spawn tmux session with model + effort + deterministic session ID
         await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId);

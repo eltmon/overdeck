@@ -22,21 +22,30 @@ import {
 } from './ModelPicker';
 import { getDefaultConversationModel, ensureDefaultConversationModel } from './defaultConversationModel';
 import { EffortPicker, loadStoredEffort, type EffortLevel } from './EffortPicker';
+import { ProviderEnvOverrideDialog, type ProviderEnvConflict } from '../ProviderEnvOverrideDialog';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── API ─────────────────────────────────────────────────────────────────────
+
+async function checkProviderConflicts(model: string): Promise<ProviderEnvConflict[]> {
+  const res = await fetch(`/api/settings/provider-env-conflicts?model=${encodeURIComponent(model)}`);
+  if (!res.ok) return [];
+  const data = await res.json() as { conflicts?: ProviderEnvConflict[] };
+  return data.conflicts ?? [];
+}
 
 /** Single endpoint: spawn session + create conversation + send first message. */
 async function spawnAndCreate(
   message: string,
   model: string,
   effort: EffortLevel,
+  applyProviderOverride = false,
 ): Promise<Conversation> {
   const res = await fetch('/api/conversations', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, model, effort }),
+    body: JSON.stringify({ message, model, effort, applyProviderOverride }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Request failed' }));
@@ -62,6 +71,9 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
   const [sending, setSending] = useState(false);
   const [text, setText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showConflictDialog, setShowConflictDialog] = useState(false);
+  const [detectedConflicts, setDetectedConflicts] = useState<ProviderEnvConflict[]>([]);
+  const pendingMessageRef = useRef<string>('');
   const editorRef = useRef<LexicalEditor | null>(null);
   // Unique key per draft instance so Lexical doesn't reuse stale state
   const draftKey = useMemo(() => `draft-${Date.now()}`, []);
@@ -102,11 +114,37 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
     saveStoredModel(newModel);
   }
 
+  const doSpawn = useCallback(async (messageText: string, applyOverride = false) => {
+    setSending(true);
+    setError(null);
+    try {
+      const conv = await spawnAndCreate(messageText, model, effort, applyOverride);
+      onPromoted(conv, messageText);
+    } catch (err) {
+      console.error('[DraftConversationPanel] Failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create conversation');
+      setSending(false);
+    }
+  }, [model, effort, onPromoted]);
+
+  const handleConflictApprove = useCallback(async () => {
+    setShowConflictDialog(false);
+    const messageText = pendingMessageRef.current;
+    if (!messageText) return;
+    await doSpawn(messageText, true);
+  }, [doSpawn]);
+
+  const handleConflictCancel = useCallback(() => {
+    setShowConflictDialog(false);
+    setDetectedConflicts([]);
+    pendingMessageRef.current = '';
+    setSending(false);
+  }, []);
+
   const handleSubmit = useCallback(async () => {
     const editor = editorRef.current;
     if (!editor || sending) return;
 
-    // Read directly from Lexical — React state may be stale if onChange hasn't fired yet
     let messageText = '';
     editor.read(() => {
       messageText = $getRoot().getTextContent().trim();
@@ -115,15 +153,21 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
 
     setSending(true);
     setError(null);
+
     try {
-      const conv = await spawnAndCreate(messageText, model, effort);
-      onPromoted(conv, messageText);
-    } catch (err) {
-      console.error('[DraftConversationPanel] Failed:', err);
-      setError(err instanceof Error ? err.message : 'Failed to create conversation');
-      setSending(false);
+      const conflicts = await checkProviderConflicts(model);
+      if (conflicts.length > 0) {
+        pendingMessageRef.current = messageText;
+        setDetectedConflicts(conflicts);
+        setShowConflictDialog(true);
+        return;
+      }
+    } catch {
+      // Detection failed — proceed without blocking
     }
-  }, [model, effort, onPromoted, sending]);
+
+    await doSpawn(messageText);
+  }, [model, sending, doSpawn]);
 
   const handleCommandKey = useCallback(
     (key: 'Enter') => {
@@ -172,7 +216,7 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
                 </button>
               </div>
             </div>
-            {sending && (
+            {sending && !showConflictDialog && (
               <p style={{ color: 'var(--muted-foreground)', fontSize: 12, padding: '4px 8px' }}>
                 Starting session...
               </p>
@@ -185,6 +229,13 @@ export function DraftConversationPanel({ onPromoted }: DraftConversationPanelPro
           </div>
         </div>
       </div>
+
+      <ProviderEnvOverrideDialog
+        conflicts={detectedConflicts}
+        isOpen={showConflictDialog}
+        onApprove={() => void handleConflictApprove()}
+        onCancel={handleConflictCancel}
+      />
     </div>
   );
 }

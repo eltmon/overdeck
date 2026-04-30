@@ -3809,3 +3809,41 @@
   line-height: 1.4;
   margin-top: 4px;
 }
+
+.forkHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ─── Fork help dialog ──────────────────────────────────────────────────── */
+
+.forkHelpOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.forkHelpDialog {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 560px;
+  max-width: 100%;
+  max-height: 80vh;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+}
+
+.forkHelpBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+}

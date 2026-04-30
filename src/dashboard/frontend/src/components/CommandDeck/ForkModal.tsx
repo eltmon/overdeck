@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, ChevronDown, GitBranchPlus } from 'lucide-react';
+import { X, ChevronDown, GitBranchPlus, HelpCircle } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   getDefaultConversationModel,
   ensureDefaultConversationModel,
@@ -190,6 +192,90 @@ function ModelSelect({
   );
 }
 
+const FORK_HELP_CONTENT = `## Fork Modes
+
+There are three ways to fork a conversation, from lightest to richest:
+
+### Plain Fork
+Copies the raw conversation history into a new session. No summary is generated — the new agent picks up exactly where the previous one left off.
+
+If the conversation was previously compacted, only the history from the last compaction point forward is carried over.
+
+**Best for:** Continuing a conversation that hit a context limit, especially when staying on the same model.
+
+**Cross-model warning:** Raw history may contain model-specific data (like signed thinking blocks) that won't validate on a different provider. Use a summary fork when switching models.
+
+### Fast Summary
+Generates a quick summary **without calling an LLM**. Extracts a bullet list of user messages, files modified, and tools used from the conversation history.
+
+**Best for:** Quick forks where you just need a rough reminder of what happened, without paying for an LLM call.
+
+### Full Summary (default)
+Sends the conversation history to an LLM to produce a structured summary. For very large conversations, the history is processed in chunks — each chunk builds on the previous summary so arbitrarily long sessions can be summarized.
+
+The summary is injected as the first message in the new session, and the agent is instructed to acknowledge it and wait for your next instruction.
+
+**Best for:** Most forks — gives the new agent a clear understanding of what was accomplished and decided.
+
+---
+
+## Options
+
+### Summary Model
+The model used to **generate the summary**. This is independent of the model the new conversation runs on. Cheaper models like Haiku work well for straightforward summarization; use a larger model for complex or nuanced conversations.
+
+### Include Thinking
+When enabled, the model's internal reasoning (thinking blocks) is included in the text sent to the summarizer. This gives the summary model richer context about **why** decisions were made, but increases input size and cost.
+
+### Launch Model
+The model the **new forked conversation** will run on. Completely independent of the summary model — you can summarize with Haiku and launch on Opus, or vice versa. Defaults to the parent conversation's model.
+`;
+
+function ForkHelpModal({ onClose }: { onClose: () => void }) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKey, true);
+    return () => window.removeEventListener('keydown', handleKey, true);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={overlayRef}
+      className={styles.forkHelpOverlay}
+      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
+    >
+      <div className={styles.forkHelpDialog} role="dialog" aria-labelledby="fork-help-title">
+        <div className={styles.forkHeader}>
+          <div className={styles.forkHeaderLeft}>
+            <HelpCircle size={16} className={styles.forkHeaderIcon} />
+            <h3 id="fork-help-title" className={styles.forkTitle}>Fork Options</h3>
+          </div>
+          <button className={styles.forkClose} onClick={onClose} aria-label="Close">
+            <X size={14} />
+          </button>
+        </div>
+        <div className={styles.forkHelpBody}>
+          <div className={styles.markdownContent}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{FORK_HELP_CONTENT}</ReactMarkdown>
+          </div>
+        </div>
+        <div className={styles.forkFooter}>
+          <button className={styles.forkConfirmBtn} onClick={onClose}>
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface ForkModalProps {
   conversation: Conversation;
   onConfirm: (
@@ -212,6 +298,7 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
   const [plainFork, setPlainFork] = useState(false);
   const [localSummaryOnly, setLocalSummaryOnly] = useState(false);
   const [includeThinkingInSummary, setIncludeThinkingInSummary] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
     setSummaryModel(compactionModel);
@@ -245,10 +332,17 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
             <GitBranchPlus size={16} className={styles.forkHeaderIcon} />
             <h3 id="fork-title" className={styles.forkTitle}>Fork Conversation</h3>
           </div>
-          <button className={styles.forkClose} onClick={onClose} aria-label="Close">
-            <X size={14} />
-          </button>
+          <div className={styles.forkHeaderRight}>
+            <button className={styles.forkClose} onClick={() => setShowHelp(true)} aria-label="Help">
+              <HelpCircle size={14} />
+            </button>
+            <button className={styles.forkClose} onClick={onClose} aria-label="Close">
+              <X size={14} />
+            </button>
+          </div>
         </div>
+
+        {showHelp && <ForkHelpModal onClose={() => setShowHelp(false)} />}
 
         <div className={styles.forkBody}>
           <p className={styles.forkDesc}>
