@@ -251,6 +251,7 @@ export function generateLauncherWrapper(config: LauncherConfig): string | null {
 
 /** Env vars that may leak from a parent tmux server and must be unset. */
 const PROVIDER_ENV_UNSETS = [
+  'ANTHROPIC_API_KEY',
   'ANTHROPIC_BASE_URL',
   'ANTHROPIC_AUTH_TOKEN',
   'OPENAI_API_KEY',

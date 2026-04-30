@@ -45,6 +45,7 @@ import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunning
 import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
 import { emitActivityEntry } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSession, killSessionAsync, listPaneValues, listPaneValuesAsync, listSessionNamesAsync, sessionExists, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
+import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 
 // ============================================================================
 // Configuration
@@ -803,7 +804,9 @@ export async function checkStuckWorkAgents(): Promise<string[]> {
         // Respawn in a new tmux session with the same launcher
         // Kill stale session first to prevent "duplicate session" error (PAN-430)
         await killSessionAsync(agent.id).catch(() => { /* no stale session */ });
-        await createSessionAsync(agent.id, workspace, `bash ${launcherPath}`);
+        await createSessionAsync(agent.id, workspace, `bash ${launcherPath}`, {
+          env: BLANKED_PROVIDER_ENV,
+        });
 
         // Reset recovery state since we respawned fresh
         stuckRecoveryState.set(agent.id, { lastAttempt: now, attempts: 0 });

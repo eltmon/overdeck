@@ -11,6 +11,7 @@ import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
 import { loadCloisterConfig } from './cloister/config.js';
+import { BLANKED_PROVIDER_ENV } from './child-env.js';
 import type { ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from './providers.js';
@@ -1136,13 +1137,14 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   await createSessionAsync(agentId, options.workspace, claudeCmd, {
     env: {
+      ...BLANKED_PROVIDER_ENV, // Blank stale provider vars inherited by tmux server
       TERM: 'xterm-256color',
       PANOPTICON_AGENT_ID: agentId,
       PANOPTICON_ISSUE_ID: options.issueId,
       PANOPTICON_SESSION_TYPE: options.phase || 'implementation',
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
       GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
-      ...providerEnv, // Add provider-specific env vars (BASE_URL, AUTH_TOKEN, etc.)
+      ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
       ...sageoxEnv // Add SageOx environment variables
     }
   });
@@ -1445,6 +1447,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
     await createSessionAsync(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
       env: {
+        ...BLANKED_PROVIDER_ENV,
         PANOPTICON_AGENT_ID: normalizedId,
         PANOPTICON_ISSUE_ID: agentState.issueId || '',
         PANOPTICON_SESSION_TYPE: agentState.phase || 'implementation',
@@ -1644,6 +1647,7 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     const claudeCmd = `bash ${launcherScript}`;
     await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {
       env: {
+        ...BLANKED_PROVIDER_ENV,
         PANOPTICON_AGENT_ID: normalizedId,
         PANOPTICON_ISSUE_ID: agentState.issueId || '',
         PANOPTICON_SESSION_TYPE: agentState.phase || 'implementation',
