@@ -34,7 +34,7 @@ import { loadProjectsConfig } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
 import { renderPrompt } from './prompts.js';
 import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
-import { markWorkspaceStuck } from '../review-status.js';
+import { markWorkspaceStuck, setReviewStatus } from '../review-status.js';
 import { appendGitOperation, type GitOperationType } from '../git-activity.js';
 import { buildStashMessage, createNamedStash, dropStash, listStashes } from '../stashes.js';
 
@@ -187,6 +187,16 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   if (_completedPostMerge.has(issueId)) {
     console.log(`[merge-agent] postMergeLifecycle already completed for ${issueId}, skipping`);
     return;
+  }
+
+  // Set mergeStatus='merged' before anything else — callers may have already done this,
+  // but if the merge happened outside the dashboard (manual git merge, direct push),
+  // the status would be stale. setReviewStatus is idempotent on same-value writes.
+  try {
+    setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
+    console.log(`[merge-agent] ✓ mergeStatus set to 'merged' for ${issueId}`);
+  } catch (err: any) {
+    console.warn(`[merge-agent] Could not set mergeStatus: ${err.message}`);
   }
 
   // Step 0: Write pending lifecycle file and spawn detached deploy script.
