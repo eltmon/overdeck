@@ -1690,6 +1690,22 @@ export async function checkStuckReviewing(): Promise<string[]> {
         activeReviewIssues.add(rState.currentIssue.toUpperCase());
       }
     }
+    // PAN-796: Also check parallel review sessions (review-<issueId>-<ts>-<role>)
+    // and coordinator sessions (review-coordinator-<issueId>-<ts>)
+    try {
+      const { listSessionNamesAsync } = await import('../tmux.js');
+      const { getActiveParallelReviewIssues } = await import('./review-agent.js');
+      const allSessions = await listSessionNamesAsync();
+      for (const issueId of getActiveParallelReviewIssues(allSessions)) {
+        activeReviewIssues.add(issueId.toUpperCase());
+      }
+      for (const s of allSessions) {
+        const coordMatch = s.match(/^review-coordinator-([A-Za-z]+-\d+)-/);
+        if (coordMatch) activeReviewIssues.add(coordMatch[1].toUpperCase());
+      }
+    } catch {
+      // Non-fatal: fall back to specialist-only detection
+    }
 
     for (const [issueId, status] of Object.entries(statuses)) {
       if (status.reviewStatus !== 'reviewing') continue;
@@ -1712,6 +1728,37 @@ export async function checkStuckReviewing(): Promise<string[]> {
     console.error('[deacon] Error checking stuck reviewing statuses:', msg);
   }
 
+  return actions;
+}
+
+// ============================================================================
+// Verification/review contradiction (PAN-796)
+// ============================================================================
+
+export async function checkVerificationReviewContradiction(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { loadReviewStatuses, setReviewStatus } = await import('../review-status.js');
+    const statuses = loadReviewStatuses();
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if (
+        status.verificationStatus === 'passed' &&
+        status.reviewStatus === 'reviewing' &&
+        status.stuckReason === 'review_infrastructure_failure'
+      ) {
+        setReviewStatus(issueId, {
+          reviewStatus: 'passed',
+          reviewNotes: 'Review bypassed: verification passed but review infrastructure repeatedly failed.',
+        });
+        const msg = `Bypassed review for ${issueId}: verification passed, review infra failed`;
+        actions.push(msg);
+        console.log(`[deacon] ${msg}`);
+      }
+    }
+  } catch (error: unknown) {
+    console.error('[deacon] Error checking verification/review contradiction:', error);
+  }
   return actions;
 }
 
@@ -3312,6 +3359,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...stuckReviewActions);
   for (const a of stuckReviewActions) addLog('action', a, state.patrolCycle);
 
+  // PAN-796: Bypass review for issues where verification passed but review infra keeps failing
+  const verifContradictionActions = await checkVerificationReviewContradiction();
+  actions.push(...verifContradictionActions);
+  for (const a of verifContradictionActions) addLog('action', a, state.patrolCycle);
+
   // Kill orphaned planning sessions whose issue has already progressed past planning.
   // PAN-682 pattern: `planning-pan-<id>` tmux session survives hours after `complete-planning`
   // because either (a) `skipKill=true` was set or (b) complete-planning was never invoked
@@ -3500,6 +3552,28 @@ export async function runPatrol(): Promise<PatrolResult> {
           actions.push(`Force-killed stuck per-project ${projSpec.specialistType} (${projSpec.projectKey})`);
         } catch {
           // Non-fatal — session may have already exited
+        }
+      }
+
+      // PAN-919: Idle-but-alive specialist — task completed but session lingers
+      // (e.g. Claude Code sitting at "Press Ctrl-D again to exit" after one-shot task).
+      // Ephemeral specialists have no reason to stay alive once idle.
+      const IDLE_LINGER_MS = 5 * 60 * 1000; // 5 minutes
+      if (
+        !isStuck &&
+        (!runtimeState || runtimeState.state === 'idle') &&
+        runtimeState?.lastActivity &&
+        Date.now() - new Date(runtimeState.lastActivity).getTime() > IDLE_LINGER_MS
+      ) {
+        const ageMin = Math.round((Date.now() - new Date(runtimeState.lastActivity).getTime()) / 60000);
+        const msg = `Killed lingering idle specialist ${projSpec.specialistType} (${projSpec.projectKey}) — idle ${ageMin}min`;
+        console.log(`[deacon] ${msg}`);
+        try {
+          await killSessionAsync(projSpec.tmuxSession);
+          actions.push(msg);
+          addLog('action', msg, state.patrolCycle);
+        } catch {
+          // Non-fatal
         }
       }
     }

@@ -1,5 +1,6 @@
 import { jsonResponse } from "../http-helpers.js";
 import { httpHandler } from './http-handler.js';
+import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
 /**
  * Workspaces route module — Effect HttpRouter.Layer (PAN-428 B8)
  *
@@ -1689,12 +1690,7 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
           cwd: workspaceDir,
           detached: true,
           stdio: ['ignore', 'pipe', 'pipe'],
-          env: {
-            ...process.env,
-            UID: String(uid),
-            GID: String(gid),
-            DOCKER_USER: `${uid}:${gid}`,
-          },
+          env: buildChildEnvWithoutTmux(process.env, { UID: String(uid), GID: String(gid), DOCKER_USER: `${uid}:${gid}` }),
         });
 
         devUp.stdout?.on('data', (data) => {
@@ -1956,12 +1952,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
       cwd: workspacePath,
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        UID: String(uid),
-        GID: String(gid),
-        DOCKER_USER: `${uid}:${gid}`,
-      },
+      env: buildChildEnvWithoutTmux(process.env, { UID: String(uid), GID: String(gid), DOCKER_USER: `${uid}:${gid}` }),
     });
 
     child.stdout?.on('data', (data) => {
