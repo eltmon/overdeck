@@ -123,6 +123,7 @@ export function copyPanopticonSettingsToWorkspace(workspacePath: string): { copi
     { source: join(homedir(), '.panopticon', 'config.yaml'), target: join(panopticonDir, 'config.yaml') },
     { source: join(homedir(), '.panopticon', 'projects.yaml'), target: join(panopticonDir, 'projects.yaml') },
     { source: join(homedir(), '.panopticon', 'settings.json'), target: join(panopticonDir, 'settings.json') },
+    { source: join(homedir(), '.claude', 'mcp.json'), target: join(claudeDir, 'mcp.json') },
   ];
 
   for (const { source, target } of filesToCopy) {
