@@ -109,7 +109,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'mimo',
     displayName: 'Xiaomi MiMo',
     compatibility: 'direct',
-    baseUrl: 'https://api.xiaomimimo.com/anthropic',
+    baseUrl: 'https://token-plan-sgp.xiaomimimo.com/anthropic',
     authType: 'static',
     models: ['mimo-v2.5-pro', 'mimo-v2.5'],
     tested: true,
