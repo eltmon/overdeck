@@ -680,6 +680,29 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     }
   }
 
+  // For polyrepo workspaces, create a beads redirect at the workspace root
+  // pointing to the first repo that has a .beads/ directory. Without this,
+  // agents starting at the workspace root can't find beads and try to re-init.
+  if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
+    const workspaceBeadsDir = join(workspacePath, '.beads');
+    if (!existsSync(workspaceBeadsDir)) {
+      for (const repo of workspaceConfig.repos) {
+        const sourceRepoPath = join(projectConfig.path, repo.path);
+        const repoBeadsDir = existsSync(sourceRepoPath)
+          ? join(realpathSync(sourceRepoPath), '.beads')
+          : join(sourceRepoPath, '.beads');
+        if (existsSync(repoBeadsDir) && !existsSync(join(repoBeadsDir, 'redirect'))) {
+          try {
+            mkdirSync(workspaceBeadsDir, { recursive: true });
+            writeFileSync(join(workspaceBeadsDir, 'redirect'), repoBeadsDir, 'utf-8');
+            result.steps.push(`Created beads redirect at workspace root → ${repo.name}/.beads`);
+          } catch { /* non-fatal */ }
+          break;
+        }
+      }
+    }
+  }
+
   progress('Creating git worktree', 'Worktree ready', 'complete');
 
   // Remove stale .planning/ directory inherited from main branch.

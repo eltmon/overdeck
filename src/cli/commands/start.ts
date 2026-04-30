@@ -286,7 +286,7 @@ async function handleRemoteWorkspace(
   // Build prompt for remote agent
   spinner.text = 'Building agent prompt...';
   const projectRoot = findProjectRoot(issueId);
-  const prompt = buildWorkAgentPrompt({ issueId, env: 'REMOTE', workspacePath: '/workspace', skipDynamicContext: true });
+  const prompt = await buildWorkAgentPrompt({ issueId, env: 'REMOTE', workspacePath: '/workspace', skipDynamicContext: true });
 
   // Sync all credentials before spawning (tokens may have expired)
   spinner.text = 'Syncing credentials (Claude, GitHub)...';
@@ -681,7 +681,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
       // Show what context would be included
       const planningContext = readPlanningContext(workspace);
-      const beadsTasks = readBeadsTasks(workspace, projectRoot, id);
+      const beadsTasks = await readBeadsTasks(workspace, projectRoot, id);
       const hasPreWorkspacePRD = hasPRDDraft(id);
       console.log('');
       console.log(chalk.bold('Context:'));
@@ -766,7 +766,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     spinner.text = 'Building agent prompt with planning context...';
     const trackerContext = await getTrackerContext(id, workspace);
-    const prompt = buildWorkAgentPrompt({ issueId: id, env: 'LOCAL', workspacePath: workspace, projectRoot, trackerContext });
+    const prompt = await buildWorkAgentPrompt({ issueId: id, env: 'LOCAL', workspacePath: workspace, projectRoot, trackerContext });
 
     spinner.text = 'Spawning agent...';
 
@@ -800,7 +800,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     // Show context info
     const planningContext = readPlanningContext(workspace);
-    const beadsTasks = readBeadsTasks(workspace, projectRoot, id);
+    const beadsTasks = await readBeadsTasks(workspace, projectRoot, id);
     if (planningContext || beadsTasks.length > 0) {
       console.log('');
       console.log(chalk.bold('Context Loaded:'));
