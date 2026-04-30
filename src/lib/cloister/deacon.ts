@@ -2900,8 +2900,10 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
         continue;
       }
 
-      if (resolution === 'done' && count >= 2) {
-        // Agent was nudged twice but still hasn't called pan work done — auto-complete
+      if (resolution === 'done' && count >= 1) {
+        // PAN-534: lowered from >= 2 to >= 1. A single done signal is sufficient
+        // evidence. The old threshold deadlocked when review failed and reset to
+        // pending — the agent never re-signaled done, so count stayed at 1 forever.
         console.log(`[deacon] Auto-completing ${agent.id} (${issueId}): resolution=done, count=${count}`);
 
         try {
