@@ -616,8 +616,8 @@ export async function runModelSummary(prompt: string, model?: string, timeoutMs?
   // correct provider env for `useModel`. If provider env lookup fails (e.g.
   // missing API key), let it throw — the caller (compactConversationNative)
   // falls back to a heuristic summary.
-  const spawnEnv = buildSpawnEnvForModel(useModel);
-  const injectedKeys = Object.keys(getProviderEnvForModel(useModel));
+  const spawnEnv = await buildSpawnEnvForModel(useModel);
+  const injectedKeys = Object.keys(await getProviderEnvForModel(useModel));
   if (injectedKeys.length > 0) {
     console.log(`[smart-compaction] Spawning claude -p for summary with model ${useModel}, injecting provider env: ${injectedKeys.join(', ')}`);
   } else {

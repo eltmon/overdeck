@@ -16,9 +16,10 @@ import { getModelId, WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from './providers.js';
 import { loadConfig as loadYamlConfig } from './config-yaml.js';
 import type { NormalizedCavemanConfig } from './config-yaml.js';
+import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
 import { loadConfig } from './config.js';
-import { getOpenAIAuthStatusSync } from './openai-auth.js';
+import { getOpenAIAuthStatus, getOpenAIAuthStatusSync } from './openai-auth.js';
 import { getCliproxyClientEnv } from './cliproxy.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
@@ -65,11 +66,12 @@ async function hasAgentRuntimeInSubtree(rootPid: string): Promise<boolean> {
   return false;
 }
 
-function getProviderAuthMode(model: string): string | undefined {
+export async function getProviderAuthMode(model: string): Promise<AuthMode | undefined> {
   const provider = getProviderForModel(model);
   if (provider.name === 'openai') {
     const { config } = loadYamlConfig();
-    return getOpenAIAuthStatusSync().loggedIn
+    const authStatus = await getOpenAIAuthStatus();
+    return authStatus.loggedIn
       ? 'subscription'
       : (config.providerAuth?.openai ?? 'api-key');
   }
@@ -89,11 +91,11 @@ const CLI_PROXY_MODEL_ALIASES: Record<string, string> = {
   'gpt-5.4-pro': 'gpt-5.4',
 };
 
-export function getLaunchModelForModel(model: string): string {
-  return getClaudishPrefix(model, getProviderAuthMode(model));
+export async function getLaunchModelForModel(model: string): Promise<string> {
+  return getClaudishPrefix(model, await getProviderAuthMode(model));
 }
 
-export function getAgentRuntimeBaseCommand(model: string): string {
+export async function getAgentRuntimeBaseCommand(model: string): Promise<string> {
   const provider = getProviderForModel(model);
   const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
   if (provider.compatibility === 'direct') {
@@ -104,13 +106,13 @@ export function getAgentRuntimeBaseCommand(model: string): string {
   // Anthropic-compatible /v1/messages endpoint, so Claude Code can drive
   // gpt-* models directly via ANTHROPIC_BASE_URL (no claudish wrapper).
   // The provider env vars are injected separately by getProviderEnvForModel.
-  if (provider.name === 'openai' && getProviderAuthMode(model) === 'subscription') {
+  if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
     // CLIProxy supports gpt-5.x but not the -pro variant; map aliases to real names.
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
     return `claude ${permissionFlags} --model ${resolvedModel}`;
   }
 
-  const routedModel = getLaunchModelForModel(model);
+  const routedModel = await getLaunchModelForModel(model);
   return `claudish -i --model ${routedModel} ${permissionFlags}`;
 }
 
@@ -130,7 +132,7 @@ export function normalizeAgentId(agentId: string): string {
  * Reads the current API key from settings so resumed/recovered agents
  * always use the latest key.
  */
-export function getProviderEnvForModel(model: string): Record<string, string> {
+export async function getProviderEnvForModel(model: string): Promise<Record<string, string>> {
   const provider = getProviderForModel(model);
   if (provider.name === 'anthropic') return {};
 
@@ -148,7 +150,7 @@ export function getProviderEnvForModel(model: string): Record<string, string> {
   const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
 
   if (provider.name === 'openai') {
-    const authStatus = getOpenAIAuthStatusSync();
+    const authStatus = await getOpenAIAuthStatus();
     if (authStatus.loggedIn) {
       // Route through the local CLIProxyAPI sidecar using the user's
       // ChatGPT subscription OAuth tokens. Claude Code sees a normal
@@ -161,7 +163,7 @@ export function getProviderEnvForModel(model: string): Record<string, string> {
     return getProviderEnv(provider, apiKey);
   }
 
-  if (provider.name === 'openai' && getOpenAIAuthStatusSync().loggedIn) {
+  if (provider.name === 'openai' && (await getOpenAIAuthStatus()).loggedIn) {
     return getCliproxyClientEnv();
   }
 
@@ -181,8 +183,8 @@ const PROVIDER_ENV_KEYS = [
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
 ] as const;
 
-export function getProviderExportsForModel(model: string): string {
-  const envVars = getProviderEnvForModel(model);
+export async function getProviderExportsForModel(model: string): Promise<string> {
+  const envVars = await getProviderEnvForModel(model);
   const unsetLines = PROVIDER_ENV_KEYS.map(key => `unset ${key}`);
   const exportLines = Object.entries(envVars)
     .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`);
@@ -200,17 +202,17 @@ export function getProviderExportsForModel(model: string): string {
  * Returns a copy of `baseEnv` (default: process.env) with all PROVIDER_ENV_KEYS
  * deleted, then overlaid with the correct provider env for `model`.
  */
-export function buildSpawnEnvForModel(
+export async function buildSpawnEnvForModel(
   model: string,
   baseEnv: NodeJS.ProcessEnv = process.env,
-): Record<string, string> {
+): Promise<Record<string, string>> {
   const sanitized: Record<string, string> = {};
   for (const [k, v] of Object.entries(baseEnv)) {
     if (v === undefined) continue;
     if ((PROVIDER_ENV_KEYS as readonly string[]).includes(k)) continue;
     sanitized[k] = v;
   }
-  const providerEnv = getProviderEnvForModel(model);
+  const providerEnv = await getProviderEnvForModel(model);
   return { ...sanitized, ...providerEnv };
 }
 
@@ -218,8 +220,8 @@ export function buildSpawnEnvForModel(
  * Get tmux -e flags for provider env vars (for use in tmux new-session).
  * Returns empty string for Anthropic models.
  */
-export function getProviderTmuxFlags(model: string): string {
-  const envVars = getProviderEnvForModel(model);
+export async function getProviderTmuxFlags(model: string): Promise<string> {
+  const envVars = await getProviderEnvForModel(model);
   let flags = '';
   for (const [key, value] of Object.entries(envVars)) {
     flags += ` -e ${key}="${value.replace(/"/g, '\\"')}"`;
@@ -777,7 +779,7 @@ export async function buildCavemanExports(
  * 5. Complexity-based routing (LEGACY - deprecated)
  * 6. Default fallback (claude-sonnet-4-6)
  */
-function determineModel(options: SpawnOptions): string {
+export function determineModel(options: SpawnOptions): string {
   console.log(`[DEBUG] determineModel called with:`, { model: options.model, workType: options.workType, phase: options.phase, agentType: options.agentType, difficulty: options.difficulty });
 
   // Explicit model always wins
@@ -942,10 +944,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // (see PAN-70 / PAN-446 — no blocking I/O in server code).
   if (
     getProviderForModel(selectedModel).name === 'openai'
-    && getProviderAuthMode(selectedModel) === 'subscription'
+    && (await getProviderAuthMode(selectedModel)) === 'subscription'
   ) {
-    const { isCliproxyRunning } = await import('./cliproxy.js');
-    if (!isCliproxyRunning()) {
+    const { isCliproxyRunningAsync } = await import('./cliproxy.js');
+    if (!(await isCliproxyRunningAsync())) {
       throw new Error(
         'CLIProxyAPI sidecar is not running. GPT subscription agents route through '
         + 'a local cliproxy process managed by `pan up`. Run `pan up` (or restart the '
@@ -1022,7 +1024,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   clearReadySignal(agentId);
 
   // Get provider-specific environment variables (BASE_URL, AUTH_TOKEN)
-  const providerEnv = getProviderEnvForModel(selectedModel);
+  const providerEnv = await getProviderEnvForModel(selectedModel);
 
   // Determine auth mode for OpenAI. A live Codex/ChatGPT login always wins.
   const provider = getProviderForModel(selectedModel as ModelId);
@@ -1041,7 +1043,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Previous approach used a positional prompt argument (print mode) which exits after
   // one tool-use cycle on recent Claude Code versions. The fix is to start interactive
   // (no positional prompt), then send the prompt via sendKeysAsync once Claude is ready.
-  const providerExports = getProviderExportsForModel(state.model);
+  const providerExports = await getProviderExportsForModel(state.model);
 
   // Build caveman env exports for the launcher script.
   // Planning agents are excluded — their output is user-facing and must remain readable.
@@ -1063,7 +1065,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     setTerminalEnv: true,
     providerExports,
     cavemanExports,
-    baseCommand: getAgentRuntimeBaseCommand(state.model),
+    baseCommand: await getAgentRuntimeBaseCommand(state.model),
   });
   writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
   const claudeCmd = `bash ${launcherScript}`;
@@ -1413,7 +1415,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
       console.warn(`[agents] Resume succeeded for ${normalizedId} but message not delivered (ready signal timed out) — falling back to fresh launch`);
     }
 
-    const providerEnv = agentState.model ? getProviderEnvForModel(agentState.model) : {};
+    const providerEnv = agentState.model ? await getProviderEnvForModel(agentState.model) : {};
     if (agentState.model) {
       const provider = getProviderForModel(agentState.model as ModelId);
       if (provider.authType === 'credential-file') {
@@ -1428,7 +1430,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
       try { await killSessionAsync(normalizedId); } catch { /* ignore */ }
     }
 
-    const providerExports = getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
+    const providerExports = await getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
     const fallbackLauncher = join(getAgentDir(normalizedId), 'launcher.sh');
     const fallbackContent = generateLauncherScript({
       agentType: 'work',
@@ -1436,7 +1438,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
       changeDir: false,
       setCi: true,
       providerExports,
-      baseCommand: getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6'),
+      baseCommand: await getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6'),
     });
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
     await createSessionAsync(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
@@ -1600,7 +1602,7 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     clearReadySignal(normalizedId);
 
     // Get provider env for the agent's model (reads latest API key from settings)
-    const providerEnv = agentState.model ? getProviderEnvForModel(agentState.model) : {};
+    const providerEnv = agentState.model ? await getProviderEnvForModel(agentState.model) : {};
 
     // For credential-file providers, ensure apiKeyHelper is configured.
     // For all other providers, clear stale apiKeyHelper from previous runs.
@@ -1619,7 +1621,7 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     // `-e KEY=VALUE` flag can only SET env, not UNSET — so env cleanup must happen
     // inside the shell tmux spawns. This mirrors the spawnAgent pattern at ~line 806.
     const model = agentState.model || 'claude-sonnet-4-6';
-    const providerExports = getProviderExportsForModel(model);
+    const providerExports = await getProviderExportsForModel(model);
     // Non-Anthropic models route through a proxy (ANTHROPIC_BASE_URL). Without an explicit
     // --model flag, Claude Code defaults to claude-sonnet-4-6 on resume, sending claude
     // requests through the proxy → "unknown provider" 502. Always include --model when
@@ -1717,7 +1719,7 @@ export function detectCrashedAgents(): AgentState[] {
 /**
  * Recover a crashed agent by restarting it with context
  */
-export function recoverAgent(agentId: string): AgentState | null {
+export async function recoverAgent(agentId: string): Promise<AgentState | null> {
   const normalizedId = normalizeAgentId(agentId);
   logAgentLifecycle(normalizedId, 'recoverAgent called');
   const state = getAgentState(normalizedId);
@@ -1761,7 +1763,7 @@ export function recoverAgent(agentId: string): AgentState | null {
   const recoveryPrompt = generateRecoveryPrompt(state);
 
   // Get provider env for the agent's model (reads latest API key from settings)
-  const providerEnv = state.model ? getProviderEnvForModel(state.model) : {};
+  const providerEnv = state.model ? await getProviderEnvForModel(state.model) : {};
 
   // For credential-file providers, ensure apiKeyHelper is configured.
   // For all other providers, clear stale apiKeyHelper from previous runs.
@@ -1775,7 +1777,7 @@ export function recoverAgent(agentId: string): AgentState | null {
   }
 
   // Restart the agent with recovery context (YOLO mode - skip permissions)
-  const claudeCmd = `${getAgentRuntimeBaseCommand(state.model)} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
+  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model)} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
   createSession(normalizedId, state.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: normalizedId,
@@ -1836,14 +1838,14 @@ function generateRecoveryPrompt(state: AgentState): string {
 /**
  * Auto-recover all crashed agents
  */
-export function autoRecoverAgents(): { recovered: string[]; failed: string[] } {
+export async function autoRecoverAgents(): Promise<{ recovered: string[]; failed: string[] }> {
   const crashed = detectCrashedAgents();
   const recovered: string[] = [];
   const failed: string[] = [];
 
   for (const agent of crashed) {
     try {
-      const result = recoverAgent(agent.id);
+      const result = await recoverAgent(agent.id);
       if (result) {
         recovered.push(agent.id);
       } else {

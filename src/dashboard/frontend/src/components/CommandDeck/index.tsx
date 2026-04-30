@@ -17,6 +17,7 @@ import { useDashboardStore, selectAgentList } from '../../lib/store';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
+import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
 import { WS_METHODS } from '@panctl/contracts';
 import type { ProjectSessionTree, SessionTreeDelta } from '@panctl/contracts';
 import styles from './styles/command-deck.module.css';
@@ -463,23 +464,31 @@ export function CommandDeck({
     try {
       await fetch(`/api/agents/${sessionId}`, { method: 'DELETE' });
       const requestBody = { issueId };
+      let lastRequestBody: Record<string, unknown> = requestBody;
       let res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify(lastRequestBody),
       });
       let data = await res.json().catch(() => ({})) as StartAgentResponse;
       if (res.status === 409 && data.requiresAcknowledgement) {
         const confirmed = window.confirm((data.guardrails?.warnings ?? []).map((warning) => `• ${warning.message}`).join('\n'));
         if (!confirmed) throw new Error('Agent start canceled');
+        lastRequestBody = { ...requestBody, guardrailAcknowledged: true };
         res = await fetch('/api/agents', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...requestBody, guardrailAcknowledged: true }),
+          body: JSON.stringify(lastRequestBody),
         });
         data = await res.json().catch(() => ({})) as StartAgentResponse;
       }
-      if (!res.ok) throw new Error(data.error || data.hint || 'Failed to restart agent');
+      if (!res.ok) {
+        if (isCodexBlockedResponse(res, data)) {
+          setPendingCodexSpawn(lastRequestBody);
+          throw new Error(data.hint || data.error || 'Codex authentication expired — re-authenticate to continue');
+        }
+        throw new Error(data.error || data.hint || 'Failed to restart agent');
+      }
       if (data.guardrails?.warnings?.length) {
         toast.success('Agent started after acknowledging system health warnings.', { duration: 6000 });
       }

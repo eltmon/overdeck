@@ -4,9 +4,10 @@ import { XTerminal } from './XTerminal';
 
 interface StandaloneTerminalProps {
   sessionName: string;
+  token?: string;
 }
 
-export function StandaloneTerminal({ sessionName }: StandaloneTerminalProps) {
+export function StandaloneTerminal({ sessionName, token }: StandaloneTerminalProps) {
   const [isAlwaysOnTop, setIsAlwaysOnTop] = useState(false);
   const [title, setTitle] = useState(sessionName);
 
@@ -56,7 +57,7 @@ export function StandaloneTerminal({ sessionName }: StandaloneTerminalProps) {
         </button>
       </div>
       <div className="flex-1 min-h-0">
-        <XTerminal sessionName={sessionName} />
+        <XTerminal sessionName={sessionName} token={token} />
       </div>
     </div>
   );

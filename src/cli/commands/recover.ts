@@ -50,7 +50,7 @@ export async function recoverCommand(id?: string, options: RecoverOptions = {}):
       }
 
       spinner.text = 'Auto-recovering agents...';
-      const result = autoRecoverAgents();
+      const result = await autoRecoverAgents();
 
       spinner.stop();
 
@@ -80,7 +80,7 @@ export async function recoverCommand(id?: string, options: RecoverOptions = {}):
     const agentId = id.startsWith('agent-') ? id : `agent-${id.toLowerCase()}`;
     spinner.text = `Recovering ${agentId}...`;
 
-    const state = recoverAgent(agentId);
+    const state = await recoverAgent(agentId);
 
     if (!state) {
       spinner.fail(`Agent not found: ${agentId}`);

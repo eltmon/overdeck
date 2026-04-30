@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { evaluateSpawnGuardrails } from '../agents.js';
+import { readGlobalResourceConfig } from '../../services/system-health-service.js';
 import type { SystemHealthSnapshot } from '../../services/system-health-service.js';
 
 const GIB = 1024 ** 3;
@@ -64,13 +65,15 @@ function createHealthSnapshot(overrides: Partial<SystemHealthSnapshot> = {}): Sy
 }
 
 describe('evaluateSpawnGuardrails', () => {
-  afterEach(() => {
+  afterEach(async () => {
     vi.unstubAllEnvs();
+    await readGlobalResourceConfig();
   });
 
-  it('does not block exactly at the memory threshold boundary', () => {
+  it('does not block exactly at the memory threshold boundary', async () => {
     vi.stubEnv('PAN_MEMORY_WARN_GB', '2');
     vi.stubEnv('PAN_MEMORY_BLOCK_GB', '2');
+    await readGlobalResourceConfig();
 
     const decision = evaluateSpawnGuardrails(createHealthSnapshot({
       summary: {
@@ -89,9 +92,10 @@ describe('evaluateSpawnGuardrails', () => {
     );
   });
 
-  it('returns acknowledgement-required warnings when work agent count is high but below the hard limit', () => {
+  it('returns acknowledgement-required warnings when work agent count is high but below the hard limit', async () => {
     vi.stubEnv('PAN_AGENT_WARN_COUNT', '5');
     vi.stubEnv('PAN_AGENT_BLOCK_COUNT', '6');
+    await readGlobalResourceConfig();
 
     const decision = evaluateSpawnGuardrails(createHealthSnapshot({
       summary: {
@@ -112,8 +116,9 @@ describe('evaluateSpawnGuardrails', () => {
     ]);
   });
 
-  it('blocks spawns when available memory is critically low', () => {
+  it('blocks spawns when available memory is critically low', async () => {
     vi.stubEnv('PAN_MEMORY_BLOCK_GB', '2');
+    await readGlobalResourceConfig();
 
     const decision = evaluateSpawnGuardrails(createHealthSnapshot({
       severity: 'critical',
@@ -136,8 +141,9 @@ describe('evaluateSpawnGuardrails', () => {
     ]);
   });
 
-  it('escalates leaked specialists to a blocking hint when critical conditions are also present', () => {
+  it('escalates leaked specialists to a blocking hint when critical conditions are also present', async () => {
     vi.stubEnv('PAN_AGENT_BLOCK_COUNT', '6');
+    await readGlobalResourceConfig();
 
     const decision = evaluateSpawnGuardrails(createHealthSnapshot({
       severity: 'critical',

@@ -1003,7 +1003,7 @@ ${basePrompt}`;
     });
 
     // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
-    const providerEnv = getProviderEnvForModel(model);
+    const providerEnv = await getProviderEnvForModel(model);
     // Add Panopticon cost attribution env vars so heartbeat hook records correct stage/issue
     const sessionTypeLabel = specialistType.replace('-agent', ''); // review-agent → review
     const panopticonEnv: Record<string, string> = {
@@ -2278,7 +2278,7 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
 
   try {
     // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
-    const providerEnv = getProviderEnvForModel(model);
+    const providerEnv = await getProviderEnvForModel(model);
     const envFlags = buildTmuxEnvFlags(providerEnv);
 
     // For credential-file providers (e.g. Kimi), configure apiKeyHelper for token refresh.
@@ -2508,7 +2508,7 @@ export async function wakeSpecialist(
       const modelFlag = `--model ${model}`;
 
       // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
-      const providerEnv = getProviderEnvForModel(model);
+      const providerEnv = await getProviderEnvForModel(model);
       // Add Panopticon cost attribution env vars
       const wakeSessionType = name.replace('-agent', ''); // review-agent → review
       const wakePanEnv: Record<string, string> = {

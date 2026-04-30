@@ -14,6 +14,7 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): (.
 
 interface XTerminalProps {
   sessionName: string;
+  token?: string;
   onDisconnect?: () => void;
   autoCopyOnSelect?: boolean;
 }
@@ -45,7 +46,7 @@ const AUTOCOPY_STORAGE_KEY = 'panopticon.terminal.autoCopyOnSelect';
 // Check if platform is Mac
 const isMac = navigator.platform.toLowerCase().includes('mac');
 
-export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCopyProp }: XTerminalProps) {
+export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: autoCopyProp }: XTerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<Terminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
@@ -393,7 +394,10 @@ export function XTerminal({ sessionName, onDisconnect, autoCopyOnSelect: autoCop
 
     // Connect to WebSocket on same port as the page (frontend and API are served together)
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/terminal?session=${encodeURIComponent(sessionName)}`;
+    let wsUrl = `${protocol}//${window.location.host}/ws/terminal?session=${encodeURIComponent(sessionName)}`;
+    if (token) {
+      wsUrl += `&token=${encodeURIComponent(token)}`;
+    }
 
     const ws = new WebSocket(wsUrl);
     // IMPORTANT: Use arraybuffer for synchronous binary processing

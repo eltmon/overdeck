@@ -419,9 +419,9 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
     const planningPrompt = buildPlanningPrompt(issue, workspacePath, planningModel, effort);
     writeFileSync(planningPromptPath, planningPrompt);
-    const cmdWithArgs = getAgentRuntimeBaseCommand(planningModel);
+    const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel);
 
-    const providerExports = getProviderExportsForModel(planningModel);
+    const providerExports = await getProviderExportsForModel(planningModel);
 
     // ── Write launcher script ──────────────────────────────────────────────
     const initMessage = `Please read the planning prompt file at ${planningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;

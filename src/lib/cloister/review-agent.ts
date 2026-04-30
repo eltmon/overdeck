@@ -533,8 +533,8 @@ async function spawnReviewer(
   promptFile: string,
   projectPath: string,
 ): Promise<void> {
-  const claudeCmd = getAgentRuntimeBaseCommand(model);
-  const providerExports = getProviderExportsForModel(model);
+  const claudeCmd = await getAgentRuntimeBaseCommand(model);
+  const providerExports = await getProviderExportsForModel(model);
 
   // Pre-generate the Claude session UUID and persist it to the canonical reviewer
   // agent directory BEFORE Claude starts. Without this, jsonl-resolver has nothing

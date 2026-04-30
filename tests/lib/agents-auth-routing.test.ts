@@ -31,6 +31,7 @@ vi.mock('../../src/lib/providers.js', async (importOriginal) => {
 
 vi.mock('../../src/lib/openai-auth.js', () => ({
   getOpenAIAuthStatusSync: mockOpenAIAuthStatus,
+  getOpenAIAuthStatus: (...args: unknown[]) => Promise.resolve(mockOpenAIAuthStatus(...args)),
 }));
 
 vi.mock('../../src/lib/cliproxy.js', () => ({
@@ -69,7 +70,7 @@ describe('agents auth routing', () => {
     }));
   });
 
-  it('routes GPT models through the local cliproxy sidecar when Codex subscription login is active', () => {
+  it('routes GPT models through the local cliproxy sidecar when Codex subscription login is active', async () => {
     mockLoadYamlConfig.mockReturnValue({
       config: {
         apiKeys: { openai: 'sk-test-123' },
@@ -78,7 +79,7 @@ describe('agents auth routing', () => {
     });
     mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
 
-    const env = getProviderEnvForModel('gpt-5.4');
+    const env = await getProviderEnvForModel('gpt-5.4');
 
     // Subscription path bypasses claudish-backed getProviderEnv entirely and
     // instead injects ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN pointing at
@@ -90,7 +91,7 @@ describe('agents auth routing', () => {
     });
   });
 
-  it('falls back to the OpenAI API key when no Codex subscription login exists', () => {
+  it('falls back to the OpenAI API key when no Codex subscription login exists', async () => {
     mockLoadYamlConfig.mockReturnValue({
       config: {
         apiKeys: { openai: 'sk-test-123' },
@@ -99,7 +100,7 @@ describe('agents auth routing', () => {
     });
     mockOpenAIAuthStatus.mockReturnValue({ loggedIn: false });
 
-    const env = getProviderEnvForModel('gpt-5.4');
+    const env = await getProviderEnvForModel('gpt-5.4');
 
     expect(mockGetProviderEnv).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'openai' }),
@@ -112,16 +113,16 @@ describe('agents auth routing', () => {
     expect(getClaudishPrefix('gpt-5.4', 'subscription')).toBe('cx@gpt-5.4');
   });
 
-  it('launches MiniMax models directly through claude instead of claudish', () => {
-    expect(getAgentRuntimeBaseCommand('minimax-m2.7')).toBe(
+  it('launches MiniMax models directly through claude instead of claudish', async () => {
+    expect(await getAgentRuntimeBaseCommand('minimax-m2.7')).toBe(
       'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model minimax-m2.7'
     );
   });
 
-  it('clears stale provider env before exporting Anthropic settings', () => {
+  it('clears stale provider env before exporting Anthropic settings', async () => {
     mockOpenAIAuthStatus.mockReturnValue({ loggedIn: false });
 
-    expect(getProviderExportsForModel('claude-sonnet-4-6')).toBe(
+    expect(await getProviderExportsForModel('claude-sonnet-4-6')).toBe(
       [
         'unset ANTHROPIC_BASE_URL',
         'unset ANTHROPIC_AUTH_TOKEN',
@@ -134,10 +135,10 @@ describe('agents auth routing', () => {
     );
   });
 
-  it('replaces stale Anthropic routing env with cliproxy exports for GPT subscription launches', () => {
+  it('replaces stale Anthropic routing env with cliproxy exports for GPT subscription launches', async () => {
     mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
 
-    expect(getProviderExportsForModel('gpt-5.4')).toBe(
+    expect(await getProviderExportsForModel('gpt-5.4')).toBe(
       [
         'unset ANTHROPIC_BASE_URL',
         'unset ANTHROPIC_AUTH_TOKEN',

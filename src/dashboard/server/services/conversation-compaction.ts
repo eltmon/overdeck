@@ -158,9 +158,9 @@ export async function maybeCompactBeforeRespawn(opts: MaybeCompactBeforeRespawnO
   await compactConversationNative(opts.sessionFile);
 }
 
-export function buildCompactionRuntimeInfo(model: string): { command: string; exports: string } {
+export async function buildCompactionRuntimeInfo(model: string): Promise<{ command: string; exports: string }> {
   return {
-    command: getAgentRuntimeBaseCommand(model),
-    exports: getProviderExportsForModel(model),
+    command: await getAgentRuntimeBaseCommand(model),
+    exports: await getProviderExportsForModel(model),
   };
 }

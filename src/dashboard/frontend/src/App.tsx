@@ -30,6 +30,8 @@ import { UpgradeAnnouncement } from './components/upgrade-announcement/UpgradeAn
 import { StandaloneTerminal } from './components/StandaloneTerminal';
 import { DeaconPauseBanner } from './components/DeaconPauseToggle';
 import { StoppedAgentsBanner } from './components/StoppedAgentsBanner';
+import { CodexAuthBanner } from './components/CodexAuthBanner';
+import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { SystemHealthPill } from './components/SystemHealthPill';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
@@ -210,10 +212,11 @@ export default function App() {
     const sessionName = terminalPath.startsWith('/terminal/')
       ? terminalPath.replace('/terminal/', '')
       : terminalSession!;
+    const token = new URLSearchParams(window.location.search).get('token') ?? undefined;
     return (
       <div className="h-screen overflow-hidden bg-[#0d1117]">
         <EventRouter />
-        <StandaloneTerminal sessionName={sessionName} />
+        <StandaloneTerminal sessionName={sessionName} token={token} />
       </div>
     );
   }
@@ -232,6 +235,7 @@ export default function App() {
       window.history.replaceState(null, '', window.location.pathname);
     }
   }, []);
+  useCodexAutoRetry();
   // Sync deep-link on hash change (browser back/forward or direct navigation)
   useEffect(() => {
     const onHashChange = () => {
@@ -546,6 +550,9 @@ export default function App() {
 
         {/* Stopped Agents Banner — shown when agents are stopped (e.g., after reboot) */}
         <StoppedAgentsBanner />
+
+        {/* Codex Auth Banner — shown when Codex OAuth tokens are expired/burned */}
+        <CodexAuthBanner />
 
         {/* Dashboard Restart Banner — shown during a planned restart (post-merge deploy, pan restart) */}
         {showRestartBanner && (
