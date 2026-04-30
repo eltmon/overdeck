@@ -422,6 +422,20 @@ program
       }
     }
 
+    // Restart tmux server with clean env — the server inherits the parent's
+    // environment at startup and persists it. If the user had provider env vars
+    // (e.g. ANTHROPIC_BASE_URL for OpenRouter), the stale values leak into
+    // every session even after the parent env is fixed. Kill + restart ensures
+    // the server picks up the current (clean) environment.
+    {
+      const { execSync } = await import('child_process');
+      try {
+        execSync('tmux -L panopticon kill-server', { stdio: 'ignore' });
+      } catch {
+        // No server running — fine
+      }
+    }
+
     // Regenerate Traefik dynamic config and ensure DNS
     if (traefikEnabled && !options.skipTraefik) {
       try {
