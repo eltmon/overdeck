@@ -29,6 +29,18 @@ async function fetchWorkspace(issueId: string): Promise<WorkspaceInfo> {
   return res.json();
 }
 
+async function forgeMerge(issueId: string): Promise<unknown> {
+  const res = await fetch(`/api/issues/${issueId}/forge-merge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Merge failed (${res.status})`);
+  }
+  return res.json();
+}
+
 async function forgeApprove(issueId: string): Promise<unknown> {
   const res = await fetch(`/api/issues/${issueId}/forge-approve`, {
     method: 'POST',
@@ -542,6 +554,8 @@ function OpenMergeRequestRow({
   updatedAt,
 }: OpenMrRowProps) {
   const confirm = useConfirm();
+  const forgeName = prUrl?.includes('gitlab') ? 'GitLab' : 'GitHub';
+
   const approveMutation = useMutation({
     mutationFn: () => forgeApprove(issueId),
     onSuccess: () => {
@@ -552,8 +566,17 @@ function OpenMergeRequestRow({
     },
   });
 
+  const mergeMutation = useMutation({
+    mutationFn: () => forgeMerge(issueId),
+    onSuccess: () => {
+      toast.success(`Merge started for ${identifier}`);
+    },
+    onError: (err: Error) => {
+      toast.error(`Merge failed for ${identifier}`, { description: err.message });
+    },
+  });
+
   const handleApprove = async () => {
-    const forgeName = prUrl?.includes('gitlab') ? 'GitLab' : 'GitHub';
     const confirmed = await confirm({
       title: `Approve ${identifier}`,
       message: `This will submit an approving review on ${forgeName} for all open PRs/MRs associated with ${identifier}.\n\nThe Panopticon review and test pipeline will continue running independently — this just records your human approval on the forge.`,
@@ -561,6 +584,18 @@ function OpenMergeRequestRow({
     });
     if (confirmed) {
       approveMutation.mutate();
+    }
+  };
+
+  const handleMerge = async () => {
+    const confirmed = await confirm({
+      title: `Merge ${identifier}`,
+      message: `This will squash-merge all open PRs/MRs for ${identifier} directly on ${forgeName}.\n\nThis is a forge-level merge only — it does NOT run Panopticon's post-merge cleanup (workspace teardown, label updates, etc.). Use this when the issue was handled outside the automated pipeline.`,
+      confirmLabel: 'Merge',
+      variant: 'destructive',
+    });
+    if (confirmed) {
+      mergeMutation.mutate();
     }
   };
 
@@ -620,6 +655,18 @@ function OpenMergeRequestRow({
             <ThumbsUp className="w-3.5 h-3.5" />
           )}
           Approve
+        </button>
+        <button
+          onClick={handleMerge}
+          disabled={mergeMutation.isPending}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {mergeMutation.isPending ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <GitMerge className="w-3.5 h-3.5" />
+          )}
+          Merge
         </button>
       </div>
     </li>
