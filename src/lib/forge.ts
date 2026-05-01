@@ -52,12 +52,19 @@ export interface ApproveReviewArtifactInput extends ReviewArtifactRef {
   repository?: string;
 }
 
+export interface DiscoverArtifactInput {
+  sourceBranch: string;
+  cwd?: string;
+  repository?: string;
+}
+
 export interface ForgeAdapter {
   readonly forge: ForgeType;
   createReviewArtifact(input: CreateReviewArtifactInput): Promise<CreateReviewArtifactResult>;
   mergeReviewArtifact(input: MergeReviewArtifactInput): Promise<void>;
   commentOnArtifact(input: CommentOnArtifactInput): Promise<void>;
   approveReviewArtifact(input: ApproveReviewArtifactInput): Promise<void>;
+  discoverArtifact(input: DiscoverArtifactInput): Promise<CreateReviewArtifactResult | null>;
 }
 
 async function withBodyFile<T>(body: string | undefined, prefix: string, fn: (bodyFile?: string) => Promise<T>): Promise<T> {
@@ -258,6 +265,10 @@ const githubForgeAdapter: ForgeAdapter = {
       { cwd: input.cwd, encoding: 'utf-8' }
     );
   },
+
+  async discoverArtifact(input) {
+    return getExistingGitHubArtifact(input.sourceBranch, input.cwd, input.repository);
+  },
 };
 
 const gitlabForgeAdapter: ForgeAdapter = {
@@ -309,6 +320,10 @@ const gitlabForgeAdapter: ForgeAdapter = {
       `glab mr approve ${target}${buildRepositoryFlag(input.repository)}`,
       { cwd: input.cwd, encoding: 'utf-8' }
     );
+  },
+
+  async discoverArtifact(input) {
+    return getExistingGitLabArtifact(input.sourceBranch, input.cwd, input.repository);
   },
 };
 
