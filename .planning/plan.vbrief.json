@@ -182,7 +182,7 @@
       {
         "id": "inspector-feature-actions",
         "title": "InspectorPanel renders feature-appropriate actions (no Start Agent)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-30T12:00:00Z",
         "metadata": {
@@ -197,7 +197,7 @@
           {
             "id": "inspector-feature-actions.ac1",
             "title": "InspectorPanel detects features via artifactType containing 'PortfolioItem'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -205,7 +205,7 @@
           {
             "id": "inspector-feature-actions.ac2",
             "title": "Feature in InspectorPanel shows Plan/See Plan, vBRIEF, and Tasks buttons",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -213,7 +213,7 @@
           {
             "id": "inspector-feature-actions.ac3",
             "title": "Feature in InspectorPanel does NOT show Start Agent, Resume Session, or Stop Agent buttons",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
