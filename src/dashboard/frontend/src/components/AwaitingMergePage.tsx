@@ -11,9 +11,10 @@
 
 import { useMemo, useState } from 'react';
 import { useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
-import { GitMerge, ExternalLink, Loader2, CheckCircle, AlertTriangle, ShieldAlert, XCircle, GitPullRequest, MessageSquare, FilePenLine, PenLine, ChevronDown, ChevronUp } from 'lucide-react';
+import { GitMerge, ExternalLink, Loader2, CheckCircle, AlertTriangle, ShieldAlert, XCircle, GitPullRequest, MessageSquare, FilePenLine, PenLine, ChevronDown, ChevronUp, ThumbsUp } from 'lucide-react';
 import { toast } from 'sonner';
-import { useDashboardStore, selectAwaitingMerge, selectBlockedFromMerge, selectIssues } from '../lib/store';
+import { useDashboardStore, selectAwaitingMerge, selectBlockedFromMerge, selectOpenMergeRequests, selectIssues } from '../lib/store';
+import { useConfirm } from './DialogProvider';
 import type { Issue } from '../types';
 
 interface WorkspaceInfo {
@@ -25,6 +26,18 @@ interface WorkspaceInfo {
 async function fetchWorkspace(issueId: string): Promise<WorkspaceInfo> {
   const res = await fetch(`/api/workspaces/${issueId}`);
   if (!res.ok) return {};
+  return res.json();
+}
+
+async function forgeApprove(issueId: string): Promise<unknown> {
+  const res = await fetch(`/api/issues/${issueId}/forge-approve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Approve failed (${res.status})`);
+  }
   return res.json();
 }
 
@@ -91,6 +104,7 @@ export function AwaitingMergePage() {
   }, [awaiting, issuesById]);
 
   const blocked = useDashboardStore(selectBlockedFromMerge);
+  const openMergeRequests = useDashboardStore(selectOpenMergeRequests);
 
   // One workspace fetch per ready issue (parallel via useQueries)
   const workspaceQueries = useQueries({
@@ -176,6 +190,43 @@ export function AwaitingMergePage() {
                     identifier={issue?.identifier ?? rs.issueId}
                     trackerUrl={issue?.url}
                     blockerReasons={rs.blockerReasons ?? []}
+                    updatedAt={rs.updatedAt}
+                  />
+                );
+              })}
+            </ul>
+          </div>
+        )}
+        {/* Open merge requests (not yet ready for merge) */}
+        {openMergeRequests.length > 0 && (
+          <div className="mt-10">
+            <header className="mb-4">
+              <div className="flex items-center gap-3 mb-1">
+                <GitPullRequest className="w-5 h-5 text-muted-foreground" />
+                <h2 className="text-lg font-semibold text-foreground">Open Merge Requests</h2>
+                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-accent text-muted-foreground">
+                  {openMergeRequests.length}
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                PRs/MRs that have been created but are still going through review and testing.
+                Approve or review them early on GitHub/GitLab.
+              </p>
+            </header>
+            <ul className="space-y-3">
+              {openMergeRequests.map((rs) => {
+                const issue = issuesById.get(rs.issueId.toLowerCase());
+                return (
+                  <OpenMergeRequestRow
+                    key={rs.issueId}
+                    issueId={rs.issueId}
+                    identifier={issue?.identifier ?? rs.issueId}
+                    title={issue?.title ?? rs.issueId}
+                    trackerUrl={issue?.url}
+                    prUrl={rs.prUrl}
+                    reviewStatus={rs.reviewStatus}
+                    testStatus={rs.testStatus}
+                    verificationStatus={rs.verificationStatus}
                     updatedAt={rs.updatedAt}
                   />
                 );
@@ -424,6 +475,153 @@ function BlockedMergeRow({
             ))}
         </div>
       )}
+    </li>
+  );
+}
+
+interface OpenMrRowProps {
+  issueId: string;
+  identifier: string;
+  title: string;
+  trackerUrl?: string;
+  prUrl?: string;
+  reviewStatus?: string;
+  testStatus?: string;
+  verificationStatus?: string;
+  updatedAt?: string;
+}
+
+function pipelineStepBadge(label: string, status?: string) {
+  if (!status || status === 'pending') {
+    return (
+      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent text-muted-foreground">
+        {label}
+      </span>
+    );
+  }
+  if (status === 'running') {
+    return (
+      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary flex items-center gap-1">
+        <Loader2 className="w-3 h-3 animate-spin" />
+        {label}
+      </span>
+    );
+  }
+  if (status === 'passed' || status === 'skipped') {
+    return (
+      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-success/15 text-success flex items-center gap-1">
+        <CheckCircle className="w-3 h-3" />
+        {label}
+      </span>
+    );
+  }
+  if (status === 'failed') {
+    return (
+      <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-destructive/15 text-destructive flex items-center gap-1">
+        <XCircle className="w-3 h-3" />
+        {label}
+      </span>
+    );
+  }
+  return (
+    <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent text-muted-foreground">
+      {label}
+    </span>
+  );
+}
+
+function OpenMergeRequestRow({
+  issueId,
+  identifier,
+  title,
+  trackerUrl,
+  prUrl,
+  reviewStatus,
+  testStatus,
+  verificationStatus,
+  updatedAt,
+}: OpenMrRowProps) {
+  const confirm = useConfirm();
+  const approveMutation = useMutation({
+    mutationFn: () => forgeApprove(issueId),
+    onSuccess: () => {
+      toast.success(`Approved ${identifier}`);
+    },
+    onError: (err: Error) => {
+      toast.error(`Approve failed for ${identifier}`, { description: err.message });
+    },
+  });
+
+  const handleApprove = async () => {
+    const forgeName = prUrl?.includes('gitlab') ? 'GitLab' : 'GitHub';
+    const confirmed = await confirm({
+      title: `Approve ${identifier}`,
+      message: `This will submit an approving review on ${forgeName} for all open PRs/MRs associated with ${identifier}.\n\nThe Panopticon review and test pipeline will continue running independently — this just records your human approval on the forge.`,
+      confirmLabel: 'Approve',
+    });
+    if (confirmed) {
+      approveMutation.mutate();
+    }
+  };
+
+  return (
+    <li className="border border-border rounded-lg bg-card p-4 flex items-start gap-4 opacity-80">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          {trackerUrl ? (
+            <a
+              href={trackerUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent text-foreground hover:underline"
+            >
+              {identifier}
+            </a>
+          ) : (
+            <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent text-foreground">
+              {identifier}
+            </span>
+          )}
+          {updatedAt && (
+            <span className="text-[11px] text-muted-foreground">
+              opened {formatRelative(updatedAt)}
+            </span>
+          )}
+        </div>
+        <p className="text-sm text-foreground truncate" title={title}>
+          {title}
+        </p>
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {pipelineStepBadge('review', reviewStatus)}
+          {pipelineStepBadge('test', testStatus)}
+          {pipelineStepBadge('verify', verificationStatus)}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {prUrl && (
+          <a
+            href={prUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-border text-foreground hover:bg-accent transition-colors"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            View PR
+          </a>
+        )}
+        <button
+          onClick={handleApprove}
+          disabled={approveMutation.isPending}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-success/15 text-success hover:bg-success/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {approveMutation.isPending ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <ThumbsUp className="w-3.5 h-3.5" />
+          )}
+          Approve
+        </button>
+      </div>
     </li>
   );
 }
