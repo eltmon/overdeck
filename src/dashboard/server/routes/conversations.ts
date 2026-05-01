@@ -562,6 +562,14 @@ export async function handleConversationMessage(
   }
 
   await deliverMessage(conv.tmuxSession, message, 'conversation-message');
+
+  // Generate AI title for conversations created via instant-start (no message at creation)
+  if (conv.titleSource === 'default') {
+    void generateAiTitle(name, message).catch((err: unknown) => {
+      console.error(`[conversations] AI title generation failed for "${name}":`, err);
+    });
+  }
+
   return jsonResponse({ ok: true });
 }
 
