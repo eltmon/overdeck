@@ -434,6 +434,28 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
     const planningPrompt = buildPlanningPrompt(issue, workspacePath, planningModel, effort);
     writeFileSync(planningPromptPath, planningPrompt);
+
+    // Write FEATURE-CONTEXT.md for Rally Features so story workspaces can reference it
+    if (issue.artifactType?.includes('PortfolioItem')) {
+      const featureContextPath = join(planningDir, 'FEATURE-CONTEXT.md');
+      const childStoriesSection = issue.childStories && issue.childStories.length > 0
+        ? issue.childStories.map(s =>
+            `### ${s.ref}: ${s.title}\n- **Status:** ${s.status}\n- **Description:** ${s.description || '(none)'}`
+          ).join('\n\n')
+        : '_No child stories found._';
+      writeFileSync(featureContextPath,
+        `# Feature Context: ${issue.identifier}\n\n` +
+        `**Title:** ${issue.title}\n\n` +
+        `**URL:** ${issue.url}\n\n` +
+        `## Description\n${issue.description || 'No description provided.'}\n\n` +
+        `## Child Stories\n${childStoriesSection}\n\n` +
+        `---\n` +
+        `*This file is auto-generated for story-level workspaces to reference.*\n`,
+        'utf-8',
+      );
+      console.log(`[start-planning] Wrote FEATURE-CONTEXT.md for ${issue.identifier}`);
+    }
+
     const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel);
 
     const providerExports = await getProviderExportsForModel(planningModel);
