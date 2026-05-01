@@ -1,79 +1,83 @@
-# PAN-923: Command Deck v0.8 Completion
+# PAN-936: Rally Feature Planning — End-to-End UX and Pipeline
 
-**Status:** In Progress (fast-track on main)
-**Planned by:** Claude Opus 4.6
-**Date:** 2026-04-29
+## Status: Planning Complete
 
----
+## Problem
 
-## Discovery Summary
+Rally Features are non-interactive in the dashboard. FeatureCard has no action bar
+(no Plan/vBRIEF/Tasks), clicking it only toggles expand/collapse (no detail view),
+CompactChildCard (child stories) aren't clickable, and the backend has no
+feature-aware planning pipeline. Three sub-issues consolidated:
 
-PAN-923 consolidates remaining PAN-830 phases (3-6), PAN-831 (rebrand refinish), and PAN-548 (draft persistence) into one sprint on `main`.
+- **PAN-704**: FeatureCard missing action bar
+- **PAN-397**: Hierarchical planning pipeline not wired end-to-end
+- **PAN-403**: derivedStatus from children affects feature column placement
 
-### Already Completed (skip in vBRIEF)
-- **Tree state filter** (item 2): `[All] [Alive] [Failed]` toggle exists at `CommandDeck/index.tsx:698-711`
-- **PR/Diff tab** (item 6): `PrDiffTab.tsx` fully implemented (475 lines), backend at `/api/issues/:id/pr/details`
-- **Discussions tab** (item 7): `DiscussionsTab.tsx` fully implemented (327 lines), backend at `/api/issues/:id/discussions`
-- **Directory rename** (item 8a): `MissionControl/` → `CommandDeck/` already done
-- **Old CSS delete** (item 8b): `mission-control.module.css` already deleted
-- **DeferredTab** is dead code — no imports reference it
+## Decisions
 
-### Key Touch Points
+### Scope
+All 3 phases: Dashboard UI + Backend Pipeline + Integration Tests.
 
-| Component | File | What Changes |
-|-----------|------|-------------|
-| PresenceDot → StatusDot | `ProjectTree/SessionNode.tsx:21-52` | Replace inline SVG spinner + CSS classes with `<StatusDot>` |
-| Collapse logic | `ProjectTree/FeatureItem.tsx:479-484` | `defaultExpandedFromState()` becomes state-aware |
-| ZoneBActionStrip | `CommandDeck/ZoneBActionStrip.tsx:291-369` | Add overflow items from PRD spec |
-| getZoneBActions | `lib/commandDeckActions.ts:298-311` | Add overflow action keys |
-| mc- tokens (249 usages) | Many `.tsx` files | Replace `var(--mc-X, var(--Y))` → `var(--Y)` |
-| mc- definitions | `styles/command-deck.module.css:4-35` | Remove alias layer after migration |
-| text-white | `BulkActionBar.tsx` | Replace with semantic foreground token |
-| DialogProvider | `components/DialogProvider.tsx` | Backdrop blur, panel styling, animation |
-| Draft persistence | `CommandDeck/IssueComposer.tsx:56` | `useState('')` → Zustand-backed state |
-| Liveness motions | Various CommandDeck components | Verify animations fire on real events |
+### Planning Flow
+Reuse existing planning pipeline for features. Plan button spawns a standard planning
+agent — no new feature-specific planning mode. The planning prompt is enhanced to detect
+features and include child story context.
 
-### mc- Token Mapping (from command-deck.module.css)
+### Detail UX
+FeatureCard title click → select issue → opens existing InspectorPanel (right sidebar).
+Chevron continues to toggle expand/collapse. Consistent with IssueCard behavior.
 
-| mc- token | Canonical replacement |
-|-----------|---------------------|
-| `--mc-text-muted` (101 uses) | `--muted-foreground` |
-| `--mc-border` (53 uses) | `--border` |
-| `--mc-success` (25 uses) | `--success` |
-| `--mc-error` (21 uses) | `--destructive` |
-| `--mc-warning` (20 uses) | `--warning` |
-| `--mc-primary` (11 uses) | `--primary` |
-| `--mc-accent` (11 uses) | `--primary` |
-| `--mc-surface-2` (5 uses) | `color-mix(in srgb, var(--foreground) 3%, transparent)` |
-| `--mc-surface` (3 uses) | `--background` |
-| `--mc-text-secondary` (2 uses) | `--muted-foreground` |
-| `--mc-text-primary` (2 uses) | `--foreground` |
-| `--mc-primary-foreground` (2 uses) | `--primary-foreground` |
-| `--mc-bg-secondary` (2 uses) | `--muted` |
+### Story Creation
+Planning agents reference existing child stories only. No auto-creation of story issues
+in Rally.
 
-Pattern: most inline styles use `var(--mc-X, var(--canonical))` with fallbacks. Replace entire expression with just `var(--canonical)`.
+### Cloister Scope (Groundwork Only)
+`getChildIssues()` + feature-aware planning prompt + FEATURE-CONTEXT.md injection.
+Cross-story dependency edges are written to vBRIEF but NOT enforced by Cloister.
+Full orchestration deferred.
 
-## Key Architectural Decisions
+### derivedStatus Fix (PAN-403)
+Investigation found two issues:
+1. **Column placement**: `groupByStatus()` uses `derivedStatus` to move features into
+   "In Progress" column even when the feature's own Rally status is "Todo"
+2. **Plan button gating**: The Plan chip checks `issue.status` (raw), not effective column
 
-### D1: StatusDot mapping for SessionNode
-**Decision:** Map session `presence` field to StatusDot `status` prop: `active→active`, `idle→idle`, `suspended→waiting`, `ended→ended`. No `thinking` state at session level (that's a status sub-state).
-**Rationale:** StatusDot already handles these states with correct animations. The PresenceDot inline SVG duplicates this without animation consistency.
+The fix for this issue: FeatureCard's Plan button uses the feature's own `status`,
+ignoring `derivedStatus` from children. This aligns with "plan at Feature, execute at
+Story" — a feature's planning state is independent of child progress.
 
-### D2: Done-issue collapse default
-**Decision:** Pass feature state to `defaultExpandedFromState()`. In-flight states (stateLabel contains "progress", "review", "testing") → expanded=true with auto-select of best alive session. Done/closed → collapsed.
-**Rationale:** Users want to see active work at a glance but not be overwhelmed by completed issues.
+**Out of scope**: Changing column placement logic for features (whether derivedStatus
+should move features between columns is a separate UX decision — file as follow-up).
 
-### D3: mc- token elimination approach
-**Decision:** Batch find-replace across all `.tsx` files. Replace `var(--mc-X, var(--Y))` patterns with `var(--Y)`. For bare `var(--mc-X)` without fallback, replace with canonical equivalent from mapping table. Then remove definitions from `command-deck.module.css`.
-**Rationale:** The mc- layer is 1:1 with canonical tokens — it adds indirection without value.
+## Architecture Notes
 
-### D4: Draft persistence via Zustand
-**Decision:** Add a `draftTexts: Record<string, string>` map to the existing dashboard Zustand store, keyed by issueId. Cleared on page refresh (not persisted to localStorage). Wire into IssueComposer via store selector.
-**Rationale:** Simplest approach that survives navigation within the SPA but doesn't persist stale drafts across sessions.
+### Existing UI Components (Reuse)
+- `BeadsTasksPanel` — Tasks chip dialog (exists, wired for IssueCard)
+- `VBriefDialog` / `VBriefViewer` — vBRIEF chip dialog (exists at `src/dashboard/frontend/src/components/vbrief/`)
+- `PlanDialog` — Plan chip dialog (exists, spawns planning agent)
+- `InspectorPanel` — Right sidebar detail view (exists, needs feature-specific action branch)
 
-### D5: Zone B overflow additions
-**Decision:** Add to getZoneBActions overflow: `viewState`, `viewVbrief`, `copySessionId`, `copyTmuxCommand`. Add corresponding ActionKey entries and ZoneBActionStrip overflow items.
-**Rationale:** PRD specifies these actions. They're utility/debug actions that belong in overflow, not primary.
+### Backend Components (New/Modified)
+- `IssueTracker.getChildIssues()` — New method on tracker interface
+- `RallyTracker.getChildIssues()` — Rally implementation querying PortfolioItem children
+- `spawn-planning-session.ts` — Enhanced to detect features and inject child story context
+- `work-agent-prompt.ts` — New `FEATURE_CONTEXT` injection for story workspaces
+- `.planning/FEATURE-CONTEXT.md` — Feature's architectural decisions + cross-story context
 
-## Remaining Work
-See plan.vbrief.json for the complete bead breakdown.
+### Key Files
+- `KanbanBoard.tsx` — FeatureCard, CompactChildCard, action bar rendering
+- `InspectorPanel.tsx` — Feature-specific action region
+- `issue-data-service.ts` — derivedStatus computation
+- `src/lib/tracker/interface.ts` — IssueTracker interface
+- `src/lib/tracker/rally.ts` — Rally implementation
+- `src/lib/planning/spawn-planning-session.ts` — Planning session spawning
+- `src/lib/cloister/work-agent-prompt.ts` — Work agent context injection
+
+## PRD Note
+The issue references `docs/prds/planned/rally-feature-planning-ux.md` but this file
+does not exist on disk. The issue body itself serves as the spec.
+
+## Related Issues
+- PAN-704: FeatureCard action bar (consolidated here)
+- PAN-397: Hierarchical planning pipeline (consolidated here)
+- PAN-403: derivedStatus gate (consolidated here)
