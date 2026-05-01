@@ -8,7 +8,7 @@
 
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
-import { existsSync, mkdirSync, writeFileSync, chmodSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, chmodSync, readFileSync } from 'fs';
 import { basename, join, resolve } from 'path';
 import { readWorkspacePlan, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
@@ -303,6 +303,27 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
  * Returns the vBRIEF item ID that was updated, or null if no match was found.
  * Callers must provide knownTitle (from bd list/show output).
  */
+/** Read a bead title from .beads/issues.jsonl by bead ID. */
+function readBeadTitleFromJsonl(beadId: string, workspacePath: string): string | null {
+  try {
+    const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
+    if (!existsSync(jsonlPath)) return null;
+    const raw = readFileSync(jsonlPath, 'utf-8');
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const entry = JSON.parse(line);
+        if (entry.id === beadId && typeof entry.title === 'string') {
+          return entry.title;
+        }
+      } catch { /* skip malformed lines */ }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function syncBeadStatusToVBrief(
   beadId: string,
   workspacePath: string,
@@ -313,7 +334,10 @@ export function syncBeadStatusToVBrief(
     const doc = readWorkspacePlan(workspacePath);
     if (!doc) return null;
 
-    const beadTitle: string | null = knownTitle ?? null;
+    let beadTitle: string | null = knownTitle ?? null;
+    if (!beadTitle) {
+      beadTitle = readBeadTitleFromJsonl(beadId, workspacePath);
+    }
 
     if (!beadTitle) return null;
 
