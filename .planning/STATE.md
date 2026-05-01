@@ -6,7 +6,7 @@
 Implementing bead workspace-rie: Add getChildIssues() method to IssueTracker interface
 
 ## Completed Work
-None yet
+- [x] workspace-rie: Add getChildIssues() method to IssueTracker interface (commit: 24c0cf9d9)
 
 ## Remaining Work
 - [ ] workspace-rie: Add getChildIssues() method to IssueTracker interface
