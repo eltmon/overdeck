@@ -1558,7 +1558,7 @@ export function findActiveRegistryKey(projectKey: string, specialistType: Specia
  * @param result - Task result
  * @param issueId - Optional: issue being handled (used to compute compound registry key)
  */
-export function signalSpecialistCompletion(
+export async function signalSpecialistCompletion(
   projectKey: string,
   specialistType: SpecialistType,
   result: {
@@ -1566,7 +1566,7 @@ export function signalSpecialistCompletion(
     notes?: string;
   },
   issueId?: string
-): void {
+): Promise<void> {
   const registryKey = issueId
     ? makeSpecialistRegistryKey(specialistType, issueId)
     : (findActiveRegistryKey(projectKey, specialistType) ?? specialistType);
@@ -1580,9 +1580,8 @@ export function signalSpecialistCompletion(
 
   // Finalize log if there's a current run
   if (metadata.currentRun) {
-    const { finalizeRunLog } = require('./specialist-logs.js');
-
     try {
+      const { finalizeRunLog } = await import('./specialist-logs.js');
       finalizeRunLog(projectKey, specialistType, metadata.currentRun, {
         status: result.status,
         notes: result.notes,
