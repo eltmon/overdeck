@@ -42,6 +42,20 @@ await mkdir(getPanopticonHome(), { recursive: true });
 // on first start; reused on subsequent starts. Used by /api/internal/pipeline/notify.
 ensureInternalToken();
 
+// Event loop stall detector — logs when the event loop is blocked for >200ms.
+// Helps diagnose intermittent terminal freezes in the dashboard.
+{
+  let lastTick = performance.now();
+  setInterval(() => {
+    const now = performance.now();
+    const delta = now - lastTick;
+    lastTick = now;
+    if (delta > 200) {
+      console.warn(`[event-loop] Stall detected: ${Math.round(delta)}ms (expected ~100ms)`);
+    }
+  }, 100);
+}
+
 // Prepare the managed tmux context exactly once, before any code path can spawn
 // tmux. After this call `buildTmuxArgs`, `buildTmuxCommandString`, and
 // `tmuxExecAsync` are effectively free — no per-call file writes, no per-call

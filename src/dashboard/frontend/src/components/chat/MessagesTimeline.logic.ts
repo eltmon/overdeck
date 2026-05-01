@@ -1,11 +1,11 @@
 /**
- * session-logic.ts (PAN-451)
+ * MessagesTimeline.logic.ts (PAN-826)
  *
  * Transforms raw ChatMessage[] + WorkLogEntry[] into TimelineEntry[],
  * which can then be rendered or converted to MessagesTimelineRow[].
  *
- * Mirrors the core pattern from T3Code's session-logic.ts, simplified
- * for Panopticon (no ProposedPlan, no attachment handling, etc.).
+ * Mirrors the core pattern from T3Code's MessagesTimeline.logic.ts, simplified
+ * for Panopticon (no attachment handling, etc.).
  */
 
 import type { ChatMessage, WorkLogEntry } from './chat-types';
@@ -32,6 +32,11 @@ export type MessagesTimelineRow =
       message: ChatMessage;
       /** Timestamp of the preceding user message — used for duration display. */
       durationStart: string;
+    }
+  | {
+      kind: 'proposed-plan';
+      id: string;
+      createdAt: string;
     }
   | {
       kind: 'working';
@@ -171,6 +176,7 @@ export function estimateMessagesTimelineRowHeight(
   timelineWidth = 800,
 ): number {
   if (row.kind === 'working') return 40;
+  if (row.kind === 'proposed-plan') return 40;
 
   if (row.kind === 'work') {
     const visible = Math.min(row.groupedEntries.length, MAX_VISIBLE_WORK_LOG_ENTRIES);

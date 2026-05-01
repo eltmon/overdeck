@@ -429,8 +429,15 @@ interface ConversationViewProps {
   roundMetadata?: ReviewerRoundMetadata;
 }
 
+export interface FailedMessage {
+  id: string;
+  text: string;
+  createdAt: string;
+}
+
 function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata }: ConversationViewProps) {
   const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
+  const [failedMessages, setFailedMessages] = useState<FailedMessage[]>([]);
   // Track count so we know when the server caught up
   const prevServerCountRef = useRef(0);
 
@@ -461,6 +468,53 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
     };
     setOptimisticMessages([optimistic]);
   }, [serverMessages.length]);
+
+  // Called by ComposerFooter when POST fails — move optimistic to failed outbox
+  const handleSendFailed = useCallback((text: string) => {
+    setOptimisticMessages([]);
+    const failed: FailedMessage = {
+      id: `failed-${Date.now()}`,
+      text,
+      createdAt: new Date().toISOString(),
+    };
+    setFailedMessages(prev => [...prev, failed]);
+  }, []);
+
+  const handleRetryFailed = useCallback(async (failedId: string, text: string) => {
+    // Remove from failed list and re-send
+    setFailedMessages(prev => prev.filter(f => f.id !== failedId));
+    try {
+      const res = await fetch(
+        `/api/conversations/${encodeURIComponent(conversation.name)}/message`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text }),
+        },
+      );
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Failed to send message (${res.status})${body ? `: ${body}` : ''}`);
+      }
+    } catch {
+      // Re-add to failed list on retry failure
+      const failed: FailedMessage = {
+        id: `failed-${Date.now()}`,
+        text,
+        createdAt: new Date().toISOString(),
+      };
+      setFailedMessages(prev => [...prev, failed]);
+    }
+  }, [conversation.name]);
+
+  const handleDiscardFailed = useCallback((failedId: string) => {
+    setFailedMessages(prev => prev.filter(f => f.id !== failedId));
+  }, []);
+
+  // Clear failed messages when switching conversations
+  useEffect(() => {
+    setFailedMessages([]);
+  }, [conversation.name]);
 
   // Clean up optimistic messages in an effect once the server catches up
   useEffect(() => {
@@ -535,6 +589,9 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           workLog={workLog}
           streaming={isWorking}
           roundMarkers={derivedRoundMarkers}
+          failedMessages={failedMessages}
+          onRetryFailed={handleRetryFailed}
+          onDiscardFailed={handleDiscardFailed}
         />
       )}
       {isForking ? null : onResume ? (
@@ -549,7 +606,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           </button>
         </div>
       ) : (
-        <ComposerFooter conversation={conversation} onSend={handleMessageSent} />
+        <ComposerFooter conversation={conversation} onSend={handleMessageSent} onSendFailed={handleSendFailed} />
       )}
     </div>
   );

@@ -123,10 +123,6 @@ vi.mock('../chat/ConversationPanel', () => ({
   ConversationPanel: () => <div data-testid="conversation-panel" />,
 }));
 
-vi.mock('../chat/DraftConversationPanel', () => ({
-  DraftConversationPanel: () => <div data-testid="draft-panel" />,
-}));
-
 vi.mock('../chat/ModelPicker', () => ({
   ModelPicker: ({ value, onChange }: any) => (
     <select data-testid="model-picker" value={value} onChange={(e) => onChange?.(e.target.value)}>

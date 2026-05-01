@@ -10,8 +10,6 @@ import { BeadsDialog } from '../BeadsDialog';
 import { ConversationList, type Conversation } from './ConversationList';
 import { ConversationPanel, type ViewMode } from '../chat/ConversationPanel';
 import { ModelPicker, loadStoredModel, saveStoredModel } from '../chat/ModelPicker';
-import { DraftConversationPanel } from '../chat/DraftConversationPanel';
-import type { ChatMessage } from '../chat/chat-types';
 import type { Agent, Issue, StartAgentResponse } from '../../types';
 import { useDashboardStore, selectAgentList } from '../../lib/store';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
@@ -167,7 +165,6 @@ export function CommandDeck({
   const [projectQueryEpoch, bumpProjectQueryEpoch] = useReducer((value: number) => value + 1, 0);
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
-  const [isDraft, setIsDraft] = useState(false);
   const [showBeads, setShowBeads] = useState(false);
   const [sidebarMode, setSidebarModeState] = useState<SidebarMode>(() => loadSidebarMode());
   const showConversations = sidebarMode === 'conversations';
@@ -186,8 +183,6 @@ export function CommandDeck({
   const selectedSessionId = selectedFeature
     ? selectedSessionByIssue[selectedFeature] ?? null
     : null;
-  // Increments each time + is clicked, forcing DraftConversationPanel to remount and re-read localStorage
-  const [draftKey, setDraftKey] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem('mc-sidebar-width');
     return saved ? Math.max(280, Number(saved)) : 320;
@@ -383,14 +378,12 @@ export function CommandDeck({
     setSelectedFeature(issueId);
     selectSession(issueId, null);
     setSelectedConversation(null);
-    setIsDraft(false);
   }, [selectSession]);
 
   const handleSelectSession = useCallback((issueId: string, sessionId: string) => {
     setSelectedFeature(issueId);
     selectSession(issueId, sessionId);
     setSelectedConversation(null);
-    setIsDraft(false);
   }, [selectSession]);
 
   const handleStopSession = useCallback(async (sessionId: string) => {
@@ -425,7 +418,6 @@ export function CommandDeck({
           setSelectedFeature(feature.issueId);
           selectSession(feature.issueId, sessionId);
           setSelectedConversation(null);
-          setIsDraft(false);
           return;
         }
       }
@@ -528,7 +520,6 @@ export function CommandDeck({
           setSelectedFeature(feature.issueId);
           selectSession(feature.issueId, sessionId);
           setSelectedConversation(null);
-          setIsDraft(false);
           return;
         }
       }
@@ -536,51 +527,41 @@ export function CommandDeck({
   }, [projectsWithSessions, selectSession]);
 
   const handleSelectConversation = useCallback((name: string | null) => {
-    setDraftKey(0);
     setSelectedConversation(name);
     if (selectedFeature) {
       selectSession(selectedFeature, null);
     }
-    setIsDraft(false);
     if (name !== null) {
       setSelectedFeature(null);
     }
   }, [selectSession, selectedFeature]);
 
-  const handleDraftCreated = useCallback(() => {
-    setDraftKey(k => k + 1);
-    setIsDraft(true);
-    setSelectedConversation(null);
-    setSelectedFeature(null);
-    setSidebarMode('conversations');
-  }, [setSidebarMode]);
-
-  const handleDraftPromoted = useCallback((conv: Conversation, firstMessage: string) => {
-    setDraftKey(0);
-    setIsDraft(false);
-    setSelectedConversation(conv.name);
-    // Update URL immediately — the conv isn't in the query cache yet so the
-    // URL-sync effect can't resolve it; do it eagerly here.
-    if (onConvIdChange) {
-      const newId = String(conv.id);
-      onConvIdChange(newId);
-      appliedConvId.current = newId;
-      prevSelectedRef.current = conv.name;
+  const handleNewConversation = useCallback(async () => {
+    try {
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: sidebarModel }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Request failed' }));
+        throw new Error((err as { error?: string }).error || 'Failed to create conversation');
+      }
+      const conv = await res.json() as Conversation;
+      setSelectedConversation(conv.name);
+      setSelectedFeature(null);
+      setSidebarMode('conversations');
+      if (onConvIdChange) {
+        const newId = String(conv.id);
+        onConvIdChange(newId);
+        appliedConvId.current = newId;
+        prevSelectedRef.current = conv.name;
+      }
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    } catch (err) {
+      console.error('[CommandDeck] Failed to create conversation:', err);
     }
-    // Seed optimistic first message so it appears immediately before polling returns data
-    const optimistic: ChatMessage = {
-      id: `optimistic-${Date.now()}`,
-      role: 'user',
-      text: firstMessage,
-      createdAt: new Date().toISOString(),
-    };
-    queryClient.setQueryData(['conversation-messages', conv.name], {
-      messages: [optimistic],
-      workLog: [],
-      streaming: true,
-    });
-    queryClient.invalidateQueries({ queryKey: ['conversations'] });
-  }, [queryClient, onConvIdChange]);
+  }, [sidebarModel, queryClient, onConvIdChange, setSidebarMode]);
 
   // Resizable sidebar drag handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -673,7 +654,7 @@ export function CommandDeck({
                 />
                 <button
                   className={styles.conversationAddBtn}
-                  onClick={handleDraftCreated}
+                  onClick={handleNewConversation}
                   title="New conversation"
                   aria-label="New conversation"
                 >
@@ -789,12 +770,7 @@ export function CommandDeck({
 
         {/* Content Area */}
         <div className={styles.content}>
-          {isDraft ? (
-            <DraftConversationPanel
-              key={draftKey}
-              onPromoted={handleDraftPromoted}
-            />
-          ) : selectedConversation ? (
+          {selectedConversation ? (
             (() => {
               const conv = conversations.find(c => c.name === selectedConversation);
               return conv ? (

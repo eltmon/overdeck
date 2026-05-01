@@ -17,17 +17,17 @@ import { reloadGlobalRouter } from './work-type-router.js';
  * Optimal model defaults — multi-provider distribution (see docs/research/)
  * - Kimi K2.6: Exploration, testing, docs, UAT, general-purpose subagent
  * - GLM-5.1: Implementation, review-response (SWE-Bench Pro #1)
- * - GPT-5.4: Specialist review agent (high-stakes code review)
+ * - GPT-5.5: Specialist review agent (high-stakes code review)
  * - MiniMax M2.7: Procedural specialists — test, merge, inspect
  * - Claude Opus/Sonnet: All parallel review agents (security, correctness, etc.)
- * - GPT-5.4 Nano/Mini: Subagents and CLI (fastest, cheapest, strong tool use)
+ * - GPT-5.5 Nano/Mini: Subagents and CLI (fastest, cheapest, strong tool use)
  *
  * NOTE: All model IDs are automatically resolved through deprecation mapping
  * to ensure this function never returns deprecated models.
  */
 export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
   const rawDefaults: Partial<Record<WorkTypeId, string>> = {
-    // Planning & high-stakes review — GPT-5.4
+    // Planning & high-stakes review — GPT-5.5
     'issue-agent:exploration': 'kimi-k2.6',
 
     // Implementation — GLM-5.1 (SWE-Bench Pro #1, 8-hour autonomous sessions)
@@ -37,7 +37,7 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'issue-agent:review-response': 'glm-5.1',
 
     // Specialist agents
-    'specialist-review-agent': 'gpt-5.4',
+    'specialist-review-agent': 'gpt-5.5',
     'specialist-test-agent': 'minimax-m2.7',
     'specialist-merge-agent': 'minimax-m2.7',
     'specialist-inspect-agent': 'minimax-m2.7-highspeed',
@@ -50,18 +50,18 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'review:requirements': 'claude-sonnet-4-6',
     'review:synthesis': 'claude-sonnet-4-6',
 
-    // Subagents — GPT-5.4 Nano (155 tok/s, Tau2-Bench 92.5% tool use)
-    'subagent:explore': 'gpt-5.4-nano',
-    'subagent:plan': 'gpt-5.4-nano',
-    'subagent:bash': 'gpt-5.4-nano',
+    // Subagents — GPT-5.5 Nano (fastest, cheapest, strong tool use)
+    'subagent:explore': 'gpt-5.5-nano',
+    'subagent:plan': 'gpt-5.5-nano',
+    'subagent:bash': 'gpt-5.5-nano',
     'subagent:general-purpose': 'kimi-k2.6',
 
     // Workflow jobs
-    'status-review': 'gpt-5.4-nano',
+    'status-review': 'gpt-5.5-nano',
 
     // CLI modes
-    'cli:interactive': 'gpt-5.4-mini',
-    'cli:quick-command': 'gpt-5.4-nano',
+    'cli:interactive': 'gpt-5.5-mini',
+    'cli:quick-command': 'gpt-5.5-nano',
   };
 
   // Apply deprecation resolution to all model IDs
@@ -140,7 +140,7 @@ export function getDefaultConversationModelApi(): ModelId {
 
   if (config.defaultConversationModel) return resolveModelId(config.defaultConversationModel);
 
-  if (config.enabledProviders.has('openai')) return resolveModelId('gpt-5.4');
+  if (config.enabledProviders.has('openai')) return resolveModelId('gpt-5.5');
   if (config.enabledProviders.has('minimax')) return resolveModelId('minimax-m2.7-highspeed');
   if (config.enabledProviders.has('google')) return resolveModelId('gemini-3.1-pro-preview');
   if (config.enabledProviders.has('kimi')) return resolveModelId('kimi-k2.5');

@@ -61,23 +61,16 @@ const SNAPSHOT_SCROLLBACK_LINES = (() => {
 /**
  * Snapshot for a fresh attach (no existing hub).
  *
- * We used to call `resizeWindowAsync` before `capturePaneAsync`, but tmux's
- * resize is only synchronous from tmux's point of view — the grid dims change
- * instantly, yet the inner program (Claude Code, etc.) only redraws its
- * content asynchronously in response to SIGWINCH. The capture ran between
- * those two events, so the snapshot contained old content laid out for the
- * previous width, painted into a new-width grid. The client then displayed
- * that garbled state until the PTY attach triggered a real redraw — a
- * visible 1–2 s "letters all over the place" glitch on every fresh attach.
+ * Always captures at tmux's current dimensions — never resizes first.
+ * Resizing before capture caused a "letters all over the place" glitch:
+ * tmux's grid changed instantly but the inner program (Claude Code, etc.)
+ * hadn't redrawn yet, so the snapshot contained old content in a new-width
+ * grid.
  *
- * New strategy: only capture if tmux is already at the client's requested
- * dims (the common reopen case — previous client disconnected, dims
- * retained). In that case the content is valid at the requested size and
- * paints cleanly. When the dims don't match, return an empty snapshot at
- * the requested dims: the client resizes its xterm, the PTY attaches at
- * those dims (driving tmux's real resize + the inner program's redraw),
- * and the first visible content is the clean live redraw — no stale
- * mid-resize garbage.
+ * By capturing at the current dims, the snapshot is always consistent with
+ * the rendered content. The client resizes xterm to match the snapshot dims,
+ * paints the content immediately, then the PTY attach drives the resize to
+ * the client's actual dims via the normal resize path.
  */
 async function captureFreshSnapshot(
   sessionName: string,
@@ -85,11 +78,11 @@ async function captureFreshSnapshot(
   requestedRows: number,
 ): Promise<{ cols: number; rows: number; data: string }> {
   const dims = await getWindowDimensionsAsync(sessionName);
-  if (!dims || dims.cols !== requestedCols || dims.rows !== requestedRows) {
+  if (!dims) {
     return { cols: requestedCols, rows: requestedRows, data: '' };
   }
   const data = await capturePaneAsync(sessionName, SNAPSHOT_SCROLLBACK_LINES, { escapeSequences: true });
-  return { cols: requestedCols, rows: requestedRows, data };
+  return { cols: dims.cols, rows: dims.rows, data };
 }
 
 /**
@@ -392,7 +385,19 @@ export function setupTerminalWebSocket(server: http.Server): void {
         hub.pty = ptyProcess;
         activePtyHubs.set(sessionName, hub);
 
+        let ptyChunks = 0;
+        let ptyBytes = 0;
+        const ptyDiagInterval = setInterval(() => {
+          if (ptyChunks === 0) return;
+          const maxBuf = Math.max(...[...hub.clients].map(c => c.bufferedAmount));
+          console.log(`[ws-terminal] PTY ${sessionName}: ${ptyChunks} chunks, ${ptyBytes}B in last 5s, ws-buf=${maxBuf}`);
+          ptyChunks = 0;
+          ptyBytes = 0;
+        }, 5000);
+
         ptyProcess.onData((data) => {
+          ptyChunks++;
+          ptyBytes += data.length;
           broadcastToHub(hub, data);
         });
 

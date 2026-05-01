@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createRequire } from "node:module";
-import { appendFileSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, writeFileSync } from "fs";
+import { appendFileSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync } from "fs";
 import { exec, execFileSync } from "child_process";
 import { dirname, join } from "path";
 import { homedir } from "os";
@@ -7671,13 +7671,18 @@ function extractPrefix(issueId) {
 * Maps Linear team prefixes and labels to project paths for workspace creation.
 */
 const PROJECTS_CONFIG_FILE = join(PANOPTICON_HOME, "projects.yaml");
-/**
-* Load projects configuration from ~/.panopticon/projects.yaml
-*/
+let _projectsCache = null;
 function loadProjectsConfig() {
 	if (!existsSync(PROJECTS_CONFIG_FILE)) return { projects: {} };
 	try {
-		return (0, import_dist.parse)(readFileSync(PROJECTS_CONFIG_FILE, "utf-8")) || { projects: {} };
+		const mtime = statSync(PROJECTS_CONFIG_FILE).mtimeMs;
+		if (_projectsCache && _projectsCache.mtime === mtime) return _projectsCache.config;
+		const config = (0, import_dist.parse)(readFileSync(PROJECTS_CONFIG_FILE, "utf-8")) || { projects: {} };
+		_projectsCache = {
+			mtime,
+			config
+		};
+		return config;
 	} catch (error) {
 		console.error(`Failed to parse projects.yaml: ${error.message}`);
 		return { projects: {} };

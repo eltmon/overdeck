@@ -51,6 +51,7 @@ import {
 } from '../../../lib/database/conversations-db.js';
 import {
   sendKeysAsync,
+  MessageDeliveryFailed,
   capturePaneAsync,
   sessionExistsAsync,
   killSessionAsync,
@@ -877,18 +878,12 @@ const getConversationsRoute = HttpRouter.add(
         const favoritedNames = getCachedFavoritedIds();
 
         // Enrich with live tmux status
-        // Grace period: treat recently-created active conversations as alive (tmux may not have
-        // started yet — spawn is async). After 30s we fall back to the actual tmux check.
-        const SPAWN_GRACE_MS = 30_000;
+        // Grace period removed (PAN-826): POST /api/conversations now waits for
+        // Claude to be ready before returning 201, so newly-created conversations
+        // are always live by the time they appear in the list.
         const liveSessionNames = new Set(await listSessionNamesAsync());
-        const now = Date.now();
-        const graceThreshold = now - SPAWN_GRACE_MS;
         const enriched = conversations.map((conv) => {
-          const withinGrace =
-            conv.status === 'active' &&
-            !conv.endedAt &&
-            new Date(conv.createdAt).getTime() > graceThreshold;
-          const sessionAlive = !conv.forkStatus && (withinGrace || liveSessionNames.has(conv.tmuxSession));
+          const sessionAlive = !conv.forkStatus && liveSessionNames.has(conv.tmuxSession);
 
           return { ...conv, sessionAlive, isWorking: false, currentTool: null, isFavorited: favoritedNames.has(conv.name) };
         });
@@ -969,10 +964,7 @@ const postConversationRoute = HttpRouter.add(
         }
         const cwd = join(homedir(), 'Projects');
 
-        if (!message) {
-          return jsonResponse({ error: 'message is required' }, { status: 400 });
-        }
-        if (message.length > MAX_MESSAGE_LENGTH) {
+        if (message && message.length > MAX_MESSAGE_LENGTH) {
           return jsonResponse(
             { error: `message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` },
             { status: 400 },
@@ -1005,9 +997,21 @@ const postConversationRoute = HttpRouter.add(
         await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId);
         console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
 
-        // Title = truncated first message (T3Code pattern)
+        // Wait for Claude Code to reach its prompt before returning.
+        // Bounded by waitForClaudeReady's existing 30s timeout.
+        await waitForClaudeReady(tmuxSession);
+        console.log(`[conversations] Claude ready in ${tmuxSession}`);
+
+        // If a message was provided (legacy callers), send it now
+        if (message) {
+          await sendKeysAsync(tmuxSession, message, 'conversation-message');
+        }
+
+        // Title = truncated first message (T3Code pattern), or default
         const MAX_TITLE_LEN = 60;
-        const title = message.slice(0, MAX_TITLE_LEN) + (message.length > MAX_TITLE_LEN ? '…' : '');
+        const title = message
+          ? message.slice(0, MAX_TITLE_LEN) + (message.length > MAX_TITLE_LEN ? '…' : '')
+          : 'New conversation';
 
         // Create DB record
         const conv = createConversation({
@@ -1017,25 +1021,18 @@ const postConversationRoute = HttpRouter.add(
           issueId,
           claudeSessionId,
           title,
-          titleSource: 'auto',
+          titleSource: message ? 'auto' : 'default',
           titleSeed: title,
           model,
           effort,
         });
 
-        // Wait for Claude Code to be ready, send message, and generate title — all async.
-        // Don't block the HTTP response; the frontend will poll for messages.
-        void (async () => {
-          try {
-            await waitForClaudeReady(tmuxSession);
-            await sendKeysAsync(tmuxSession, message, 'conversation-message');
-            void generateAiTitle(name, message).catch((err: unknown) => {
-              console.error(`[conversations] AI title generation failed for "${name}":`, err);
-            });
-          } catch (err) {
-            console.error(`[conversations] Failed to send first message to ${tmuxSession}:`, err);
-          }
-        })();
+        // Generate AI title in background (non-blocking)
+        if (message) {
+          void generateAiTitle(name, message).catch((err: unknown) => {
+            console.error(`[conversations] AI title generation failed for "${name}":`, err);
+          });
+        }
 
         return jsonResponse({ ...conv, sessionAlive: true }, { status: 201 });
       } catch (error: unknown) {
@@ -1216,7 +1213,11 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         const effort = conv.effort ?? undefined;
         const issueId = conv.issueId ?? undefined;
         await maybeCompactBeforeRespawn({ sessionFile, cwd, modelChanged: true });
-        await spawnConversationSession(tmuxSession, cwd, oldSessionId ?? randomUUID(), model, effort, issueId, !!oldSessionId);
+        // Only resume if the session JSONL actually exists — Claude Code's --resume
+        // fails with "No conversation found" if the file is missing (e.g., first
+        // model switch on a fresh conversation or cross-provider switch).
+        const canResume = !!oldSessionId && !!sessionFile && existsSync(sessionFile);
+        await spawnConversationSession(tmuxSession, cwd, oldSessionId ?? randomUUID(), model, effort, issueId, canResume);
         await waitForTmuxSession(tmuxSession);
         await waitForClaudePrompt(tmuxSession, 30000).catch(() => false);
 
@@ -1476,6 +1477,14 @@ const postConversationMessageRoute = HttpRouter.add(
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] send message failed:', msg);
+        // MessageDeliveryFailed includes a pane snapshot for debugging
+        if (error instanceof Error && error.name === 'MessageDeliveryFailed') {
+          return jsonResponse({
+            error: 'Message delivery failed — text did not reach the terminal',
+            deliveryFailed: true,
+            details: msg,
+          }, { status: 504 });
+        }
         return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
@@ -1640,6 +1649,8 @@ const postConversationRestartAllRoute = HttpRouter.add(
 
             // Re-spawn with stored model
             const oldSessionId = conv.claudeSessionId ?? sessionIdFromFile(conv.sessionFile);
+            const sessionFileForResume = resolveSessionFile(conv);
+            const canResume = !!oldSessionId && !!sessionFileForResume && existsSync(sessionFileForResume);
             await spawnConversationSession(
               conv.tmuxSession,
               conv.cwd,
@@ -1647,7 +1658,7 @@ const postConversationRestartAllRoute = HttpRouter.add(
               conv.model ?? undefined,
               conv.effort ?? undefined,
               conv.issueId ?? undefined,
-              !!oldSessionId,
+              canResume,
             );
             markConversationActive(conv.name);
             results.push({ name: conv.name, model: conv.model, status: 'restarted' });
