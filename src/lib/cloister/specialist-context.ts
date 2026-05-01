@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from '
 import { join } from 'path';
 import { exec } from 'child_process';
 import { getPanopticonHome } from '../paths.js';
-import { getRecentRunLogs, type RunLogEntry } from './specialist-logs.js';
+import type { RunLogEntry } from './specialist-logs.js';
 import { getProject } from '../projects.js';
 import { getModelId } from '../work-type-router.js';
 
@@ -145,6 +145,7 @@ export async function generateContextDigest(
 
   // Get recent runs
   const runCount = options.runCount ?? getContextRunsCount(projectKey);
+  const { getRecentRunLogs } = await import('./specialist-logs.js');
   const recentRuns = getRecentRunLogs(projectKey, specialistType, runCount);
 
   if (recentRuns.length === 0 && !options.force) {
