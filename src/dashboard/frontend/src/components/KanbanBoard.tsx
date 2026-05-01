@@ -648,7 +648,7 @@ function TrackerShadowBadges({ issue, compact = false }: { issue: Issue; compact
 
 // Feature card — rich card for Rally Features with progress and expand/collapse
 // Children (user stories) render INSIDE the card
-function FeatureCard({
+export function FeatureCard({
   feature,
   childCount,
   isExpanded,
@@ -799,7 +799,7 @@ function FeatureCard({
 }
 
 // Compact child card — slim inline card for stories under a Feature
-function CompactChildCard({
+export function CompactChildCard({
   issue,
   agents,
   isSelected,

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { Issue, Agent } from '../types';
 import type { SpecialistAgent } from './SpecialistAgentCard';
-import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge } from './KanbanBoard';
+import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge, FeatureCard, CompactChildCard } from './KanbanBoard';
 import { useDashboardStore } from '../lib/store';
 
 describe('groupByLabels', () => {
@@ -743,5 +743,275 @@ describe('DivergedBadge', () => {
 
   afterEach(() => {
     useDashboardStore.setState({ reviewStatusByIssueId: {} } as Parameters<typeof useDashboardStore.setState>[0]);
+  });
+});
+
+// ─── FeatureCard ──────────────────────────────────────────────────────────────
+
+describe('FeatureCard', () => {
+  const createMockFeature = (overrides: Partial<Issue> = {}): Issue => ({
+    id: 'feature-1',
+    identifier: 'F123',
+    title: 'Test Feature',
+    description: 'A test feature',
+    status: 'In Progress',
+    priority: 3,
+    labels: [],
+    url: 'https://rally.com/F123',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    project: {
+      id: 'proj-1',
+      name: 'Test Project',
+      color: '#000',
+      icon: 'test',
+    },
+    source: 'rally',
+    ...overrides,
+  });
+
+  it('renders Plan button when feature is not done', () => {
+    const feature = createMockFeature();
+    render(
+      <FeatureCard
+        feature={feature}
+        childCount={2}
+        isExpanded={false}
+        onToggle={vi.fn()}
+        onPlan={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('action-plan-F123')).toBeDefined();
+    expect(screen.getByText('Plan')).toBeDefined();
+  });
+
+  it('renders See Plan button when planned label exists', () => {
+    const feature = createMockFeature({ labels: ['planned'] });
+    render(
+      <FeatureCard
+        feature={feature}
+        childCount={2}
+        isExpanded={false}
+        onToggle={vi.fn()}
+        onPlan={vi.fn()}
+      />
+    );
+    expect(screen.getByText('See Plan')).toBeDefined();
+  });
+
+  it('renders Tasks button when feature has beads', () => {
+    const feature = createMockFeature({ hasBeads: true });
+    render(
+      <FeatureCard
+        feature={feature}
+        childCount={2}
+        isExpanded={false}
+        onToggle={vi.fn()}
+        onViewBeads={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('action-tasks-F123')).toBeDefined();
+    expect(screen.getByText('Tasks')).toBeDefined();
+  });
+
+  it('renders vBRIEF button when feature has a plan', () => {
+    const feature = createMockFeature({ hasPlan: true });
+    render(
+      <FeatureCard
+        feature={feature}
+        childCount={2}
+        isExpanded={false}
+        onToggle={vi.fn()}
+        onViewVBrief={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('action-vbrief-F123')).toBeDefined();
+    expect(screen.getByText('vBRIEF')).toBeDefined();
+  });
+
+  it('hides Plan button when feature is done', () => {
+    const feature = createMockFeature({ status: 'Done' });
+    render(
+      <FeatureCard
+        feature={feature}
+        childCount={2}
+        isExpanded={false}
+        onToggle={vi.fn()}
+      />
+    );
+    expect(screen.queryByTestId('action-plan-F123')).toBeNull();
+  });
+
+  it('calls onPlan when Plan button is clicked', () => {
+    const onPlan = vi.fn();
+    const feature = createMockFeature();
+    render(
+      <FeatureCard
+        feature={feature}
+        childCount={2}
+        isExpanded={false}
+        onToggle={vi.fn()}
+        onPlan={onPlan}
+      />
+    );
+    fireEvent.click(screen.getByTestId('action-plan-F123'));
+    expect(onPlan).toHaveBeenCalled();
+  });
+
+  it('calls onViewBeads when Tasks button is clicked', () => {
+    const onViewBeads = vi.fn();
+    const feature = createMockFeature({ hasBeads: true });
+    render(
+      <FeatureCard
+        feature={feature}
+        childCount={2}
+        isExpanded={false}
+        onToggle={vi.fn()}
+        onViewBeads={onViewBeads}
+      />
+    );
+    fireEvent.click(screen.getByTestId('action-tasks-F123'));
+    expect(onViewBeads).toHaveBeenCalled();
+  });
+
+  it('applies selection ring when isSelected is true', () => {
+    const feature = createMockFeature();
+    const { container } = render(
+      <FeatureCard
+        feature={feature}
+        childCount={2}
+        isExpanded={false}
+        onToggle={vi.fn()}
+        isSelected={true}
+      />
+    );
+    const card = container.querySelector('.ring-2');
+    expect(card).toBeTruthy();
+  });
+
+  it('does not apply selection ring when isSelected is false', () => {
+    const feature = createMockFeature();
+    const { container } = render(
+      <FeatureCard
+        feature={feature}
+        childCount={2}
+        isExpanded={false}
+        onToggle={vi.fn()}
+        isSelected={false}
+      />
+    );
+    const card = container.querySelector('.ring-2');
+    expect(card).toBeFalsy();
+  });
+
+  it('calls onSelect when clicking the title/content area', () => {
+    const onSelect = vi.fn();
+    const onToggle = vi.fn();
+    const feature = createMockFeature();
+    const { container } = render(
+      <FeatureCard
+        feature={feature}
+        childCount={2}
+        isExpanded={false}
+        onToggle={onToggle}
+        onSelect={onSelect}
+      />
+    );
+    // Click on the content div (title area)
+    const contentDiv = container.querySelector('.flex-1.min-w-0');
+    expect(contentDiv).toBeTruthy();
+    fireEvent.click(contentDiv!);
+    expect(onSelect).toHaveBeenCalled();
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it('calls onToggle but not onSelect when clicking the chevron', () => {
+    const onSelect = vi.fn();
+    const onToggle = vi.fn();
+    const feature = createMockFeature();
+    const { container } = render(
+      <FeatureCard
+        feature={feature}
+        childCount={2}
+        isExpanded={false}
+        onToggle={onToggle}
+        onSelect={onSelect}
+      />
+    );
+    const chevronDiv = container.querySelector('[class*="shrink-0"]');
+    expect(chevronDiv).toBeTruthy();
+    fireEvent.click(chevronDiv!);
+    expect(onToggle).toHaveBeenCalled();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+});
+
+// ─── CompactChildCard ─────────────────────────────────────────────────────────
+
+describe('CompactChildCard', () => {
+  const createMockChild = (overrides: Partial<Issue> = {}): Issue => ({
+    id: 'child-1',
+    identifier: 'US100',
+    title: 'Child Story',
+    description: '',
+    status: 'In Progress',
+    priority: 3,
+    labels: [],
+    url: 'https://rally.com/US100',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    project: {
+      id: 'proj-1',
+      name: 'Test Project',
+      color: '#000',
+      icon: 'test',
+    },
+    source: 'rally',
+    ...overrides,
+  });
+
+  it('renders child identifier and title', () => {
+    const child = createMockChild();
+    render(<CompactChildCard issue={child} agents={[]} />);
+    expect(screen.getByText('US100')).toBeDefined();
+    expect(screen.getByText('Child Story')).toBeDefined();
+  });
+
+  it('calls onSelect when clicked', () => {
+    const onSelect = vi.fn();
+    const child = createMockChild();
+    const { container } = render(<CompactChildCard issue={child} agents={[]} onSelect={onSelect} />);
+    fireEvent.click(container.firstChild!);
+    expect(onSelect).toHaveBeenCalled();
+  });
+
+  it('applies selected background when isSelected is true', () => {
+    const child = createMockChild();
+    const { container } = render(<CompactChildCard issue={child} agents={[]} isSelected={true} />);
+    const el = container.querySelector('.bg-primary\\/10');
+    expect(el).toBeTruthy();
+  });
+
+  it('does not apply selected background when isSelected is false', () => {
+    const child = createMockChild();
+    const { container } = render(<CompactChildCard issue={child} agents={[]} isSelected={false} />);
+    const el = container.querySelector('.bg-primary\\/10');
+    expect(el).toBeFalsy();
+  });
+
+  it('shows agent pulse dot when agent is running', () => {
+    const child = createMockChild();
+    const agents: Agent[] = [{
+      id: 'agent-1',
+      issueId: 'US100',
+      runtime: 'claude',
+      model: 'test',
+      status: 'healthy',
+      startedAt: new Date().toISOString(),
+      consecutiveFailures: 0,
+      killCount: 0,
+    }];
+    render(<CompactChildCard issue={child} agents={agents} />);
+    expect(screen.getByTitle('Agent running')).toBeDefined();
   });
 });
