@@ -4585,6 +4585,83 @@ const postForgeApproveRoute = HttpRouter.add(
   }))
 );
 
+// ─── Route: POST /api/issues/:issueId/forge-merge ────────────────────────
+// Merges the PR/MR directly on GitHub/GitLab via the forge adapter.
+// This is a lightweight forge-level merge — it does NOT run Panopticon's
+// full post-merge lifecycle (label cleanup, workspace teardown, etc.).
+
+const postForgeMergeRoute = HttpRouter.add(
+  'POST',
+  '/api/issues/:issueId/forge-merge',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    if (!/^[A-Z]+-\d+$/i.test(issueId)) {
+      return jsonResponse({ error: 'Invalid issue ID format' }, { status: 400 });
+    }
+
+    return yield* Effect.promise(async () => {
+      const { getMergeSet } = await import('../../../lib/merge-set.js');
+      const { getForgeAdapter } = await import('../../../lib/forge.js');
+
+      const mergeSet = getMergeSet(issueId);
+      if (!mergeSet) {
+        return jsonResponse({ error: `No merge set found for ${issueId}` }, { status: 404 });
+      }
+
+      const results: Array<{ repoKey: string; merged: boolean; error?: string }> = [];
+      for (const repo of mergeSet.repos) {
+        if (!repo.artifactUrl && !repo.artifactId) {
+          results.push({ repoKey: repo.repoKey, merged: false, error: 'No PR/MR found' });
+          continue;
+        }
+        if (repo.mergeStatus === 'merged' || repo.mergeStatus === 'skipped') {
+          results.push({ repoKey: repo.repoKey, merged: true });
+          continue;
+        }
+        try {
+          const adapter = getForgeAdapter(repo.forge);
+          const workspacePath = mergeSet.workspaceType === 'polyrepo'
+            ? join(mergeSet.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`, repo.repoKey)
+            : join(mergeSet.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+          await adapter.mergeReviewArtifact({
+            forge: repo.forge,
+            url: repo.artifactUrl,
+            id: repo.artifactId,
+            method: 'squash',
+            cwd: workspacePath,
+          });
+          results.push({ repoKey: repo.repoKey, merged: true });
+        } catch (err: any) {
+          results.push({ repoKey: repo.repoKey, merged: false, error: err.message });
+        }
+      }
+
+      const mergedCount = results.filter(r => r.merged).length;
+      if (mergedCount > 0) {
+        const { emitActivityEntry, emitActivityTts } = await import('../../../lib/activity-logger.js');
+        emitActivityEntry({
+          source: 'dashboard',
+          level: 'success',
+          message: `Merged ${issueId} on ${mergeSet.repos[0]?.forge ?? 'forge'}`,
+          issueId,
+        });
+        emitActivityTts({
+          utterance: `${issueId} has been merged`,
+          priority: 1,
+          issueId,
+        });
+      }
+
+      const allMerged = results.every(r => r.merged);
+      return jsonResponse(
+        { success: allMerged, results },
+        { status: allMerged ? 200 : 207 }
+      );
+    });
+  }))
+);
+
 // ─── Route: POST /api/issues/:issueId/approve ────────────────────────────
 
 const postWorkspaceApproveRoute = HttpRouter.add(
@@ -5140,6 +5217,7 @@ export const workspacesRouteLayer = Layer.mergeAll(
   postWorkspaceSyncMainRoute,
   postWorkspaceMergeRoute,
   postForgeApproveRoute,
+  postForgeMergeRoute,
   postWorkspaceApproveRoute,
   deleteWorkspacePendingRoute,
   getWorkspaceTldrRoute,
