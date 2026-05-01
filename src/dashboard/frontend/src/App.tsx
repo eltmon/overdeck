@@ -74,7 +74,7 @@ const PATH_TO_TAB: Record<string, Tab> = Object.fromEntries(
 function getTabFromPath(): Tab {
   const path = window.location.pathname;
   if (path.startsWith('/conv/')) return 'command-deck';
-  return PATH_TO_TAB[path] || 'kanban';
+  return PATH_TO_TAB[path] || 'command-deck';
 }
 
 export function getConversationViewModeFromSearch(search = window.location.search): ConversationViewMode {

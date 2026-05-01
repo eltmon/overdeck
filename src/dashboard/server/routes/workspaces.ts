@@ -4530,29 +4530,57 @@ const postForgeApproveRoute = HttpRouter.add(
     }
 
     return yield* Effect.promise(async () => {
-      const { getMergeSet } = await import('../../../lib/merge-set.js');
+      const { getMergeSet, upsertMergeSet, withRepoArtifactUrl, withRepoState } = await import('../../../lib/merge-set.js');
       const { getForgeAdapter } = await import('../../../lib/forge.js');
 
-      const mergeSet = getMergeSet(issueId);
+      let mergeSet = getMergeSet(issueId);
       if (!mergeSet) {
         return jsonResponse({ error: `No merge set found for ${issueId}` }, { status: 404 });
       }
 
       const results: Array<{ repoKey: string; approved: boolean; error?: string }> = [];
       for (const repo of mergeSet.repos) {
-        if (!repo.artifactUrl && !repo.artifactId) {
-          results.push({ repoKey: repo.repoKey, approved: false, error: 'No PR/MR found' });
+        if (repo.mergeStatus === 'merged' || repo.mergeStatus === 'skipped') {
+          results.push({ repoKey: repo.repoKey, approved: true });
           continue;
         }
+
+        const adapter = getForgeAdapter(repo.forge);
+        const workspacePath = mergeSet.workspaceType === 'polyrepo'
+          ? join(mergeSet.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`, repo.repoKey)
+          : join(mergeSet.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+
+        let artifactUrl = repo.artifactUrl;
+        let artifactId = repo.artifactId;
+
+        if (!artifactUrl && !artifactId) {
+          try {
+            const discovered = await adapter.discoverArtifact({
+              sourceBranch: repo.sourceBranch,
+              cwd: existsSync(workspacePath) ? workspacePath : repo.repoPath,
+            });
+            if (discovered?.url || discovered?.id) {
+              artifactUrl = discovered.url;
+              artifactId = discovered.id;
+              mergeSet = withRepoArtifactUrl(mergeSet, repo.repoKey, artifactUrl ?? '', artifactId);
+              upsertMergeSet(mergeSet);
+              console.log(`[forge-approve] Discovered artifact for ${issueId}/${repo.repoKey}: ${artifactUrl}`);
+            } else {
+              results.push({ repoKey: repo.repoKey, approved: true });
+              continue;
+            }
+          } catch {
+            results.push({ repoKey: repo.repoKey, approved: true });
+            continue;
+          }
+        }
+
         try {
-          const adapter = getForgeAdapter(repo.forge);
           await adapter.approveReviewArtifact({
             forge: repo.forge,
-            url: repo.artifactUrl,
-            id: repo.artifactId,
-            cwd: mergeSet.workspaceType === 'polyrepo'
-              ? join(mergeSet.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`, repo.repoKey)
-              : join(mergeSet.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`),
+            url: artifactUrl,
+            id: artifactId,
+            cwd: existsSync(workspacePath) ? workspacePath : repo.repoPath,
           });
           results.push({ repoKey: repo.repoKey, approved: true });
         } catch (err: any) {
@@ -4601,36 +4629,65 @@ const postForgeMergeRoute = HttpRouter.add(
     }
 
     return yield* Effect.promise(async () => {
-      const { getMergeSet } = await import('../../../lib/merge-set.js');
+      const { getMergeSet, upsertMergeSet, withRepoArtifactUrl, withRepoState } = await import('../../../lib/merge-set.js');
       const { getForgeAdapter } = await import('../../../lib/forge.js');
 
-      const mergeSet = getMergeSet(issueId);
+      let mergeSet = getMergeSet(issueId);
       if (!mergeSet) {
         return jsonResponse({ error: `No merge set found for ${issueId}` }, { status: 404 });
       }
 
       const results: Array<{ repoKey: string; merged: boolean; error?: string }> = [];
       for (const repo of mergeSet.repos) {
-        if (!repo.artifactUrl && !repo.artifactId) {
-          results.push({ repoKey: repo.repoKey, merged: false, error: 'No PR/MR found' });
-          continue;
-        }
         if (repo.mergeStatus === 'merged' || repo.mergeStatus === 'skipped') {
           results.push({ repoKey: repo.repoKey, merged: true });
           continue;
         }
+
+        const adapter = getForgeAdapter(repo.forge);
+        const workspacePath = mergeSet.workspaceType === 'polyrepo'
+          ? join(mergeSet.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`, repo.repoKey)
+          : join(mergeSet.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+
+        let artifactUrl = repo.artifactUrl;
+        let artifactId = repo.artifactId;
+
+        if (!artifactUrl && !artifactId) {
+          try {
+            const discovered = await adapter.discoverArtifact({
+              sourceBranch: repo.sourceBranch,
+              cwd: existsSync(workspacePath) ? workspacePath : repo.repoPath,
+            });
+            if (discovered?.url || discovered?.id) {
+              artifactUrl = discovered.url;
+              artifactId = discovered.id;
+              mergeSet = withRepoArtifactUrl(mergeSet, repo.repoKey, artifactUrl ?? '', artifactId);
+              upsertMergeSet(mergeSet);
+              console.log(`[forge-merge] Discovered artifact for ${issueId}/${repo.repoKey}: ${artifactUrl}`);
+            } else {
+              mergeSet = withRepoState(mergeSet, repo.repoKey, { mergeStatus: 'skipped' });
+              upsertMergeSet(mergeSet);
+              results.push({ repoKey: repo.repoKey, merged: true });
+              continue;
+            }
+          } catch {
+            mergeSet = withRepoState(mergeSet, repo.repoKey, { mergeStatus: 'skipped' });
+            upsertMergeSet(mergeSet);
+            results.push({ repoKey: repo.repoKey, merged: true });
+            continue;
+          }
+        }
+
         try {
-          const adapter = getForgeAdapter(repo.forge);
-          const workspacePath = mergeSet.workspaceType === 'polyrepo'
-            ? join(mergeSet.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`, repo.repoKey)
-            : join(mergeSet.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
           await adapter.mergeReviewArtifact({
             forge: repo.forge,
-            url: repo.artifactUrl,
-            id: repo.artifactId,
+            url: artifactUrl,
+            id: artifactId,
             method: 'squash',
-            cwd: workspacePath,
+            cwd: existsSync(workspacePath) ? workspacePath : repo.repoPath,
           });
+          mergeSet = withRepoState(mergeSet, repo.repoKey, { mergeStatus: 'merged' });
+          upsertMergeSet(mergeSet);
           results.push({ repoKey: repo.repoKey, merged: true });
         } catch (err: any) {
           results.push({ repoKey: repo.repoKey, merged: false, error: err.message });
