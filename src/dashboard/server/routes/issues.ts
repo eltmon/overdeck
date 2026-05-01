@@ -2413,12 +2413,10 @@ const getIssuePlanningStateRoute = HttpRouter.add(
     const hasPlan = !!planPath && existsSync(planPath);
     const planningComplete = workspacePath && existsSync(join(workspacePath, '.planning', '.planning-complete'));
 
-    // Check for beads by looking at the issues.jsonl file — pure filesystem
-    // stat, no bd process spawn, no dolt lock contention. The file exists
-    // in the workspace's .beads/ directory (or via redirect to the main repo).
-    const hasBeads = workspacePath && existsSync(workspacePath)
-      ? existsSync(join(workspacePath, '.beads', 'issues.jsonl'))
-      : false;
+    // The .planning-complete marker is written ONLY after generate-tasks succeeds
+    // (see POST /api/issues/:id/generate-tasks). It's the definitive signal for
+    // "tasks have been generated from this plan." No bd query needed — pure stat.
+    const hasBeads = !!planningComplete;
 
     return jsonResponse({
       hasPlan,
