@@ -16,6 +16,7 @@ const {
   writeFeedbackFileMock,
   messageAgentMock,
   findProjectByPathMock,
+  existsSyncMock,
 } = vi.hoisted(() => ({
   execMock: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>()
     .mockResolvedValue({ stdout: 'Already up to date\n', stderr: '' }),
@@ -25,6 +26,7 @@ const {
   writeFeedbackFileMock: vi.fn(),
   messageAgentMock: vi.fn(),
   findProjectByPathMock: vi.fn(),
+  existsSyncMock: vi.fn(),
 }));
 
 vi.mock('child_process', () => {
@@ -51,6 +53,10 @@ vi.mock('child_process', () => {
 
   return { exec, execFile };
 });
+
+vi.mock('fs', () => ({
+  existsSync: existsSyncMock,
+}));
 
 vi.mock('../../src/lib/review-status.js', () => ({
   getReviewStatus: getReviewStatusMock,
@@ -114,6 +120,7 @@ describe('runVerificationForIssue', () => {
     writeFeedbackFileMock.mockResolvedValue({ success: true, relativePath: '.planning/feedback/001-verification-failed.md' });
     messageAgentMock.mockResolvedValue(undefined);
     findProjectByPathMock.mockReturnValue(null); // no project config → DEFAULT_GATES
+    existsSyncMock.mockImplementation((p: string) => p.endsWith('/.git'));
   });
 
   describe('circuit breaker', () => {
@@ -219,7 +226,7 @@ describe('runVerificationForIssue', () => {
           workspacePath,
           specialist: 'verification-gate',
           outcome: 'failed',
-          summary: expect.stringContaining('Sync with main FAILED'),
+          summary: expect.stringContaining('Sync FAILED'),
           markdownBody: expect.stringContaining('fatal: Not possible to fast-forward, aborting.'),
         })
       );
