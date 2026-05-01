@@ -436,6 +436,50 @@ export class RallyTracker implements IssueTracker {
     await this.addComment(issueId, `Linked Pull Request: ${prUrl}`);
   }
 
+  async getChildIssues(parentId: string): Promise<Issue[]> {
+    // Query Rally for HierarchicalRequirement and Defect artifacts
+    // whose PortfolioItem matches the given feature FormattedID.
+    const childTypes = [
+      { type: 'hierarchicalrequirement', stateField: 'ScheduleState' },
+      { type: 'defect', stateField: 'State' },
+    ];
+
+    const queries = childTypes.map(async (childType) => {
+      const query: any = {
+        type: childType.type,
+        fetch: FETCH_FIELDS,
+        query: `(PortfolioItem.FormattedID = "${parentId}")`,
+        limit: 200,
+      };
+
+      if (this.workspace) {
+        query.workspace = this.workspace;
+      }
+      if (this.project) {
+        query.project = this.project;
+        query.projectScopeDown = true;
+      }
+
+      try {
+        const result = await this.queryRally(query);
+        return result.Results.map((artifact: any) => this.normalizeIssue(artifact));
+      } catch (error: any) {
+        if (process.env.DEBUG?.includes('rally')) {
+          console.debug(`[Rally] Failed to query ${childType.type} children:`, error.message);
+        }
+        return [];
+      }
+    });
+
+    const results = await Promise.all(queries);
+    const allChildren = results.flat();
+
+    // Sort by FormattedID for stable ordering
+    allChildren.sort((a, b) => a.ref.localeCompare(b.ref));
+
+    return allChildren;
+  }
+
   // Private helper methods
 
   /**

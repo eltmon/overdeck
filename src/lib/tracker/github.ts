@@ -238,6 +238,11 @@ export class GitHubTracker implements IssueTracker {
     );
   }
 
+  async getChildIssues(_parentId: string): Promise<Issue[]> {
+    // GitHub Issues does not support hierarchical parent-child relationships
+    return [];
+  }
+
   private normalizeIssue(ghIssue: any): Issue {
     const labels: string[] = ghIssue.labels.map((l: any) =>
       typeof l === 'string' ? l : l.name
