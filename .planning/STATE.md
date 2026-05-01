@@ -12,17 +12,17 @@ Implementing InspectorPanel feature-specific actions (workspace-0jy)
 - [x] workspace-nqj: Plan button on features uses feature's own status, ignoring derivedStatus (commit: 92c4ba0d4)
 - [x] workspace-6qo: FeatureCard title click opens InspectorPanel; chevron still toggles expand (commit: 92c4ba0d4)
 - [x] workspace-33x: CompactChildCard click selects child story in InspectorPanel (commit: 92c4ba0d4)
+- [x] workspace-0jy: InspectorPanel renders feature-appropriate actions (no Start Agent) (commit: eecb291e8)
 
 ## Remaining Work
-- [ ] workspace-0jy: InspectorPanel renders feature-appropriate actions (no Start Agent)
-- [ ] workspace-dan: Planning prompt detects Rally Feature and includes child story context
-- [ ] workspace-qhv: Write FEATURE-CONTEXT.md to .planning/ for story workspaces
-- [ ] workspace-h72: Feature-level vBRIEF supports cross-story dependency edges
-- [ ] workspace-ai7: Tests for FeatureCard action bar rendering and chip interactions
-- [ ] workspace-0g1: Tests for FeatureCard and CompactChildCard click-to-select behavior
-- [ ] workspace-676: Tests for InspectorPanel feature-specific actions
-- [ ] workspace-b6h: Tests for getChildIssues() interface and Rally implementation
-- [ ] workspace-arj: Tests for feature-aware planning prompt and context injection
+- [x] workspace-dan: Planning prompt detects Rally Feature and includes child story context
+- [x] workspace-qhv: Write FEATURE-CONTEXT.md to .planning/ for story workspaces
+- [x] workspace-h72: Feature-level vBRIEF supports cross-story dependency edges
+- [x] workspace-ai7: Tests for FeatureCard action bar rendering and chip interactions
+- [x] workspace-0g1: Tests for FeatureCard and CompactChildCard click-to-select behavior
+- [x] workspace-676: Tests for InspectorPanel feature-specific actions
+- [x] workspace-b6h: Tests for getChildIssues() interface and Rally implementation
+- [x] workspace-arj: Tests for feature-aware planning prompt and context injection
 
 ## Key Decisions
 - Feature planning state is independent of child progress: Plan button uses issue.status, not derivedStatus
