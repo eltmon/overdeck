@@ -923,7 +923,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
         )}
 
         {/* Service URLs */}
-        {workspace?.hasDocker && (workspace?.frontendUrl || workspace?.apiUrl) && (
+        {(workspace?.frontendUrl || workspace?.apiUrl) && (
           <div className="px-3 py-2 border-b border-border text-xs">
             <div className="uppercase tracking-wider text-[10px] mb-2 font-semibold text-muted-foreground">Services</div>
             <div className="space-y-1.5">

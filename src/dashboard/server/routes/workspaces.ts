@@ -1064,7 +1064,7 @@ const getWorkspaceRoute = HttpRouter.add(
         }
 
         const devcontainerPath = join(workspacePath, '.devcontainer');
-        const hasDocker =
+        let hasDocker =
           existsSync(dockerCompose) ||
           existsSync(join(workspacePath, 'compose.yaml')) ||
           existsSync(join(devcontainerPath, 'docker-compose.yml')) ||
@@ -1072,6 +1072,21 @@ const getWorkspaceRoute = HttpRouter.add(
           existsSync(join(devcontainerPath, 'compose.yaml')) ||
           existsSync(join(devcontainerPath, 'compose.infra.yml')) ||
           existsSync(devcontainerPath);
+
+        // For polyrepo workspaces, also check compose files inside sub-repos
+        if (!hasDocker && projectConfig?.workspace?.repos) {
+          for (const repo of projectConfig.workspace.repos) {
+            const repoPath = join(workspacePath, repo.path);
+            if (
+              existsSync(join(repoPath, 'docker-compose.yml')) ||
+              existsSync(join(repoPath, 'docker-compose.yaml')) ||
+              existsSync(join(repoPath, 'compose.yaml'))
+            ) {
+              hasDocker = true;
+              break;
+            }
+          }
+        }
 
         const canContainerize = false;
 
