@@ -1058,6 +1058,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           reviewStatusLoading={reviewStatusLoading}
           workspace={workspace}
           hasPlan={planningState?.hasPlan ?? false}
+          hasBeads={planningState?.hasBeads ?? false}
           beadsCount={planningState?.beadsCount ?? 0}
           reviewMutation={reviewMutation}
           cancelMutation={cancelMutation}

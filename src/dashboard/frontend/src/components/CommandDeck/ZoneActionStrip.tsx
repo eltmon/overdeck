@@ -82,6 +82,7 @@ export function ZoneActionStrip({
       lifecycle,
       workspace,
       hasPlan: planningState?.hasPlan ?? false,
+      hasBeads: planningState?.hasBeads ?? false,
       beadsCount: planningState?.beadsCount ?? 0,
       hasInference: false,
       hasTranscripts: false,
@@ -93,7 +94,7 @@ export function ZoneActionStrip({
 
   // Density rule (B6): when the state is "boring" (no agent, no review, no plan,
   // no beads), collapse secondary actions into overflow so Zone A stays clean.
-  const isBoring = !agent && !reviewStatus && !planningState?.hasPlan && (planningState?.beadsCount ?? 0) === 0;
+  const isBoring = !agent && !reviewStatus && !planningState?.hasPlan && !planningState?.hasBeads;
   const displayLayout = isBoring
     ? { primary: layout.primary, secondary: [] as ActionKey[], overflow: [...layout.secondary, ...layout.overflow] }
     : layout;

@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useDashboardStore, selectAgentList, selectSpecialistList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
 /* Drag-and-drop disabled pending rework (PAN-TODO)
@@ -1451,27 +1451,19 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
   const grouped = groupByStatus(filteredIssues, includeCompleted);
 
-  // Fetch planning state for all Todo issues so we can sort
-  // "ready to start" items to the top and pass full state to cards (avoids per-card fan-out).
-  const todoPlanningStates = useQueries({
-    queries: (grouped.todo ?? []).map(issue => ({
-      queryKey: ['planning-state', issue.identifier],
-      queryFn: async () => {
-        const res = await fetch(`/api/issues/${issue.identifier}/planning-state`);
-        if (!res.ok) return { hasPlan: false, hasBeads: false, beadsCount: 0, planningComplete: false };
-        return res.json() as Promise<PlanningState>;
-      },
-      staleTime: 30000,
-    })),
-  });
-
+  // Planning-state is embedded in each issue from the /api/issues response
+  // (computed server-side via cheap filesystem checks). No per-card fetches needed.
   const planningStateById = useMemo(() => {
     const map: Record<string, PlanningState> = {};
-    (grouped.todo ?? []).forEach((issue, i) => {
-      map[issue.identifier] = todoPlanningStates[i]?.data ?? { hasPlan: false, hasBeads: false, beadsCount: 0, planningComplete: false };
-    });
+    for (const issue of filteredIssues) {
+      map[issue.identifier] = {
+        hasPlan: issue.hasPlan ?? false,
+        hasBeads: issue.hasBeads ?? false,
+        planningComplete: issue.planningComplete ?? false,
+      };
+    }
     return map;
-  }, [grouped.todo, todoPlanningStates]);
+  }, [filteredIssues]);
 
   // Sort Todo: planning-complete first, then updatedAt desc
   const sortedGrouped = useMemo(() => {
@@ -2501,7 +2493,6 @@ export function DeaconIgnoreButton({
 interface PlanningState {
   hasPlan: boolean;
   hasBeads: boolean;
-  beadsCount: number;
   planningComplete: boolean;
 }
 
@@ -2615,30 +2606,16 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
     4: 'bg-border',
   };
 
-  // Planning state — drives chip coloring + Generate Tasks affordance.
-  // Only fetched when this card has any chance of having a plan (anything past
-  // backlog where the agent could have produced one). We poll every 30s so the
-  // chip flips from red→green right after Generate Tasks runs.
-  // If parent passes planningState prop, skip the per-card fetch (avoids fan-out).
-  const planningStateQuery = useQuery({
-    queryKey: ['planning-state', issue.identifier],
-    queryFn: async () => {
-      const res = await fetch(`/api/issues/${issue.identifier}/planning-state`);
-      if (!res.ok) throw new Error('Failed to fetch planning state');
-      return res.json() as Promise<PlanningState>;
-    },
-    enabled: !!issue.identifier && !planningStateProp,
-    refetchInterval: 30000,
-    staleTime: 15000,
-  });
-  const hasPlan = planningStateProp?.hasPlan ?? planningStateQuery.data?.hasPlan ?? false;
-  const beadsCount = planningStateProp?.beadsCount ?? planningStateQuery.data?.beadsCount ?? 0;
-  const planningComplete = planningStateProp?.planningComplete ?? planningStateQuery.data?.planningComplete ?? false;
+  // Planning-state is embedded in the issue from /api/issues (server-side
+  // filesystem checks). No per-card fetch needed.
+  const hasPlan = planningStateProp?.hasPlan ?? issue.hasPlan ?? false;
+  const hasBeads = planningStateProp?.hasBeads ?? issue.hasBeads ?? false;
+  const planningComplete = planningStateProp?.planningComplete ?? issue.planningComplete ?? false;
   const artifactLinks = (
     <ArtifactLinks
       issueId={issue.identifier || ''}
       hasPlan={hasPlan}
-      beadsCount={beadsCount}
+      hasBeads={hasBeads}
       onViewBeads={() => onViewBeads && onViewBeads(issue)}
       onViewVBrief={() => onViewVBrief && onViewVBrief(issue)}
       variant="card"
@@ -3416,7 +3393,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               {(resumeSessionMutation.isPending || isResuming) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
               <span>{(resumeSessionMutation.isPending || isResuming) ? 'Resuming...' : 'Resume Session'}</span>
             </button>
-          ) : beadsCount > 0 ? (
+          ) : hasBeads ? (
             <button
               ref={startButtonRef}
               onClick={handleStartAgent}
