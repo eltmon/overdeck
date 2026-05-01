@@ -562,6 +562,8 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       url: string;
       source: 'linear' | 'github' | 'rally';
       comments?: Array<{ author: string; body: string; createdAt: string }>;
+      artifactType?: string;
+      childStories?: Array<{ ref: string; title: string; status: string; description: string }>;
     };
     let newStateName = 'In Planning';
 
@@ -594,6 +596,20 @@ const postIssueStartPlanningRoute = HttpRouter.add(
     } else if (trackerTypeForIssue === 'rally') {
       const rallyIssue = yield* rally.getIssue(id);
 
+      // Fetch child stories for Rally Features
+      let childStories: Array<{ ref: string; title: string; status: string; description: string }> = [];
+      if (rallyIssue.artifactType?.includes('PortfolioItem')) {
+        const children = yield* rally.getChildIssues(id).pipe(
+          Effect.catch(() => Effect.succeed([] as readonly { ref: string; title: string; status: string; description: string }[])),
+        );
+        childStories = children.map((c) => ({
+          ref: c.ref,
+          title: c.title,
+          status: c.status,
+          description: c.description || '',
+        }));
+      }
+
       issue = {
         id: rallyIssue.id,
         identifier: rallyIssue.ref,
@@ -601,6 +617,8 @@ const postIssueStartPlanningRoute = HttpRouter.add(
         description: rallyIssue.description || '',
         url: rallyIssue.url,
         source: 'rally',
+        artifactType: rallyIssue.artifactType,
+        childStories: childStories.length > 0 ? childStories : undefined,
       };
 
     } else {

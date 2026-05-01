@@ -25,9 +25,19 @@ export interface RallyIssue {
   readonly url: string;
   readonly state: string;
   readonly labels: ReadonlyArray<string>;
+  /** Rally artifact type, e.g. "HierarchicalRequirement" or "PortfolioItem/Feature" */
+  readonly artifactType: string;
 }
 
 // ─── Service interface ────────────────────────────────────────────────────────
+
+export interface RallyChildIssue {
+  readonly id: string;
+  readonly ref: string;
+  readonly title: string;
+  readonly status: string;
+  readonly description: string;
+}
 
 export interface RallyClientShape {
   /**
@@ -36,6 +46,13 @@ export interface RallyClientShape {
   readonly getIssue: (
     id: string,
   ) => Effect.Effect<RallyIssue, IssueNotFound | TrackerApiError>;
+
+  /**
+   * Get child issues (stories/defects) for a parent feature.
+   */
+  readonly getChildIssues: (
+    id: string,
+  ) => Effect.Effect<readonly RallyChildIssue[], TrackerApiError>;
 
   /**
    * Transition a Rally artifact to a new normalized state.
@@ -103,7 +120,23 @@ export const RallyClientLive = Layer.effect(
               url: raw.url,
               state: raw.state,
               labels: raw.labels,
+              artifactType: raw.artifactType || 'artifact',
             } satisfies RallyIssue;
+          },
+          catch: (err) => wrapRallyError(err),
+        }),
+
+      getChildIssues: (id) =>
+        Effect.tryPromise({
+          try: async () => {
+            const children = await tracker.getChildIssues(id);
+            return children.map((raw) => ({
+              id: raw.id,
+              ref: raw.ref,
+              title: raw.title,
+              status: raw.state,
+              description: raw.description,
+            })) satisfies RallyChildIssue[];
           },
           catch: (err) => wrapRallyError(err),
         }),
@@ -137,6 +170,7 @@ function getRallyClient(): RallyClientShape {
     const fail = Effect.fail(new TrackerNotConfigured({ tracker: 'rally' }));
     return {
       getIssue: () => fail,
+      getChildIssues: () => fail,
       updateState: () => fail,
       addComment: () => fail,
     };
@@ -173,7 +207,30 @@ function getRallyClient(): RallyClientShape {
           url: raw.url,
           state: raw.state,
           labels: raw.labels,
+          artifactType: raw.artifactType || 'artifact',
         } satisfies RallyIssue;
+      }),
+
+    getChildIssues: (id) =>
+      Effect.gen(function* () {
+        const { RallyTracker } = yield* Effect.promise(() => import('../../../lib/tracker/rally.js'));
+        const tracker = new RallyTracker({
+          apiKey: config.apiKey,
+          server: config.server,
+          workspace: config.workspace,
+          project: config.project,
+        });
+        const children = yield* Effect.tryPromise({
+          try: () => tracker.getChildIssues(id),
+          catch: (err) => wrapRallyError(err),
+        });
+        return children.map((raw) => ({
+          id: raw.id,
+          ref: raw.ref,
+          title: raw.title,
+          status: raw.state,
+          description: raw.description,
+        })) satisfies RallyChildIssue[];
       }),
 
     updateState: (id, state) =>

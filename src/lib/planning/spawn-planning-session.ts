@@ -82,6 +82,10 @@ export interface PlanningIssue {
   url: string;
   source: 'linear' | 'github' | 'rally';
   comments?: Array<{ author: string; body: string; createdAt: string }>;
+  /** Rally artifact type (e.g. "PortfolioItem/Feature") */
+  artifactType?: string;
+  /** Child stories for Rally Features */
+  childStories?: Array<{ ref: string; title: string; status: string; description: string }>;
 }
 
 /** Progress event emitted during planning session setup. */
@@ -221,6 +225,15 @@ ${repos.map((r: any) => `| \`${r.name}/\` | Git worktree for ${r.path} |`).join(
 `;
   }
 
+  // Build child stories section for Rally Features
+  let childStoriesSection = '';
+  if (issue.childStories && issue.childStories.length > 0) {
+    const storyLines = issue.childStories.map(
+      (s) => `- **${s.ref}**: ${s.title} (status: ${s.status})\n  ${s.description || ''}`.trim(),
+    );
+    childStoriesSection = `\n## Child Stories\n\n**This Rally Feature has ${issue.childStories.length} child story(ies).** Reference these existing stories during planning — do NOT create new ones.\n\n${storyLines.join('\n\n')}\n`;
+  }
+
   const effortSection = effort && effort !== 'medium' ? `
 ## Planning Effort: ${effort === 'high' ? 'High (Deep Analysis)' : 'Low (Quick Planning)'}
 
@@ -256,6 +269,7 @@ ${effort === 'high'
       MODEL_AUTHOR: modelAuthor,
       COMMENTS_SECTION: commentsSection,
       SPEC_SECTION: specSection,
+      CHILD_STORIES_SECTION: childStoriesSection,
       PROJECT_STRUCTURE_SECTION: projectStructureSection,
       EFFORT_SECTION: effortSection,
       PRD_REFERENCES: prdReferences,
