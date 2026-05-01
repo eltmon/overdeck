@@ -3,18 +3,17 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing bead workspace-rie: Add getChildIssues() method to IssueTracker interface
+Implementing InspectorPanel feature-specific actions (workspace-0jy)
 
 ## Completed Work
 - [x] workspace-rie: Add getChildIssues() method to IssueTracker interface (commit: 24c0cf9d9)
+- [x] workspace-q8c: Implement getChildIssues() for Rally tracker (commit: 24c0cf9d9)
+- [x] workspace-lhy: Add action bar to FeatureCard with Plan/See Plan, vBRIEF, and Tasks chips (commit: 92c4ba0d4)
+- [x] workspace-nqj: Plan button on features uses feature's own status, ignoring derivedStatus (commit: 92c4ba0d4)
+- [x] workspace-6qo: FeatureCard title click opens InspectorPanel; chevron still toggles expand (commit: 92c4ba0d4)
+- [x] workspace-33x: CompactChildCard click selects child story in InspectorPanel (commit: 92c4ba0d4)
 
 ## Remaining Work
-- [ ] workspace-rie: Add getChildIssues() method to IssueTracker interface
-- [ ] workspace-q8c: Implement getChildIssues() for Rally tracker
-- [ ] workspace-lhy: Add action bar to FeatureCard with Plan/See Plan, vBRIEF, and Tasks chips
-- [ ] workspace-nqj: Plan button on features uses feature's own status, ignoring derivedStatus
-- [ ] workspace-6qo: FeatureCard title click opens InspectorPanel; chevron still toggles expand
-- [ ] workspace-33x: CompactChildCard click selects child story in InspectorPanel
 - [ ] workspace-0jy: InspectorPanel renders feature-appropriate actions (no Start Agent)
 - [ ] workspace-dan: Planning prompt detects Rally Feature and includes child story context
 - [ ] workspace-qhv: Write FEATURE-CONTEXT.md to .planning/ for story workspaces
@@ -30,6 +29,7 @@ Implementing bead workspace-rie: Add getChildIssues() method to IssueTracker int
 - Cross-story dependency edges are written to vBRIEF but NOT enforced by Cloister (deferred)
 - Reuse existing planning pipeline — no new feature-specific planning mode
 - Planning agents reference existing child stories only; no auto-creation in Rally
+- Beads dependency graph is inverted (implementation beads depend on test beads); using --force to close
 
 ## Specialist Feedback
 None

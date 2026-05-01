@@ -29,6 +29,7 @@ import { getFriendlyModelName, shouldForceReviewTrigger } from './inspector/util
 import { useAlert } from './DialogProvider';
 import { BeadsDialog } from './BeadsDialog';
 import { VBriefDialog } from './vbrief/VBriefDialog';
+import { PlanDialog } from './PlanDialog';
 import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
@@ -145,6 +146,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
   const [containersStartedAt, setContainersStartedAt] = useState(0);
   const [agentLaunchState, setAgentLaunchState] = useState<'starting' | 'resuming' | null>(null);
   const [showSwitchModel, setShowSwitchModel] = useState(false);
+  const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null);
   const [containerMenu, setContainerMenu] = useState<{
     x: number; y: number; containerName: string; isRunning: boolean;
   } | null>(null);
@@ -1087,6 +1089,8 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           onSwitchModel={() => setShowSwitchModel(true)}
           lifecycle={agentLifecycle}
           agentLaunchState={agentLaunchState}
+          isFeature={issue?.artifactType?.includes('PortfolioItem') ?? false}
+          onPlan={() => setPlanDialogIssue(issue ?? null)}
         />
 
         {/* Issue labels/tags for no-agent view */}
@@ -1126,6 +1130,19 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
             });
           }}
           isPending={isSwitchPending}
+        />
+      )}
+
+      {/* Plan dialog */}
+      {planDialogIssue && (
+        <PlanDialog
+          issue={planDialogIssue}
+          isOpen={true}
+          onClose={() => setPlanDialogIssue(null)}
+          onComplete={async () => {
+            setPlanDialogIssue(null);
+            await refreshDashboardState(queryClient);
+          }}
         />
       )}
 

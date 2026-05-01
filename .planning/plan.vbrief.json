@@ -51,7 +51,7 @@
       {
         "id": "featurecard-action-bar",
         "title": "Add action bar to FeatureCard with Plan/See Plan, vBRIEF, and Tasks chips",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-30T12:00:00Z",
         "metadata": {
@@ -66,7 +66,7 @@
           {
             "id": "featurecard-action-bar.ac1",
             "title": "FeatureCard renders action bar with Plan/See Plan, vBRIEF, and Tasks chips below the progress bar",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -74,7 +74,7 @@
           {
             "id": "featurecard-action-bar.ac2",
             "title": "Plan chip opens PlanDialog; vBRIEF chip opens VBriefDialog; Tasks chip opens BeadsTasksPanel — same as IssueCard",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -82,7 +82,7 @@
           {
             "id": "featurecard-action-bar.ac3",
             "title": "No Start Agent button appears on FeatureCard action bar",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -90,7 +90,7 @@
           {
             "id": "featurecard-action-bar.ac4",
             "title": "Plan chip shows 'See Plan' (green) when hasPlan is true, 'Plan' (gray) otherwise",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -100,7 +100,7 @@
       {
         "id": "featurecard-click-to-select",
         "title": "FeatureCard title click opens InspectorPanel; chevron still toggles expand",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-30T12:00:00Z",
         "metadata": {
@@ -115,7 +115,7 @@
           {
             "id": "featurecard-click-to-select.ac1",
             "title": "Clicking FeatureCard title text sets selectedIssue and opens InspectorPanel with the feature's data",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -123,7 +123,7 @@
           {
             "id": "featurecard-click-to-select.ac2",
             "title": "Clicking the chevron icon toggles expand/collapse without changing selectedIssue",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -131,7 +131,7 @@
           {
             "id": "featurecard-click-to-select.ac3",
             "title": "FeatureCard shows selected state (visual highlight) when it is the selectedIssue",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -141,7 +141,7 @@
       {
         "id": "compactchild-click-to-select",
         "title": "CompactChildCard click selects child story in InspectorPanel",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-04-30T12:00:00Z",
         "metadata": {
@@ -156,7 +156,7 @@
           {
             "id": "compactchild-click-to-select.ac1",
             "title": "Clicking a CompactChildCard row (outside the identifier link) sets selectedIssue to the child story",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -164,7 +164,7 @@
           {
             "id": "compactchild-click-to-select.ac2",
             "title": "Clicking the identifier link still opens the external tracker in a new tab",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -172,7 +172,7 @@
           {
             "id": "compactchild-click-to-select.ac3",
             "title": "CompactChildCard shows selected state when it is the selectedIssue",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -223,7 +223,7 @@
       {
         "id": "derivedstatus-plan-gate",
         "title": "Plan button on features uses feature's own status, ignoring derivedStatus",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-04-30T12:00:00Z",
         "metadata": {
@@ -238,7 +238,7 @@
           {
             "id": "derivedstatus-plan-gate.ac1",
             "title": "Feature with status='todo' and derivedStatus='in_progress' shows Plan button in FeatureCard action bar",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -246,7 +246,7 @@
           {
             "id": "derivedstatus-plan-gate.ac2",
             "title": "Feature with status='todo' and derivedStatus='in_progress' shows Plan button in InspectorPanel",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -254,7 +254,7 @@
           {
             "id": "derivedstatus-plan-gate.ac3",
             "title": "Feature with status='closed' does NOT show Plan button regardless of derivedStatus",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
