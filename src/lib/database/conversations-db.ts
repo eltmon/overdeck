@@ -324,8 +324,8 @@ export function clearStuckForks(): number {
  */
 export function canReplaceTitle(conv: Conversation): boolean {
   if (conv.titleSource === 'manual') return false;
-  if (conv.titleSource === 'auto') return true;
-  // If AI already set it, don't replace again
+  // Allow AI title generation for default (instant-start) and auto (message at creation) titles
+  if (conv.titleSource === 'default' || conv.titleSource === 'auto') return true;
   return false;
 }
 
