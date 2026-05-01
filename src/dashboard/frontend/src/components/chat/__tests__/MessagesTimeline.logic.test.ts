@@ -4,7 +4,7 @@ import {
   deriveMessagesTimelineRows,
   estimateMessagesTimelineRowHeight,
   computeMessageDurationStart,
-} from '../session-logic';
+} from '../MessagesTimeline.logic';
 import type { ChatMessage, WorkLogEntry } from '../chat-types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

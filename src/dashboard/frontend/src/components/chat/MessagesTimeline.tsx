@@ -22,15 +22,16 @@ import {
   memo,
 } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus, RotateCcw, XCircle } from 'lucide-react';
 import type { WorkLogEntry } from './chat-types';
+import type { FailedMessage } from './ConversationPanel';
 import { ChatMarkdown } from './ChatMarkdown';
 import {
   deriveTimelineEntries,
   deriveMessagesTimelineRows,
   estimateMessagesTimelineRowHeight,
   type MessagesTimelineRow,
-} from './session-logic';
+} from './MessagesTimeline.logic';
 import type { ChatMessage } from './chat-types';
 import type { RoundVerdict } from '../CommandDeck/RoundCard';
 import styles from '../CommandDeck/styles/command-deck.module.css';
@@ -85,6 +86,9 @@ export interface MessagesTimelineProps {
   workLog: WorkLogEntry[];
   streaming: boolean;
   roundMarkers?: ReadonlyArray<RoundMarker>;
+  failedMessages?: FailedMessage[];
+  onRetryFailed?: (failedId: string, text: string) => void;
+  onDiscardFailed?: (failedId: string) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -94,6 +98,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   workLog,
   streaming,
   roundMarkers,
+  failedMessages,
+  onRetryFailed,
+  onDiscardFailed,
 }: MessagesTimelineProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -256,6 +263,38 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       </div>
     </div>
 
+    {/* Failed message outbox — shows messages that failed to send with Retry/Discard */}
+    {failedMessages && failedMessages.length > 0 && (
+      <div className={styles.failedOutbox}>
+        {failedMessages.map((fm) => (
+          <div key={fm.id} className={styles.failedMessage}>
+            <div className={styles.failedMessageBubble}>
+              <ChatMarkdown text={fm.text} />
+            </div>
+            <div className={styles.failedMessageActions}>
+              <span className={styles.failedMessageLabel}>Failed to send</span>
+              <button
+                className={styles.failedMessageBtn}
+                onClick={() => onRetryFailed?.(fm.id, fm.text)}
+                title="Retry sending"
+              >
+                <RotateCcw size={12} />
+                Retry
+              </button>
+              <button
+                className={styles.failedMessageBtn}
+                onClick={() => onDiscardFailed?.(fm.id)}
+                title="Discard message"
+              >
+                <XCircle size={12} />
+                Discard
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+
     {/* Scroll-to-bottom button — appears when user has scrolled up */}
     {showScrollToBottom && (
       <button
@@ -302,6 +341,9 @@ const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming
   }
   if (row.kind === 'work') {
     return <WorkLogGroup entries={row.groupedEntries} />;
+  }
+  if (row.kind === 'proposed-plan') {
+    return null; // Not yet implemented — placeholder for T3Code alignment
   }
   if (row.message.role === 'user') {
     return <UserMessageRow message={row.message} />;
@@ -428,7 +470,7 @@ function WorkLogGroup({ entries }: { entries: WorkLogEntry[] }) {
   return (
     <div className={styles.workLogGroup}>
       {visible.map((entry) => (
-        <WorkLogEntryRow key={entry.id} entry={entry} />
+        <SimpleWorkEntryRow key={entry.id} entry={entry} />
       ))}
       {hasOverflow && !expanded && (
         <button
@@ -454,7 +496,7 @@ function WorkLogGroup({ entries }: { entries: WorkLogEntry[] }) {
 
 const TERMINAL_TOOLS = new Set(['Bash', 'bash', 'terminal', 'shell']);
 
-function WorkLogEntryRow({ entry }: { entry: WorkLogEntry }) {
+function SimpleWorkEntryRow({ entry }: { entry: WorkLogEntry }) {
   const [showResult, setShowResult] = useState(false);
   const toneColor: Record<WorkLogEntry['tone'], string> = {
     thinking: 'var(--muted-foreground)',
@@ -464,14 +506,16 @@ function WorkLogEntryRow({ entry }: { entry: WorkLogEntry }) {
   };
 
   const isTerminal = TERMINAL_TOOLS.has(entry.toolTitle ?? entry.label);
+  const isThinking = entry.tone === 'thinking';
   const hasResult = !!entry.result;
+  const isExpandable = hasResult || (isThinking && !!entry.detail);
 
   return (
     <div>
       <div
         className={styles.workLogEntry}
-        style={hasResult ? { cursor: 'pointer' } : undefined}
-        onClick={hasResult ? () => setShowResult(prev => !prev) : undefined}
+        style={isExpandable ? { cursor: 'pointer' } : undefined}
+        onClick={isExpandable ? () => setShowResult(prev => !prev) : undefined}
       >
         {isTerminal ? (
           <span
@@ -498,7 +542,7 @@ function WorkLogEntryRow({ entry }: { entry: WorkLogEntry }) {
             {entry.detail.length > 80 ? '…' : ''}
           </span>
         )}
-        {hasResult && (
+        {isExpandable && (
           <ChevronRight
             size={10}
             style={{
@@ -511,14 +555,18 @@ function WorkLogEntryRow({ entry }: { entry: WorkLogEntry }) {
           />
         )}
       </div>
-      {showResult && entry.result && (
-        isTerminal ? (
+      {showResult && (
+        isTerminal && entry.result ? (
           <pre className={styles.workLogResult}>{entry.result}</pre>
-        ) : (
+        ) : isThinking && entry.detail ? (
+          <div className={styles.workLogResult}>
+            <ChatMarkdown text={entry.detail} />
+          </div>
+        ) : entry.result ? (
           <div className={styles.workLogResult}>
             <ChatMarkdown text={entry.result} />
           </div>
-        )
+        ) : null
       )}
     </div>
   );

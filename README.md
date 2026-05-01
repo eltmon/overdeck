@@ -50,7 +50,7 @@ Panopticon started as a CLI for orchestrating coding agents and grew into **Comm
 ## Why Panopticon?
 
 - **Stop babysitting agents.** Spawn them from a dashboard, monitor progress in real time, and let specialists handle code review, testing, and merging.
-- **Use the right model for the job.** Opus for planning, GPT-5.4 or Kimi for implementation, Haiku for quick commands — automatic routing based on task type and capabilities.
+- **Use the right model for the job.** Opus for planning, GPT-5.5 or Kimi for implementation, Haiku for quick commands — automatic routing based on task type and capabilities.
 - **Work survives across sessions.** PRDs, state files, beads, and skills persist context so agents don't start from zero every time.
 - **One skill format, every tool.** Write a SKILL.md once and it works across Claude Code, Codex, Cursor, and Gemini CLI.
 - **Tune routing without hand-editing prompts.** The Settings page lets you enable model families and set per-job overrides for work agents and specialists.

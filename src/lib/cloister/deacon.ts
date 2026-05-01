@@ -3318,6 +3318,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...resumeActions);
   for (const a of resumeActions) addLog('action', a, state.patrolCycle);
 
+  // Detect "Invalid signature in thinking block" in active agent output (PAN-612).
+  // Context compaction corrupts thinking-block signatures; the session cannot be
+  // resumed. Must run before idle-suspend so we recover corrupted agents first.
+  const signatureCorruptionActions = await checkThinkingSignatureCorruption();
+  actions.push(...signatureCorruptionActions);
+  for (const a of signatureCorruptionActions) addLog('action', a, state.patrolCycle);
+
   // Check and auto-suspend idle agents (PAN-80, fixed in PAN-154)
   const suspendActions = await checkAndSuspendIdleAgents();
   actions.push(...suspendActions);
@@ -3648,6 +3655,89 @@ export function getDeaconLogs(limit = 100): DeaconLogEntry[] {
  */
 export function getLastPatrolResult(): PatrolResult | null {
   return lastPatrolResult;
+}
+
+/**
+ * Detect agents whose tmux output contains "Invalid signature in thinking block" —
+ * a symptom of context compaction corrupting thinking-block cryptographic signatures
+ * (PAN-612). The corrupted session cannot be resumed; the agent must start fresh.
+ *
+ * Recovery: kill the tmux session, mark agent stopped, delete session.id so
+ * autoResumeStoppedWorkAgents won't try --resume with the corrupted session.
+ * The JSONL file is NEVER deleted (sacred).
+ */
+async function checkThinkingSignatureCorruption(): Promise<string[]> {
+  const actions: string[] = [];
+  if (!existsSync(AGENTS_DIR)) return actions;
+
+  let agentDirs: string[];
+  try {
+    agentDirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-'));
+  } catch {
+    return actions;
+  }
+
+  for (const agentId of agentDirs) {
+    // Only check agents that claim to be running
+    const stateFile = join(AGENTS_DIR, agentId, 'state.json');
+    if (!existsSync(stateFile)) continue;
+    let state: Record<string, unknown>;
+    try {
+      state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+    } catch {
+      continue;
+    }
+    if (state.status !== 'running') continue;
+
+    // Check if the tmux session is alive
+    if (!sessionExists(agentId)) continue;
+
+    // Capture recent output and scan for signature corruption
+    let output: string;
+    try {
+      output = await capturePaneAsync(agentId, 100);
+    } catch {
+      continue;
+    }
+
+    if (!output.includes('Invalid signature in thinking block')) continue;
+
+    // Corruption detected — recover the agent
+    const issueId = (state.issueId as string | undefined) ?? agentId;
+    console.error(`[deacon] SIGNATURE CORRUPTION detected in ${agentId} (${issueId}) — recovering`);
+    logDeaconEvent(`checkThinkingSignatureCorruption: corruption detected in ${agentId} (${issueId})`);
+    logAgentLifecycle(agentId, 'signature corruption detected — recovering: killed session, cleared session.id');
+
+    // Kill the tmux session
+    try {
+      await killSessionAsync(agentId);
+    } catch { /* non-fatal */ }
+
+    // Delete session.id so resumeAgent won't --resume the corrupted session
+    const sessionFile = join(AGENTS_DIR, agentId, 'session.id');
+    if (existsSync(sessionFile)) {
+      try { rmSync(sessionFile); } catch { /* non-fatal */ }
+    }
+
+    // Mark agent as stopped
+    state.status = 'stopped';
+    state.stoppedAt = new Date().toISOString();
+    try {
+      writeFileSync(stateFile, JSON.stringify(state, null, 2));
+    } catch { /* non-fatal */ }
+
+    // Notify server layer so the read model and frontend update
+    if (agentStoppedNotifier) {
+      try { agentStoppedNotifier(agentId); } catch { /* non-fatal */ }
+    }
+
+    const msg = `Recovered ${agentId} (${issueId}) from thinking-block signature corruption — session killed, will start fresh on next resume`;
+    actions.push(msg);
+    console.log(`[deacon] ${msg}`);
+    logDeaconEvent(`checkThinkingSignatureCorruption: ${msg}`);
+  }
+
+  return actions;
 }
 
 /**

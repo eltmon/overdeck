@@ -42,7 +42,7 @@ describe('getDefaultConversationModelApi', () => {
     expect(mockResolveModelId).toHaveBeenCalledWith('claude-sonnet-4-6');
   });
 
-  it('defaults to GPT-5.4 when OpenAI is enabled', async () => {
+  it('defaults to GPT-5.5 when OpenAI is enabled', async () => {
     mockLoadConfig.mockReturnValue({
       config: {
         enabledProviders: new Set(['anthropic', 'openai']),
@@ -60,8 +60,8 @@ describe('getDefaultConversationModelApi', () => {
 
     const { getDefaultConversationModelApi } = await import('../settings-api.js');
 
-    expect(getDefaultConversationModelApi()).toBe('gpt-5.4');
-    expect(mockResolveModelId).toHaveBeenCalledWith('gpt-5.4');
+    expect(getDefaultConversationModelApi()).toBe('gpt-5.5');
+    expect(mockResolveModelId).toHaveBeenCalledWith('gpt-5.5');
   });
 
   it('loads conversation compaction settings from config', async () => {

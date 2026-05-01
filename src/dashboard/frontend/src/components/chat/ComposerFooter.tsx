@@ -137,11 +137,13 @@ interface ComposerFooterProps {
   conversation: Conversation;
   /** Called with the message text the instant it is sent — use for optimistic display */
   onSend?: (text: string) => void;
+  /** Called when the POST fails — parent should move the optimistic message to the failed outbox */
+  onSendFailed?: (text: string) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
+export function ComposerFooter({ conversation, onSend, onSendFailed }: ComposerFooterProps) {
   const [model, setModel] = useState<string>(conversation.model ?? getDefaultConversationModel());
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
@@ -265,14 +267,21 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     processUploadQueue();
   }, [processUploadQueue]);
 
-  // Send /model command to tmux when model is changed on an active conversation
+  // Switch model via API — kills session and respawns with correct provider env.
+  // Unlike /model (same-provider only), this works for cross-provider switches.
   const handleModelChange = useCallback((newModel: string, _effortLevels: readonly string[]) => {
     setModel(newModel);
     saveStoredModel(newModel);
     if (conversation.sessionAlive) {
-      void sendConversationMessage(conversation.name, `/model ${newModel}`).catch((err: unknown) => {
-        console.error('[ComposerFooter] Failed to send /model:', err);
-      });
+      setSending(true);
+      void switchModel(conversation.name, newModel)
+        .catch((err: unknown) => {
+          console.error('[ComposerFooter] Failed to switch model:', err);
+          toast.error(err instanceof Error ? err.message : 'Failed to switch model');
+        })
+        .finally(() => {
+          setSending(false);
+        });
     }
   }, [conversation.name, conversation.sessionAlive]);
 
@@ -345,6 +354,10 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     if (!messageText && uploadedImages.length === 0) return;
 
     setSending(true);
+    const imagePrefix = uploadedImages
+      .map((image) => `@${image.serverPath}`)
+      .join('\n');
+    const composedMessage = [imagePrefix, messageText].filter(Boolean).join('\n');
     try {
       // If the selected model differs from the conversation's current model,
       // kill the session and restart with the new model before sending.
@@ -362,11 +375,6 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
         }
         return;
       }
-
-      const imagePrefix = uploadedImages
-        .map((image) => `@${image.serverPath}`)
-        .join('\n');
-      const composedMessage = [imagePrefix, messageText].filter(Boolean).join('\n');
 
       // Optimistic: notify parent immediately so message appears before server round-trip
       onSend?.(composedMessage);
@@ -391,12 +399,13 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     } catch (err) {
       console.error('[ComposerFooter] Failed to send:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to send message');
+      onSendFailed?.(composedMessage);
     } finally {
       setSending(false);
       // Refocus editor
       editor.focus();
     }
-  }, [model, conversation.name, conversation.model, conversation.sessionAlive, sending, isDisabled, onSend]);
+  }, [model, conversation.name, conversation.model, conversation.sessionAlive, sending, isDisabled, onSend, onSendFailed]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;

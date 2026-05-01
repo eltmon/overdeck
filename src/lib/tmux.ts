@@ -414,42 +414,89 @@ export async function resizeWindowAsync(target: string, cols: number, rows: numb
 }
 
 /**
+ * Error raised when message delivery to a tmux session fails verification.
+ */
+export class MessageDeliveryFailed extends Error {
+  constructor(
+    message: string,
+    public readonly sessionName: string,
+    public readonly paneSnapshot: string,
+  ) {
+    super(message);
+    this.name = 'MessageDeliveryFailed';
+  }
+}
+
+/**
  * Send keys to a tmux session (async, non-blocking).
- * Uses load-buffer + paste-buffer for reliable delivery, with a delay before Enter.
+ * Uses load-buffer + paste-buffer with capture-pane verification.
  * MUST be used from the dashboard server and any async context.
  */
 export async function sendKeysAsync(sessionName: string, keys: string, caller?: string): Promise<void> {
   validateSessionName(sessionName);
   logSendKeys(sessionName, keys, caller);
 
-  // Mirror the sync `sendKeys` pattern: one temp file, one load-buffer, one
-  // paste-buffer, one Enter. Splitting by line and pasting line-by-line
-  // (the previous implementation) cost ~5 tmux spawns and 50 ms of sleep
-  // per line, which made large prompts take seconds (PAN-785).
-  // `paste-buffer -d` drops the buffer in the same call so we don't need a
-  // separate delete-buffer round-trip.
   const sendId = randomUUID();
   const tmpFile = join(tmpdir(), `pan-sendkeys-${sendId}.txt`);
-  // Use a named tmux buffer so concurrent sendKeysAsync calls (e.g. spawning
-  // 4 parallel reviewers) don't race on the global unnamed buffer.
   const bufferName = `pan-${sendId}`;
 
   try {
     await writeFile(tmpFile, keys, 'utf-8');
     await tmuxExecAsync(['load-buffer', '-b', bufferName, tmpFile], { encoding: 'utf-8' });
     await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-t', sessionName], { encoding: 'utf-8' });
-    // Explicitly delete the named buffer — paste-buffer -d only drops the default buffer.
     await tmuxExecAsync(['delete-buffer', '-b', bufferName], { encoding: 'utf-8' }).catch(() => {});
-    // Scale delay with prompt size — large pastes need more time to render before
-    // Enter arrives. Hybrid formula: 15ms/line + 50ms per 1000 chars, minimum 600ms.
-    // (PAN-699: 300ms was insufficient for small messages when Claude Code shows
-    // warning banners; 600ms provides headroom for TUI render latency.)
-    const lineDelay = keys.split('\n').length * 15;
-    const lengthDelay = Math.floor(keys.length / 1000) * 50;
-    const delayMs = Math.max(600, Math.min(3000, lineDelay + lengthDelay));
-    await new Promise(r => setTimeout(r, delayMs));
+
+    // Verify paste arrived: poll capture-pane until the first line of the pasted
+    // text is visible in the pane. Cap at 3s to avoid hangs.
+    const firstLine = keys.split('\n')[0]?.trim() ?? '';
+    const VERIFY_TIMEOUT_MS = 3_000;
+    const VERIFY_INTERVAL_MS = 50;
+    const deadline = Date.now() + VERIFY_TIMEOUT_MS;
+    let pasteVerified = false;
+
+    if (firstLine.length >= 3) {
+      while (Date.now() < deadline) {
+        const pane = await capturePaneAsync(sessionName, 10);
+        if (pane.includes(firstLine.slice(0, 40))) {
+          pasteVerified = true;
+          break;
+        }
+        await new Promise(r => setTimeout(r, VERIFY_INTERVAL_MS));
+      }
+    } else {
+      // Very short text — use the old delay-based approach
+      const delayMs = Math.max(600, Math.min(3000, keys.split('\n').length * 15 + Math.floor(keys.length / 1000) * 50));
+      await new Promise(r => setTimeout(r, delayMs));
+      pasteVerified = true;
+    }
+
+    if (!pasteVerified) {
+      const snapshot = await capturePaneAsync(sessionName, 30);
+      throw new MessageDeliveryFailed(
+        `Paste verification failed for ${sessionName} — text not visible after ${VERIFY_TIMEOUT_MS}ms`,
+        sessionName,
+        snapshot,
+      );
+    }
+
+    // Send Enter
     await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
     logSendKeys(sessionName, '[Enter sent]', caller);
+
+    // Verify Enter submitted: poll until the pasted text is no longer in the
+    // input region (last 3 lines of the pane). This confirms the message was
+    // submitted rather than just sitting in the input box.
+    if (firstLine.length >= 3) {
+      const SUBMIT_TIMEOUT_MS = 2_000;
+      const submitDeadline = Date.now() + SUBMIT_TIMEOUT_MS;
+      while (Date.now() < submitDeadline) {
+        const pane = await capturePaneAsync(sessionName, 5);
+        if (!pane.includes(firstLine.slice(0, 40))) {
+          break; // Text moved out of input — submitted
+        }
+        await new Promise(r => setTimeout(r, VERIFY_INTERVAL_MS));
+      }
+    }
   } finally {
     await unlink(tmpFile).catch(() => {});
   }
