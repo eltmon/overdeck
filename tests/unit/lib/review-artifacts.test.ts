@@ -10,7 +10,8 @@ const { execMock, ensureMergeSetForIssueMock, upsertMergeSetMock, createReviewAr
   createReviewArtifactMock: vi.fn(),
 }));
 
-vi.mock('child_process', () => {
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
   const kCustom = Symbol.for('nodejs.util.promisify.custom');
 
   function exec(cmd: string, optionsOrCb: any, maybeCallback?: any) {
@@ -21,7 +22,7 @@ vi.mock('child_process', () => {
   }
 
   (exec as any)[kCustom] = execMock;
-  return { exec };
+  return { ...actual, exec };
 });
 
 vi.mock('../../../src/lib/merge-set.js', async (importOriginal) => {
