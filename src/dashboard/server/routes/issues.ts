@@ -30,6 +30,7 @@ import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { withBdMutex } from '../utils/bd-mutex.js';
 
 import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
@@ -1007,7 +1008,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
 
         // Sync beads
         try {
-          await execAsync('bd sync 2>/dev/null || true', { cwd: gitRoot, encoding: 'utf-8', timeout: 10000 });
+          await withBdMutex(() => execAsync('bd sync 2>/dev/null || true', { cwd: gitRoot, encoding: 'utf-8', timeout: 10000 }));
         } catch { /* bd might not be installed */ }
 
         // The .planning-complete marker is written by `pan plan-finalize` from the
@@ -1395,13 +1396,13 @@ const postIssueReopenRoute = HttpRouter.add(
           const { createBeadsFromVBrief } = await import('../../../lib/vbrief/beads.js');
           if (existsSync(workspacePath) && findPlan(workspacePath)) {
             try {
-              const { stdout: bdCheck } = await execAsync(
+              const { stdout: bdCheck } = await withBdMutex(() => execAsync(
                 `bd list --json -l ${issueLower} --limit 1`,
                 { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 },
-              );
+              ));
               const existing = JSON.parse(bdCheck.trim() || '[]');
               if (existing.length === 0) {
-                const result = await createBeadsFromVBrief(workspacePath);
+                const result = await withBdMutex(() => createBeadsFromVBrief(workspacePath));
                 if (result.created.length > 0) {
                   console.log(`[reopen] Recreated ${result.created.length} beads for ${id} from vBRIEF plan`);
                   return true;
@@ -2338,11 +2339,11 @@ const getIssueBeadsRoute = HttpRouter.add(
     const { beads, querySource } = yield* Effect.promise(async (): Promise<{ beads: any[]; querySource: string }> => {
       try {
         const bdSearchDir = (workspacePath && existsSync(workspacePath)) ? workspacePath : (projectPath || homedir());
-        const { stdout } = await execAsync(`bd list --json -l "${id.toLowerCase()}" --status all --limit 0`, {
+        const { stdout } = await withBdMutex(() => execAsync(`bd list --json -l "${id.toLowerCase()}" --status all --limit 0`, {
           cwd: bdSearchDir,
           encoding: 'utf-8',
           timeout: 10000,
-        });
+        }));
         return { beads: JSON.parse(stdout || '[]'), querySource: 'local' };
       } catch (bdError: any) {
         console.error('bd search failed:', bdError.message);
@@ -2412,28 +2413,17 @@ const getIssuePlanningStateRoute = HttpRouter.add(
     const hasPlan = !!planPath && existsSync(planPath);
     const planningComplete = workspacePath && existsSync(join(workspacePath, '.planning', '.planning-complete'));
 
-    // bd query is best-effort: a missing/broken database must NOT prevent the
-    // chip from coloring vBRIEF correctly. Errors are swallowed inside the
-    // promise so Effect.promise never sees a rejection.
-    const beadsCount = workspacePath && existsSync(workspacePath)
-      ? yield* Effect.promise(async () => {
-          try {
-            const { stdout } = await execAsync(
-              `bd list --json -l "${issueLower}" --status all --limit 0`,
-              { cwd: workspacePath, encoding: 'utf-8', timeout: 8000 },
-            );
-            const arr = JSON.parse(stdout || '[]');
-            return Array.isArray(arr) ? arr.length : 0;
-          } catch {
-            return 0;
-          }
-        })
-      : 0;
+    // Check for beads by looking at the issues.jsonl file — pure filesystem
+    // stat, no bd process spawn, no dolt lock contention. The file exists
+    // in the workspace's .beads/ directory (or via redirect to the main repo).
+    const hasBeads = workspacePath && existsSync(workspacePath)
+      ? existsSync(join(workspacePath, '.beads', 'issues.jsonl'))
+      : false;
 
     return jsonResponse({
       hasPlan,
-      hasBeads: beadsCount > 0,
-      beadsCount,
+      hasBeads,
+      beadsCount: 0,  // Deprecated — use hasBeads. Kept for backward compat.
       planningComplete,
       workspacePath,
     });
@@ -2481,7 +2471,7 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
     }
 
     const { createBeadsFromVBrief } = yield* Effect.promise(() => import('../../../lib/vbrief/beads.js'));
-    const result = yield* Effect.promise(() => createBeadsFromVBrief(workspacePath));
+    const result = yield* Effect.promise(() => withBdMutex(() => createBeadsFromVBrief(workspacePath)));
 
     if (!result.success || result.created.length === 0) {
       const errors = result.errors.length > 0 ? result.errors : ['Beads creation produced no tasks'];

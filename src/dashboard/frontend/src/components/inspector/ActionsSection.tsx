@@ -27,7 +27,8 @@ interface ActionsSectionProps {
   reviewStatusLoading?: boolean;
   workspace?: WorkspaceInfo;
   hasPlan: boolean;
-  beadsCount: number;
+  hasBeads: boolean;
+  beadsCount?: number;  // Deprecated — use hasBeads
   reviewMutation: AnyMutation;
   cancelMutation: AnyMutation;
   startAgentMutation: UseMutationResult<unknown, Error, string | undefined, unknown>;
@@ -62,6 +63,7 @@ export function ActionsSection({
   reviewStatusLoading,
   workspace,
   hasPlan,
+  hasBeads,
   beadsCount,
   reviewMutation,
   cancelMutation,
@@ -421,6 +423,7 @@ export function ActionsSection({
             <ArtifactLinks
               issueId={issueId}
               hasPlan={hasPlan}
+              hasBeads={hasBeads}
               beadsCount={beadsCount}
               onViewBeads={onViewBeads}
               onViewVBrief={onViewVBrief}

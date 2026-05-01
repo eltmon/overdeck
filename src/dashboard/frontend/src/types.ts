@@ -40,6 +40,11 @@ export interface Issue {
   completedChildCount?: number;  // Children in Done state
   inProgressChildCount?: number;  // Children in active work
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';  // From review-status, set by specialist pipeline
+  // Planning-state (embedded from /api/issues via filesystem checks)
+  hasPlan?: boolean;
+  hasBeads?: boolean;
+  planningComplete?: boolean;
+  workspacePath?: string;
 }
 
 export interface GitStatus {

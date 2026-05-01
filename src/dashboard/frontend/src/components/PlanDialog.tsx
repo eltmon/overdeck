@@ -272,8 +272,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     refetchInterval: step === 'planning' ? 4000 : false,
   });
   const planningHasPlan = planningStateQuery.data?.hasPlan ?? false;
-  const planningBeadsCount = planningStateQuery.data?.beadsCount ?? 0;
-  const tasksNeedGeneration = planningHasPlan && planningBeadsCount === 0;
+  const planningHasBeads = planningStateQuery.data?.hasBeads ?? false;
+  const tasksNeedGeneration = planningHasPlan && !planningHasBeads;
 
   const generateTasksMutation = useMutation({
     mutationFn: async () => {

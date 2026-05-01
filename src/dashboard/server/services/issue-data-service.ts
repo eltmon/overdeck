@@ -12,11 +12,14 @@
  */
 
 import { Octokit } from '@octokit/rest';
+import { existsSync } from 'fs';
+import { join } from 'path';
 import { mapGitHubStateToCanonical } from '../../../core/state-mapping.js';
 import { CacheService, DEFAULT_TTLS } from './cache-service.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
 import type { GitHubConfig, RallyConfig } from './tracker-config.js';
 import { loadReviewStatuses } from '../../../lib/review-status.js';
+import { resolveProjectFromIssue } from '../../../lib/projects.js';
 
 /**
  * Map a raw status string to its canonical state.
@@ -89,6 +92,36 @@ function mapRallyStateToCanonical(issueState: string): string {
   if (stateLower === 'closed') return 'done';
   // 'open' and anything unrecognized → 'todo'
   return 'todo';
+}
+
+/**
+ * Compute planning-state for an issue via cheap filesystem checks.
+ * No bd process, no dolt lock — just stat calls.
+ */
+function computePlanningState(identifier: string): {
+  hasPlan: boolean;
+  hasBeads: boolean;
+  planningComplete: boolean;
+  workspacePath: string;
+} {
+  try {
+    const resolved = resolveProjectFromIssue(identifier);
+    const projectPath = resolved?.projectPath ?? '';
+    if (!projectPath) {
+      return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '' };
+    }
+    const issueLower = identifier.toLowerCase();
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+    if (!existsSync(workspacePath)) {
+      return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath };
+    }
+    const hasPlan = existsSync(join(workspacePath, '.planning', 'plan.vbrief.json'));
+    const hasBeads = existsSync(join(workspacePath, '.beads', 'issues.jsonl'));
+    const planningComplete = existsSync(join(workspacePath, '.planning', '.planning-complete'));
+    return { hasPlan, hasBeads, planningComplete, workspacePath };
+  } catch {
+    return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '' };
+  }
 }
 
 export class IssueDataService {
@@ -276,6 +309,18 @@ export class IssueDataService {
     } catch {
       // review-status.json may not exist yet
     }
+
+    // Enrich with planning-state (filesystem checks, no bd process)
+    allIssues = allIssues.map(issue => {
+      const ps = computePlanningState(issue.identifier);
+      return {
+        ...issue,
+        hasPlan: ps.hasPlan,
+        hasBeads: ps.hasBeads,
+        planningComplete: ps.planningComplete,
+        workspacePath: ps.workspacePath || undefined,
+      };
+    });
 
     // Sort by updatedAt
     allIssues.sort((a, b) =>

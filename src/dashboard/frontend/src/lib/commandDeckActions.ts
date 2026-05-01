@@ -88,7 +88,8 @@ export interface ZoneAInput {
   lifecycle?: Pick<WorkAgentLifecycle, 'canResumeSession'> | null;
   workspace?: Pick<WorkspaceInfo, 'exists'> | null;
   hasPlan: boolean;
-  beadsCount: number;
+  hasBeads: boolean;
+  beadsCount?: number;  // Deprecated — use hasBeads
   hasInference: boolean;
   hasTranscripts: boolean;
   hasDiscussions: boolean;
@@ -270,7 +271,7 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
   }
 
   // ── Artifacts / planning (always present, demoted to secondary) ───────────
-  if (input.beadsCount > 0 || input.hasPlan) secondary.push('beads');
+  if (input.hasBeads || input.hasPlan) secondary.push('beads');
   if (input.hasPlan) secondary.push('vbrief');
   secondary.push('state', 'prd');
   if (input.hasInference) secondary.push('inference');
