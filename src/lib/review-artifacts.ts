@@ -14,6 +14,7 @@ import {
   type MergeSet,
   type MergeSetRepoState,
 } from './merge-set.js';
+import { emitActivityEntry } from './activity-logger.js';
 
 const execAsync = promisify(exec);
 
@@ -156,6 +157,16 @@ export async function createReviewArtifactsForIssue(
       verificationStatus: 'pending',
       mergeStatus: 'pending',
     });
+    if (artifact.created) {
+      const repoSuffix = mergeSet.repos.length > 1 ? ` (${repo.repoKey})` : '';
+      emitActivityEntry({
+        source: 'merge-agent',
+        level: 'info',
+        message: `Merge request created for ${issueId}${repoSuffix}`,
+        details: artifact.url,
+        issueId,
+      });
+    }
     artifacts.push({
       repoKey: repo.repoKey,
       created: artifact.created,

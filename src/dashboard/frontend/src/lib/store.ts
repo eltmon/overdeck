@@ -159,6 +159,23 @@ export const selectBlockedFromMerge = memoizeArraySelector<DashboardState, 'revi
       .sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')),
 )
 
+/**
+ * Open merge requests — PR/MR exists but not yet readyForMerge.
+ * Shown on the Awaiting Merge page so the user can approve/review early.
+ */
+export const selectOpenMergeRequests = memoizeArraySelector<DashboardState, 'reviewStatusByIssueId', ReviewStatusSnapshot[]>(
+  'reviewStatusByIssueId',
+  (rsMap) =>
+    Object.values(rsMap)
+      .filter(
+        (rs): rs is ReviewStatusSnapshot =>
+          !!rs?.prUrl &&
+          rs.readyForMerge !== true &&
+          rs.mergeStatus !== 'merged',
+      )
+      .sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')),
+)
+
 const EMPTY_STRING_ARRAY: string[] = []
 
 export const selectAgentOutput =

@@ -47,11 +47,17 @@ export interface CommentOnArtifactInput extends ReviewArtifactRef {
   repository?: string;
 }
 
+export interface ApproveReviewArtifactInput extends ReviewArtifactRef {
+  cwd?: string;
+  repository?: string;
+}
+
 export interface ForgeAdapter {
   readonly forge: ForgeType;
   createReviewArtifact(input: CreateReviewArtifactInput): Promise<CreateReviewArtifactResult>;
   mergeReviewArtifact(input: MergeReviewArtifactInput): Promise<void>;
   commentOnArtifact(input: CommentOnArtifactInput): Promise<void>;
+  approveReviewArtifact(input: ApproveReviewArtifactInput): Promise<void>;
 }
 
 async function withBodyFile<T>(body: string | undefined, prefix: string, fn: (bodyFile?: string) => Promise<T>): Promise<T> {
@@ -244,6 +250,14 @@ const githubForgeAdapter: ForgeAdapter = {
       );
     });
   },
+
+  async approveReviewArtifact(input) {
+    const target = buildGitHubReviewTarget(input);
+    await execAsync(
+      `gh pr review ${target} --approve${buildRepositoryFlag(input.repository)}`,
+      { cwd: input.cwd, encoding: 'utf-8' }
+    );
+  },
 };
 
 const gitlabForgeAdapter: ForgeAdapter = {
@@ -287,6 +301,14 @@ const gitlabForgeAdapter: ForgeAdapter = {
         { cwd: input.cwd, encoding: 'utf-8' }
       );
     });
+  },
+
+  async approveReviewArtifact(input) {
+    const target = buildGitLabReviewTarget(input);
+    await execAsync(
+      `glab mr approve ${target}${buildRepositoryFlag(input.repository)}`,
+      { cwd: input.cwd, encoding: 'utf-8' }
+    );
   },
 };
 
