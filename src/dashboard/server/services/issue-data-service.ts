@@ -116,8 +116,10 @@ function computePlanningState(identifier: string): {
       return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath };
     }
     const hasPlan = existsSync(join(workspacePath, '.planning', 'plan.vbrief.json'));
-    const hasBeads = existsSync(join(workspacePath, '.beads', 'issues.jsonl'));
     const planningComplete = existsSync(join(workspacePath, '.planning', '.planning-complete'));
+    // .planning-complete is written ONLY after generate-tasks succeeds.
+    // It's the definitive signal for "tasks have been generated." No bd query.
+    const hasBeads = planningComplete;
     return { hasPlan, hasBeads, planningComplete, workspacePath };
   } catch {
     return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '' };
