@@ -330,18 +330,21 @@ export function extractBeadsIdsFromState(stateContent: string): string[] {
 
 /**
  * Read beads tasks for an issue from the live Dolt database via `bd list`.
- * Falls back gracefully to an empty array if bd CLI is unavailable.
+ * Falls back to `.beads/issues.jsonl` in workspacePath, then projectRoot.
  */
 export async function readBeadsTasks(
   workspacePath: string,
-  _projectRoot: string,
+  projectRoot: string,
   issueId: string
 ): Promise<string[]> {
   const tasks: string[] = [];
 
   const acByTitle = buildACLookupByTitle(workspacePath);
 
-  const beads = await queryBeadsForIssue(workspacePath, issueId);
+  let beads = await queryBeadsForIssue(workspacePath, issueId);
+  if (beads.length === 0) {
+    beads = await queryBeadsForIssue(projectRoot, issueId);
+  }
 
   for (const bead of beads) {
     tasks.push(`- [${bead.status || 'open'}] ${bead.title} (${bead.id})`);
