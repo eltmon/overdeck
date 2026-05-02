@@ -147,6 +147,7 @@ export const ReadModelServiceLive = Layer.effect(
         agents: Object.values(state.agentsById),
         specialists: Object.values(state.specialistsByName),
         reviewStatuses: Object.values(state.reviewStatusByIssueId),
+        turnDiffSummariesByAgentId: state.turnDiffSummariesByAgentId,
         issues: state.issuesRaw,
         resources: state.resources ?? undefined,
         timestamp: new Date().toISOString(),
