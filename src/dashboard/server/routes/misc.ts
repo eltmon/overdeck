@@ -34,9 +34,10 @@ import { jsonResponse } from "../http-helpers.js";
  *   POST /api/shadow/:issueId/monitor
  *   POST /api/shadow/:issueId/observe
  *   POST /api/dev/rebuild
+ *   POST /api/system/restart-dashboard
  */
 
-import { exec } from 'node:child_process';
+import { exec, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { access, mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -1642,6 +1643,31 @@ const postDevRebuildRoute = HttpRouter.add(
   }),
 );
 
+// POST /api/system/restart-dashboard — fire-and-forget restart of the dashboard
+// server. Spawns a detached `pan restart --dashboard` so the new process
+// outlives the SIGTERM that kills this server. Used by the browser fallback
+// path in App.tsx when window.panopticonBridge is not available.
+const postRestartDashboardRoute = HttpRouter.add(
+  'POST',
+  '/api/system/restart-dashboard',
+  Effect.sync(() => {
+    try {
+      const child = spawn('pan', ['restart', '--dashboard'], {
+        detached: true,
+        stdio: 'ignore',
+      });
+      child.on('error', (err) => {
+        console.error('[restart-dashboard] pan restart spawn failed:', err);
+      });
+      child.unref();
+      return jsonResponse({ ok: true, pid: child.pid ?? null }, { status: 202 });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return jsonResponse({ error: 'Restart failed: ' + msg }, { status: 500 });
+    }
+  }),
+);
+
 export const miscRouteLayer = Layer.mergeAll(
   postTrackersRefreshRoute,
   getProjectMappingsRoute,
@@ -1676,6 +1702,7 @@ export const miscRouteLayer = Layer.mergeAll(
   postShadowMonitorRoute,
   postShadowObserveRoute,
   postDevRebuildRoute,
+  postRestartDashboardRoute,
 );
 
 export default miscRouteLayer;

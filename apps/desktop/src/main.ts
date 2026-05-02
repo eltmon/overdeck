@@ -44,6 +44,7 @@ export const IPC = {
   CHECK_FOR_UPDATES: "pan:check-for-updates",
   DOWNLOAD_UPDATE: "pan:download-update",
   QUIT_AND_INSTALL: "pan:quit-and-install",
+  RESTART_DASHBOARD: "pan:restart-dashboard",
 } as const;
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -212,6 +213,19 @@ function registerIpcHandlers(): void {
 
   ipcMain.on(IPC.QUIT_AND_INSTALL, () => {
     quitAndInstall();
+  });
+
+  ipcMain.handle(IPC.RESTART_DASHBOARD, async () => {
+    console.log("[main] manual dashboard restart requested");
+    stopServer();
+    // Brief delay so SIGTERM has a chance to land before we re-spawn.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    startServer((port, wsUrl) => {
+      serverPort = port;
+      serverUrl = `http://127.0.0.1:${port}`;
+      serverWsUrl = wsUrl;
+      console.log(`[main] dashboard restarted on ${serverUrl}`);
+    });
   });
 }
 
