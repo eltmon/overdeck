@@ -226,6 +226,7 @@ export const DashboardSnapshot = Schema.Struct({
   reviewStatuses: Schema.Array(ReviewStatusSnapshot),
   issues: Schema.Array(Schema.Unknown),  // Issues are complex — pass through unvalidated
   resources: Schema.optional(Schema.Unknown),
+  turnDiffSummariesByAgentId: Schema.optional(Schema.Record(Schema.String, Schema.Array(TurnDiffSummary))),
   timestamp: Schema.String,
 })
 export type DashboardSnapshot = typeof DashboardSnapshot.Type

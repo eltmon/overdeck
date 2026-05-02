@@ -10,7 +10,9 @@ import { Effect, Layer } from 'effect'
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http'
 import { jsonResponse } from '../http-helpers.js'
 import { ReadModelService } from '../read-model.js'
+import { getEventStore } from '../event-store.js'
 import {
+  captureCheckpoint,
   diffCheckpoints,
   diffCheckpointFiles,
   listCheckpoints,
@@ -51,7 +53,7 @@ const getDiffsRoute = HttpRouter.add(
         }
 
         const workspace: string | null = agent.workspace ?? null
-        const summaries = (snapshot as any).turnDiffSummariesByAgentId?.[agentId] ?? []
+        const summaries = snapshot.turnDiffSummariesByAgentId?.[agentId] ?? []
 
         let checkpointTurns: string[] = []
         if (workspace) {
@@ -177,12 +179,82 @@ const getFullDiffRoute = HttpRouter.add(
   }),
 )
 
+// ─── Route: POST /api/agents/:agentId/diffs/test-checkpoint ─────────────────
+// Test-only: captures a checkpoint and emits a turn_diff_completed event.
+
+const postTestCheckpointRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:agentId/diffs/test-checkpoint',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest
+    const originCheck = validateOrigin(request)
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 })
+    }
+
+    const params = yield* HttpRouter.params
+    const agentId = params.agentId
+    const readModel = yield* ReadModelService
+
+    return yield* Effect.promise(async () => {
+      try {
+        const snapshot = await Effect.runPromise(readModel.getSnapshot)
+        const agent = (snapshot.agents as any[]).find((a: any) => a.id === agentId)
+        if (!agent) {
+          return jsonResponse({ error: 'Agent not found' }, { status: 404 })
+        }
+
+        const workspace: string | null = agent.workspace ?? null
+        if (!workspace) {
+          return jsonResponse({ error: 'Agent has no workspace' }, { status: 400 })
+        }
+
+        const turnId = `test-turn-${Date.now()}`
+
+        // Capture checkpoint
+        await captureCheckpoint(workspace, turnId)
+
+        // Get file changes from previous checkpoint (if any)
+        const checkpoints = await listCheckpoints(workspace)
+        const prevCheckpoint = checkpoints.length >= 2 ? checkpoints[checkpoints.length - 2] : null
+        let files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }> = []
+        if (prevCheckpoint) {
+          files = await diffCheckpointFiles(workspace, prevCheckpoint, turnId)
+        }
+
+        // Emit event
+        const store = getEventStore()
+        await store.appendAsync({
+          type: 'agent.turn_diff_completed',
+          timestamp: new Date().toISOString(),
+          payload: {
+            agentId,
+            turnId,
+            completedAt: new Date().toISOString(),
+            files,
+            checkpointRef: `refs/pan/turn/${turnId}`,
+            assistantMessageId: null,
+            checkpointTurnCount: checkpoints.length,
+          },
+        } as any)
+
+        return jsonResponse({ turnId, files, checkpointCount: checkpoints.length })
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error)
+        console.error('[diffs] test checkpoint failed:', msg)
+        return jsonResponse({ error: msg }, { status: 500 })
+      }
+    })
+  }),
+)
+
 // ─── Compose ──────────────────────────────────────────────────────────────────
 
 export const diffsRouteLayer = Layer.mergeAll(
   getDiffsRoute,
   getTurnDiffRoute,
   getFullDiffRoute,
+  postTestCheckpointRoute,
 )
 
 export default diffsRouteLayer
