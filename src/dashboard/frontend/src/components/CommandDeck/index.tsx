@@ -779,6 +779,7 @@ export function CommandDeck({
                   conversation={conv}
                   viewMode={conversationViewMode}
                   onViewModeChange={onConversationViewModeChange}
+                  agentId={selectedAgent?.id}
                   onArchived={() => {
                     setSelectedConversation(null);
                     queryClient.invalidateQueries({ queryKey: ['conversations'] });

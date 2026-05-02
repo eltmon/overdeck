@@ -125,7 +125,7 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
               />
             ) : specialistConversation ? (
               // Down specialist → show JSONL conversation (same as Command Deck)
-              <ConversationPanel conversation={specialistConversation} />
+              <ConversationPanel conversation={specialistConversation} agentId={agentId} />
             ) : null
           ) : workAgentIssueId ? (
             <ActivityView issueId={workAgentIssueId} />

@@ -14,6 +14,7 @@ import { initEventStore } from '../event-store.js';
 import type { StoredEvent } from '../event-store.js';
 import { ReadModelService } from '../read-model.js';
 import { emitActivityDetailed } from '../../../lib/activity-logger.js';
+import { captureCheckpoint, diffCheckpointFiles, listCheckpoints } from '../../../lib/checkpoint/checkpoint-manager.js';
 import { randomUUID } from 'crypto';
 
 // ─── EventStoreService ────────────────────────────────────────────────────────
@@ -163,6 +164,69 @@ export const EventStoreServiceLive = Layer.effect(
       if (event.type.startsWith('activity.')) return;
       const detailed = mapDomainEventToDetailed(event);
       if (detailed) emitActivityDetailed(detailed);
+    });
+
+    // Capture checkpoints when agent activity changes.
+    // Fires async (non-blocking) on every agent.activity_changed event for agents
+    // with a workspace. Creates a git checkpoint, computes file changes since the
+    // previous checkpoint, and emits agent.turn_diff_completed.
+    // Rate-limited to one checkpoint per agent per 10 seconds.
+    const checkpointCooldown = new Map<string, number>(); // agentId → last checkpoint timestamp
+    store.subscribe((event) => {
+      if (event.type !== 'agent.activity_changed') return;
+      const p = (event.payload ?? {}) as Record<string, unknown>;
+      const agentId = p['agentId'] as string | undefined;
+      if (!agentId) return;
+
+      // Rate limit: skip if last checkpoint was <10s ago
+      const lastCheckpoint = checkpointCooldown.get(agentId) ?? 0;
+      if (Date.now() - lastCheckpoint < 10_000) return;
+      checkpointCooldown.set(agentId, Date.now());
+
+      // Fire-and-forget async checkpoint — don't block the event loop
+      (async () => {
+        try {
+          // Look up agent workspace from read model snapshot
+          const snapshot = await Effect.runPromise(readModel.getSnapshot);
+          const agent = (snapshot.agents as any[]).find((a: any) => a.id === agentId);
+          if (!agent?.workspace) return;
+
+          const workspace: string = agent.workspace;
+          const turnId = `turn-${Date.now()}-${randomUUID().slice(0, 8)}`;
+
+          // Capture checkpoint (git tag at current working tree state)
+          await captureCheckpoint(workspace, turnId);
+
+          // Compute file changes from previous checkpoint
+          const checkpoints = await listCheckpoints(workspace);
+          const prevCheckpoint = checkpoints.length >= 2 ? checkpoints[checkpoints.length - 2] : null;
+          let files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }> = [];
+          if (prevCheckpoint) {
+            files = await diffCheckpointFiles(workspace, prevCheckpoint, turnId);
+          }
+
+          // Only emit if there are actual changes
+          if (files.length === 0) return;
+
+          // Emit turn_diff_completed event
+          store.appendAsync({
+            type: 'agent.turn_diff_completed',
+            timestamp: new Date().toISOString(),
+            payload: {
+              agentId,
+              turnId,
+              completedAt: new Date().toISOString(),
+              files,
+              checkpointRef: `refs/pan/turn/${turnId}`,
+              assistantMessageId: null,
+              checkpointTurnCount: checkpoints.length,
+            },
+          } as any);
+        } catch (err) {
+          // Checkpoint capture is best-effort — log but don't crash
+          console.error('[checkpoint] Failed to capture checkpoint for', agentId, err);
+        }
+      })();
     });
 
     const streamEvents = Stream.callback<StoredEvent>((queue) =>
