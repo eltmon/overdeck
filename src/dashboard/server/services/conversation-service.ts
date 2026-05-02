@@ -514,6 +514,31 @@ export async function parseConversationMessages(
         preTokens: typeof meta?.preTokens === 'number' ? meta.preTokens : undefined,
         model: typeof meta?.model === 'string' ? meta.model : undefined,
       });
+    } else if (entry.type === 'attachment') {
+      // Claude Code 2.1.121+ attachment-based plan mode protocol.
+      // The agent writes the plan to ~/.claude/plans/<slug>.md and the runtime
+      // emits a `plan_file_reference` attachment with the full content. Approval
+      // is signalled by a subsequent `plan_mode_exit` attachment.
+      const attachment = (entry as Record<string, unknown>).attachment as Record<string, unknown> | undefined;
+      if (attachment?.type === 'plan_file_reference') {
+        const planContent = typeof attachment.planContent === 'string' ? attachment.planContent : '';
+        if (planContent) {
+          const planFilePath = typeof attachment.planFilePath === 'string' ? attachment.planFilePath : undefined;
+          const id = ((entry as Record<string, unknown>).uuid as string | undefined) ?? `plan-${lineSequence}`;
+          proposedPlan = {
+            id,
+            plan: planContent,
+            planFilePath,
+            status: 'pending',
+            createdAt: entry.timestamp ?? new Date().toISOString(),
+          };
+        }
+      } else if (attachment?.type === 'plan_mode_exit') {
+        if (proposedPlan && proposedPlan.status === 'pending') {
+          proposedPlan.status = 'approved';
+          proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+        }
+      }
     }
   }
 
