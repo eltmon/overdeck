@@ -78,6 +78,7 @@ import {
   maybeCompactBeforeRespawn,
   compactConversationNative,
   shouldInterceptManualCompact,
+  isCompacting,
 } from '../services/conversation-compaction.js';
 import { sessionFilePath, sessionIdFromFile, encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { generateSummaryForFork, generateFallbackSummary, reserveSummaryForkSession, copySessionFromCompactBoundary } from '../../../lib/conversations/summary-fork.js';
@@ -229,6 +230,10 @@ async function getCachedMessages(
         lastSequence: incremental.lastSequence,
         mtimeMs: incremental.mtimeMs,
         proposedPlan: incremental.proposedPlan ?? cachedResult.proposedPlan,
+        get compactBoundaries() {
+          return cachedResult.compactBoundaries.concat(incremental.compactBoundaries);
+        },
+        planToolUseIds: incremental.planToolUseIds,
       };
     }
   } else {
@@ -1370,6 +1375,8 @@ const getConversationMessagesRoute = HttpRouter.add(
             streaming: result.streaming,
             totalCost: result.totalCost,
             proposedPlan: result.proposedPlan,
+            compactBoundaries: result.compactBoundaries.length > 0 ? result.compactBoundaries : undefined,
+            compacting: isCompacting(sessionFile) || undefined,
           });
         } catch (parseErr: unknown) {
           // File may not exist yet — Claude Code is still starting up.

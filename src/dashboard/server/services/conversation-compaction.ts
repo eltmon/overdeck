@@ -10,6 +10,11 @@ import { getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../../..
 
 const COMPACT_TOKEN_THRESHOLD = 100_000;
 
+const activeCompactions = new Set<string>();
+export function isCompacting(sessionFile: string): boolean {
+  return activeCompactions.has(sessionFile);
+}
+
 export interface NativeCompactionResult {
   summary: string;
   tokensBefore: number;
@@ -80,6 +85,15 @@ export async function compactConversationNative(sessionFile: string): Promise<Na
   if (!existsSync(sessionFile)) {
     throw new Error(`Session file not found: ${sessionFile}`);
   }
+  activeCompactions.add(sessionFile);
+  try {
+    return await doCompact(sessionFile);
+  } finally {
+    activeCompactions.delete(sessionFile);
+  }
+}
+
+async function doCompact(sessionFile: string): Promise<NativeCompactionResult> {
 
   const settings = getConversationCompactionSettings();
   const tokensBefore = await estimateContextTokens(sessionFile);

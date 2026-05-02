@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Check, MessageSquare, ChevronDown, ChevronRight } from 'lucide-react';
+import { Check, MessageSquare, ChevronDown, ChevronRight, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ProposedPlan } from './chat-types';
 import { ChatMarkdown } from './ChatMarkdown';
@@ -33,7 +33,8 @@ export function PlanCard({ plan, conversationName }: PlanCardProps) {
   const [sending, setSending] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedback, setFeedback] = useState('');
-  const [expanded, setExpanded] = useState(true);
+  const isPending = plan.status === 'pending';
+  const [expanded, setExpanded] = useState(isPending);
 
   const handleAction = useCallback(async (action: string, feedbackText?: string) => {
     setSending(true);
@@ -58,8 +59,26 @@ export function PlanCard({ plan, conversationName }: PlanCardProps) {
     setFeedback('');
   }, [handleAction, feedback]);
 
+  const badgeClass = plan.status === 'approved'
+    ? styles.planCardBadgeApproved
+    : plan.status === 'rejected'
+      ? styles.planCardBadgeRejected
+      : styles.planCardBadge;
+
+  const badgeLabel = plan.status === 'approved'
+    ? 'Approved'
+    : plan.status === 'rejected'
+      ? 'Changes requested'
+      : 'Awaiting approval';
+
+  const BadgeIcon = plan.status === 'approved'
+    ? CheckCircle2
+    : plan.status === 'rejected'
+      ? XCircle
+      : null;
+
   return (
-    <div className={styles.planCard}>
+    <div className={`${styles.planCard} ${!isPending ? styles.planCardResolved : ''}`}>
       <div className={styles.planCardHeader}>
         <button
           type="button"
@@ -67,9 +86,14 @@ export function PlanCard({ plan, conversationName }: PlanCardProps) {
           onClick={() => setExpanded(v => !v)}
         >
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          <span className={styles.planCardTitle}>Proposed Plan</span>
+          <span className={styles.planCardTitle}>
+            {isPending ? 'Proposed Plan' : 'Plan'}
+          </span>
         </button>
-        <span className={styles.planCardBadge}>Awaiting approval</span>
+        <span className={badgeClass}>
+          {BadgeIcon && <BadgeIcon size={12} />}
+          {badgeLabel}
+        </span>
       </div>
 
       {expanded && (
@@ -78,59 +102,63 @@ export function PlanCard({ plan, conversationName }: PlanCardProps) {
         </div>
       )}
 
-      <div className={styles.planCardActions}>
-        <button
-          className={styles.planCardApproveBtn}
-          onClick={handleApprove}
-          disabled={sending}
-          title="Approve plan and begin implementation"
-        >
-          <Check size={14} />
-          Approve
-        </button>
-        <button
-          className={styles.planCardFeedbackBtn}
-          onClick={() => setShowFeedback(v => !v)}
-          disabled={sending}
-          title="Request changes to the plan"
-        >
-          <MessageSquare size={14} />
-          Request Changes
-        </button>
-      </div>
-
-      {showFeedback && (
-        <div className={styles.planCardFeedbackArea}>
-          <textarea
-            className={styles.planCardTextarea}
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            placeholder="Describe what to change..."
-            rows={3}
-            disabled={sending}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                handleRejectWithFeedback();
-              }
-            }}
-          />
-          <div className={styles.planCardFeedbackActions}>
+      {isPending && (
+        <>
+          <div className={styles.planCardActions}>
             <button
               className={styles.planCardApproveBtn}
-              onClick={handleRejectWithFeedback}
-              disabled={sending || !feedback.trim()}
+              onClick={handleApprove}
+              disabled={sending}
+              title="Approve plan and begin implementation"
             >
-              Send Feedback
+              <Check size={14} />
+              Approve
             </button>
             <button
-              className={styles.planCardCancelBtn}
-              onClick={() => { setShowFeedback(false); setFeedback(''); }}
+              className={styles.planCardFeedbackBtn}
+              onClick={() => setShowFeedback(v => !v)}
               disabled={sending}
+              title="Request changes to the plan"
             >
-              Cancel
+              <MessageSquare size={14} />
+              Request Changes
             </button>
           </div>
-        </div>
+
+          {showFeedback && (
+            <div className={styles.planCardFeedbackArea}>
+              <textarea
+                className={styles.planCardTextarea}
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Describe what to change..."
+                rows={3}
+                disabled={sending}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    handleRejectWithFeedback();
+                  }
+                }}
+              />
+              <div className={styles.planCardFeedbackActions}>
+                <button
+                  className={styles.planCardApproveBtn}
+                  onClick={handleRejectWithFeedback}
+                  disabled={sending || !feedback.trim()}
+                >
+                  Send Feedback
+                </button>
+                <button
+                  className={styles.planCardCancelBtn}
+                  onClick={() => { setShowFeedback(false); setFeedback(''); }}
+                  disabled={sending}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

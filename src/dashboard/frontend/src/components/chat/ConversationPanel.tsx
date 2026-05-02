@@ -151,9 +151,45 @@ export function ConversationPanel({
     return map
   }, [diffData?.summaries])
 
-  const handleOpenTurnDiff = useCallback((turnId: string, _filePath?: string) => {
-    // TODO: Open diff panel in Phase 3
-    console.log('[diff] open turn diff:', turnId, _filePath)
+  // Diff panel state — read from URL
+  const [diffOpen, setDiffOpen] = useState(() => {
+    const params = parseDiffRouteSearch(
+      Object.fromEntries(new URLSearchParams(window.location.search)),
+    )
+    return params.diff === '1'
+  })
+
+  // Listen for URL changes (popstate)
+  useEffect(() => {
+    const onPopState = () => {
+      const params = parseDiffRouteSearch(
+        Object.fromEntries(new URLSearchParams(window.location.search)),
+      )
+      setDiffOpen(params.diff === '1')
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  const handleOpenTurnDiff = useCallback((turnId: string, filePath?: string) => {
+    const searchParams = new URLSearchParams(window.location.search)
+    searchParams.set('diff', '1')
+    searchParams.set('diffTurnId', turnId)
+    if (filePath) searchParams.set('diffFilePath', filePath)
+    const url = `${window.location.pathname}?${searchParams.toString()}`
+    window.history.pushState({}, '', url)
+    setDiffOpen(true)
+  }, [])
+
+  const handleCloseDiff = useCallback(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    searchParams.delete('diff')
+    searchParams.delete('diffTurnId')
+    searchParams.delete('diffFilePath')
+    const query = searchParams.toString()
+    const url = query ? `${window.location.pathname}?${query}` : window.location.pathname
+    window.history.pushState({}, '', url)
+    setDiffOpen(false)
   }, [])
 
   const resumeMutation = useMutation({
@@ -367,34 +403,47 @@ export function ConversationPanel({
         </div>
       )}
 
-      {/* Body */}
-      <div className={styles.conversationTerminalBody}>
-        {/* Terminal: only mounted when actively viewing (xterm.js crashes with visibility:hidden) */}
-        {showTerminal && viewMode === 'terminal' && (
-          <XTerminal sessionName={conversation.tmuxSession} />
-        )}
-        {/* Conversation view — shown when in conversation mode or session ended */}
-        {(viewMode === 'conversation' || !showTerminal) && (
-          <ConversationView
-            conversation={conversation}
-            onResume={!embedded && !showTerminal ? handleResume : undefined}
-            onArchive={!embedded ? handleArchive : undefined}
-            resumePending={resumeMutation.isPending}
-            roundMarkers={roundMarkers}
-            roundMetadata={roundMetadata}
-            turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
-            onOpenTurnDiff={handleOpenTurnDiff}
-            resolvedTheme={resolvedTheme}
-            modelPicker={!embedded ? (
-              <ModelPicker
-                value={selectedModel}
-                onChange={(modelId) => {
-                  setSelectedModel(modelId);
-                  switchModelMutation.mutate(modelId);
-                }}
-              />
-            ) : undefined}
-          />
+      {/* Body — conversation + optional diff panel */}
+      <div className="flex flex-1 overflow-hidden">
+        <div className={styles.conversationTerminalBody}>
+          {/* Terminal: only mounted when actively viewing (xterm.js crashes with visibility:hidden) */}
+          {showTerminal && viewMode === 'terminal' && (
+            <XTerminal sessionName={conversation.tmuxSession} />
+          )}
+          {/* Conversation view — shown when in conversation mode or session ended */}
+          {(viewMode === 'conversation' || !showTerminal) && (
+            <ConversationView
+              conversation={conversation}
+              onResume={!embedded && !showTerminal ? handleResume : undefined}
+              onArchive={!embedded ? handleArchive : undefined}
+              resumePending={resumeMutation.isPending}
+              roundMarkers={roundMarkers}
+              roundMetadata={roundMetadata}
+              turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
+              onOpenTurnDiff={handleOpenTurnDiff}
+              resolvedTheme={resolvedTheme}
+              modelPicker={!embedded ? (
+                <ModelPicker
+                  value={selectedModel}
+                  onChange={(modelId) => {
+                    setSelectedModel(modelId);
+                    switchModelMutation.mutate(modelId);
+                  }}
+                />
+              ) : undefined}
+            />
+          )}
+        </div>
+        {/* Diff side panel — rendered when ?diff=1 is in the URL */}
+        {diffOpen && agentId && diffData?.summaries && (
+          <DiffWorkerPoolProvider>
+            <DiffPanel
+              mode="inline"
+              agentId={agentId}
+              turnDiffSummaries={diffData.summaries}
+              onClose={handleCloseDiff}
+            />
+          </DiffWorkerPoolProvider>
         )}
       </div>
     </div>

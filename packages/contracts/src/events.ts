@@ -206,6 +206,28 @@ export const AgentStateRestoredEvent = Schema.Struct({
 })
 export type AgentStateRestoredEvent = typeof AgentStateRestoredEvent.Type
 
+/** Emitted when a turn diff checkpoint is captured and diff computed */
+export const AgentTurnDiffCompletedEvent = Schema.Struct({
+  type: Schema.Literal("agent.turn_diff_completed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    turnId: Schema.String,
+    completedAt: Schema.String,
+    files: Schema.Array(Schema.Struct({
+      path: Schema.String,
+      kind: Schema.optional(Schema.String),
+      additions: Schema.optional(Schema.Number),
+      deletions: Schema.optional(Schema.Number),
+    })),
+    checkpointRef: Schema.optional(Schema.String),
+    assistantMessageId: Schema.optional(Schema.String),
+    checkpointTurnCount: Schema.optional(Schema.Number),
+  }),
+})
+export type AgentTurnDiffCompletedEvent = typeof AgentTurnDiffCompletedEvent.Type
+
 // ─── Planning Events ──────────────────────────────────────────────────────────
 
 /** Replaces socket.io `planning:started` */
@@ -671,6 +693,7 @@ export const DomainEvent = Schema.Union([
   AgentCurrentIssueSetEvent,
   AgentResolutionChangedEvent,
   AgentStateRestoredEvent,
+  AgentTurnDiffCompletedEvent,
   PlanningStartedEvent,
   PlanningFailedEvent,
   PlanningSyncEvent,

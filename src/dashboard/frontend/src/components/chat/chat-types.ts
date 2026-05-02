@@ -37,6 +37,34 @@ export interface ProposedPlan {
   resolvedAt?: string;
 }
 
+export interface CompactBoundary {
+  id: string;
+  timestamp: string;
+  trigger?: string;
+  preTokens?: number;
+  model?: string;
+}
+
 export type ConversationEvent =
-  | { kind: 'messages'; messages: ChatMessage[]; workLog: WorkLogEntry[]; streaming: boolean; proposedPlan?: ProposedPlan }
+  | { kind: 'messages'; messages: ChatMessage[]; workLog: WorkLogEntry[]; streaming: boolean; proposedPlan?: ProposedPlan; compactBoundaries?: CompactBoundary[] }
   | { kind: 'discovering' };
+
+// ─── Turn Diff Types ─────────────────────────────────────────────────────────
+// Mirror T3Code's types from apps/web/src/types.ts
+
+export interface TurnDiffFileChange {
+  path: string;
+  kind?: string;
+  additions?: number;
+  deletions?: number;
+}
+
+export interface TurnDiffSummary {
+  turnId: string;
+  completedAt: string;
+  status?: string;
+  files: TurnDiffFileChange[];
+  checkpointRef?: string;
+  assistantMessageId?: string;
+  checkpointTurnCount?: number;
+}

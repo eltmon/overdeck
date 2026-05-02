@@ -8,7 +8,7 @@
  * for Panopticon (no attachment handling, etc.).
  */
 
-import type { ChatMessage, ProposedPlan, WorkLogEntry } from './chat-types';
+import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from './chat-types';
 
 // ─── Timeline entry types ─────────────────────────────────────────────────────
 
@@ -38,6 +38,17 @@ export type MessagesTimelineRow =
       id: string;
       createdAt: string;
       plan: ProposedPlan;
+    }
+  | {
+      kind: 'compact-boundary';
+      id: string;
+      createdAt: string;
+      boundary: CompactBoundary;
+    }
+  | {
+      kind: 'compacting';
+      id: string;
+      createdAt: string;
     }
   | {
       kind: 'working';
@@ -177,6 +188,8 @@ export function estimateMessagesTimelineRowHeight(
   timelineWidth = 800,
 ): number {
   if (row.kind === 'working') return 40;
+  if (row.kind === 'compact-boundary') return 40;
+  if (row.kind === 'compacting') return 40;
   if (row.kind === 'proposed-plan') {
     const lines = Math.max(3, Math.ceil(row.plan.plan.length / 60));
     return 120 + lines * 20;

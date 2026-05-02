@@ -68,6 +68,17 @@ export const ProposedPlan = Schema.Struct({
 })
 export type ProposedPlan = typeof ProposedPlan.Type
 
+// ─── Compact boundary types ──────────────────────────────────────────────────
+
+export const CompactBoundary = Schema.Struct({
+  id: Schema.String,
+  timestamp: Schema.String,
+  trigger: Schema.optional(Schema.String),
+  preTokens: Schema.optional(Schema.Number),
+  model: Schema.optional(Schema.String),
+})
+export type CompactBoundary = typeof CompactBoundary.Type
+
 // ─── Chat / conversation message types (PAN-451) ──────────────────────────────
 
 export const ChatMessage = Schema.Struct({
@@ -108,6 +119,7 @@ export interface ConversationResponse {
   totalCost: number;
   byteOffset: number;
   proposedPlan?: ProposedPlan;
+  compactBoundaries?: CompactBoundary[];
 }
 
 export const ConversationEvent = Schema.Union([
@@ -117,6 +129,7 @@ export const ConversationEvent = Schema.Union([
     workLog: Schema.Array(WorkLogEntry),
     streaming: Schema.Boolean,
     proposedPlan: Schema.optional(ProposedPlan),
+    compactBoundaries: Schema.optional(Schema.Array(CompactBoundary)),
   }),
   Schema.Struct({
     kind: Schema.Literal('discovering'),
