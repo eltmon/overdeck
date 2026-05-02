@@ -986,6 +986,15 @@ const postConversationRoute = HttpRouter.add(
       return jsonResponse({ error: originCheck.error }, { status: 403 });
     }
     const body = yield* readJsonBody;
+
+    // Log request origin to trace who is creating conversations
+    const reqOrigin = getHeader(request, 'origin') ?? 'none';
+    const reqReferer = getHeader(request, 'referer') ?? 'none';
+    const reqUserAgent = getHeader(request, 'user-agent') ?? 'none';
+    const reqXff = getHeader(request, 'x-forwarded-for') ?? 'none';
+    const reqIp = request.headers['x-real-ip'] ?? 'local';
+    console.log(`[conversations] POST /api/conversations origin=${reqOrigin} referer=${reqReferer} ua=${reqUserAgent.slice(0, 80)} xff=${reqXff} ip=${reqIp}`);
+
     return yield* Effect.promise(async () => {
       try {
         const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
