@@ -22,10 +22,13 @@ import {
   memo,
 } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus, RotateCcw, XCircle } from 'lucide-react';
-import type { ProposedPlan, WorkLogEntry } from './chat-types';
+import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus, RotateCcw, XCircle, Scissors } from 'lucide-react';
+import type { CompactBoundary, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import type { FailedMessage } from './ConversationPanel';
 import { ChatMarkdown } from './ChatMarkdown';
+import { ChangedFilesTree } from './ChangedFilesTree';
+import { DiffStatLabel } from './DiffStatLabel';
+import { summarizeTurnDiffStats } from '../../lib/turnDiffTree';
 import { PlanCard } from './PlanCard';
 import {
   deriveTimelineEntries,
@@ -91,7 +94,12 @@ export interface MessagesTimelineProps {
   onRetryFailed?: (failedId: string, text: string) => void;
   onDiscardFailed?: (failedId: string) => void;
   proposedPlan?: ProposedPlan;
+  compactBoundaries?: CompactBoundary[];
+  compacting?: boolean;
   conversationName?: string;
+  turnDiffSummaryByAssistantMessageId?: Map<string, TurnDiffSummary>;
+  onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
+  resolvedTheme?: 'light' | 'dark';
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -105,7 +113,12 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   onRetryFailed,
   onDiscardFailed,
   proposedPlan,
+  compactBoundaries,
+  compacting,
   conversationName,
+  turnDiffSummaryByAssistantMessageId,
+  onOpenTurnDiff,
+  resolvedTheme,
 }: MessagesTimelineProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -118,21 +131,68 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const timelineEntries = useMemo(() => deriveTimelineEntries(messages, workLog), [messages, workLog]);
   const baseRows = useMemo(() => deriveMessagesTimelineRows(timelineEntries, streaming), [timelineEntries, streaming]);
   const rows = useMemo(() => {
-    if (!proposedPlan || proposedPlan.status !== 'pending') return baseRows;
-    const planRow: MessagesTimelineRow = {
-      kind: 'proposed-plan',
-      id: `plan-${proposedPlan.id}`,
-      createdAt: proposedPlan.createdAt,
-      plan: proposedPlan,
-    };
-    const workingIdx = baseRows.findIndex(r => r.kind === 'working');
-    if (workingIdx >= 0) {
-      const copy = [...baseRows];
-      copy.splice(workingIdx, 0, planRow);
-      return copy;
+    let result = baseRows;
+
+    // Inject compact boundary dividers by timestamp
+    if (compactBoundaries && compactBoundaries.length > 0) {
+      const copy = [...result];
+      for (const boundary of compactBoundaries) {
+        const boundaryRow: MessagesTimelineRow = {
+          kind: 'compact-boundary',
+          id: `compact-${boundary.id}`,
+          createdAt: boundary.timestamp,
+          boundary,
+        };
+        const idx = copy.findIndex(r => r.createdAt && r.createdAt > boundary.timestamp);
+        if (idx >= 0) {
+          copy.splice(idx, 0, boundaryRow);
+        } else {
+          copy.push(boundaryRow);
+        }
+      }
+      result = copy;
     }
-    return [...baseRows, planRow];
-  }, [baseRows, proposedPlan]);
+
+    // Inject proposed plan
+    if (proposedPlan) {
+      const planRow: MessagesTimelineRow = {
+        kind: 'proposed-plan',
+        id: `plan-${proposedPlan.id}`,
+        createdAt: proposedPlan.createdAt,
+        plan: proposedPlan,
+      };
+      if (proposedPlan.status === 'pending') {
+        const workingIdx = result.findIndex(r => r.kind === 'working');
+        if (workingIdx >= 0) {
+          const copy = [...result];
+          copy.splice(workingIdx, 0, planRow);
+          result = copy;
+        } else {
+          result = [...result, planRow];
+        }
+      } else {
+        const copy = [...result];
+        const insertIdx = copy.findIndex(r => r.createdAt && r.createdAt > proposedPlan.createdAt);
+        if (insertIdx >= 0) {
+          copy.splice(insertIdx, 0, planRow);
+        } else {
+          copy.push(planRow);
+        }
+        result = copy;
+      }
+    }
+
+    // Inject compacting indicator at the end
+    if (compacting) {
+      result = [...result, {
+        kind: 'compacting' as const,
+        id: 'compacting-indicator',
+        createdAt: new Date().toISOString(),
+      }];
+    }
+
+    return result;
+  }, [baseRows, proposedPlan, compactBoundaries, compacting]);
 
   // Index round markers by the row they should follow. A single row can have
   // multiple markers (e.g. two consecutive rounds without any new messages
@@ -251,9 +311,17 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                     left: 0,
                     width: '100%',
                     transform: `translateY(${virtualItem.start}px)`,
+                    background: 'var(--background)',
                   }}
                 >
-                  <TimelineRowRenderer row={row} isStreaming={streaming} conversationName={conversationName} />
+                  <TimelineRowRenderer
+                    row={row}
+                    isStreaming={streaming}
+                    conversationName={conversationName}
+                    turnDiffSummary={row.kind === 'message' && row.message.role === 'assistant' ? turnDiffSummaryByAssistantMessageId?.get(row.message.id) : undefined}
+                    onOpenTurnDiff={onOpenTurnDiff}
+                    resolvedTheme={resolvedTheme}
+                  />
                   {markersForRow?.map((marker) => (
                     <RoundDivider
                       key={`marker-${marker.round}-${marker.label ?? ''}`}
@@ -271,7 +339,14 @@ export const MessagesTimeline = memo(function MessagesTimeline({
           const markersForRow = markersByAfterId.get(row.id);
           return (
             <Fragment key={row.id}>
-              <TimelineRowRenderer row={row} isStreaming={streaming} conversationName={conversationName} />
+              <TimelineRowRenderer
+                row={row}
+                isStreaming={streaming}
+                conversationName={conversationName}
+                turnDiffSummary={row.kind === 'message' && row.message.role === 'assistant' ? turnDiffSummaryByAssistantMessageId?.get(row.message.id) : undefined}
+                onOpenTurnDiff={onOpenTurnDiff}
+                resolvedTheme={resolvedTheme}
+              />
               {markersForRow?.map((marker) => (
                 <RoundDivider
                   key={`marker-${marker.round}-${marker.label ?? ''}`}
@@ -355,9 +430,12 @@ interface RowProps {
   row: MessagesTimelineRow;
   isStreaming: boolean;
   conversationName?: string;
+  turnDiffSummary?: TurnDiffSummary;
+  onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
+  resolvedTheme?: 'light' | 'dark';
 }
 
-const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName }: RowProps) {
+const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, turnDiffSummary, onOpenTurnDiff, resolvedTheme }: RowProps) {
   if (row.kind === 'working') {
     return <WorkingIndicator startedAt={row.createdAt} />;
   }
@@ -367,6 +445,12 @@ const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming
   if (row.kind === 'proposed-plan') {
     return <PlanCard plan={row.plan} conversationName={conversationName ?? ''} />;
   }
+  if (row.kind === 'compact-boundary') {
+    return <CompactBoundaryDivider boundary={row.boundary} />;
+  }
+  if (row.kind === 'compacting') {
+    return <CompactingIndicator />;
+  }
   if (row.message.role === 'user') {
     return <UserMessageRow message={row.message} />;
   }
@@ -375,6 +459,9 @@ const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming
       message={row.message}
       durationStart={row.durationStart}
       isStreaming={isStreaming}
+      turnDiffSummary={turnDiffSummary}
+      onOpenTurnDiff={onOpenTurnDiff}
+      resolvedTheme={resolvedTheme}
     />
   );
 });
@@ -451,20 +538,66 @@ function AssistantMessageRow({
   message,
   durationStart,
   isStreaming,
+  turnDiffSummary,
+  onOpenTurnDiff,
+  resolvedTheme,
 }: {
   message: ChatMessage;
   durationStart: string;
   isStreaming: boolean;
+  turnDiffSummary?: TurnDiffSummary;
+  onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
+  resolvedTheme?: 'light' | 'dark';
 }) {
   const duration = message.completedAt
     ? formatElapsed(durationStart, message.completedAt)
     : null;
+
+  const [allExpanded, setAllExpanded] = useState(false);
 
   return (
     <div className={styles.assistantMessageRow}>
       <Bot size={14} className={styles.assistantMessageAvatar} aria-hidden="true" />
       <div className={styles.assistantMessageContent}>
         <ChatMarkdown text={message.text} isStreaming={isStreaming && !message.completedAt} />
+        {turnDiffSummary && turnDiffSummary.files.length > 0 && (
+          <div className="mt-2 rounded-md border border-border/50 bg-muted/30 p-2">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-medium text-muted-foreground">
+                Changed files ({turnDiffSummary.files.length})
+                {' '}
+                <DiffStatLabel
+                  additions={summarizeTurnDiffStats(turnDiffSummary.files).additions}
+                  deletions={summarizeTurnDiffStats(turnDiffSummary.files).deletions}
+                  showParentheses
+                />
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  className="text-[10px] text-muted-foreground hover:text-foreground"
+                  onClick={() => setAllExpanded((v) => !v)}
+                >
+                  {allExpanded ? 'Collapse all' : 'Expand all'}
+                </button>
+                {onOpenTurnDiff && (
+                  <button
+                    className="text-[10px] text-primary hover:underline"
+                    onClick={() => onOpenTurnDiff(turnDiffSummary.turnId)}
+                  >
+                    View diff
+                  </button>
+                )}
+              </div>
+            </div>
+            <ChangedFilesTree
+              turnId={turnDiffSummary.turnId}
+              files={turnDiffSummary.files}
+              allDirectoriesExpanded={allExpanded}
+              resolvedTheme={resolvedTheme ?? 'dark'}
+              onOpenTurnDiff={onOpenTurnDiff ?? (() => {})}
+            />
+          </div>
+        )}
         <div className={styles.messageMetadata}>
           <span className={styles.messageTimestamp}>
             {formatTimestamp(message.createdAt)}
@@ -686,6 +819,41 @@ function RoundDivider({ marker }: { marker: RoundMarker }) {
           background: 'var(--border)',
         }}
       />
+    </div>
+  );
+}
+
+// ─── Compact boundary divider ────────────────────────────────────────────────
+
+function CompactBoundaryDivider({ boundary }: { boundary: CompactBoundary }) {
+  const label = boundary.preTokens
+    ? `Compacted (${Math.round(boundary.preTokens / 1000)}k tokens)`
+    : 'Conversation compacted';
+  const detail = [
+    boundary.trigger && boundary.trigger !== 'panopticon-native' ? boundary.trigger : null,
+    boundary.model,
+  ].filter(Boolean).join(' · ');
+
+  return (
+    <div className={styles.compactBoundaryDivider}>
+      <div className={styles.compactBoundaryLine} />
+      <div className={styles.compactBoundaryLabel}>
+        <Scissors size={12} />
+        <span>{label}</span>
+        {detail && <span className={styles.compactBoundaryDetail}>{detail}</span>}
+      </div>
+      <div className={styles.compactBoundaryLine} />
+    </div>
+  );
+}
+
+// ─── Compacting indicator ────────────────────────────────────────────────────
+
+function CompactingIndicator() {
+  return (
+    <div className={styles.compactingIndicator}>
+      <Scissors size={14} className={styles.compactingIcon} />
+      <span>Compacting conversation...</span>
     </div>
   );
 }

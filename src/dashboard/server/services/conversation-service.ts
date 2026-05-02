@@ -10,7 +10,7 @@
 import { readdir, stat, watch, open } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { ChatMessage, ProposedPlan, WorkLogEntry } from '@panctl/contracts';
+import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from '@panctl/contracts';
 import { calculateCost, getPricing, type AIProvider } from '../../../lib/cost.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 
@@ -45,6 +45,8 @@ export interface ParseResult {
   proposedPlan?: ProposedPlan;
   /** ExitPlanMode tool_use IDs (persist across incremental calls). */
   planToolUseIds: Set<string>;
+  /** Compact boundary markers detected in the JSONL. */
+  compactBoundaries: CompactBoundary[];
 }
 
 /** State carried across incremental parseConversationMessages calls. */
@@ -290,6 +292,8 @@ export async function parseConversationMessages(
   let proposedPlan: ProposedPlan | undefined = priorState?.proposedPlan;
   // Set of ExitPlanMode tool_use IDs so we can match tool_results to plans
   const planToolUseIds = priorState?.planToolUseIds ?? new Set<string>();
+  // Compact boundary markers
+  const compactBoundaries: CompactBoundary[] = [];
 
   for (const line of lines) {
     let entry: JsonlEntry;
@@ -501,6 +505,15 @@ export async function parseConversationMessages(
           sequence: lineSequence,
         };
       }
+    } else if (entry.type === 'system' && (entry as Record<string, unknown>).subtype === 'compact_boundary') {
+      const meta = (entry as Record<string, unknown>).compactMetadata as Record<string, unknown> | undefined;
+      compactBoundaries.push({
+        id: (entry as Record<string, unknown>).uuid as string ?? `compact-${lineSequence}`,
+        timestamp: entry.timestamp ?? new Date().toISOString(),
+        trigger: typeof meta?.trigger === 'string' ? meta.trigger : undefined,
+        preTokens: typeof meta?.preTokens === 'number' ? meta.preTokens : undefined,
+        model: typeof meta?.model === 'string' ? meta.model : undefined,
+      });
     }
   }
 
@@ -563,6 +576,7 @@ export async function parseConversationMessages(
     mtimeMs: fileStats.mtimeMs,
     proposedPlan,
     planToolUseIds,
+    compactBoundaries,
   };
 }
 

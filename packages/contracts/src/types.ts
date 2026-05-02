@@ -196,6 +196,27 @@ export const ReviewStatusSnapshot = Schema.Struct({
 })
 export type ReviewStatusSnapshot = typeof ReviewStatusSnapshot.Type
 
+// ─── Turn Diff ───────────────────────────────────────────────────────────────
+
+export const TurnDiffFileChange = Schema.Struct({
+  path: Schema.String,
+  kind: Schema.optional(Schema.String),
+  additions: Schema.optional(Schema.Number),
+  deletions: Schema.optional(Schema.Number),
+})
+export type TurnDiffFileChange = typeof TurnDiffFileChange.Type
+
+export const TurnDiffSummary = Schema.Struct({
+  turnId: Schema.String,
+  completedAt: Schema.String,
+  status: Schema.optional(Schema.String),
+  files: Schema.Array(TurnDiffFileChange),
+  checkpointRef: Schema.optional(Schema.String),
+  assistantMessageId: Schema.optional(Schema.String),
+  checkpointTurnCount: Schema.optional(Schema.Number),
+})
+export type TurnDiffSummary = typeof TurnDiffSummary.Type
+
 // ─── Dashboard Snapshot ──────────────────────────────────────────────────────
 
 export const DashboardSnapshot = Schema.Struct({

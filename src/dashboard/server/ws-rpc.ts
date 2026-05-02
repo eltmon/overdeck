@@ -351,6 +351,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                     workLog: initial.workLog,
                     streaming: initial.streaming,
                     proposedPlan: initial.proposedPlan,
+                    compactBoundaries: initial.compactBoundaries.length > 0 ? initial.compactBoundaries : undefined,
                   });
 
                   // Watch for new content and stream incremental updates
@@ -363,6 +364,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                       workLog: result.workLog,
                       streaming: result.streaming,
                       proposedPlan: result.proposedPlan,
+                      compactBoundaries: result.compactBoundaries.length > 0 ? result.compactBoundaries : undefined,
                     });
                   });
 

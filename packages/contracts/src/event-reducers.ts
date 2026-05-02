@@ -17,6 +17,7 @@ import type {
   ResourceStats,
   ReviewStatusSnapshot,
   SpecialistSnapshot,
+  TurnDiffSummary,
 } from './index'
 
 // ─── Read model state shape ──────────────────────────────────────────────────
@@ -39,6 +40,7 @@ export interface ReadModelState {
   detailedActivity: unknown[]
   ttsActivity: unknown[]
   shadowInferenceByIssueId: Record<string, string>
+  turnDiffSummariesByAgentId: Record<string, TurnDiffSummary[]>
   dashboardLifecycle: DashboardLifecycleState
 }
 
@@ -66,6 +68,7 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   detailedActivity: [],
   ttsActivity: [],
   shadowInferenceByIssueId: {},
+  turnDiffSummariesByAgentId: {},
   dashboardLifecycle: {
     active: false,
     reason: null,
@@ -756,6 +759,40 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           error,
         },
       };
+    }
+
+    case 'agent.turn_diff_completed': {
+      const p = event.payload as {
+        agentId: string
+        turnId: string
+        completedAt: string
+        files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }>
+        checkpointRef?: string
+        assistantMessageId?: string
+        checkpointTurnCount?: number
+      }
+      const existing = state.turnDiffSummariesByAgentId[p.agentId] ?? []
+      const summary: TurnDiffSummary = {
+        turnId: p.turnId,
+        completedAt: p.completedAt,
+        files: p.files,
+        checkpointRef: p.checkpointRef,
+        assistantMessageId: p.assistantMessageId,
+        checkpointTurnCount: p.checkpointTurnCount,
+      }
+      // Deduplicate by turnId — replace if exists, append otherwise
+      const idx = existing.findIndex(s => s.turnId === p.turnId)
+      const updated = idx >= 0
+        ? existing.map((s, i) => i === idx ? summary : s)
+        : [...existing, summary]
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        turnDiffSummariesByAgentId: {
+          ...state.turnDiffSummariesByAgentId,
+          [p.agentId]: updated,
+        },
+      }
     }
 
     default: {
