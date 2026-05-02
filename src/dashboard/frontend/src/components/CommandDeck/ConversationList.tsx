@@ -229,6 +229,7 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
   const [sort, setSort] = useState<SortOption>(loadSort);
   const [tab, setTab] = useState<ListTab>(loadTab);
   const [forkTarget, setForkTarget] = useState<Conversation | null>(null);
+  const [confirmArchiveName, setConfirmArchiveName] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const now = useNow(60_000);
 
@@ -556,17 +557,35 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                       <GitBranchPlus size={11} />
                     </span>
                   )}
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    className={styles.conversationArchiveBtn}
-                    onClick={e => { e.stopPropagation(); archiveMutation.mutate(conv.name); }}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); archiveMutation.mutate(conv.name); } }}
-                    title="Archive conversation"
-                    aria-label={`Archive ${conv.name}`}
-                  >
-                    <Archive size={11} />
-                  </span>
+                  {confirmArchiveName === conv.name ? (
+                    <span className={styles.archiveConfirmInline} onClick={e => e.stopPropagation()}>
+                      <span className={styles.archiveConfirmLabelInline}>Archive?</span>
+                      <button
+                        className={styles.archiveConfirmYesInline}
+                        onClick={e => { e.stopPropagation(); setConfirmArchiveName(null); archiveMutation.mutate(conv.name); }}
+                      >
+                        Yes
+                      </button>
+                      <button
+                        className={styles.archiveConfirmNoInline}
+                        onClick={e => { e.stopPropagation(); setConfirmArchiveName(null); }}
+                      >
+                        No
+                      </button>
+                    </span>
+                  ) : (
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className={styles.conversationArchiveBtn}
+                      onClick={e => { e.stopPropagation(); setConfirmArchiveName(conv.name); }}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setConfirmArchiveName(conv.name); } }}
+                      title="Archive conversation"
+                      aria-label={`Archive ${conv.name}`}
+                    >
+                      <Archive size={11} />
+                    </span>
+                  )}
                   <span
                     role="button"
                     tabIndex={0}
