@@ -350,6 +350,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                     messages: initial.messages,
                     workLog: initial.workLog,
                     streaming: initial.streaming,
+                    proposedPlan: initial.proposedPlan,
                   });
 
                   // Watch for new content and stream incremental updates
@@ -361,6 +362,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                       messages: result.messages,
                       workLog: result.workLog,
                       streaming: result.streaming,
+                      proposedPlan: result.proposedPlan,
                     });
                   });
 

@@ -28,6 +28,15 @@ export interface WorkLogEntry {
   sequence?: number;
 }
 
+export interface ProposedPlan {
+  id: string;
+  plan: string;
+  planFilePath?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
+  resolvedAt?: string;
+}
+
 export type ConversationEvent =
-  | { kind: 'messages'; messages: ChatMessage[]; workLog: WorkLogEntry[]; streaming: boolean }
+  | { kind: 'messages'; messages: ChatMessage[]; workLog: WorkLogEntry[]; streaming: boolean; proposedPlan?: ProposedPlan }
   | { kind: 'discovering' };

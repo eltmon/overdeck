@@ -8,7 +8,7 @@ import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
 import { ModelPicker, saveStoredModel } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
-import type { ChatMessage, WorkLogEntry } from './chat-types';
+import type { ChatMessage, ProposedPlan, WorkLogEntry } from './chat-types';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import type { ReviewerRoundMetadata } from '@panctl/contracts';
@@ -408,6 +408,7 @@ interface MessagesResponse {
   streaming: boolean;
   discovering?: boolean;
   totalCost?: number;
+  proposedPlan?: ProposedPlan;
 }
 
 async function fetchMessages(name: string): Promise<MessagesResponse> {
@@ -592,6 +593,8 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           failedMessages={failedMessages}
           onRetryFailed={handleRetryFailed}
           onDiscardFailed={handleDiscardFailed}
+          proposedPlan={data?.proposedPlan}
+          conversationName={conversation.name}
         />
       )}
       {isForking ? null : onResume ? (

@@ -23,9 +23,10 @@ import {
 } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus, RotateCcw, XCircle } from 'lucide-react';
-import type { WorkLogEntry } from './chat-types';
+import type { ProposedPlan, WorkLogEntry } from './chat-types';
 import type { FailedMessage } from './ConversationPanel';
 import { ChatMarkdown } from './ChatMarkdown';
+import { PlanCard } from './PlanCard';
 import {
   deriveTimelineEntries,
   deriveMessagesTimelineRows,
@@ -89,6 +90,8 @@ export interface MessagesTimelineProps {
   failedMessages?: FailedMessage[];
   onRetryFailed?: (failedId: string, text: string) => void;
   onDiscardFailed?: (failedId: string) => void;
+  proposedPlan?: ProposedPlan;
+  conversationName?: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -101,6 +104,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   failedMessages,
   onRetryFailed,
   onDiscardFailed,
+  proposedPlan,
+  conversationName,
 }: MessagesTimelineProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -111,7 +116,23 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   const timelineEntries = useMemo(() => deriveTimelineEntries(messages, workLog), [messages, workLog]);
-  const rows = useMemo(() => deriveMessagesTimelineRows(timelineEntries, streaming), [timelineEntries, streaming]);
+  const baseRows = useMemo(() => deriveMessagesTimelineRows(timelineEntries, streaming), [timelineEntries, streaming]);
+  const rows = useMemo(() => {
+    if (!proposedPlan || proposedPlan.status !== 'pending') return baseRows;
+    const planRow: MessagesTimelineRow = {
+      kind: 'proposed-plan',
+      id: `plan-${proposedPlan.id}`,
+      createdAt: proposedPlan.createdAt,
+      plan: proposedPlan,
+    };
+    const workingIdx = baseRows.findIndex(r => r.kind === 'working');
+    if (workingIdx >= 0) {
+      const copy = [...baseRows];
+      copy.splice(workingIdx, 0, planRow);
+      return copy;
+    }
+    return [...baseRows, planRow];
+  }, [baseRows, proposedPlan]);
 
   // Index round markers by the row they should follow. A single row can have
   // multiple markers (e.g. two consecutive rounds without any new messages
@@ -232,7 +253,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                     transform: `translateY(${virtualItem.start}px)`,
                   }}
                 >
-                  <TimelineRowRenderer row={row} isStreaming={streaming} />
+                  <TimelineRowRenderer row={row} isStreaming={streaming} conversationName={conversationName} />
                   {markersForRow?.map((marker) => (
                     <RoundDivider
                       key={`marker-${marker.round}-${marker.label ?? ''}`}
@@ -250,7 +271,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
           const markersForRow = markersByAfterId.get(row.id);
           return (
             <Fragment key={row.id}>
-              <TimelineRowRenderer row={row} isStreaming={streaming} />
+              <TimelineRowRenderer row={row} isStreaming={streaming} conversationName={conversationName} />
               {markersForRow?.map((marker) => (
                 <RoundDivider
                   key={`marker-${marker.round}-${marker.label ?? ''}`}
@@ -333,9 +354,10 @@ export const MessagesTimeline = memo(function MessagesTimeline({
 interface RowProps {
   row: MessagesTimelineRow;
   isStreaming: boolean;
+  conversationName?: string;
 }
 
-const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming }: RowProps) {
+const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName }: RowProps) {
   if (row.kind === 'working') {
     return <WorkingIndicator startedAt={row.createdAt} />;
   }
@@ -343,7 +365,7 @@ const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming
     return <WorkLogGroup entries={row.groupedEntries} />;
   }
   if (row.kind === 'proposed-plan') {
-    return null; // Not yet implemented — placeholder for T3Code alignment
+    return <PlanCard plan={row.plan} conversationName={conversationName ?? ''} />;
   }
   if (row.message.role === 'user') {
     return <UserMessageRow message={row.message} />;

@@ -65,6 +65,8 @@ export interface ConversationsConfig {
   manual_compact_mode?: ManualCompactMode;
   /** Whether to use the richer 9-section summary format (more tokens, less efficient incremental updates) */
   rich_compaction?: boolean;
+  /** Model used for AI-generated conversation titles (default: claude-haiku-4-5) */
+  title_model?: ModelId;
 }
 
 /**
@@ -287,6 +289,7 @@ export interface NormalizedConfig {
     compactionModel: ModelId;
     manualCompactMode: ManualCompactMode;
     richCompaction: boolean;
+    titleModel: ModelId;
   };
 
   /** Shadow mode configuration */
@@ -377,6 +380,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     compactionModel: 'claude-haiku-4-5',
     manualCompactMode: 'claude-code',
     richCompaction: true,
+    titleModel: 'claude-haiku-4-5',
   },
   shadow: {
     enabled: false,
@@ -732,6 +736,9 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
     }
     if (config.conversations?.rich_compaction !== undefined) {
       result.conversations.richCompaction = config.conversations.rich_compaction;
+    }
+    if (config.conversations?.title_model) {
+      result.conversations.titleModel = resolveModelId(config.conversations.title_model);
     }
 
     // Merge OpenRouter favorites
