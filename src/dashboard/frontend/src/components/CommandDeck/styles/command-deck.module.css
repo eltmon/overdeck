@@ -2193,6 +2193,40 @@
   background: var(--accent);
 }
 
+.archiveConfirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.archiveConfirmLabel {
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.archiveConfirmYes,
+.archiveConfirmNo {
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--foreground);
+  transition: background 0.15s;
+}
+
+.archiveConfirmYes:hover {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+  border-color: var(--destructive);
+}
+
+.archiveConfirmNo:hover {
+  background: var(--accent);
+}
+
 .conversationTitleEditBtn {
   background: transparent;
   border: none;
@@ -3808,13 +3842,39 @@
   font-weight: 600;
 }
 
-.planCardBadge {
+.planCardBadge,
+.planCardBadgeApproved,
+.planCardBadgeRejected {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 999px;
+}
+
+.planCardBadge {
   background: color-mix(in srgb, var(--primary) 15%, transparent);
   color: var(--primary);
+}
+
+.planCardBadgeApproved {
+  background: color-mix(in srgb, #22c55e 15%, transparent);
+  color: #22c55e;
+}
+
+.planCardBadgeRejected {
+  background: color-mix(in srgb, #f59e0b 15%, transparent);
+  color: #f59e0b;
+}
+
+.planCardResolved {
+  border-color: var(--border);
+}
+
+.planCardResolved .planCardHeader {
+  background: transparent;
 }
 
 .planCardBody {
@@ -3922,4 +3982,65 @@
   display: flex;
   gap: 8px;
   margin-top: 8px;
+}
+
+/* ─── Compact Boundary Divider ───────────────────────────────────────────── */
+
+.compactBoundaryDivider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.compactBoundaryLine {
+  flex: 1;
+  height: 1px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--border) 0,
+    var(--border) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
+
+.compactBoundaryLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+
+.compactBoundaryDetail {
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.compactingIndicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  animation: compactingPulse 1.5s ease-in-out infinite;
+}
+
+.compactingIcon {
+  animation: compactingSpin 2s linear infinite;
+}
+
+@keyframes compactingPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+@keyframes compactingSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }

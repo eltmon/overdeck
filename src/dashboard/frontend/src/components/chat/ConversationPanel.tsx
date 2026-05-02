@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useTheme } from '../../hooks/useTheme';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, CheckCircle2, AlertCircle, Archive } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
@@ -8,10 +9,13 @@ import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
 import { ModelPicker, saveStoredModel } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
-import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from './chat-types';
+import type { ChatMessage, CompactBoundary, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import type { ReviewerRoundMetadata } from '@panctl/contracts';
+import { DiffPanel } from '../DiffPanel';
+import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
+import { parseDiffRouteSearch } from '../../lib/diffRouteSearch';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Phase icon map ───────────────────────────────────────────────────────────
@@ -47,6 +51,8 @@ interface ConversationPanelProps {
    *  Resume/Archive — used when embedded inside SessionPanel where ZoneB
    *  already shows session info and specialists can't be resumed. */
   embedded?: boolean;
+  /** Agent ID for fetching turn diffs. Omit to skip diff display. */
+  agentId?: string;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -71,9 +77,11 @@ export function ConversationPanel({
   roundMarkers,
   roundMetadata,
   embedded = false,
+  agentId,
 }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || getDefaultConversationModel());
   const [editingTitle, setEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
@@ -114,6 +122,39 @@ export function ConversationPanel({
   const workingLabel = getPhaseLabel(workingPhase, pendingEntry);
   const WorkingIcon = PHASE_ICONS[workingPhase];
   const workingIconClass = isSpinnerPhase(workingPhase) ? styles.spinnerIcon : styles.pulseIcon;
+
+  // Theme for diff tree icons
+  const { theme } = useTheme();
+  const resolvedTheme = theme === 'light' ? 'light' : 'dark';
+
+  // Fetch turn diff summaries when agentId is available
+  const { data: diffData } = useQuery({
+    queryKey: ['agent-diffs', agentId],
+    queryFn: async () => {
+      if (!agentId) return null
+      const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/diffs`)
+      if (!res.ok) return null
+      return res.json() as Promise<{ summaries: TurnDiffSummary[] }>
+    },
+    enabled: !!agentId,
+    refetchInterval: 5000,
+  })
+
+  const turnDiffSummaryByAssistantMessageId = useMemo(() => {
+    const map = new Map<string, TurnDiffSummary>()
+    if (!diffData?.summaries) return map
+    for (const summary of diffData.summaries) {
+      if (summary.assistantMessageId) {
+        map.set(summary.assistantMessageId, summary)
+      }
+    }
+    return map
+  }, [diffData?.summaries])
+
+  const handleOpenTurnDiff = useCallback((turnId: string, _filePath?: string) => {
+    // TODO: Open diff panel in Phase 3
+    console.log('[diff] open turn diff:', turnId, _filePath)
+  }, [])
 
   const resumeMutation = useMutation({
     mutationFn: () => resumeConversation(conversation.name, selectedModel),
@@ -278,15 +319,32 @@ export function ConversationPanel({
             {copied ? <Check size={14} /> : <Copy size={14} />}
           </button>
 
-          {/* Archive button */}
-          {onArchived && (
+          {/* Archive button with inline confirmation */}
+          {onArchived && !confirmArchive && (
             <button
               className={styles.copyLinkButton}
-              onClick={handleArchive}
+              onClick={() => setConfirmArchive(true)}
               title="Archive conversation"
             >
               <Archive size={14} />
             </button>
+          )}
+          {onArchived && confirmArchive && (
+            <span className={styles.archiveConfirm}>
+              <span className={styles.archiveConfirmLabel}>Archive?</span>
+              <button
+                className={styles.archiveConfirmYes}
+                onClick={() => { setConfirmArchive(false); handleArchive(); }}
+              >
+                Yes
+              </button>
+              <button
+                className={styles.archiveConfirmNo}
+                onClick={() => setConfirmArchive(false)}
+              >
+                No
+              </button>
+            </span>
           )}
 
           {/* View toggle — only show when session is live */}
@@ -324,6 +382,9 @@ export function ConversationPanel({
             resumePending={resumeMutation.isPending}
             roundMarkers={roundMarkers}
             roundMetadata={roundMetadata}
+            turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
+            onOpenTurnDiff={handleOpenTurnDiff}
+            resolvedTheme={resolvedTheme}
             modelPicker={!embedded ? (
               <ModelPicker
                 value={selectedModel}
@@ -441,6 +502,9 @@ interface ConversationViewProps {
   roundMarkers?: ReadonlyArray<RoundMarker>;
   /** Reviewer round metadata to derive timeline dividers (PAN-830 high-8). */
   roundMetadata?: ReviewerRoundMetadata;
+  turnDiffSummaryByAssistantMessageId?: Map<string, TurnDiffSummary>;
+  onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
+  resolvedTheme?: 'light' | 'dark';
 }
 
 export interface FailedMessage {
@@ -449,7 +513,7 @@ export interface FailedMessage {
   createdAt: string;
 }
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme }: ConversationViewProps) {
   const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
   const [failedMessages, setFailedMessages] = useState<FailedMessage[]>([]);
   // Track count so we know when the server caught up
@@ -610,6 +674,9 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           compactBoundaries={data?.compactBoundaries}
           compacting={data?.compacting}
           conversationName={conversation.name}
+          turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
+          onOpenTurnDiff={onOpenTurnDiff}
+          resolvedTheme={resolvedTheme}
         />
       )}
       {isForking ? null : onResume ? (
