@@ -457,18 +457,20 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
     await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-t', sessionName], { encoding: 'utf-8' });
     await tmuxExecAsync(['delete-buffer', '-b', bufferName], { encoding: 'utf-8' }).catch(() => {});
 
-    // Verify paste arrived: poll capture-pane until the first line of the pasted
-    // text is visible in the pane. Cap at 3s to avoid hangs.
-    const firstLine = keys.split('\n')[0]?.trim() ?? '';
+    // Verify paste arrived: poll capture-pane until the last non-empty line of
+    // the pasted text is visible. Using the last line instead of the first
+    // because large messages scroll the first line out of the capture window.
+    const lines = keys.split('\n');
+    const verifyLine = (lines.findLast(l => l.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? '';
     const VERIFY_TIMEOUT_MS = 3_000;
     const VERIFY_INTERVAL_MS = 50;
     const deadline = Date.now() + VERIFY_TIMEOUT_MS;
     let pasteVerified = false;
 
-    if (firstLine.length >= 3) {
+    if (verifyLine.length >= 3) {
       while (Date.now() < deadline) {
         const pane = await capturePaneAsync(sessionName, 10);
-        if (pane.includes(firstLine.slice(0, 40))) {
+        if (pane.includes(verifyLine.slice(0, 40))) {
           pasteVerified = true;
           break;
         }
@@ -497,12 +499,12 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
     // Verify Enter submitted: poll until the pasted text is no longer in the
     // input region (last 3 lines of the pane). This confirms the message was
     // submitted rather than just sitting in the input box.
-    if (firstLine.length >= 3) {
+    if (verifyLine.length >= 3) {
       const SUBMIT_TIMEOUT_MS = 2_000;
       const submitDeadline = Date.now() + SUBMIT_TIMEOUT_MS;
       while (Date.now() < submitDeadline) {
         const pane = await capturePaneAsync(sessionName, 5);
-        if (!pane.includes(firstLine.slice(0, 40))) {
+        if (!pane.includes(verifyLine.slice(0, 40))) {
           break; // Text moved out of input — submitted
         }
         await new Promise(r => setTimeout(r, VERIFY_INTERVAL_MS));
