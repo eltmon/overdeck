@@ -141,13 +141,27 @@ export const ReadModelServiceLive = Layer.effect(
     // Reference to projection cache — set during bootstrap once the event store initializes it
     let projectionCache: import('./services/projection-cache.js').ProjectionCache | null = null;
 
+    function sanitizeTurnDiffs(
+      raw: ReadModelState['turnDiffSummariesByAgentId'],
+    ): DashboardSnapshot['turnDiffSummariesByAgentId'] {
+      const out: Record<string, Array<{ turnId: string; completedAt: string; status?: string; files: any[]; checkpointRef?: string; assistantMessageId?: string; checkpointTurnCount?: number }>> = {};
+      for (const [agentId, summaries] of Object.entries(raw)) {
+        out[agentId] = summaries.map(s => ({
+          ...s,
+          assistantMessageId: s.assistantMessageId ?? undefined,
+          checkpointRef: s.checkpointRef ?? undefined,
+        }));
+      }
+      return out;
+    }
+
     function buildSnapshot(): DashboardSnapshot {
       return {
         sequence: state.sequence,
         agents: Object.values(state.agentsById),
         specialists: Object.values(state.specialistsByName),
         reviewStatuses: Object.values(state.reviewStatusByIssueId),
-        turnDiffSummariesByAgentId: state.turnDiffSummariesByAgentId,
+        turnDiffSummariesByAgentId: sanitizeTurnDiffs(state.turnDiffSummariesByAgentId),
         issues: state.issuesRaw,
         resources: state.resources ?? undefined,
         timestamp: new Date().toISOString(),

@@ -233,7 +233,7 @@ const postTestCheckpointRoute = HttpRouter.add(
             completedAt: new Date().toISOString(),
             files,
             checkpointRef: `refs/pan/turn/${turnId}`,
-            assistantMessageId: null,
+            assistantMessageId: undefined,
             checkpointTurnCount: checkpoints.length,
           },
         } as any)
