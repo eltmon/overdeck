@@ -777,7 +777,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         completedAt: p.completedAt,
         files: p.files,
         checkpointRef: p.checkpointRef,
-        assistantMessageId: p.assistantMessageId,
+        assistantMessageId: p.assistantMessageId ?? undefined,
         checkpointTurnCount: p.checkpointTurnCount,
       }
       // Deduplicate by turnId — replace if exists, append otherwise

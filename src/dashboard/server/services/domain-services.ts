@@ -218,7 +218,7 @@ export const EventStoreServiceLive = Layer.effect(
               completedAt: new Date().toISOString(),
               files,
               checkpointRef: `refs/pan/turn/${turnId}`,
-              assistantMessageId: null,
+              assistantMessageId: undefined,
               checkpointTurnCount: checkpoints.length,
             },
           } as any);
