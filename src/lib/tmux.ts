@@ -485,16 +485,13 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
 
     if (!pasteVerified) {
       const snapshot = await capturePaneAsync(sessionName, 30);
-      throw new MessageDeliveryFailed(
-        `Paste verification failed for ${sessionName} — text not visible after ${VERIFY_TIMEOUT_MS}ms`,
-        sessionName,
-        snapshot,
-      );
+      console.warn(`[tmux] Paste verification failed for ${sessionName} — text not visible after ${VERIFY_TIMEOUT_MS}ms. Sending Enter anyway to avoid orphaned input. Snapshot:\n${snapshot.slice(0, 500)}`);
     }
 
-    // Send Enter
+    // Send Enter — even if verification failed, the buffer was pasted; leaving
+    // orphaned text in the input is worse than a possibly-redundant Enter.
     await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
-    logSendKeys(sessionName, '[Enter sent]', caller);
+    logSendKeys(sessionName, pasteVerified ? '[Enter sent]' : '[Enter sent (unverified paste)]', caller);
 
     // Verify Enter submitted: poll until the pasted text is no longer in the
     // input region (last 3 lines of the pane). This confirms the message was
