@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, CheckCircle2, AlertCircle, Archive } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { updateConversationTitle } from '../CommandDeck/ConversationList';
@@ -8,7 +8,7 @@ import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
 import { ModelPicker, saveStoredModel } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
-import type { ChatMessage, ProposedPlan, WorkLogEntry } from './chat-types';
+import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from './chat-types';
 import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import type { ReviewerRoundMetadata } from '@panctl/contracts';
@@ -278,6 +278,17 @@ export function ConversationPanel({
             {copied ? <Check size={14} /> : <Copy size={14} />}
           </button>
 
+          {/* Archive button */}
+          {onArchived && (
+            <button
+              className={styles.copyLinkButton}
+              onClick={handleArchive}
+              title="Archive conversation"
+            >
+              <Archive size={14} />
+            </button>
+          )}
+
           {/* View toggle — only show when session is live */}
           {showTerminal && (
             <div className={styles.viewToggle}>
@@ -409,6 +420,8 @@ interface MessagesResponse {
   discovering?: boolean;
   totalCost?: number;
   proposedPlan?: ProposedPlan;
+  compactBoundaries?: CompactBoundary[];
+  compacting?: boolean;
 }
 
 async function fetchMessages(name: string): Promise<MessagesResponse> {
@@ -594,6 +607,8 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           onRetryFailed={handleRetryFailed}
           onDiscardFailed={handleDiscardFailed}
           proposedPlan={data?.proposedPlan}
+          compactBoundaries={data?.compactBoundaries}
+          compacting={data?.compacting}
           conversationName={conversation.name}
         />
       )}
