@@ -26,6 +26,7 @@ const IPC = {
   GET_DESKTOP_SETTINGS: "pan:get-desktop-settings",
   UPDATE_DESKTOP_SETTING: "pan:update-desktop-setting",
   NOTIFY: "pan:notify",
+  RESTART_DASHBOARD: "pan:restart-dashboard",
 } as const;
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -96,6 +97,9 @@ export interface PanopticonBridge {
    * Sends a native OS notification (if permitted by per-event-type settings).
    */
   notify(eventType: NotificationEventType, title: string, body: string): Promise<void>;
+
+  /** Stops and restarts the embedded dashboard server in the main process. */
+  restartDashboard(): Promise<void>;
 }
 
 // ─── Bridge implementation ────────────────────────────────────────────────────
@@ -143,6 +147,9 @@ const bridge: PanopticonBridge = {
 
   notify: (eventType: NotificationEventType, title: string, body: string) =>
     ipcRenderer.invoke(IPC.NOTIFY, eventType, title, body) as Promise<void>,
+
+  restartDashboard: () =>
+    ipcRenderer.invoke(IPC.RESTART_DASHBOARD) as Promise<void>,
 };
 
 contextBridge.exposeInMainWorld("panopticonBridge", bridge);

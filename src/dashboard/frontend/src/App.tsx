@@ -310,8 +310,23 @@ export default function App() {
     retryDelay: 1000,
     staleTime: 0,
   });
-  // Only show banner after 2 consecutive failures to avoid flicker on transient errors
-  const showBackendBanner = backendDown && backendFailureCount >= 2;
+  // Latched banner: appears after 2 failed polls, hides only after 2 consecutive successes.
+  // Prevents mid-outage flicker when the backend is intermittent.
+  const successStreakRef = useRef(0);
+  const [bannerLatched, setBannerLatched] = useState(false);
+  useEffect(() => {
+    if (backendDown) {
+      successStreakRef.current = 0;
+      if (backendFailureCount >= 2) setBannerLatched(true);
+    } else if (bannerLatched) {
+      successStreakRef.current += 1;
+      if (successStreakRef.current >= 2) {
+        setBannerLatched(false);
+        successStreakRef.current = 0;
+      }
+    }
+  }, [backendDown, backendFailureCount, bannerLatched]);
+  const showBackendBanner = bannerLatched;
   // Restart banner: shown when dashboard is in a planned restart (lifecycle active)
   const showRestartBanner = dashboardLifecycle.active;
 
@@ -346,6 +361,27 @@ export default function App() {
     },
     onError: (err: Error) => {
       toast.error('Failed to restart CLIProxy: ' + err.message);
+    },
+  });
+
+  // Force Restart for the dashboard backend. Prefers the Electron bridge
+  // (direct stop/start of the embedded server); falls back to a server-side
+  // endpoint that respawns the dashboard via `pan restart --dashboard`.
+  const restartBackendMutation = useMutation({
+    mutationFn: async () => {
+      const bridge = window.panopticonBridge;
+      if (bridge?.restartDashboard) {
+        await bridge.restartDashboard();
+        return;
+      }
+      const res = await fetch('/api/system/restart-dashboard', { method: 'POST' });
+      if (!res.ok) throw new Error(`Restart returned ${res.status}`);
+    },
+    onSuccess: () => {
+      toast.success('Restart requested — reconnecting…');
+    },
+    onError: (err: Error) => {
+      toast.error('Restart failed: ' + err.message);
     },
   });
 
@@ -553,7 +589,7 @@ export default function App() {
 
         {/* Dashboard Restart Banner — shown during a planned restart (post-merge deploy, pan restart) */}
         {showRestartBanner && (
-          <div className="bg-primary/15 border-b-2 border-primary/40 px-4 py-3 flex items-center gap-3 shrink-0">
+          <div className="bg-primary/15 border-b-2 border-primary/40 px-4 py-3 flex items-center gap-3 shrink-0 overflow-hidden animate-slide-down-banner">
             <RefreshCw className="w-5 h-5 text-primary shrink-0 animate-spin" />
             <p className="text-primary text-sm font-semibold flex-1">
               Dashboard is restarting
@@ -570,12 +606,19 @@ export default function App() {
 
         {/* Backend Offline Banner — shown when /api/version fails repeatedly AND not in a planned restart */}
         {showBackendBanner && !showRestartBanner && (
-          <div className="bg-destructive/15 border-b-2 border-destructive/50 px-4 py-3 flex items-center gap-3 shrink-0">
+          <div className="bg-destructive/15 border-b-2 border-destructive/50 px-4 py-3 flex items-center gap-3 shrink-0 overflow-hidden animate-slide-down-banner">
             <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
             <p className="text-destructive text-sm font-semibold flex-1">
-              Backend is unreachable — dashboard data is stale. Check that <code className="font-mono bg-destructive/20 px-1 rounded">pan up</code> is running.
+              Backend is unreachable — waiting for it to come back.
             </p>
             <span className="text-destructive/60 text-xs shrink-0 animate-pulse">● Retrying…</span>
+            <button
+              onClick={() => restartBackendMutation.mutate()}
+              disabled={restartBackendMutation.isPending}
+              className="px-4 py-1.5 bg-destructive/20 hover:bg-destructive/30 text-destructive text-sm font-bold rounded-md border border-destructive/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            >
+              {restartBackendMutation.isPending ? 'Restarting…' : 'Force Restart'}
+            </button>
           </div>
         )}
 

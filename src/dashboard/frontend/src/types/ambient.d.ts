@@ -40,6 +40,7 @@ interface PanopticonBridge {
     title: string,
     body: string,
   ): Promise<void>;
+  restartDashboard(): Promise<void>;
 }
 
 interface Window {
