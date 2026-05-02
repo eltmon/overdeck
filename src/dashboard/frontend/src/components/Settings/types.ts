@@ -94,6 +94,7 @@ export interface SettingsConfig {
     compaction_model?: ModelId;
     manual_compact_mode?: 'claude-code' | 'panopticon-native';
     rich_compaction?: boolean;
+    title_model?: ModelId;
   };
 }
 

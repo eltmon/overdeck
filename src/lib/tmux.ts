@@ -428,6 +428,17 @@ export class MessageDeliveryFailed extends Error {
 }
 
 /**
+ * Send a raw keystroke to a tmux session — no load-buffer, no Enter.
+ * Used for Ink TUI interactions (e.g. plan approval digit selection)
+ * where the application consumes single keystrokes directly.
+ */
+export async function sendRawKeystrokeAsync(sessionName: string, key: string, caller?: string): Promise<void> {
+  validateSessionName(sessionName);
+  logSendKeys(sessionName, key, caller ?? 'raw-keystroke');
+  await tmuxExecAsync(['send-keys', '-t', sessionName, key], { encoding: 'utf-8' });
+}
+
+/**
  * Send keys to a tmux session (async, non-blocking).
  * Uses load-buffer + paste-buffer with capture-pane verification.
  * MUST be used from the dashboard server and any async context.

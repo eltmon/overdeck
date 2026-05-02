@@ -433,6 +433,16 @@ export function SettingsPage() {
     });
   };
 
+  const handleTitleModelChange = (modelId: ModelId) => {
+    setFormData({
+      ...formData,
+      conversations: {
+        ...formData.conversations,
+        title_model: modelId,
+      },
+    });
+  };
+
   const handleManualCompactModeChange = (mode: 'claude-code' | 'panopticon-native') => {
     setFormData({
       ...formData,
@@ -1109,6 +1119,36 @@ export function SettingsPage() {
             </select>
             <p className="text-xs text-muted-foreground">
               Default: Claude Haiku 4.5 for fast, low-cost compaction.
+            </p>
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+            <div>
+              <h3 className="font-bold text-foreground">AI title generation model</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Used to generate conversation titles from the first message. Falls back to message truncation if the model is unavailable.
+              </p>
+            </div>
+            <select
+              value={formData.conversations?.title_model || 'claude-haiku-4-5'}
+              onChange={(e) => handleTitleModelChange(e.target.value as ModelId)}
+              className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+            >
+              {Object.entries(MODELS_BY_PROVIDER).flatMap(([, providerDef]) =>
+                providerDef.models.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {providerDef.name} — {model.name}
+                  </option>
+                ))
+              )}
+              {openRouterFavoriteModels.map((model) => (
+                <option key={model.id} value={model.id}>
+                  OpenRouter — {model.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Default: Claude Haiku 4.5 for fast, low-cost title generation.
             </p>
           </div>
 

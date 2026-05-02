@@ -10,7 +10,7 @@
 import { readdir, stat, watch, open } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { ChatMessage, WorkLogEntry } from '@panctl/contracts';
+import type { ChatMessage, ProposedPlan, WorkLogEntry } from '@panctl/contracts';
 import { calculateCost, getPricing, type AIProvider } from '../../../lib/cost.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 
@@ -41,6 +41,10 @@ export interface ParseResult {
   lastSequence: number;
   /** File modification time in ms from the stat call made during parsing. */
   mtimeMs: number;
+  /** Active proposed plan (ExitPlanMode with no matching tool_result yet). */
+  proposedPlan?: ProposedPlan;
+  /** ExitPlanMode tool_use IDs (persist across incremental calls). */
+  planToolUseIds: Set<string>;
 }
 
 /** State carried across incremental parseConversationMessages calls. */
@@ -48,6 +52,8 @@ export interface ParseState {
   pendingToolUse: Map<string, WorkLogEntry>;
   unresolvedResults: Map<string, { resultText?: string; isError: boolean; rawContent: unknown }>;
   lastSequence: number;
+  planToolUseIds: Set<string>;
+  proposedPlan?: ProposedPlan;
 }
 
 export interface ConversationActivitySummary {
@@ -280,6 +286,10 @@ export async function parseConversationMessages(
   const unresolvedResults = priorState?.unresolvedResults ?? new Map<string, { resultText?: string; isError: boolean; rawContent: unknown }>();
   // Monotonic sequence counter per JSONL line
   let sequence = priorState?.lastSequence ?? 0;
+  // Plan mode: track ExitPlanMode tool_use id → ProposedPlan
+  let proposedPlan: ProposedPlan | undefined = priorState?.proposedPlan;
+  // Set of ExitPlanMode tool_use IDs so we can match tool_results to plans
+  const planToolUseIds = priorState?.planToolUseIds ?? new Set<string>();
 
   for (const line of lines) {
     let entry: JsonlEntry;
@@ -318,7 +328,6 @@ export async function parseConversationMessages(
         // Collect tool_result blocks first (they complete pending WorkLogEntries)
         for (const block of rawContent as ContentBlock[]) {
           if (block.type === 'tool_result' && block.tool_use_id) {
-            const pending = pendingToolUse.get(block.tool_use_id);
             let resultText: string | undefined;
             if (typeof block.content === 'string') {
               resultText = block.content;
@@ -328,22 +337,36 @@ export async function parseConversationMessages(
                 .map(b => b.text)
                 .join('\n');
             }
-            if (pending) {
-              pendingToolUse.delete(block.tool_use_id);
-              workLog.push({
-                ...pending,
-                detail: block.is_error
-                  ? `Error: ${resultText ?? JSON.stringify(block.content)}`
-                  : pending.detail,
-                result: resultText,
-                tone: block.is_error ? 'error' : pending.tone,
-              });
+            if (planToolUseIds.has(block.tool_use_id)) {
+              if (proposedPlan && proposedPlan.id === block.tool_use_id) {
+                const text = resultText ?? '';
+                if (text.includes('approved')) {
+                  proposedPlan.status = 'approved';
+                  proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+                } else if (text.includes("doesn't want to proceed") || text.includes('does not want')) {
+                  proposedPlan.status = 'rejected';
+                  proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+                }
+              }
             } else {
-              unresolvedResults.set(block.tool_use_id, {
-                resultText,
-                isError: block.is_error ?? false,
-                rawContent: block.content,
-              });
+              const pending = pendingToolUse.get(block.tool_use_id);
+              if (pending) {
+                pendingToolUse.delete(block.tool_use_id);
+                workLog.push({
+                  ...pending,
+                  detail: block.is_error
+                    ? `Error: ${resultText ?? JSON.stringify(block.content)}`
+                    : pending.detail,
+                  result: resultText,
+                  tone: block.is_error ? 'error' : pending.tone,
+                });
+              } else {
+                unresolvedResults.set(block.tool_use_id, {
+                  resultText,
+                  isError: block.is_error ?? false,
+                  rawContent: block.content,
+                });
+              }
             }
           }
         }
@@ -399,29 +422,57 @@ export async function parseConversationMessages(
             sequence: lineSequence,
           });
         } else if (block.type === 'tool_use' && block.id) {
-          // WorkLogEntry for the tool call
-          const toolEntry: WorkLogEntry = {
-            id: block.id,
-            createdAt: entry.timestamp ?? new Date().toISOString(),
-            label: block.name ?? 'tool',
-            tone: 'tool',
-            toolTitle: block.name,
-            detail: block.input ? JSON.stringify(block.input) : undefined,
-            sequence: lineSequence,
-          };
-          const unresolved = unresolvedResults.get(block.id);
-          if (unresolved) {
-            unresolvedResults.delete(block.id);
-            workLog.push({
-              ...toolEntry,
-              detail: unresolved.isError
-                ? `Error: ${unresolved.resultText ?? JSON.stringify(unresolved.rawContent)}`
-                : toolEntry.detail,
-              result: unresolved.resultText,
-              tone: unresolved.isError ? 'error' : toolEntry.tone,
-            });
+          if (block.name === 'ExitPlanMode') {
+            const input = block.input as Record<string, unknown> | undefined;
+            const planText = typeof input?.plan === 'string' ? input.plan : '';
+            const planFilePath = typeof input?.planFilePath === 'string' ? input.planFilePath : undefined;
+            proposedPlan = {
+              id: block.id,
+              plan: planText,
+              planFilePath,
+              status: 'pending',
+              createdAt: entry.timestamp ?? new Date().toISOString(),
+            };
+            planToolUseIds.add(block.id);
+            const unresolved = unresolvedResults.get(block.id);
+            if (unresolved) {
+              unresolvedResults.delete(block.id);
+              const resultText = unresolved.resultText ?? '';
+              if (resultText.includes('approved')) {
+                proposedPlan.status = 'approved';
+                proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+              } else if (resultText.includes("doesn't want to proceed") || resultText.includes('does not want')) {
+                proposedPlan.status = 'rejected';
+                proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+              }
+            }
+          } else if (block.name === 'EnterPlanMode') {
+            // Skip — don't add to workLog
           } else {
-            pendingToolUse.set(block.id, toolEntry);
+            // WorkLogEntry for the tool call
+            const toolEntry: WorkLogEntry = {
+              id: block.id,
+              createdAt: entry.timestamp ?? new Date().toISOString(),
+              label: block.name ?? 'tool',
+              tone: 'tool',
+              toolTitle: block.name,
+              detail: block.input ? JSON.stringify(block.input) : undefined,
+              sequence: lineSequence,
+            };
+            const unresolved = unresolvedResults.get(block.id);
+            if (unresolved) {
+              unresolvedResults.delete(block.id);
+              workLog.push({
+                ...toolEntry,
+                detail: unresolved.isError
+                  ? `Error: ${unresolved.resultText ?? JSON.stringify(unresolved.rawContent)}`
+                  : toolEntry.detail,
+                result: unresolved.resultText,
+                tone: unresolved.isError ? 'error' : toolEntry.tone,
+              });
+            } else {
+              pendingToolUse.set(block.id, toolEntry);
+            }
           }
         }
         blockIndex++;
@@ -462,8 +513,10 @@ export async function parseConversationMessages(
   // Only flush on non-incremental parses; incremental callers pass priorState
   // and will receive pendingToolUse back for the next call.
   if (!priorState) {
-    for (const [, entry] of pendingToolUse) {
-      workLog.push(entry);
+    for (const [id, entry] of pendingToolUse) {
+      if (!planToolUseIds.has(id)) {
+        workLog.push(entry);
+      }
     }
     pendingToolUse.clear();
   }
@@ -508,6 +561,8 @@ export async function parseConversationMessages(
     unresolvedResults,
     lastSequence: sequence,
     mtimeMs: fileStats.mtimeMs,
+    proposedPlan,
+    planToolUseIds,
   };
 }
 
@@ -807,6 +862,8 @@ export function watchConversation(
             pendingToolUse: fullResult.pendingToolUse,
             unresolvedResults: fullResult.unresolvedResults,
             lastSequence: fullResult.lastSequence,
+            planToolUseIds: fullResult.planToolUseIds,
+            proposedPlan: fullResult.proposedPlan,
           };
           // Include in-flight tools so the live view shows pending work
           const workLog = [...fullResult.workLog, ...fullResult.pendingToolUse.values()];
@@ -818,6 +875,8 @@ export function watchConversation(
           pendingToolUse: result.pendingToolUse,
           unresolvedResults: result.unresolvedResults,
           lastSequence: result.lastSequence,
+          planToolUseIds: result.planToolUseIds,
+          proposedPlan: result.proposedPlan,
         };
         // Include in-flight tools so the live view shows pending work
         const workLog = [...result.workLog, ...result.pendingToolUse.values()];

@@ -9,7 +9,7 @@ import { getDatabase } from './index.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type TitleSource = 'auto' | 'ai' | 'manual';
+export type TitleSource = 'auto' | 'ai' | 'manual' | 'default';
 
 export interface Conversation {
   id: number;

@@ -1,5 +1,5 @@
 import { jsonResponse } from "../http-helpers.js";
-import { buildChildEnvWithoutTmux, BLANKED_PROVIDER_ENV } from '../../../lib/child-env.js';
+import { buildChildEnv, buildChildEnvWithoutTmux, BLANKED_PROVIDER_ENV } from '../../../lib/child-env.js';
 /**
  * Conversations route module — Effect HttpRouter.Layer (PAN-416)
  *
@@ -51,6 +51,7 @@ import {
 } from '../../../lib/database/conversations-db.js';
 import {
   sendKeysAsync,
+  sendRawKeystrokeAsync,
   MessageDeliveryFailed,
   capturePaneAsync,
   sessionExistsAsync,
@@ -67,6 +68,7 @@ import {
 } from '../../../lib/agents.js';
 import { injectProviderEnvOverlay } from '../../../lib/claude-settings-overlay.js';
 import { generateLauncherScript } from '../../../lib/launcher-generator.js';
+import { loadConfig } from '../../../lib/config-yaml.js';
 import {
   parseConversationMessages,
   parseFromLastCompactBoundary,
@@ -226,6 +228,7 @@ async function getCachedMessages(
         unresolvedResults: incremental.unresolvedResults,
         lastSequence: incremental.lastSequence,
         mtimeMs: incremental.mtimeMs,
+        proposedPlan: incremental.proposedPlan ?? cachedResult.proposedPlan,
       };
     }
   } else {
@@ -242,6 +245,8 @@ async function getCachedMessages(
       pendingToolUse: result.pendingToolUse,
       unresolvedResults: result.unresolvedResults,
       lastSequence: result.lastSequence,
+      planToolUseIds: result.planToolUseIds,
+      proposedPlan: result.proposedPlan,
     },
   });
   if (messagesCache.size > MESSAGES_CACHE_MAX) {
@@ -775,75 +780,98 @@ async function spawnConversationSession(
  * Generate an AI title for a conversation using Claude CLI (T3Code pattern).
  * Runs `claude -p --output-format json --json-schema ...` with the first message
  * as input, then updates the conversation title if it hasn't been manually renamed.
+ *
+ * Uses the title_model from config.yaml conversations section, with proper provider
+ * routing via getProviderEnvForModel. Falls back to message truncation on failure.
  */
 async function generateAiTitle(conversationName: string, firstMessage: string): Promise<void> {
   const conv = getConversationByName(conversationName);
-  if (!conv || !canReplaceTitle(conv)) return;
+  if (!conv || !canReplaceTitle(conv)) {
+    return;
+  }
 
-  const schema = JSON.stringify({
-    type: 'object',
-    properties: { title: { type: 'string' } },
-    required: ['title'],
-  });
+  const { config } = loadConfig();
+  const titleModel = config.conversations.titleModel;
 
-  const prompt = [
-    'You write concise thread titles for coding conversations.',
-    'Summarize the user\'s request in 3-8 words.',
-    'Avoid quotes, filler, prefixes, and trailing punctuation.',
-    '',
-    'User message:',
-    firstMessage,
-  ].join('\n');
+  let aiTitle: string | undefined;
 
-  const stdout = await new Promise<string>((resolve, reject) => {
-    const child = spawn(
-      'claude',
-      [
-        '-p',
-        '--output-format', 'json',
-        '--json-schema', schema,
-        '--model', 'claude-haiku-4-5-20251001',
-      ],
-      { env: buildChildEnvWithoutTmux() },
-    );
-    let out = '';
-    let errOut = '';
-    const timeout = setTimeout(() => {
-      child.kill('SIGTERM');
-      reject(new Error('claude title generation timed out after 30s'));
-    }, 30_000);
-    child.stdout.setEncoding('utf-8');
-    child.stderr.setEncoding('utf-8');
-    child.stdout.on('data', (data: string) => { out += data; });
-    child.stderr.on('data', (data: string) => { errOut += data; });
-    child.on('error', (err: Error) => {
-      clearTimeout(timeout);
-      reject(err);
+  try {
+    const schema = JSON.stringify({
+      type: 'object',
+      properties: { title: { type: 'string' } },
+      required: ['title'],
     });
-    child.on('close', (code: number | null) => {
-      clearTimeout(timeout);
-      if (code !== 0) {
-        reject(new Error(errOut || `claude title generation exited with code ${code}`));
-      } else {
-        resolve(out);
+
+    const prompt = [
+      'You write concise thread titles for coding conversations.',
+      'Summarize the user\'s request in 3-8 words.',
+      'Avoid quotes, filler, prefixes, and trailing punctuation.',
+      '',
+      'User message:',
+      firstMessage,
+    ].join('\n');
+
+    // Build provider-env for the title model (same routing as conversation sessions)
+    const providerEnv = await getProviderEnvForModel(titleModel);
+    const childEnv = { ...buildChildEnv(), ...providerEnv };
+
+    const stdout = await new Promise<string>((resolve, reject) => {
+      const child = spawn(
+        'claude',
+        [
+          '-p',
+          '--output-format', 'json',
+          '--json-schema', schema,
+          '--model', titleModel,
+        ],
+        { env: childEnv },
+      );
+      let out = '';
+      let errOut = '';
+      const timeout = setTimeout(() => {
+        child.kill('SIGTERM');
+        reject(new Error('claude title generation timed out after 30s'));
+      }, 30_000);
+      child.stdout.setEncoding('utf-8');
+      child.stderr.setEncoding('utf-8');
+      child.stdout.on('data', (data: string) => { out += data; });
+      child.stderr.on('data', (data: string) => { errOut += data; });
+      child.on('error', (err: Error) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+      child.on('close', (code: number | null) => {
+        clearTimeout(timeout);
+        if (code !== 0) {
+          reject(new Error(errOut || `claude title generation exited with code ${code}`));
+        } else {
+          resolve(out);
+        }
+      });
+      try {
+        child.stdin.write(prompt, 'utf-8');
+        child.stdin.end();
+      } catch (err) {
+        clearTimeout(timeout);
+        child.kill('SIGTERM');
+        reject(err);
       }
     });
-    try {
-      child.stdin.write(prompt, 'utf-8');
-      child.stdin.end();
-    } catch (err) {
-      clearTimeout(timeout);
-      child.kill('SIGTERM');
-      reject(err);
-    }
-  });
 
-  // Claude CLI returns { structured_output: { title: "..." }, ... } or { result: "..." }
-  const parsed = JSON.parse(stdout.trim());
-  const aiTitle: string | undefined =
-    parsed?.structured_output?.title ?? parsed?.title;
+    // Claude CLI returns { structured_output: { title: "..." }, ... } or { result: "..." }
+    const parsed = JSON.parse(stdout.trim());
+    aiTitle = parsed?.structured_output?.title ?? parsed?.title;
+  } catch {
+    // Model unavailable or timed out — fall back to message truncation
+    aiTitle = undefined;
+  }
 
-  if (!aiTitle || !aiTitle.trim()) return;
+  // If AI generation failed, fall back to truncating the first message
+  if (!aiTitle || !aiTitle.trim()) {
+    aiTitle = firstMessage.slice(0, 60).split(/\r?\n/)[0]?.trim();
+  }
+
+  if (!aiTitle) return;
 
   // Sanitize: strip quotes, normalize whitespace, take first line only
   const sanitized = aiTitle
@@ -861,7 +889,6 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
   if (!freshConv || !canReplaceTitle(freshConv)) return;
 
   updateConversationTitle(conversationName, sanitized, 'ai');
-  console.log(`[conversations] AI title for "${conversationName}": ${sanitized}`);
 }
 
 // ─── Route: GET /api/conversations ───────────────────────────────────────────
@@ -1342,6 +1369,7 @@ const getConversationMessagesRoute = HttpRouter.add(
             workLog: result.workLog,
             streaming: result.streaming,
             totalCost: result.totalCost,
+            proposedPlan: result.proposedPlan,
           });
         } catch (parseErr: unknown) {
           // File may not exist yet — Claude Code is still starting up.
@@ -1916,6 +1944,61 @@ const postConversationSummaryForkRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/conversations/:name/plan-action ────────────────────────
+
+const PLAN_ACTION_KEYSTROKES: Record<string, string> = {
+  'approve-auto': '1',
+  'approve-manual': '2',
+  'reject-ultraplan': '3',
+};
+
+const postConversationPlanActionRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/plan-action',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+
+        const action = typeof body['action'] === 'string' ? body['action'] : '';
+        const feedback = typeof body['feedback'] === 'string' ? body['feedback'].trim() : '';
+
+        if (action === 'reject-feedback') {
+          await sendRawKeystrokeAsync(conv.tmuxSession, '4', 'plan-action-reject');
+          if (feedback) {
+            await new Promise(r => setTimeout(r, 300));
+            await sendKeysAsync(conv.tmuxSession, feedback, 'plan-action-feedback');
+          }
+          return jsonResponse({ ok: true });
+        }
+
+        const keystroke = PLAN_ACTION_KEYSTROKES[action];
+        if (!keystroke) {
+          return jsonResponse({ error: `Invalid action: ${action}` }, { status: 400 });
+        }
+
+        await sendRawKeystrokeAsync(conv.tmuxSession, keystroke, `plan-action-${action}`);
+        return jsonResponse({ ok: true });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] plan action failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const conversationsRouteLayer = Layer.mergeAll(
@@ -1936,6 +2019,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationFavoriteRoute,
   deleteConversationFavoriteRoute,
   postConversationSummaryForkRoute,
+  postConversationPlanActionRoute,
 );
 
 export default conversationsRouteLayer;

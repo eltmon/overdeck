@@ -56,6 +56,18 @@ export const AgentOutput = Schema.Struct({
 })
 export type AgentOutput = typeof AgentOutput.Type
 
+// ─── Plan mode types ─────────────────────────────────────────────────────────
+
+export const ProposedPlan = Schema.Struct({
+  id: Schema.String,
+  plan: Schema.String,
+  planFilePath: Schema.optional(Schema.String),
+  status: Schema.Literals(['pending', 'approved', 'rejected']),
+  createdAt: Schema.String,
+  resolvedAt: Schema.optional(Schema.String),
+})
+export type ProposedPlan = typeof ProposedPlan.Type
+
 // ─── Chat / conversation message types (PAN-451) ──────────────────────────────
 
 export const ChatMessage = Schema.Struct({
@@ -95,6 +107,7 @@ export interface ConversationResponse {
   streaming: boolean;
   totalCost: number;
   byteOffset: number;
+  proposedPlan?: ProposedPlan;
 }
 
 export const ConversationEvent = Schema.Union([
@@ -103,6 +116,7 @@ export const ConversationEvent = Schema.Union([
     messages: Schema.Array(ChatMessage),
     workLog: Schema.Array(WorkLogEntry),
     streaming: Schema.Boolean,
+    proposedPlan: Schema.optional(ProposedPlan),
   }),
   Schema.Struct({
     kind: Schema.Literal('discovering'),

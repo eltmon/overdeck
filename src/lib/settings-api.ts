@@ -105,6 +105,7 @@ export interface ApiSettingsConfig {
     compaction_model?: ModelId;
     manual_compact_mode?: 'claude-code' | 'panopticon-native';
     rich_compaction?: boolean;
+    title_model?: ModelId;
   };
   api_keys: {
     openai?: string;
@@ -214,6 +215,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
       compaction_model: config.conversations.compactionModel,
       manual_compact_mode: config.conversations.manualCompactMode,
       rich_compaction: config.conversations.richCompaction,
+      title_model: config.conversations.titleModel,
     },
     tracker_keys: config.trackerKeys,
     deprecation_warnings: deprecationWarnings.length > 0 ? deprecationWarnings : undefined,

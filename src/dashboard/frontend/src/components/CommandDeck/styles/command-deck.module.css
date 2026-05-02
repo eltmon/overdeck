@@ -3771,3 +3771,155 @@
   color: var(--foreground);
   border-color: var(--foreground);
 }
+
+/* ─── Plan Card ──────────────────────────────────────────────────────────── */
+
+.planCard {
+  margin: 8px 0;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  background: var(--card, var(--background));
+  overflow: hidden;
+}
+
+.planCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+
+.planCardToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--foreground);
+  font: inherit;
+}
+
+.planCardTitle {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.planCardBadge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: var(--primary);
+}
+
+.planCardBody {
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.planCardActions {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.planCardApproveBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.planCardApproveBtn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.planCardApproveBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.planCardFeedbackBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.planCardFeedbackBtn:hover:not(:disabled) {
+  background: var(--muted);
+  border-color: var(--foreground);
+}
+
+.planCardFeedbackBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.planCardCancelBtn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.planCardCancelBtn:hover:not(:disabled) {
+  color: var(--foreground);
+  border-color: var(--foreground);
+}
+
+.planCardFeedbackArea {
+  padding: 8px 12px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.planCardTextarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: 13px;
+  resize: vertical;
+  outline: none;
+}
+
+.planCardTextarea:focus {
+  border-color: var(--primary);
+}
+
+.planCardFeedbackActions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}

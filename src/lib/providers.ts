@@ -39,6 +39,7 @@ export interface ProviderConfig {
   credentialFile?: string; // Path to credential file (for 'credential-file' auth)
   credentialHelper?: string; // Script that reads credential file and prints token
   models: (ModelId | string)[];
+  haikuModel?: string; // Model to use as haiku substitute (for non-Anthropic providers)
   tested: boolean; // Whether compatibility has been verified
   description: string;
 }
@@ -91,6 +92,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     compatibility: 'direct',
     baseUrl: 'https://api.minimax.io/anthropic',
     models: ['minimax-m2.7', 'minimax-m2.7-highspeed'],
+    haikuModel: 'minimax-m2.7-highspeed',
     tested: true,
     description: 'Anthropic-compatible API via MiniMax API',
   },
@@ -101,6 +103,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     compatibility: 'direct',
     baseUrl: 'https://api.z.ai/api/anthropic',
     models: ['glm-5.1', 'glm-4.7', 'glm-4.7-flash'],
+    haikuModel: 'glm-4.7-flash',
     tested: true,
     description: 'Anthropic-compatible API via Z.AI GLM models',
   },
@@ -112,6 +115,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     baseUrl: 'https://token-plan-sgp.xiaomimimo.com/anthropic',
     authType: 'static',
     models: ['mimo-v2.5-pro', 'mimo-v2.5'],
+    haikuModel: 'mimo-v2.5',
     tested: true,
     description: 'Anthropic-compatible API via Xiaomi MiMo (pay-as-you-go or Token Plan)',
   },
@@ -235,6 +239,13 @@ export function getProviderEnv(
     // MiniMax, Z.AI, and MiMo recommend longer timeouts
     if (provider.name === 'minimax' || provider.name === 'zai' || provider.name === 'mimo') {
       env.API_TIMEOUT_MS = '300000';
+    }
+
+    // Non-Anthropic providers don't support claude-haiku-4-5-20251001.
+    // Tell Claude Code to use the provider's small/fast model instead
+    // for Explore agents and other haiku-dependent features.
+    if (provider.haikuModel) {
+      env.ANTHROPIC_DEFAULT_HAIKU_MODEL = provider.haikuModel;
     }
 
     return env;
