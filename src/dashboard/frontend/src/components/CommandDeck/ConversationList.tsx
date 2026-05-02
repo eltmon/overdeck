@@ -436,7 +436,7 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.15, ease: 'easeOut' }}
-                className={`${styles.conversationItem} ${selectedConversation === conv.name ? styles.conversationItemSelected : ''}`}
+                className={`${styles.conversationItem} ${selectedConversation === conv.name ? styles.conversationItemSelected : ''} ${confirmArchiveName === conv.name ? styles.conversationItemConfirming : ''}`}
                 onClick={() => onSelectConversation(conv.name)}
                 title={conv.name}
               >

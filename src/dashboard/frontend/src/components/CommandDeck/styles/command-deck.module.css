@@ -1833,7 +1833,8 @@
 }
 
 .conversationItem:hover .conversationActions,
-.conversationItem:focus-within .conversationActions {
+.conversationItem:focus-within .conversationActions,
+.conversationItemConfirming .conversationActions {
   max-width: 120px;
   opacity: 1;
   margin-left: 0;
