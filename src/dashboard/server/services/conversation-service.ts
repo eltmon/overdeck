@@ -47,6 +47,8 @@ export interface ParseResult {
   planToolUseIds: Set<string>;
   /** Compact boundary markers detected in the JSONL. */
   compactBoundaries: CompactBoundary[];
+  /** Current permission mode (plan/default/bypassPermissions/acceptEdits). */
+  permissionMode?: string;
 }
 
 /** State carried across incremental parseConversationMessages calls. */
@@ -56,6 +58,8 @@ export interface ParseState {
   lastSequence: number;
   planToolUseIds: Set<string>;
   proposedPlan?: ProposedPlan;
+  /** Current permission mode (plan/default/bypassPermissions/acceptEdits). */
+  permissionMode?: string;
 }
 
 export interface ConversationActivitySummary {
@@ -220,6 +224,7 @@ export async function parseConversationMessages(
       unresolvedResults: priorState?.unresolvedResults ?? new Map(),
       lastSequence: priorState?.lastSequence ?? 0,
       mtimeMs: fileStats.mtimeMs,
+      permissionMode: priorState?.permissionMode,
     };
   }
 
@@ -294,6 +299,8 @@ export async function parseConversationMessages(
   const planToolUseIds = priorState?.planToolUseIds ?? new Set<string>();
   // Compact boundary markers
   const compactBoundaries: CompactBoundary[] = [];
+  // Track permission mode across incremental parses
+  let permissionMode: string | undefined = priorState?.permissionMode;
 
   for (const line of lines) {
     let entry: JsonlEntry;
@@ -514,6 +521,17 @@ export async function parseConversationMessages(
         preTokens: typeof meta?.preTokens === 'number' ? meta.preTokens : undefined,
         model: typeof meta?.model === 'string' ? meta.model : undefined,
       });
+    } else if (entry.type === 'permission-mode') {
+      // Track permission mode transitions. Exiting 'plan' mode is an approval
+      // signal when no explicit plan_mode_exit attachment was emitted.
+      const newMode = (entry as Record<string, unknown>).permissionMode as string | undefined;
+      if (newMode && permissionMode === 'plan' && newMode !== 'plan') {
+        if (proposedPlan && proposedPlan.status === 'pending') {
+          proposedPlan.status = 'approved';
+          proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+        }
+      }
+      permissionMode = newMode;
     } else if (entry.type === 'attachment') {
       // Claude Code 2.1.121+ attachment-based plan mode protocol.
       // The agent writes the plan to ~/.claude/plans/<slug>.md and the runtime
@@ -525,12 +543,16 @@ export async function parseConversationMessages(
         if (planContent) {
           const planFilePath = typeof attachment.planFilePath === 'string' ? attachment.planFilePath : undefined;
           const id = ((entry as Record<string, unknown>).uuid as string | undefined) ?? `plan-${lineSequence}`;
+          // If permission mode has already exited 'plan', auto-approve since the
+          // user already approved before this attachment arrived (or no exit was emitted).
+          const alreadyApproved = permissionMode !== 'plan' && permissionMode !== undefined;
           proposedPlan = {
             id,
             plan: planContent,
             planFilePath,
-            status: 'pending',
+            status: alreadyApproved ? 'approved' : 'pending',
             createdAt: entry.timestamp ?? new Date().toISOString(),
+            ...(alreadyApproved ? { resolvedAt: entry.timestamp ?? new Date().toISOString() } : {}),
           };
         }
       } else if (attachment?.type === 'plan_mode_exit') {
@@ -602,6 +624,7 @@ export async function parseConversationMessages(
     proposedPlan,
     planToolUseIds,
     compactBoundaries,
+    permissionMode,
   };
 }
 
@@ -903,6 +926,7 @@ export function watchConversation(
             lastSequence: fullResult.lastSequence,
             planToolUseIds: fullResult.planToolUseIds,
             proposedPlan: fullResult.proposedPlan,
+            permissionMode: fullResult.permissionMode,
           };
           // Include in-flight tools so the live view shows pending work
           const workLog = [...fullResult.workLog, ...fullResult.pendingToolUse.values()];

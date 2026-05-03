@@ -329,3 +329,13 @@ VBriefViewer components at `src/dashboard/frontend/src/components/vbrief/`:
 - Accessible via **vBRIEF button** on kanban issue cards and InspectorPanel
 - List / DAG / Raw JSON tabs
 - Fetches from `GET /api/workspaces/:issueId/plan`
+
+## Issue Creation from PRDs
+
+When creating a Linear or GitHub issue from a PRD, **always reference the PRD at the very top of the issue description** -- before any other content. Use a bold label with a repo-relative path and a clickable link:
+
+```
+**PRD:** [`path/to/prd.md`](https link to the file in the repo)
+```
+
+The issue body should then contain a tight summary (vision, motivation, design goals, key capabilities, phases) -- NOT a full copy of the PRD. The PRD is the source of truth for data models, architecture, code samples, and implementation details. Duplicating that content into the issue creates drift.

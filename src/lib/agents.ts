@@ -27,6 +27,7 @@ import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix } from './projects.js';
 import { generateLauncherScript } from './launcher-generator.js';
 import { logAgentLifecycle } from './persistent-logger.js';
+import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
 
 const execAsync = promisify(exec);
 
@@ -1203,6 +1204,24 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   // Track work in CV
   startWork(agentId, options.issueId);
+
+  // Emit activity + TTS so the user knows an agent has started
+  const isPlanning = options.phase === 'planning';
+  emitActivityEntry({
+    source: isPlanning ? 'planning-agent' : 'dashboard',
+    level: 'info',
+    message: isPlanning
+      ? `Planning started for ${options.issueId}`
+      : `Work agent started for ${options.issueId}`,
+    issueId: options.issueId,
+  });
+  emitActivityTts({
+    utterance: isPlanning
+      ? `Planning started for ${options.issueId}`
+      : `Work agent started for ${options.issueId}`,
+    priority: 2,
+    issueId: options.issueId,
+  });
 
   // For planner agents, capture SageOx session path after it becomes available
   if (sageoxEnabled && options.phase === 'planning') {

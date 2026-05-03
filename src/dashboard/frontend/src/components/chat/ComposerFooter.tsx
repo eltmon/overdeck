@@ -28,15 +28,16 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 async function switchModel(
   conversationName: string,
   model: string,
+  agentId?: string,
 ): Promise<void> {
-  const res = await fetch(
-    `/api/conversations/${encodeURIComponent(conversationName)}/switch-model`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model }),
-    },
-  );
+  const endpoint = agentId
+    ? `/api/agents/${encodeURIComponent(agentId)}/switch-model`
+    : `/api/conversations/${encodeURIComponent(conversationName)}/switch-model`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model }),
+  });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error(`Failed to switch model (${res.status})${body ? `: ${body}` : ''}`);
@@ -46,15 +47,16 @@ async function switchModel(
 async function sendConversationMessage(
   conversationName: string,
   message: string,
+  agentId?: string,
 ): Promise<void> {
-  const res = await fetch(
-    `/api/conversations/${encodeURIComponent(conversationName)}/message`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message }),
-    },
-  );
+  const endpoint = agentId
+    ? `/api/agents/${encodeURIComponent(agentId)}/message`
+    : `/api/conversations/${encodeURIComponent(conversationName)}/message`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error(`Failed to send message (${res.status})${body ? `: ${body}` : ''}`);
@@ -139,11 +141,13 @@ interface ComposerFooterProps {
   onSend?: (text: string) => void;
   /** Called when the POST fails — parent should move the optimistic message to the failed outbox */
   onSendFailed?: (text: string) => void;
+  /** Agent ID for agent sessions (uses /api/agents/* endpoints instead of /api/conversations/*) */
+  agentId?: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ComposerFooter({ conversation, onSend, onSendFailed }: ComposerFooterProps) {
+export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: ComposerFooterProps) {
   const [model, setModel] = useState<string>(conversation.model ?? getDefaultConversationModel());
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
@@ -363,7 +367,7 @@ export function ComposerFooter({ conversation, onSend, onSendFailed }: ComposerF
       // kill the session and restart with the new model before sending.
       // switchModel already waits for the new session to be ready before returning.
       if (model !== conversation.model && conversation.sessionAlive) {
-        await switchModel(submitConversationName, model);
+        await switchModel(submitConversationName, model, agentId);
       }
 
       // Abort if conversation switched during the async model switch — the
@@ -379,7 +383,7 @@ export function ComposerFooter({ conversation, onSend, onSendFailed }: ComposerF
       // Optimistic: notify parent immediately so message appears before server round-trip
       onSend?.(composedMessage);
 
-      await sendConversationMessage(submitConversationName, composedMessage);
+      await sendConversationMessage(submitConversationName, composedMessage, agentId);
 
       // Only clear state if conversation is still the same (avoid clearing the
       // new conversation's composer if user switched while send was in flight)

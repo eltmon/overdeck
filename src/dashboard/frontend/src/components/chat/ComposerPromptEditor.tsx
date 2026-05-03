@@ -601,7 +601,7 @@ export function ComposerPromptEditor({
 
   return (
     <div style={{ position: 'relative' }}>
-      <LexicalComposer initialConfig={initialConfig}>
+      <LexicalComposer key={conversationName} initialConfig={initialConfig}>
         <div className={`${styles.composerEditor} ${disabled ? styles.composerEditorDisabled : ''}`}>
           <PlainTextPlugin
             contentEditable={
