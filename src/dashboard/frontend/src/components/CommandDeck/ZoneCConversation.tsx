@@ -18,8 +18,9 @@ interface ZoneCConversationProps {
   session: SessionNodeType;
   issueId: string;
   roundMarkers?: ReadonlyArray<RoundMarker>;
+  reviewers?: readonly SessionNodeType[];
 }
 
-export function ZoneCConversation({ session, issueId, roundMarkers }: ZoneCConversationProps) {
-  return <SessionPanel session={session} issueId={issueId} roundMarkers={roundMarkers} />;
+export function ZoneCConversation({ session, issueId, roundMarkers, reviewers }: ZoneCConversationProps) {
+  return <SessionPanel session={session} issueId={issueId} roundMarkers={roundMarkers} reviewers={reviewers} />;
 }

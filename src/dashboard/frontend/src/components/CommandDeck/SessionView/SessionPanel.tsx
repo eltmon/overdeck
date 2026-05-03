@@ -7,6 +7,7 @@ import { ChatMarkdown } from '../../chat/ChatMarkdown';
 import { XTerminal } from '../../XTerminal';
 import { RoundCard } from '../RoundCard';
 import type { RoundData, RoundVerdict } from '../RoundCard';
+import { ReviewSummary } from './ReviewSummary';
 import styles from '../styles/command-deck.module.css';
 
 interface SessionPanelProps {
@@ -14,6 +15,8 @@ interface SessionPanelProps {
   issueId?: string;
   /** Optional review-round dividers passed through to the conversation timeline. */
   roundMarkers?: ReadonlyArray<RoundMarker>;
+  /** Reviewer sessions — passed when session.type === 'review' to show ReviewSummary. */
+  reviewers?: readonly SessionNodeType[];
 }
 
 function getViewKey(sessionId: string): string {
@@ -66,10 +69,14 @@ function deriveRoundData(metadata: SessionNodeType['roundMetadata']): RoundData[
   }));
 }
 
-export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelProps) {
-  const [view, setView] = useState<PanelView>(() =>
-    readView(session.sessionId),
-  );
+export function SessionPanel({ session, issueId, roundMarkers, reviewers }: SessionPanelProps) {
+  const isReviewSession = session.type === 'review';
+  const [view, setView] = useState<PanelView>(() => {
+    const stored = readView(session.sessionId);
+    // Default review sessions to summary tab
+    if (isReviewSession && stored === 'conversation') return 'findings';
+    return stored;
+  });
 
   const handleSetView = (v: PanelView) => {
     setView(v);
@@ -110,13 +117,22 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
       {/* View toggle — slim tab bar (info already shown in ZoneB) */}
       <div className={styles.sessionPanelHeader}>
         <div className={styles.sessionPanelToggle}>
-          <button
-            className={`${styles.sessionPanelToggleBtn} ${view === 'conversation' ? styles.sessionPanelToggleBtnActive : ''}`}
-            onClick={() => handleSetView('conversation')}
-          >
-            Conversation
-          </button>
-          {hasFindings && (
+          {isReviewSession ? (
+            <button
+              className={`${styles.sessionPanelToggleBtn} ${view === 'findings' ? styles.sessionPanelToggleBtnActive : ''}`}
+              onClick={() => handleSetView('findings')}
+            >
+              Summary
+            </button>
+          ) : (
+            <button
+              className={`${styles.sessionPanelToggleBtn} ${view === 'conversation' ? styles.sessionPanelToggleBtnActive : ''}`}
+              onClick={() => handleSetView('conversation')}
+            >
+              Conversation
+            </button>
+          )}
+          {!isReviewSession && hasFindings && (
             <button
               className={`${styles.sessionPanelToggleBtn} ${view === 'findings' ? styles.sessionPanelToggleBtnActive : ''}`}
               onClick={() => handleSetView('findings')}
@@ -156,7 +172,15 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
           )
         )}
 
-        {view === 'findings' && (
+        {view === 'findings' && isReviewSession && (
+          <ReviewSummary
+            session={session}
+            reviewers={reviewers ?? []}
+            roundData={roundData}
+          />
+        )}
+
+        {view === 'findings' && !isReviewSession && (
           <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
             {roundData.length === 0 ? (
               <div className={styles.sessionPanelEmpty}>No review rounds recorded.</div>
