@@ -77,6 +77,18 @@ vi.mock('../../src/lib/projects.js', () => ({
   findProjectByPath: findProjectByPathMock,
 }));
 
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal() as any;
+  return {
+    ...actual,
+    existsSync: vi.fn().mockReturnValue(true),
+  };
+});
+
+vi.mock('../../src/lib/vbrief/beads.js', () => ({
+  getVBriefACStatus: vi.fn().mockReturnValue({ allCompleted: true, totalPending: 0, totalCount: 0, items: [] }),
+}));
+
 // Import under test after mocks
 import { runVerificationForIssue, VERIFICATION_MAX_CYCLES } from '../../src/lib/cloister/verification-runner.js';
 
@@ -219,7 +231,7 @@ describe('runVerificationForIssue', () => {
           workspacePath,
           specialist: 'verification-gate',
           outcome: 'failed',
-          summary: expect.stringContaining('Sync with main FAILED'),
+          summary: expect.stringContaining('Sync FAILED'),
           markdownBody: expect.stringContaining('fatal: Not possible to fast-forward, aborting.'),
         })
       );
