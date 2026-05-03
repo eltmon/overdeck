@@ -11,16 +11,37 @@
     "status": "approved",
     "uid": "bb9afa10-315b-409a-a625-02d14573e029",
     "author": "agent:claude-opus-4-6",
-    "sequence": 1,
+    "sequence": 2,
     "created": "2026-05-03T12:00:00Z",
-    "updated": "2026-05-03T12:00:00Z",
+    "updated": "2026-05-03T13:09:31.891Z",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/946", "label": "PAN-946", "type": "issue" },
-      { "uri": "https://github.com/deftai/vBRIEF", "label": "deft vBRIEF spec", "type": "spec" },
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/944", "label": "PAN-944", "type": "issue" },
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/945", "label": "PAN-945", "type": "issue" }
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/946",
+        "label": "PAN-946",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/deftai/vBRIEF",
+        "label": "deft vBRIEF spec",
+        "type": "spec"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/944",
+        "label": "PAN-944",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/945",
+        "label": "PAN-945",
+        "type": "issue"
+      }
     ],
-    "tags": ["vbrief", "lifecycle", "architecture", "cli"],
+    "tags": [
+      "vbrief",
+      "lifecycle",
+      "architecture",
+      "cli"
+    ],
     "narratives": {
       "Problem": "Panopticon vBRIEF plans are ephemeral workspace artifacts with no structured lifecycle. Plans disappear after close-out, there's no cross-issue visibility, and the only lifecycle gate is a boolean .planning-complete marker file. STATE.md is unstructured prose that wastes agent context.",
       "Proposal": "Adopt deft's filesystem-as-state lifecycle model with per-project ./vbrief/ directories, lifecycle subdirectories (proposed/active/completed/cancelled), issue-keyed filenames, plan.status as lifecycle gate, and a separate continue.vbrief.json for structured session state. Hybrid git model: proposed/approved on main for visibility, running/updates on feature branch, completed/cancelled on main after merge. Automatic transitions as side effects of existing pipeline events; pan scope commands as manual overrides."
@@ -29,7 +50,7 @@
       {
         "id": "vbrief-lifecycle-foundation",
         "title": "vBRIEF lifecycle foundation: types, filename convention, directory helpers",
-        "status": "pending",
+        "status": "completed",
         "priority": "critical",
         "created": "2026-05-03T12:00:00Z",
         "metadata": {
@@ -43,32 +64,42 @@
           {
             "id": "vbrief-lifecycle-foundation.ac1",
             "title": "VBriefLifecycleDir type exported from src/lib/vbrief/ with values: proposed, active, completed, cancelled",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "vbrief-lifecycle-foundation.ac2",
             "title": "generateVBriefFilename(issueId, slug, createdDate) returns YYYY-MM-DD-ISSUE-ID-slug.vbrief.json",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "vbrief-lifecycle-foundation.ac3",
             "title": "parseVBriefFilename(filename) extracts {issueId, slug, date} or returns null for non-matching filenames",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "vbrief-lifecycle-foundation.ac4",
             "title": "ensureVBriefDirs(projectRoot) creates ./vbrief/{proposed,active,completed,cancelled}/ and returns the root path",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "vbrief-lifecycle-foundation.ac5",
             "title": "resolveVBriefDir(projectRoot, lifecycleDir) returns absolute path to the specified lifecycle directory",
-            "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -90,25 +121,33 @@
             "id": "continue-state-module.ac1",
             "title": "ContinueState type exported with fields: gitState, decisions[], hazards[], resumePoint, beadsMapping, agentModel, sessionHistory[]",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "continue-state-module.ac2",
             "title": "writeContinueState(dir, issueId, state) writes continue-{issueId}.vbrief.json atomically (temp + rename)",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "continue-state-module.ac3",
             "title": "readContinueState(dir, issueId) reads and validates the continue file, returns null if missing",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "continue-state-module.ac4",
             "title": "appendSessionEntry(dir, issueId, entry) adds timestamped entry to sessionHistory array with reason, crash info, agent model",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -130,25 +169,33 @@
             "id": "vbrief-lifecycle-io.ac1",
             "title": "findVBriefByIssue(projectRoot, issueId) returns {path, lifecycleDir, document} searching proposed → active → completed → cancelled",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "vbrief-lifecycle-io.ac2",
             "title": "moveVBrief(projectRoot, issueId, targetDir) atomically moves scope vBRIEF + continue file to target lifecycle directory",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "vbrief-lifecycle-io.ac3",
             "title": "moveVBrief runs git add on both source removal and destination addition",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "vbrief-lifecycle-io.ac4",
             "title": "updatePlanStatus(filePath, newStatus) updates plan.status atomically with plan.sequence increment and plan.updated timestamp",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -170,19 +217,25 @@
             "id": "plan-finalize-lifecycle.ac1",
             "title": "plan-finalize generates canonical filename and stores it in plan.metadata.canonicalFilename",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "plan-finalize-lifecycle.ac2",
             "title": "plan.status set to 'proposed' after finalization",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "plan-finalize-lifecycle.ac3",
             "title": ".planning-complete marker still written for backward compat during transition",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -204,25 +257,33 @@
             "id": "complete-planning-to-proposed.ac1",
             "title": "vBRIEF copied from workspace .planning/plan.vbrief.json to project root's ./vbrief/proposed/<canonical-filename>",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "complete-planning-to-proposed.ac2",
             "title": "continue file copied from workspace .planning/ to ./vbrief/proposed/ if it exists",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "complete-planning-to-proposed.ac3",
             "title": "Changes committed to main branch with message 'scope: propose PAN-XXX vBRIEF'",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "complete-planning-to-proposed.ac4",
             "title": "Old docs/prds/active/ copy step removed for vBRIEF/STATE.md artifacts",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -244,19 +305,25 @@
             "id": "plan-status-gate.ac1",
             "title": "Dashboard Done button enabled when plan.status is 'proposed' instead of .planning-complete file existence",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "plan-status-gate.ac2",
             "title": "Backward compat: if .planning-complete exists but plan.status missing, treated as 'proposed'",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "plan-status-gate.ac3",
             "title": "All code paths that check for .planning-complete updated to use plan.status",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -278,19 +345,25 @@
             "id": "approve-to-active.ac1",
             "title": "Start-agent flow (or explicit approve) moves vBRIEF from proposed/ to active/ on main before worktree creation",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "approve-to-active.ac2",
             "title": "plan.status updated to 'approved' with sequence increment",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "approve-to-active.ac3",
             "title": "Git commit on main with message 'scope: approve PAN-XXX vBRIEF'",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -312,13 +385,17 @@
             "id": "start-agent-running.ac1",
             "title": "pan start locates vBRIEF in worktree ./vbrief/active/ and sets plan.status to 'running'",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "start-agent-running.ac2",
             "title": "plan.sequence incremented and plan.updated set",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -340,19 +417,25 @@
             "id": "agent-continue-integration.ac1",
             "title": "Agent start writes initial continue state (branch, sha, agent model) to ./vbrief/active/continue-{issue}.vbrief.json",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "agent-continue-integration.ac2",
             "title": "Agent session end updates continue state with latest resume point",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "agent-continue-integration.ac3",
             "title": "Agent resume reads continue state and appends session entry with resume reason",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -374,19 +457,25 @@
             "id": "merge-complete-transition.ac1",
             "title": "postMergeLifecycle moves vBRIEF + continue file from active/ to completed/ on main",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "merge-complete-transition.ac2",
             "title": "plan.status set to 'completed' with timestamp",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "merge-complete-transition.ac3",
             "title": "Git commit on main with message 'scope: complete PAN-XXX vBRIEF'",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -408,19 +497,25 @@
             "id": "close-cancel-transition.ac1",
             "title": "pan close moves vBRIEF from active/ or proposed/ to cancelled/ on main",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "close-cancel-transition.ac2",
             "title": "plan.status set to 'cancelled'",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "close-cancel-transition.ac3",
             "title": "continue file moved to cancelled/ alongside scope vBRIEF",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -442,19 +537,25 @@
             "id": "workspace-plan-from-lifecycle.ac1",
             "title": "findPlan() checks ./vbrief/active/ for issue-keyed vBRIEF before .planning/plan.vbrief.json",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "workspace-plan-from-lifecycle.ac2",
             "title": "readWorkspacePlan() resolves from lifecycle dir transparently",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "workspace-plan-from-lifecycle.ac3",
             "title": "Fallback to .planning/plan.vbrief.json preserved for in-progress planning sessions",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -476,19 +577,25 @@
             "id": "dashboard-plan-from-lifecycle.ac1",
             "title": "Endpoint uses findVBriefByIssue() to locate plan across lifecycle dirs",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "dashboard-plan-from-lifecycle.ac2",
             "title": "Falls back to .planning/plan.vbrief.json for in-progress planning sessions",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "dashboard-plan-from-lifecycle.ac3",
             "title": "Response includes lifecycleDir field indicating plan lifecycle state",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -510,19 +617,25 @@
             "id": "planning-prompt-continue.ac1",
             "title": "PLANNING_PROMPT.md template instructs agent to write continue.vbrief.json instead of STATE.md",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "planning-prompt-continue.ac2",
             "title": "Continue file written to .planning/ during planning, moved to proposed/ by complete-planning",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "planning-prompt-continue.ac3",
             "title": "Planning prompt no longer references STATE.md creation",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -544,13 +657,17 @@
             "id": "work-agent-read-continue.ac1",
             "title": "Work agent prompt template references continue.vbrief.json in ./vbrief/active/ for planning context",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "work-agent-read-continue.ac2",
             "title": "Agent resume flow reads continue state for decisions, hazards, resume point",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -572,25 +689,33 @@
             "id": "remove-state-md-refs.ac1",
             "title": "No references to STATE.md in any prompt template (planning, work, specialist)",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "remove-state-md-refs.ac2",
             "title": "No references to STATE.md in lifecycle code (clean-planning, archive-planning, complete-planning)",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "remove-state-md-refs.ac3",
             "title": "No references to STATE.md in dashboard server routes",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "remove-state-md-refs.ac4",
             "title": "docs/VBRIEF.md updated to document continue.vbrief.json as the replacement for STATE.md",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -612,13 +737,17 @@
             "id": "scope-command-group.ac1",
             "title": "src/cli/commands/scope/index.ts exports registerScopeCommands() following admin pattern",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "scope-command-group.ac2",
             "title": "pan scope registered in cli/index.ts and pan scope --help lists subcommands",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -640,19 +769,25 @@
             "id": "scope-list.ac1",
             "title": "Lists vBRIEFs from all lifecycle dirs for all registered projects",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "scope-list.ac2",
             "title": "Output shows issue ID, title, plan.status, lifecycle dir, created date in table format",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "scope-list.ac3",
             "title": "Scans active worktrees for in-flight vBRIEFs not yet on main",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -674,19 +809,25 @@
             "id": "scope-show.ac1",
             "title": "Resolves vBRIEF by issue ID using findVBriefByIssue()",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "scope-show.ac2",
             "title": "Displays plan title, status, lifecycle dir, items with completion, and narratives",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "scope-show.ac3",
             "title": "Shows continue state summary (last session, decisions count, hazards) if continue file exists",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -708,13 +849,17 @@
             "id": "scope-propose.ac1",
             "title": "Moves vBRIEF to proposed/ and sets plan.status to 'proposed'",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "scope-propose.ac2",
             "title": "Commits change to current branch with descriptive message",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -736,13 +881,17 @@
             "id": "scope-approve.ac1",
             "title": "Moves vBRIEF from proposed/ to active/ and sets plan.status to 'approved'",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "scope-approve.ac2",
             "title": "Commits change to current branch with descriptive message",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -764,13 +913,17 @@
             "id": "scope-complete.ac1",
             "title": "Moves vBRIEF from active/ to completed/ and sets plan.status to 'completed'",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "scope-complete.ac2",
             "title": "Commits change to current branch with descriptive message",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -792,13 +945,17 @@
             "id": "scope-cancel.ac1",
             "title": "Moves vBRIEF to cancelled/ and sets plan.status to 'cancelled'",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "scope-cancel.ac2",
             "title": "Commits change to current branch with descriptive message",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -820,13 +977,17 @@
             "id": "scope-restore.ac1",
             "title": "Moves vBRIEF from completed/ or cancelled/ back to active/",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "scope-restore.ac2",
             "title": "Sets plan.status to 'approved' and commits with descriptive message",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       },
@@ -848,56 +1009,168 @@
             "id": "sync-vbrief-audit.ac1",
             "title": "Flags vBRIEF in active/ but GitHub issue is closed",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "sync-vbrief-audit.ac2",
             "title": "Flags vBRIEF in completed/ but workspace worktree still exists",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "sync-vbrief-audit.ac3",
             "title": "Flags tracker shows in-progress but no vBRIEF found in active/ (main or worktrees)",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           },
           {
             "id": "sync-vbrief-audit.ac4",
             "title": "Each disagreement prints suggested pan scope command to fix it",
             "status": "pending",
-            "metadata": { "kind": "acceptance_criterion" }
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
           }
         ]
       }
     ],
     "edges": [
-      { "from": "vbrief-lifecycle-foundation", "to": "vbrief-lifecycle-io", "type": "blocks" },
-      { "from": "vbrief-lifecycle-foundation", "to": "plan-finalize-lifecycle", "type": "blocks" },
-      { "from": "vbrief-lifecycle-io", "to": "complete-planning-to-proposed", "type": "blocks" },
-      { "from": "vbrief-lifecycle-io", "to": "approve-to-active", "type": "blocks" },
-      { "from": "vbrief-lifecycle-io", "to": "merge-complete-transition", "type": "blocks" },
-      { "from": "vbrief-lifecycle-io", "to": "close-cancel-transition", "type": "blocks" },
-      { "from": "vbrief-lifecycle-io", "to": "workspace-plan-from-lifecycle", "type": "blocks" },
-      { "from": "vbrief-lifecycle-io", "to": "scope-command-group", "type": "blocks" },
-      { "from": "vbrief-lifecycle-io", "to": "sync-vbrief-audit", "type": "blocks" },
-      { "from": "plan-finalize-lifecycle", "to": "complete-planning-to-proposed", "type": "blocks" },
-      { "from": "complete-planning-to-proposed", "to": "plan-status-gate", "type": "blocks" },
-      { "from": "approve-to-active", "to": "start-agent-running", "type": "blocks" },
-      { "from": "continue-state-module", "to": "agent-continue-integration", "type": "blocks" },
-      { "from": "continue-state-module", "to": "planning-prompt-continue", "type": "blocks" },
-      { "from": "continue-state-module", "to": "work-agent-read-continue", "type": "blocks" },
-      { "from": "start-agent-running", "to": "agent-continue-integration", "type": "blocks" },
-      { "from": "workspace-plan-from-lifecycle", "to": "dashboard-plan-from-lifecycle", "type": "blocks" },
-      { "from": "planning-prompt-continue", "to": "remove-state-md-refs", "type": "blocks" },
-      { "from": "work-agent-read-continue", "to": "remove-state-md-refs", "type": "blocks" },
-      { "from": "scope-command-group", "to": "scope-list", "type": "blocks" },
-      { "from": "scope-command-group", "to": "scope-show", "type": "blocks" },
-      { "from": "scope-command-group", "to": "scope-propose", "type": "blocks" },
-      { "from": "scope-command-group", "to": "scope-approve", "type": "blocks" },
-      { "from": "scope-command-group", "to": "scope-complete", "type": "blocks" },
-      { "from": "scope-command-group", "to": "scope-cancel", "type": "blocks" },
-      { "from": "scope-command-group", "to": "scope-restore", "type": "blocks" }
+      {
+        "from": "vbrief-lifecycle-foundation",
+        "to": "vbrief-lifecycle-io",
+        "type": "blocks"
+      },
+      {
+        "from": "vbrief-lifecycle-foundation",
+        "to": "plan-finalize-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "vbrief-lifecycle-io",
+        "to": "complete-planning-to-proposed",
+        "type": "blocks"
+      },
+      {
+        "from": "vbrief-lifecycle-io",
+        "to": "approve-to-active",
+        "type": "blocks"
+      },
+      {
+        "from": "vbrief-lifecycle-io",
+        "to": "merge-complete-transition",
+        "type": "blocks"
+      },
+      {
+        "from": "vbrief-lifecycle-io",
+        "to": "close-cancel-transition",
+        "type": "blocks"
+      },
+      {
+        "from": "vbrief-lifecycle-io",
+        "to": "workspace-plan-from-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "vbrief-lifecycle-io",
+        "to": "scope-command-group",
+        "type": "blocks"
+      },
+      {
+        "from": "vbrief-lifecycle-io",
+        "to": "sync-vbrief-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-finalize-lifecycle",
+        "to": "complete-planning-to-proposed",
+        "type": "blocks"
+      },
+      {
+        "from": "complete-planning-to-proposed",
+        "to": "plan-status-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "approve-to-active",
+        "to": "start-agent-running",
+        "type": "blocks"
+      },
+      {
+        "from": "continue-state-module",
+        "to": "agent-continue-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "continue-state-module",
+        "to": "planning-prompt-continue",
+        "type": "blocks"
+      },
+      {
+        "from": "continue-state-module",
+        "to": "work-agent-read-continue",
+        "type": "blocks"
+      },
+      {
+        "from": "start-agent-running",
+        "to": "agent-continue-integration",
+        "type": "blocks"
+      },
+      {
+        "from": "workspace-plan-from-lifecycle",
+        "to": "dashboard-plan-from-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "planning-prompt-continue",
+        "to": "remove-state-md-refs",
+        "type": "blocks"
+      },
+      {
+        "from": "work-agent-read-continue",
+        "to": "remove-state-md-refs",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-command-group",
+        "to": "scope-list",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-command-group",
+        "to": "scope-show",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-command-group",
+        "to": "scope-propose",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-command-group",
+        "to": "scope-approve",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-command-group",
+        "to": "scope-complete",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-command-group",
+        "to": "scope-cancel",
+        "type": "blocks"
+      },
+      {
+        "from": "scope-command-group",
+        "to": "scope-restore",
+        "type": "blocks"
+      }
     ]
   }
 }
