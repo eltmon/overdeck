@@ -22,7 +22,7 @@ interface FeatureItemProps {
   onViewTerminal?: (sessionId: string) => void;
   onPauseSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
-  onRestartSession?: (sessionId: string, issueId: string) => void;
+  onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => void;
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
@@ -671,6 +671,81 @@ function FeatureMenu({
   );
 }
 
+function ReviewGroup({
+  parent,
+  children,
+  issueId,
+  selectedSessionId,
+  onSelectSession,
+  onStopSession,
+  onViewTerminal,
+  onPauseSession,
+  onResumeSession,
+  onRestartSession,
+  onDeepWipe,
+  onOpenStateDir,
+  onViewJsonl,
+}: {
+  parent: SessionNodeType;
+  children: SessionNodeType[];
+  issueId: string;
+  selectedSessionId?: string | null;
+  onSelectSession?: (issueId: string, sessionId: string) => void;
+  onStopSession?: (sessionId: string) => void;
+  onViewTerminal?: (sessionId: string) => void;
+  onPauseSession?: (sessionId: string) => void;
+  onResumeSession?: (sessionId: string) => void;
+  onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => void;
+  onDeepWipe?: (issueId: string) => void;
+  onOpenStateDir?: (sessionId: string) => void;
+  onViewJsonl?: (sessionId: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(true);
+
+  return (
+    <div>
+      <SessionNode
+        session={parent}
+        issueId={issueId}
+        isSelected={selectedSessionId === parent.sessionId}
+        onClick={() => onSelectSession?.(issueId, parent.sessionId)}
+        onStopSession={onStopSession}
+        onViewTerminal={onViewTerminal}
+        onPauseSession={onPauseSession}
+        onResumeSession={onResumeSession}
+        onRestartSession={onRestartSession}
+        onDeepWipe={onDeepWipe}
+        onOpenStateDir={onOpenStateDir}
+        onViewJsonl={onViewJsonl}
+        expandable
+        expanded={expanded}
+        onToggleExpand={() => setExpanded(e => !e)}
+      />
+      {expanded && children.length > 0 && (
+        <div style={{ paddingLeft: 12 }}>
+          {children.map(session => (
+            <SessionNode
+              key={session.sessionId}
+              session={session}
+              issueId={issueId}
+              isSelected={selectedSessionId === session.sessionId}
+              onClick={() => onSelectSession?.(issueId, session.sessionId)}
+              onStopSession={onStopSession}
+              onViewTerminal={onViewTerminal}
+              onPauseSession={onPauseSession}
+              onResumeSession={onResumeSession}
+              onRestartSession={onRestartSession}
+              onDeepWipe={onDeepWipe}
+              onOpenStateDir={onOpenStateDir}
+              onViewJsonl={onViewJsonl}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources }: FeatureItemProps) {
   const trimmedTitle = title?.trim() ?? '';
   const displayTitle = trimmedTitle || '(untitled)';
@@ -844,23 +919,50 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
 
       {expanded && hasVisibleSessions && (
         <div className={styles.sessionList}>
-          {visibleSessions.map(session => (
-            <SessionNode
-              key={session.sessionId}
-              session={session}
-              issueId={feature.issueId}
-              isSelected={selectedSessionId === session.sessionId}
-              onClick={() => onSelectSession?.(feature.issueId, session.sessionId)}
-              onStopSession={onStopSession}
-              onViewTerminal={onViewTerminal}
-              onPauseSession={onPauseSession}
-              onResumeSession={onResumeSession}
-              onRestartSession={onRestartSession}
-              onDeepWipe={onDeepWipe}
-              onOpenStateDir={onOpenStateDir}
-              onViewJsonl={onViewJsonl}
-            />
-          ))}
+          {(() => {
+            const reviewParent = visibleSessions.find(s => s.type === 'review');
+            const reviewerChildren = visibleSessions.filter(s => s.type === 'reviewer');
+            const nonReviewSessions = visibleSessions.filter(s => s.type !== 'review' && s.type !== 'reviewer');
+
+            return (
+              <>
+                {nonReviewSessions.map(session => (
+                  <SessionNode
+                    key={session.sessionId}
+                    session={session}
+                    issueId={feature.issueId}
+                    isSelected={selectedSessionId === session.sessionId}
+                    onClick={() => onSelectSession?.(feature.issueId, session.sessionId)}
+                    onStopSession={onStopSession}
+                    onViewTerminal={onViewTerminal}
+                    onPauseSession={onPauseSession}
+                    onResumeSession={onResumeSession}
+                    onRestartSession={onRestartSession}
+                    onDeepWipe={onDeepWipe}
+                    onOpenStateDir={onOpenStateDir}
+                    onViewJsonl={onViewJsonl}
+                  />
+                ))}
+                {reviewParent && (
+                  <ReviewGroup
+                    parent={reviewParent}
+                    children={reviewerChildren}
+                    issueId={feature.issueId}
+                    selectedSessionId={selectedSessionId}
+                    onSelectSession={onSelectSession}
+                    onStopSession={onStopSession}
+                    onViewTerminal={onViewTerminal}
+                    onPauseSession={onPauseSession}
+                    onResumeSession={onResumeSession}
+                    onRestartSession={onRestartSession}
+                    onDeepWipe={onDeepWipe}
+                    onOpenStateDir={onOpenStateDir}
+                    onViewJsonl={onViewJsonl}
+                  />
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
     </div>

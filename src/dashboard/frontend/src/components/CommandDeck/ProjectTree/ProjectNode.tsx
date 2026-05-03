@@ -74,7 +74,7 @@ interface ProjectNodeProps {
   onViewTerminal?: (sessionId: string) => void;
   onPauseSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
-  onRestartSession?: (sessionId: string, issueId: string) => void;
+  onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => void;
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;

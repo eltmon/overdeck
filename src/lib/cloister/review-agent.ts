@@ -495,7 +495,10 @@ function reviewRoleToWorkType(role: string): Parameters<typeof getModelId>[0] | 
 /** Resolve the model to use for a reviewer, preferring agent-level override then work-type routing */
 export function resolveReviewerModel(agent: ReviewAgentConfig, defaultModel: string): string {
   let model: string;
-  if (agent.model) {
+  const envOverride = process.env.PANOPTICON_REVIEW_MODEL_OVERRIDE;
+  if (envOverride) {
+    model = envOverride;
+  } else if (agent.model) {
     model = agent.model;
   } else {
     const workType = reviewRoleToWorkType(agent.name);
@@ -528,7 +531,7 @@ export function resolveReviewerModel(agent: ReviewAgentConfig, defaultModel: str
  *  resolve to the correct checkout. The workspace is a git worktree, so it
  *  shares .claude/rules/ and CLAUDE.md with the main repo.
  */
-async function spawnReviewer(
+export async function spawnSingleReviewer(
   sessionName: string,
   model: string,
   promptFile: string,
@@ -809,7 +812,7 @@ export async function runParallelReview(
   filesChanged: string[],
   agents: ReviewAgentConfig[],
   {
-    spawnFn = spawnReviewer,
+    spawnFn = spawnSingleReviewer,
     waitFn = (session, outputFile, timeoutMs) => waitForReviewer(session, outputFile, timeoutMs),
     waitSynthesisFn = (session, outputFile, timeoutMs) => waitForReviewer(session, outputFile, timeoutMs, { requireMarker: 'REVIEW_RESULT:' }),
     parseSynthesisFn = parseReviewSynthesis,
@@ -1397,7 +1400,7 @@ export function reviewResultToReviewStatus(
  * status (passed/failed) directly via `setReviewStatus` when the CLI exits.
  */
 export async function dispatchParallelReview(
-  opts: { issueId: string; workspace: string; branch: string; prUrl?: string },
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string },
   {
     coordinatorSpawnFn = spawnReviewCoordinatorSession,
   }: {
@@ -1407,7 +1410,7 @@ export async function dispatchParallelReview(
      * (spawnReviewCoordinatorSession).
      */
     coordinatorSpawnFn?: (
-      opts: { issueId: string; workspace: string },
+      opts: { issueId: string; workspace: string; model?: string },
     ) => Promise<{ sessionName: string }>;
   } = {},
 ): Promise<{ success: boolean; message: string; error?: string }> {
@@ -1501,6 +1504,7 @@ export async function dispatchParallelReview(
     const { sessionName } = await coordinatorSpawnFn({
       issueId: opts.issueId,
       workspace: opts.workspace,
+      model: opts.model,
     });
     console.log(`[review-agent] Review coordinator spawned for ${opts.issueId}: ${sessionName}`);
     emitActivityEntry({ source: 'review-specialist', level: 'info', message: `Review coordinator spawned for ${opts.issueId}: ${sessionName}`, issueId: opts.issueId });
@@ -1541,6 +1545,7 @@ export async function dispatchParallelReview(
 export async function spawnReviewCoordinatorSession(opts: {
   issueId: string;
   workspace: string;
+  model?: string;
 }): Promise<{ sessionName: string }> {
   const sessionName = `review-coordinator-${opts.issueId}-${Date.now()}`;
   const logDir = join(opts.workspace, '.pan', 'review', 'coordinator');
@@ -1550,14 +1555,16 @@ export async function spawnReviewCoordinatorSession(opts: {
   const exitCodeFile = join(logDir, `${logStem}.exit`);
   const panBin = join(dirname(process.execPath), 'pan');
   const command = `bash -lc 'set -o pipefail; ${panBin} review run ${opts.issueId} 2>&1 | tee -a "${logFile}"; status=\${PIPESTATUS[0]}; printf "%s\\n" "$status" > "${exitCodeFile}"; printf "\\n[pan review run exit %s at %s]\\n" "$status" "$(date -Is)" >> "${logFile}"; exit "$status"'`;
-  await createSessionAsync(sessionName, opts.workspace, command, {
-    env: {
-      ...BLANKED_PROVIDER_ENV,
-      PANOPTICON_AGENT_ID: '',
-      PANOPTICON_ISSUE_ID: '',
-      PANOPTICON_SESSION_TYPE: '',
-    },
-  });
+  const env: Record<string, string> = {
+    ...BLANKED_PROVIDER_ENV,
+    PANOPTICON_AGENT_ID: '',
+    PANOPTICON_ISSUE_ID: '',
+    PANOPTICON_SESSION_TYPE: '',
+  };
+  if (opts.model) {
+    env.PANOPTICON_REVIEW_MODEL_OVERRIDE = opts.model;
+  }
+  await createSessionAsync(sessionName, opts.workspace, command, { env });
   try {
     await setOptionAsync(sessionName, 'remain-on-exit', 'on');
   } catch (err) {
