@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { ChevronRight, ChevronDown } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
@@ -8,6 +8,18 @@ import { useDashboardStore } from '../../../lib/store';
 import { useSharedTick } from '../../../lib/useSharedTick';
 import { formatRelativeTime } from '../../../lib/formatRelativeTime';
 import styles from '../styles/command-deck.module.css';
+import {
+  ContextMenuRoot,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuDestructiveItem,
+  ContextMenuSeparator,
+  ContextMenuLabel,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuSubContent,
+} from '../../shared/ContextMenu';
 
 function stalenessColor(ms: number): string {
   if (ms < 2 * 60_000)  return 'var(--success)';
@@ -126,60 +138,7 @@ function deriveSessionLabel(session: SessionNodeType): string {
   }
 }
 
-interface ContextMenuState {
-  x: number;
-  y: number;
-  open: boolean;
-}
-
-function MenuItem({
-  label,
-  onClick,
-  variant = 'default',
-}: {
-  label: string;
-  onClick: () => void;
-  variant?: 'default' | 'danger';
-}) {
-  return (
-    <button
-      style={{
-        display: 'block',
-        width: '100%',
-        padding: '6px 12px',
-        border: 'none',
-        background: 'none',
-        textAlign: 'left',
-        cursor: 'pointer',
-        color: variant === 'danger' ? 'var(--destructive)' : 'var(--foreground)',
-        fontSize: 12,
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.background = 'var(--accent)';
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.background = 'transparent';
-      }}
-      onClick={onClick}
-    >
-      {label}
-    </button>
-  );
-}
-
-function MenuDivider() {
-  return (
-    <div
-      style={{
-        height: 1,
-        background: 'var(--border)',
-        margin: '4px 8px',
-      }}
-    />
-  );
-}
-
-function RestartSubmenu({
+function RestartModelSubmenu({
   defaultModel,
   groups,
   label,
@@ -190,123 +149,38 @@ function RestartSubmenu({
   label?: string;
   onRestart: (model?: string) => void;
 }) {
-  const [showModels, setShowModels] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleMouseEnter = () => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    setShowModels(true);
-  };
-  const handleMouseLeave = () => {
-    timeoutRef.current = setTimeout(() => setShowModels(false), 200);
-  };
-
   const defaultLabel = defaultModel
     ? defaultModel.replace(/^claude-/, '').replace(/-\d{8}$/, '')
     : 'default';
 
   return (
-    <div
-      style={{ position: 'relative' }}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      <button
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          width: '100%',
-          padding: '6px 12px',
-          border: 'none',
-          background: 'none',
-          textAlign: 'left',
-          cursor: 'pointer',
-          color: 'var(--foreground)',
-          fontSize: 12,
-          gap: 8,
-        }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLElement).style.background = 'var(--accent)';
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLElement).style.background = 'transparent';
-        }}
-        onClick={() => onRestart()}
-      >
-        <span>{label ? `${label} (${defaultLabel})` : `Restart (${defaultLabel})`}</span>
-        <ChevronRight size={10} style={{ flexShrink: 0, opacity: 0.5 }} />
-      </button>
-
-      {showModels && (
-        <div
-          style={{
-            position: 'absolute',
-            left: '100%',
-            top: 0,
-            zIndex: 1001,
-            background: 'var(--card)',
-            border: '1px solid var(--border)',
-            borderRadius: 6,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            padding: '4px 0',
-            minWidth: 180,
-            maxHeight: 300,
-            overflowY: 'auto',
-            fontSize: 12,
-          }}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-        >
-          {groups.map((group) => (
-            <div key={group.provider}>
-              <div style={{
-                padding: '4px 12px 2px',
-                fontSize: 10,
-                fontWeight: 600,
-                color: 'var(--muted-foreground)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-              }}>
-                {group.label}
-              </div>
-              {group.models.map((m) => (
-                <button
-                  key={m.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    width: '100%',
-                    padding: '4px 12px',
-                    border: 'none',
-                    background: 'none',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    color: m.id === defaultModel ? 'var(--primary)' : 'var(--foreground)',
-                    fontSize: 12,
-                    fontWeight: m.id === defaultModel ? 600 : 400,
-                    gap: 8,
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = 'var(--accent)';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = 'transparent';
-                  }}
-                  onClick={() => onRestart(m.id)}
+    <ContextMenuSub>
+      <ContextMenuSubTrigger>
+        {label ? `${label} (${defaultLabel})` : `Restart (${defaultLabel})`}
+      </ContextMenuSubTrigger>
+      <ContextMenuSubContent>
+        <ContextMenuItem onSelect={() => onRestart()}>
+          <span className="flex-1">Default ({defaultLabel})</span>
+        </ContextMenuItem>
+        {groups.map((group) => (
+          <div key={group.provider}>
+            <ContextMenuLabel>{group.label}</ContextMenuLabel>
+            {group.models.map((m) => (
+              <ContextMenuItem key={m.id} onSelect={() => onRestart(m.id)}>
+                <span
+                  className={`flex-1 ${m.id === defaultModel ? 'font-semibold text-primary' : ''}`}
                 >
-                  <span>{m.label}</span>
-                  {m.costDisplay && (
-                    <span style={{ opacity: 0.5, fontSize: 10 }}>{m.costDisplay}</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+                  {m.label}
+                </span>
+                {m.costDisplay && (
+                  <span className="ml-2 shrink-0 text-[10px] opacity-50">{m.costDisplay}</span>
+                )}
+              </ContextMenuItem>
+            ))}
+          </div>
+        ))}
+      </ContextMenuSubContent>
+    </ContextMenuSub>
   );
 }
 
@@ -327,45 +201,14 @@ export function SessionNode({
   expanded,
   onToggleExpand,
 }: SessionNodeProps) {
-  const [menu, setMenu] = useState<ContextMenuState>({ x: 0, y: 0, open: false });
-  const menuRef = useRef<HTMLDivElement>(null);
   const { groups } = useAvailableModels();
   const resolvedModels = useResolvedModels();
 
-  // Subscribe to runtime snapshot for live lastActivity (same pattern as ZoneB)
   const runtime = useDashboardStore((s) => s.agentRuntimeById[session.sessionId]);
   const lastActivity = runtime?.lastActivity;
 
-  // Live flash when presence or status changes (blocker-8)
   const flashKey = `${session.sessionId}:${session.presence}:${session.status}`;
   const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
-
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setMenu({ x: e.clientX, y: e.clientY, open: true });
-  }, []);
-
-  const closeMenu = useCallback(() => {
-    setMenu((m) => ({ ...m, open: false }));
-  }, []);
-
-  // Close menu on click outside or scroll
-  useEffect(() => {
-    if (!menu.open) return;
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        closeMenu();
-      }
-    };
-    const handleScroll = () => closeMenu();
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('scroll', handleScroll, true);
-    return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('scroll', handleScroll, true);
-    };
-  }, [menu.open, closeMenu]);
 
   const canPause = session.presence === 'active' && onPauseSession;
   const canResume = session.presence === 'suspended' && onResumeSession;
@@ -382,156 +225,112 @@ export function SessionNode({
     if (confirmed) {
       onDeepWipe(issueId);
     }
-    closeMenu();
-  }, [issueId, onDeepWipe, closeMenu]);
+  }, [issueId, onDeepWipe]);
+
+  const workTypeKey = session.type === 'review' ? 'specialist-review-agent'
+    : session.type === 'reviewer' && session.role ? `review:${session.role}`
+    : session.type === 'work' ? 'issue-agent:implementation'
+    : session.type === 'planning' ? 'planning-agent'
+    : session.type === 'test' ? 'specialist-test-agent'
+    : session.type === 'merge' ? 'specialist-merge-agent'
+    : null;
+  const defaultModel = workTypeKey ? (resolvedModels[workTypeKey] ?? null) : null;
+  const restartLabel = session.type === 'review' ? 'Restart all' : undefined;
 
   return (
-    <>
-      <button
-        className={`${styles.sessionNode} ${isSelected ? styles.sessionNodeSelected : ''} ${flashClass}`}
-        onClick={() => onClick?.()}
-        onContextMenu={handleContextMenu}
-      >
-        {expandable && (
+    <ContextMenuRoot>
+      <ContextMenuTrigger asChild>
+        <button
+          className={`${styles.sessionNode} ${isSelected ? styles.sessionNodeSelected : ''} ${flashClass}`}
+          onClick={() => onClick?.()}
+        >
+          {expandable && (
+            <span
+              role="button"
+              tabIndex={-1}
+              onClick={(e) => { e.stopPropagation(); onToggleExpand?.(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onToggleExpand?.(); } }}
+              style={{ display: 'inline-flex', flexShrink: 0, cursor: 'pointer' }}
+            >
+              {expanded
+                ? <ChevronDown size={12} style={{ color: 'var(--muted-foreground)' }} />
+                : <ChevronRight size={12} style={{ color: 'var(--muted-foreground)' }} />}
+            </span>
+          )}
+          <StatusDot status={presenceToStatus(session.presence)} size="sm" />
+          <TypeBadge type={session.type} role={session.role} />
           <span
-            role="button"
-            tabIndex={-1}
-            onClick={(e) => { e.stopPropagation(); onToggleExpand?.(); }}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onToggleExpand?.(); } }}
-            style={{ display: 'inline-flex', flexShrink: 0, cursor: 'pointer' }}
+            className={styles.sessionLabel}
+            title={(() => {
+              if (!lastActivity) return session.sessionId;
+              const ms = Date.now() - new Date(lastActivity).getTime();
+              if (ms < 1000) return session.sessionId;
+              return `${session.sessionId} · Last heard: ${formatRelativeTime(lastActivity, new Date())}`;
+            })()}
           >
-            {expanded
-              ? <ChevronDown size={12} style={{ color: 'var(--muted-foreground)' }} />
-              : <ChevronRight size={12} style={{ color: 'var(--muted-foreground)' }} />}
+            {deriveSessionLabel(session)}
           </span>
+          <LiveLastHeard lastActivity={lastActivity} />
+          <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${session.status}`] ?? ''}`}>
+            {session.status}
+          </span>
+          <span className={styles.sessionDuration}>{formatDuration(session.duration)}</span>
+        </button>
+      </ContextMenuTrigger>
+
+      <ContextMenuContent>
+        {canPause && (
+          <ContextMenuItem onSelect={() => onPauseSession!(session.sessionId)}>
+            Pause
+          </ContextMenuItem>
         )}
-        <StatusDot status={presenceToStatus(session.presence)} size="sm" />
-        <TypeBadge type={session.type} role={session.role} />
-        <span
-          className={styles.sessionLabel}
-          title={(() => {
-            if (!lastActivity) return session.sessionId;
-            const ms = Date.now() - new Date(lastActivity).getTime();
-            if (ms < 1000) return session.sessionId;
-            return `${session.sessionId} · Last heard: ${formatRelativeTime(lastActivity, new Date())}`;
-          })()}
-        >
-          {deriveSessionLabel(session)}
-        </span>
-        <LiveLastHeard lastActivity={lastActivity} />
-        <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${session.status}`] ?? ''}`}>
-          {session.status}
-        </span>
-        <span className={styles.sessionDuration}>{formatDuration(session.duration)}</span>
-      </button>
+        {canResume && (
+          <ContextMenuItem onSelect={() => onResumeSession!(session.sessionId)}>
+            Resume
+          </ContextMenuItem>
+        )}
+        {canStop && (
+          <ContextMenuItem onSelect={() => onStopSession!(session.sessionId)}>
+            Stop
+          </ContextMenuItem>
+        )}
+        {canRestart && (
+          <RestartModelSubmenu
+            defaultModel={defaultModel}
+            groups={groups}
+            label={restartLabel}
+            onRestart={(model) => onRestartSession!(session.sessionId, issueId!, session.type, session.role, model)}
+          />
+        )}
 
-      {menu.open && (
-        <div
-          ref={menuRef}
-          style={{
-            position: 'fixed',
-            left: menu.x,
-            top: menu.y,
-            zIndex: 1000,
-            background: 'var(--card)',
-            border: '1px solid var(--border)',
-            borderRadius: 6,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            padding: '4px 0',
-            minWidth: 160,
-            fontSize: 12,
-          }}
-        >
-          {/* Lifecycle actions */}
-          {canPause && (
-            <MenuItem
-              label="Pause"
-              onClick={() => {
-                onPauseSession!(session.sessionId);
-                closeMenu();
-              }}
-            />
-          )}
-          {canResume && (
-            <MenuItem
-              label="Resume"
-              onClick={() => {
-                onResumeSession!(session.sessionId);
-                closeMenu();
-              }}
-            />
-          )}
-          {canStop && (
-            <MenuItem
-              label="Stop"
-              onClick={() => {
-                onStopSession!(session.sessionId);
-                closeMenu();
-              }}
-            />
-          )}
-          {canRestart && (() => {
-            const workTypeKey = session.type === 'review' ? 'specialist-review-agent'
-              : session.type === 'reviewer' && session.role ? `review:${session.role}`
-              : session.type === 'work' ? 'issue-agent:implementation'
-              : session.type === 'planning' ? 'planning-agent'
-              : session.type === 'test' ? 'specialist-test-agent'
-              : session.type === 'merge' ? 'specialist-merge-agent'
-              : null;
-            const defaultModel = workTypeKey ? (resolvedModels[workTypeKey] ?? null) : null;
-            const restartLabel = session.type === 'review' ? 'Restart all' : undefined;
-            return (
-              <RestartSubmenu
-                defaultModel={defaultModel}
-                groups={groups}
-                label={restartLabel}
-                onRestart={(model) => {
-                  onRestartSession!(session.sessionId, issueId!, session.type, session.role, model);
-                  closeMenu();
-                }}
-              />
-            );
-          })()}
+        {hasLifecycleActions && canDeepWipe && <ContextMenuSeparator />}
 
-          {hasLifecycleActions && canDeepWipe && <MenuDivider />}
+        {canDeepWipe && (
+          <ContextMenuDestructiveItem onSelect={handleDeepWipe}>
+            Deep Wipe
+          </ContextMenuDestructiveItem>
+        )}
 
-          {/* Destructive */}
-          {canDeepWipe && (
-            <MenuItem label="Deep Wipe" variant="danger" onClick={handleDeepWipe} />
-          )}
+        {(hasLifecycleActions || canDeepWipe) && (onOpenStateDir || onViewJsonl || onViewTerminal) && (
+          <ContextMenuSeparator />
+        )}
 
-          {(hasLifecycleActions || canDeepWipe) && (onOpenStateDir || onViewJsonl) && <MenuDivider />}
-
-          {/* Utility */}
-          {onOpenStateDir && (
-            <MenuItem
-              label="Open State Dir"
-              onClick={() => {
-                onOpenStateDir(session.sessionId);
-                closeMenu();
-              }}
-            />
-          )}
-          {onViewJsonl && session.hasJsonl && (
-            <MenuItem
-              label="View JSONL"
-              onClick={() => {
-                onViewJsonl(session.sessionId);
-                closeMenu();
-              }}
-            />
-          )}
-          {onViewTerminal && (
-            <MenuItem
-              label="View Terminal"
-              onClick={() => {
-                onViewTerminal(session.sessionId);
-                closeMenu();
-              }}
-            />
-          )}
-        </div>
-      )}
-    </>
+        {onOpenStateDir && (
+          <ContextMenuItem onSelect={() => onOpenStateDir(session.sessionId)}>
+            Open State Dir
+          </ContextMenuItem>
+        )}
+        {onViewJsonl && session.hasJsonl && (
+          <ContextMenuItem onSelect={() => onViewJsonl(session.sessionId)}>
+            View JSONL
+          </ContextMenuItem>
+        )}
+        {onViewTerminal && (
+          <ContextMenuItem onSelect={() => onViewTerminal(session.sessionId)}>
+            View Terminal
+          </ContextMenuItem>
+        )}
+      </ContextMenuContent>
+    </ContextMenuRoot>
   );
 }

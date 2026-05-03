@@ -329,6 +329,31 @@ body::after {
   }
 }
 
+/* ─── Radix context menu animations ────────────────────────────────────────── */
+@keyframes context-menu-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes context-menu-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.95); }
+}
+
+[data-radix-context-menu-content],
+[data-radix-context-menu-subcontent] {
+  transform-origin: var(--radix-context-menu-content-transform-origin);
+}
+
+[data-radix-context-menu-content][data-state="open"],
+[data-radix-context-menu-subcontent][data-state="open"] {
+  animation: context-menu-in 120ms ease-out;
+}
+
+[data-radix-context-menu-content][data-state="closed"],
+[data-radix-context-menu-subcontent][data-state="closed"] {
+  animation: context-menu-out 80ms ease-in;
+}
+
 /* ─── Prose notes (review/test notes in inspector) ─────────────────────────── */
 .prose-notes p          { margin: 0 0 0.4em; line-height: 1.5; }
 .prose-notes p:last-child { margin-bottom: 0; }

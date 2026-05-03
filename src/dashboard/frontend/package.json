@@ -21,6 +21,7 @@
     "@lexical/react": "^0.41.0",
     "@panctl/contracts": "workspace:*",
     "@pierre/diffs": "^1.1.0",
+    "@radix-ui/react-context-menu": "^2.2.16",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-query": "^5.0.0",
     "@tanstack/react-virtual": "^3.13.18",
