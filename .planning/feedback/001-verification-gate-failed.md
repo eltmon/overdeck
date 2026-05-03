@@ -2,21 +2,39 @@
 specialist: verification-gate
 issueId: PAN-946
 outcome: failed
-timestamp: 2026-05-03T16:34:28Z
+timestamp: 2026-05-03T16:57:13Z
 ---
 
 VERIFICATION FAILED for PAN-946 (attempt 1/10):
 
-Failed check: typecheck
+Failed check: test
 
-Verification FAILED at typecheck (2952ms):
+Verification FAILED at test (41032ms):
 
+ only
+ FAIL |panopticon-dashboard|  src/components/CommandDeck/__tests__/ConversationList.test.tsx > ConversationList rename flow > does not call API when title is unchanged
+ FAIL |panopticon-dashboard|  src/components/CommandDeck/__tests__/ConversationList.test.tsx > ConversationList rename flow > prevents double-commit when Enter is followed by blur
+ FAIL |panopticon-dashboard|  src/components/CommandDeck/__tests__/ConversationList.test.tsx > ConversationList rename flow > resets the committed guard when a new edit session starts
+Error: useConfirm must be used within DialogProvider
+ ❯ Module.useConfirm src/components/DialogProvider.tsx:35:19
+     33| export function useConfirm() {
+     34|   const ctx = useContext(DialogContext);
+     35|   if (!ctx) throw new Error('useConfirm must be used within DialogProv…
+       |                   ^
+     36|   return ctx.confirm;
+     37| }
+ ❯ ConversationRow src/components/CommandDeck/ConversationRow.tsx:75:19
+ ❯ renderWithHooks ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:15486:18
+ ❯ mountIndeterminateComponent ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:20103:13
+ ❯ beginWork ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:21626:16
+ ❯ beginWork$1 ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:27465:14
+ ❯ performUnitOfWork ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:26599:12
+ ❯ workLoopSync ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:26505:5
+ ❯ renderRootSync ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:26473:7
+ ❯ recoverFromConcurrentError ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:25889:20
 
-> @panctl/cli@0.8.11 typecheck
-> tsc --noEmit
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/44]⎯
 
-src/lib/tmux.ts(464,31): error TS2550: Property 'findLast' does not exist on type 'string[]'. Do you need to change your target library? Try changing the 'lib' compiler option to 'es2023' or later.
-src/lib/tmux.ts(464,40): error TS7006: Parameter 'l' implicitly has an 'any' type.
 
 
 ## REQUIRED: Fix the failing check, then invoke the /rebase-and-submit skill
@@ -25,6 +43,6 @@ src/lib/tmux.ts(464,40): error TS7006: Parameter 'l' implicitly has an 'any' typ
 2. Fix the code causing the failure
 3. Run the failing check locally to verify it passes
 4. Commit every change
-5. Invoke the /rebase-and-submit skill for PAN-946 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-946 -m "Fixed typecheck"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.
+5. Invoke the /rebase-and-submit skill for PAN-946 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-946 -m "Fixed test"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.
 
 Do NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until `pan review request` has completed successfully.
