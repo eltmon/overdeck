@@ -4,7 +4,7 @@
     "created": "2026-05-03T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-946: Adopt deft vBRIEF lifecycle model for scope vBRIEFs",
-    "updated": "2026-05-03T10:25:00Z"
+    "updated": "2026-05-03T10:30:00Z"
   },
   "plan": {
     "id": "pan-946",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "bb9afa10-315b-409a-a625-02d14573e029",
     "author": "agent:claude-opus-4-6",
-    "sequence": 7,
+    "sequence": 8,
     "created": "2026-05-03T12:00:00Z",
-    "updated": "2026-05-03T10:25:00Z",
+    "updated": "2026-05-03T10:30:00Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/946",
@@ -388,9 +388,10 @@
       {
         "id": "start-agent-running",
         "title": "Set plan.status to running on pan start",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T10:30:00Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -402,7 +403,8 @@
           {
             "id": "start-agent-running.ac1",
             "title": "pan start locates vBRIEF in worktree ./vbrief/active/ and sets plan.status to 'running'",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:30:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -410,7 +412,8 @@
           {
             "id": "start-agent-running.ac2",
             "title": "plan.sequence incremented and plan.updated set",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:30:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }

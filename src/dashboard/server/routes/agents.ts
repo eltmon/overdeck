@@ -72,7 +72,7 @@ import { hasPRDDraft } from '../../../lib/prd-draft.js';
 import { findPrdAnywhere } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { isPlanningComplete } from '../../../lib/vbrief/io.js';
-import { transitionVBriefOnMain } from '../../../lib/vbrief/lifecycle-io.js';
+import { transitionVBriefOnMain, updatePlanStatus } from '../../../lib/vbrief/lifecycle-io.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
@@ -1781,6 +1781,19 @@ const postAgentsRoute = HttpRouter.add(
           console.warn(`[start-agent] vBRIEF approval transition failed (non-fatal): ${err?.message ?? err}`);
         }),
     );
+
+    // Running transition (PAN-946): set workspace plan.status to 'running'.
+    // This is the worktree-side state — the workspace .planning/plan.vbrief.json
+    // is updated directly, and the planning artifacts commit below will pick it
+    // up. Non-fatal: agent starts even if the write fails.
+    if (existsSync(planPath)) {
+      try {
+        updatePlanStatus(planPath, 'running');
+        console.log(`[start-agent] Set plan.status=running for ${issueId}`);
+      } catch (planStatusErr: any) {
+        console.warn(`[start-agent] Failed to set plan.status=running (non-fatal): ${planStatusErr?.message ?? planStatusErr}`);
+      }
+    }
 
     const planningPromptPath = join(workspacePlanningDir, 'PLANNING_PROMPT.md');
     if (existsSync(planningPromptPath)) {
