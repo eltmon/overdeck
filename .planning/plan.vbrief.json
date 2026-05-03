@@ -1,0 +1,800 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-04-30T12:00:00Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-936: Rally feature planning — end-to-end UX and pipeline",
+    "updated": "2026-05-03T09:12:47.185Z"
+  },
+  "plan": {
+    "id": "pan-936",
+    "title": "Rally feature planning: end-to-end UX and pipeline",
+    "status": "approved",
+    "uid": "83388e32-1afb-4b03-86ed-f4c8ab92f134",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 194,
+    "created": "2026-04-30T12:00:00Z",
+    "updated": "2026-05-03T09:12:47.185Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/936",
+        "label": "PAN-936",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/704",
+        "label": "PAN-704",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/397",
+        "label": "PAN-397",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/403",
+        "label": "PAN-403",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "rally",
+      "feature-planning",
+      "ui",
+      "pipeline"
+    ],
+    "narratives": {
+      "Problem": "Rally Features are non-interactive in the dashboard. FeatureCard has no action bar (Plan/vBRIEF/Tasks), no click-to-detail, and child stories aren't clickable. The backend has no feature-aware planning pipeline — no getChildIssues(), no feature context injection for story workspaces, no cross-story dependency edges.",
+      "Proposal": "Phase 1: Add action bar and click-to-select on FeatureCard and CompactChildCard, fix derivedStatus gate. Phase 2: Add getChildIssues() to tracker interface with Rally impl, enhance planning prompt for features, inject FEATURE-CONTEXT.md into story workspaces, write cross-story edges in vBRIEF. Phase 3: Integration tests for all new behavior. Reuse existing planning pipeline (no new feature planning mode). InspectorPanel for detail view. Cross-story edges written but not enforced by Cloister."
+    },
+    "items": [
+      {
+        "id": "featurecard-action-bar",
+        "title": "Add action bar to FeatureCard with Plan/See Plan, vBRIEF, and Tasks chips",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-30T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-936",
+          "phase": "1"
+        },
+        "narrative": {
+          "Action": "Add an action bar to FeatureCard (KanbanBoard.tsx ~line 624) with Plan/See Plan chip, vBRIEF chip, and Tasks chip. Wire chips to existing PlanDialog, VBriefDialog, and BeadsTasksPanel. Explicitly NO Start Agent button — features are planned, not executed directly. The Plan chip should use the same planChip logic as IssueCard but gate visibility on feature's own status (not derivedStatus)."
+        },
+        "subItems": [
+          {
+            "id": "featurecard-action-bar.ac1",
+            "title": "FeatureCard renders action bar with Plan/See Plan, vBRIEF, and Tasks chips below the progress bar",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "featurecard-action-bar.ac2",
+            "title": "Plan chip opens PlanDialog; vBRIEF chip opens VBriefDialog; Tasks chip opens BeadsTasksPanel — same as IssueCard",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "featurecard-action-bar.ac3",
+            "title": "No Start Agent button appears on FeatureCard action bar",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "featurecard-action-bar.ac4",
+            "title": "Plan chip shows 'See Plan' (green) when hasPlan is true, 'Plan' (gray) otherwise",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-03T09:12:47.185Z"
+      },
+      {
+        "id": "featurecard-click-to-select",
+        "title": "FeatureCard title click opens InspectorPanel; chevron still toggles expand",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-30T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-936",
+          "phase": "1"
+        },
+        "narrative": {
+          "Action": "Split FeatureCard click handling: clicking the feature title sets selectedIssue (opens InspectorPanel), clicking the chevron icon toggles expand/collapse. Currently the entire header row toggles expand. Must separate the two click targets so title → select, chevron → expand."
+        },
+        "subItems": [
+          {
+            "id": "featurecard-click-to-select.ac1",
+            "title": "Clicking FeatureCard title text sets selectedIssue and opens InspectorPanel with the feature's data",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "featurecard-click-to-select.ac2",
+            "title": "Clicking the chevron icon toggles expand/collapse without changing selectedIssue",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "featurecard-click-to-select.ac3",
+            "title": "FeatureCard shows selected state (visual highlight) when it is the selectedIssue",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-03T09:12:47.185Z"
+      },
+      {
+        "id": "compactchild-click-to-select",
+        "title": "CompactChildCard click selects child story in InspectorPanel",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-30T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-936",
+          "phase": "1"
+        },
+        "narrative": {
+          "Action": "Make CompactChildCard (KanbanBoard.tsx ~line 719) clickable — clicking the row sets selectedIssue to the child story, opening InspectorPanel. The identifier link currently opens the external tracker; keep that on the identifier specifically, but make the rest of the row select the story."
+        },
+        "subItems": [
+          {
+            "id": "compactchild-click-to-select.ac1",
+            "title": "Clicking a CompactChildCard row (outside the identifier link) sets selectedIssue to the child story",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compactchild-click-to-select.ac2",
+            "title": "Clicking the identifier link still opens the external tracker in a new tab",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "compactchild-click-to-select.ac3",
+            "title": "CompactChildCard shows selected state when it is the selectedIssue",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-03T09:12:47.184Z"
+      },
+      {
+        "id": "inspector-feature-actions",
+        "title": "InspectorPanel renders feature-appropriate actions (no Start Agent)",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-30T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-936",
+          "phase": "1"
+        },
+        "narrative": {
+          "Action": "Add feature detection to InspectorPanel (check artifactType includes 'PortfolioItem'). When a feature is selected, render Plan/See Plan, vBRIEF, and Tasks action buttons but NOT Start Agent, Resume Session, or Stop Agent. Features are planning surfaces, not execution surfaces."
+        },
+        "subItems": [
+          {
+            "id": "inspector-feature-actions.ac1",
+            "title": "InspectorPanel detects features via artifactType containing 'PortfolioItem'",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspector-feature-actions.ac2",
+            "title": "Feature in InspectorPanel shows Plan/See Plan, vBRIEF, and Tasks buttons",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inspector-feature-actions.ac3",
+            "title": "Feature in InspectorPanel does NOT show Start Agent, Resume Session, or Stop Agent buttons",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-03T09:12:47.184Z"
+      },
+      {
+        "id": "derivedstatus-plan-gate",
+        "title": "Plan button on features uses feature's own status, ignoring derivedStatus",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-30T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-936",
+          "phase": "1"
+        },
+        "narrative": {
+          "Action": "In FeatureCard's action bar and InspectorPanel's feature actions, the Plan button visibility must use the feature's own tracker status (issue.status), not derivedStatus. A feature in 'Todo' state in Rally should show Plan even if derivedStatus is 'in_progress' because children are active. This aligns with 'plan at Feature, execute at Story' — feature planning state is independent of child progress."
+        },
+        "subItems": [
+          {
+            "id": "derivedstatus-plan-gate.ac1",
+            "title": "Feature with status='todo' and derivedStatus='in_progress' shows Plan button in FeatureCard action bar",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derivedstatus-plan-gate.ac2",
+            "title": "Feature with status='todo' and derivedStatus='in_progress' shows Plan button in InspectorPanel",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "derivedstatus-plan-gate.ac3",
+            "title": "Feature with status='closed' does NOT show Plan button regardless of derivedStatus",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-03T09:12:47.184Z"
+      },
+      {
+        "id": "get-child-issues-interface",
+        "title": "Add getChildIssues() method to IssueTracker interface",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-30T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-936",
+          "phase": "2"
+        },
+        "narrative": {
+          "Action": "Add getChildIssues(parentId: string): Promise<Issue[]> to the IssueTracker interface in src/lib/tracker/interface.ts. Add a default no-op implementation that returns empty array for trackers that don't support hierarchy (GitHub, Linear). Only Rally will have a real implementation."
+        },
+        "subItems": [
+          {
+            "id": "get-child-issues-interface.ac1",
+            "title": "IssueTracker interface has getChildIssues(parentId: string): Promise<Issue[]> method",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "get-child-issues-interface.ac2",
+            "title": "GitHub and Linear tracker implementations return empty array from getChildIssues()",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "get-child-issues-interface.ac3",
+            "title": "TypeScript compiles cleanly — all IssueTracker implementations satisfy the new method",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-03T09:12:47.184Z"
+      },
+      {
+        "id": "get-child-issues-rally",
+        "title": "Implement getChildIssues() for Rally tracker",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-30T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-936",
+          "phase": "2"
+        },
+        "narrative": {
+          "Action": "Implement getChildIssues() in src/lib/tracker/rally.ts. Given a feature ID (e.g., 'F1234'), query Rally API for HierarchicalRequirement and Defect artifacts whose PortfolioItem field matches the feature. Return normalized Issue[] objects. Use existing Rally query patterns from listIssues()."
+        },
+        "subItems": [
+          {
+            "id": "get-child-issues-rally.ac1",
+            "title": "RallyTracker.getChildIssues('F1234') returns all HierarchicalRequirement/Defect children of feature F1234",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.386Z"
+          },
+          {
+            "id": "get-child-issues-rally.ac2",
+            "title": "Returned issues are normalized to Issue[] format with parentRef set to the feature ID",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.386Z"
+          },
+          {
+            "id": "get-child-issues-rally.ac3",
+            "title": "Returns empty array when feature has no children or feature ID is invalid",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.386Z"
+          }
+        ],
+        "completed": "2026-05-03T09:12:47.182Z"
+      },
+      {
+        "id": "feature-detect-planning",
+        "title": "Planning prompt detects Rally Feature and includes child story context",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-04-30T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-936",
+          "phase": "2"
+        },
+        "narrative": {
+          "Action": "Enhance spawn-planning-session.ts to detect when the issue is a Rally Feature (artifactType includes 'PortfolioItem'). When detected, call getChildIssues() to fetch child stories and include them in the planning prompt as context. The planning agent sees: feature description + list of child stories (ID, title, status, description). This uses the existing planning flow — no new planning mode."
+        },
+        "subItems": [
+          {
+            "id": "feature-detect-planning.ac1",
+            "title": "spawn-planning-session detects Rally Feature via artifactType and fetches child stories via getChildIssues()",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.383Z"
+          },
+          {
+            "id": "feature-detect-planning.ac2",
+            "title": "Planning prompt includes a 'Child Stories' section listing each child's ID, title, status, and description",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.383Z"
+          },
+          {
+            "id": "feature-detect-planning.ac3",
+            "title": "Non-feature issues (stories, defects) skip the child story fetch — no behavior change for existing flow",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.386Z"
+          }
+        ],
+        "completed": "2026-05-03T09:12:47.182Z"
+      },
+      {
+        "id": "feature-context-injection",
+        "title": "Write FEATURE-CONTEXT.md to .planning/ for story workspaces",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-30T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-936",
+          "phase": "2"
+        },
+        "narrative": {
+          "Action": "When spawning a story workspace that belongs to a Rally Feature, inject .planning/FEATURE-CONTEXT.md containing: the parent feature's title, architectural decisions from the feature's vBRIEF narratives, and cross-story dependency notes. This gives story work agents awareness of the broader feature plan. Read from the feature's workspace at workspaces/feature-<featureId>/.planning/plan.vbrief.json. Also add FEATURE_CONTEXT injection to work-agent-prompt.ts readPlanningContext()."
+        },
+        "subItems": [
+          {
+            "id": "feature-context-injection.ac1",
+            "title": ".planning/FEATURE-CONTEXT.md is written to story workspace containing parent feature title and vBRIEF narratives",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.382Z"
+          },
+          {
+            "id": "feature-context-injection.ac2",
+            "title": "work-agent-prompt.ts readPlanningContext() reads FEATURE-CONTEXT.md and injects it into the work agent prompt",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.382Z"
+          },
+          {
+            "id": "feature-context-injection.ac3",
+            "title": "Story workspaces without a parent feature skip FEATURE-CONTEXT.md — no error, no empty file",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.382Z"
+          }
+        ],
+        "completed": "2026-05-03T09:12:47.181Z"
+      },
+      {
+        "id": "vbrief-feature-edges",
+        "title": "Feature-level vBRIEF supports cross-story dependency edges",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-04-30T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-936",
+          "phase": "2"
+        },
+        "narrative": {
+          "Action": "Document and validate that feature-level vBRIEF plans can include edges between story items using blocks/informs/invalidates/suggests types. The vBRIEF types already support edges (VBriefEdge in types.ts). Ensure the planning prompt for features instructs the planning agent to include cross-story dependency edges when relevant. These edges are written to the vBRIEF but NOT enforced by Cloister — that is deferred to a future issue."
+        },
+        "subItems": [
+          {
+            "id": "vbrief-feature-edges.ac1",
+            "title": "Feature planning prompt instructs agent to include cross-story dependency edges in the vBRIEF",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.389Z"
+          },
+          {
+            "id": "vbrief-feature-edges.ac2",
+            "title": "VBriefViewer displays edges from feature-level plans without errors",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.389Z"
+          },
+          {
+            "id": "vbrief-feature-edges.ac3",
+            "title": "Edges are NOT enforced by Cloister — no changes to cloister/service.ts ordering logic",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.390Z"
+          }
+        ],
+        "completed": "2026-05-03T09:12:47.183Z"
+      },
+      {
+        "id": "test-featurecard-actions",
+        "title": "Tests for FeatureCard action bar rendering and chip interactions",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-30T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-936",
+          "phase": "3"
+        },
+        "narrative": {
+          "Action": "Write component tests for FeatureCard action bar: Plan/See Plan chip renders correctly based on hasPlan state, vBRIEF chip opens VBriefDialog, Tasks chip opens BeadsTasksPanel, no Start Agent button present. Test derivedStatus gate: feature with derivedStatus='in_progress' and status='todo' still shows Plan."
+        },
+        "subItems": [
+          {
+            "id": "test-featurecard-actions.ac1",
+            "title": "Test: FeatureCard renders Plan chip when feature status is todo and hasPlan is false",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.387Z"
+          },
+          {
+            "id": "test-featurecard-actions.ac2",
+            "title": "Test: FeatureCard renders See Plan chip when hasPlan is true",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.387Z"
+          },
+          {
+            "id": "test-featurecard-actions.ac3",
+            "title": "Test: FeatureCard does NOT render Start Agent button",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.387Z"
+          },
+          {
+            "id": "test-featurecard-actions.ac4",
+            "title": "Test: Feature with derivedStatus='in_progress' and status='todo' shows Plan button",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.388Z"
+          }
+        ],
+        "completed": "2026-05-03T09:12:47.182Z"
+      },
+      {
+        "id": "test-click-to-select",
+        "title": "Tests for FeatureCard and CompactChildCard click-to-select behavior",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-30T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-936",
+          "phase": "3"
+        },
+        "narrative": {
+          "Action": "Write component tests: FeatureCard title click sets selectedIssue, chevron click toggles expand without changing selection. CompactChildCard row click sets selectedIssue, identifier link click doesn't propagate to row selection. Both show selected visual state."
+        },
+        "subItems": [
+          {
+            "id": "test-click-to-select.ac1",
+            "title": "Test: FeatureCard title click fires onSelect, chevron click fires onToggle",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.389Z"
+          },
+          {
+            "id": "test-click-to-select.ac2",
+            "title": "Test: CompactChildCard row click fires onSelect, identifier link click does not",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.389Z"
+          },
+          {
+            "id": "test-click-to-select.ac3",
+            "title": "Test: Both components show selected visual state when isSelected prop is true",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.389Z"
+          }
+        ],
+        "completed": "2026-05-03T09:12:47.183Z"
+      },
+      {
+        "id": "test-inspector-feature",
+        "title": "Tests for InspectorPanel feature-specific actions",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-30T12:00:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-936",
+          "phase": "3"
+        },
+        "narrative": {
+          "Action": "Write component tests: InspectorPanel with a feature issue shows Plan/vBRIEF/Tasks but not Start Agent. InspectorPanel with a story issue still shows Start Agent (regression check)."
+        },
+        "subItems": [
+          {
+            "id": "test-inspector-feature.ac1",
+            "title": "Test: InspectorPanel with PortfolioItem issue shows Plan, vBRIEF, Tasks buttons",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.388Z"
+          },
+          {
+            "id": "test-inspector-feature.ac2",
+            "title": "Test: InspectorPanel with PortfolioItem issue does NOT show Start Agent button",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.388Z"
+          },
+          {
+            "id": "test-inspector-feature.ac3",
+            "title": "Test: InspectorPanel with story issue still shows Start Agent button (regression)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.388Z"
+          }
+        ],
+        "completed": "2026-05-03T09:12:47.183Z"
+      },
+      {
+        "id": "test-get-child-issues",
+        "title": "Tests for getChildIssues() interface and Rally implementation",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-30T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-936",
+          "phase": "3"
+        },
+        "narrative": {
+          "Action": "Write unit tests for getChildIssues(): Rally implementation returns normalized children for a feature, returns empty for non-feature. GitHub/Linear implementations return empty array. Test that returned issues have parentRef set correctly."
+        },
+        "subItems": [
+          {
+            "id": "test-get-child-issues.ac1",
+            "title": "Test: RallyTracker.getChildIssues() returns children with correct parentRef for a known feature",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.382Z"
+          },
+          {
+            "id": "test-get-child-issues.ac2",
+            "title": "Test: RallyTracker.getChildIssues() returns empty array for non-existent feature",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.382Z"
+          },
+          {
+            "id": "test-get-child-issues.ac3",
+            "title": "Test: GitHubTracker.getChildIssues() returns empty array",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.383Z"
+          }
+        ],
+        "completed": "2026-05-03T09:12:47.182Z"
+      },
+      {
+        "id": "test-feature-planning-pipeline",
+        "title": "Tests for feature-aware planning prompt and context injection",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-04-30T12:00:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-936",
+          "phase": "3"
+        },
+        "narrative": {
+          "Action": "Write integration tests: planning prompt for a Rally Feature includes child story context. FEATURE-CONTEXT.md is written correctly for story workspaces with a parent feature. Work agent prompt includes FEATURE_CONTEXT section. Non-feature planning and non-child stories are unaffected."
+        },
+        "subItems": [
+          {
+            "id": "test-feature-planning-pipeline.ac1",
+            "title": "Test: Planning prompt for Rally Feature includes 'Child Stories' section with child issue details",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.381Z"
+          },
+          {
+            "id": "test-feature-planning-pipeline.ac2",
+            "title": "Test: FEATURE-CONTEXT.md is written with parent feature title and vBRIEF narratives",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.381Z"
+          },
+          {
+            "id": "test-feature-planning-pipeline.ac3",
+            "title": "Test: Non-feature issue planning prompt does NOT include child story context (regression)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            },
+            "completed": "2026-05-01T05:11:22.381Z"
+          }
+        ],
+        "completed": "2026-05-03T09:12:47.180Z"
+      }
+    ],
+    "edges": [
+      {
+        "from": "featurecard-action-bar",
+        "to": "derivedstatus-plan-gate",
+        "type": "informs"
+      },
+      {
+        "from": "featurecard-action-bar",
+        "to": "inspector-feature-actions",
+        "type": "informs"
+      },
+      {
+        "from": "get-child-issues-interface",
+        "to": "get-child-issues-rally",
+        "type": "blocks"
+      },
+      {
+        "from": "get-child-issues-rally",
+        "to": "feature-detect-planning",
+        "type": "blocks"
+      },
+      {
+        "from": "feature-detect-planning",
+        "to": "feature-context-injection",
+        "type": "blocks"
+      },
+      {
+        "from": "feature-detect-planning",
+        "to": "vbrief-feature-edges",
+        "type": "informs"
+      },
+      {
+        "from": "featurecard-action-bar",
+        "to": "test-featurecard-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "featurecard-click-to-select",
+        "to": "test-click-to-select",
+        "type": "blocks"
+      },
+      {
+        "from": "compactchild-click-to-select",
+        "to": "test-click-to-select",
+        "type": "blocks"
+      },
+      {
+        "from": "inspector-feature-actions",
+        "to": "test-inspector-feature",
+        "type": "blocks"
+      },
+      {
+        "from": "derivedstatus-plan-gate",
+        "to": "test-featurecard-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "get-child-issues-rally",
+        "to": "test-get-child-issues",
+        "type": "blocks"
+      },
+      {
+        "from": "feature-detect-planning",
+        "to": "test-feature-planning-pipeline",
+        "type": "blocks"
+      },
+      {
+        "from": "feature-context-injection",
+        "to": "test-feature-planning-pipeline",
+        "type": "blocks"
+      }
+    ]
+  }
+}
