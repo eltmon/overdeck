@@ -75,6 +75,7 @@ import { registerCavemanCommands } from './commands/caveman.js';
 import { registerReleaseCommands } from './commands/release.js';
 import { resourcesCommand } from './commands/resources.js';
 import { devCommand } from './commands/dev.js';
+import { registerScopeCommands } from './commands/scope.js';
 
 const program = new Command();
 program.enablePositionalOptions();
@@ -347,6 +348,7 @@ registerInspectCommand(program);
 
 // Register caveman commands (pan caveman-compress)
 registerCavemanCommands(program);
+registerScopeCommands(program);
 
 // Shorthand: pan status = pan status
 program

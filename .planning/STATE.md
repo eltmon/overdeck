@@ -3,7 +3,7 @@
 ## Status: In Progress
 
 ## Current Phase
-Approval transition wired into start-agent flow. Next: workspace-3pq (set plan.status to running on pan start).
+pan scope commands implemented. Next: workspace-44p (continue.vbrief.json integration) or workspace-475 (remove STATE.md references).
 
 ## Completed Work
 - [x] workspace-0k8: vBRIEF lifecycle foundation — types, filename convention, directory helpers in `src/lib/vbrief/lifecycle.ts` with 14 unit tests (commit 7ae8315fa)
@@ -18,25 +18,20 @@ Approval transition wired into start-agent flow. Next: workspace-3pq (set plan.s
 - [x] workspace-bdc: Close/cancel transition in `runDestructiveIssueLifecycle` (issues.ts) — `transitionVBriefOnMain()` moves vBRIEF to cancelled/ on main with `scope: cancel <ID> vBRIEF` commit when mode='cancel'. Non-fatal.
 - [x] workspace-57b: Dashboard plan endpoint GET /api/workspaces/:issueId/plan now uses `findVBriefByIssue()` to resolve from lifecycle dirs first, falling back to workspace `.planning/plan.vbrief.json` for in-progress planning. Response includes `lifecycleDir` field.
 - [x] workspace-0ka: `findPlan()` in `src/lib/vbrief/io.ts` now checks lifecycle dirs on the project root (via `findVBriefByIssue`) before falling back to workspace `.planning/plan.vbrief.json`. `readWorkspacePlan()` inherits this transparently since it calls `findPlan()`. All callers (task-readiness, beads sync, work-agent-prompt, etc.) work without modification.
+- [x] workspace-7il: `pan scope` command group skeleton — `src/cli/commands/scope.ts` exports `registerScopeCommands()` following the admin command pattern. Registered in `src/cli/index.ts`.
+- [x] workspace-czx: `pan scope list` — scans all lifecycle dirs (`proposed/`, `active/`, `completed/`, `cancelled/`) and prints issue ID, title, status, and lifecycle directory. Groups by lifecycle dir.
+- [x] workspace-5a0: `pan scope show <issueId>` — uses `findVBriefByIssue()` to resolve a vBRIEF, displays title, lifecycle dir, status, sequence, file path, and item count.
+- [x] workspace-1u5: `pan scope propose <issueId>` — manual override to move vBRIEF to `proposed/` and set `plan.status` to `proposed`. Commits on main via `transitionVBriefOnMain()`.
+- [x] workspace-waf: `pan scope approve <issueId>` — manual override to move vBRIEF to `active/` and set `plan.status` to `approved`. Commits on main via `transitionVBriefOnMain()`.
+- [x] workspace-7zx: `pan scope complete <issueId>` — manual override to move vBRIEF to `completed/` and set `plan.status` to `completed`. Commits on main via `transitionVBriefOnMain()`.
+- [x] workspace-7nz: `pan scope cancel <issueId>` — manual override to move vBRIEF to `cancelled/` and set `plan.status` to `cancelled`. Commits on main via `transitionVBriefOnMain()`.
+- [x] workspace-cho: `pan scope restore <issueId>` — restores vBRIEF from `completed/` or `cancelled/` back to `active/` and sets `plan.status` to `approved`. Commits on main via `transitionVBriefOnMain()`.
 
 ## Remaining Work
 - [ ] workspace-44p: Write/update continue.vbrief.json during agent sessions
-- [ ] workspace-44p: Write/update continue.vbrief.json during agent sessions
-- [ ] workspace-qe9: Post-merge — move vBRIEF from active/ to completed/ on main
-- [ ] workspace-bdc: Close/cancel — move vBRIEF to cancelled/ on main
-- [ ] workspace-0ka: Update workspace plan resolution to read from ./vbrief/active/
-- [ ] workspace-57b: Update dashboard plan endpoint to resolve from lifecycle dirs
 - [ ] workspace-ujl: Update planning prompt to write continue.vbrief.json instead of STATE.md
 - [ ] workspace-61m: Update work agent to read continue.vbrief.json for context
 - [ ] workspace-475: Remove all STATE.md references from codebase
-- [ ] workspace-7il: Create pan scope command group skeleton
-- [ ] workspace-czx: pan scope list — show all vBRIEFs with lifecycle status
-- [ ] workspace-5a0: pan scope show <issue> — display plan details
-- [ ] workspace-1u5: pan scope propose <issue> — manual move to proposed/
-- [ ] workspace-waf: pan scope approve <issue> — manual move to active/
-- [ ] workspace-7zx: pan scope complete <issue> — manual move to completed/
-- [ ] workspace-7nz: pan scope cancel <issue> — manual move to cancelled/
-- [ ] workspace-cho: pan scope restore <issue> — restore from completed/cancelled to active/
 - [ ] workspace-9ny: Extend pan sync with vBRIEF state disagreement detection
 
 ## Key Decisions

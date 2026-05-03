@@ -4,7 +4,7 @@
     "created": "2026-05-03T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-946: Adopt deft vBRIEF lifecycle model for scope vBRIEFs",
-    "updated": "2026-05-03T10:30:00Z"
+    "updated": "2026-05-03T12:58:00Z"
   },
   "plan": {
     "id": "pan-946",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "bb9afa10-315b-409a-a625-02d14573e029",
     "author": "agent:claude-opus-4-6",
-    "sequence": 11,
+    "sequence": 12,
     "created": "2026-05-03T12:00:00Z",
-    "updated": "2026-05-03T10:40:00Z",
+    "updated": "2026-05-03T12:58:00Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/946",
@@ -496,7 +496,8 @@
           {
             "id": "merge-complete-transition.ac3",
             "title": "Git commit on main with message 'scope: complete PAN-XXX vBRIEF'",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:35:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -758,9 +759,10 @@
       {
         "id": "scope-command-group",
         "title": "Create pan scope command group skeleton",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T10:45:00Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -772,7 +774,8 @@
           {
             "id": "scope-command-group.ac1",
             "title": "src/cli/commands/scope/index.ts exports registerScopeCommands() following admin pattern",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -780,7 +783,8 @@
           {
             "id": "scope-command-group.ac2",
             "title": "pan scope registered in cli/index.ts and pan scope --help lists subcommands",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -790,9 +794,10 @@
       {
         "id": "scope-list",
         "title": "pan scope list — show all vBRIEFs with lifecycle status",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T10:45:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -804,7 +809,8 @@
           {
             "id": "scope-list.ac1",
             "title": "Lists vBRIEFs from all lifecycle dirs for all registered projects",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -812,7 +818,8 @@
           {
             "id": "scope-list.ac2",
             "title": "Output shows issue ID, title, plan.status, lifecycle dir, created date in table format",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -820,7 +827,8 @@
           {
             "id": "scope-list.ac3",
             "title": "Scans active worktrees for in-flight vBRIEFs not yet on main",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -830,9 +838,10 @@
       {
         "id": "scope-show",
         "title": "pan scope show <issue> — display plan details",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T10:45:00Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -844,7 +853,8 @@
           {
             "id": "scope-show.ac1",
             "title": "Resolves vBRIEF by issue ID using findVBriefByIssue()",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -852,7 +862,8 @@
           {
             "id": "scope-show.ac2",
             "title": "Displays plan title, status, lifecycle dir, items with completion, and narratives",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -860,7 +871,8 @@
           {
             "id": "scope-show.ac3",
             "title": "Shows continue state summary (last session, decisions count, hazards) if continue file exists",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -870,9 +882,10 @@
       {
         "id": "scope-propose",
         "title": "pan scope propose <issue> — manual move to proposed/",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T10:45:00Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -884,7 +897,8 @@
           {
             "id": "scope-propose.ac1",
             "title": "Moves vBRIEF to proposed/ and sets plan.status to 'proposed'",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -892,7 +906,8 @@
           {
             "id": "scope-propose.ac2",
             "title": "Commits change to current branch with descriptive message",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -902,9 +917,10 @@
       {
         "id": "scope-approve",
         "title": "pan scope approve <issue> — manual move to active/",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T10:45:00Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -916,7 +932,8 @@
           {
             "id": "scope-approve.ac1",
             "title": "Moves vBRIEF from proposed/ to active/ and sets plan.status to 'approved'",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -924,7 +941,8 @@
           {
             "id": "scope-approve.ac2",
             "title": "Commits change to current branch with descriptive message",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -934,9 +952,10 @@
       {
         "id": "scope-complete",
         "title": "pan scope complete <issue> — manual move to completed/",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T10:45:00Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -948,7 +967,8 @@
           {
             "id": "scope-complete.ac1",
             "title": "Moves vBRIEF from active/ to completed/ and sets plan.status to 'completed'",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -956,7 +976,8 @@
           {
             "id": "scope-complete.ac2",
             "title": "Commits change to current branch with descriptive message",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -966,9 +987,10 @@
       {
         "id": "scope-cancel",
         "title": "pan scope cancel <issue> — manual move to cancelled/",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T10:45:00Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -980,7 +1002,8 @@
           {
             "id": "scope-cancel.ac1",
             "title": "Moves vBRIEF to cancelled/ and sets plan.status to 'cancelled'",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -988,7 +1011,8 @@
           {
             "id": "scope-cancel.ac2",
             "title": "Commits change to current branch with descriptive message",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -998,9 +1022,10 @@
       {
         "id": "scope-restore",
         "title": "pan scope restore <issue> — restore from completed/cancelled to active/",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T10:45:00Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -1012,7 +1037,8 @@
           {
             "id": "scope-restore.ac1",
             "title": "Moves vBRIEF from completed/ or cancelled/ back to active/",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1020,7 +1046,8 @@
           {
             "id": "scope-restore.ac2",
             "title": "Sets plan.status to 'approved' and commits with descriptive message",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:45:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
