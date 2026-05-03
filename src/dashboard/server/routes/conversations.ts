@@ -23,6 +23,7 @@ import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
 import { resolveClaudeSessionId } from './jsonl-resolver.js';
+import { getProject } from '../../../lib/projects.js';
 
 import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -1005,6 +1006,7 @@ const postConversationRoute = HttpRouter.add(
         const model = typeof body['model'] === 'string' ? body['model'].trim() : undefined;
         const effort = typeof body['effort'] === 'string' ? body['effort'].trim() : undefined;
         const issueId = typeof body['issueId'] === 'string' ? body['issueId'] : undefined;
+        const projectKey = typeof body['projectKey'] === 'string' ? body['projectKey'].trim() : undefined;
         const applyProviderOverride = body['applyProviderOverride'] === true;
         if (issueId && !SAFE_ISSUE_ID_PATTERN.test(issueId)) {
           return jsonResponse({ error: 'Invalid issueId' }, { status: 400 });
@@ -1015,7 +1017,15 @@ const postConversationRoute = HttpRouter.add(
         if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
           return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
         }
-        const cwd = join(homedir(), 'Projects');
+        let cwd = join(homedir(), 'Projects');
+        if (projectKey) {
+          const projectConfig = getProject(projectKey);
+          if (projectConfig?.path && existsSync(projectConfig.path)) {
+            cwd = projectConfig.path;
+          } else {
+            return jsonResponse({ error: `Unknown project: ${projectKey}` }, { status: 400 });
+          }
+        }
 
         if (message && message.length > MAX_MESSAGE_LENGTH) {
           return jsonResponse(
@@ -1033,7 +1043,7 @@ const postConversationRoute = HttpRouter.add(
         const tmuxSession = `conv-${name}`;
         const claudeSessionId = randomUUID();
 
-        console.log(`[conversations] Creating conversation "${name}" with model=${model ?? 'default'} effort=${effort ?? 'default'}`);
+        console.log(`[conversations] Creating conversation "${name}" with model=${model ?? 'default'} effort=${effort ?? 'default'} cwd=${cwd}`);
 
         // Apply provider env overlay if user consented via the conflict dialog
         if (applyProviderOverride && model) {
