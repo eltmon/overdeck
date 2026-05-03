@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play, Radio } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useSharedTick } from '../lib/useSharedTick';
+import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { useAgentCost } from '../hooks/useHandoffData';
 import { HandoffPanel } from './HandoffPanel';
 import { useConfirm, useAlert } from './DialogProvider';
@@ -128,14 +130,6 @@ function formatDuration(startedAt: string): string {
   return `${diffMins}m`;
 }
 
-function formatTimeSince(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  if (hours > 0) return `${hours}h ${minutes % 60}m ago`;
-  if (minutes > 0) return `${minutes}m ${seconds % 60}s ago`;
-  return `${seconds}s ago`;
-}
 
 function stalenessClass(ms: number): string {
   if (ms < 2 * 60_000) return 'text-success';
@@ -145,21 +139,12 @@ function stalenessClass(ms: number): string {
 }
 
 function LiveLastHeard({ lastActivity }: { lastActivity: string | null }) {
-  const [label, setLabel] = useState('');
-  const [cls, setCls] = useState('text-muted-foreground');
-  useEffect(() => {
-    if (!lastActivity) return;
-    const update = () => {
-      const ms = Date.now() - new Date(lastActivity).getTime();
-      if (ms < 1000) { setLabel(''); return; }
-      setLabel(formatTimeSince(ms));
-      setCls(stalenessClass(ms));
-    };
-    update();
-    const t = setInterval(update, 1000);
-    return () => clearInterval(t);
-  }, [lastActivity]);
-  if (!lastActivity || !label) return null;
+  const now = useSharedTick();
+  if (!lastActivity) return null;
+  const ms = now.getTime() - new Date(lastActivity).getTime();
+  if (ms < 1000) return null;
+  const label = formatRelativeTime(lastActivity, now);
+  const cls = stalenessClass(ms);
   return (
     <div className={`flex items-center gap-1 text-xs ${cls}`} title={`Last heard: ${label}`}>
       <Radio className="w-3 h-3" />
