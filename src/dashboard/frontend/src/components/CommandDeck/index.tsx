@@ -366,7 +366,7 @@ export function CommandDeck({
   const { projectConversations, excludeConvIds } = useMemo(() => {
     const map: Record<string, import('./ConversationList').Conversation[]> = {};
     const excludeSet = new Set<number>();
-    if (registeredProjects.length === 0) return { projectConversations: map, excludeConvIds: excludeSet };
+    if (!Array.isArray(registeredProjects) || registeredProjects.length === 0) return { projectConversations: map, excludeConvIds: excludeSet };
 
     const pathToKey = new Map<string, string>();
     for (const rp of registeredProjects) {
