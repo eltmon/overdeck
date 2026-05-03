@@ -4,7 +4,59 @@ import { useLiveFlash } from '../../../lib/useLiveFlash';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import { useAvailableModels, type ModelGroup } from '../../shared/ModelPicker/ModelPicker';
+import { useDashboardStore } from '../../../lib/store';
 import styles from '../styles/command-deck.module.css';
+
+function stalenessColor(ms: number): string {
+  if (ms < 2 * 60_000)  return 'var(--success)';
+  if (ms < 10 * 60_000) return 'var(--warning)';
+  if (ms < 30 * 60_000) return 'var(--orange, #f97316)';
+  return 'var(--destructive)';
+}
+
+function formatLastHeard(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  if (h > 0) return `${h}h ${m % 60}m ago`;
+  if (m > 0) return `${m}m ${s % 60}s ago`;
+  return `${s}s ago`;
+}
+
+function LiveLastHeard({ lastActivity }: { lastActivity?: string }) {
+  const [label, setLabel] = useState('');
+  const [color, setColor] = useState('var(--muted-foreground)');
+
+  useEffect(() => {
+    if (!lastActivity) return;
+    const update = () => {
+      const ms = Date.now() - new Date(lastActivity).getTime();
+      if (ms < 2000) { setLabel(''); return; }
+      setLabel(formatLastHeard(ms));
+      setColor(stalenessColor(ms));
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [lastActivity]);
+
+  if (!lastActivity || !label) return null;
+
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        fontVariantNumeric: 'tabular-nums',
+        color,
+        marginLeft: 'auto',
+        flexShrink: 0,
+      }}
+      title={`Last heard: ${label}`}
+    >
+      {label}
+    </span>
+  );
+}
 
 let resolvedModelsCache: Record<string, string | null> | null = null;
 let resolvedModelsFetchPromise: Promise<Record<string, string | null>> | null = null;
@@ -298,6 +350,10 @@ export function SessionNode({
   const { groups } = useAvailableModels();
   const resolvedModels = useResolvedModels();
 
+  // Subscribe to runtime snapshot for live lastActivity (same pattern as ZoneB)
+  const runtime = useDashboardStore((s) => s.agentRuntimeById[session.sessionId]);
+  const lastActivity = runtime?.lastActivity;
+
   // Live flash when presence or status changes (blocker-8)
   const flashKey = `${session.sessionId}:${session.presence}:${session.status}`;
   const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
@@ -369,12 +425,18 @@ export function SessionNode({
         )}
         <StatusDot status={presenceToStatus(session.presence)} size="sm" />
         <TypeBadge type={session.type} role={session.role} />
-        <span className={styles.sessionLabel} title={session.sessionId}>
+        <span
+          className={styles.sessionLabel}
+          title={lastActivity
+            ? `${session.sessionId} · Last heard: ${formatLastHeard(Date.now() - new Date(lastActivity).getTime())}`
+            : session.sessionId}
+        >
           {deriveSessionLabel(session)}
         </span>
         <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${session.status}`] ?? ''}`}>
           {session.status}
         </span>
+        <LiveLastHeard lastActivity={lastActivity} />
         <span className={styles.sessionDuration}>{formatDuration(session.duration)}</span>
       </button>
 
