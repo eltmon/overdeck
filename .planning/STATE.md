@@ -1,79 +1,90 @@
-# PAN-923: Command Deck v0.8 Completion
+# PAN-946: Adopt deft vBRIEF Lifecycle Model for Scope vBRIEFs
 
-**Status:** In Progress (fast-track on main)
-**Planned by:** Claude Opus 4.6
-**Date:** 2026-04-29
+## Problem
 
----
+Panopticon's vBRIEF plans are ephemeral workspace artifacts that disappear after close-out. Plans live in `.planning/plan.vbrief.json`, get copied to `docs/prds/active/`, and are cleaned up post-merge. There's no structured lifecycle, no cross-issue visibility, and no durable continuation state. The `.planning-complete` boolean marker is the only lifecycle gate.
 
-## Discovery Summary
+## Proposal
 
-PAN-923 consolidates remaining PAN-830 phases (3-6), PAN-831 (rebrand refinish), and PAN-548 (draft persistence) into one sprint on `main`.
+Adopt deft's filesystem-as-state lifecycle model with explicit lifecycle directories, structured status transitions, and issue-keyed filenames. Diverge from deft's single-plan-per-project constraint to support Panopticon's multi-agent, multi-issue world.
 
-### Already Completed (skip in vBRIEF)
-- **Tree state filter** (item 2): `[All] [Alive] [Failed]` toggle exists at `CommandDeck/index.tsx:698-711`
-- **PR/Diff tab** (item 6): `PrDiffTab.tsx` fully implemented (475 lines), backend at `/api/issues/:id/pr/details`
-- **Discussions tab** (item 7): `DiscussionsTab.tsx` fully implemented (327 lines), backend at `/api/issues/:id/discussions`
-- **Directory rename** (item 8a): `MissionControl/` → `CommandDeck/` already done
-- **Old CSS delete** (item 8b): `mission-control.module.css` already deleted
-- **DeferredTab** is dead code — no imports reference it
+## Architecture Decisions
 
-### Key Touch Points
+### 1. Canonical directory: per-project `./vbrief/`
 
-| Component | File | What Changes |
-|-----------|------|-------------|
-| PresenceDot → StatusDot | `ProjectTree/SessionNode.tsx:21-52` | Replace inline SVG spinner + CSS classes with `<StatusDot>` |
-| Collapse logic | `ProjectTree/FeatureItem.tsx:479-484` | `defaultExpandedFromState()` becomes state-aware |
-| ZoneBActionStrip | `CommandDeck/ZoneBActionStrip.tsx:291-369` | Add overflow items from PRD spec |
-| getZoneBActions | `lib/commandDeckActions.ts:298-311` | Add overflow action keys |
-| mc- tokens (249 usages) | Many `.tsx` files | Replace `var(--mc-X, var(--Y))` → `var(--Y)` |
-| mc- definitions | `styles/command-deck.module.css:4-35` | Remove alias layer after migration |
-| text-white | `BulkActionBar.tsx` | Replace with semantic foreground token |
-| DialogProvider | `components/DialogProvider.tsx` | Backdrop blur, panel styling, animation |
-| Draft persistence | `CommandDeck/IssueComposer.tsx:56` | `useState('')` → Zustand-backed state |
-| Liveness motions | Various CommandDeck components | Verify animations fire on real events |
+Each registered project gets `./vbrief/` at its repo root with lifecycle subdirectories:
+```
+./vbrief/
+├── proposed/     ← planning complete, awaiting approval
+├── active/       ← agent is working on it
+├── completed/    ← merged/closed, immutable archive
+└── cancelled/    ← abandoned, immutable archive
+```
 
-### mc- Token Mapping (from command-deck.module.css)
+### 2. Hybrid git model
 
-| mc- token | Canonical replacement |
-|-----------|---------------------|
-| `--mc-text-muted` (101 uses) | `--muted-foreground` |
-| `--mc-border` (53 uses) | `--border` |
-| `--mc-success` (25 uses) | `--success` |
-| `--mc-error` (21 uses) | `--destructive` |
-| `--mc-warning` (20 uses) | `--warning` |
-| `--mc-primary` (11 uses) | `--primary` |
-| `--mc-accent` (11 uses) | `--primary` |
-| `--mc-surface-2` (5 uses) | `color-mix(in srgb, var(--foreground) 3%, transparent)` |
-| `--mc-surface` (3 uses) | `--background` |
-| `--mc-text-secondary` (2 uses) | `--muted-foreground` |
-| `--mc-text-primary` (2 uses) | `--foreground` |
-| `--mc-primary-foreground` (2 uses) | `--primary-foreground` |
-| `--mc-bg-secondary` (2 uses) | `--muted` |
+- **proposed/ and active/ on main**: Planning creates the vBRIEF in the workspace, then `complete-planning` copies it to main's `./vbrief/proposed/`. Approval moves it to `./vbrief/active/` on main. This gives cross-issue visibility from any branch or the dashboard.
+- **running + item updates on feature branch**: When a worktree is created from main, it inherits the vBRIEF in `./vbrief/active/`. The work agent updates item statuses and the continue file in the feature branch.
+- **completed/cancelled on main**: After PR merge, `postMergeLifecycle` moves the vBRIEF from `active/` to `completed/` on main. Issue close without merge moves to `cancelled/`.
 
-Pattern: most inline styles use `var(--mc-X, var(--canonical))` with fallbacks. Replace entire expression with just `var(--canonical)`.
+### 3. Issue-keyed filenames
 
-## Key Architectural Decisions
+Format: `YYYY-MM-DD-<ISSUE-ID>-<slug>.vbrief.json`
+Example: `2026-05-03-PAN-946-vbrief-lifecycle.vbrief.json`
 
-### D1: StatusDot mapping for SessionNode
-**Decision:** Map session `presence` field to StatusDot `status` prop: `active→active`, `idle→idle`, `suspended→waiting`, `ended→ended`. No `thinking` state at session level (that's a status sub-state).
-**Rationale:** StatusDot already handles these states with correct animations. The PresenceDot inline SVG duplicates this without animation consistency.
+Date is creation date (immutable). Issue ID gives Panopticon ergonomics. Slug gives human readability.
 
-### D2: Done-issue collapse default
-**Decision:** Pass feature state to `defaultExpandedFromState()`. In-flight states (stateLabel contains "progress", "review", "testing") → expanded=true with auto-select of best alive session. Done/closed → collapsed.
-**Rationale:** Users want to see active work at a glance but not be overwhelmed by completed issues.
+### 4. plan.status as lifecycle gate
 
-### D3: mc- token elimination approach
-**Decision:** Batch find-replace across all `.tsx` files. Replace `var(--mc-X, var(--Y))` patterns with `var(--Y)`. For bare `var(--mc-X)` without fallback, replace with canonical equivalent from mapping table. Then remove definitions from `command-deck.module.css`.
-**Rationale:** The mc- layer is 1:1 with canonical tokens — it adds indirection without value.
+Replace `.planning-complete` marker with `plan.status` field:
+- `draft` → planning in progress
+- `proposed` → planning done, awaiting approval
+- `approved` → user approved, ready to start
+- `running` → agent is executing
+- `completed` → work done, merged
+- `blocked` / `cancelled` → as needed
 
-### D4: Draft persistence via Zustand
-**Decision:** Add a `draftTexts: Record<string, string>` map to the existing dashboard Zustand store, keyed by issueId. Cleared on page refresh (not persisted to localStorage). Wire into IssueComposer via store selector.
-**Rationale:** Simplest approach that survives navigation within the SPA but doesn't persist stale drafts across sessions.
+Backward compat shim: if `.planning-complete` exists but `plan.status` missing, treat as proposed.
 
-### D5: Zone B overflow additions
-**Decision:** Add to getZoneBActions overflow: `viewState`, `viewVbrief`, `copySessionId`, `copyTmuxCommand`. Add corresponding ActionKey entries and ZoneBActionStrip overflow items.
-**Rationale:** PRD specifies these actions. They're utility/debug actions that belong in overflow, not primary.
+### 5. Separate continue.vbrief.json replaces STATE.md
 
-## Remaining Work
-See plan.vbrief.json for the complete bead breakdown.
+The scope vBRIEF stays clean — "here's what we're building." A separate `continue-<issue-id>.vbrief.json` lives alongside it in the same lifecycle directory. It's a living session history document:
+
+- Written during planning (replaces STATE.md)
+- Updated on agent session start/end
+- Updated on resume with why we're resuming
+- Persists through completion for post-mortems
+- Contains: git state, decisions, hazards, resume point, beads mapping, agent model, session history
+
+### 6. Direct reference — no workspace cache
+
+Agents read the vBRIEF directly from `./vbrief/active/<filename>` in their worktree (inherited from main). No copy to `.planning/plan.vbrief.json`, no drift, no reconciliation. During planning only, the work-in-progress vBRIEF lives at `.planning/plan.vbrief.json` before being promoted to proposed/.
+
+### 7. Automatic lifecycle transitions
+
+Lifecycle transitions are side effects of existing pipeline events:
+- `plan-finalize` → sets plan.status to "proposed"
+- `complete-planning` → copies vBRIEF to main's `./vbrief/proposed/`
+- Approval (dashboard or `pan scope approve`) → moves to `active/` on main
+- `pan start` → sets plan.status to "running" in worktree
+- PR merge → `postMergeLifecycle` moves to `completed/` on main
+- `pan close` → moves to `cancelled/` on main
+
+`pan scope` commands exist as manual overrides for fixing state disagreement.
+
+### 8. No migration of existing artifacts
+
+Existing `docs/prds/active/` and `docs/prds/completed/` stay in place. They're markdown PRDs from a different era, not scope vBRIEFs. New work uses `./vbrief/`, old stuff stays where it is. Clean cut.
+
+## Scope
+
+**In scope:** Items 1-6, 8, 9 from the issue (canonical directory, lifecycle subdirs, filenames, plan.status, continue file, direct reference, CLI commands, sync audit).
+
+**Out of scope:** Item 7 (scope agent — future work).
+
+## Hazards
+
+- **Cross-worktree git operations**: Complete-planning and approve transitions commit to main while the workspace is on a feature branch. Must ensure no conflicts and clean git state.
+- **Backward compatibility**: In-flight workspaces during transition may still use `.planning-complete`. Shim required.
+- **Dashboard plan viewer**: Must handle plans in both old (`.planning/`) and new (`./vbrief/`) locations during transition.
+- **Beads integration**: plan-finalize creates beads from the vBRIEF. Must work regardless of vBRIEF location.

@@ -4,7 +4,7 @@
      Session summarizers should SKIP this block and focus on the agent's
      actual work, decisions, and tradeoffs that follow. -->
 
-# Planning Session: PAN-905
+# Planning Session: PAN-946
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -68,57 +68,124 @@ After `pan plan-finalize` and the user clicks **Done**, the pipeline runs withou
 ---
 
 ## Issue Details
-- **ID:** PAN-905
-- **Title:** Command Deck: add merge phase to pipeline stepper with CI detail, queue position, and retry history
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/905
+- **ID:** PAN-946
+- **Title:** Adopt deft vBRIEF lifecycle model for scope vBRIEFs
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/946
 
 ## Description
-## Problem
+## Summary
 
-After clicking MERGE on a PR, the dashboard gives fragmented visibility into what's happening. The pipeline stepper in `ReviewPipelineSection` shows Build Gate → Review → Tests but stops there — merge isn't a visible phase. To track merge progress you have to bounce between the PR/Diff Tab (CI checks), the Awaiting Merge page (merge state), and the MergeButton (stuck detection). There's also useful data the backend computes that the frontend never displays.
+Adopt deft's vBRIEF lifecycle model into Panopticon's scope management. This replaces the current implicit state model (file-existence markers, workspace-inferred status) with explicit, structured, filesystem-as-state lifecycle management for scope vBRIEFs.
 
-## What to build
+**Context:** Panopticon already uses vBRIEF v0.5 for per-issue work plans. Today these live ephemerally in workspace `.planning/` directories and disappear on close-out. This issue promotes vBRIEFs to durable, first-class source-of-truth artifacts with explicit lifecycle transitions, structured continuation state, and auditable history.
 
-### 1. Add "Merge" as a 4th step in the pipeline stepper
-- Extends the existing Build Gate → Review → Tests pipeline in `ReviewPipelineSection.tsx`
-- When active, shows sub-statuses for each CI check (build: ✅, lint: ⏳, test: pending) inline
-- States: pending → CI running → merging → merged (or failed)
-- Replaces the need to open the PR/Diff Tab just to see CI progress
+**Relationship to deft:** Cherry-picks the valuable parts of deft's model (status enum, lifecycle directories, archive, structured state) while deliberately diverging on constraints incompatible with multi-agent orchestration (single plan per project, serialized changes). See "Divergence from deft" section below.
 
-### 2. Surface merge queue position
-- Backend already computes queue position in `/api/review/:issueId/status` (`queuePosition`, `activeSpecialist`)
-- Display "Position N in merge queue" in the pipeline stepper or issue overview when queued
-- Especially useful when multiple PRs are merging concurrently
+---
 
-### 3. Surface `mergeNotes` and `mergeRetryCount`
-- Both fields exist in `ReviewStatus` and are returned by the API
-- Show retry count (e.g., "Attempt 2/3") in the merge step
-- Show `mergeNotes` as expandable detail — explains WHY a merge failed
+## Enumerated Changes
 
-### 4. Specialist log shortcut during active merge phase
-- Currently you can "View last specialist log" only after completion
-- Add a live log link while the merge specialist is actively running
-- Lets you watch the merge agent's work in real time
+### 1. Adopt `./vbrief/` as canonical directory
 
-## Key files
+vBRIEFs are source-of-truth artifacts, not metadata. They live at `./vbrief/` in the project repo (for MYN polyrepo: in the meta repo `myn/meta/vbrief/`, or potentially each sub-repo for repo-scoped changes).
 
-- `src/dashboard/frontend/src/components/inspector/ReviewPipelineSection.tsx` — pipeline stepper (add 4th step)
-- `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/PrDiffTab.tsx` — CI checks display (model for sub-statuses)
-- `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts` — ReviewStatusData, PullRequestData interfaces
-- `src/dashboard/frontend/src/components/MergeButton.tsx` — merge state machine (stuck detection)
-- `src/dashboard/frontend/src/components/AwaitingMergePage.tsx` — merge queue UI
-- `src/dashboard/server/routes/workspaces.ts` — `/api/review/:issueId/status` (already returns mergeStatus, mergeNotes, mergeRetryCount, queuePosition)
-- `src/lib/review-status.ts` — ReviewStatus interface
+### 2. Adopt lifecycle subdirectories
 
-## Acceptance criteria
+```
+./vbrief/
+├── proposed/     ← planning complete, awaiting approval
+├── active/       ← agent is working on it
+├── completed/    ← merged/closed, immutable archive
+└── cancelled/    ← abandoned, immutable archive
+```
 
-- [ ] Pipeline stepper shows 4 steps: Build Gate → Review → Tests → Merge
-- [ ] Merge step shows individual CI check sub-statuses (name + pass/fail/running) when CI is in progress
-- [ ] Merge queue position displayed when issue is queued behind others
-- [ ] `mergeRetryCount` shown as "Attempt N" in the merge step
-- [ ] `mergeNotes` shown as expandable detail on failure
-- [ ] Live specialist log link available during active merge phase
-- [ ] Existing 3-step behavior unchanged when merge phase hasn't started
+Files move between directories on status transitions. This is the filesystem-as-state model from deft, adapted for our multi-issue world.
+
+### 3. Issue-keyed filenames with optional date prefix
+
+Format: `YYYY-MM-DD-<ISSUE-ID>-<slug>.vbrief.json`
+
+Example: `2026-04-28-MIN-846-fizzy-master.vbrief.json`
+
+Date is creation date (immutable — doesn't change when the file moves between lifecycle dirs). Issue ID gives Panopticon ergonomics. Slug gives human readability. The date prefix gives chronological sorting for free and aligns with deft's archive convention.
+
+### 4. Use `plan.status` field as the lifecycle gate
+
+Replace the `.planning-complete` boolean marker with reading `plan.status` from the vBRIEF:
+
+- `draft` — planning in progress
+- `proposed` — planning done, awaiting approval
+- `approved` — user approved, ready to start
+- `running` — agent is executing
+- `completed` — work done, merged
+- `blocked` / `cancelled` — as needed
+
+Backward compat shim during transition: if `.planning-complete` exists but `plan.status` is missing, treat as `approved`. Remove shim after one release cycle.
+
+### 5. Replace STATE.MD with structured continue checkpoint
+
+Move from prose STATE.MD to a structured `continue.vbrief.json` (or extend the scope vBRIEF itself with continuation fields). Machine-parseable resume state including:
+
+- Task completion status (from vBRIEF items)
+- Decisions made (narratives)
+- Hazards/warnings (narratives)
+- Exact resume point
+- **Extended for Panopticon:** git state, sub-repo context, beads mapping, agent model, review feedback
+
+### 6. No workspace cache — direct reference
+
+The workspace doesn't get a copy of the vBRIEF. Instead, the agent state tracks the **path** to its scope vBRIEF in `./vbrief/active/`. No copy, no drift, no reconciliation. The vBRIEF in the repo IS the source of truth, and the agent reads it from there.
+
+### 7. Scope agent (future — not in this change)
+
+A first-class agent in the specialist chain that takes a PRD (from conversation or doc) and produces a well-formed scope vBRIEF with proper `items`, `edges` (blocks/produces/consumes), `references`, and lifecycle entry in `proposed/`. This is the DAG entry point — the scope agent can also analyze overlap with other in-flight scope vBRIEFs to identify cross-issue dependencies.
+
+### 8. `pan scope:*` commands for lifecycle transitions
+
+CLI commands that move vBRIEFs between lifecycle directories and emit transition log entries:
+
+- `pan scope propose <issue>` — move to `proposed/`
+- `pan scope approve <issue>` — move to `active/`, set `plan.status: approved`
+- `pan scope complete <issue>` — move to `completed/`
+- `pan scope cancel <issue>` — move to `cancelled/`
+- `pan scope restore <issue>` — move from `completed/` or `cancelled/` back to `active/`
+
+### 9. `pan sync` audit for state disagreement
+
+Extend `pan sync` to detect filesystem/tracker/tmux/vBRIEF disagreement:
+
+- vBRIEF says `active/` but tracker says closed → flag
+- vBRIEF says `completed/` but workspace still exists → flag
+- Tracker says in-progress but no vBRIEF in `active/` → flag
+
+---
+
+## What we explicitly do NOT adopt
+
+- **`specification.vbrief.json`** — product-level spec is not our concern right now (though the DAG vision could evolve into this)
+- **`playbook-{name}.vbrief.json`** — we have skills for this
+- **Single plan per project constraint** — fundamentally incompatible with multi-agent; see divergence section
+- **`history/changes/` folder structure** — our lifecycle dirs + issue-keyed filenames serve the same purpose more naturally for multi-issue
+
+## Divergence from deft
+
+Deft's model assumes one stream of work serialized through a single `plan.vbrief.json` per project. Key quotes from their docs:
+
+- `"There is exactly ONE plan.vbrief.json at a time per project"` (vbrief.md:193)
+- `"⊗ Having multiple active changes without explicit user coordination"` (commands.md:202)
+
+Panopticon runs N concurrent agents on N issues within one project, each isolated in its own workspace. The vBRIEF format itself works perfectly — it's the "one per project" constraint and the serialized change model that breaks.
+
+Deft's `swarm.md` handles parallel tasks within one change but not parallel changes. The proposed extension: issue-keyed scope vBRIEFs in lifecycle directories, with the DAG's `edges` expressing cross-issue dependencies that their single-change model never needs to represent.
+
+This divergence should be filed upstream as a proposal for multi-agent/multi-issue support in the deft directive.
+
+---
+
+## Related Issues
+
+- PAN-944 — Make vBRIEF the durable task graph source of truth
+- PAN-945 — Path mismatch: planning writes to `api/docs/prds/planned/`, runtime reads from `.planning/`
 
 ---
 
@@ -207,10 +274,10 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
     "version": "0.5",
     "created": "<ISO 8601 timestamp>",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-905: <issue title>"
+    "description": "Plan for PAN-946: <issue title>"
   },
   "plan": {
-    "id": "pan-905",
+    "id": "pan-946",
     "title": "<issue title>",
     "status": "approved",
     "uid": "<generate a UUID v4>",
@@ -219,7 +286,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
     "created": "<ISO 8601 timestamp — same as vBRIEFInfo.created>",
     "updated": "<ISO 8601 timestamp — same as created>",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/905", "label": "PAN-905", "type": "issue" }
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/946", "label": "PAN-946", "type": "issue" }
     ],
     "tags": ["<relevant tags>"],
     "narratives": {
@@ -235,7 +302,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
         "created": "<ISO 8601 timestamp>",
         "metadata": {
           "difficulty": "trivial|simple|medium|complex|expert",
-          "issueLabel": "pan-905"
+          "issueLabel": "pan-946"
         },
         "narrative": { "Action": "<what needs to be done>" },
         "subItems": [
@@ -257,7 +324,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
 
 **CRITICAL vBRIEF rules:**
 - The file MUST have `vBRIEFInfo` and `plan` as the ONLY top-level keys
-- `plan.id` MUST be the issue ID in lowercase (e.g., "pan-905")
+- `plan.id` MUST be the issue ID in lowercase (e.g., "pan-946")
 - `plan.uid` MUST be a freshly generated UUID v4
 - Do NOT use `issue`, `issueId`, or `issue_id` — use `plan.id`
 - `items[].status` MUST be one of: draft, proposed, approved, pending, running, completed, blocked, cancelled
