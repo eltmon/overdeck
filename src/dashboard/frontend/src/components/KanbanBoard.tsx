@@ -84,7 +84,7 @@ function LiveLastHeardBadge({ lastActivity }: { lastActivity?: string }) {
     if (!lastActivity) return;
     const update = () => {
       const ms = Date.now() - new Date(lastActivity).getTime();
-      if (ms < 60_000) { setLabel(''); return; }
+      if (ms < 1000) { setLabel(''); return; }
       setLabel(kbFormatLastHeard(ms));
       setStyle(kbStalenessStyle(ms));
     };

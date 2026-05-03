@@ -77,7 +77,7 @@ function LastHeardCounter({ lastActivity }: { lastActivity?: string }) {
     if (!lastActivity) return;
     const update = () => {
       const ms = Date.now() - new Date(lastActivity).getTime();
-      if (ms < 60_000) { setLabel(''); return; }
+      if (ms < 1000) { setLabel(''); return; }
       setLabel(formatLastHeard(ms));
       setColor(stalenessColor(ms));
     };
@@ -104,7 +104,7 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
   const lastHeardTooltip = (() => {
     if (!agent.lastActivity) return '';
     const ms = Date.now() - new Date(agent.lastActivity).getTime();
-    if (ms < 60_000) return '';
+    if (ms < 1000) return '';
     return `Last heard: ${formatLastHeard(ms)}`;
   })();
   const cardTooltip = [
