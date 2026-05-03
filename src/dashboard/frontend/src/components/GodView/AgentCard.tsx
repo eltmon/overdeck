@@ -77,6 +77,7 @@ function LastHeardCounter({ lastActivity }: { lastActivity?: string }) {
     if (!lastActivity) return;
     const update = () => {
       const ms = Date.now() - new Date(lastActivity).getTime();
+      if (ms < 60_000) { setLabel(''); return; }
       setLabel(formatLastHeard(ms));
       setColor(stalenessColor(ms));
     };
@@ -100,9 +101,12 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
 
   const phaseColor = agent.agentPhase ? PHASE_COLORS[agent.agentPhase] || 'var(--gv-blue)' : 'var(--gv-blue)';
 
-  const lastHeardTooltip = agent.lastActivity
-    ? `Last heard: ${formatLastHeard(Date.now() - new Date(agent.lastActivity).getTime())}`
-    : '';
+  const lastHeardTooltip = (() => {
+    if (!agent.lastActivity) return '';
+    const ms = Date.now() - new Date(agent.lastActivity).getTime();
+    if (ms < 60_000) return '';
+    return `Last heard: ${formatLastHeard(ms)}`;
+  })();
   const cardTooltip = [
     agent.issueId || agent.id,
     agent.agentPhase ? `Phase: ${agent.agentPhase}` : '',

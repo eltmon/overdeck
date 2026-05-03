@@ -108,12 +108,14 @@ function stalenessClass(timestamp: string | null): string {
 }
 
 function LiveLastHeard({ timestamp, label }: { timestamp: string | null; label?: string }) {
-  const [text, setText] = useState(() => (timestamp ? formatTimeAgo(timestamp) : 'Never'));
-  const [cls, setCls] = useState(() => stalenessClass(timestamp));
+  const [text, setText] = useState('');
+  const [cls, setCls] = useState('text-muted-foreground');
 
   useEffect(() => {
     if (!timestamp) return;
     const update = () => {
+      const ms = Date.now() - new Date(timestamp).getTime();
+      if (ms < 60_000) { setText(''); return; }
       setText(formatTimeAgo(timestamp));
       setCls(stalenessClass(timestamp));
     };
@@ -121,6 +123,8 @@ function LiveLastHeard({ timestamp, label }: { timestamp: string | null; label?:
     const t = setInterval(update, 1000);
     return () => clearInterval(t);
   }, [timestamp]);
+
+  if (!text) return null;
 
   return (
     <span className={cls} title={label ? `${label}: ${text}` : text}>

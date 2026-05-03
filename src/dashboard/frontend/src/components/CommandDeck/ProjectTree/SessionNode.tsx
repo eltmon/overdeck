@@ -31,7 +31,7 @@ function LiveLastHeard({ lastActivity }: { lastActivity?: string }) {
     if (!lastActivity) return;
     const update = () => {
       const ms = Date.now() - new Date(lastActivity).getTime();
-      if (ms < 2000) { setLabel(''); return; }
+      if (ms < 60_000) { setLabel(''); return; }
       setLabel(formatLastHeard(ms));
       setColor(stalenessColor(ms));
     };
@@ -427,9 +427,12 @@ export function SessionNode({
         <TypeBadge type={session.type} role={session.role} />
         <span
           className={styles.sessionLabel}
-          title={lastActivity
-            ? `${session.sessionId} · Last heard: ${formatLastHeard(Date.now() - new Date(lastActivity).getTime())}`
-            : session.sessionId}
+          title={(() => {
+            if (!lastActivity) return session.sessionId;
+            const ms = Date.now() - new Date(lastActivity).getTime();
+            if (ms < 60_000) return session.sessionId;
+            return `${session.sessionId} · Last heard: ${formatLastHeard(ms)}`;
+          })()}
         >
           {deriveSessionLabel(session)}
         </span>
