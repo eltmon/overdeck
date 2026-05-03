@@ -231,6 +231,26 @@
   font-weight: 400;
 }
 
+.projectAddConvBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, opacity 0.1s;
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+.projectAddConvBtn:hover {
+  background: var(--accent);
+  color: var(--foreground);
+  opacity: 1;
+}
+
 /* Feature Item */
 .featureItem {
   display: flex;
