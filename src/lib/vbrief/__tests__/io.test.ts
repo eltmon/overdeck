@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { findPlan, readPlan, readWorkspacePlan, updateItemStatus, updateSubItemStatus } from '../io.js';
+import { findPlan, isPlanningComplete, isPlanningProposed, readPlan, readWorkspacePlan, updateItemStatus, updateSubItemStatus } from '../io.js';
 import type { VBriefDocument } from '../types.js';
 
 let TEST_DIR: string;
@@ -204,5 +204,118 @@ describe('updateSubItemStatus', () => {
     expect(() => updateSubItemStatus(TEST_DIR, 'item-1', 'nonexistent', 'completed')).not.toThrow();
     const updated = readWorkspacePlan(TEST_DIR)!;
     expect(updated.plan.items[0].subItems![0].status).toBe('pending');
+  });
+});
+
+function writeMarker(workspacePath: string): void {
+  const dir = join(workspacePath, '.planning');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, '.planning-complete'), '');
+}
+
+function writePlanWithStatus(workspacePath: string, status: string): void {
+  const doc = makePlanDoc();
+  doc.plan.status = status;
+  writePlanDoc(workspacePath, doc);
+}
+
+describe('isPlanningProposed', () => {
+  it('returns true when plan.status is "proposed"', () => {
+    writePlanWithStatus(TEST_DIR, 'proposed');
+    expect(isPlanningProposed(TEST_DIR)).toBe(true);
+  });
+
+  it('returns false when plan.status is "draft"', () => {
+    writePlanWithStatus(TEST_DIR, 'draft');
+    expect(isPlanningProposed(TEST_DIR)).toBe(false);
+  });
+
+  it('returns false when plan.status is "approved"', () => {
+    writePlanWithStatus(TEST_DIR, 'approved');
+    expect(isPlanningProposed(TEST_DIR)).toBe(false);
+  });
+
+  it('returns false when plan.status is "running"', () => {
+    writePlanWithStatus(TEST_DIR, 'running');
+    expect(isPlanningProposed(TEST_DIR)).toBe(false);
+  });
+
+  it('returns false when plan.status is explicit but not "proposed", even with marker present (status wins)', () => {
+    writePlanWithStatus(TEST_DIR, 'approved');
+    writeMarker(TEST_DIR);
+    expect(isPlanningProposed(TEST_DIR)).toBe(false);
+  });
+
+  it('returns true via legacy marker when plan has no status field', () => {
+    const doc = makePlanDoc();
+    delete (doc.plan as Partial<typeof doc.plan>).status;
+    writePlanDoc(TEST_DIR, doc);
+    writeMarker(TEST_DIR);
+    expect(isPlanningProposed(TEST_DIR)).toBe(true);
+  });
+
+  it('returns true via legacy marker when there is no plan at all', () => {
+    writeMarker(TEST_DIR);
+    expect(isPlanningProposed(TEST_DIR)).toBe(true);
+  });
+
+  it('returns false when no plan and no marker', () => {
+    expect(isPlanningProposed(TEST_DIR)).toBe(false);
+  });
+
+  it('returns true via legacy marker when plan is corrupt', () => {
+    const dir = join(TEST_DIR, '.planning');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'plan.vbrief.json'), 'not json');
+    writeMarker(TEST_DIR);
+    expect(isPlanningProposed(TEST_DIR)).toBe(true);
+  });
+});
+
+describe('isPlanningComplete', () => {
+  it.each(['proposed', 'approved', 'pending', 'running', 'completed', 'blocked'])(
+    'returns true when plan.status is "%s"',
+    (status) => {
+      writePlanWithStatus(TEST_DIR, status);
+      expect(isPlanningComplete(TEST_DIR)).toBe(true);
+    },
+  );
+
+  it('returns false when plan.status is "draft"', () => {
+    writePlanWithStatus(TEST_DIR, 'draft');
+    expect(isPlanningComplete(TEST_DIR)).toBe(false);
+  });
+
+  it('returns false when plan.status is "cancelled"', () => {
+    writePlanWithStatus(TEST_DIR, 'cancelled');
+    expect(isPlanningComplete(TEST_DIR)).toBe(false);
+  });
+
+  it('returns true via legacy marker when plan has no status field', () => {
+    const doc = makePlanDoc();
+    delete (doc.plan as Partial<typeof doc.plan>).status;
+    writePlanDoc(TEST_DIR, doc);
+    writeMarker(TEST_DIR);
+    expect(isPlanningComplete(TEST_DIR)).toBe(true);
+  });
+
+  it('returns false when no plan and no marker', () => {
+    expect(isPlanningComplete(TEST_DIR)).toBe(false);
+  });
+
+  it('explicit non-finished status wins over marker', () => {
+    writePlanWithStatus(TEST_DIR, 'draft');
+    writeMarker(TEST_DIR);
+    expect(isPlanningComplete(TEST_DIR)).toBe(false);
+  });
+
+  it('accepts a planningDir override pointing to a non-standard location', () => {
+    const customPlanningDir = join(TEST_DIR, '.planning', 'foo-1');
+    mkdirSync(customPlanningDir, { recursive: true });
+    const doc = makePlanDoc();
+    doc.plan.status = 'running';
+    writeFileSync(join(customPlanningDir, 'plan.vbrief.json'), JSON.stringify(doc));
+    expect(isPlanningComplete(TEST_DIR, customPlanningDir)).toBe(true);
+    expect(isPlanningProposed(TEST_DIR, customPlanningDir)).toBe(false);
   });
 });

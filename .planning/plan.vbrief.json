@@ -3,7 +3,8 @@
     "version": "0.5",
     "created": "2026-05-03T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-946: Adopt deft vBRIEF lifecycle model for scope vBRIEFs"
+    "description": "Plan for PAN-946: Adopt deft vBRIEF lifecycle model for scope vBRIEFs",
+    "updated": "2026-05-03T09:55:00Z"
   },
   "plan": {
     "id": "pan-946",
@@ -11,9 +12,9 @@
     "status": "approved",
     "uid": "bb9afa10-315b-409a-a625-02d14573e029",
     "author": "agent:claude-opus-4-6",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-05-03T12:00:00Z",
-    "updated": "2026-05-03T13:17:17.160Z",
+    "updated": "2026-05-03T09:55:00Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/946",
@@ -294,9 +295,10 @@
       {
         "id": "plan-status-gate",
         "title": "Replace .planning-complete marker with plan.status check",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T09:55:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -308,7 +310,8 @@
           {
             "id": "plan-status-gate.ac1",
             "title": "Dashboard Done button enabled when plan.status is 'proposed' instead of .planning-complete file existence",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T09:55:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -316,7 +319,8 @@
           {
             "id": "plan-status-gate.ac2",
             "title": "Backward compat: if .planning-complete exists but plan.status missing, treated as 'proposed'",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T09:55:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -324,7 +328,8 @@
           {
             "id": "plan-status-gate.ac3",
             "title": "All code paths that check for .planning-complete updated to use plan.status",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T09:55:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }

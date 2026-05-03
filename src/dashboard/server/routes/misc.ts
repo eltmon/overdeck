@@ -64,6 +64,7 @@ import { loadConfig as loadPanConfig } from '../../../lib/config.js';
 import { checkAgentHealthAsync, determineHealthStatusAsync } from '../../lib/health-filtering.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
+import { isPlanningComplete, isPlanningProposed } from '../../../lib/vbrief/io.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { ReadModelService } from '../read-model.js';
@@ -982,10 +983,18 @@ const getPlanningStatusRoute = HttpRouter.add(
         const hasPromptFile = planningDir
           ? existsSync(join(planningDir, 'PLANNING_PROMPT.md'))
           : false;
+        // hasCompletionMarker now means "plan.status === 'proposed'" (gates the
+        // dashboard Done button which should hide once the user has approved).
+        // planningCompleted means "plan.status indicates planning has finished"
+        // (any of proposed/approved/pending/running/completed/blocked) — the
+        // broader check used for dialog step routing. Both fall back to the
+        // legacy `.planning-complete` marker for vBRIEFs without status fields.
         const hasCompletionMarker = planningDir
-          ? existsSync(join(planningDir, '.planning-complete'))
+          ? isPlanningProposed(workspacePath, planningDir)
           : false;
-        const planningCompleted = hasCompletionMarker;
+        const planningCompleted = planningDir
+          ? isPlanningComplete(workspacePath, planningDir)
+          : false;
 
         return jsonResponse({
           active: sessionExists || agentStarting,

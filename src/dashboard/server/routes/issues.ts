@@ -37,6 +37,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
+import { isPlanningComplete } from '../../../lib/vbrief/io.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus } from '../review-status.js';
@@ -2458,11 +2459,12 @@ const getIssuePlanningStateRoute = HttpRouter.add(
       : '';
     const planPath = workspacePath ? join(workspacePath, '.planning', 'plan.vbrief.json') : '';
     const hasPlan = !!planPath && existsSync(planPath);
-    const planningComplete = workspacePath && existsSync(join(workspacePath, '.planning', '.planning-complete'));
+    // planningComplete now means "plan.status indicates planning has finished" —
+    // any of proposed/approved/pending/running/completed/blocked. Falls back to
+    // the legacy `.planning-complete` marker for vBRIEFs without status fields.
+    // It's the definitive signal for "tasks have been generated from this plan."
+    const planningComplete = workspacePath ? isPlanningComplete(workspacePath) : false;
 
-    // The .planning-complete marker is written ONLY after generate-tasks succeeds
-    // (see POST /api/issues/:id/generate-tasks). It's the definitive signal for
-    // "tasks have been generated from this plan." No bd query needed — pure stat.
     const hasBeads = !!planningComplete;
 
     return jsonResponse({

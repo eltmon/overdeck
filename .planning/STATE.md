@@ -3,17 +3,17 @@
 ## Status: In Progress
 
 ## Current Phase
-Foundation modules done. plan-finalize updated. Next: workspace-b2q (complete-planning copies vBRIEF to ./vbrief/proposed/ on main).
+plan-status read-side migration done. Next: workspace-b2q (complete-planning copies vBRIEF to ./vbrief/proposed/ on main).
 
 ## Completed Work
 - [x] workspace-0k8: vBRIEF lifecycle foundation — types, filename convention, directory helpers in `src/lib/vbrief/lifecycle.ts` with 14 unit tests (commit 7ae8315fa)
 - [x] workspace-8tz: Continue state module — `src/lib/vbrief/continue-state.ts` with ContinueState type, writeContinueState, readContinueState, appendSessionEntry. 13 unit tests passing (commit 214a0fbf0)
 - [x] workspace-2gb: vBRIEF lifecycle IO — `src/lib/vbrief/lifecycle-io.ts` with findVBriefByIssue, moveVBrief (async, git-staging), moveVBriefFilesOnly (sync), updatePlanStatus, deleteVBrief. 16 unit tests passing.
 - [x] workspace-9y5: plan-finalize stamps proposed status + canonical filename — added typed `metadata.canonicalFilename` to VBriefPlan; new `stampPlanForFinalization()` exports preserves existing canonical filename so date stays immutable across re-finalizations. 9 unit tests passing.
+- [x] workspace-q1e: Replaced `.planning-complete` marker reads with `plan.status` checks. Added `isPlanningProposed()` (strict, gates Done button) and `isPlanningComplete()` (broad, gates "tasks generated") helpers in `src/lib/vbrief/io.ts`, both with legacy marker fallback for vBRIEFs without status fields. Updated 4 read sites (misc.ts, agents.ts, issues.ts, issue-data-service.ts). 39 io.test.ts tests passing (13 new for the helpers).
 
 ## Remaining Work
 - [ ] workspace-b2q: Update complete-planning to copy vBRIEF to main's ./vbrief/proposed/
-- [ ] workspace-q1e: Replace .planning-complete marker with plan.status check
 - [ ] workspace-tq9: Approval transition — move vBRIEF from proposed/ to active/ on main
 - [ ] workspace-3pq: Set plan.status to running on pan start
 - [ ] workspace-44p: Write/update continue.vbrief.json during agent sessions

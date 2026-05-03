@@ -65,6 +65,68 @@ export function readWorkspacePlan(workspacePath: string): VBriefDocument | null 
 }
 
 /**
+ * vBRIEF lifecycle statuses that mean "planning has finished" — i.e., the
+ * agent can pick up work or the plan is done. Excludes 'draft' (still being
+ * written) and 'cancelled' (abandoned).
+ */
+const PLANNING_FINISHED_STATUSES = new Set(['proposed', 'approved', 'pending', 'running', 'completed', 'blocked']);
+
+/**
+ * Check whether planning has reached the "proposed" state for this workspace.
+ *
+ * Returns true ONLY when `plan.status === 'proposed'`. Used to gate the
+ * dashboard Done button which should hide once the user has approved the plan
+ * (status moves out of 'proposed'). Falls back to the legacy
+ * `.planning/.planning-complete` marker only when the plan is missing a
+ * status field, so legacy vBRIEFs still work during the transition.
+ *
+ * Pass either a workspace root (helper looks in `<root>/.planning/`) or a
+ * `.planning/` directory directly via `planningDir`.
+ */
+export function isPlanningProposed(workspacePath: string, planningDir?: string): boolean {
+  return checkPlanStatus(workspacePath, planningDir, status => status === 'proposed');
+}
+
+/**
+ * Check whether planning has finished for this workspace — i.e., beads have
+ * been generated and the agent can (or already did) start work.
+ *
+ * Returns true when `plan.status` is any of: 'proposed', 'approved', 'pending',
+ * 'running', 'completed', or 'blocked'. Falls back to the legacy
+ * `.planning/.planning-complete` marker so older vBRIEFs without the status
+ * field continue to gate "tasks generated" checks correctly.
+ *
+ * Pass either a workspace root (helper looks in `<root>/.planning/`) or a
+ * `.planning/` directory directly via `planningDir`.
+ */
+export function isPlanningComplete(workspacePath: string, planningDir?: string): boolean {
+  return checkPlanStatus(workspacePath, planningDir, status => PLANNING_FINISHED_STATUSES.has(status));
+}
+
+function checkPlanStatus(
+  workspacePath: string,
+  planningDir: string | undefined,
+  matchStatus: (status: string) => boolean,
+): boolean {
+  const dir = planningDir ?? join(workspacePath, '.planning');
+  const planPath = join(dir, 'plan.vbrief.json');
+  if (existsSync(planPath)) {
+    try {
+      const doc = readPlan(planPath);
+      const status = doc.plan?.status;
+      if (status && matchStatus(status)) return true;
+      // Plan exists with an explicit non-matching status — trust it. Don't
+      // fall through to the marker (which could be stale).
+      if (status) return false;
+    } catch {
+      // Corrupt / unreadable plan — fall through to the legacy marker.
+    }
+  }
+  return existsSync(join(dir, '.planning-complete'));
+}
+
+
+/**
  * Updates the status of a specific item in plan.vbrief.json.
  * Uses a write-to-temp-then-rename pattern to minimize race conditions.
  * No-ops gracefully if the file or item doesn't exist.

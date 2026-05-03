@@ -71,6 +71,7 @@ import { getProviderForModel } from '../../../lib/providers.js';
 import { hasPRDDraft } from '../../../lib/prd-draft.js';
 import { findPrdAnywhere } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
+import { isPlanningComplete } from '../../../lib/vbrief/io.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
@@ -1590,14 +1591,16 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
-    const planningComplete = join(workspacePath, '.planning', '.planning-complete');
     const hasPlan = existsSync(planPath);
-    const isComplete = existsSync(planningComplete);
+    // Planning has finished when plan.status is any of:
+    // proposed/approved/pending/running/completed/blocked. Falls back to the
+    // legacy `.planning-complete` marker for vBRIEFs without status fields.
+    const isComplete = isPlanningComplete(workspacePath);
 
     if (!hasPlan || !isComplete) {
       const reason = !hasPlan
         ? 'No plan.vbrief.json found — planning has not run for this issue.'
-        : 'Planning started but did not complete (.planning-complete marker missing).';
+        : 'Planning started but did not complete (plan.status indicates planning is still in progress).';
       return jsonResponse({
         error: reason,
         hint: 'Run planning first (click Plan button or use /plan skill). The planning agent produces a vBRIEF plan which is then converted to beads automatically.',
