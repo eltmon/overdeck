@@ -202,7 +202,7 @@ async function getCachedMessages(
   const fileStats = await stat(sessionFile);
   const cacheKey = `${sessionFile}:${isSpecialist}`;
   const cached = messagesCache.get(cacheKey);
-  if (cached && cached.mtimeMs === fileStats.mtimeMs && cached.size === fileStats.size) {
+  if (cached && cached.mtimeMs === fileStats.mtimeMs && cached.size === fileStats.size && cached.byteOffset >= fileStats.size) {
     return cached.result;
   }
 
