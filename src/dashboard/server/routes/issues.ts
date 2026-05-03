@@ -278,6 +278,24 @@ async function runDestructiveIssueLifecycle(
 
   cleanupLog.push(...result.steps.flatMap((step: any) => step.details || [step.error].filter(Boolean)));
 
+  // vBRIEF lifecycle transition for cancel (PAN-946): move to cancelled/ on main.
+  if (mode === 'cancel') {
+    try {
+      const { transitionVBriefOnMain } = await import('../../../lib/vbrief/lifecycle-io.js');
+      const tx = await transitionVBriefOnMain(
+        ctx.projectPath,
+        id,
+        'cancelled',
+        'cancelled',
+        `scope: cancel ${id.toUpperCase()} vBRIEF`,
+      );
+      if (tx.moved) cleanupLog.push(`vBRIEF moved ${tx.fromDir} → cancelled`);
+      if (tx.committed) cleanupLog.push(`Committed vBRIEF cancellation on main`);
+    } catch (err: any) {
+      cleanupLog.push(`vBRIEF cancel transition failed (non-fatal): ${err?.message ?? err}`);
+    }
+  }
+
   // Kill canonical reviewer/synthesis tmux sessions (PAN-915). They persist
   // across review rounds to preserve context, so reset/cancel/deep-wipe is the
   // right place to tear them down — the issue is going back to Todo or being

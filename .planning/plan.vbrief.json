@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "bb9afa10-315b-409a-a625-02d14573e029",
     "author": "agent:claude-opus-4-6",
-    "sequence": 8,
+    "sequence": 9,
     "created": "2026-05-03T12:00:00Z",
-    "updated": "2026-05-03T10:30:00Z",
+    "updated": "2026-05-03T10:35:00Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/946",
@@ -463,9 +463,10 @@
       {
         "id": "merge-complete-transition",
         "title": "Post-merge: move vBRIEF from active/ to completed/ on main",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T10:35:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -477,7 +478,8 @@
           {
             "id": "merge-complete-transition.ac1",
             "title": "postMergeLifecycle moves vBRIEF + continue file from active/ to completed/ on main",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:35:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -485,7 +487,8 @@
           {
             "id": "merge-complete-transition.ac2",
             "title": "plan.status set to 'completed' with timestamp",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:35:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -503,9 +506,10 @@
       {
         "id": "close-cancel-transition",
         "title": "Close/cancel: move vBRIEF to cancelled/ on main",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T10:35:00Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -517,7 +521,8 @@
           {
             "id": "close-cancel-transition.ac1",
             "title": "pan close moves vBRIEF from active/ or proposed/ to cancelled/ on main",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:35:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -525,7 +530,8 @@
           {
             "id": "close-cancel-transition.ac2",
             "title": "plan.status set to 'cancelled'",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:35:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -533,7 +539,8 @@
           {
             "id": "close-cancel-transition.ac3",
             "title": "continue file moved to cancelled/ alongside scope vBRIEF",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:35:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
