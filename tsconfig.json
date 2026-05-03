@@ -3,7 +3,7 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "ES2023.Array"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
