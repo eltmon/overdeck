@@ -140,6 +140,18 @@
   padding: 4px 0;
 }
 
+.sidebarSection {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebarSectionCollapsed {
+  flex: 0 0 auto;
+}
+
 .sectionHeader {
   display: flex;
   align-items: center;
@@ -153,7 +165,7 @@
   text-transform: uppercase;
   letter-spacing: 0.5px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 2px;
+  flex-shrink: 0;
   transition: color 0.15s;
 }
 
@@ -163,6 +175,12 @@
 
 .sectionTitle {
   flex: 1;
+}
+
+.sectionBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px 0;
 }
 
 /* Project Node */
