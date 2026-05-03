@@ -1,0 +1,23 @@
+#!/bin/bash
+# ~/.panopticon/bin/user-prompt-submit-hook
+#
+# Fires on Claude Code UserPromptSubmit. Emits three events:
+#   1. agent.waiting_cleared  — clears hasPendingQuestion / suspension
+#   2. agent.message_received — updates lastActivity + lastMessageAt
+#   3. agent.activity_changed — sets activity=idle so the dashboard spinner restarts
+
+set +e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=pan-hook-lib.sh
+. "$SCRIPT_DIR/pan-hook-lib.sh" 2>/dev/null || exit 0
+
+pan_resolve_agent_id || exit 0
+
+TS=$(date -Iseconds)
+
+pan_emit_event "$AGENT_ID" "{\"kind\":\"waiting_clear\",\"clearedBy\":\"user_response\",\"timestamp\":\"$TS\"}"
+pan_emit_event "$AGENT_ID" "{\"kind\":\"message_received\",\"direction\":\"to_agent\",\"source\":\"user\",\"timestamp\":\"$TS\"}"
+pan_emit_event "$AGENT_ID" "{\"kind\":\"activity\",\"activity\":\"idle\",\"timestamp\":\"$TS\"}"
+
+exit 0
