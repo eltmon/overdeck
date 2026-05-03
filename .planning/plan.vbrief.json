@@ -4,7 +4,7 @@
     "created": "2026-05-03T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-946: Adopt deft vBRIEF lifecycle model for scope vBRIEFs",
-    "updated": "2026-05-03T13:40:00Z"
+    "updated": "2026-05-03T14:00:00Z"
   },
   "plan": {
     "id": "pan-946",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "bb9afa10-315b-409a-a625-02d14573e029",
     "author": "agent:claude-opus-4-6",
-    "sequence": 15,
+    "sequence": 16,
     "created": "2026-05-03T12:00:00Z",
-    "updated": "2026-05-03T13:40:00Z",
+    "updated": "2026-05-03T14:00:00Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/946",
@@ -1073,9 +1073,10 @@
       {
         "id": "sync-vbrief-audit",
         "title": "Extend pan sync with vBRIEF state disagreement detection",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T14:00:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -1087,7 +1088,8 @@
           {
             "id": "sync-vbrief-audit.ac1",
             "title": "Flags vBRIEF in active/ but GitHub issue is closed",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T14:00:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1095,7 +1097,8 @@
           {
             "id": "sync-vbrief-audit.ac2",
             "title": "Flags vBRIEF in completed/ but workspace worktree still exists",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T14:00:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1103,7 +1106,8 @@
           {
             "id": "sync-vbrief-audit.ac3",
             "title": "Flags tracker shows in-progress but no vBRIEF found in active/ (main or worktrees)",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T14:00:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1111,7 +1115,8 @@
           {
             "id": "sync-vbrief-audit.ac4",
             "title": "Each disagreement prints suggested pan scope command to fix it",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T14:00:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }

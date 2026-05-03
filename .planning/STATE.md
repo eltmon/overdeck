@@ -1,9 +1,9 @@
 # PAN-946: Adopt deft vBRIEF Lifecycle Model for Scope vBRIEFs
 
-## Status: In Progress
+## Status: Complete
 
 ## Current Phase
-Agent session continue state integration complete. Next: workspace-9ny (sync audit with vBRIEF state disagreement detection).
+All beads complete. Ready for verification and merge.
 
 ## Completed Work
 - [x] workspace-0k8: vBRIEF lifecycle foundation — types, filename convention, directory helpers in `src/lib/vbrief/lifecycle.ts` with 14 unit tests (commit 7ae8315fa)
@@ -31,9 +31,7 @@ Agent session continue state integration complete. Next: workspace-9ny (sync aud
 
 - [x] workspace-475: Removed primary STATE.md dependencies across the codebase. Dashboard routes (workspaces, issues, agents, misc, command-deck, projects, resource-discovery) now read continue files first with legacy STATE.md fallback during transition. Lifecycle code (clean-planning, archive-planning) updated to handle continue files. docs/VBRIEF.md documents continue.vbrief.json as the replacement for STATE.md.
 - [x] workspace-44p: Agent session continue state integration — start-agent route writes initial continue state (git branch, sha, agent model) to `./vbrief/active/continue-{issue}.vbrief.json`. `pan work done` appends 'end' session entry. `resumeAgent` appends 'resume' session entry with agent model.
-
-## Remaining Work
-- [ ] workspace-9ny: Extend pan sync with vBRIEF state disagreement detection
+- [x] workspace-9ny: `pan sync` vBRIEF state disagreement detection — three checks: active vBRIEF but GitHub closed, completed vBRIEF but workspace exists, workspace exists but no active vBRIEF. Prints suggested `pan scope` fix commands.
 
 ## Key Decisions
 - **D1**: Filename regex requires `[A-Za-z][A-Za-z0-9]*-\d+` for issue IDs so prefixes like `PAN`, `MIN`, `KRUX` all match. Slug uses `[a-z0-9-]+`. Dates always interpreted as UTC so filenames are stable across timezones.
