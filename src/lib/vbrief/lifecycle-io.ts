@@ -9,7 +9,7 @@
  */
 
 import { exec } from 'child_process';
-import { existsSync, readFileSync, readdirSync, renameSync, writeFileSync, unlinkSync } from 'fs';
+import { copyFileSync, existsSync, readFileSync, readdirSync, renameSync, writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { promisify } from 'util';
 
@@ -17,8 +17,10 @@ import { continueFilename, continueFilePath } from './continue-state.js';
 import {
   VBRIEF_LIFECYCLE_DIRS,
   ensureVBriefDirs,
+  generateVBriefFilename,
   parseVBriefFilename,
   resolveVBriefDir,
+  slugify,
   type VBriefLifecycleDir,
 } from './lifecycle.js';
 import { readPlan } from './io.js';
@@ -208,4 +210,57 @@ export function deleteVBrief(projectRoot: string, issueId: string): boolean {
 /** Internal helper exported for tests — verify a file exists and is JSON. */
 export function readJsonFile(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf-8'));
+}
+
+/**
+ * Copy a workspace's scope vBRIEF (and its continue file, if present) from
+ * `<workspacePath>/.planning/` to `<projectRoot>/vbrief/proposed/<canonical>`.
+ *
+ * Reads `plan.metadata.canonicalFilename` if present (set by `pan plan-finalize`),
+ * otherwise generates one from the plan's title (or id, or issue ID) using the
+ * same algorithm as `stampPlanForFinalization`.
+ *
+ * Sync — caller is responsible for git staging/commit. Returns the absolute
+ * destination paths so the caller can stage them.
+ *
+ * Throws if the workspace plan doesn't exist.
+ */
+export interface PromotedVBrief {
+  destVBrief: string;
+  destContinue: string | null;
+  canonicalFilename: string;
+}
+
+export function promoteVBriefToProposed(
+  workspacePath: string,
+  projectRoot: string,
+  issueId: string,
+): PromotedVBrief {
+  const planningDir = join(workspacePath, '.planning');
+  const sourceVBrief = join(planningDir, 'plan.vbrief.json');
+  if (!existsSync(sourceVBrief)) {
+    throw new Error(`No plan.vbrief.json found at ${sourceVBrief}`);
+  }
+
+  const planDoc = readPlan(sourceVBrief);
+  const upperIssueId = issueId.toUpperCase();
+  const existingFilename = planDoc.plan.metadata?.canonicalFilename;
+  const canonicalFilename = (existingFilename && typeof existingFilename === 'string')
+    ? existingFilename
+    : generateVBriefFilename(upperIssueId, slugify(planDoc.plan.title || planDoc.plan.id || upperIssueId));
+
+  ensureVBriefDirs(projectRoot);
+  const proposedDir = resolveVBriefDir(projectRoot, 'proposed');
+  const destVBrief = join(proposedDir, canonicalFilename);
+  copyFileSync(sourceVBrief, destVBrief);
+
+  const continueName = continueFilename(upperIssueId);
+  const sourceContinue = join(planningDir, continueName);
+  let destContinue: string | null = null;
+  if (existsSync(sourceContinue)) {
+    destContinue = join(proposedDir, continueName);
+    copyFileSync(sourceContinue, destContinue);
+  }
+
+  return { destVBrief, destContinue, canonicalFilename };
 }

@@ -3,7 +3,7 @@
 ## Status: In Progress
 
 ## Current Phase
-plan-status read-side migration done. Next: workspace-b2q (complete-planning copies vBRIEF to ./vbrief/proposed/ on main).
+complete-planning now copies workspace vBRIEF to ./vbrief/proposed/ on main with `scope: propose <ID> vBRIEF` commit. Next: workspace-tq9 (approval transition moves vBRIEF from proposed/ to active/ on main).
 
 ## Completed Work
 - [x] workspace-0k8: vBRIEF lifecycle foundation — types, filename convention, directory helpers in `src/lib/vbrief/lifecycle.ts` with 14 unit tests (commit 7ae8315fa)
@@ -11,9 +11,9 @@ plan-status read-side migration done. Next: workspace-b2q (complete-planning cop
 - [x] workspace-2gb: vBRIEF lifecycle IO — `src/lib/vbrief/lifecycle-io.ts` with findVBriefByIssue, moveVBrief (async, git-staging), moveVBriefFilesOnly (sync), updatePlanStatus, deleteVBrief. 16 unit tests passing.
 - [x] workspace-9y5: plan-finalize stamps proposed status + canonical filename — added typed `metadata.canonicalFilename` to VBriefPlan; new `stampPlanForFinalization()` exports preserves existing canonical filename so date stays immutable across re-finalizations. 9 unit tests passing.
 - [x] workspace-q1e: Replaced `.planning-complete` marker reads with `plan.status` checks. Added `isPlanningProposed()` (strict, gates Done button) and `isPlanningComplete()` (broad, gates "tasks generated") helpers in `src/lib/vbrief/io.ts`, both with legacy marker fallback for vBRIEFs without status fields. Updated 4 read sites (misc.ts, agents.ts, issues.ts, issue-data-service.ts). 39 io.test.ts tests passing (13 new for the helpers).
+- [x] workspace-b2q: complete-planning endpoint promotes vBRIEF to ./vbrief/proposed/ on main. Extracted `promoteVBriefToProposed()` to `src/lib/vbrief/lifecycle-io.ts`. Removed old `docs/prds/active/` copy step for plan artifacts (PRD discovery from `docs/prds/planned/` retained). Path-scoped commit `scope: propose <ID> vBRIEF` only when project root is on main. 24 lifecycle-io tests passing (8 new for promote).
 
 ## Remaining Work
-- [ ] workspace-b2q: Update complete-planning to copy vBRIEF to main's ./vbrief/proposed/
 - [ ] workspace-tq9: Approval transition — move vBRIEF from proposed/ to active/ on main
 - [ ] workspace-3pq: Set plan.status to running on pan start
 - [ ] workspace-44p: Write/update continue.vbrief.json during agent sessions

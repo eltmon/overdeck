@@ -4,7 +4,7 @@
     "created": "2026-05-03T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-946: Adopt deft vBRIEF lifecycle model for scope vBRIEFs",
-    "updated": "2026-05-03T09:55:00Z"
+    "updated": "2026-05-03T10:10:00Z"
   },
   "plan": {
     "id": "pan-946",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "bb9afa10-315b-409a-a625-02d14573e029",
     "author": "agent:claude-opus-4-6",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-05-03T12:00:00Z",
-    "updated": "2026-05-03T09:55:00Z",
+    "updated": "2026-05-03T10:10:00Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/946",
@@ -247,9 +247,10 @@
       {
         "id": "complete-planning-to-proposed",
         "title": "Update complete-planning to copy vBRIEF to main's ./vbrief/proposed/",
-        "status": "pending",
+        "status": "completed",
         "priority": "critical",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T10:10:00Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-946"
@@ -261,7 +262,8 @@
           {
             "id": "complete-planning-to-proposed.ac1",
             "title": "vBRIEF copied from workspace .planning/plan.vbrief.json to project root's ./vbrief/proposed/<canonical-filename>",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:10:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -269,7 +271,8 @@
           {
             "id": "complete-planning-to-proposed.ac2",
             "title": "continue file copied from workspace .planning/ to ./vbrief/proposed/ if it exists",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:10:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -277,7 +280,8 @@
           {
             "id": "complete-planning-to-proposed.ac3",
             "title": "Changes committed to main branch with message 'scope: propose PAN-XXX vBRIEF'",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:10:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -285,7 +289,8 @@
           {
             "id": "complete-planning-to-proposed.ac4",
             "title": "Old docs/prds/active/ copy step removed for vBRIEF/STATE.md artifacts",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:10:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }

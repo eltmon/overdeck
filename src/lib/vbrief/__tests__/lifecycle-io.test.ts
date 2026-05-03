@@ -9,6 +9,7 @@ import {
   findVBriefByIssue,
   moveVBrief,
   moveVBriefFilesOnly,
+  promoteVBriefToProposed,
   updatePlanStatus,
 } from '../lifecycle-io.js';
 import {
@@ -292,5 +293,157 @@ describe('deleteVBrief', () => {
   it('returns false when issue has no vBRIEF', () => {
     ensureVBriefDirs(TEST_DIR);
     expect(deleteVBrief(TEST_DIR, 'PAN-999')).toBe(false);
+  });
+});
+
+describe('promoteVBriefToProposed', () => {
+  function createWorkspace(workspacePath: string, plan: VBriefDocument): void {
+    const planningDir = join(workspacePath, '.planning');
+    mkdirSync(planningDir, { recursive: true });
+    writeFileSync(
+      join(planningDir, 'plan.vbrief.json'),
+      JSON.stringify(plan, null, 2),
+      'utf-8',
+    );
+  }
+
+  it('throws when workspace plan is missing', () => {
+    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-1');
+    mkdirSync(workspacePath, { recursive: true });
+    expect(() => promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-1')).toThrow(
+      /No plan\.vbrief\.json/,
+    );
+  });
+
+  it('copies vBRIEF using stamped canonicalFilename when present', () => {
+    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-1');
+    const plan = makePlan('PAN-1', 'foo');
+    plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-1-foo.vbrief.json' };
+    createWorkspace(workspacePath, plan);
+
+    const result = promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-1');
+
+    expect(result.canonicalFilename).toBe('2026-05-03-PAN-1-foo.vbrief.json');
+    expect(result.destVBrief).toBe(
+      join(TEST_DIR, 'vbrief', 'proposed', '2026-05-03-PAN-1-foo.vbrief.json'),
+    );
+    expect(result.destContinue).toBeNull();
+    expect(existsSync(result.destVBrief)).toBe(true);
+    const copied = JSON.parse(readFileSync(result.destVBrief, 'utf-8'));
+    expect(copied.plan.id).toBe('pan-1');
+  });
+
+  it('generates canonical filename from plan title when metadata is absent', () => {
+    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-2');
+    const plan = makePlan('PAN-2', 'fallback');
+    plan.plan.title = 'Adopt deft vBRIEF Lifecycle Model';
+    // No metadata.canonicalFilename
+    createWorkspace(workspacePath, plan);
+
+    const result = promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-2');
+
+    expect(result.canonicalFilename).toMatch(
+      /^\d{4}-\d{2}-\d{2}-PAN-2-adopt-deft-vbrief-lifecycle-model\.vbrief\.json$/,
+    );
+    expect(existsSync(result.destVBrief)).toBe(true);
+  });
+
+  it('uppercases issue ID for filename even when caller passes lowercase', () => {
+    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-3');
+    const plan = makePlan('PAN-3', 'lowercase-test');
+    createWorkspace(workspacePath, plan);
+
+    const result = promoteVBriefToProposed(workspacePath, TEST_DIR, 'pan-3');
+
+    // generateVBriefFilename rejects lowercase issueId in its regex, so we verify
+    // the filename has uppercase PAN-3.
+    expect(result.canonicalFilename).toMatch(/PAN-3/);
+  });
+
+  it('copies continue file when present', () => {
+    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-4');
+    const plan = makePlan('PAN-4', 'with-continue');
+    plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-4-with-continue.vbrief.json' };
+    createWorkspace(workspacePath, plan);
+
+    // Write a continue file in the workspace .planning/
+    const continueFileName = 'continue-PAN-4.vbrief.json';
+    const continueContent: ContinueState = {
+      issueId: 'PAN-4',
+      created: '2026-05-03T00:00:00Z',
+      updated: '2026-05-03T00:00:00Z',
+      gitState: { branch: 'feature/pan-4', sha: 'abc123', dirty: false },
+      decisions: [],
+      hazards: [],
+      resumePoint: null,
+      beadsMapping: {},
+      sessionHistory: [],
+    };
+    writeFileSync(
+      join(workspacePath, '.planning', continueFileName),
+      JSON.stringify(continueContent, null, 2),
+      'utf-8',
+    );
+
+    const result = promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-4');
+
+    expect(result.destContinue).toBe(
+      join(TEST_DIR, 'vbrief', 'proposed', continueFileName),
+    );
+    expect(existsSync(result.destContinue!)).toBe(true);
+    const copied = JSON.parse(readFileSync(result.destContinue!, 'utf-8'));
+    expect(copied.issueId).toBe('PAN-4');
+  });
+
+  it('returns destContinue null when continue file is absent', () => {
+    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-5');
+    const plan = makePlan('PAN-5', 'no-continue');
+    plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-5-no-continue.vbrief.json' };
+    createWorkspace(workspacePath, plan);
+
+    const result = promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-5');
+
+    expect(result.destContinue).toBeNull();
+    expect(existsSync(join(TEST_DIR, 'vbrief', 'proposed', 'continue-PAN-5.vbrief.json'))).toBe(false);
+  });
+
+  it('creates lifecycle dirs if they do not exist yet', () => {
+    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-6');
+    const plan = makePlan('PAN-6', 'first-promotion');
+    plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-6-first-promotion.vbrief.json' };
+    createWorkspace(workspacePath, plan);
+
+    // Confirm vbrief dirs do NOT exist before
+    expect(existsSync(join(TEST_DIR, 'vbrief', 'proposed'))).toBe(false);
+
+    promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-6');
+
+    // All four lifecycle dirs created
+    expect(existsSync(join(TEST_DIR, 'vbrief', 'proposed'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, 'vbrief', 'active'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, 'vbrief', 'completed'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, 'vbrief', 'cancelled'))).toBe(true);
+  });
+
+  it('overwrites existing destination file (idempotent re-runs)', () => {
+    const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-7');
+    const plan = makePlan('PAN-7', 'overwrite-test');
+    plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-7-overwrite-test.vbrief.json' };
+    createWorkspace(workspacePath, plan);
+
+    promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-7');
+
+    // Modify the workspace plan and re-run promotion
+    plan.plan.title = 'Updated title';
+    writeFileSync(
+      join(workspacePath, '.planning', 'plan.vbrief.json'),
+      JSON.stringify(plan, null, 2),
+      'utf-8',
+    );
+
+    const result = promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-7');
+
+    const copied = JSON.parse(readFileSync(result.destVBrief, 'utf-8'));
+    expect(copied.plan.title).toBe('Updated title');
   });
 });
