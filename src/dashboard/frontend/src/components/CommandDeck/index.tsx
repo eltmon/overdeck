@@ -560,7 +560,27 @@ export function CommandDeck({
         return;
       }
 
-      // Default: work agent restart (existing flow)
+      // Default: work agent restart. Try resume first — Claude sessions are never
+      // discarded. Only start fresh if the agent has no saved session to resume.
+      const resumeRes = await fetch(`/api/agents/${sessionId}/resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const resumeData = await resumeRes.json().catch(() => ({})) as { success?: boolean; error?: string; lifecycle?: { canResumeSession?: boolean; hasLiveTmuxSession?: boolean } };
+      if (resumeRes.ok) {
+        toast.success('Agent resumed');
+        await refreshDashboardState(queryClient);
+        return;
+      }
+      // Only fall through to start-fresh when there is genuinely no session to resume
+      // and the agent is not already running.
+      const noSession = resumeData.lifecycle?.canResumeSession === false && !resumeData.lifecycle?.hasLiveTmuxSession;
+      if (!noSession) {
+        throw new Error(resumeData.error || 'Failed to resume agent');
+      }
+
+      // No saved session — start fresh.
       await fetch(`/api/agents/${sessionId}`, { method: 'DELETE' });
       const requestBody: Record<string, unknown> = { issueId };
       if (model) requestBody.model = model;
@@ -587,7 +607,7 @@ export function CommandDeck({
           setPendingCodexSpawn(lastRequestBody);
           throw new Error(data.hint || data.error || 'Codex authentication expired — re-authenticate to continue');
         }
-        throw new Error(data.error || data.hint || 'Failed to restart agent');
+        throw new Error(data.error || data.hint || 'Failed to start agent');
       }
       if (data.guardrails?.warnings?.length) {
         toast.success('Agent started after acknowledging system health warnings.', { duration: 6000 });
