@@ -274,26 +274,31 @@ export function DiffPanel({
     [turnDiffSummaries],
   )
 
+  const isVsMain = selectedTurnId === 'vs-main'
   const selectedTurn =
-    selectedTurnId === null
+    selectedTurnId === null || isVsMain
       ? undefined
       : (orderedTurnDiffSummaries.find((s) => s.turnId === selectedTurnId) ??
         orderedTurnDiffSummaries[0])
 
-  // Fetch the diff for the selected turn (or full conversation)
+  // Fetch the diff for the selected turn, vs-main, or full conversation
   const { data: diffResponse, isLoading: isLoadingDiff } = useQuery({
-    queryKey: selectedTurn
-      ? ['agent-turn-diff', agentId, selectedTurn.turnId]
-      : ['agent-full-diff', agentId],
+    queryKey: isVsMain
+      ? ['agent-vs-main-diff', agentId]
+      : selectedTurn
+        ? ['agent-turn-diff', agentId, selectedTurn.turnId]
+        : ['agent-full-diff', agentId],
     queryFn: async () => {
-      const url = selectedTurn
-        ? `/api/agents/${encodeURIComponent(agentId)}/diffs/${encodeURIComponent(selectedTurn.turnId)}`
-        : `/api/agents/${encodeURIComponent(agentId)}/diffs/full`
+      const url = isVsMain
+        ? `/api/agents/${encodeURIComponent(agentId)}/diffs/vs-main`
+        : selectedTurn
+          ? `/api/agents/${encodeURIComponent(agentId)}/diffs/${encodeURIComponent(selectedTurn.turnId)}`
+          : `/api/agents/${encodeURIComponent(agentId)}/diffs/full`
       const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to fetch diff')
       return res.json() as Promise<{ diff?: string }>
     },
-    enabled: diffOpen && orderedTurnDiffSummaries.length > 0,
+    enabled: diffOpen,
   })
 
   const selectedPatch = diffResponse?.diff
@@ -392,6 +397,11 @@ export function DiffPanel({
     setUrlParams(readDiffParamsFromUrl())
   }
 
+  const selectVsMain = () => {
+    writeDiffParamsToUrl({ diff: '1', diffTurnId: 'vs-main' })
+    setUrlParams(readDiffParamsFromUrl())
+  }
+
   const handleClose = () => {
     clearDiffParamsFromUrl()
     setUrlParams(readDiffParamsFromUrl())
@@ -457,6 +467,23 @@ export function DiffPanel({
               )}
             >
               <div className="text-[10px] leading-tight font-medium">All turns</div>
+            </div>
+          </button>
+          <button
+            type="button"
+            className="shrink-0 rounded-md"
+            onClick={selectVsMain}
+            data-turn-chip-selected={isVsMain}
+          >
+            <div
+              className={cn(
+                'rounded-md border px-2 py-1 text-left transition-colors',
+                isVsMain
+                  ? 'border-border bg-accent text-accent-foreground'
+                  : 'border-border/70 bg-background/70 text-muted-foreground/80 hover:border-border hover:text-foreground/80',
+              )}
+            >
+              <div className="text-[10px] leading-tight font-medium">vs main</div>
             </div>
           </button>
           {orderedTurnDiffSummaries.map((summary, index) => (
