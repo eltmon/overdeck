@@ -1742,7 +1742,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
     if (!projectConfig) {
       return jsonResponse({ error: `Cannot resolve project for ${issueId}` }, { status: 404 });
     }
-    const workspacePath = join(projectConfig.path, 'workspaces', `feature-${issueId.toLowerCase()}`);
+    const workspacePath = join(projectConfig.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
     if (!existsSync(workspacePath)) {
       return jsonResponse({ error: `Workspace not found: ${workspacePath}` }, { status: 404 });
     }
@@ -1820,7 +1820,7 @@ const postProjectReviewerRoleRestartRoute = HttpRouter.add(
     if (!projectConfig) {
       return jsonResponse({ error: `Cannot resolve project for ${issueId}` }, { status: 404 });
     }
-    const workspacePath = join(projectConfig.path, 'workspaces', `feature-${issueId.toLowerCase()}`);
+    const workspacePath = join(projectConfig.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
     if (!existsSync(workspacePath)) {
       return jsonResponse({ error: `Workspace not found` }, { status: 404 });
     }
