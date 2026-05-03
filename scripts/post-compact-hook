@@ -1,0 +1,25 @@
+#!/bin/bash
+# ~/.panopticon/bin/post-compact-hook
+#
+# Fires on Claude Code PostCompact. Emits agent.activity_changed(idle) to clear
+# the compacting indicator and return the agent to normal idle state.
+
+set +e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=pan-hook-lib.sh
+. "$SCRIPT_DIR/pan-hook-lib.sh" 2>/dev/null || exit 0
+
+pan_resolve_agent_id || exit 0
+
+TS=$(date -Iseconds)
+
+if command -v jq >/dev/null 2>&1; then
+  BODY=$(jq -n --arg ts "$TS" \
+    '{kind: "activity", activity: "idle", timestamp: $ts}')
+else
+  BODY="{\"kind\":\"activity\",\"activity\":\"idle\",\"timestamp\":\"$TS\"}"
+fi
+
+pan_emit_event "$AGENT_ID" "$BODY"
+exit 0

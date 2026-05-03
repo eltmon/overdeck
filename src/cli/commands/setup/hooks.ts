@@ -161,6 +161,8 @@ export async function setupHooksCommand(): Promise<void> {
     'work-agent-stop-hook',   // PAN-800: chained from stop-hook; emits agent.resolution_changed
     'session-start-hook',          // PAN-800: SessionStart — emits agent.activity_changed(idle) + agent.model_set
     'user-prompt-submit-hook',     // UserPromptSubmit — clears waiting state, records message_received, restarts spinner
+    'pre-compact-hook',            // PreCompact — emits activity=working/compact so dashboard shows compacting indicator
+    'post-compact-hook',           // PostCompact — emits activity=idle to clear compacting state
     'record-cost-event.js',
     'tldr-read-enforcer',
     'tldr-post-edit',
@@ -286,6 +288,8 @@ export async function setupHooksCommand(): Promise<void> {
   addHookIfMissing('SessionStart', 'session-start-hook');
   addHookIfMissing('Notification', 'notification-hook');
   addHookIfMissing('UserPromptSubmit', 'user-prompt-submit-hook');
+  addHookIfMissing('PreCompact', 'pre-compact-hook');
+  addHookIfMissing('PostCompact', 'post-compact-hook');
 
   // TLDR helpers (optional — only when python3 is available).
   if (python3Available) {
