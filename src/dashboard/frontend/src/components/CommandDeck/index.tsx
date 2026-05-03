@@ -376,9 +376,18 @@ export function CommandDeck({
 
   const handleSelectFeature = useCallback((issueId: string) => {
     setSelectedFeature(issueId);
-    selectSession(issueId, null);
     setSelectedConversation(null);
-  }, [selectSession]);
+
+    // Auto-select the active work agent session so the user lands in
+    // conversation view instead of the overview with a disabled composer.
+    const feature = projectsWithSessions
+      .flatMap(p => p.features)
+      .find(f => f.issueId === issueId);
+    const activeWorkSession = feature?.sessions?.find(
+      (s) => s.presence === 'active' && s.type === 'work',
+    );
+    selectSession(issueId, activeWorkSession?.sessionId ?? null);
+  }, [selectSession, projectsWithSessions]);
 
   const handleSelectSession = useCallback((issueId: string, sessionId: string) => {
     setSelectedFeature(issueId);
