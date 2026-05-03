@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { ChevronRight, Plus } from 'lucide-react';
+import { ChevronRight, MessageSquarePlus } from 'lucide-react';
 import type { SessionNode } from '@panctl/contracts';
 import { FeatureItem, sessionMatchesFilter, type TreeSessionFilter } from './FeatureItem';
 import styles from '../styles/command-deck.module.css';
@@ -205,7 +205,7 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
             title="New conversation in this project"
             aria-label={`New conversation in ${name}`}
           >
-            <Plus size={12} />
+            <MessageSquarePlus size={12} />
           </span>
         )}
       </button>
