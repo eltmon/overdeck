@@ -4,7 +4,7 @@
     "created": "2026-05-03T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-946: Adopt deft vBRIEF lifecycle model for scope vBRIEFs",
-    "updated": "2026-05-03T16:35:24.559Z"
+    "updated": "2026-05-03T16:35:34.906Z"
   },
   "plan": {
     "id": "pan-946",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "bb9afa10-315b-409a-a625-02d14573e029",
     "author": "agent:claude-opus-4-6",
-    "sequence": 91,
+    "sequence": 116,
     "created": "2026-05-03T12:00:00Z",
-    "updated": "2026-05-03T16:35:24.559Z",
+    "updated": "2026-05-03T16:35:34.906Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/946",
@@ -103,7 +103,7 @@
             }
           }
         ],
-        "completed": "2026-05-03T16:35:24.559Z"
+        "completed": "2026-05-03T16:35:34.906Z"
       },
       {
         "id": "continue-state-module",
@@ -152,7 +152,7 @@
             }
           }
         ],
-        "completed": "2026-05-03T16:35:24.559Z"
+        "completed": "2026-05-03T16:35:34.906Z"
       },
       {
         "id": "vbrief-lifecycle-io",
@@ -201,7 +201,7 @@
             }
           }
         ],
-        "completed": "2026-05-03T16:35:24.558Z"
+        "completed": "2026-05-03T16:35:34.906Z"
       },
       {
         "id": "plan-finalize-lifecycle",
@@ -209,7 +209,7 @@
         "status": "completed",
         "priority": "high",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.558Z",
+        "completed": "2026-05-03T16:35:34.905Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -253,7 +253,7 @@
         "status": "completed",
         "priority": "critical",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.555Z",
+        "completed": "2026-05-03T16:35:34.902Z",
         "metadata": {
           "difficulty": "complex",
           "issueLabel": "pan-946"
@@ -306,7 +306,7 @@
         "status": "completed",
         "priority": "high",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.550Z",
+        "completed": "2026-05-03T16:35:34.897Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -350,7 +350,7 @@
         "status": "completed",
         "priority": "high",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.557Z",
+        "completed": "2026-05-03T16:35:34.904Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -394,7 +394,7 @@
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.554Z",
+        "completed": "2026-05-03T16:35:34.901Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -429,7 +429,7 @@
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.549Z",
+        "completed": "2026-05-03T16:35:34.896Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -473,7 +473,7 @@
         "status": "completed",
         "priority": "high",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.557Z",
+        "completed": "2026-05-03T16:35:34.904Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -517,7 +517,7 @@
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.556Z",
+        "completed": "2026-05-03T16:35:34.903Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -561,7 +561,7 @@
         "status": "completed",
         "priority": "high",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.556Z",
+        "completed": "2026-05-03T16:35:34.903Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -605,7 +605,7 @@
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.553Z",
+        "completed": "2026-05-03T16:35:34.901Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -649,7 +649,7 @@
         "status": "completed",
         "priority": "high",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.558Z",
+        "completed": "2026-05-03T16:35:34.905Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -693,7 +693,7 @@
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.557Z",
+        "completed": "2026-05-03T16:35:34.905Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -728,7 +728,7 @@
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.554Z",
+        "completed": "2026-05-03T16:35:34.902Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -781,7 +781,7 @@
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.555Z",
+        "completed": "2026-05-03T16:35:34.903Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -816,7 +816,7 @@
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.553Z",
+        "completed": "2026-05-03T16:35:34.901Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -860,7 +860,7 @@
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.552Z",
+        "completed": "2026-05-03T16:35:34.900Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -904,7 +904,7 @@
         "status": "completed",
         "priority": "low",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.552Z",
+        "completed": "2026-05-03T16:35:34.899Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -939,7 +939,7 @@
         "status": "completed",
         "priority": "low",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.552Z",
+        "completed": "2026-05-03T16:35:34.899Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -974,7 +974,7 @@
         "status": "completed",
         "priority": "low",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.551Z",
+        "completed": "2026-05-03T16:35:34.898Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -1009,7 +1009,7 @@
         "status": "completed",
         "priority": "low",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.551Z",
+        "completed": "2026-05-03T16:35:34.898Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -1044,7 +1044,7 @@
         "status": "completed",
         "priority": "low",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.551Z",
+        "completed": "2026-05-03T16:35:34.897Z",
         "metadata": {
           "difficulty": "simple",
           "issueLabel": "pan-946"
@@ -1079,7 +1079,7 @@
         "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
-        "completed": "2026-05-03T16:35:24.555Z",
+        "completed": "2026-05-03T16:35:34.902Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
