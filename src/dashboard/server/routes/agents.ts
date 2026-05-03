@@ -73,6 +73,8 @@ import { findPrdAnywhere } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { isPlanningComplete } from '../../../lib/vbrief/io.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../../lib/vbrief/lifecycle-io.js';
+import { resolveVBriefDir } from '../../../lib/vbrief/lifecycle.js';
+import { readContinueState, writeContinueState } from '../../../lib/vbrief/continue-state.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
@@ -1796,6 +1798,44 @@ const postAgentsRoute = HttpRouter.add(
       } catch (planStatusErr: any) {
         console.warn(`[start-agent] Failed to set plan.status=running (non-fatal): ${planStatusErr?.message ?? planStatusErr}`);
       }
+    }
+
+    // Write initial continue state (PAN-946: workspace-44p)
+    try {
+      const { stdout: branchOut } = await execAsync('git branch --show-current', { cwd: workspacePath, encoding: 'utf-8' });
+      const { stdout: shaOut } = await execAsync('git rev-parse --short HEAD', { cwd: workspacePath, encoding: 'utf-8' });
+      const { stdout: dirtyOut } = await execAsync('git status --porcelain', { cwd: workspacePath, encoding: 'utf-8' });
+      const branch = branchOut.trim();
+      const sha = shaOut.trim();
+      const dirty = dirtyOut.trim().length > 0;
+
+      const activeDir = resolveVBriefDir(projectPath, 'active');
+      const existing = readContinueState(activeDir, issueId);
+      const now = new Date().toISOString();
+      const next = existing
+        ? {
+            ...existing,
+            gitState: { branch, sha, dirty },
+            agentModel: spawnModel,
+            sessionHistory: [...existing.sessionHistory, { timestamp: now, reason: 'start' as const, agentModel: spawnModel }],
+          }
+        : {
+            version: '1' as const,
+            issueId,
+            created: now,
+            updated: now,
+            gitState: { branch, sha, dirty },
+            decisions: [],
+            hazards: [],
+            resumePoint: null,
+            beadsMapping: {},
+            agentModel: spawnModel,
+            sessionHistory: [{ timestamp: now, reason: 'start' as const, agentModel: spawnModel }],
+          };
+      writeContinueState(activeDir, issueId, next);
+      console.log(`[start-agent] Wrote initial continue state for ${issueId}`);
+    } catch (continueErr: any) {
+      console.warn(`[start-agent] Failed to write continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
     }
 
     const planningPromptPath = join(workspacePlanningDir, 'PLANNING_PROMPT.md');

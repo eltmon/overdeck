@@ -14,6 +14,9 @@ import { updateShadowState } from '../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../core/state-mapping.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumber, resolveIssueId } from '../../lib/issue-id.js';
+import { appendSessionEntry } from '../../lib/vbrief/continue-state.js';
+import { resolveProjectFromIssue } from '../../lib/projects.js';
+import { resolveVBriefDir } from '../../lib/vbrief/lifecycle.js';
 
 interface DoneOptions {
   comment?: string;
@@ -393,6 +396,20 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       trackerUpdated,
       comment: options.comment,
     }));
+
+    // Append 'end' session entry to continue state (PAN-946: workspace-44p)
+    try {
+      const resolved = resolveProjectFromIssue(issueId);
+      if (resolved) {
+        const activeDir = resolveVBriefDir(resolved.projectPath, 'active');
+        appendSessionEntry(activeDir, issueId, {
+          reason: 'end',
+          note: options.comment || 'Agent signaled work complete',
+        });
+      }
+    } catch (continueErr: any) {
+      console.warn(`[pan done] Failed to append end entry to continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
+    }
 
     // Step 4b: Guard against already-merged issues (e.g. merge completed in
     // background while agent was finishing up). If already merged, skip the
