@@ -127,16 +127,23 @@ function capitalize(s: string): string {
   return s.length === 0 ? s : s[0]!.toUpperCase() + s.slice(1);
 }
 
+function shortModel(model: string): string {
+  return model
+    .replace(/^claude-/, '')
+    .replace(/-\d{8}$/, '')
+    .replace(/-latest$/, '');
+}
+
 function deriveSessionLabel(session: SessionNodeType): string {
   const model = session.model && session.model !== 'unknown' && session.model !== 'specialist'
-    ? session.model
+    ? shortModel(session.model)
     : '';
   switch (session.type) {
-    case 'merge': return 'Merge agent';
-    case 'test': return 'Tests';
-    case 'review': return 'Review';
-    case 'reviewer': return session.role ? `${capitalize(session.role)} reviewer` : 'Reviewer';
-    case 'work': return model ? `Work agent (${model})` : 'Work agent';
+    case 'merge': return model ? `Merge (${model})` : 'Merge agent';
+    case 'test': return model ? `Tests (${model})` : 'Tests';
+    case 'review': return model ? `Review (${model})` : 'Review';
+    case 'reviewer': return model ? model : (session.role ? capitalize(session.role) : 'Reviewer');
+    case 'work': return model ? `Work (${model})` : 'Work agent';
     case 'planning': return model ? `Planning (${model})` : 'Planning';
     case 'legacy': return 'Planning state';
     default: return session.type;
