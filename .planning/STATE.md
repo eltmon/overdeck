@@ -3,13 +3,13 @@
 ## Status: In Progress
 
 ## Current Phase
-Implementing remaining beads sequentially. Foundation module (lifecycle.ts) is in place — moving on to continue-state-module.
+Foundation modules done. Next: workspace-2gb (vBRIEF lifecycle IO — find by issue, move between dirs).
 
 ## Completed Work
-- [x] workspace-0k8: vBRIEF lifecycle foundation — types, filename convention, directory helpers in `src/lib/vbrief/lifecycle.ts` with 14 unit tests
+- [x] workspace-0k8: vBRIEF lifecycle foundation — types, filename convention, directory helpers in `src/lib/vbrief/lifecycle.ts` with 14 unit tests (commit 7ae8315fa)
+- [x] workspace-8tz: Continue state module — `src/lib/vbrief/continue-state.ts` with ContinueState type, writeContinueState, readContinueState, appendSessionEntry. 13 unit tests passing.
 
 ## Remaining Work
-- [ ] workspace-8tz: Continue state module — types and IO for continue.vbrief.json
 - [ ] workspace-2gb: vBRIEF lifecycle IO — find by issue, move between dirs, update status
 - [ ] workspace-9y5: Update plan-finalize to set proposed status and generate canonical filename
 - [ ] workspace-b2q: Update complete-planning to copy vBRIEF to main's ./vbrief/proposed/

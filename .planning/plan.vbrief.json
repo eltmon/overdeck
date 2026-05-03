@@ -11,9 +11,9 @@
     "status": "approved",
     "uid": "bb9afa10-315b-409a-a625-02d14573e029",
     "author": "agent:claude-opus-4-6",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-03T12:00:00Z",
-    "updated": "2026-05-03T13:09:31.891Z",
+    "updated": "2026-05-03T13:13:38.478Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/946",
@@ -106,7 +106,7 @@
       {
         "id": "continue-state-module",
         "title": "Continue state module: types and IO for continue.vbrief.json",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-03T12:00:00Z",
         "metadata": {
@@ -120,7 +120,7 @@
           {
             "id": "continue-state-module.ac1",
             "title": "ContinueState type exported with fields: gitState, decisions[], hazards[], resumePoint, beadsMapping, agentModel, sessionHistory[]",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -128,7 +128,7 @@
           {
             "id": "continue-state-module.ac2",
             "title": "writeContinueState(dir, issueId, state) writes continue-{issueId}.vbrief.json atomically (temp + rename)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -136,7 +136,7 @@
           {
             "id": "continue-state-module.ac3",
             "title": "readContinueState(dir, issueId) reads and validates the continue file, returns null if missing",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -144,7 +144,7 @@
           {
             "id": "continue-state-module.ac4",
             "title": "appendSessionEntry(dir, issueId, entry) adds timestamped entry to sessionHistory array with reason, crash info, agent model",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
