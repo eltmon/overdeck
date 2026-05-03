@@ -24,11 +24,13 @@ export interface WorkAgentPromptContext {
 export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise<string> {
   let beadsTasksStr = '';
   let stitchDesignsStr = '';
+  let featureContextStr = '';
   let polyrepoContextStr = '';
   let pendingFeedbackStr = '';
 
   if (!ctx.skipDynamicContext && ctx.projectRoot) {
     const planningContent = readPlanningContext(ctx.workspacePath);
+    const featureContext = readFeatureContext(ctx.workspacePath);
 
     const beadsTasks = await readBeadsTasks(ctx.workspacePath, ctx.projectRoot, ctx.issueId);
     if (beadsTasks.length > 0) {
@@ -38,6 +40,10 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
     const stitchDesigns = extractStitchDesigns(planningContent);
     if (stitchDesigns) {
       stitchDesignsStr = stitchDesigns;
+    }
+
+    if (featureContext) {
+      featureContextStr = featureContext;
     }
 
     polyrepoContextStr = buildPolyrepoContext(ctx.issueId, ctx.workspacePath);
@@ -55,6 +61,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       PROJECT_ROOT: ctx.projectRoot || '',
       BEADS_TASKS: beadsTasksStr,
       STITCH_DESIGNS: stitchDesignsStr,
+      FEATURE_CONTEXT: featureContextStr,
       POLYREPO_CONTEXT: polyrepoContextStr,
       PENDING_FEEDBACK: pendingFeedbackStr,
       NEW_TRACKER_CONTEXT: ctx.trackerContext || '',
@@ -256,6 +263,18 @@ export function readPlanningContext(workspacePath: string): string | null {
   const statePath = join(workspacePath, '.planning', 'STATE.md');
   if (existsSync(statePath)) {
     return readFileSync(statePath, 'utf-8');
+  }
+  return null;
+}
+
+/**
+ * Read FEATURE-CONTEXT.md for Rally Features so story agents receive
+ * feature-level context (child stories, description, URL).
+ */
+export function readFeatureContext(workspacePath: string): string | null {
+  const featureContextPath = join(workspacePath, '.planning', 'FEATURE-CONTEXT.md');
+  if (existsSync(featureContextPath)) {
+    return readFileSync(featureContextPath, 'utf-8');
   }
   return null;
 }

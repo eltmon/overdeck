@@ -428,7 +428,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
               // Sync bead completion to vBRIEF plan
               try {
                 const beadData = await queryBeadById(workspacePath, beadId);
-                const updatedItemId = syncBeadStatusToVBrief(beadId, workspacePath, 'completed', beadData?.title);
+                const updatedItemId = await syncBeadStatusToVBrief(beadId, workspacePath, 'completed', beadData?.title);
                 if (updatedItemId) {
                   // Check which tasks are now unblocked and wake the work agent
                   try {

@@ -9,7 +9,8 @@
  * "Waiting for session to start..." until the tmux session is ready.
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -31,10 +32,11 @@ import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
-function getPackageVersion(): string {
+async function getPackageVersion(): Promise<string> {
   try {
     const pkgPath = resolve(__dirname, '../../../package.json');
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string };
+    const pkgRaw = await readFile(pkgPath, 'utf-8');
+    const pkg = JSON.parse(pkgRaw) as { version: string };
     return pkg.version;
   } catch {
     return '0.0.0';
@@ -45,7 +47,7 @@ function getPackageVersion(): string {
  * Discover PRD files matching an issue ID from docs/prds directories.
  * Returns list of { path, label } for use in references template.
  */
-function discoverPrdFiles(workspacePath: string, issueId: string): Array<{ path: string; label: string }> {
+async function discoverPrdFiles(workspacePath: string, issueId: string): Promise<Array<{ path: string; label: string }>> {
   const issueLower = issueId.toLowerCase();
   const searchDirs = [
     join(workspacePath, 'docs', 'prds', 'planned'),
@@ -59,7 +61,7 @@ function discoverPrdFiles(workspacePath: string, issueId: string): Array<{ path:
   for (const dir of searchDirs) {
     if (!existsSync(dir)) continue;
     try {
-      const files = readdirSync(dir);
+      const files = await readdir(dir);
       for (const file of files) {
         if (file.toLowerCase().includes(issueLower)) {
           found.push({ path: join(dir, file), label: file });
@@ -150,11 +152,11 @@ async function ensureTmuxRunning(): Promise<void> {
 
 // ─── Planning prompt builder ─────────────────────────────────────────────────
 
-export function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high'): string {
+export async function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string, planningModel?: string, effort?: 'low' | 'medium' | 'high'): Promise<string> {
   const issueLower = issue.identifier.toLowerCase();
-  const version = getPackageVersion();
+  const version = await getPackageVersion();
   const modelAuthor = planningModel ? `agent:${planningModel}` : 'agent:claude-opus-4-6';
-  const prdFiles = discoverPrdFiles(workspacePath, issue.identifier);
+  const prdFiles = await discoverPrdFiles(workspacePath, issue.identifier);
 
   // Build comments section
   let commentsSection = '';
@@ -178,12 +180,12 @@ export function buildPlanningPrompt(issue: PlanningIssue, workspacePath: string,
   for (const specDir of specSearchDirs) {
     if (!existsSync(specDir)) continue;
     try {
-      const files = readdirSync(specDir);
+      const files = await readdir(specDir);
       const specFile = files.find(f =>
         f.toLowerCase().includes(issueLower) && f.endsWith('-spec.md')
       );
       if (specFile) {
-        const specContent = readFileSync(join(specDir, specFile), 'utf-8');
+        const specContent = await readFile(join(specDir, specFile), 'utf-8');
         specSection = `
 ## Feature Spec (Human-Written)
 
@@ -305,8 +307,11 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // ── Step 1: Create workspace if needed ─────────────────────────────────
     progress(1, 'Creating workspace', `${issueLower} on ${projectPath.split('/').pop() || 'project'}`);
 
-    let workspaceCreated = existsSync(workspacePath) &&
-      !readdirSync(workspacePath).every((f: string) => f === '.planning');
+    let workspaceCreated = false;
+    if (existsSync(workspacePath)) {
+      const files = await readdir(workspacePath);
+      workspaceCreated = !files.every((f: string) => f === '.planning');
+    }
 
     if (!workspaceCreated) {
       try {
@@ -352,7 +357,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         const errorMsg = `Workspace creation failed: ${err.message}`;
         console.error(`[start-planning] ABORTING: ${errorMsg}`);
         progress(1, 'Creating workspace', errorMsg, 'error');
-        writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
+        await writeFile(join(agentStateDir, 'state.json'), JSON.stringify({
           id: sessionName, issueId: issue.identifier, workspace: workspacePath,
           status: 'failed', error: errorMsg,
           startedAt: new Date().toISOString(), type: 'planning', agentPhase: 'planning', location: workspaceLocation,
@@ -371,9 +376,9 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     // Create planning directory structure
     const planningDir = join(workspacePath, '.planning');
-    mkdirSync(planningDir, { recursive: true });
+    await mkdir(planningDir, { recursive: true });
     for (const subdir of ['transcripts', 'discussions', 'notes']) {
-      mkdirSync(join(planningDir, subdir), { recursive: true });
+      await mkdir(join(planningDir, subdir), { recursive: true });
     }
 
     // Clear stale STATE.md and .planning-complete from previous session
@@ -381,7 +386,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       const stalePath = join(planningDir, staleFile);
       if (existsSync(stalePath)) {
         console.log(`[start-planning] Clearing stale ${staleFile}`);
-        rmSync(stalePath, { force: true });
+        await rm(stalePath, { force: true });
       }
     }
 
@@ -389,7 +394,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     if (shadowMode) {
       const inferencePath = join(planningDir, 'INFERENCE.md');
       if (!existsSync(inferencePath)) {
-        writeFileSync(inferencePath,
+        await writeFile(inferencePath,
           `# Inference Document - ${issue.identifier.toUpperCase()}\n\n*This document is maintained by the Shadow Engineering Monitoring Agent.*\n\n## Status\n\nAwaiting initial artifact analysis.\n`,
           'utf-8',
         );
@@ -411,14 +416,14 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const planningModel = modelOverride || settingsModel;
 
     // Discover and copy PRD files to workspace
-    const prdFiles = discoverPrdFiles(workspacePath, issue.identifier);
+    const prdFiles = await discoverPrdFiles(workspacePath, issue.identifier);
     if (prdFiles.length > 0) {
       const prdDestPath = join(planningDir, 'prd.md');
       if (!existsSync(prdDestPath)) {
         // Copy the first matching PRD (prefer active over planned)
         try {
-          const prdContent = readFileSync(prdFiles[0].path, 'utf-8');
-          writeFileSync(prdDestPath, prdContent, 'utf-8');
+          const prdContent = await readFile(prdFiles[0].path, 'utf-8');
+          await writeFile(prdDestPath, prdContent, 'utf-8');
           console.log(`[start-planning] Copied PRD to ${prdDestPath} from ${prdFiles[0].path}`);
         } catch (err: any) {
           console.warn(`[start-planning] Could not copy PRD: ${err.message}`);
@@ -432,8 +437,8 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     progress(4, 'Configuring agent', planningModel);
 
     const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
-    const planningPrompt = buildPlanningPrompt(issue, workspacePath, planningModel, effort);
-    writeFileSync(planningPromptPath, planningPrompt);
+    const planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort);
+    await writeFile(planningPromptPath, planningPrompt);
 
     // Write FEATURE-CONTEXT.md for Rally Features so story workspaces can reference it
     if (issue.artifactType?.includes('PortfolioItem')) {
@@ -443,7 +448,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
             `### ${s.ref}: ${s.title}\n- **Status:** ${s.status}\n- **Description:** ${s.description || '(none)'}`
           ).join('\n\n')
         : '_No child stories found._';
-      writeFileSync(featureContextPath,
+      await writeFile(featureContextPath,
         `# Feature Context: ${issue.identifier}\n\n` +
         `**Title:** ${issue.title}\n\n` +
         `**URL:** ${issue.url}\n\n` +
@@ -464,8 +469,8 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const initMessage = `Please read the planning prompt file at ${planningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
     const promptFile = join(agentStateDir, 'init-prompt.txt');
     const launcherScript = join(agentStateDir, 'launcher.sh');
-    writeFileSync(promptFile, initMessage);
-    writeFileSync(
+    await writeFile(promptFile, initMessage);
+    await writeFile(
       launcherScript,
       generateLauncherScript({
         agentType: 'planning',
@@ -508,7 +513,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // See PAN-417 for the full forensic timeline.
 
     // ── Update agent state to running ──────────────────────────────────────
-    writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
+    await writeFile(join(agentStateDir, 'state.json'), JSON.stringify({
       id: sessionName,
       issueId: issue.identifier,
       workspace: workspacePath,
@@ -530,7 +535,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     console.error(`[start-planning] Agent spawn failed for ${issue.identifier}:`, err);
     // Update state file to reflect failure
     try {
-      writeFileSync(join(agentStateDir, 'state.json'), JSON.stringify({
+      await writeFile(join(agentStateDir, 'state.json'), JSON.stringify({
         id: sessionName,
         issueId: issue.identifier,
         workspace: workspacePath,

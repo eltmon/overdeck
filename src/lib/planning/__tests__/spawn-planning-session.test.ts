@@ -11,15 +11,15 @@ describe('buildPlanningPrompt', () => {
     source: 'github',
   };
 
-  it('renders a planning prompt without child stories', () => {
-    const prompt = buildPlanningPrompt(baseIssue, '/tmp/workspace');
+  it('renders a planning prompt without child stories', async () => {
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace');
     expect(prompt).toContain('PAN-123');
     expect(prompt).toContain('Test Issue');
     expect(prompt).toContain('A test description');
     expect(prompt).not.toContain('Child Stories');
   });
 
-  it('renders child stories section for Rally Features', () => {
+  it('renders child stories section for Rally Features', async () => {
     const featureIssue: PlanningIssue = {
       ...baseIssue,
       source: 'rally',
@@ -30,7 +30,7 @@ describe('buildPlanningPrompt', () => {
       ],
     };
 
-    const prompt = buildPlanningPrompt(featureIssue, '/tmp/workspace');
+    const prompt = await buildPlanningPrompt(featureIssue, '/tmp/workspace');
     expect(prompt).toContain('Child Stories');
     expect(prompt).toContain('US100');
     expect(prompt).toContain('Story A');
@@ -38,7 +38,7 @@ describe('buildPlanningPrompt', () => {
     expect(prompt).toContain('Story B');
   });
 
-  it('renders dependency-edge guidance when child stories exist', () => {
+  it('renders dependency-edge guidance when child stories exist', async () => {
     const featureIssue: PlanningIssue = {
       ...baseIssue,
       source: 'rally',
@@ -48,20 +48,20 @@ describe('buildPlanningPrompt', () => {
       ],
     };
 
-    const prompt = buildPlanningPrompt(featureIssue, '/tmp/workspace');
+    const prompt = await buildPlanningPrompt(featureIssue, '/tmp/workspace');
     expect(prompt).toContain('Cross-story dependencies');
     expect(prompt).toContain('blocks');
     expect(prompt).toContain('informs');
   });
 
-  it('does not render child stories section for non-PortfolioItem issues', () => {
+  it('does not render child stories section for non-PortfolioItem issues', async () => {
     const storyIssue: PlanningIssue = {
       ...baseIssue,
       source: 'rally',
       artifactType: 'HierarchicalRequirement',
     };
 
-    const prompt = buildPlanningPrompt(storyIssue, '/tmp/workspace');
+    const prompt = await buildPlanningPrompt(storyIssue, '/tmp/workspace');
     expect(prompt).not.toContain('Child Stories');
   });
 });

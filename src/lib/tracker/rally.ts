@@ -85,6 +85,22 @@ const FETCH_FIELDS = [
   '_type',
 ];
 
+/**
+ * Validate a Rally FormattedID to prevent WSAPI query injection.
+ * Rally IDs look like: US123, DE456, TA789, F012
+ */
+function validateRallyId(id: string): boolean {
+  return /^[A-Za-z]+\d+$/.test(id);
+}
+
+/**
+ * Escape a string value for use in Rally WSAPI query strings.
+ * Replaces double quotes with escaped quotes to prevent query injection.
+ */
+function escapeQueryValue(value: string): string {
+  return value.replace(/"/g, '\\"');
+}
+
 // Rally priority strings to numbers
 const PRIORITY_MAP: Record<string, number> = {
   'Resolve Immediately': 0,
@@ -208,6 +224,9 @@ export class RallyTracker implements IssueTracker {
   }
 
   async getIssue(id: string): Promise<Issue> {
+    if (!validateRallyId(id)) {
+      throw new IssueNotFoundError(id, 'rally' as TrackerType);
+    }
     try {
       // Rally FormattedIDs look like: US123, DE456, TA789, F012
       const query: any = {
@@ -227,7 +246,7 @@ export class RallyTracker implements IssueTracker {
           'Parent',
           '_type',
         ],
-        query: `(FormattedID = "${id}")`,
+        query: `(FormattedID = "${escapeQueryValue(id)}")`,
       };
 
       if (this.workspace) {
@@ -248,13 +267,19 @@ export class RallyTracker implements IssueTracker {
   }
 
   async updateIssue(id: string, update: IssueUpdate): Promise<Issue> {
-    const issue = await this.getIssue(id);
+    if (!validateRallyId(id)) {
+      throw new IssueNotFoundError(id, 'rally' as TrackerType);
+    }
 
-    // Get the Rally object reference
+    // Single query: fetch display fields + ObjectID/_ref/_type needed for update
     const query: any = {
       type: 'artifact',
-      fetch: ['ObjectID', '_ref', '_type'],
-      query: `(FormattedID = "${id}")`,
+      fetch: [
+        'FormattedID', 'Name', 'Description', 'ScheduleState', 'State',
+        'Tags', 'Owner', 'Priority', 'DueDate', 'CreationDate', 'LastUpdateDate',
+        'Parent', '_type', 'ObjectID', '_ref',
+      ],
+      query: `(FormattedID = "${escapeQueryValue(id)}")`,
     };
 
     if (this.workspace) {
@@ -297,7 +322,12 @@ export class RallyTracker implements IssueTracker {
       await this.updateRally(artifact._type.toLowerCase(), artifact._ref, updatePayload);
     }
 
-    return this.getIssue(id);
+    // Re-query to get the updated artifact with fresh state
+    const refreshed = await this.queryRally(query);
+    if (!refreshed.Results || refreshed.Results.length === 0) {
+      throw new IssueNotFoundError(id, 'rally' as TrackerType);
+    }
+    return this.normalizeIssue(refreshed.Results[0]);
   }
 
   async createIssue(newIssue: NewIssue): Promise<Issue> {
@@ -331,13 +361,15 @@ export class RallyTracker implements IssueTracker {
   }
 
   async getComments(issueId: string): Promise<Comment[]> {
-    const issue = await this.getIssue(issueId);
+    if (!validateRallyId(issueId)) {
+      return [];
+    }
 
     // Get the Rally object to find its Discussion
     const query: any = {
       type: 'artifact',
       fetch: ['ObjectID', '_ref', 'Discussion'],
-      query: `(FormattedID = "${issueId}")`,
+      query: `(FormattedID = "${escapeQueryValue(issueId)}")`,
     };
 
     if (this.workspace) {
@@ -375,11 +407,15 @@ export class RallyTracker implements IssueTracker {
   }
 
   async addComment(issueId: string, body: string): Promise<Comment> {
+    if (!validateRallyId(issueId)) {
+      throw new IssueNotFoundError(issueId, 'rally' as TrackerType);
+    }
+
     // Get the Rally object to find its Discussion
     const query: any = {
       type: 'artifact',
       fetch: ['ObjectID', '_ref', 'Discussion'],
-      query: `(FormattedID = "${issueId}")`,
+      query: `(FormattedID = "${escapeQueryValue(issueId)}")`,
     };
 
     if (this.workspace) {
@@ -437,6 +473,10 @@ export class RallyTracker implements IssueTracker {
   }
 
   async getChildIssues(parentId: string): Promise<Issue[]> {
+    if (!validateRallyId(parentId)) {
+      return [];
+    }
+
     // Query Rally for HierarchicalRequirement and Defect artifacts
     // whose PortfolioItem matches the given feature FormattedID.
     const childTypes = [
@@ -448,7 +488,7 @@ export class RallyTracker implements IssueTracker {
       const query: any = {
         type: childType.type,
         fetch: FETCH_FIELDS,
-        query: `(PortfolioItem.FormattedID = "${parentId}")`,
+        query: `(PortfolioItem.FormattedID = "${escapeQueryValue(parentId)}")`,
         limit: 200,
       };
 
@@ -526,12 +566,12 @@ export class RallyTracker implements IssueTracker {
     }
 
     if (filters?.assignee) {
-      conditions.push(`(Owner.Name contains "${filters.assignee}")`);
+      conditions.push(`(Owner.Name contains "${escapeQueryValue(filters.assignee)}")`);
     }
 
     if (filters?.labels && filters.labels.length > 0) {
       const labelConditions = filters.labels.map(
-        (label) => `(Tags.Name contains "${label}")`
+        (label) => `(Tags.Name contains "${escapeQueryValue(label)}")`
       );
       // Rally WSAPI only supports binary AND — nest into pairs
       const labelExpr = labelConditions.reduce((acc, cond) => acc ? `(${acc} AND ${cond})` : cond, '');
@@ -539,7 +579,7 @@ export class RallyTracker implements IssueTracker {
     }
 
     if (filters?.query) {
-      conditions.push(`((Name contains "${filters.query}") OR (Description contains "${filters.query}"))`);
+      conditions.push(`((Name contains "${escapeQueryValue(filters.query)}") OR (Description contains "${escapeQueryValue(filters.query)}"))`);
     }
 
     // Rally WSAPI only supports binary (expr AND expr) — reduce into nested pairs

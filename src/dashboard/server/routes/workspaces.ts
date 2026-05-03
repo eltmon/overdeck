@@ -629,11 +629,11 @@ async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<st
  * Fallback bead reader that parses .beads/issues.jsonl directly.
  * Used when the bd CLI is unavailable (e.g. in tests).
  */
-function readBeadsFromJsonl(workspacePath: string, issueId: string): Array<{ title: string; status: string }> {
+async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promise<Array<{ title: string; status: string }>> {
   try {
     const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
     if (!existsSync(jsonlPath)) return [];
-    const raw = readFileSync(jsonlPath, 'utf-8');
+    const raw = await readFile(jsonlPath, 'utf-8');
     const issueLower = issueId.toLowerCase();
     const beads: Array<{ title: string; status: string }> = [];
     for (const line of raw.split('\n')) {
@@ -688,7 +688,7 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
     let beads = await queryBeadsForIssue(workspacePath, issueId);
     if (beads.length === 0) {
       // Fallback: read from .beads/issues.jsonl when bd CLI is unavailable
-      beads = readBeadsFromJsonl(workspacePath, issueId);
+      beads = await readBeadsFromJsonl(workspacePath, issueId);
     }
     if (beads.length > 0) {
       lines.push('## Implementation Tasks');

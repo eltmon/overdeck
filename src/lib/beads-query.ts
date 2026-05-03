@@ -1,6 +1,7 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { readFileSync, existsSync } from 'fs';
+import { existsSync } from 'fs';
+import { readFile } from 'node:fs/promises';
 import { join } from 'path';
 
 const execFileAsync = promisify(execFile);
@@ -15,11 +16,11 @@ export interface BeadEntry {
   [key: string]: unknown;
 }
 
-function readBeadsFromJsonl(workspacePath: string, issueId: string): BeadEntry[] {
+async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promise<BeadEntry[]> {
   try {
     const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
     if (!existsSync(jsonlPath)) return [];
-    const raw = readFileSync(jsonlPath, 'utf-8');
+    const raw = await readFile(jsonlPath, 'utf-8');
     const beads: BeadEntry[] = [];
     const label = issueId.toLowerCase();
     for (const line of raw.split('\n')) {
@@ -63,7 +64,7 @@ export async function queryBeadsForIssue(
     const parsed = JSON.parse(stdout || '[]');
     return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return readBeadsFromJsonl(workspacePath, issueId);
+    return await readBeadsFromJsonl(workspacePath, issueId);
   }
 }
 

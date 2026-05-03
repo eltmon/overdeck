@@ -944,6 +944,33 @@ describe('FeatureCard', () => {
     expect(onToggle).toHaveBeenCalled();
     expect(onSelect).not.toHaveBeenCalled();
   });
+
+  it('does NOT render Start Agent button', () => {
+    const feature = createMockFeature();
+    render(
+      <FeatureCard
+        feature={feature}
+        childCount={2}
+        isExpanded={false}
+        onToggle={vi.fn()}
+      />
+    );
+    expect(screen.queryByText(/Start Agent/i)).toBeNull();
+  });
+
+  it('shows Plan button when derivedStatus is in_progress but status is Todo', () => {
+    const feature = createMockFeature({ status: 'Todo', derivedStatus: 'in_progress' });
+    render(
+      <FeatureCard
+        feature={feature}
+        childCount={2}
+        isExpanded={false}
+        onToggle={vi.fn()}
+        onPlan={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('action-plan-F123')).toBeDefined();
+  });
 });
 
 // ─── CompactChildCard ─────────────────────────────────────────────────────────
@@ -983,6 +1010,15 @@ describe('CompactChildCard', () => {
     const { container } = render(<CompactChildCard issue={child} agents={[]} onSelect={onSelect} />);
     fireEvent.click(container.firstChild!);
     expect(onSelect).toHaveBeenCalled();
+  });
+
+  it('does not call onSelect when clicking the identifier link', () => {
+    const onSelect = vi.fn();
+    const child = createMockChild();
+    render(<CompactChildCard issue={child} agents={[]} onSelect={onSelect} />);
+    const link = screen.getByText('US100');
+    fireEvent.click(link);
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it('applies selected background when isSelected is true', () => {

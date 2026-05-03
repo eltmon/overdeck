@@ -324,25 +324,22 @@ describe('RallyTracker', () => {
 
   describe('updateIssue', () => {
     it('should update issue title and description', async () => {
-      // Mock getIssue call (first query)
+      // Mock combined fetch (all fields + ObjectID/_ref/_type)
       mockQuery.mockResolvedValueOnce(wsapiResponse([{
         ...sampleStory,
-        _ref: '/hierarchicalrequirement/12345',
-      }]));
-
-      // Mock query for ref (second query)
-      mockQuery.mockResolvedValueOnce(wsapiResponse([{
         ObjectID: '12345',
         _ref: '/hierarchicalrequirement/12345',
         _type: 'HierarchicalRequirement',
       }]));
 
-      // Mock final getIssue call
+      // Mock refresh query after update
       mockQuery.mockResolvedValueOnce(wsapiResponse([{
         ...sampleStory,
         Name: 'Updated Title',
         Description: 'Updated description',
+        ObjectID: '12345',
         _ref: '/hierarchicalrequirement/12345',
+        _type: 'HierarchicalRequirement',
       }]));
 
       mockUpdate.mockResolvedValue({
@@ -369,9 +366,6 @@ describe('RallyTracker', () => {
       mockQuery
         .mockResolvedValueOnce(wsapiResponse([{
           ...sampleStory,
-          _ref: '/hierarchicalrequirement/12345',
-        }]))
-        .mockResolvedValueOnce(wsapiResponse([{
           ObjectID: '12345',
           _ref: '/hierarchicalrequirement/12345',
           _type: 'HierarchicalRequirement',
@@ -379,7 +373,9 @@ describe('RallyTracker', () => {
         .mockResolvedValueOnce(wsapiResponse([{
           ...sampleStory,
           ScheduleState: 'In-Progress',
+          ObjectID: '12345',
           _ref: '/hierarchicalrequirement/12345',
+          _type: 'HierarchicalRequirement',
         }]));
 
       mockUpdate.mockResolvedValue({
@@ -402,9 +398,6 @@ describe('RallyTracker', () => {
       mockQuery
         .mockResolvedValueOnce(wsapiResponse([{
           ...sampleDefect,
-          _ref: '/defect/67890',
-        }]))
-        .mockResolvedValueOnce(wsapiResponse([{
           ObjectID: '67890',
           _ref: '/defect/67890',
           _type: 'Defect',
@@ -412,7 +405,9 @@ describe('RallyTracker', () => {
         .mockResolvedValueOnce(wsapiResponse([{
           ...sampleDefect,
           State: 'Completed',
+          ObjectID: '67890',
           _ref: '/defect/67890',
+          _type: 'Defect',
         }]));
 
       mockUpdate.mockResolvedValue({
@@ -434,7 +429,9 @@ describe('RallyTracker', () => {
     it('should update priority', async () => {
       mockQuery.mockResolvedValue(wsapiResponse([{
         ...sampleStory,
+        ObjectID: '12345',
         _ref: '/hierarchicalrequirement/12345',
+        _type: 'HierarchicalRequirement',
       }]));
 
       mockUpdate.mockResolvedValue({
@@ -520,18 +517,13 @@ describe('RallyTracker', () => {
 
   describe('getComments', () => {
     it('should return comments for issue', async () => {
-      // First query: getIssue
+      // First query: get artifact with Discussion
       mockQuery.mockResolvedValueOnce(wsapiResponse([{
-        ...sampleStory,
-        _ref: '/hierarchicalrequirement/12345',
-      }]))
-      // Second query: get artifact with Discussion
-      .mockResolvedValueOnce(wsapiResponse([{
         ObjectID: '12345',
         _ref: '/hierarchicalrequirement/12345',
         Discussion: { _ref: '/discussion/111' },
       }]))
-      // Third query: get conversation posts
+      // Second query: get conversation posts
       .mockResolvedValueOnce(wsapiResponse([
         {
           ObjectID: '1001',
@@ -563,13 +555,8 @@ describe('RallyTracker', () => {
     });
 
     it('should return empty array if no discussion', async () => {
-      // First query: getIssue
+      // First query: get artifact with no Discussion
       mockQuery.mockResolvedValueOnce(wsapiResponse([{
-        ...sampleStory,
-        _ref: '/hierarchicalrequirement/12345',
-      }]))
-      // Second query: get artifact with no Discussion
-      .mockResolvedValueOnce(wsapiResponse([{
         ObjectID: '12345',
         _ref: '/hierarchicalrequirement/12345',
         Discussion: null,

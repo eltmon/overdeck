@@ -8,7 +8,8 @@
 
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
-import { existsSync, mkdirSync, writeFileSync, chmodSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, chmodSync } from 'fs';
+import { readFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'path';
 import { readWorkspacePlan, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
@@ -304,11 +305,11 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
  * Callers must provide knownTitle (from bd list/show output).
  */
 /** Read a bead title from .beads/issues.jsonl by bead ID. */
-function readBeadTitleFromJsonl(beadId: string, workspacePath: string): string | null {
+async function readBeadTitleFromJsonl(beadId: string, workspacePath: string): Promise<string | null> {
   try {
     const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
     if (!existsSync(jsonlPath)) return null;
-    const raw = readFileSync(jsonlPath, 'utf-8');
+    const raw = await readFile(jsonlPath, 'utf-8');
     for (const line of raw.split('\n')) {
       if (!line.trim()) continue;
       try {
@@ -324,19 +325,19 @@ function readBeadTitleFromJsonl(beadId: string, workspacePath: string): string |
   }
 }
 
-export function syncBeadStatusToVBrief(
+export async function syncBeadStatusToVBrief(
   beadId: string,
   workspacePath: string,
   status: VBriefItemStatus = 'completed',
   knownTitle?: string
-): string | null {
+): Promise<string | null> {
   try {
     const doc = readWorkspacePlan(workspacePath);
     if (!doc) return null;
 
     let beadTitle: string | null = knownTitle ?? null;
     if (!beadTitle) {
-      beadTitle = readBeadTitleFromJsonl(beadId, workspacePath);
+      beadTitle = await readBeadTitleFromJsonl(beadId, workspacePath);
     }
 
     if (!beadTitle) return null;
