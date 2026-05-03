@@ -3,7 +3,7 @@
 ## Status: In Progress
 
 ## Current Phase
-Prompt templates and dashboard routes migrated to continue.vbrief.json. Next: workspace-44p (agent session writes continue file) or workspace-9ny (sync audit).
+Agent session continue state integration complete. Next: workspace-9ny (sync audit with vBRIEF state disagreement detection).
 
 ## Completed Work
 - [x] workspace-0k8: vBRIEF lifecycle foundation — types, filename convention, directory helpers in `src/lib/vbrief/lifecycle.ts` with 14 unit tests (commit 7ae8315fa)
@@ -30,9 +30,9 @@ Prompt templates and dashboard routes migrated to continue.vbrief.json. Next: wo
 - [x] workspace-61m: Work agent prompt updated — `src/lib/cloister/prompts/work.md` instructs agents to read `./vbrief/active/continue-{issue}.vbrief.json` for planning context. Bead workflow updated to update continue file instead of STATE.md. `work-agent-prompt.ts` reads continue file from lifecycle dirs first, falling back to workspace `.planning/` and finally `STATE.md` (legacy). `getTrackerContext` uses continue file mtime for comment filtering.
 
 - [x] workspace-475: Removed primary STATE.md dependencies across the codebase. Dashboard routes (workspaces, issues, agents, misc, command-deck, projects, resource-discovery) now read continue files first with legacy STATE.md fallback during transition. Lifecycle code (clean-planning, archive-planning) updated to handle continue files. docs/VBRIEF.md documents continue.vbrief.json as the replacement for STATE.md.
+- [x] workspace-44p: Agent session continue state integration — start-agent route writes initial continue state (git branch, sha, agent model) to `./vbrief/active/continue-{issue}.vbrief.json`. `pan work done` appends 'end' session entry. `resumeAgent` appends 'resume' session entry with agent model.
 
 ## Remaining Work
-- [ ] workspace-44p: Write/update continue.vbrief.json during agent sessions
 - [ ] workspace-9ny: Extend pan sync with vBRIEF state disagreement detection
 
 ## Key Decisions

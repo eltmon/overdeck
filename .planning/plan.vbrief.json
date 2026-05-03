@@ -4,7 +4,7 @@
     "created": "2026-05-03T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-946: Adopt deft vBRIEF lifecycle model for scope vBRIEFs",
-    "updated": "2026-05-03T13:25:00Z"
+    "updated": "2026-05-03T13:40:00Z"
   },
   "plan": {
     "id": "pan-946",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "bb9afa10-315b-409a-a625-02d14573e029",
     "author": "agent:claude-opus-4-6",
-    "sequence": 14,
+    "sequence": 15,
     "created": "2026-05-03T12:00:00Z",
-    "updated": "2026-05-03T13:25:00Z",
+    "updated": "2026-05-03T13:40:00Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/946",
@@ -423,9 +423,10 @@
       {
         "id": "agent-continue-integration",
         "title": "Write/update continue.vbrief.json during agent sessions",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T13:40:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -437,7 +438,8 @@
           {
             "id": "agent-continue-integration.ac1",
             "title": "Agent start writes initial continue state (branch, sha, agent model) to ./vbrief/active/continue-{issue}.vbrief.json",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T13:40:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -445,7 +447,8 @@
           {
             "id": "agent-continue-integration.ac2",
             "title": "Agent session end updates continue state with latest resume point",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T13:40:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -453,7 +456,8 @@
           {
             "id": "agent-continue-integration.ac3",
             "title": "Agent resume reads continue state and appends session entry with resume reason",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T13:40:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
