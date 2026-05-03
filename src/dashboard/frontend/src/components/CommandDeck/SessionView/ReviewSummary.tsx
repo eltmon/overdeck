@@ -148,12 +148,12 @@ export function ReviewSummary({ session, reviewers, roundData }: ReviewSummaryPr
 
             return (
               <div key={reviewer.sessionId} className={styles.reviewerCard}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <div className={styles.reviewerCardLabel}>
                   <Icon size={14} style={{ color: iconColor, flexShrink: 0 }} />
                   <span style={{ fontWeight: 600, fontSize: 12 }}>{label}</span>
                   <StatusDot status={presenceToStatus(reviewer.presence)} size="sm" />
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--muted-foreground)' }}>
+                <div className={styles.reviewerCardStats}>
                   <span style={{ color: statusColor(reviewer.status), fontWeight: 500 }}>
                     {statusLabel(reviewer.status)}
                   </span>
@@ -166,12 +166,12 @@ export function ReviewSummary({ session, reviewers, roundData }: ReviewSummaryPr
                   {latestRound?.cost != null && (
                     <span>{fmtCost(latestRound.cost)}</span>
                   )}
+                  {reviewer.status === 'error' && reviewer.roundMetadata?.latestStatus && reviewer.roundMetadata.latestStatus !== 'error' && (
+                    <span style={{ color: 'var(--destructive)', fontFamily: 'var(--font-mono)', fontSize: 10 }}>
+                      {reviewer.roundMetadata.latestStatus}
+                    </span>
+                  )}
                 </div>
-                {reviewer.status === 'error' && reviewer.roundMetadata?.latestStatus && reviewer.roundMetadata.latestStatus !== 'error' && (
-                  <div style={{ fontSize: 10, color: 'var(--destructive)', marginTop: 2, fontFamily: 'var(--font-mono)', wordBreak: 'break-word' }}>
-                    {reviewer.roundMetadata.latestStatus}
-                  </div>
-                )}
               </div>
             );
           })}
@@ -195,9 +195,7 @@ export function ReviewSummary({ session, reviewers, roundData }: ReviewSummaryPr
       {/* Synthesis findings */}
       {synthSummary && (
         <div className={styles.reviewSynthesis}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
-            Findings
-          </div>
+          <div className={styles.reviewSynthesisHeading}>Findings</div>
           <ChatMarkdown text={synthSummary} isStreaming={false} />
         </div>
       )}

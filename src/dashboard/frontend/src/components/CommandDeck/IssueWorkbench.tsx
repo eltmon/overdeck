@@ -143,7 +143,7 @@ export function IssueWorkbench({
       {isAgentSelected ? (
         <>
           <ZoneB session={selectedSession} issueId={issueId} />
-          <ZoneCConversation session={selectedSession} issueId={issueId} reviewers={reviewers} />
+          <ZoneCConversation key={selectedSession.sessionId} session={selectedSession} issueId={issueId} reviewers={reviewers} />
         </>
       ) : (
         <>

@@ -129,16 +129,21 @@ export function ConversationPanel({
   const { theme } = useTheme();
   const resolvedTheme = theme === 'light' ? 'light' : 'dark';
 
-  // Fetch turn diff summaries when agentId is available
+  // Fetch turn diff summaries — agent diffs (checkpoint-based) or conversation diffs (JSONL-based)
   const { data: diffData } = useQuery({
-    queryKey: ['agent-diffs', agentId],
+    queryKey: agentId
+      ? ['agent-diffs', agentId]
+      : ['conversation-diffs', conversation.name],
     queryFn: async () => {
-      if (!agentId) return null
-      const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/diffs`)
+      if (agentId) {
+        const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/diffs`)
+        if (!res.ok) return null
+        return res.json() as Promise<{ summaries: TurnDiffSummary[] }>
+      }
+      const res = await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/diffs`)
       if (!res.ok) return null
       return res.json() as Promise<{ summaries: TurnDiffSummary[] }>
     },
-    enabled: !!agentId,
     refetchInterval: 5000,
   })
 
@@ -482,13 +487,14 @@ export function ConversationPanel({
           )}
         </div>
         {/* Diff side panel — rendered when ?diff=1 is in the URL */}
-        {diffOpen && agentId && diffData?.summaries && (
+        {diffOpen && diffData?.summaries && (
           <DiffWorkerPoolProvider>
             <DiffPanel
               mode="inline"
-              agentId={agentId}
+              agentId={agentId ?? conversation.name}
               turnDiffSummaries={diffData.summaries}
               onClose={handleCloseDiff}
+              {...(!agentId ? { diffUrlPrefix: `/api/conversations/${encodeURIComponent(conversation.name)}/diffs` } : {})}
             />
           </DiffWorkerPoolProvider>
         )}

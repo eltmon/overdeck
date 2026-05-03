@@ -329,3 +329,79 @@ export async function diffAgainstMainFiles(cwd: string): Promise<TurnDiffFileCha
 
   return files.sort((a, b) => a.path.localeCompare(b.path))
 }
+
+// ─── Conversation diff helpers ───────────────────────────────────────────────
+
+export async function findCommitAtTime(cwd: string, isoTimestamp: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync('git', [
+      'rev-list', '-1', `--before=${isoTimestamp}`, 'HEAD',
+    ], { cwd, encoding: 'utf-8' })
+    const sha = stdout.trim()
+    return sha.length > 0 ? sha : null
+  } catch {
+    return null
+  }
+}
+
+export async function diffSinceCommit(cwd: string, baseCommit: string): Promise<TurnDiffFileChange[]> {
+  const [numstatResult, nameStatusResult] = await Promise.all([
+    execFileAsync('git', ['diff', '--numstat', '--no-color', baseCommit], { cwd, encoding: 'utf-8' }),
+    execFileAsync('git', ['diff', '--name-status', '--no-color', baseCommit], { cwd, encoding: 'utf-8' }),
+  ])
+
+  return parseNumstatWithStatus(numstatResult.stdout, nameStatusResult.stdout)
+}
+
+export async function diffFilesAgainstHead(cwd: string, filePaths: string[]): Promise<TurnDiffFileChange[]> {
+  if (filePaths.length === 0) return []
+
+  const [numstatResult, nameStatusResult] = await Promise.all([
+    execFileAsync('git', ['diff', '--numstat', '--no-color', 'HEAD', '--', ...filePaths], { cwd, encoding: 'utf-8' }),
+    execFileAsync('git', ['diff', '--name-status', '--no-color', 'HEAD', '--', ...filePaths], { cwd, encoding: 'utf-8' }),
+  ])
+
+  return parseNumstatWithStatus(numstatResult.stdout, nameStatusResult.stdout)
+}
+
+export async function diffPatchSinceCommit(cwd: string, baseCommit: string): Promise<string> {
+  const { stdout } = await execFileAsync('git', [
+    'diff', '--patch', '--minimal', '--no-color', baseCommit,
+  ], { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
+  return stdout
+}
+
+export async function diffPatchFilesAgainstHead(cwd: string, filePaths: string[]): Promise<string> {
+  if (filePaths.length === 0) return ''
+  const { stdout } = await execFileAsync('git', [
+    'diff', '--patch', '--minimal', '--no-color', 'HEAD', '--', ...filePaths,
+  ], { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
+  return stdout
+}
+
+function parseNumstatWithStatus(numstat: string, nameStatus: string): TurnDiffFileChange[] {
+  const statusMap = new Map<string, string>()
+  for (const line of nameStatus.split('\n')) {
+    if (!line.trim()) continue
+    const parts = line.split('\t')
+    if (parts.length >= 2) {
+      statusMap.set(parts[parts.length - 1], parts[0])
+    }
+  }
+
+  const files: TurnDiffFileChange[] = []
+  for (const line of numstat.split('\n')) {
+    if (!line.trim()) continue
+    const [addStr, delStr, ...pathParts] = line.split('\t')
+    const path = pathParts.join('\t')
+    if (!path) continue
+    files.push({
+      path,
+      kind: statusMap.get(path),
+      additions: parseInt(addStr, 10) || 0,
+      deletions: parseInt(delStr, 10) || 0,
+    })
+  }
+
+  return files.sort((a, b) => a.path.localeCompare(b.path))
+}
