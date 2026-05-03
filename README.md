@@ -2,7 +2,7 @@
 
 # Panopticon CLI
 
-**Multi-agent orchestration for AI coding assistants**
+**The IDE for the agent era**
 
 [![npm version](https://img.shields.io/npm/v/%40panctl%2Fcli.svg)](https://www.npmjs.com/package/@panctl/cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -15,11 +15,11 @@
 
 </div>
 
-Panopticon is an open-source control plane for multi-agent software development. It connects to your issue tracker, assigns an Opus-class model to write a PRD, hands implementation to a cost-effective model working in an isolated git worktree, then runs automated code review, testing, inspection, and merge through five dedicated specialist agents. The only human step is clicking **Merge**. Every stage runs as a separate process in its own tmux session with full terminal I/O — attach mid-flight, read scrollback, or send commands directly. A lifecycle manager called **Cloister** handles model routing, stuck detection, cost tracking, and specialist coordination. Everything is observable through **Mission Control**, a 13-view real-time dashboard.
+IDEs were built for humans who type code. Panopticon is built for humans who **direct** code. Command Deck puts you in the cockpit of a multi-model, multi-agent development environment — you see every change as it happens, steer agents mid-flight, swap models on the fly, diff any turn against main, fork conversations when you want to explore a different approach, and checkpoint work so nothing is lost. When you want to go fully hands-off, the specialist pipeline takes your issue from plan to merged PR without you touching the keyboard.
 
 <div align="center">
 
-<img src="docs/screenshot-board.png" alt="Panopticon Kanban Board" width="800" />
+<img src="docs/screenshot-board.png" alt="Panopticon Command Deck" width="800" />
 
 </div>
 
@@ -29,31 +29,46 @@ Panopticon is an open-source control plane for multi-agent software development.
 npx @panctl/cli
 ```
 
-No install step required. `npx @panctl/cli` starts the browser/server experience, and you can use `panctl` or `pan` after `npm install -g @panctl/cli`. The packaged desktop app is published separately as `@panctl/desktop`.
-
-For the power-user path that installs everything up front: `pan install`.
+No install step required. `npx @panctl/cli` starts Command Deck and opens the dashboard in your browser. Use `panctl` or `pan` after `npm install -g @panctl/cli`. The packaged desktop app is published separately as `@panctl/desktop`.
 
 Dashboard runs at https://pan.localhost (or http://localhost:3011 if you skip HTTPS setup).
-
-On install, Panopticon rebuilds native modules like `better-sqlite3` for your active Node.js version. If you switch Node versions later, run `npm rebuild better-sqlite3` before starting Panopticon again.
 
 See the [full documentation](https://panopticon-cli.com) for detailed setup, configuration, and usage guides.
 
 ---
 
-## Architecture at a Glance
+## Command Deck
 
-Panopticon started as a CLI for orchestrating coding agents and grew into **Command Deck**, a desktop app. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — so you can spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @panctl/cli`; keep `pan` for headless and CI, or use `@panctl/desktop` for the packaged desktop app.
+Command Deck is the live development surface where you and your agents work together. It's built around three zones that update in real time — no refresh buttons, no polling. Every event animates in as it happens.
+
+| Zone | What You See |
+|:-----|:-------------|
+| **Issue Header** | Issue identity, pipeline stage, live cost tracking, activity sparkline, quality gate rollup |
+| **Agent Context** | Selected agent's role, status, current tool, thinking/waiting state, round history, per-session costs |
+| **Conversation + Composer** | Full conversation timeline with composer, or a tabbed dashboard when viewing the issue itself |
+
+### What You Can Do
+
+- **Switch models mid-session** — open the model picker and change from Opus to Sonnet to Kimi without restarting
+- **Fork conversations** — branch into a summary fork or plain fork, with or without thinking blocks, to explore alternatives
+- **Diff any turn** — see exactly what changed file-by-file at any point in the conversation, or compare the full implementation against main
+- **Checkpoint and restore** — auto-captured snapshots of agent state let you roll back to any point
+- **Plan visually** — vBRIEF plans render as interactive DAGs with item status tracking and acceptance criteria
+- **Archive and manage** — archive conversations with inline confirmations, manage session history
+
+### 13 Dashboard Views
+
+Project tree, activity feed, kanban board, agent status, cost analytics, convoy status, specialist handoffs, real-time activity log, performance metrics, skill library, health diagnostics, God View (cross-project), and settings.
 
 ---
 
 ## Why Panopticon?
 
-- **Stop babysitting agents.** Spawn them from a dashboard, monitor progress in real time, and let specialists handle code review, testing, and merging.
-- **Use the right model for the job.** Opus for planning, GPT-5.5 or Kimi for implementation, Haiku for quick commands — automatic routing based on task type and capabilities.
-- **Work survives across sessions.** PRDs, state files, beads, and skills persist context so agents don't start from zero every time.
+- **You set the direction, agents do the typing.** See every change in real time, steer with messages, swap models, fork conversations — you're the conductor, not the audience.
+- **Use the right model for the job.** Opus for planning, GPT-5.5 or Kimi for implementation, Haiku for quick commands — automatic routing based on task type, capability, and budget. Override any assignment with two clicks.
+- **Work survives across sessions.** PRDs, state files, beads, checkpoints, and skills persist context so agents don't start from zero every time.
 - **One skill format, every tool.** Write a SKILL.md once and it works across Claude Code, Codex, Cursor, and Gemini CLI.
-- **Tune routing without hand-editing prompts.** The Settings page lets you enable model families and set per-job overrides for work agents and specialists.
+- **Go fully hands-off when you want to.** The specialist pipeline takes an issue from plan to merged PR autonomously — review, test, inspect, UAT, merge. You just click Merge when you're satisfied.
 
 ---
 
@@ -74,7 +89,7 @@ Panopticon started as a CLI for orchestrating coding agents and grew into **Comm
  Rally
 ```
 
-Plus two specialists that run inline: **Inspect** verifies each implementation step against the spec, and **UAT** performs browser-based requirement verification after tests pass.
+You can drive any stage from the dashboard, the CLI, or a webhook. Engage as much or as little as you want — from hands-on pair programming with a single agent to launching a fully autonomous pipeline across dozens of issues.
 
 ---
 
@@ -82,22 +97,30 @@ Plus two specialists that run inline: **Inspect** verifies each implementation s
 
 | Feature | Description |
 |:--------|:------------|
-| **Multi-Agent Orchestration** | Spawn and manage AI agents in tmux sessions via dashboard or CLI |
+| **Command Deck** | Live three-zone development surface with real-time updates, no refresh buttons |
+| **Model Switching** | Change models mid-conversation — Opus, Sonnet, GPT, Kimi, Gemini, and more |
+| **Conversation Forking** | Branch any conversation to explore alternatives without losing the original |
+| **Turn-by-Turn Diffs** | See exactly what changed at every step, compare against main at any point |
+| **Checkpoints** | Auto-captured agent state snapshots — roll back to any point in the work |
+| **vBRIEF Plan Viewer** | Interactive DAG visualization of work plans with status tracking and acceptance criteria |
+| **Multi-Model Routing** | Anthropic, OpenAI, Google, Kimi, MiniMax, and OpenRouter — route by task type, capability, and budget |
 | **Cloister Lifecycle Manager** | Automatic model routing, stuck detection, cost tracking, and specialist handoffs |
-| **Mission Control** | 13-view dashboard — project tree, activity feed, kanban board, agent status, costs, metrics, and more |
+| **5 Specialist Agents** | Review, test, inspect, UAT, and merge — fully automated quality pipeline |
 | **PRD-Driven Workflow** | Opus writes a PRD before implementation starts; agents are blocked without one |
 | **70+ Universal Skills** | Pre-built skills ship out of the box, auto-synced on every `pan up` — one SKILL.md works across all AI tools |
 | **Multi-Tracker Support** | GitHub Issues, Linear, GitLab, Rally — all from one dashboard |
-| **Multi-Model Routing** | Anthropic, OpenAI, Google, Kimi, MiniMax, and OpenRouter — route by task type, capability, and budget |
 | **Workspaces** | Git worktree-based feature branches with Docker isolation (local and remote via Fly.io) |
 | **Convoys** | Run parallel agents on related issues with automatic synthesis |
-| **5 Specialist Agents** | Review, test, inspect, UAT, and merge — fully automated quality pipeline |
-| **Beads** | Git-backed task tracking that survives context compaction and works offline — auto-synced from vBRIEF plans |
-| **vBRIEF Plans** | Machine-readable work plans (v0.5 spec) with DAG viewer, item status tracking, and auto-copied artifacts |
-| **TLDR Code Analysis** | Token-efficient codebase analysis (500–1,200 tokens/file vs 10–25k) via semantic search and call graphs |
-| **Effect.js Server** | Dashboard server built on Effect.js with typed RPC, structured concurrency, and zero sync FS calls |
+| **Beads** | Git-backed task tracking that survives context compaction and works offline |
+| **TLDR Code Analysis** | Token-efficient codebase analysis (500-1,200 tokens/file vs 10-25k) via semantic search and call graphs |
 | **Cost Tracking** | Per-issue, per-stage token costs with dashboard analytics |
-| **Legacy Codebase Support** | AI self-monitoring skills that learn your codebase conventions over time ([details](docs/LEGACY-CODEBASE.md)) |
+| **Effect.js Server** | Dashboard server built on Effect.js with typed RPC, structured concurrency, and zero sync FS calls |
+
+---
+
+## Architecture at a Glance
+
+Panopticon started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @panctl/cli`; keep `pan` for headless and CI, or use `@panctl/desktop` for the packaged desktop app.
 
 ---
 
@@ -106,11 +129,11 @@ Plus two specialists that run inline: **Inspect** verifies each implementation s
 <div align="center">
 <table>
 <tr>
-<td><img src="docs/dashboard-overview.png" alt="Mission Control" width="400" /></td>
+<td><img src="docs/dashboard-overview.png" alt="Command Deck" width="400" /></td>
 <td><img src="docs/screenshot-agents.png" alt="Agent Management" width="400" /></td>
 </tr>
 <tr>
-<td align="center"><em>Mission Control — project tree, activity timeline, specialist pipeline</em></td>
+<td align="center"><em>Command Deck — project tree, activity timeline, specialist pipeline</em></td>
 <td align="center"><em>Cloister Deacon, specialist agents, and issue agent management</em></td>
 </tr>
 <tr>

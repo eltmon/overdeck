@@ -1,6 +1,6 @@
 ---
 title: Quick Start
-description: 'Get Panopticon running in one command'
+description: 'Get Command Deck running in one command'
 ---
 
 # Quick Start
@@ -11,7 +11,7 @@ description: 'Get Panopticon running in one command'
 npx @panctl/cli
 ```
 
-That's it. `npx @panctl/cli` starts the Panopticon browser/server experience and opens the dashboard in your browser. No global install step required.
+That's it. `npx @panctl/cli` starts Command Deck and opens the dashboard in your browser. No global install step required.
 
 Missing tools (tmux, gh, mkcert, etc.) are prompted and installed inline the first time you use a feature that needs them.
 
@@ -21,10 +21,12 @@ Missing tools (tmux, gh, mkcert, etc.) are prompted and installed inline the fir
 
 ## What Happens Next
 
-1. **Dashboard starts** — Panopticon launches the local server and opens the browser UI
+1. **Command Deck starts** — Panopticon launches the local server and opens the dashboard
 2. **Add a project** — click the project picker and point Panopticon at a GitHub or GitLab repo
 3. **Pick an issue** — select an open issue from the kanban board
-4. **Spawn an agent** — Panopticon creates a git worktree, writes a PRD (plan), and starts coding
+4. **Start working** — spawn an agent, watch it plan and code in real time, steer it with messages, switch models, fork conversations, diff every turn
+
+You're in the cockpit. Engage as much or as little as you want — pair-program with a single agent, or let the full specialist pipeline take issues from plan to merged PR autonomously.
 
 ## Headless / CI
 
@@ -57,4 +59,4 @@ Prefer a standalone app? Download the latest release for your platform:
 
 ## Architecture at a Glance
 
-Panopticon started as a CLI for orchestrating coding agents and grew into **Command Deck**, a desktop app. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — so you can spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch the browser/server experience with `npx @panctl/cli`, use `@panctl/desktop` for the packaged desktop app, and keep `pan` for headless and CI.
+Panopticon started as a CLI and grew into **Command Deck**, a desktop-class development environment. The CLI, the GUI, and any script that can make an HTTP request all drive the same REST surface — spawn an agent from a kanban card, a terminal, or a webhook without switching tools. Under the hood: an Effect.js + TypeScript server, a React frontend over typed WebSocket RPC, SQLite for state, and Electron as the shell. Launch with `npx @panctl/cli`, use `@panctl/desktop` for the packaged desktop app, and keep `pan` for headless and CI.

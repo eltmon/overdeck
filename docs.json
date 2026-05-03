@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "name": "Panopticon",
+  "name": "Panopticon — The IDE for the Agent Era",
   "theme": "maple",
   "layout": "topnav",
   "colors": {
