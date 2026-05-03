@@ -11,6 +11,17 @@ This prevents scope creep, keeps changes traceable, and ensures every fix goes t
 
 **Exception:** If the bug directly blocks your assigned issue, fix it — but document it as a separate commit with a clear message.
 
+## tmux Socket — CRITICAL
+
+**Panopticon agents run under a separate tmux socket named `panopticon`.** Always use `-L panopticon`:
+
+```bash
+tmux -L panopticon list-sessions
+tmux -L panopticon capture-pane -t agent-{{ISSUE_ID_LOWER}} -p -S -50
+```
+
+Plain `tmux list-sessions` queries the default socket and will show "no server running" — this does NOT mean the agent is dead.
+
 ## Warnings
 
 - **DO NOT** modify files outside this workspace without explicit permission

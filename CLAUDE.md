@@ -111,6 +111,21 @@ nearly instant (~2s). It correctly resolves `@panctl/contracts` to the worktree'
 - `npm run lint` — ESLint
 - `npm test` — Vitest (root + frontend)
 
+## tmux Socket — CRITICAL
+
+**Panopticon agents run under a separate tmux socket named `panopticon`.** Always use `-L panopticon` when inspecting agent sessions:
+
+```bash
+# List all agent sessions
+tmux -L panopticon list-sessions
+
+# Attach or capture a specific agent
+tmux -L panopticon capture-pane -t agent-min-846 -p -S -50
+tmux -L panopticon attach -t agent-min-846
+```
+
+The default tmux socket (`/tmp/tmux-1000/default`) is NOT used by agents. Plain `tmux list-sessions` will show "no server running" or list unrelated sessions. This is a common source of false "agent not found" errors.
+
 ## tmux Message Delivery
 
 Use `load-buffer` + `paste-buffer` pattern (NOT raw `send-keys` for text):
