@@ -12,7 +12,7 @@
     "status": "approved",
     "uid": "bb9afa10-315b-409a-a625-02d14573e029",
     "author": "agent:claude-opus-4-6",
-    "sequence": 10,
+    "sequence": 11,
     "created": "2026-05-03T12:00:00Z",
     "updated": "2026-05-03T10:40:00Z",
     "references": [
@@ -550,9 +550,10 @@
       {
         "id": "workspace-plan-from-lifecycle",
         "title": "Update workspace plan resolution to read from ./vbrief/active/",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T10:40:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -564,7 +565,8 @@
           {
             "id": "workspace-plan-from-lifecycle.ac1",
             "title": "findPlan() checks ./vbrief/active/ for issue-keyed vBRIEF before .planning/plan.vbrief.json",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:40:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -572,7 +574,8 @@
           {
             "id": "workspace-plan-from-lifecycle.ac2",
             "title": "readWorkspacePlan() resolves from lifecycle dir transparently",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:40:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -580,7 +583,8 @@
           {
             "id": "workspace-plan-from-lifecycle.ac3",
             "title": "Fallback to .planning/plan.vbrief.json preserved for in-progress planning sessions",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:40:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }

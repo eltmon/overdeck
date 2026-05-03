@@ -17,6 +17,7 @@ Approval transition wired into start-agent flow. Next: workspace-3pq (set plan.s
 - [x] workspace-qe9: Post-merge transition in `postMergeLifecycle` (merge-agent.ts) — `transitionVBriefOnMain()` moves vBRIEF from active/ to completed/ on main with `scope: complete <ID> vBRIEF` commit. Handles both move + continue file + status update. Non-fatal.
 - [x] workspace-bdc: Close/cancel transition in `runDestructiveIssueLifecycle` (issues.ts) — `transitionVBriefOnMain()` moves vBRIEF to cancelled/ on main with `scope: cancel <ID> vBRIEF` commit when mode='cancel'. Non-fatal.
 - [x] workspace-57b: Dashboard plan endpoint GET /api/workspaces/:issueId/plan now uses `findVBriefByIssue()` to resolve from lifecycle dirs first, falling back to workspace `.planning/plan.vbrief.json` for in-progress planning. Response includes `lifecycleDir` field.
+- [x] workspace-0ka: `findPlan()` in `src/lib/vbrief/io.ts` now checks lifecycle dirs on the project root (via `findVBriefByIssue`) before falling back to workspace `.planning/plan.vbrief.json`. `readWorkspacePlan()` inherits this transparently since it calls `findPlan()`. All callers (task-readiness, beads sync, work-agent-prompt, etc.) work without modification.
 
 ## Remaining Work
 - [ ] workspace-44p: Write/update continue.vbrief.json during agent sessions

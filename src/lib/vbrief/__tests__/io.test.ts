@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { findPlan, isPlanningComplete, isPlanningProposed, readPlan, readWorkspacePlan, updateItemStatus, updateSubItemStatus } from '../io.js';
+import { ensureVBriefDirs, generateVBriefFilename, resolveVBriefDir } from '../lifecycle.js';
 import type { VBriefDocument } from '../types.js';
 
 let TEST_DIR: string;
@@ -53,6 +54,51 @@ describe('findPlan', () => {
     expect(result).not.toBeNull();
     expect(result).toContain('plan.vbrief.json');
     expect(existsSync(result!)).toBe(true);
+  });
+
+  it('resolves from lifecycle dir before workspace .planning/ (PAN-946)', () => {
+    // Create a project-like structure: TEST_DIR/project/workspaces/feature-pan-1
+    const projectRoot = join(TEST_DIR, 'project');
+    const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-1');
+    mkdirSync(workspacePath, { recursive: true });
+
+    // Write a workspace plan
+    writePlanDoc(workspacePath, makePlanDoc());
+
+    // Write a lifecycle plan (should win)
+    ensureVBriefDirs(projectRoot);
+    const lifecyclePlan: VBriefDocument = {
+      vBRIEFInfo: { version: '0.5', created: '2026-05-03T00:00:00Z' },
+      plan: {
+        id: 'pan-1',
+        title: 'Lifecycle Plan',
+        status: 'active',
+        items: [],
+        edges: [],
+      },
+    };
+    const filename = generateVBriefFilename('PAN-1', 'test', '2026-05-03');
+    writeFileSync(
+      join(resolveVBriefDir(projectRoot, 'active'), filename),
+      JSON.stringify(lifecyclePlan, null, 2),
+    );
+
+    const result = findPlan(workspacePath);
+    expect(result).not.toBeNull();
+    expect(result!).toContain('vbrief/active/');
+    const doc = JSON.parse(readFileSync(result!, 'utf-8')) as VBriefDocument;
+    expect(doc.plan.title).toBe('Lifecycle Plan');
+  });
+
+  it('falls back to workspace .planning/ when no lifecycle vBRIEF exists (PAN-946)', () => {
+    const projectRoot = join(TEST_DIR, 'project');
+    const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-2');
+    mkdirSync(workspacePath, { recursive: true });
+    writePlanDoc(workspacePath, makePlanDoc());
+
+    const result = findPlan(workspacePath);
+    expect(result).not.toBeNull();
+    expect(result!).toContain('.planning/plan.vbrief.json');
   });
 });
 
