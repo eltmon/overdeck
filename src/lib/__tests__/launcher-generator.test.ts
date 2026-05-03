@@ -142,6 +142,7 @@ describe('generateLauncherScript', () => {
       export PANOPTICON_ISSUE_ID='PAN-824'
       export PANOPTICON_SESSION_TYPE='correctness-review'
       cd -- '/workspace/project'
+      unset ANTHROPIC_API_KEY
       unset ANTHROPIC_BASE_URL
       unset ANTHROPIC_AUTH_TOKEN
       unset OPENAI_API_KEY
@@ -176,6 +177,7 @@ describe('generateLauncherScript', () => {
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
+      unset ANTHROPIC_API_KEY
       unset ANTHROPIC_BASE_URL
       unset ANTHROPIC_AUTH_TOKEN
       unset OPENAI_API_KEY
