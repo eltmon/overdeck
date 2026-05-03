@@ -72,6 +72,7 @@ import { hasPRDDraft } from '../../../lib/prd-draft.js';
 import { findPrdAnywhere } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { isPlanningComplete } from '../../../lib/vbrief/io.js';
+import { transitionVBriefOnMain } from '../../../lib/vbrief/lifecycle-io.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
@@ -1753,6 +1754,33 @@ const postAgentsRoute = HttpRouter.add(
         }
       }).pipe(Effect.catch(() => Effect.void));
     }
+
+    // Approval transition (PAN-946): move the scope vBRIEF on main from
+    // proposed/ → active/ and stamp plan.status='approved'. Idempotent: if the
+    // vBRIEF is already in active/ with status approved, this is a no-op. The
+    // commit only happens when projectPath is on main; otherwise the on-disk
+    // move still applies and a later sync will pick it up. Failure is non-fatal
+    // — agent spawn proceeds even if the lifecycle move fails.
+    yield* Effect.promise(() =>
+      transitionVBriefOnMain(
+        projectPath,
+        issueId,
+        'active',
+        'approved',
+        `scope: approve ${issueId.toUpperCase()} vBRIEF`,
+      )
+        .then((result) => {
+          if (result.moved) {
+            console.log(`[start-agent] vBRIEF moved ${result.fromDir} → active for ${issueId}`);
+          }
+          if (result.committed) {
+            console.log(`[start-agent] Committed approval transition on main for ${issueId}`);
+          }
+        })
+        .catch((err) => {
+          console.warn(`[start-agent] vBRIEF approval transition failed (non-fatal): ${err?.message ?? err}`);
+        }),
+    );
 
     const planningPromptPath = join(workspacePlanningDir, 'PLANNING_PROMPT.md');
     if (existsSync(planningPromptPath)) {

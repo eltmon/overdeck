@@ -10,6 +10,7 @@ import {
   moveVBrief,
   moveVBriefFilesOnly,
   promoteVBriefToProposed,
+  transitionVBriefOnMain,
   updatePlanStatus,
 } from '../lifecycle-io.js';
 import {
@@ -445,5 +446,179 @@ describe('promoteVBriefToProposed', () => {
 
     const copied = JSON.parse(readFileSync(result.destVBrief, 'utf-8'));
     expect(copied.plan.title).toBe('Updated title');
+  });
+});
+
+describe('transitionVBriefOnMain', () => {
+  it('moves vBRIEF between dirs, updates status, and commits on main', async () => {
+    initGitRepo(TEST_DIR);
+    ensureVBriefDirs(TEST_DIR);
+    const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
+    writePlan(
+      resolveVBriefDir(TEST_DIR, 'proposed'),
+      filename,
+      makePlan('PAN-1', 'foo', 'proposed'),
+    );
+    execSync('git add vbrief/', { cwd: TEST_DIR });
+    execSync('git -c commit.gpgsign=false commit -q -m "add proposed"', { cwd: TEST_DIR });
+
+    const result = await transitionVBriefOnMain(
+      TEST_DIR,
+      'PAN-1',
+      'active',
+      'approved',
+      'scope: approve PAN-1 vBRIEF',
+    );
+
+    expect(result.fromDir).toBe('proposed');
+    expect(result.toDir).toBe('active');
+    expect(result.moved).toBe(true);
+    expect(result.statusUpdated).toBe(true);
+    expect(result.committed).toBe(true);
+    expect(existsSync(result.toPath)).toBe(true);
+    expect(existsSync(join(resolveVBriefDir(TEST_DIR, 'proposed'), filename))).toBe(false);
+
+    const updatedDoc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as VBriefDocument;
+    expect(updatedDoc.plan.status).toBe('approved');
+    expect(updatedDoc.plan.sequence).toBe(2);
+
+    const log = execSync('git log -1 --pretty=%s', { cwd: TEST_DIR, encoding: 'utf-8' }).trim();
+    expect(log).toBe('scope: approve PAN-1 vBRIEF');
+  });
+
+  it('is idempotent: no commit when already in target dir with correct status', async () => {
+    initGitRepo(TEST_DIR);
+    ensureVBriefDirs(TEST_DIR);
+    const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
+    writePlan(
+      resolveVBriefDir(TEST_DIR, 'active'),
+      filename,
+      makePlan('PAN-1', 'foo', 'approved'),
+    );
+    execSync('git add vbrief/', { cwd: TEST_DIR });
+    execSync('git -c commit.gpgsign=false commit -q -m "seed active"', { cwd: TEST_DIR });
+
+    const result = await transitionVBriefOnMain(
+      TEST_DIR,
+      'PAN-1',
+      'active',
+      'approved',
+      'scope: approve PAN-1 vBRIEF',
+    );
+
+    expect(result.moved).toBe(false);
+    expect(result.statusUpdated).toBe(false);
+    expect(result.committed).toBe(false);
+
+    // git log should still show only the seed commit (init + seed = 2)
+    const logCount = execSync('git rev-list --count HEAD', { cwd: TEST_DIR, encoding: 'utf-8' }).trim();
+    expect(logCount).toBe('2');
+  });
+
+  it('updates status only when already in target dir but status differs', async () => {
+    initGitRepo(TEST_DIR);
+    ensureVBriefDirs(TEST_DIR);
+    const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
+    writePlan(
+      resolveVBriefDir(TEST_DIR, 'active'),
+      filename,
+      makePlan('PAN-1', 'foo', 'proposed'), // wrong status
+    );
+    execSync('git add vbrief/', { cwd: TEST_DIR });
+    execSync('git -c commit.gpgsign=false commit -q -m "seed active proposed"', { cwd: TEST_DIR });
+
+    const result = await transitionVBriefOnMain(
+      TEST_DIR,
+      'PAN-1',
+      'active',
+      'approved',
+      'scope: approve PAN-1 vBRIEF',
+    );
+
+    expect(result.moved).toBe(false);
+    expect(result.statusUpdated).toBe(true);
+    expect(result.committed).toBe(true);
+
+    const doc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as VBriefDocument;
+    expect(doc.plan.status).toBe('approved');
+  });
+
+  it('moves continue file alongside vBRIEF when both exist', async () => {
+    initGitRepo(TEST_DIR);
+    ensureVBriefDirs(TEST_DIR);
+    const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
+    writePlan(
+      resolveVBriefDir(TEST_DIR, 'proposed'),
+      filename,
+      makePlan('PAN-1', 'foo', 'proposed'),
+    );
+    const continueState: ContinueState = {
+      version: '1',
+      issueId: 'PAN-1',
+      created: '2026-05-03T00:00:00Z',
+      updated: '2026-05-03T00:00:00Z',
+      gitState: {},
+      decisions: [],
+      hazards: [],
+      resumePoint: null,
+      beadsMapping: {},
+      sessionHistory: [],
+    };
+    writeContinueState(resolveVBriefDir(TEST_DIR, 'proposed'), 'PAN-1', continueState);
+    execSync('git add vbrief/', { cwd: TEST_DIR });
+    execSync('git -c commit.gpgsign=false commit -q -m "seed with continue"', { cwd: TEST_DIR });
+
+    const result = await transitionVBriefOnMain(
+      TEST_DIR,
+      'PAN-1',
+      'active',
+      'approved',
+      'scope: approve PAN-1 vBRIEF',
+    );
+
+    expect(result.movedContinue).toBe(true);
+    expect(existsSync(continueFilePath(resolveVBriefDir(TEST_DIR, 'active'), 'PAN-1'))).toBe(true);
+    expect(existsSync(continueFilePath(resolveVBriefDir(TEST_DIR, 'proposed'), 'PAN-1'))).toBe(false);
+  });
+
+  it('throws when no vBRIEF exists for the issue', async () => {
+    initGitRepo(TEST_DIR);
+    ensureVBriefDirs(TEST_DIR);
+    await expect(
+      transitionVBriefOnMain(TEST_DIR, 'PAN-999', 'active', 'approved', 'scope: approve PAN-999 vBRIEF'),
+    ).rejects.toThrow();
+  });
+
+  it('does NOT commit when projectRoot is not on main', async () => {
+    initGitRepo(TEST_DIR);
+    ensureVBriefDirs(TEST_DIR);
+    const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
+    writePlan(
+      resolveVBriefDir(TEST_DIR, 'proposed'),
+      filename,
+      makePlan('PAN-1', 'foo', 'proposed'),
+    );
+    execSync('git add vbrief/', { cwd: TEST_DIR });
+    execSync('git -c commit.gpgsign=false commit -q -m "seed proposed"', { cwd: TEST_DIR });
+    execSync('git checkout -q -b feature/test', { cwd: TEST_DIR });
+
+    const result = await transitionVBriefOnMain(
+      TEST_DIR,
+      'PAN-1',
+      'active',
+      'approved',
+      'scope: approve PAN-1 vBRIEF',
+    );
+
+    // The on-disk move + status update happens regardless of branch.
+    expect(result.moved).toBe(true);
+    expect(result.statusUpdated).toBe(true);
+    // But no commit since we're not on main.
+    expect(result.committed).toBe(false);
+    expect(existsSync(result.toPath)).toBe(true);
+
+    // git log should still show only the init + seed commits, no scope commit.
+    const logCount = execSync('git rev-list --count HEAD', { cwd: TEST_DIR, encoding: 'utf-8' }).trim();
+    expect(logCount).toBe('2');
   });
 });

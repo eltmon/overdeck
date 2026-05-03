@@ -8,7 +8,7 @@
  * overrides.
  */
 
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { copyFileSync, existsSync, readFileSync, readdirSync, renameSync, writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { promisify } from 'util';
@@ -205,6 +205,145 @@ export function deleteVBrief(projectRoot: string, issueId: string): boolean {
   const continuePath = continueFilePath(resolveVBriefDir(projectRoot, found.lifecycleDir), issueId);
   if (existsSync(continuePath)) unlinkSync(continuePath);
   return true;
+}
+
+/**
+ * Result of {@link transitionVBriefOnMain}.
+ */
+export interface VBriefTransitionResult {
+  /** Lifecycle dir the vBRIEF was found in before the move. */
+  fromDir: VBriefLifecycleDir;
+  /** Lifecycle dir the vBRIEF lives in now. */
+  toDir: VBriefLifecycleDir;
+  /** Absolute path of the vBRIEF after the transition. */
+  toPath: string;
+  /** True if a continue file was moved alongside the vBRIEF. */
+  movedContinue: boolean;
+  /** True if `plan.status` was changed (false if it was already at `newStatus`). */
+  statusUpdated: boolean;
+  /** True if a git commit was created on main. False if not on main, or nothing changed. */
+  committed: boolean;
+  /** True if the vBRIEF actually moved between directories. False if it was already in target. */
+  moved: boolean;
+}
+
+/**
+ * Move a vBRIEF between lifecycle directories on the project root, update
+ * `plan.status`, and commit on main with `commitMessage`. Idempotent: if the
+ * vBRIEF is already in the target directory and has the target status, no
+ * commit is created.
+ *
+ * The commit only happens if `projectRoot` is currently on the `main` branch.
+ * Otherwise the on-disk move + status update still happens (so the file
+ * reflects the new state) but no commit is created — a later sync or manual
+ * commit can pick it up. This avoids accidentally committing onto a feature
+ * branch when the user has the dashboard project root checked out elsewhere.
+ *
+ * Triggers a background `git push` after committing — non-fatal on failure.
+ *
+ * Throws when no vBRIEF exists for the issue.
+ */
+export async function transitionVBriefOnMain(
+  projectRoot: string,
+  issueId: string,
+  targetDir: VBriefLifecycleDir,
+  newStatus: string,
+  commitMessage: string,
+): Promise<VBriefTransitionResult> {
+  const found = findVBriefByIssue(projectRoot, issueId);
+  if (!found) {
+    throw new Error(`No vBRIEF found for issue ${issueId} under ${projectRoot}`);
+  }
+
+  const needsMove = found.lifecycleDir !== targetDir;
+  const needsStatus = found.document.plan.status !== newStatus;
+
+  let toPath = found.path;
+  let movedContinue = false;
+  let fromContinuePath: string | null = null;
+  let toContinuePath: string | null = null;
+
+  if (needsMove) {
+    const moveResult = moveVBriefFilesOnly(projectRoot, issueId, targetDir);
+    toPath = moveResult.toPath;
+    movedContinue = moveResult.movedContinue;
+    fromContinuePath = continueFilePath(resolveVBriefDir(projectRoot, found.lifecycleDir), issueId);
+    toContinuePath = continueFilePath(resolveVBriefDir(projectRoot, targetDir), issueId);
+  }
+
+  if (needsStatus) {
+    updatePlanStatus(toPath, newStatus);
+  }
+
+  let committed = false;
+  if (needsMove || needsStatus) {
+    try {
+      const { stdout: branchStdout } = await execAsync('git rev-parse --abbrev-ref HEAD', {
+        cwd: projectRoot,
+        encoding: 'utf-8',
+      });
+      const currentBranch = branchStdout.trim();
+      if (currentBranch === 'main') {
+        // Stage the destination + (if moved) the source so the rename is recorded.
+        const stageList: string[] = [toPath];
+        if (needsMove) {
+          stageList.push(found.path);
+        }
+        if (movedContinue && fromContinuePath && toContinuePath) {
+          stageList.push(toContinuePath);
+          stageList.push(fromContinuePath);
+        }
+        await runGitAdd(projectRoot, stageList);
+
+        const quotedAll = stageList
+          .map(p => `"${p.replace(/"/g, '\\"')}"`)
+          .join(' ');
+        try {
+          await execAsync(`git diff --cached --quiet -- ${quotedAll}`, {
+            cwd: projectRoot,
+            encoding: 'utf-8',
+          });
+          // exit 0 → nothing staged for our paths → no commit needed
+        } catch {
+          await execAsync(
+            `git commit -m ${JSON.stringify(commitMessage)} -- ${quotedAll}`,
+            { cwd: projectRoot, encoding: 'utf-8' },
+          );
+          committed = true;
+          // Background push — non-fatal on failure (no remote, auth issue, etc).
+          try {
+            const { stdout: remotes } = await execAsync('git remote', {
+              cwd: projectRoot,
+              encoding: 'utf-8',
+            });
+            if (remotes.trim()) {
+              const pushChild = spawn('git', ['push'], {
+                cwd: projectRoot,
+                detached: true,
+                stdio: 'ignore',
+              });
+              pushChild.unref();
+            }
+          } catch {
+            /* push setup failed — non-fatal */
+          }
+        }
+      }
+    } catch {
+      // Branch detection or git ops failed — leave on-disk state in place but
+      // don't propagate a commit error. Caller can detect via `committed` flag.
+    }
+  }
+
+  return {
+    fromDir: found.lifecycleDir,
+    toDir: targetDir,
+    toPath,
+    movedContinue,
+    statusUpdated: needsStatus,
+    committed,
+    moved: needsMove,
+  };
 }
 
 /** Internal helper exported for tests — verify a file exists and is JSON. */

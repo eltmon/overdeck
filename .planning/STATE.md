@@ -3,7 +3,7 @@
 ## Status: In Progress
 
 ## Current Phase
-complete-planning now copies workspace vBRIEF to ./vbrief/proposed/ on main with `scope: propose <ID> vBRIEF` commit. Next: workspace-tq9 (approval transition moves vBRIEF from proposed/ to active/ on main).
+Approval transition wired into start-agent flow. Next: workspace-3pq (set plan.status to running on pan start).
 
 ## Completed Work
 - [x] workspace-0k8: vBRIEF lifecycle foundation — types, filename convention, directory helpers in `src/lib/vbrief/lifecycle.ts` with 14 unit tests (commit 7ae8315fa)
@@ -12,9 +12,9 @@ complete-planning now copies workspace vBRIEF to ./vbrief/proposed/ on main with
 - [x] workspace-9y5: plan-finalize stamps proposed status + canonical filename — added typed `metadata.canonicalFilename` to VBriefPlan; new `stampPlanForFinalization()` exports preserves existing canonical filename so date stays immutable across re-finalizations. 9 unit tests passing.
 - [x] workspace-q1e: Replaced `.planning-complete` marker reads with `plan.status` checks. Added `isPlanningProposed()` (strict, gates Done button) and `isPlanningComplete()` (broad, gates "tasks generated") helpers in `src/lib/vbrief/io.ts`, both with legacy marker fallback for vBRIEFs without status fields. Updated 4 read sites (misc.ts, agents.ts, issues.ts, issue-data-service.ts). 39 io.test.ts tests passing (13 new for the helpers).
 - [x] workspace-b2q: complete-planning endpoint promotes vBRIEF to ./vbrief/proposed/ on main. Extracted `promoteVBriefToProposed()` to `src/lib/vbrief/lifecycle-io.ts`. Removed old `docs/prds/active/` copy step for plan artifacts (PRD discovery from `docs/prds/planned/` retained). Path-scoped commit `scope: propose <ID> vBRIEF` only when project root is on main. 24 lifecycle-io tests passing (8 new for promote).
+- [x] workspace-tq9: Approval transition wired into start-agent flow. Added `transitionVBriefOnMain()` to `src/lib/vbrief/lifecycle-io.ts` — generic helper for moving a vBRIEF between lifecycle dirs on main, updating `plan.status`, and committing with a custom message. Idempotent (no commit if already in target dir with target status), branch-aware (only commits when projectRoot is on main). Called from POST /api/agents flow with `scope: approve PAN-XXX vBRIEF`. 30 lifecycle-io tests passing (6 new for the transition helper).
 
 ## Remaining Work
-- [ ] workspace-tq9: Approval transition — move vBRIEF from proposed/ to active/ on main
 - [ ] workspace-3pq: Set plan.status to running on pan start
 - [ ] workspace-44p: Write/update continue.vbrief.json during agent sessions
 - [ ] workspace-qe9: Post-merge — move vBRIEF from active/ to completed/ on main

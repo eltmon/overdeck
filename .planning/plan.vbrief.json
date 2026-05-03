@@ -4,7 +4,7 @@
     "created": "2026-05-03T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-946: Adopt deft vBRIEF lifecycle model for scope vBRIEFs",
-    "updated": "2026-05-03T10:10:00Z"
+    "updated": "2026-05-03T10:25:00Z"
   },
   "plan": {
     "id": "pan-946",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "bb9afa10-315b-409a-a625-02d14573e029",
     "author": "agent:claude-opus-4-6",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-05-03T12:00:00Z",
-    "updated": "2026-05-03T10:10:00Z",
+    "updated": "2026-05-03T10:25:00Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/946",
@@ -344,9 +344,10 @@
       {
         "id": "approve-to-active",
         "title": "Approval transition: move vBRIEF from proposed/ to active/ on main",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T10:25:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -358,7 +359,8 @@
           {
             "id": "approve-to-active.ac1",
             "title": "Start-agent flow (or explicit approve) moves vBRIEF from proposed/ to active/ on main before worktree creation",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:25:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -366,7 +368,8 @@
           {
             "id": "approve-to-active.ac2",
             "title": "plan.status updated to 'approved' with sequence increment",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:25:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -374,7 +377,8 @@
           {
             "id": "approve-to-active.ac3",
             "title": "Git commit on main with message 'scope: approve PAN-XXX vBRIEF'",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:25:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
