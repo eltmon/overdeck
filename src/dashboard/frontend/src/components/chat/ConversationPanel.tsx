@@ -202,12 +202,16 @@ export function ConversationPanel({
   });
 
   const switchModelMutation = useMutation({
-    mutationFn: (model: string) =>
-      fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/switch-model`, {
+    mutationFn: (model: string) => {
+      const endpoint = agentId
+        ? `/api/agents/${encodeURIComponent(agentId)}/switch-model`
+        : `/api/conversations/${encodeURIComponent(conversation.name)}/switch-model`;
+      return fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model }),
-      }).then(r => { if (!r.ok) throw new Error('Failed to switch model'); return r.json(); }),
+      }).then(r => { if (!r.ok) throw new Error('Failed to switch model'); return r.json(); });
+    },
     onSuccess: (_, model) => {
       saveStoredModel(model);
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
@@ -422,6 +426,7 @@ export function ConversationPanel({
               turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
               onOpenTurnDiff={handleOpenTurnDiff}
               resolvedTheme={resolvedTheme}
+              agentId={agentId}
               modelPicker={!embedded ? (
                 <ModelPicker
                   value={selectedModel}
@@ -554,6 +559,8 @@ interface ConversationViewProps {
   turnDiffSummaryByAssistantMessageId?: Map<string, TurnDiffSummary>;
   onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
   resolvedTheme?: 'light' | 'dark';
+  /** Agent ID for agent sessions (uses /api/agents/* endpoints instead of /api/conversations/*) */
+  agentId?: string;
 }
 
 export interface FailedMessage {
@@ -562,7 +569,7 @@ export interface FailedMessage {
   createdAt: string;
 }
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId }: ConversationViewProps) {
   const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
   const [failedMessages, setFailedMessages] = useState<FailedMessage[]>([]);
   // Track count so we know when the server caught up
@@ -611,14 +618,14 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
     // Remove from failed list and re-send
     setFailedMessages(prev => prev.filter(f => f.id !== failedId));
     try {
-      const res = await fetch(
-        `/api/conversations/${encodeURIComponent(conversation.name)}/message`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: text }),
-        },
-      );
+      const endpoint = agentId
+        ? `/api/agents/${encodeURIComponent(agentId)}/message`
+        : `/api/conversations/${encodeURIComponent(conversation.name)}/message`;
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      });
       if (!res.ok) {
         const body = await res.text().catch(() => '');
         throw new Error(`Failed to send message (${res.status})${body ? `: ${body}` : ''}`);
@@ -632,7 +639,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
       };
       setFailedMessages(prev => [...prev, failed]);
     }
-  }, [conversation.name]);
+  }, [conversation.name, agentId]);
 
   const handleDiscardFailed = useCallback((failedId: string) => {
     setFailedMessages(prev => prev.filter(f => f.id !== failedId));
@@ -740,7 +747,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           </button>
         </div>
       ) : (
-        <ComposerFooter conversation={conversation} onSend={handleMessageSent} onSendFailed={handleSendFailed} />
+        <ComposerFooter conversation={conversation} onSend={handleMessageSent} onSendFailed={handleSendFailed} agentId={agentId} />
       )}
     </div>
   );

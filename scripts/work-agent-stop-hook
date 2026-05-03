@@ -9,6 +9,7 @@
 # Escalation tiers:
 #   working   — default while tool activity is recent
 #   done      — STATE.md marked complete AND branch pushed
+#   api_error — transient provider error detected (auto-retry nudge)
 #   needs_input — LLM verdict STOPPED_FOR_INPUT
 #   stuck     — 2+ consecutive UNCLEAR LLM verdicts
 #
@@ -225,6 +226,52 @@ fi
 OUTPUT=$(tmux capture-pane -t "$AGENT_ID" -p -S -200 2>/dev/null || echo "")
 [ -z "$OUTPUT" ] && exit 0
 echo "$OUTPUT" | tail -20 | grep -qE '(^❯|Worked for|Sautéed|Cooking|Thinking for)' || exit 0
+
+# ── Phase 2.5: API error detection (auto-retry) ─────────────────────────
+# If the agent stopped because of a transient API error, nudge it to retry
+# instead of burning an LLM call on completion analysis. The agent was doing
+# work and got cut off by infrastructure — it should just continue.
+API_ERROR_PATTERNS=(
+  "API Error: The server had an error while processing your request"
+  "API Error: Overloaded"
+  "API Error: Rate limit"
+  "API Error: Request was aborted"
+  "API Error: Timed out"
+  "529 Overloaded"
+  "502 Bad Gateway"
+  "503 Service Unavailable"
+)
+
+API_ERROR_DETECTED=false
+for pattern in "${API_ERROR_PATTERNS[@]}"; do
+  if echo "$OUTPUT" | grep -qF "$pattern"; then
+    API_ERROR_DETECTED=true
+    break
+  fi
+done
+
+if [ "$API_ERROR_DETECTED" = "true" ]; then
+  # Cooldown: don't retry more than once per 5 minutes for API errors.
+  API_ERROR_NUDGE_FILE="$AGENT_STATE_DIR/.last-api-error-nudge"
+  if [ -f "$API_ERROR_NUDGE_FILE" ]; then
+    LAST_API_NUDGE=$(cat "$API_ERROR_NUDGE_FILE" 2>/dev/null || echo "0")
+    NOW=$(date +%s)
+    if [ $(( NOW - LAST_API_NUDGE )) -lt 300 ]; then
+      echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID api_error detected but cooldown active" \
+        >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+      exit 0
+    fi
+  fi
+
+  emit_resolution "api_error"
+  date +%s > "$API_ERROR_NUDGE_FILE" 2>/dev/null || true
+
+  echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID api_error detected — nudging retry" \
+    >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+
+  nudge_agent "You stopped due to a transient API error. This is a temporary server issue, not a problem with your code. Continue your work from where you left off. Do NOT start over — pick up exactly where you stopped."
+  exit 0
+fi
 
 # ── Phase 3: LLM fallback ────────────────────────────────────────────────
 COMPLETION_MODEL="${PANOPTICON_COMPLETION_CHECK_MODEL:-}"

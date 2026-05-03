@@ -3,6 +3,7 @@ import { existsSync, writeFileSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
 import { findPlan } from '../../lib/vbrief/io.js';
+import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 
 interface PlanFinalizeOptions {
   workspace?: string;
@@ -57,6 +58,21 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
 
   const markerPath = join(workspacePath, '.planning', '.planning-complete');
   writeFileSync(markerPath, '', 'utf-8');
+
+  // Derive issue ID from workspace directory name (feature-<id> or <id>)
+  const workspaceName = workspacePath.split('/').pop() || '';
+  const issueId = workspaceName.replace(/^feature-/, '').toUpperCase();
+  emitActivityEntry({
+    source: 'planning-agent',
+    level: 'info',
+    message: `${issueId} planning finalized — awaiting your approval`,
+    issueId,
+  });
+  emitActivityTts({
+    utterance: `${issueId} planning is done, awaiting your approval`,
+    priority: 1,
+    issueId,
+  });
 
   if (options.json) {
     console.log(JSON.stringify({

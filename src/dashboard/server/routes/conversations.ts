@@ -234,6 +234,7 @@ async function getCachedMessages(
           return cachedResult.compactBoundaries.concat(incremental.compactBoundaries);
         },
         planToolUseIds: incremental.planToolUseIds,
+        permissionMode: incremental.permissionMode ?? cachedResult.permissionMode,
       };
     }
   } else {
@@ -252,6 +253,7 @@ async function getCachedMessages(
       lastSequence: result.lastSequence,
       planToolUseIds: result.planToolUseIds,
       proposedPlan: result.proposedPlan,
+      permissionMode: result.permissionMode,
     },
   });
   if (messagesCache.size > MESSAGES_CACHE_MAX) {

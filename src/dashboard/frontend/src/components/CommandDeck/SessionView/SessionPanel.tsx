@@ -143,6 +143,7 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
               roundMarkers={roundMarkers}
               roundMetadata={session.roundMetadata}
               embedded
+              agentId={session.sessionId}
             />
           ) : hasTranscript ? (
             <div className={styles.sessionPanelTranscript}>

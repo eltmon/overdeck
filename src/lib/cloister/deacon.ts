@@ -831,6 +831,102 @@ export async function checkStuckWorkAgents(): Promise<string[]> {
   return actions;
 }
 
+// ============================================================================
+// API Error Recovery
+// ============================================================================
+
+/**
+ * API error patterns that indicate transient server failures.
+ * When an agent stops with one of these in its tmux output, it should
+ * be nudged to retry rather than left idle.
+ */
+const API_ERROR_PATTERNS = [
+  'API Error: The server had an error while processing your request',
+  'API Error: Overloaded',
+  'API Error: Rate limit',
+  'API Error: Request was aborted',
+  'API Error: Timed out',
+  '529 Overloaded',
+  '502 Bad Gateway',
+  '503 Service Unavailable',
+];
+
+/**
+ * Cooldown between API-error recovery nudges per agent.
+ * Prevents spamming agents that are hitting persistent errors.
+ */
+const API_ERROR_RECOVERY_COOLDOWN_MS = 5 * 60_000; // 5 minutes
+
+/**
+ * Track API-error recovery attempts per agent.
+ */
+const apiErrorRecoveryState: Map<string, { lastAttempt: number }> = new Map();
+
+/**
+ * Check for work agents that stopped due to transient API errors.
+ *
+ * Unlike stuck-thinking agents (which are actively processing), API-error
+ * agents have stopped with the prompt showing. The tmux output contains
+ * an error message from the provider. Recovery: send a "continue" nudge.
+ */
+export async function checkApiErrorAgents(): Promise<string[]> {
+  const actions: string[] = [];
+  const agents = listRunningAgents();
+  const isSpecialistSession = (id: string) => id.startsWith('specialist-');
+  const now = Date.now();
+
+  for (const agent of agents) {
+    if (!agent.tmuxActive) continue;
+
+    const isWorkAgent = agent.id.startsWith('agent-') && !isSpecialistSession(agent.id);
+    if (!isWorkAgent) continue;
+
+    // Check cooldown
+    const recovery = apiErrorRecoveryState.get(agent.id);
+    if (recovery && (now - recovery.lastAttempt) < API_ERROR_RECOVERY_COOLDOWN_MS) {
+      continue;
+    }
+
+    // Capture more lines to see the error context
+    let tmuxOutput: string;
+    try {
+      tmuxOutput = await capturePaneAsync(agent.id, 30);
+    } catch {
+      continue;
+    }
+
+    if (!tmuxOutput.trim()) continue;
+
+    // Check if the prompt is showing (agent is idle, not actively thinking)
+    const hasPrompt = tmuxOutput.includes('❯');
+    if (!hasPrompt) continue;
+
+    // Check for API error patterns
+    const hasApiError = API_ERROR_PATTERNS.some(pattern => tmuxOutput.includes(pattern));
+    if (!hasApiError) continue;
+
+    // PAN-653: skip workspaces marked stuck or deacon-ignored
+    const agentIssueId = (agent.issueId || agent.id.replace('agent-', '')).toUpperCase();
+    const agentReviewStatus = getReviewStatus(agentIssueId);
+    if (agentReviewStatus?.stuck || agentReviewStatus?.deaconIgnored) {
+      continue;
+    }
+
+    console.log(`[deacon] Work agent ${agent.id} stopped with API error — nudging retry`);
+
+    try {
+      const continueMsg = 'You stopped due to a transient API error. This is a temporary server issue, not a problem with your code. Continue your work from where you left off. Do NOT start over — pick up exactly where you stopped.';
+      await sendKeysAsync(agent.id, continueMsg);
+      apiErrorRecoveryState.set(agent.id, { lastAttempt: now });
+      actions.push(`API error recovery: nudged ${agent.id} to retry`);
+    } catch (err) {
+      console.error(`[deacon] Failed to nudge ${agent.id} for API error retry:`, err);
+    }
+  }
+
+  return actions;
+}
+
 /**
  * Clean up stale agent state directories (PAN-154)
  *
@@ -3447,6 +3543,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   const stuckActions = await checkStuckWorkAgents();
   actions.push(...stuckActions);
   for (const a of stuckActions) addLog('action', a, state.patrolCycle);
+
+  // API error recovery: nudge agents that stopped due to transient provider errors.
+  const apiErrorActions = await checkApiErrorAgents();
+  actions.push(...apiErrorActions);
+  for (const a of apiErrorActions) addLog('action', a, state.patrolCycle);
 
   const configuredStashJanitorEveryCycles = config.stashJanitorEveryCycles
     ?? Math.round((60 * 60 * 1000) / config.patrolIntervalMs);

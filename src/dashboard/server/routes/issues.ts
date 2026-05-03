@@ -56,8 +56,10 @@ import { GitHubClient } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
 import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 import { getAgentStateAsync, normalizeAgentId } from '../../../lib/agents.js';
+import { emitActivityEntry, emitActivityTts } from '../../../lib/activity-logger.js';
 import type { LifecycleContext, StepResult } from '../../../lib/lifecycle/types.js';
 import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
+import { validatePlanningDocument } from '../../../lib/planning/planning-agent.js';
 import {
   getCachedResourceAllocatedIssues,
   getResourceDetailIdentifiers,
@@ -1109,6 +1111,48 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
 
     // Clear agents cache so the dashboard stops showing the planning agent as active
     invalidateAgentsCache();
+
+    // Emit activity + TTS for planning completion
+    const planningDirForCheck = projectPath
+      ? join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning')
+      : '';
+    let openQuestionsCount = 0;
+    if (planningDirForCheck && existsSync(planningDirForCheck)) {
+      try {
+        const stateMdPath = join(planningDirForCheck, 'STATE.md');
+        if (existsSync(stateMdPath)) {
+          const stateMdContent = await readFile(stateMdPath, 'utf-8');
+          const validation = validatePlanningDocument(stateMdContent);
+          openQuestionsCount = validation.openQuestions;
+        }
+      } catch { /* non-fatal */ }
+    }
+
+    if (openQuestionsCount > 0) {
+      emitActivityEntry({
+        source: 'planning-agent',
+        level: 'warn',
+        message: `${id} planning complete with ${openQuestionsCount} open question(s) — awaiting user input`,
+        issueId: id,
+      });
+      emitActivityTts({
+        utterance: `${id} planning complete with ${openQuestionsCount} open question awaiting your input`,
+        priority: 1,
+        issueId: id,
+      });
+    } else {
+      emitActivityEntry({
+        source: 'planning-agent',
+        level: 'info',
+        message: `${id} planning complete — ready for work`,
+        issueId: id,
+      });
+      emitActivityTts({
+        utterance: `${id} planning complete, ready for work`,
+        priority: 2,
+        issueId: id,
+      });
+    }
 
     // Suppress unused variable warning — remoteVmName used for remote session cleanup if added later
     void isRemotePlanning; void remoteVmName;
