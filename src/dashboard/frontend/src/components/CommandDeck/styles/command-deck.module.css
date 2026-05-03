@@ -721,8 +721,7 @@
 
 /* Session Node (child of FeatureItem) */
 .sessionNode {
-  display: grid;
-  grid-template-columns: 8px max-content minmax(0, 1fr) max-content max-content;
+  display: flex;
   align-items: center;
   gap: 6px;
   padding: 4px 8px 4px calc(12px + 32px);
@@ -770,7 +769,7 @@
   font-size: 10px;
   color: var(--muted-foreground);
   flex-shrink: 0;
-  justify-self: end;
+  margin-left: auto;
   text-transform: lowercase;
   padding: 1px 6px;
   border-radius: 3px;

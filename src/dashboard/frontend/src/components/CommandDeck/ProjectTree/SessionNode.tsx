@@ -1,8 +1,36 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { ChevronRight, ChevronDown } from 'lucide-react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
+import { useAvailableModels, type ModelGroup } from '../../shared/ModelPicker/ModelPicker';
 import styles from '../styles/command-deck.module.css';
+
+let resolvedModelsCache: Record<string, string | null> | null = null;
+let resolvedModelsFetchPromise: Promise<Record<string, string | null>> | null = null;
+
+function useResolvedModels(): Record<string, string | null> {
+  const [models, setModels] = useState<Record<string, string | null>>(resolvedModelsCache ?? {});
+
+  useEffect(() => {
+    if (resolvedModelsCache) {
+      setModels(resolvedModelsCache);
+      return;
+    }
+    if (!resolvedModelsFetchPromise) {
+      resolvedModelsFetchPromise = fetch('/api/models/resolve')
+        .then(r => r.json())
+        .then((data: Record<string, string | null>) => {
+          resolvedModelsCache = data;
+          return data;
+        })
+        .catch(() => ({}));
+    }
+    resolvedModelsFetchPromise.then(data => setModels(data)).catch(() => {});
+  }, []);
+
+  return models;
+}
 
 function presenceToStatus(presence: SessionNodeType['presence']): StatusDotStatus {
   switch (presence) {
@@ -23,10 +51,13 @@ interface SessionNodeProps {
   onViewTerminal?: (sessionId: string) => void;
   onPauseSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
-  onRestartSession?: (sessionId: string, issueId: string) => void;
+  onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => void;
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
+  expandable?: boolean;
+  expanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 function TypeBadge({ type, role }: { type: SessionNodeType['type']; role?: string }) {
@@ -114,6 +145,137 @@ function MenuDivider() {
   );
 }
 
+function RestartSubmenu({
+  defaultModel,
+  groups,
+  label,
+  onRestart,
+}: {
+  defaultModel: string | null;
+  groups: ModelGroup[];
+  label?: string;
+  onRestart: (model?: string) => void;
+}) {
+  const [showModels, setShowModels] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnter = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setShowModels(true);
+  };
+  const handleMouseLeave = () => {
+    timeoutRef.current = setTimeout(() => setShowModels(false), 200);
+  };
+
+  const defaultLabel = defaultModel
+    ? defaultModel.replace(/^claude-/, '').replace(/-\d{8}$/, '')
+    : 'default';
+
+  return (
+    <div
+      style={{ position: 'relative' }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      <button
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          width: '100%',
+          padding: '6px 12px',
+          border: 'none',
+          background: 'none',
+          textAlign: 'left',
+          cursor: 'pointer',
+          color: 'var(--foreground)',
+          fontSize: 12,
+          gap: 8,
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLElement).style.background = 'var(--accent)';
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLElement).style.background = 'transparent';
+        }}
+        onClick={() => onRestart()}
+      >
+        <span>{label ? `${label} (${defaultLabel})` : `Restart (${defaultLabel})`}</span>
+        <ChevronRight size={10} style={{ flexShrink: 0, opacity: 0.5 }} />
+      </button>
+
+      {showModels && (
+        <div
+          style={{
+            position: 'absolute',
+            left: '100%',
+            top: 0,
+            zIndex: 1001,
+            background: 'var(--card)',
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            padding: '4px 0',
+            minWidth: 180,
+            maxHeight: 300,
+            overflowY: 'auto',
+            fontSize: 12,
+          }}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          {groups.map((group) => (
+            <div key={group.provider}>
+              <div style={{
+                padding: '4px 12px 2px',
+                fontSize: 10,
+                fontWeight: 600,
+                color: 'var(--muted-foreground)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}>
+                {group.label}
+              </div>
+              {group.models.map((m) => (
+                <button
+                  key={m.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    width: '100%',
+                    padding: '4px 12px',
+                    border: 'none',
+                    background: 'none',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    color: m.id === defaultModel ? 'var(--primary)' : 'var(--foreground)',
+                    fontSize: 12,
+                    fontWeight: m.id === defaultModel ? 600 : 400,
+                    gap: 8,
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = 'var(--accent)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = 'transparent';
+                  }}
+                  onClick={() => onRestart(m.id)}
+                >
+                  <span>{m.label}</span>
+                  {m.costDisplay && (
+                    <span style={{ opacity: 0.5, fontSize: 10 }}>{m.costDisplay}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function SessionNode({
   session,
   issueId,
@@ -127,9 +289,14 @@ export function SessionNode({
   onDeepWipe,
   onOpenStateDir,
   onViewJsonl,
+  expandable,
+  expanded,
+  onToggleExpand,
 }: SessionNodeProps) {
   const [menu, setMenu] = useState<ContextMenuState>({ x: 0, y: 0, open: false });
   const menuRef = useRef<HTMLDivElement>(null);
+  const { groups } = useAvailableModels();
+  const resolvedModels = useResolvedModels();
 
   // Live flash when presence or status changes (blocker-8)
   const flashKey = `${session.sessionId}:${session.presence}:${session.status}`;
@@ -184,9 +351,22 @@ export function SessionNode({
     <>
       <button
         className={`${styles.sessionNode} ${isSelected ? styles.sessionNodeSelected : ''} ${flashClass}`}
-        onClick={onClick}
+        onClick={() => onClick?.()}
         onContextMenu={handleContextMenu}
       >
+        {expandable && (
+          <span
+            role="button"
+            tabIndex={-1}
+            onClick={(e) => { e.stopPropagation(); onToggleExpand?.(); }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onToggleExpand?.(); } }}
+            style={{ display: 'inline-flex', flexShrink: 0, cursor: 'pointer' }}
+          >
+            {expanded
+              ? <ChevronDown size={12} style={{ color: 'var(--muted-foreground)' }} />
+              : <ChevronRight size={12} style={{ color: 'var(--muted-foreground)' }} />}
+          </span>
+        )}
         <StatusDot status={presenceToStatus(session.presence)} size="sm" />
         <TypeBadge type={session.type} role={session.role} />
         <span className={styles.sessionLabel} title={session.sessionId}>
@@ -243,15 +423,28 @@ export function SessionNode({
               }}
             />
           )}
-          {canRestart && (
-            <MenuItem
-              label="Restart"
-              onClick={() => {
-                onRestartSession!(session.sessionId, issueId!);
-                closeMenu();
-              }}
-            />
-          )}
+          {canRestart && (() => {
+            const workTypeKey = session.type === 'review' ? 'specialist-review-agent'
+              : session.type === 'reviewer' && session.role ? `review:${session.role}`
+              : session.type === 'work' ? 'issue-agent:implementation'
+              : session.type === 'planning' ? 'planning-agent'
+              : session.type === 'test' ? 'specialist-test-agent'
+              : session.type === 'merge' ? 'specialist-merge-agent'
+              : null;
+            const defaultModel = workTypeKey ? (resolvedModels[workTypeKey] ?? null) : null;
+            const restartLabel = session.type === 'review' ? 'Restart all' : undefined;
+            return (
+              <RestartSubmenu
+                defaultModel={defaultModel}
+                groups={groups}
+                label={restartLabel}
+                onRestart={(model) => {
+                  onRestartSession!(session.sessionId, issueId!, session.type, session.role, model);
+                  closeMenu();
+                }}
+              />
+            );
+          })()}
 
           {hasLifecycleActions && canDeepWipe && <MenuDivider />}
 

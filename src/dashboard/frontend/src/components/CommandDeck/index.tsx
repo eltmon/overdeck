@@ -400,8 +400,8 @@ export function CommandDeck({
       const res = await fetch(`/api/agents/${sessionId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to stop session');
       await refreshDashboardState(queryClient);
-    } catch {
-      // Silently ignore — the user can retry from Zone B if needed
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to stop session');
     }
   }, [queryClient]);
 
@@ -414,8 +414,8 @@ export function CommandDeck({
       if (!res.ok) throw new Error('Failed to clean up orphaned resources');
       bumpProjectQueryEpoch();
       await refreshDashboardState(queryClient);
-    } catch {
-      // Silently ignore — user can retry from the resource popover
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to clean up resources');
     }
   }, [queryClient]);
 
@@ -442,8 +442,8 @@ export function CommandDeck({
       });
       if (!res.ok) throw new Error('Failed to pause session');
       await refreshDashboardState(queryClient);
-    } catch {
-      // Silently ignore — user can retry
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to pause session');
     }
   }, [queryClient]);
 
@@ -456,16 +456,51 @@ export function CommandDeck({
       });
       if (!res.ok) throw new Error('Failed to resume session');
       await refreshDashboardState(queryClient);
-    } catch {
-      // Silently ignore — user can retry
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to resume session');
     }
   }, [queryClient]);
 
-  const handleRestartSession = useCallback(async (sessionId: string, issueId: string) => {
+  const handleRestartSession = useCallback(async (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => {
     try {
+      // Find project key for this issue
+      const projectKey = projectsWithSessions.find(p =>
+        p.features.some(f => f.issueId === issueId),
+      )?.name;
+
+      if (sessionType === 'review' && projectKey) {
+        // Restart all reviewers — kill coordinator + all 5, then re-dispatch
+        const res = await fetch(`/api/specialists/${encodeURIComponent(projectKey)}/${encodeURIComponent(issueId)}/review/restart`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Failed to restart review');
+        toast.success('Review restarted');
+        await refreshDashboardState(queryClient);
+        return;
+      }
+
+      if (sessionType === 'reviewer' && role && projectKey) {
+        // Restart single reviewer role
+        const res = await fetch(`/api/specialists/${encodeURIComponent(projectKey)}/${encodeURIComponent(issueId)}/reviewer/${encodeURIComponent(role)}/restart`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `Failed to restart ${role} reviewer`);
+        toast.success(`${role} reviewer restarted`);
+        await refreshDashboardState(queryClient);
+        return;
+      }
+
+      // Default: work agent restart (existing flow)
       await fetch(`/api/agents/${sessionId}`, { method: 'DELETE' });
-      const requestBody = { issueId };
-      let lastRequestBody: Record<string, unknown> = requestBody;
+      const requestBody: Record<string, unknown> = { issueId };
+      if (model) requestBody.model = model;
+      let lastRequestBody = requestBody;
       let res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -494,10 +529,10 @@ export function CommandDeck({
         toast.success('Agent started after acknowledging system health warnings.', { duration: 6000 });
       }
       await refreshDashboardState(queryClient);
-    } catch {
-      // Silently ignore — user can retry
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to restart session');
     }
-  }, [queryClient]);
+  }, [queryClient, projectsWithSessions]);
 
   const handleDeepWipe = useCallback(async (issueId: string) => {
     try {
@@ -511,8 +546,8 @@ export function CommandDeck({
       // Deselect the feature since its workspace is gone
       setSelectedFeature(null);
       selectSession(issueId, null);
-    } catch {
-      // Silently ignore — user can retry
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to deep wipe');
     }
   }, [queryClient, selectSession]);
 

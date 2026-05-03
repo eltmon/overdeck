@@ -1766,6 +1766,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
       workspace: workspacePath,
       branch,
       prUrl,
+      model,
     }));
 
     return jsonResponse({

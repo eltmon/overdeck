@@ -202,7 +202,7 @@ export interface SpecialistStatus extends SpecialistMetadata {
  * One step in the model resolution trace (PAN-754)
  */
 export interface ResolutionStep {
-  source: 'work-type-router' | 'cloister-config' | 'fallback';
+  source: 'explicit-param' | 'work-type-router' | 'cloister-config' | 'fallback';
   workTypeId?: string;
   configKey?: string;
   resolvedAlias?: string;
@@ -800,6 +800,7 @@ export async function spawnEphemeralSpecialist(
     prUrl?: string;
     context?: TaskContext;
     promptOverride?: string; // Use this prompt instead of building from template
+    model?: string;
   }
 ): Promise<{
   success: boolean;
@@ -948,13 +949,18 @@ ${basePrompt}`;
 
   try {
     // Determine model for this specialist
-    // Priority: work-type-router (respects config.yaml overrides) > cloister config defaults > fallback
-    // PAN-754: work-type-router MUST be checked first so user's models.overrides.specialist-X config wins.
+    // Priority: explicit param > work-type-router (config.yaml overrides) > cloister config defaults > fallback
     const fallbackModel = 'claude-sonnet-4-6';
     let model: string | undefined;
     const resolutionTrace: ResolutionStep[] = [];
 
-    try {
+    if (task.model) {
+      model = task.model;
+      resolutionTrace.push({ source: 'explicit-param', resolvedModel: task.model, matched: true });
+      console.log(`[specialist] Using explicit model "${model}" for ${specialistType}`);
+    }
+
+    if (!model) try {
       const workTypeId: WorkTypeId = `specialist-${specialistType}` as WorkTypeId;
       const resolved = getModelId(workTypeId);
       if (resolved) {
