@@ -81,6 +81,18 @@ async function fetchVersion(): Promise<{ version: string }> {
   return res.json();
 }
 
+interface RegisteredProject {
+  key: string;
+  name: string;
+  path: string;
+}
+
+async function fetchRegisteredProjects(): Promise<RegisteredProject[]> {
+  const res = await fetch('/api/registered-projects');
+  if (!res.ok) throw new Error('Failed to fetch registered projects');
+  return res.json();
+}
+
 async function fetchAllSessionTrees(projectKeys: string[]): Promise<ProjectSessionTree[]> {
   if (projectKeys.length === 0) return [];
   const res = await fetch(`/api/session-trees?projects=${encodeURIComponent(projectKeys.join(','))}`);
@@ -143,6 +155,7 @@ interface CommandDeckProps {
 
 const CONVS_COLLAPSED_KEY = 'mc-convs-collapsed';
 const PROJECTS_COLLAPSED_KEY = 'mc-projects-collapsed';
+const SECTION_SPLIT_KEY = 'mc-section-split';
 
 export function CommandDeck({
   issues = [],
@@ -175,6 +188,16 @@ export function CommandDeck({
       return next;
     });
   }, []);
+  const [sectionSplit, setSectionSplit] = useState(() => {
+    try {
+      const saved = localStorage.getItem(SECTION_SPLIT_KEY);
+      return saved ? Math.max(20, Math.min(80, Number(saved))) : 50;
+    } catch { return 50; }
+  });
+  const isSectionDragging = useRef(false);
+  const sectionDragStartY = useRef(0);
+  const sectionDragStartSplit = useRef(50);
+  const sectionContainerRef = useRef<HTMLDivElement>(null);
   const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
 
@@ -205,6 +228,12 @@ export function CommandDeck({
     queryKey: ['costs-by-issue'],
     queryFn: fetchCostsByIssue,
     refetchInterval: 15000,
+  });
+
+  const { data: registeredProjects = [] } = useQuery({
+    queryKey: ['registered-projects'],
+    queryFn: fetchRegisteredProjects,
+    staleTime: 60000,
   });
 
   const { data: versionData } = useQuery({
@@ -330,6 +359,32 @@ export function CommandDeck({
     queryFn: fetchConversations,
     refetchInterval: 10000,
   });
+
+  // Partition conversations into project-scoped vs unscoped
+  const { projectConversations, excludeConvIds } = useMemo(() => {
+    const map: Record<string, import('./ConversationList').Conversation[]> = {};
+    const excludeSet = new Set<number>();
+    if (registeredProjects.length === 0) return { projectConversations: map, excludeConvIds: excludeSet };
+
+    const pathToKey = new Map<string, string>();
+    for (const rp of registeredProjects) {
+      if (rp.path) pathToKey.set(rp.path, rp.key);
+    }
+
+    for (const conv of conversations) {
+      if (!conv.cwd) continue;
+      for (const [projectPath, projectKey] of pathToKey) {
+        if (conv.cwd === projectPath || conv.cwd.startsWith(projectPath + '/')) {
+          if (!map[projectKey]) map[projectKey] = [];
+          map[projectKey].push(conv);
+          excludeSet.add(conv.id);
+          break;
+        }
+      }
+    }
+
+    return { projectConversations: map, excludeConvIds: excludeSet };
+  }, [conversations, registeredProjects]);
 
   // Track the last deep-link ID we applied so we only navigate for *new* deep-links
   // (e.g. popstate), not on every conversations refetch.
@@ -618,6 +673,47 @@ export function CommandDeck({
     void createConversationForProject(projectKey);
   }, [createConversationForProject]);
 
+  // Section divider drag handlers
+  const handleSectionDragStart = useCallback((e: React.MouseEvent) => {
+    isSectionDragging.current = true;
+    sectionDragStartY.current = e.clientY;
+    sectionDragStartSplit.current = sectionSplit;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  }, [sectionSplit]);
+
+  useEffect(() => {
+    const handleSectionDragMove = (e: MouseEvent) => {
+      if (!isSectionDragging.current || !sectionContainerRef.current) return;
+      const containerHeight = sectionContainerRef.current.getBoundingClientRect().height;
+      if (containerHeight <= 0) return;
+      const deltaY = e.clientY - sectionDragStartY.current;
+      const deltaPct = (deltaY / containerHeight) * 100;
+      const newSplit = Math.max(15, Math.min(85, sectionDragStartSplit.current + deltaPct));
+      setSectionSplit(newSplit);
+    };
+
+    const handleSectionDragEnd = () => {
+      if (isSectionDragging.current) {
+        isSectionDragging.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        setSectionSplit(prev => {
+          try { localStorage.setItem(SECTION_SPLIT_KEY, String(Math.round(prev))); } catch { /* ignore */ }
+          return prev;
+        });
+      }
+    };
+
+    document.addEventListener('mousemove', handleSectionDragMove);
+    document.addEventListener('mouseup', handleSectionDragEnd);
+    return () => {
+      document.removeEventListener('mousemove', handleSectionDragMove);
+      document.removeEventListener('mouseup', handleSectionDragEnd);
+    };
+  }, []);
+
   // Resizable sidebar drag handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     isDragging.current = true;
@@ -720,25 +816,41 @@ export function CommandDeck({
 
           </div>
 
+          <div ref={sectionContainerRef} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
           {/* ── Conversations section ─────────────────────────────── */}
-          <div className={`${styles.sidebarSection} ${convsCollapsed ? styles.sidebarSectionCollapsed : ''}`}>
+          <div
+            className={`${styles.sidebarSection} ${convsCollapsed ? styles.sidebarSectionCollapsed : ''}`}
+            style={!convsCollapsed && !projectsCollapsed ? { flex: `0 0 ${sectionSplit}%` } : undefined}
+          >
             <div className={styles.sectionHeader} onClick={toggleConvsCollapsed}>
               {convsCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
               <span className={styles.sectionTitle}>Conversations</span>
-              <span className={styles.segmentCount}>{conversations.length}</span>
+              <span className={styles.segmentCount}>{conversations.length - excludeConvIds.size}</span>
             </div>
             {!convsCollapsed && (
               <div className={styles.sectionBody}>
                 <ConversationList
                   selectedConversation={selectedConversation}
                   onSelectConversation={handleSelectConversation}
+                  excludeIds={excludeConvIds}
                 />
               </div>
             )}
           </div>
 
+          {/* ── Draggable divider ─────────────────────────────────── */}
+          {!convsCollapsed && !projectsCollapsed && (
+            <div
+              className={styles.sectionDivider}
+              onMouseDown={handleSectionDragStart}
+            />
+          )}
+
           {/* ── Projects section ──────────────────────────────────── */}
-          <div className={`${styles.sidebarSection} ${projectsCollapsed ? styles.sidebarSectionCollapsed : ''}`}>
+          <div
+            className={`${styles.sidebarSection} ${projectsCollapsed ? styles.sidebarSectionCollapsed : ''}`}
+            style={!convsCollapsed && !projectsCollapsed ? { flex: `0 0 ${100 - sectionSplit}%` } : undefined}
+          >
             <div className={styles.sectionHeader} onClick={toggleProjectsCollapsed}>
               {projectsCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
               <span className={styles.sectionTitle}>Projects</span>
@@ -771,10 +883,11 @@ export function CommandDeck({
                 ) : (
                   projectsWithSessions
                     .filter((project) => {
-                      if (treeFilter === 'all') return project.features.length > 0;
+                      const hasConvs = (projectConversations[project.name]?.length ?? 0) > 0;
+                      if (treeFilter === 'all') return project.features.length > 0 || hasConvs;
                       return project.features.some((feature) =>
                         (feature.sessions ?? []).some((session) => sessionMatchesFilter(session, treeFilter)),
-                      );
+                      ) || hasConvs;
                     })
                     .map(project => (
                     <ProjectNode
@@ -798,11 +911,15 @@ export function CommandDeck({
                       onViewJsonl={handleViewJsonl}
                       onCleanupOrphanedResources={handleCleanupOrphanedResources}
                       onNewConversation={handleNewProjectConversation}
+                      conversations={projectConversations[project.name] ?? []}
+                      selectedConversation={selectedConversation}
+                      onSelectConversation={handleSelectConversation}
                     />
                   ))
                 )}
               </div>
             )}
+          </div>
           </div>
 
           <DeaconStatus />

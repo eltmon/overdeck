@@ -233,6 +233,7 @@ interface DiffPanelProps {
   agentId: string
   turnDiffSummaries: TurnDiffSummary[]
   onClose?: () => void
+  diffUrlPrefix?: string
 }
 
 export function DiffPanel({
@@ -240,6 +241,7 @@ export function DiffPanel({
   agentId,
   turnDiffSummaries,
   onClose,
+  diffUrlPrefix,
 }: DiffPanelProps) {
   const { theme } = useTheme()
   const resolvedTheme = theme === 'light' ? 'light' : 'dark'
@@ -282,18 +284,19 @@ export function DiffPanel({
         orderedTurnDiffSummaries[0])
 
   // Fetch the diff for the selected turn, vs-main, or full conversation
+  const baseUrl = diffUrlPrefix ?? `/api/agents/${encodeURIComponent(agentId)}/diffs`
   const { data: diffResponse, isLoading: isLoadingDiff } = useQuery({
     queryKey: isVsMain
-      ? ['agent-vs-main-diff', agentId]
+      ? ['diff-vs-main', agentId]
       : selectedTurn
-        ? ['agent-turn-diff', agentId, selectedTurn.turnId]
-        : ['agent-full-diff', agentId],
+        ? ['diff-turn', agentId, selectedTurn.turnId]
+        : ['diff-full', agentId],
     queryFn: async () => {
       const url = isVsMain
-        ? `/api/agents/${encodeURIComponent(agentId)}/diffs/vs-main`
+        ? `${baseUrl}/vs-main`
         : selectedTurn
-          ? `/api/agents/${encodeURIComponent(agentId)}/diffs/${encodeURIComponent(selectedTurn.turnId)}`
-          : `/api/agents/${encodeURIComponent(agentId)}/diffs/full`
+          ? `${baseUrl}/${encodeURIComponent(selectedTurn.turnId)}`
+          : `${baseUrl}/full`
       const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to fetch diff')
       return res.json() as Promise<{ diff?: string }>

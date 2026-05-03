@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { ChevronRight, MessageSquarePlus } from 'lucide-react';
+import { ChevronRight, MessageSquare, MessageSquarePlus, Circle } from 'lucide-react';
 import type { SessionNode } from '@panctl/contracts';
 import { FeatureItem, sessionMatchesFilter, type TreeSessionFilter } from './FeatureItem';
+import type { Conversation } from '../ConversationList';
 import styles from '../styles/command-deck.module.css';
 
 export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker';
@@ -80,6 +81,9 @@ interface ProjectNodeProps {
   onViewJsonl?: (sessionId: string) => void;
   onCleanupOrphanedResources?: (issueId: string) => void;
   onNewConversation?: (projectKey: string) => void;
+  conversations?: Conversation[];
+  selectedConversation?: string | null;
+  onSelectConversation?: (name: string) => void;
 }
 
 interface ContextMenuState {
@@ -162,7 +166,7 @@ function ProjectNodeMenu({
   );
 }
 
-export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onNewConversation }: ProjectNodeProps) {
+export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onNewConversation, conversations = [], selectedConversation, onSelectConversation }: ProjectNodeProps) {
   const visibleFeatures = useMemo(() => {
     if (filter === 'all') return features;
     return features.filter((feature) =>
@@ -217,6 +221,26 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
           onClose={closeMenu}
           projectName={name}
         />
+      )}
+
+      {expanded && (
+        <>
+          {conversations.length > 0 && conversations.map(conv => (
+            <button
+              key={conv.id}
+              className={`${styles.projectConvItem} ${selectedConversation === conv.name ? styles.projectConvItemSelected : ''}`}
+              onClick={() => onSelectConversation?.(conv.name)}
+            >
+              <MessageSquare size={12} className={styles.projectConvIcon} />
+              <span className={styles.projectConvLabel}>
+                {conv.title || conv.name}
+              </span>
+              {conv.sessionAlive && (
+                <Circle size={6} fill="var(--success)" stroke="none" className={styles.projectConvAlive} />
+              )}
+            </button>
+          ))}
+        </>
       )}
 
       {expanded && (

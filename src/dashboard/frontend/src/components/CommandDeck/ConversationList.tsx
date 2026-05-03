@@ -176,6 +176,7 @@ export function sortConversations(convs: Conversation[], sort: SortOption): Conv
 interface ConversationListProps {
   selectedConversation: string | null;
   onSelectConversation: (name: string | null) => void;
+  excludeIds?: Set<number>;
 }
 
 // ─── WorkingSpinner ───────────────────────────────────────────────────────────
@@ -220,7 +221,7 @@ function WorkingSpinner({
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ConversationList({ selectedConversation, onSelectConversation }: ConversationListProps) {
+export function ConversationList({ selectedConversation, onSelectConversation, excludeIds }: ConversationListProps) {
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState('');
@@ -358,6 +359,10 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
   const displayConversations = useMemo(() => {
     let filtered = conversations;
 
+    if (excludeIds && excludeIds.size > 0) {
+      filtered = filtered.filter((c) => !excludeIds.has(c.id));
+    }
+
     // Favorites tab filter
     if (tab === 'favorites') {
       filtered = filtered.filter((c) => c.isFavorited);
@@ -375,7 +380,7 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
     );
 
     return [...active, ...inactive];
-  }, [conversations, sort, tab]);
+  }, [conversations, sort, tab, excludeIds]);
 
   if (isLoading) {
     return (

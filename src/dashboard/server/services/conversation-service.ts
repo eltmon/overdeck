@@ -60,6 +60,8 @@ export interface ParseState {
   proposedPlan?: ProposedPlan;
   /** Current permission mode (plan/default/bypassPermissions/acceptEdits). */
   permissionMode?: string;
+  /** Map assistant message ID → file paths touched by file-modifying tool_use calls in that turn. */
+  fileEditsByAssistantId: Map<string, Array<{ tool: string; filePath: string }>>;
 }
 
 export interface ConversationActivitySummary {
@@ -225,6 +227,7 @@ export async function parseConversationMessages(
       lastSequence: priorState?.lastSequence ?? 0,
       mtimeMs: fileStats.mtimeMs,
       permissionMode: priorState?.permissionMode,
+      fileEditsByAssistantId: new Map(),
     };
   }
 
@@ -301,6 +304,9 @@ export async function parseConversationMessages(
   const compactBoundaries: CompactBoundary[] = [];
   // Track permission mode across incremental parses
   let permissionMode: string | undefined = priorState?.permissionMode;
+  // Track file-modifying tool_use calls per assistant message for diff computation
+  const fileEditsByAssistantId = new Map<string, Array<{ tool: string; filePath: string }>>();
+  const FILE_EDIT_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'MultiEdit']);
 
   for (const line of lines) {
     let entry: JsonlEntry;
@@ -460,6 +466,22 @@ export async function parseConversationMessages(
           } else if (block.name === 'EnterPlanMode') {
             // Skip — don't add to workLog
           } else {
+            // Track file-modifying tools for diff computation
+            if (block.name && FILE_EDIT_TOOLS.has(block.name) && block.input) {
+              const input = block.input as Record<string, unknown>;
+              const filePath = typeof input.file_path === 'string' ? input.file_path : undefined;
+              if (filePath) {
+                const asstId = pendingAssistant?.id ?? entry.uuid ?? msg.id ?? `asst-${messages.length}`;
+                let edits = fileEditsByAssistantId.get(asstId);
+                if (!edits) {
+                  edits = [];
+                  fileEditsByAssistantId.set(asstId, edits);
+                }
+                if (!edits.some(e => e.filePath === filePath)) {
+                  edits.push({ tool: block.name!, filePath });
+                }
+              }
+            }
             // WorkLogEntry for the tool call
             const toolEntry: WorkLogEntry = {
               id: block.id,
@@ -625,6 +647,7 @@ export async function parseConversationMessages(
     planToolUseIds,
     compactBoundaries,
     permissionMode,
+    fileEditsByAssistantId,
   };
 }
 
