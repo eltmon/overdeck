@@ -15,6 +15,7 @@ import type { Agent, Issue, WorkAgentLifecycle, StartAgentResponse } from '../..
 import type { ReviewStatus, WorkspaceInfo } from '../inspector/types';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../../lib/pending-codex-spawn';
+import { shouldForceReviewTrigger } from '../inspector/utils';
 
 interface PlanningState {
   hasPlan: boolean;
@@ -191,7 +192,11 @@ export function useZoneAActions(
 
   const reviewMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/review/${issueId}/trigger`, {
+      const force = shouldForceReviewTrigger(reviewStatus);
+      const url = force
+        ? `/api/review/${issueId}/trigger?force=true`
+        : `/api/review/${issueId}/trigger`;
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -203,6 +208,9 @@ export function useZoneAActions(
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
       await refreshDashboardState(queryClient);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
     },
   });
 

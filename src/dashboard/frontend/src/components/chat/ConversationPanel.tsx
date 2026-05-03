@@ -622,6 +622,18 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
   const [failedMessages, setFailedMessages] = useState<FailedMessage[]>([]);
   // Track count so we know when the server caught up
   const prevServerCountRef = useRef(0);
+  const queryClient = useQueryClient();
+
+  // When forkStatus transitions from non-null to null (fork completed),
+  // immediately re-fetch messages so the user doesn't see a stale empty state.
+  const prevForkStatusRef = useRef(conversation.forkStatus);
+  useEffect(() => {
+    const prev = prevForkStatusRef.current;
+    prevForkStatusRef.current = conversation.forkStatus;
+    if (prev && !conversation.forkStatus) {
+      queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversation.name] });
+    }
+  }, [conversation.forkStatus, conversation.name, queryClient]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['conversation-messages', conversation.name],

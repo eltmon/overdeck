@@ -863,7 +863,8 @@ const API_ERROR_RECOVERY_COOLDOWN_MS = 5 * 60_000; // 5 minutes
 const apiErrorRecoveryState: Map<string, { lastAttempt: number }> = new Map();
 
 /**
- * Check for work agents that stopped due to transient API errors.
+ * Check for agents (work agents, specialists, planning) that stopped due
+ * to transient API errors.
  *
  * Unlike stuck-thinking agents (which are actively processing), API-error
  * agents have stopped with the prompt showing. The tmux output contains
@@ -871,56 +872,60 @@ const apiErrorRecoveryState: Map<string, { lastAttempt: number }> = new Map();
  */
 export async function checkApiErrorAgents(): Promise<string[]> {
   const actions: string[] = [];
-  const agents = listRunningAgents();
-  const isSpecialistSession = (id: string) => id.startsWith('specialist-');
   const now = Date.now();
 
-  for (const agent of agents) {
-    if (!agent.tmuxActive) continue;
+  // Check all tmux sessions — not just listRunningAgents() — because
+  // specialist sessions aren't always in the agents registry.
+  let sessionNames: string[];
+  try {
+    sessionNames = await listSessionNamesAsync();
+  } catch {
+    return actions;
+  }
 
-    const isWorkAgent = agent.id.startsWith('agent-') && !isSpecialistSession(agent.id);
-    if (!isWorkAgent) continue;
+  const agentSessions = sessionNames.filter(
+    name => name.startsWith('agent-') || name.startsWith('specialist-') || name.startsWith('planning-'),
+  );
 
-    // Check cooldown
-    const recovery = apiErrorRecoveryState.get(agent.id);
+  for (const sessionName of agentSessions) {
+    const recovery = apiErrorRecoveryState.get(sessionName);
     if (recovery && (now - recovery.lastAttempt) < API_ERROR_RECOVERY_COOLDOWN_MS) {
       continue;
     }
 
-    // Capture more lines to see the error context
     let tmuxOutput: string;
     try {
-      tmuxOutput = await capturePaneAsync(agent.id, 100);
+      tmuxOutput = await capturePaneAsync(sessionName, 100);
     } catch {
       continue;
     }
 
     if (!tmuxOutput.trim()) continue;
 
-    // Check if the prompt is showing (agent is idle, not actively thinking)
     const hasPrompt = tmuxOutput.includes('❯');
     if (!hasPrompt) continue;
 
-    // Check for API error patterns
     const hasApiError = API_ERROR_PATTERNS.some(pattern => tmuxOutput.includes(pattern));
     if (!hasApiError) continue;
 
-    // PAN-653: skip workspaces marked stuck or deacon-ignored
-    const agentIssueId = (agent.issueId || agent.id.replace('agent-', '')).toUpperCase();
-    const agentReviewStatus = getReviewStatus(agentIssueId);
-    if (agentReviewStatus?.stuck || agentReviewStatus?.deaconIgnored) {
-      continue;
+    // For work agents, respect stuck/deacon-ignored flags
+    if (sessionName.startsWith('agent-')) {
+      const agentIssueId = (sessionName.replace('agent-', '')).toUpperCase();
+      const agentReviewStatus = getReviewStatus(agentIssueId);
+      if (agentReviewStatus?.stuck || agentReviewStatus?.deaconIgnored) {
+        continue;
+      }
     }
 
-    console.log(`[deacon] Work agent ${agent.id} stopped with API error — nudging retry`);
+    console.log(`[deacon] Agent ${sessionName} stopped with API error — nudging retry`);
 
     try {
-      const continueMsg = 'You stopped due to a transient API error. This is a temporary server issue, not a problem with your code. Continue your work from where you left off. Do NOT start over — pick up exactly where you stopped.';
-      await sendKeysAsync(agent.id, continueMsg);
-      apiErrorRecoveryState.set(agent.id, { lastAttempt: now });
-      actions.push(`API error recovery: nudged ${agent.id} to retry`);
+      const continueMsg = 'You stopped due to a transient API error. This is a temporary server issue, not a problem with your work. Continue from where you left off. Do NOT start over — pick up exactly where you stopped.';
+      await sendKeysAsync(sessionName, continueMsg);
+      apiErrorRecoveryState.set(sessionName, { lastAttempt: now });
+      actions.push(`API error recovery: nudged ${sessionName} to retry`);
     } catch (err) {
-      console.error(`[deacon] Failed to nudge ${agent.id} for API error retry:`, err);
+      console.error(`[deacon] Failed to nudge ${sessionName} for API error retry:`, err);
     }
   }
 

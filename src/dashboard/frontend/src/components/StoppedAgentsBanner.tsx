@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Play, X, AlertTriangle, Loader2, CheckCircle } from 'lucide-react';
 import { useDashboardStore, selectAgentList } from '../lib/store';
@@ -13,6 +13,22 @@ interface RestartResult {
 
 export function StoppedAgentsBanner() {
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
+
+  // Show toast when an agent hits an API error (resolution transitions to 'api_error')
+  const prevApiErrorAgentsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const currentApiErrorAgents = new Set(
+      agents.filter(a => a.resolution === 'api_error').map(a => a.id),
+    );
+    for (const id of currentApiErrorAgents) {
+      if (!prevApiErrorAgentsRef.current.has(id)) {
+        const agent = agents.find(a => a.id === id);
+        const label = agent?.issueId || id;
+        toast.warning(`${label}: API error — auto-retry nudge sent`, { duration: 8000 });
+      }
+    }
+    prevApiErrorAgentsRef.current = currentApiErrorAgents;
+  }, [agents]);
 
   /** Phases where an agent is considered actively in the pipeline.
    *  Stopped agents in these phases + not completed = likely crashed/orphaned.

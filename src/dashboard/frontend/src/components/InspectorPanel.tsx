@@ -442,6 +442,9 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
       await refreshDashboardState(queryClient);
     },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
+    },
   });
 
   const cancelMutation = useMutation({
