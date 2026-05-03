@@ -27,6 +27,7 @@ interface ClaudeSettings {
     Notification?: HookConfig[];
     PreCompact?: HookConfig[];
     PostCompact?: HookConfig[];
+    UserPromptSubmit?: HookConfig[];
   };
   mcpServers?: Record<string, McpServer>;
   [key: string]: any;
@@ -158,7 +159,8 @@ export async function setupHooksCommand(): Promise<void> {
     'notification-hook',      // PAN-800: Notification — emits agent.waiting_started
     'specialist-stop-hook',
     'work-agent-stop-hook',   // PAN-800: chained from stop-hook; emits agent.resolution_changed
-    'session-start-hook',     // PAN-800: SessionStart — emits agent.activity_changed(idle) + agent.model_set
+    'session-start-hook',          // PAN-800: SessionStart — emits agent.activity_changed(idle) + agent.model_set
+    'user-prompt-submit-hook',     // UserPromptSubmit — clears waiting state, records message_received, restarts spinner
     'record-cost-event.js',
     'tldr-read-enforcer',
     'tldr-post-edit',
@@ -283,6 +285,7 @@ export async function setupHooksCommand(): Promise<void> {
   // PAN-800: SessionStart + Notification hooks.
   addHookIfMissing('SessionStart', 'session-start-hook');
   addHookIfMissing('Notification', 'notification-hook');
+  addHookIfMissing('UserPromptSubmit', 'user-prompt-submit-hook');
 
   // TLDR helpers (optional — only when python3 is available).
   if (python3Available) {
