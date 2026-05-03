@@ -133,6 +133,9 @@ const sampleStoryWithParent = {
 describe('RallyTracker', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockQuery.mockReset();
+    mockCreate.mockReset();
+    mockUpdate.mockReset();
   });
 
   describe('constructor', () => {
@@ -332,16 +335,6 @@ describe('RallyTracker', () => {
         _type: 'HierarchicalRequirement',
       }]));
 
-      // Mock refresh query after update
-      mockQuery.mockResolvedValueOnce(wsapiResponse([{
-        ...sampleStory,
-        Name: 'Updated Title',
-        Description: 'Updated description',
-        ObjectID: '12345',
-        _ref: '/hierarchicalrequirement/12345',
-        _type: 'HierarchicalRequirement',
-      }]));
-
       mockUpdate.mockResolvedValue({
         OperationResult: { Object: {}, Errors: [], Warnings: [] },
       });
@@ -370,13 +363,7 @@ describe('RallyTracker', () => {
           _ref: '/hierarchicalrequirement/12345',
           _type: 'HierarchicalRequirement',
         }]))
-        .mockResolvedValueOnce(wsapiResponse([{
-          ...sampleStory,
-          ScheduleState: 'In-Progress',
-          ObjectID: '12345',
-          _ref: '/hierarchicalrequirement/12345',
-          _type: 'HierarchicalRequirement',
-        }]));
+;
 
       mockUpdate.mockResolvedValue({
         OperationResult: { Object: {}, Errors: [], Warnings: [] },
@@ -398,13 +385,6 @@ describe('RallyTracker', () => {
       mockQuery
         .mockResolvedValueOnce(wsapiResponse([{
           ...sampleDefect,
-          ObjectID: '67890',
-          _ref: '/defect/67890',
-          _type: 'Defect',
-        }]))
-        .mockResolvedValueOnce(wsapiResponse([{
-          ...sampleDefect,
-          State: 'Completed',
           ObjectID: '67890',
           _ref: '/defect/67890',
           _type: 'Defect',

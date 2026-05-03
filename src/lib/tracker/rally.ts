@@ -175,6 +175,8 @@ export class RallyTracker implements IssueTracker {
       if (match) projectObjectId = match[1];
     }
 
+    const perTypeLimit = Math.ceil(limit / QUERYABLE_TYPES.length) * 2;
+
     const queries = QUERYABLE_TYPES.map(async (artifactType) => {
       const queryString = this.buildQueryStringForType(filters, artifactType, projectObjectId);
 
@@ -185,7 +187,7 @@ export class RallyTracker implements IssueTracker {
       const query: any = {
         type: artifactType.type,
         fetch: FETCH_FIELDS,
-        limit,
+        limit: perTypeLimit,
         query: queryString,
       };
 
@@ -322,12 +324,16 @@ export class RallyTracker implements IssueTracker {
       await this.updateRally(artifact._type.toLowerCase(), artifact._ref, updatePayload);
     }
 
-    // Re-query to get the updated artifact with fresh state
-    const refreshed = await this.queryRally(query);
-    if (!refreshed.Results || refreshed.Results.length === 0) {
-      throw new IssueNotFoundError(id, 'rally' as TrackerType);
-    }
-    return this.normalizeIssue(refreshed.Results[0]);
+    // Reconstruct the normalized issue from the pre-update artifact merged with
+    // the update payload — avoids an extra ~300ms WSAPI round-trip.
+    const updatedArtifact = { ...artifact };
+    if (updatePayload.Name !== undefined) updatedArtifact.Name = updatePayload.Name;
+    if (updatePayload.Description !== undefined) updatedArtifact.Description = updatePayload.Description;
+    if (updatePayload.ScheduleState !== undefined) updatedArtifact.ScheduleState = updatePayload.ScheduleState;
+    if (updatePayload.State !== undefined) updatedArtifact.State = updatePayload.State;
+    if (updatePayload.Priority !== undefined) updatedArtifact.Priority = updatePayload.Priority;
+    if (updatePayload.DueDate !== undefined) updatedArtifact.DueDate = updatePayload.DueDate;
+    return this.normalizeIssue(updatedArtifact);
   }
 
   async createIssue(newIssue: NewIssue): Promise<Issue> {

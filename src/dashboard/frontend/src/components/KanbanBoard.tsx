@@ -71,19 +71,29 @@ function kbStalenessStyle(ms: number): { color: string; bg: string; border: stri
 }
 
 function LiveLastHeardBadge({ lastActivity }: { lastActivity?: string }) {
-  const now = useSharedTick();
-  if (!lastActivity) return null;
-  const ms = now.getTime() - new Date(lastActivity).getTime();
-  if (ms < 1000) return null;
-  const label = formatRelativeTime(lastActivity, now);
-  const style = kbStalenessStyle(ms);
+  const baseTime = useMemo(() => new Date(lastActivity ?? 0).getTime(), [lastActivity]);
+  const [display, setDisplay] = useState<{ label: string; style: ReturnType<typeof kbStalenessStyle> }>({
+    label: '', style: kbStalenessStyle(0),
+  });
+  useEffect(() => {
+    if (!lastActivity) return;
+    const update = () => {
+      const ms = Date.now() - baseTime;
+      if (ms < 2000) { setDisplay(d => ({ ...d, label: '' })); return; }
+      setDisplay({ label: kbFormatLastHeard(ms), style: kbStalenessStyle(ms) });
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [lastActivity, baseTime]);
+  if (!lastActivity || !display.label) return null;
   return (
     <span
-      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${style.bg} ${style.color} border ${style.border}`}
-      title={`Last heard: ${label}`}
+      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${display.style.bg} ${display.style.color} border ${display.style.border}`}
+      title={`Last heard: ${display.label}`}
     >
       <Radio className="w-3 h-3" />
-      {label}
+      {display.label}
     </span>
   );
 }

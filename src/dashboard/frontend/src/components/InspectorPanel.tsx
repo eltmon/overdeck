@@ -1090,6 +1090,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           lifecycle={agentLifecycle}
           agentLaunchState={agentLaunchState}
           isFeature={issue?.artifactType?.includes('PortfolioItem') ?? false}
+          issueStatus={issue?.status}
           onPlan={() => setPlanDialogIssue(issue ?? null)}
         />
 

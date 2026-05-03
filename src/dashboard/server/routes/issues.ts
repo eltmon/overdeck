@@ -837,7 +837,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
             const workspacePath = existsSync(featureWorkspacePath) ? featureWorkspacePath : plainWorkspacePath;
 
             if (existsSync(workspacePath)) {
-              await execAsync(`pan workspace destroy ${issueIdentifier!.toLowerCase()} --force`, {
+              await execFileAsync('pan', ['workspace', 'destroy', issueIdentifier!.toLowerCase(), '--force'], {
                 cwd: projectPath,
                 encoding: 'utf-8',
                 timeout: 120000,

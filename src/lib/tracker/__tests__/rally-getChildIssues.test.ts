@@ -84,6 +84,7 @@ describe('RallyTracker.getChildIssues', () => {
                 Description: 'Desc A',
                 ScheduleState: 'In-Progress',
                 _type: 'HierarchicalRequirement',
+                PortfolioItem: { FormattedID: 'F123' },
                 CreationDate: '2024-01-01T00:00:00.000Z',
                 LastUpdateDate: '2024-01-01T00:00:00.000Z',
               },
@@ -106,6 +107,7 @@ describe('RallyTracker.getChildIssues', () => {
     expect(result[0].ref).toBe('US100');
     expect(result[0].title).toBe('Story A');
     expect(result[0].state).toBe('in_progress');
+    expect(result[0].parentRef).toBe('F123');
     expect(result[1].ref).toBe('US200');
     expect(result[1].title).toBe('Story B');
     expect(result[1].state).toBe('open');

@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeam } from '../projects.js';
 import { readWorkspacePlan } from '../vbrief/io.js';
@@ -275,6 +275,21 @@ export function readFeatureContext(workspacePath: string): string | null {
   const featureContextPath = join(workspacePath, '.planning', 'FEATURE-CONTEXT.md');
   if (existsSync(featureContextPath)) {
     return readFileSync(featureContextPath, 'utf-8');
+  }
+  // Story workspaces may not have their own FEATURE-CONTEXT.md — fall back to
+  // any sibling feature workspace that has one (e.g. a Rally Feature's context
+  // written during planning).
+  const projectRoot = dirname(dirname(workspacePath));
+  const workspacesDir = join(projectRoot, 'workspaces');
+  if (existsSync(workspacesDir)) {
+    for (const entry of readdirSync(workspacesDir)) {
+      if (entry.startsWith('feature-')) {
+        const siblingPath = join(workspacesDir, entry, '.planning', 'FEATURE-CONTEXT.md');
+        if (existsSync(siblingPath)) {
+          return readFileSync(siblingPath, 'utf-8');
+        }
+      }
+    }
   }
   return null;
 }

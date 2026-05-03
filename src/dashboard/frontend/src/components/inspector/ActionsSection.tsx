@@ -3,7 +3,7 @@ import {
   XCircle, RefreshCw, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X, Send, ChevronRight, Box, Tag, LayoutGrid,
 } from 'lucide-react';
 import type { UseMutationResult } from '@tanstack/react-query';
-import { Agent, WorkAgentLifecycle } from '../../types';
+import { Agent, WorkAgentLifecycle, STATUS_LABELS } from '../../types';
 import type { ReviewStatus, WorkspaceInfo } from './types';
 import { ReviewPipelineSection } from './ReviewPipelineSection';
 import { isReviewPipelineStuck } from '../../lib/pipeline-state';
@@ -54,6 +54,7 @@ interface ActionsSectionProps {
   lifecycle?: WorkAgentLifecycle;
   agentLaunchState?: 'starting' | 'resuming' | null;
   isFeature?: boolean;
+  issueStatus?: string;
   onPlan?: () => void;
 }
 
@@ -92,6 +93,7 @@ export function ActionsSection({
   lifecycle,
   agentLaunchState,
   isFeature,
+  issueStatus,
   onPlan,
 }: ActionsSectionProps) {
   const [showResumeInput, setShowResumeInput] = useState(false);
@@ -329,7 +331,7 @@ export function ActionsSection({
              </>
            )}
            {/* Feature-only actions: Plan button (features are planned, not executed) */}
-           {isFeature && onPlan && (
+           {isFeature && onPlan && STATUS_LABELS[issueStatus ?? ''] !== 'done' && STATUS_LABELS[issueStatus ?? ''] !== 'canceled' && (
              <button
                onClick={onPlan}
                className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${

@@ -120,7 +120,7 @@ function renderWithDialog(ui: JSX.Element) {
 const defaultProps = {
   issueId: 'PAN-331',
   hasPlan: false,
-  beadsCount: 0,
+  hasBeads: false,
   reviewMutation: makeMutation(),
   cancelMutation: makeMutation(),
   reopenMutation: makeMutation(),

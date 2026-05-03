@@ -279,6 +279,30 @@ ${effort === 'high'
   });
 }
 
+/**
+ * Write FEATURE-CONTEXT.md for Rally Features so story work agents can
+ * reference feature-level context (child stories, description, URL).
+ */
+export async function writeFeatureContext(planningDir: string, issue: PlanningIssue): Promise<void> {
+  if (!issue.artifactType?.includes('PortfolioItem')) return;
+  const featureContextPath = join(planningDir, 'FEATURE-CONTEXT.md');
+  const childStoriesSection = issue.childStories && issue.childStories.length > 0
+    ? issue.childStories.map(s =>
+        `### ${s.ref}: ${s.title}\n- **Status:** ${s.status}\n- **Description:** ${s.description || '(none)'}`
+      ).join('\n\n')
+    : '_No child stories found._';
+  await writeFile(featureContextPath,
+    `# Feature Context: ${issue.identifier}\n\n` +
+    `**Title:** ${issue.title}\n\n` +
+    `**URL:** ${issue.url}\n\n` +
+    `## Description\n${issue.description || 'No description provided.'}\n\n` +
+    `## Child Stories\n${childStoriesSection}\n\n` +
+    `---\n` +
+    `*This file is auto-generated for story-level workspaces to reference.*\n`,
+    'utf-8',
+  );
+}
+
 // ─── Main spawn function ─────────────────────────────────────────────────────
 
 /**
@@ -440,26 +464,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort);
     await writeFile(planningPromptPath, planningPrompt);
 
-    // Write FEATURE-CONTEXT.md for Rally Features so story workspaces can reference it
-    if (issue.artifactType?.includes('PortfolioItem')) {
-      const featureContextPath = join(planningDir, 'FEATURE-CONTEXT.md');
-      const childStoriesSection = issue.childStories && issue.childStories.length > 0
-        ? issue.childStories.map(s =>
-            `### ${s.ref}: ${s.title}\n- **Status:** ${s.status}\n- **Description:** ${s.description || '(none)'}`
-          ).join('\n\n')
-        : '_No child stories found._';
-      await writeFile(featureContextPath,
-        `# Feature Context: ${issue.identifier}\n\n` +
-        `**Title:** ${issue.title}\n\n` +
-        `**URL:** ${issue.url}\n\n` +
-        `## Description\n${issue.description || 'No description provided.'}\n\n` +
-        `## Child Stories\n${childStoriesSection}\n\n` +
-        `---\n` +
-        `*This file is auto-generated for story-level workspaces to reference.*\n`,
-        'utf-8',
-      );
-      console.log(`[start-planning] Wrote FEATURE-CONTEXT.md for ${issue.identifier}`);
-    }
+    await writeFeatureContext(planningDir, issue);
 
     const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel);
 
