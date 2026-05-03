@@ -518,13 +518,20 @@ export function CommandDeck({
 
   const handleRestartSession = useCallback(async (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => {
     try {
-      // Find project key for this issue
+      // Find project key for this issue. Primary: resource-allocated issue list.
+      // Fallback: session tree (covers issues where the work agent is done but
+      // review is still running — those drop off resource-allocated but stay in the tree).
       const projectKey = projectsWithSessions.find(p =>
         p.features.some(f => f.issueId === issueId),
-      )?.name;
+      )?.name
+        ?? Object.entries(sessionTreeMap).find(([, tree]) =>
+          tree.features.some(f => f.issueId.toLowerCase() === issueId.toLowerCase()),
+        )?.[0];
 
-      if (sessionType === 'review' && projectKey) {
-        // Restart all reviewers — kill coordinator + all 5, then re-dispatch
+      if (sessionType === 'review') {
+        // Restart all reviewers — kill coordinator + all 5, then re-dispatch.
+        // Guard here so review sessions never fall through to the work-agent restart path.
+        if (!projectKey) throw new Error(`Cannot find project for ${issueId}`);
         const res = await fetch(`/api/specialists/${encodeURIComponent(projectKey)}/${encodeURIComponent(issueId)}/review/restart`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -537,8 +544,10 @@ export function CommandDeck({
         return;
       }
 
-      if (sessionType === 'reviewer' && role && projectKey) {
-        // Restart single reviewer role
+      if (sessionType === 'reviewer' && role) {
+        // Restart single reviewer role.
+        // Guard here so reviewer sessions never fall through to the work-agent restart path.
+        if (!projectKey) throw new Error(`Cannot find project for ${issueId}`);
         const res = await fetch(`/api/specialists/${encodeURIComponent(projectKey)}/${encodeURIComponent(issueId)}/reviewer/${encodeURIComponent(role)}/restart`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -587,7 +596,7 @@ export function CommandDeck({
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to restart session');
     }
-  }, [queryClient, projectsWithSessions]);
+  }, [queryClient, projectsWithSessions, sessionTreeMap]);
 
   const handleDeepWipe = useCallback(async (issueId: string) => {
     try {
