@@ -1,5 +1,20 @@
 import { useState, useCallback, useEffect } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  Code2,
+  Compass,
+  Eye,
+  FlaskConical,
+  GitMerge,
+  ShieldCheck,
+  Lock,
+  Gauge,
+  ClipboardList,
+  Layers,
+  Archive,
+  type LucideIcon,
+} from 'lucide-react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
@@ -99,9 +114,28 @@ interface SessionNodeProps {
   onToggleExpand?: () => void;
 }
 
-function TypeBadge({ type, role }: { type: SessionNodeType['type']; role?: string }) {
-  const label = role && type === 'reviewer' ? `${type}:${role}` : type;
-  return <span className={styles.sessionTypeBadge}>{label}</span>;
+const TYPE_ICON: Record<string, LucideIcon> = {
+  work: Code2,
+  planning: Compass,
+  review: Eye,
+  test: FlaskConical,
+  merge: GitMerge,
+  legacy: Archive,
+};
+
+const REVIEWER_ROLE_ICON: Record<string, LucideIcon> = {
+  correctness: ShieldCheck,
+  security: Lock,
+  performance: Gauge,
+  requirements: ClipboardList,
+  synthesis: Layers,
+};
+
+function TypeIcon({ type, role }: { type: SessionNodeType['type']; role?: string }) {
+  const Icon = type === 'reviewer' && role
+    ? (REVIEWER_ROLE_ICON[role] ?? ShieldCheck)
+    : (TYPE_ICON[type] ?? Code2);
+  return <Icon size={13} className={styles.sessionTypeIcon} />;
 }
 
 function formatDuration(seconds: number | null): string {
@@ -258,7 +292,7 @@ export function SessionNode({
             </span>
           )}
           <StatusDot status={presenceToStatus(session.presence)} size="sm" />
-          <TypeBadge type={session.type} role={session.role} />
+          <TypeIcon type={session.type} role={session.role} />
           <span
             className={styles.sessionLabel}
             title={(() => {
