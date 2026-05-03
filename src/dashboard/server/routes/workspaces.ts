@@ -86,6 +86,7 @@ import {
 } from '../../../lib/agents.js';
 import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { findPlan, readPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
+import { findVBriefByIssue } from '../../../lib/vbrief/lifecycle-io.js';
 import { criticalPath } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
 import { capturePaneAsync, killSessionAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
@@ -1254,7 +1255,21 @@ const getWorkspacePlanRoute = HttpRouter.add(
     const workspaceName = `feature-${issueLower}`;
     const workspacePath = join(projectPath, 'workspaces', workspaceName);
 
-    const planPath = findPlan(workspacePath);
+    // PAN-946: resolve from lifecycle dirs first, then fall back to workspace
+    // .planning/ for in-progress planning sessions.
+    let planPath: string | null = null;
+    let lifecycleDir: string | null = null;
+    const found = findVBriefByIssue(projectPath, issueId);
+    if (found) {
+      planPath = found.path;
+      lifecycleDir = found.lifecycleDir;
+    } else {
+      planPath = findPlan(workspacePath);
+      if (planPath) {
+        lifecycleDir = 'planning';
+      }
+    }
+
     if (!planPath) {
       return jsonResponse(
         { error: 'No vBRIEF plan found for this workspace' },
@@ -1264,7 +1279,7 @@ const getWorkspacePlanRoute = HttpRouter.add(
 
     const doc = readPlan(planPath);
     const cp = criticalPath(doc);
-    return jsonResponse({ ...doc, criticalPath: cp });
+    return jsonResponse({ ...doc, criticalPath: cp, lifecycleDir });
   }))
 );
 

@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "bb9afa10-315b-409a-a625-02d14573e029",
     "author": "agent:claude-opus-4-6",
-    "sequence": 9,
+    "sequence": 10,
     "created": "2026-05-03T12:00:00Z",
-    "updated": "2026-05-03T10:35:00Z",
+    "updated": "2026-05-03T10:40:00Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/946",
@@ -590,9 +590,10 @@
       {
         "id": "dashboard-plan-from-lifecycle",
         "title": "Update dashboard plan endpoint to resolve from lifecycle dirs",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T10:40:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -604,7 +605,8 @@
           {
             "id": "dashboard-plan-from-lifecycle.ac1",
             "title": "Endpoint uses findVBriefByIssue() to locate plan across lifecycle dirs",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:40:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -612,7 +614,8 @@
           {
             "id": "dashboard-plan-from-lifecycle.ac2",
             "title": "Falls back to .planning/plan.vbrief.json for in-progress planning sessions",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:40:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -620,7 +623,8 @@
           {
             "id": "dashboard-plan-from-lifecycle.ac3",
             "title": "Response includes lifecycleDir field indicating plan lifecycle state",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T10:40:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }

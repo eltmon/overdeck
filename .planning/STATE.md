@@ -16,6 +16,7 @@ Approval transition wired into start-agent flow. Next: workspace-3pq (set plan.s
 - [x] workspace-3pq: Set plan.status to running on pan start. After the approval transition on main, `updatePlanStatus(planPath, 'running')` is called on the workspace's `.planning/plan.vbrief.json` before the agent spawns. Sequence incremented and timestamps refreshed. Non-fatal — agent starts even if the update fails.
 - [x] workspace-qe9: Post-merge transition in `postMergeLifecycle` (merge-agent.ts) — `transitionVBriefOnMain()` moves vBRIEF from active/ to completed/ on main with `scope: complete <ID> vBRIEF` commit. Handles both move + continue file + status update. Non-fatal.
 - [x] workspace-bdc: Close/cancel transition in `runDestructiveIssueLifecycle` (issues.ts) — `transitionVBriefOnMain()` moves vBRIEF to cancelled/ on main with `scope: cancel <ID> vBRIEF` commit when mode='cancel'. Non-fatal.
+- [x] workspace-57b: Dashboard plan endpoint GET /api/workspaces/:issueId/plan now uses `findVBriefByIssue()` to resolve from lifecycle dirs first, falling back to workspace `.planning/plan.vbrief.json` for in-progress planning. Response includes `lifecycleDir` field.
 
 ## Remaining Work
 - [ ] workspace-44p: Write/update continue.vbrief.json during agent sessions
