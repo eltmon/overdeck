@@ -890,7 +890,7 @@ export async function checkApiErrorAgents(): Promise<string[]> {
     // Capture more lines to see the error context
     let tmuxOutput: string;
     try {
-      tmuxOutput = await capturePaneAsync(agent.id, 30);
+      tmuxOutput = await capturePaneAsync(agent.id, 100);
     } catch {
       continue;
     }
