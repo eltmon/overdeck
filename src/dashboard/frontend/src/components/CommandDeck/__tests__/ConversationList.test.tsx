@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConversationList, updateConversationTitle } from '../ConversationList';
+import { DialogProvider } from '../../DialogProvider';
 
 vi.mock('lucide-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('lucide-react')>();
@@ -71,12 +72,14 @@ function makeClient() {
 function renderList(props?: { selectedConversation?: string | null }) {
   const client = makeClient();
   render(
-    <QueryClientProvider client={client}>
-      <ConversationList
-        selectedConversation={props?.selectedConversation ?? null}
-        onSelectConversation={() => {}}
-      />
-    </QueryClientProvider>,
+    <DialogProvider>
+      <QueryClientProvider client={client}>
+        <ConversationList
+          selectedConversation={props?.selectedConversation ?? null}
+          onSelectConversation={() => {}}
+        />
+      </QueryClientProvider>
+    </DialogProvider>,
   );
   return client;
 }
@@ -139,9 +142,11 @@ describe('ConversationList rename flow', () => {
     const client = makeClient();
     client.setQueryData(['conversations'], [{ ...mockConversation, sessionAlive: true, isWorking: true }]);
     render(
-      <QueryClientProvider client={client}>
-        <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
-      </QueryClientProvider>,
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
     );
     expect(screen.getByTestId('conversation-spinner')).toBeInTheDocument();
     expect(screen.queryByTestId('conversation-dot')).not.toBeInTheDocument();
@@ -151,9 +156,11 @@ describe('ConversationList rename flow', () => {
     const client = makeClient();
     client.setQueryData(['conversations'], [{ ...mockConversation, sessionAlive: true, isWorking: false }]);
     render(
-      <QueryClientProvider client={client}>
-        <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
-      </QueryClientProvider>,
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
     );
     expect(screen.getByTestId('conversation-dot')).toBeInTheDocument();
     expect(screen.queryByTestId('conversation-spinner')).not.toBeInTheDocument();
