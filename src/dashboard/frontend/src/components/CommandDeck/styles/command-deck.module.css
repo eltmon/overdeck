@@ -974,12 +974,13 @@
   background: var(--primary);
 }
 
-/* Project-scoped conversation items */
+/* Project-scoped conversation items — reuses conversationRow affordances */
 .projectConvItem {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 8px 3px 32px;
+  gap: 4px;
+  padding: 3px 26px 3px 32px;
+  position: relative;
   cursor: pointer;
   transition: background 0.1s;
   font-size: 11px;
@@ -1000,11 +1001,6 @@
   color: var(--foreground);
 }
 
-.projectConvIcon {
-  flex-shrink: 0;
-  opacity: 0.6;
-}
-
 .projectConvLabel {
   flex: 1;
   min-width: 0;
@@ -1013,8 +1009,43 @@
   white-space: nowrap;
 }
 
-.projectConvAlive {
-  flex-shrink: 0;
+/* Hover actions for nested project conversations */
+.projectConvItem .conversationActions {
+  gap: 2px;
+}
+
+.projectConvItem:hover .conversationActions,
+.projectConvItem:focus-within .conversationActions {
+  max-width: 100px;
+  opacity: 1;
+  margin-left: 0;
+}
+
+.projectConvItem .conversationStopBtn {
+  left: 18px;
+  width: 14px;
+  height: 14px;
+}
+
+.projectConvItem:hover .conversationStopBtn {
+  opacity: 1;
+}
+
+.projectConvItem .conversationStarBtn,
+.projectConvItem .conversationStarPersistent {
+  right: 6px;
+  width: 16px;
+  height: 16px;
+}
+
+.projectConvItem:hover .conversationStarBtn,
+.projectConvItem:focus-within .conversationStarBtn {
+  opacity: 1;
+}
+
+/* Hide timestamp in nested view — too compact */
+.projectConvItem .conversationTime {
+  display: none;
 }
 
 /* Content Area */
