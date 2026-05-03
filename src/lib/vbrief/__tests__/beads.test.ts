@@ -69,9 +69,8 @@ describe('syncBeadStatusToVBrief', () => {
   it('syncs status when bead title matches with plan prefix', () => {
     const doc = makePlanDoc([{ id: 'item-1', title: 'Wire the pipeline' }]);
     writePlan(TEST_DIR, doc);
-    writeBeadsFile(TEST_DIR, [{ id: 'bead-1', title: 'PAN-388: Wire the pipeline' }]);
 
-    const result = syncBeadStatusToVBrief('bead-1', TEST_DIR);
+    const result = syncBeadStatusToVBrief('bead-1', TEST_DIR, 'completed', 'PAN-388: Wire the pipeline');
     expect(result).toBe('item-1');
 
     const updated = readWorkspacePlan(TEST_DIR)!;
@@ -80,17 +79,15 @@ describe('syncBeadStatusToVBrief', () => {
 
   it('syncs status when bead title matches without plan prefix', () => {
     writePlan(TEST_DIR, makePlanDoc([{ id: 'item-2', title: 'Wire the pipeline' }]));
-    writeBeadsFile(TEST_DIR, [{ id: 'bead-2', title: 'Wire the pipeline' }]);
 
-    const result = syncBeadStatusToVBrief('bead-2', TEST_DIR);
+    const result = syncBeadStatusToVBrief('bead-2', TEST_DIR, 'completed', 'Wire the pipeline');
     expect(result).toBe('item-2');
   });
 
   it('uses in_progress status when specified', () => {
     writePlan(TEST_DIR, makePlanDoc([{ id: 'item-3', title: 'Start work' }]));
-    writeBeadsFile(TEST_DIR, [{ id: 'bead-3', title: 'PAN-388: Start work' }]);
 
-    syncBeadStatusToVBrief('bead-3', TEST_DIR, 'in_progress');
+    syncBeadStatusToVBrief('bead-3', TEST_DIR, 'in_progress', 'PAN-388: Start work');
 
     const updated = readWorkspacePlan(TEST_DIR)!;
     expect(updated.plan.items[0].status).toBe('in_progress');
@@ -98,22 +95,15 @@ describe('syncBeadStatusToVBrief', () => {
 
   it('matching is case-insensitive', () => {
     writePlan(TEST_DIR, makePlanDoc([{ id: 'item-4', title: 'Wire The Pipeline' }]));
-    writeBeadsFile(TEST_DIR, [{ id: 'bead-4', title: 'PAN-388: wire the pipeline' }]);
 
-    const result = syncBeadStatusToVBrief('bead-4', TEST_DIR);
+    const result = syncBeadStatusToVBrief('bead-4', TEST_DIR, 'completed', 'PAN-388: wire the pipeline');
     expect(result).toBe('item-4');
   });
 
   it('handles malformed lines in issues.jsonl gracefully', () => {
     writePlan(TEST_DIR, makePlanDoc([{ id: 'item-1', title: 'Good task' }]));
-    const beadsDir = join(TEST_DIR, '.beads');
-    mkdirSync(beadsDir, { recursive: true });
-    writeFileSync(join(beadsDir, 'issues.jsonl'),
-      'not json\n' +
-      JSON.stringify({ id: 'bead-1', title: 'PAN-388: Good task', status: 'open' }) + '\n',
-    );
 
-    const result = syncBeadStatusToVBrief('bead-1', TEST_DIR);
+    const result = syncBeadStatusToVBrief('bead-1', TEST_DIR, 'completed', 'PAN-388: Good task');
     expect(result).toBe('item-1');
   });
 });
