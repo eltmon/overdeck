@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   getZoneAActions,
@@ -58,7 +58,13 @@ const failedAgentNoWorkspace = {
 };
 
 const surfaceFiles = Object.fromEntries(
-  COMMAND_DECK_PARITY_SURFACES.map(({ surface, file }) => [surface, resolve(process.cwd(), file)])
+  COMMAND_DECK_PARITY_SURFACES.map(({ surface, file }) => {
+    const fromCwd = resolve(process.cwd(), file);
+    // When tests run from the frontend workspace, cwd is src/dashboard/frontend
+    // and the file paths already include src/dashboard/frontend/ — try repo root too
+    const fromRepoRoot = resolve(process.cwd(), '../../..', file);
+    return [surface, existsSync(fromCwd) ? fromCwd : fromRepoRoot];
+  })
 ) as Record<(typeof COMMAND_DECK_PARITY_SURFACES)[number]['surface'], string>;
 
 function getSourceActions(): ActionKey[] {

@@ -115,7 +115,7 @@ describe('ConversationPanel rename flow', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   it('renders the conversation title in the header', () => {

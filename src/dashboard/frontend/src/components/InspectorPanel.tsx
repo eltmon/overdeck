@@ -184,7 +184,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     });
   }, [confirm]);
 
-  const { data: workspace } = useQuery<WorkspaceInfo>({
+  const { data: workspace } = useQuery<WorkspaceInfo & { salvageableStashes?: SalvageableStashInfo[] }>({
     queryKey: ['workspace', issueId],
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}`);
@@ -199,21 +199,24 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
         const anyFailed = statuses.some(c => c.status?.startsWith('exited'));
         if (allRunning || (gracePeriodPassed && anyFailed)) setContainersStarting(false);
       }
+      if (data.exists) {
+        try {
+          const stashRes = await fetch(`/api/workspaces/${issueId}/stashes`);
+          if (stashRes.ok) {
+            const stashData = await stashRes.json();
+            data.salvageableStashes = stashData.salvageableStashes || [];
+          } else {
+            data.salvageableStashes = [];
+          }
+        } catch {
+          data.salvageableStashes = [];
+        }
+      } else {
+        data.salvageableStashes = [];
+      }
       return data;
     },
     refetchInterval: (workspaceCreating || containersStarting || !!agentLaunchState) ? 5000 : 30000,
-  });
-
-  const { data: stashData } = useQuery<{ salvageableStashes: SalvageableStashInfo[] }>({
-    queryKey: ['workspace-stashes', issueId],
-    queryFn: async () => {
-      const res = await fetch(`/api/workspaces/${issueId}/stashes`);
-      if (!res.ok) throw new Error('Failed to fetch workspace stashes');
-      return res.json();
-    },
-    enabled: workspace?.exists === true,
-    refetchInterval: 60000,
-    staleTime: 30000,
   });
 
   // Self-contained review status query (shares cache key with DetailPanelLayout)
@@ -1017,11 +1020,11 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           </div>
         )}
 
-        {stashData?.salvageableStashes && stashData.salvageableStashes.length > 0 && (
+        {workspace?.salvageableStashes && workspace.salvageableStashes.length > 0 && (
           <div className="px-3 py-2 border-b border-border text-xs">
             <div className="uppercase tracking-wider text-[10px] mb-2 font-semibold text-muted-foreground">Salvageable Stashes</div>
             <div className="space-y-2">
-              {stashData.salvageableStashes.map((stash) => (
+              {workspace.salvageableStashes.map((stash) => (
                 <div key={stash.ref} className="rounded border border-border px-2 py-2 bg-card/40">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">

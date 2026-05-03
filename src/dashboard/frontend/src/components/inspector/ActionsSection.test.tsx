@@ -437,6 +437,18 @@ describe('ActionsSection', () => {
     expect(screen.queryByText('Resume Session')).not.toBeInTheDocument();
   });
 
+  it('hides Plan button for closed feature', () => {
+    renderWithDialog(
+      <ActionsSection
+        {...defaultProps}
+        isFeature={true}
+        issueStatus="Done"
+        onPlan={vi.fn()}
+      />
+    );
+    expect(screen.queryByTestId('inspector-plan-feature')).not.toBeInTheDocument();
+  });
+
   it('calls onPlan when Plan button is clicked for a feature', () => {
     const onPlan = vi.fn();
     renderWithDialog(

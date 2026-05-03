@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, createContext, useContext } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useDashboardStore, selectAgentList, selectSpecialistList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
@@ -80,31 +80,28 @@ function kbStalenessStyle(ms: number): { color: string; bg: string; border: stri
 }
 
 function LiveLastHeardBadge({ lastActivity }: { lastActivity?: string }) {
-  const baseTime = useMemo(() => new Date(lastActivity ?? 0).getTime(), [lastActivity]);
-  const [display, setDisplay] = useState<{ label: string; style: ReturnType<typeof kbStalenessStyle> }>({
-    label: '', style: kbStalenessStyle(0),
-  });
-  useEffect(() => {
-    if (!lastActivity) return;
-    const update = () => {
-      const ms = Date.now() - baseTime;
-      if (ms < 2000) { setDisplay(d => ({ ...d, label: '' })); return; }
-      setDisplay({ label: kbFormatLastHeard(ms), style: kbStalenessStyle(ms) });
-    };
-    update();
-    const t = setInterval(update, 1000);
-    return () => clearInterval(t);
-  }, [lastActivity, baseTime]);
-  if (!lastActivity || !display.label) return null;
+  const tick = useKanbanTick();
+  if (!lastActivity) return null;
+  const ms = tick - new Date(lastActivity).getTime();
+  if (ms < 2000) return null;
+  const label = kbFormatLastHeard(ms);
+  const style = kbStalenessStyle(ms);
   return (
     <span
-      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${display.style.bg} ${display.style.color} border ${display.style.border}`}
-      title={`Last heard: ${display.label}`}
+      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${style.bg} ${style.color} border ${style.border}`}
+      title={`Last heard: ${label}`}
     >
       <Radio className="w-3 h-3" />
-      {display.label}
+      {label}
     </span>
   );
+}
+
+// Shared one-second tick for all KanbanBoard child components (eliminates
+// N independent setInterval timers when many agent cards are visible).
+const KanbanTickContext = createContext<number>(Date.now());
+function useKanbanTick() {
+  return useContext(KanbanTickContext);
 }
 
 // Difficulty badge component
@@ -1099,6 +1096,13 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   // Rally feature expand/collapse state (lifted from ColumnContent for expand/collapse all)
   const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
 
+  // Shared one-second tick for all child badges (eliminates per-badge intervals)
+  const [kanbanTick, setKanbanTick] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setKanbanTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
   const toggleFeature = useCallback((featureId: string) => {
     setCollapsedFeatures(prev => {
       const next = new Set(prev);
@@ -1589,6 +1593,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   }, [grouped, planningStateById]);
 
   return (
+    <KanbanTickContext.Provider value={kanbanTick}>
     <div className="space-y-4">
       {/* Filter bar */}
       <div className="flex flex-col gap-2">
@@ -1950,6 +1955,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         onClose={handleCloseProgress}
       />
     </div>
+    </KanbanTickContext.Provider>
   );
 }
 

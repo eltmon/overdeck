@@ -799,6 +799,20 @@ describe('FeatureCard', () => {
     expect(screen.getByText('See Plan')).toBeDefined();
   });
 
+  it('renders See Plan button when hasPlan is true', () => {
+    const feature = createMockFeature({ hasPlan: true });
+    render(
+      <FeatureCard
+        feature={feature}
+        childCount={2}
+        isExpanded={false}
+        onToggle={vi.fn()}
+        onPlan={vi.fn()}
+      />
+    );
+    expect(screen.getByText('See Plan')).toBeDefined();
+  });
+
   it('renders Tasks button when feature has beads', () => {
     const feature = createMockFeature({ hasBeads: true });
     render(
