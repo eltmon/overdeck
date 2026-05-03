@@ -81,6 +81,7 @@ import { loadConfig } from '../../../lib/config-yaml.js';
 import {
   parseConversationMessages,
   parseFromLastCompactBoundary,
+  summarizeConversationActivity,
   type ParseState,
 } from '../services/conversation-service.js';
 import {
@@ -943,11 +944,26 @@ const getConversationsRoute = HttpRouter.add(
         // Claude to be ready before returning 201, so newly-created conversations
         // are always live by the time they appear in the list.
         const liveSessionNames = new Set(await listSessionNamesAsync());
-        const enriched = conversations.map((conv) => {
+        const enriched = await Promise.all(conversations.map(async (conv) => {
           const sessionAlive = !conv.forkStatus && liveSessionNames.has(conv.tmuxSession);
+          let isWorking = false;
+          let currentTool: string | null = null;
 
-          return { ...conv, sessionAlive, isWorking: false, currentTool: null, isFavorited: favoritedNames.has(conv.name) };
-        });
+          if (sessionAlive) {
+            const sf = resolveSessionFile(conv);
+            if (sf && existsSync(sf)) {
+              try {
+                const summary = await summarizeConversationActivity(sf);
+                isWorking = summary.isWorking;
+                currentTool = summary.currentTool;
+              } catch {
+                // JSONL parse failure — fall back to defaults
+              }
+            }
+          }
+
+          return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name) };
+        }));
 
         return jsonResponse(enriched);
       }    catch (error: unknown) {

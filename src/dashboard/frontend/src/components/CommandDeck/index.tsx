@@ -8,6 +8,8 @@ import { DeaconStatus } from './DeaconStatus';
 import { IssueWorkbench } from './IssueWorkbench';
 import { BeadsDialog } from '../BeadsDialog';
 import { ConversationList, type Conversation } from './ConversationList';
+import { useConversationMutations } from './useConversationMutations';
+import { ForkModal } from './ForkModal';
 import { ConversationPanel, type ViewMode } from '../chat/ConversationPanel';
 import { ModelPicker, loadStoredModel, saveStoredModel } from '../chat/ModelPicker';
 import type { Agent, Issue, StartAgentResponse } from '../../types';
@@ -664,6 +666,8 @@ export function CommandDeck({
     }
   }, [selectSession, selectedFeature]);
 
+  const projectConvMutations = useConversationMutations(selectedConversation, handleSelectConversation);
+
   const createConversationForProject = useCallback(async (projectKey?: string) => {
     try {
       const payload: Record<string, unknown> = { model: sidebarModel };
@@ -943,6 +947,7 @@ export function CommandDeck({
                       conversations={projectConversations[project.name] ?? []}
                       selectedConversation={selectedConversation}
                       onSelectConversation={handleSelectConversation}
+                      conversationMutations={projectConvMutations}
                     />
                   ))
                 )}
@@ -950,6 +955,17 @@ export function CommandDeck({
             )}
           </div>
           </div>
+
+          {projectConvMutations.forkTarget && (
+            <ForkModal
+              conversation={projectConvMutations.forkTarget}
+              isPending={projectConvMutations.isForkPending}
+              onClose={projectConvMutations.closeForkModal}
+              onConfirm={(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary) => {
+                projectConvMutations.submitFork(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary);
+              }}
+            />
+          )}
 
           <DeaconStatus />
           {versionData && (
