@@ -3,14 +3,15 @@
 ## Status: In Progress
 
 ## Current Phase
-Foundation modules done. Next: workspace-2gb (vBRIEF lifecycle IO — find by issue, move between dirs).
+Foundation modules done. Next: workspace-9y5 (plan-finalize → set proposed status + canonical filename).
 
 ## Completed Work
 - [x] workspace-0k8: vBRIEF lifecycle foundation — types, filename convention, directory helpers in `src/lib/vbrief/lifecycle.ts` with 14 unit tests (commit 7ae8315fa)
-- [x] workspace-8tz: Continue state module — `src/lib/vbrief/continue-state.ts` with ContinueState type, writeContinueState, readContinueState, appendSessionEntry. 13 unit tests passing.
+- [x] workspace-8tz: Continue state module — `src/lib/vbrief/continue-state.ts` with ContinueState type, writeContinueState, readContinueState, appendSessionEntry. 13 unit tests passing (commit 214a0fbf0)
+- [x] workspace-2gb: vBRIEF lifecycle IO — `src/lib/vbrief/lifecycle-io.ts` with findVBriefByIssue, moveVBrief (async, git-staging), moveVBriefFilesOnly (sync), updatePlanStatus, deleteVBrief. 16 unit tests passing.
 
 ## Remaining Work
-- [ ] workspace-2gb: vBRIEF lifecycle IO — find by issue, move between dirs, update status
+- [ ] workspace-9y5: Update plan-finalize to set proposed status and generate canonical filename
 - [ ] workspace-9y5: Update plan-finalize to set proposed status and generate canonical filename
 - [ ] workspace-b2q: Update complete-planning to copy vBRIEF to main's ./vbrief/proposed/
 - [ ] workspace-q1e: Replace .planning-complete marker with plan.status check

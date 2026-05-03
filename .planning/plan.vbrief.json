@@ -11,9 +11,9 @@
     "status": "approved",
     "uid": "bb9afa10-315b-409a-a625-02d14573e029",
     "author": "agent:claude-opus-4-6",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-05-03T12:00:00Z",
-    "updated": "2026-05-03T13:13:38.478Z",
+    "updated": "2026-05-03T13:17:17.160Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/946",
@@ -154,7 +154,7 @@
       {
         "id": "vbrief-lifecycle-io",
         "title": "vBRIEF lifecycle IO: find by issue, move between dirs, update status",
-        "status": "pending",
+        "status": "completed",
         "priority": "critical",
         "created": "2026-05-03T12:00:00Z",
         "metadata": {
@@ -168,7 +168,7 @@
           {
             "id": "vbrief-lifecycle-io.ac1",
             "title": "findVBriefByIssue(projectRoot, issueId) returns {path, lifecycleDir, document} searching proposed → active → completed → cancelled",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -176,7 +176,7 @@
           {
             "id": "vbrief-lifecycle-io.ac2",
             "title": "moveVBrief(projectRoot, issueId, targetDir) atomically moves scope vBRIEF + continue file to target lifecycle directory",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -184,7 +184,7 @@
           {
             "id": "vbrief-lifecycle-io.ac3",
             "title": "moveVBrief runs git add on both source removal and destination addition",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -192,7 +192,7 @@
           {
             "id": "vbrief-lifecycle-io.ac4",
             "title": "updatePlanStatus(filePath, newStatus) updates plan.status atomically with plan.sequence increment and plan.updated timestamp",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
