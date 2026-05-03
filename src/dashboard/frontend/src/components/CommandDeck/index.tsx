@@ -709,22 +709,25 @@ export function CommandDeck({
 
           </div>
 
-          {/* Unified sidebar — Conversations + Projects as collapsible sections */}
-          <div className={styles.projectTree}>
-            {/* ── Conversations section ─────────────────────────────── */}
+          {/* ── Conversations section ─────────────────────────────── */}
+          <div className={`${styles.sidebarSection} ${convsCollapsed ? styles.sidebarSectionCollapsed : ''}`}>
             <div className={styles.sectionHeader} onClick={toggleConvsCollapsed}>
               {convsCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
               <span className={styles.sectionTitle}>Conversations</span>
               <span className={styles.segmentCount}>{conversations.length}</span>
             </div>
             {!convsCollapsed && (
-              <ConversationList
-                selectedConversation={selectedConversation}
-                onSelectConversation={handleSelectConversation}
-              />
+              <div className={styles.sectionBody}>
+                <ConversationList
+                  selectedConversation={selectedConversation}
+                  onSelectConversation={handleSelectConversation}
+                />
+              </div>
             )}
+          </div>
 
-            {/* ── Projects section ──────────────────────────────────── */}
+          {/* ── Projects section ──────────────────────────────────── */}
+          <div className={`${styles.sidebarSection} ${projectsCollapsed ? styles.sidebarSectionCollapsed : ''}`}>
             <div className={styles.sectionHeader} onClick={toggleProjectsCollapsed}>
               {projectsCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
               <span className={styles.sectionTitle}>Projects</span>
@@ -733,7 +736,7 @@ export function CommandDeck({
               </span>
             </div>
             {!projectsCollapsed && (
-              <>
+              <div className={styles.sectionBody}>
                 <div className={styles.treeFilterRow}>
                   {(['all', 'alive', 'failed'] as TreeSessionFilter[]).map((f) => (
                     <button
@@ -786,7 +789,7 @@ export function CommandDeck({
                     />
                   ))
                 )}
-              </>
+              </div>
             )}
           </div>
 
