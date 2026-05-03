@@ -18,6 +18,60 @@ TS=$(date -Iseconds)
 BODY="{\"kind\":\"activity\",\"activity\":\"idle\",\"timestamp\":\"$TS\"}"
 pan_emit_event "$AGENT_ID" "$BODY"
 
+# ── API error detection (all agent types) ────────────────────────────────
+# If the agent stopped because of a transient API error, nudge it to retry.
+# This runs before chaining to specialist/work-agent hooks because it
+# applies universally. 5-minute cooldown per agent.
+LOG_DIR="$HOME/.panopticon/logs"
+mkdir -p "$LOG_DIR"
+API_ERROR_NUDGE_FILE="$HOME/.panopticon/agents/$AGENT_ID/.last-api-error-nudge"
+
+OUTPUT=$(tmux capture-pane -t "$AGENT_ID" -p -S -100 2>/dev/null || echo "")
+if [ -n "$OUTPUT" ]; then
+  API_ERROR_DETECTED=false
+  for pattern in \
+    "API Error: The server had an error while processing your request" \
+    "API Error: Overloaded" \
+    "API Error: Rate limit" \
+    "API Error: Request was aborted" \
+    "API Error: Timed out" \
+    "529 Overloaded" \
+    "502 Bad Gateway" \
+    "503 Service Unavailable"; do
+    if echo "$OUTPUT" | grep -qF "$pattern"; then
+      API_ERROR_DETECTED=true
+      break
+    fi
+  done
+
+  if [ "$API_ERROR_DETECTED" = "true" ]; then
+    SHOULD_NUDGE=true
+    if [ -f "$API_ERROR_NUDGE_FILE" ]; then
+      LAST_API_NUDGE=$(cat "$API_ERROR_NUDGE_FILE" 2>/dev/null || echo "0")
+      NOW=$(date +%s)
+      if [ $(( NOW - LAST_API_NUDGE )) -lt 300 ]; then
+        SHOULD_NUDGE=false
+      fi
+    fi
+
+    if [ "$SHOULD_NUDGE" = "true" ]; then
+      mkdir -p "$(dirname "$API_ERROR_NUDGE_FILE")"
+      date +%s > "$API_ERROR_NUDGE_FILE" 2>/dev/null || true
+
+      echo "[$(date -Iseconds)] stop-hook: $AGENT_ID api_error detected — nudging retry" \
+        >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+
+      tmpfile=$(mktemp)
+      echo "You stopped due to a transient API error. This is a temporary server issue, not a problem with your work. Continue from where you left off. Do NOT start over — pick up exactly where you stopped." > "$tmpfile"
+      tmux load-buffer "$tmpfile" 2>/dev/null
+      tmux paste-buffer -t "$AGENT_ID" 2>/dev/null
+      sleep 0.3
+      tmux send-keys -t "$AGENT_ID" C-m 2>/dev/null
+      rm -f "$tmpfile"
+    fi
+  fi
+fi
+
 # Chain to specialist-specific hook (auto-completion detection).
 SPECIALIST_HOOK="$HOME/.panopticon/bin/specialist-stop-hook"
 if [ -x "$SPECIALIST_HOOK" ]; then

@@ -3152,6 +3152,15 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 Blocked
               </span>
             )}
+            {!isTerminal && agent?.resolution === 'api_error' && (
+              <span
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-orange-900/60 text-orange-300 border border-orange-500/40"
+                title="Agent hit a transient API error — auto-retry nudge sent"
+              >
+                <AlertCircle className="w-3 h-3" />
+                API Error
+              </span>
+            )}
             {/* Compacting badge — shown when agent is compressing context */}
             {isRunning && activeAgent?.runtimeState === 'compacting' && (
               <span
