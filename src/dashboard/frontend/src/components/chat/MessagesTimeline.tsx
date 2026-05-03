@@ -22,7 +22,7 @@ import {
   memo,
 } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus, RotateCcw, XCircle, Scissors } from 'lucide-react';
+import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus, RotateCcw, XCircle, Scissors, ClipboardList } from 'lucide-react';
 import type { CompactBoundary, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import type { FailedMessage } from './ConversationPanel';
 import { ChatMarkdown } from './ChatMarkdown';
@@ -473,9 +473,16 @@ function isSummaryForkMessage(text: string): boolean {
     text.includes('**Do not take any action.** This is context from a prior conversation fork');
 }
 
+function isReviewerContextMessage(text: string): boolean {
+  return text.startsWith('# Review Context\n');
+}
+
 function UserMessageRow({ message }: { message: ChatMessage }) {
   if (isSummaryForkMessage(message.text)) {
     return <ContextMessageBlock message={message} />;
+  }
+  if (isReviewerContextMessage(message.text)) {
+    return <ReviewerContextBlock message={message} />;
   }
 
   const isPending = message.id.startsWith('optimistic-');
@@ -525,6 +532,31 @@ function ContextMessageBlock({ message }: { message: ChatMessage }) {
         {expanded && (
           <div className={styles.contextMessageContent}>
             <ChatMarkdown text={cleanText} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ReviewerContextBlock({ message }: { message: ChatMessage }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className={styles.contextMessageRow}>
+      <div className={styles.contextMessageBlock}>
+        <button
+          type="button"
+          className={styles.contextMessageToggle}
+          onClick={() => setExpanded((v) => !v)}
+        >
+          <ClipboardList size={14} className={styles.contextMessageIcon} />
+          <span className={styles.contextMessageLabel}>Review Context</span>
+          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </button>
+        {expanded && (
+          <div className={styles.contextMessageContent}>
+            <ChatMarkdown text={message.text} />
           </div>
         )}
       </div>
