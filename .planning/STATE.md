@@ -3,7 +3,7 @@
 ## Status: In Progress
 
 ## Current Phase
-pan scope commands implemented. Next: workspace-44p (continue.vbrief.json integration) or workspace-475 (remove STATE.md references).
+Prompt templates and dashboard routes migrated to continue.vbrief.json. Next: workspace-44p (agent session writes continue file) or workspace-9ny (sync audit).
 
 ## Completed Work
 - [x] workspace-0k8: vBRIEF lifecycle foundation — types, filename convention, directory helpers in `src/lib/vbrief/lifecycle.ts` with 14 unit tests (commit 7ae8315fa)
@@ -26,12 +26,13 @@ pan scope commands implemented. Next: workspace-44p (continue.vbrief.json integr
 - [x] workspace-7zx: `pan scope complete <issueId>` — manual override to move vBRIEF to `completed/` and set `plan.status` to `completed`. Commits on main via `transitionVBriefOnMain()`.
 - [x] workspace-7nz: `pan scope cancel <issueId>` — manual override to move vBRIEF to `cancelled/` and set `plan.status` to `cancelled`. Commits on main via `transitionVBriefOnMain()`.
 - [x] workspace-cho: `pan scope restore <issueId>` — restores vBRIEF from `completed/` or `cancelled/` back to `active/` and sets `plan.status` to `approved`. Commits on main via `transitionVBriefOnMain()`.
+- [x] workspace-ujl: Planning prompt updated — `src/lib/cloister/prompts/planning.md` instructs agents to write `.planning/continue-{issueId}.vbrief.json` instead of `STATE.md`. Removed obsolete `docs/prds/active/` copy instruction. Added continue.vbrief.json JSON format template. `spawn-planning-session.ts` clears stale continue files on session start.
+- [x] workspace-61m: Work agent prompt updated — `src/lib/cloister/prompts/work.md` instructs agents to read `./vbrief/active/continue-{issue}.vbrief.json` for planning context. Bead workflow updated to update continue file instead of STATE.md. `work-agent-prompt.ts` reads continue file from lifecycle dirs first, falling back to workspace `.planning/` and finally `STATE.md` (legacy). `getTrackerContext` uses continue file mtime for comment filtering.
+
+- [x] workspace-475: Removed primary STATE.md dependencies across the codebase. Dashboard routes (workspaces, issues, agents, misc, command-deck, projects, resource-discovery) now read continue files first with legacy STATE.md fallback during transition. Lifecycle code (clean-planning, archive-planning) updated to handle continue files. docs/VBRIEF.md documents continue.vbrief.json as the replacement for STATE.md.
 
 ## Remaining Work
 - [ ] workspace-44p: Write/update continue.vbrief.json during agent sessions
-- [ ] workspace-ujl: Update planning prompt to write continue.vbrief.json instead of STATE.md
-- [ ] workspace-61m: Update work agent to read continue.vbrief.json for context
-- [ ] workspace-475: Remove all STATE.md references from codebase
 - [ ] workspace-9ny: Extend pan sync with vBRIEF state disagreement detection
 
 ## Key Decisions

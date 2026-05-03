@@ -4,7 +4,7 @@
     "created": "2026-05-03T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-946: Adopt deft vBRIEF lifecycle model for scope vBRIEFs",
-    "updated": "2026-05-03T12:58:00Z"
+    "updated": "2026-05-03T13:25:00Z"
   },
   "plan": {
     "id": "pan-946",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "bb9afa10-315b-409a-a625-02d14573e029",
     "author": "agent:claude-opus-4-6",
-    "sequence": 12,
+    "sequence": 14,
     "created": "2026-05-03T12:00:00Z",
-    "updated": "2026-05-03T12:58:00Z",
+    "updated": "2026-05-03T13:25:00Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/946",
@@ -639,9 +639,10 @@
       {
         "id": "planning-prompt-continue",
         "title": "Update planning prompt to write continue.vbrief.json instead of STATE.md",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T13:10:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -653,7 +654,8 @@
           {
             "id": "planning-prompt-continue.ac1",
             "title": "PLANNING_PROMPT.md template instructs agent to write continue.vbrief.json instead of STATE.md",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T13:10:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -661,7 +663,8 @@
           {
             "id": "planning-prompt-continue.ac2",
             "title": "Continue file written to .planning/ during planning, moved to proposed/ by complete-planning",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T13:10:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -669,7 +672,8 @@
           {
             "id": "planning-prompt-continue.ac3",
             "title": "Planning prompt no longer references STATE.md creation",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T13:10:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -679,9 +683,10 @@
       {
         "id": "work-agent-read-continue",
         "title": "Update work agent to read continue.vbrief.json for context",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T13:10:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -693,7 +698,8 @@
           {
             "id": "work-agent-read-continue.ac1",
             "title": "Work agent prompt template references continue.vbrief.json in ./vbrief/active/ for planning context",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T13:10:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -701,7 +707,8 @@
           {
             "id": "work-agent-read-continue.ac2",
             "title": "Agent resume flow reads continue state for decisions, hazards, resume point",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T13:10:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -711,9 +718,10 @@
       {
         "id": "remove-state-md-refs",
         "title": "Remove all STATE.md references from codebase",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T13:25:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -725,7 +733,8 @@
           {
             "id": "remove-state-md-refs.ac1",
             "title": "No references to STATE.md in any prompt template (planning, work, specialist)",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T13:25:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -733,7 +742,8 @@
           {
             "id": "remove-state-md-refs.ac2",
             "title": "No references to STATE.md in lifecycle code (clean-planning, archive-planning, complete-planning)",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T13:25:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -741,7 +751,8 @@
           {
             "id": "remove-state-md-refs.ac3",
             "title": "No references to STATE.md in dashboard server routes",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T13:25:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -749,7 +760,8 @@
           {
             "id": "remove-state-md-refs.ac4",
             "title": "docs/VBRIEF.md updated to document continue.vbrief.json as the replacement for STATE.md",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T13:25:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
