@@ -920,46 +920,53 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       {expanded && hasVisibleSessions && (
         <div className={styles.sessionList}>
           {(() => {
-            const reviewParent = visibleSessions.find(s => s.type === 'review');
             const reviewerChildren = visibleSessions.filter(s => s.type === 'reviewer');
-            const nonReviewSessions = visibleSessions.filter(s => s.type !== 'review' && s.type !== 'reviewer');
+            // Sort non-reviewer sessions by type priority so review always precedes legacy
+            const sortedNonReviewers = visibleSessions
+              .filter(s => s.type !== 'reviewer')
+              .sort((a, b) => (TYPE_PRIORITY[a.type] ?? 99) - (TYPE_PRIORITY[b.type] ?? 99));
 
             return (
               <>
-                {nonReviewSessions.map(session => (
-                  <SessionNode
-                    key={session.sessionId}
-                    session={session}
-                    issueId={feature.issueId}
-                    isSelected={selectedSessionId === session.sessionId}
-                    onClick={() => onSelectSession?.(feature.issueId, session.sessionId)}
-                    onStopSession={onStopSession}
-                    onViewTerminal={onViewTerminal}
-                    onPauseSession={onPauseSession}
-                    onResumeSession={onResumeSession}
-                    onRestartSession={onRestartSession}
-                    onDeepWipe={onDeepWipe}
-                    onOpenStateDir={onOpenStateDir}
-                    onViewJsonl={onViewJsonl}
-                  />
-                ))}
-                {reviewParent && (
-                  <ReviewGroup
-                    parent={reviewParent}
-                    children={reviewerChildren}
-                    issueId={feature.issueId}
-                    selectedSessionId={selectedSessionId}
-                    onSelectSession={onSelectSession}
-                    onStopSession={onStopSession}
-                    onViewTerminal={onViewTerminal}
-                    onPauseSession={onPauseSession}
-                    onResumeSession={onResumeSession}
-                    onRestartSession={onRestartSession}
-                    onDeepWipe={onDeepWipe}
-                    onOpenStateDir={onOpenStateDir}
-                    onViewJsonl={onViewJsonl}
-                  />
-                )}
+                {sortedNonReviewers.map(session => {
+                  if (session.type === 'review') {
+                    return (
+                      <ReviewGroup
+                        key={session.sessionId}
+                        parent={session}
+                        children={reviewerChildren}
+                        issueId={feature.issueId}
+                        selectedSessionId={selectedSessionId}
+                        onSelectSession={onSelectSession}
+                        onStopSession={onStopSession}
+                        onViewTerminal={onViewTerminal}
+                        onPauseSession={onPauseSession}
+                        onResumeSession={onResumeSession}
+                        onRestartSession={onRestartSession}
+                        onDeepWipe={onDeepWipe}
+                        onOpenStateDir={onOpenStateDir}
+                        onViewJsonl={onViewJsonl}
+                      />
+                    );
+                  }
+                  return (
+                    <SessionNode
+                      key={session.sessionId}
+                      session={session}
+                      issueId={feature.issueId}
+                      isSelected={selectedSessionId === session.sessionId}
+                      onClick={() => onSelectSession?.(feature.issueId, session.sessionId)}
+                      onStopSession={onStopSession}
+                      onViewTerminal={onViewTerminal}
+                      onPauseSession={onPauseSession}
+                      onResumeSession={onResumeSession}
+                      onRestartSession={onRestartSession}
+                      onDeepWipe={onDeepWipe}
+                      onOpenStateDir={onOpenStateDir}
+                      onViewJsonl={onViewJsonl}
+                    />
+                  );
+                })}
               </>
             );
           })()}

@@ -233,7 +233,7 @@ export function IssueAgentCard({
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className={`w-3 h-3 rounded-full ${STATUS_COLORS[agent.status]}`} />
+          <div className={`w-3 h-3 rounded-full ${STATUS_COLORS[agent.status]} ${agent.status === 'healthy' ? 'animate-pulse' : ''}`} />
           <div>
             <div className="font-medium text-foreground flex items-center gap-2">
               {agent.id}
