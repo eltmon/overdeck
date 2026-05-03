@@ -1645,9 +1645,10 @@ const postConversationArchiveRoute = HttpRouter.add(
         // Kill tmux session if still alive
         await killSessionAsync(conv.tmuxSession).catch(() => {});
 
-        // Mark as ended and archived
+        // Mark as ended and archived, unfavorite if starred
         markConversationEnded(name);
         archiveConversation(name);
+        removeFavorite('conversation', name);
         // Unconditionally remove all attachments — archiving is permanent and
         // unsent paste uploads should not leak.
         await cleanupConversationAttachments(name);

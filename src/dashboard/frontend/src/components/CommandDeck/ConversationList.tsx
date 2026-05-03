@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useNow } from '../../hooks/useNow';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
+import { useConfirm } from '../DialogProvider';
 import styles from './styles/command-deck.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -230,6 +231,7 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
   const [tab, setTab] = useState<ListTab>(loadTab);
   const [forkTarget, setForkTarget] = useState<Conversation | null>(null);
   const [confirmArchiveName, setConfirmArchiveName] = useState<string | null>(null);
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const now = useNow(60_000);
 
@@ -436,7 +438,7 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.15, ease: 'easeOut' }}
-                className={`${styles.conversationItem} ${selectedConversation === conv.name ? styles.conversationItemSelected : ''} ${confirmArchiveName === conv.name ? styles.conversationItemConfirming : ''}`}
+                className={`${styles.conversationItem} ${selectedConversation === conv.name ? styles.conversationItemSelected : ''}`}
                 onClick={() => onSelectConversation(conv.name)}
                 title={conv.name}
               >
@@ -557,29 +559,43 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                       <GitBranchPlus size={11} />
                     </span>
                   )}
-                  {confirmArchiveName === conv.name ? (
-                    <span className={styles.archiveConfirmInline} onClick={e => e.stopPropagation()}>
-                      <span className={styles.archiveConfirmLabelInline}>Archive?</span>
-                      <button
-                        className={styles.archiveConfirmYesInline}
-                        onClick={e => { e.stopPropagation(); setConfirmArchiveName(null); archiveMutation.mutate(conv.name); }}
-                      >
-                        Yes
-                      </button>
-                      <button
-                        className={styles.archiveConfirmNoInline}
-                        onClick={e => { e.stopPropagation(); setConfirmArchiveName(null); }}
-                      >
-                        No
-                      </button>
-                    </span>
-                  ) : (
+                  {confirmArchiveName !== conv.name && (
                     <span
                       role="button"
                       tabIndex={0}
                       className={styles.conversationArchiveBtn}
-                      onClick={e => { e.stopPropagation(); setConfirmArchiveName(conv.name); }}
-                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); setConfirmArchiveName(conv.name); } }}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (conv.isFavorited) {
+                          const ok = await confirm({
+                            title: 'Archive favorited conversation',
+                            message: `"${conv.title ?? conv.name}" is favorited.\n\nArchiving will remove the favorite, end the session, and move it to the archive.`,
+                            confirmLabel: 'Archive',
+                            cancelLabel: 'Cancel',
+                            variant: 'destructive',
+                          });
+                          if (ok) archiveMutation.mutate(conv.name);
+                        } else {
+                          setConfirmArchiveName(conv.name);
+                        }
+                      }}
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.stopPropagation();
+                          if (conv.isFavorited) {
+                            const ok = await confirm({
+                              title: 'Archive favorited conversation',
+                              message: `"${conv.title ?? conv.name}" is favorited.\n\nArchiving will remove the favorite, end the session, and move it to the archive.`,
+                              confirmLabel: 'Archive',
+                              cancelLabel: 'Cancel',
+                              variant: 'destructive',
+                            });
+                            if (ok) archiveMutation.mutate(conv.name);
+                          } else {
+                            setConfirmArchiveName(conv.name);
+                          }
+                        }
+                      }}
                       title="Archive conversation"
                       aria-label={`Archive ${conv.name}`}
                     >
@@ -598,6 +614,24 @@ export function ConversationList({ selectedConversation, onSelectConversation }:
                     {copiedId === conv.id ? <Check size={11} /> : <Copy size={11} />}
                   </span>
                 </span>
+                {/* Inline archive confirm — outside .conversationActions so it stays visible without hover */}
+                {confirmArchiveName === conv.name && (
+                  <span className={styles.archiveConfirmInline} onClick={e => e.stopPropagation()}>
+                    <span className={styles.archiveConfirmLabelInline}>Archive?</span>
+                    <button
+                      className={styles.archiveConfirmYesInline}
+                      onClick={e => { e.stopPropagation(); setConfirmArchiveName(null); archiveMutation.mutate(conv.name); }}
+                    >
+                      Yes
+                    </button>
+                    <button
+                      className={styles.archiveConfirmNoInline}
+                      onClick={e => { e.stopPropagation(); setConfirmArchiveName(null); }}
+                    >
+                      No
+                    </button>
+                  </span>
+                )}
                 {/* Star — pinned far right, same column for favorited and hover-to-favorite */}
                 <span
                   role="button"
