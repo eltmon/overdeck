@@ -23,7 +23,7 @@ import {
 */
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState, type StartAgentResponse } from '../types';
 import { getFriendlyModelName } from './inspector/utils';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText, Pause, RefreshCw} from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText, Pause, RefreshCw, Radio } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
@@ -60,6 +60,49 @@ const DIFFICULTY_COLORS: Record<ComplexityLevel, string> = {
   complex: 'badge-bg-warning text-warning-foreground',
   expert: 'badge-bg-destructive text-destructive-foreground',
 };
+
+function kbStalenessStyle(ms: number): { color: string; bg: string; border: string } {
+  if (ms < 2 * 60_000)  return { color: 'text-success',     bg: 'badge-bg-success',     border: 'border-success/40' };
+  if (ms < 10 * 60_000) return { color: 'text-warning',     bg: 'badge-bg-warning',     border: 'border-warning/40' };
+  if (ms < 30 * 60_000) return { color: 'text-orange-400',  bg: 'bg-orange-900/40',     border: 'border-orange-500/40' };
+  return                        { color: 'text-destructive', bg: 'badge-bg-destructive', border: 'border-destructive/40' };
+}
+
+function kbFormatLastHeard(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const h = Math.floor(m / 60);
+  if (h > 0) return `${h}h ${m % 60}m ago`;
+  if (m > 0) return `${m}m ${s % 60}s ago`;
+  return `${s}s ago`;
+}
+
+function LiveLastHeardBadge({ lastActivity }: { lastActivity?: string }) {
+  const [label, setLabel] = useState('');
+  const [style, setStyle] = useState(kbStalenessStyle(0));
+  useEffect(() => {
+    if (!lastActivity) return;
+    const update = () => {
+      const ms = Date.now() - new Date(lastActivity).getTime();
+      if (ms < 2000) { setLabel(''); return; }
+      setLabel(kbFormatLastHeard(ms));
+      setStyle(kbStalenessStyle(ms));
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [lastActivity]);
+  if (!lastActivity || !label) return null;
+  return (
+    <span
+      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${style.bg} ${style.color} border ${style.border}`}
+      title={`Last heard: ${label}`}
+    >
+      <Radio className="w-3 h-3" />
+      {label}
+    </span>
+  );
+}
 
 // Difficulty badge component
 function DifficultyBadge({ level }: { level: ComplexityLevel }) {
@@ -3134,6 +3177,10 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                 <Loader2 className="w-3 h-3 animate-spin" />
                 Compacting
               </span>
+            )}
+            {/* Last heard — live staleness indicator for any running agent */}
+            {!isTerminal && isRunning && agent?.lastActivity && (
+              <LiveLastHeardBadge lastActivity={agent.lastActivity} />
             )}
             {/* Idle badge — time-based health indicator. Shows when agent hasn't been active for 30+ min */}
             {!isTerminal && isAgentIdle && agent?.resolution !== 'stuck' && agent?.resolution !== 'abandoned' && (

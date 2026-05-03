@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import { useDashboardStore, selectSpecialistList } from '../lib/store';
-import { Brain, Play, Square, Clock, AlertCircle, CheckCircle2, Activity, XCircle } from 'lucide-react';
+import { Brain, Play, Square, Clock, AlertCircle, CheckCircle2, Activity, XCircle, Radio } from 'lucide-react';
 import { type SpecialistAgent } from './SpecialistAgentCard';
 
 interface CloisterStatus {
@@ -95,6 +96,37 @@ function formatTimeAgo(timestamp: string | null): string {
   if (diffSecs < 60) return `${diffSecs}s ago`;
   if (diffMins < 60) return `${diffMins}m ago`;
   return `${Math.floor(diffMins / 60)}h ago`;
+}
+
+function stalenessClass(timestamp: string | null): string {
+  if (!timestamp) return 'text-muted-foreground';
+  const ms = Date.now() - new Date(timestamp).getTime();
+  if (ms < 2 * 60_000) return 'text-success';
+  if (ms < 10 * 60_000) return 'text-warning';
+  if (ms < 30 * 60_000) return 'text-orange-400';
+  return 'text-destructive';
+}
+
+function LiveLastHeard({ timestamp, label }: { timestamp: string | null; label?: string }) {
+  const [text, setText] = useState(() => (timestamp ? formatTimeAgo(timestamp) : 'Never'));
+  const [cls, setCls] = useState(() => stalenessClass(timestamp));
+
+  useEffect(() => {
+    if (!timestamp) return;
+    const update = () => {
+      setText(formatTimeAgo(timestamp));
+      setCls(stalenessClass(timestamp));
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [timestamp]);
+
+  return (
+    <span className={cls} title={label ? `${label}: ${text}` : text}>
+      {text}
+    </span>
+  );
 }
 
 
@@ -316,7 +348,10 @@ export function AgentList({ selectedAgent, onSelectAgent }: AgentListProps) {
                       {ps.isRunning ? '● Running' : '○ Completed'}
                     </div>
                     {ps.metadata?.lastRunAt && (
-                      <div className="text-muted-foreground">{formatTimeAgo(ps.metadata.lastRunAt)}</div>
+                      <div className="flex items-center gap-1 justify-end">
+                        <Radio className="w-3 h-3 text-muted-foreground" />
+                        <LiveLastHeard timestamp={ps.metadata.lastRunAt} label="Last heard" />
+                      </div>
                     )}
                   </div>
                   <button

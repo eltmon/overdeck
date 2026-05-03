@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play } from 'lucide-react';
-import { useState } from 'react';
+import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play, Radio } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useAgentCost } from '../hooks/useHandoffData';
 import { HandoffPanel } from './HandoffPanel';
 import { useConfirm, useAlert } from './DialogProvider';
@@ -128,20 +128,43 @@ function formatDuration(startedAt: string): string {
   return `${diffMins}m`;
 }
 
-function formatTimeSince(ms: number | null): string {
-  if (ms === null) return 'unknown';
-
+function formatTimeSince(ms: number): string {
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
+  if (hours > 0) return `${hours}h ${minutes % 60}m ago`;
+  if (minutes > 0) return `${minutes}m ${seconds % 60}s ago`;
+  return `${seconds}s ago`;
+}
 
-  if (hours > 0) {
-    return `${hours}h ago`;
-  } else if (minutes > 0) {
-    return `${minutes}m ago`;
-  } else {
-    return `${seconds}s ago`;
-  }
+function stalenessClass(ms: number): string {
+  if (ms < 2 * 60_000) return 'text-success';
+  if (ms < 10 * 60_000) return 'text-warning';
+  if (ms < 30 * 60_000) return 'text-orange-400';
+  return 'text-destructive';
+}
+
+function LiveLastHeard({ lastActivity }: { lastActivity: string | null }) {
+  const [label, setLabel] = useState('');
+  const [cls, setCls] = useState('text-muted-foreground');
+  useEffect(() => {
+    if (!lastActivity) return;
+    const update = () => {
+      const ms = Date.now() - new Date(lastActivity).getTime();
+      setLabel(formatTimeSince(ms));
+      setCls(stalenessClass(ms));
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [lastActivity]);
+  if (!lastActivity || !label) return null;
+  return (
+    <div className={`flex items-center gap-1 text-xs ${cls}`} title={`Last heard: ${label}`}>
+      <Radio className="w-3 h-3" />
+      {label}
+    </div>
+  );
 }
 
 export function IssueAgentCard({
@@ -280,11 +303,8 @@ export function IssueAgentCard({
               <Clock className="w-4 h-4" />
               {formatDuration(agent.startedAt)}
             </div>
-            {health && health.timeSinceActivity !== null && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Activity className="w-3 h-3" />
-                {formatTimeSince(health.timeSinceActivity)}
-              </div>
+            {health && (
+              <LiveLastHeard lastActivity={health.lastActivity} />
             )}
             {agent.consecutiveFailures > 0 && (
               <div className="flex items-center gap-1 text-sm text-warning-foreground">
