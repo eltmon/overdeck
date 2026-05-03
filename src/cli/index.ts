@@ -72,6 +72,7 @@ import { createCostCommand } from './commands/cost.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { registerCavemanCommands } from './commands/caveman.js';
 import { registerReleaseCommands } from './commands/release.js';
+import { resourcesCommand } from './commands/resources.js';
 
 const program = new Command();
 program.enablePositionalOptions();
@@ -987,6 +988,13 @@ program
   .command('doctor')
   .description('Check system health and dependencies')
   .action(doctorCommand);
+
+// Resources command
+program
+  .command('resources')
+  .description('Show RAM usage by agents, conversations, and system processes')
+  .option('--json', 'Output as JSON')
+  .action(resourcesCommand);
 
 // Update command
 program
