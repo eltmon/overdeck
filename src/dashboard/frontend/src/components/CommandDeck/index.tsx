@@ -580,12 +580,14 @@ export function CommandDeck({
     }
   }, [selectSession, selectedFeature]);
 
-  const handleNewConversation = useCallback(async () => {
+  const createConversationForProject = useCallback(async (projectKey?: string) => {
     try {
+      const payload: Record<string, unknown> = { model: sidebarModel };
+      if (projectKey) payload.projectKey = projectKey;
       const res = await fetch('/api/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: sidebarModel }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Request failed' }));
@@ -604,8 +606,17 @@ export function CommandDeck({
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     } catch (err) {
       console.error('[CommandDeck] Failed to create conversation:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to create conversation');
     }
   }, [sidebarModel, queryClient, onConvIdChange, convsCollapsed]);
+
+  const handleNewConversation = useCallback(() => {
+    void createConversationForProject();
+  }, [createConversationForProject]);
+
+  const handleNewProjectConversation = useCallback((projectKey: string) => {
+    void createConversationForProject(projectKey);
+  }, [createConversationForProject]);
 
   // Resizable sidebar drag handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -786,6 +797,7 @@ export function CommandDeck({
                       onOpenStateDir={handleOpenStateDir}
                       onViewJsonl={handleViewJsonl}
                       onCleanupOrphanedResources={handleCleanupOrphanedResources}
+                      onNewConversation={handleNewProjectConversation}
                     />
                   ))
                 )}

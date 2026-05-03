@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Plus } from 'lucide-react';
 import type { SessionNode } from '@panctl/contracts';
 import { FeatureItem, sessionMatchesFilter, type TreeSessionFilter } from './FeatureItem';
 import styles from '../styles/command-deck.module.css';
@@ -79,6 +79,7 @@ interface ProjectNodeProps {
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
   onCleanupOrphanedResources?: (issueId: string) => void;
+  onNewConversation?: (projectKey: string) => void;
 }
 
 interface ContextMenuState {
@@ -161,7 +162,7 @@ function ProjectNodeMenu({
   );
 }
 
-export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources }: ProjectNodeProps) {
+export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onNewConversation }: ProjectNodeProps) {
   const visibleFeatures = useMemo(() => {
     if (filter === 'all') return features;
     return features.filter((feature) =>
@@ -194,6 +195,19 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
         />
         <span className={styles.projectName}>{name}</span>
         <span className={styles.featureCount}>{visibleFeatures.length}</span>
+        {onNewConversation && (
+          <span
+            role="button"
+            tabIndex={0}
+            className={styles.projectAddConvBtn}
+            onClick={e => { e.stopPropagation(); onNewConversation(name); }}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onNewConversation(name); } }}
+            title="New conversation in this project"
+            aria-label={`New conversation in ${name}`}
+          >
+            <Plus size={12} />
+          </span>
+        )}
       </button>
 
       {menu.open && (
