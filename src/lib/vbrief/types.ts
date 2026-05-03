@@ -106,6 +106,16 @@ export interface VBriefPlan {
     Alternative?: string;
     [key: string]: string | undefined;
   };
+  /**
+   * Panopticon-specific plan metadata. Free-form per-key storage for
+   * lifecycle bookkeeping (e.g. canonicalFilename for the issue-keyed
+   * filename convention).
+   */
+  metadata?: {
+    /** Issue-keyed filename used in `./vbrief/<lifecycle>/`. Set by plan-finalize. */
+    canonicalFilename?: string;
+    [key: string]: unknown;
+  };
   items: VBriefItem[];
   edges: VBriefEdge[];
 }

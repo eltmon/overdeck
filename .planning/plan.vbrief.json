@@ -202,9 +202,10 @@
       {
         "id": "plan-finalize-lifecycle",
         "title": "Update plan-finalize to set proposed status and generate canonical filename",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-03T12:00:00Z",
+        "completed": "2026-05-03T09:25:00Z",
         "metadata": {
           "difficulty": "medium",
           "issueLabel": "pan-946"
@@ -216,7 +217,8 @@
           {
             "id": "plan-finalize-lifecycle.ac1",
             "title": "plan-finalize generates canonical filename and stores it in plan.metadata.canonicalFilename",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T09:25:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -224,7 +226,8 @@
           {
             "id": "plan-finalize-lifecycle.ac2",
             "title": "plan.status set to 'proposed' after finalization",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T09:25:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -232,7 +235,8 @@
           {
             "id": "plan-finalize-lifecycle.ac3",
             "title": ".planning-complete marker still written for backward compat during transition",
-            "status": "pending",
+            "status": "completed",
+            "completed": "2026-05-03T09:25:00Z",
             "metadata": {
               "kind": "acceptance_criterion"
             }
