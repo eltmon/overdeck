@@ -29,6 +29,9 @@ function makeHub(...clients: WebSocket[]): PtyHub {
 // ── broadcastToHub ─────────────────────────────────────────────────────────────
 
 describe('broadcastToHub', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
   it('sends data to all OPEN ready clients', () => {
     const ws1 = makeMockWs(WebSocket.OPEN);
     const ws2 = makeMockWs(WebSocket.OPEN);
@@ -37,6 +40,7 @@ describe('broadcastToHub', () => {
     addClientToHub(hub, ws2, true);
 
     broadcastToHub(hub, 'hello');
+    vi.runAllTimers();
 
     expect(ws1.send).toHaveBeenCalledWith('hello');
     expect(ws2.send).toHaveBeenCalledWith('hello');
@@ -52,6 +56,7 @@ describe('broadcastToHub', () => {
     addClientToHub(hub, connecting, true);
 
     broadcastToHub(hub, 'ping');
+    vi.runAllTimers();
 
     expect(open.send).toHaveBeenCalledWith('ping');
     expect(closed.send).not.toHaveBeenCalled();
@@ -69,6 +74,7 @@ describe('broadcastToHub', () => {
     addClientToHub(hub, open, false);
 
     broadcastToHub(hub, 'scrollback-flood');
+    vi.runAllTimers();
 
     expect(open.send).not.toHaveBeenCalled();
     expect(hub.clientStates.get(open)?.pending).toEqual(['scrollback-flood']);
@@ -80,6 +86,7 @@ describe('broadcastToHub', () => {
     addClientToHub(hub, open, false);
 
     broadcastToHub(hub, 'normal-data');
+    vi.runAllTimers();
     setClientReady(hub, open);
 
     expect(open.send).toHaveBeenCalledWith('normal-data');
