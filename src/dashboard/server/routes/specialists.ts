@@ -1208,12 +1208,13 @@ const postProjectSpecialistSpawnRoute = HttpRouter.add(
     const project = params['project'] as string;
     const type = params['type'] as string;
     const body = yield* readJsonBody;
-    const { issueId, branch, workspace, prUrl, context } = body as {
+    const { issueId, branch, workspace, prUrl, context, model } = body as {
       issueId?: string;
       branch?: string;
       workspace?: string;
       prUrl?: string;
       context?: unknown;
+      model?: string;
     };
 
     if (!issueId) {
@@ -1234,6 +1235,7 @@ const postProjectSpecialistSpawnRoute = HttpRouter.add(
       workspace,
       prUrl,
       context,
+      model,
     }));
 
     if (result.success) {
@@ -1699,6 +1701,208 @@ const postProjectSpecialistResetSessionRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/specialists/:project/:issueId/review/restart ───────────
+// Kills all reviewer tmux sessions + coordinator, then dispatches a fresh review.
+
+const postProjectReviewRestartRoute = HttpRouter.add(
+  'POST',
+  '/api/specialists/:project/:issueId/review/restart',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const project = params['project'] as string;
+    const issueId = params['issueId'] as string;
+    const body = yield* readJsonBody;
+    const { model } = body as { model?: string };
+
+    const { killAllReviewerSessions } = yield* Effect.promise(
+      () => import('../../../lib/cloister/review-agent.js'),
+    );
+    const { getTmuxSessionName } = yield* Effect.promise(
+      () => import('../../../lib/cloister/specialists.js'),
+    );
+
+    // Kill coordinator + all 5 reviewer sessions
+    const coordinatorSession = getTmuxSessionName('review-agent', project, issueId);
+    yield* Effect.promise(() => killSessionAsync(coordinatorSession).catch(() => {}));
+    const killResult = yield* Effect.promise(() => killAllReviewerSessions(project, issueId));
+
+    // Also kill any coordinator sessions (review-coordinator-<issueId>-*)
+    const { listSessionNamesAsync: listSessions } = yield* Effect.promise(
+      () => import('../../../lib/tmux.js'),
+    );
+    const sessions = yield* Effect.promise(() => listSessions().catch(() => [] as string[]));
+    for (const s of sessions) {
+      if (s.startsWith(`review-coordinator-${issueId}-`)) {
+        yield* Effect.promise(() => killSessionAsync(s).catch(() => {}));
+      }
+    }
+
+    // Resolve workspace info for re-dispatch
+    const projectConfig = resolveProjectFromIssue(issueId);
+    if (!projectConfig) {
+      return jsonResponse({ error: `Cannot resolve project for ${issueId}` }, { status: 404 });
+    }
+    const workspacePath = join(projectConfig.path, 'workspaces', `feature-${issueId.toLowerCase()}`);
+    if (!existsSync(workspacePath)) {
+      return jsonResponse({ error: `Workspace not found: ${workspacePath}` }, { status: 404 });
+    }
+
+    // Detect branch
+    let branch = 'unknown';
+    try {
+      const { stdout } = yield* Effect.promise(() => execAsync(
+        `cd "${workspacePath}" && git branch --show-current`,
+        { encoding: 'utf-8', timeout: 5000 },
+      ));
+      branch = stdout.trim() || 'unknown';
+    } catch { /* non-fatal */ }
+
+    const { dispatchParallelReview } = yield* Effect.promise(
+      () => import('../../../lib/cloister/review-agent.js'),
+    );
+    const prUrl = getReviewStatus(issueId)?.prUrl;
+    const result = yield* Effect.promise(() => dispatchParallelReview({
+      issueId,
+      workspace: workspacePath,
+      branch,
+      prUrl,
+    }));
+
+    return jsonResponse({
+      success: result.success,
+      message: result.message,
+      killed: killResult.killed,
+      model: model ?? undefined,
+    });
+  })),
+);
+
+// ─── Route: POST /api/specialists/:project/:issueId/reviewer/:role/restart ───
+// Kills a single reviewer role's tmux session and re-spawns it using the
+// prompt from the most recent review run. If no prompt file exists (review
+// never ran), returns 404 — the user should restart all reviewers instead.
+
+const postProjectReviewerRoleRestartRoute = HttpRouter.add(
+  'POST',
+  '/api/specialists/:project/:issueId/reviewer/:role/restart',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const project = params['project'] as string;
+    const issueId = params['issueId'] as string;
+    const role = params['role'] as string;
+    const body = yield* readJsonBody;
+    const { model } = body as { model?: string };
+
+    const {
+      REVIEWER_ROLES,
+      getReviewerSessionName,
+    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
+
+    if (!REVIEWER_ROLES.includes(role as any)) {
+      return jsonResponse(
+        { error: `Invalid reviewer role: ${role}. Must be one of: ${REVIEWER_ROLES.join(', ')}` },
+        { status: 400 },
+      );
+    }
+
+    const sessionName = getReviewerSessionName(role as any, project, issueId);
+
+    // Kill existing session
+    yield* Effect.promise(() => killSessionAsync(sessionName).catch(() => {}));
+    saveAgentRuntimeState(sessionName, {
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+    });
+
+    // Resolve workspace
+    const projectConfig = resolveProjectFromIssue(issueId);
+    if (!projectConfig) {
+      return jsonResponse({ error: `Cannot resolve project for ${issueId}` }, { status: 404 });
+    }
+    const workspacePath = join(projectConfig.path, 'workspaces', `feature-${issueId.toLowerCase()}`);
+    if (!existsSync(workspacePath)) {
+      return jsonResponse({ error: `Workspace not found` }, { status: 404 });
+    }
+
+    // Find the most recent review run's prompt file for this role
+    const panReviewDir = join(workspacePath, '.pan', 'review');
+    let promptFile: string | null = null;
+    try {
+      const entries = yield* Effect.promise(() => readdir(panReviewDir));
+      const reviewDirs = entries.filter(e => e.startsWith('review-')).sort().reverse();
+      for (const dir of reviewDirs) {
+        const candidate = join(panReviewDir, dir, `${role}-prompt.md`);
+        if (existsSync(candidate)) {
+          promptFile = candidate;
+          break;
+        }
+      }
+    } catch { /* review dir may not exist */ }
+
+    if (!promptFile) {
+      return jsonResponse(
+        { error: `No prompt file found for ${role} reviewer. Use "Restart Review" to run a full review instead.` },
+        { status: 404 },
+      );
+    }
+
+    // Resolve model
+    const { resolveReviewerModel, spawnSingleReviewer } = yield* Effect.promise(
+      () => import('../../../lib/cloister/review-agent.js'),
+    );
+    const resolvedModel = model ?? resolveReviewerModel(
+      { name: role, model: undefined } as any,
+      'claude-sonnet-4-6',
+    );
+
+    yield* Effect.promise(() => spawnSingleReviewer(sessionName, resolvedModel, promptFile!, workspacePath));
+
+    return jsonResponse({
+      success: true,
+      message: `Restarted ${role} reviewer for ${issueId}`,
+      sessionName,
+      model: resolvedModel,
+    });
+  })),
+);
+
+// ─── Route: GET /api/models/resolve ──────────────────────────────────────────
+// Returns the resolved default model for each session/work type.
+
+const getModelsResolveRoute = HttpRouter.add(
+  'GET',
+  '/api/models/resolve',
+  httpHandler(Effect.gen(function* () {
+    const { getModelId: getModel } = yield* Effect.promise(
+      () => import('../../../lib/work-type-router.js'),
+    );
+
+    const workTypes = [
+      'planning-agent',
+      'issue-agent:implementation',
+      'specialist-review-agent',
+      'review:correctness',
+      'review:security',
+      'review:performance',
+      'review:requirements',
+      'review:synthesis',
+      'specialist-test-agent',
+      'specialist-merge-agent',
+    ] as const;
+
+    const resolved: Record<string, string | null> = {};
+    for (const wt of workTypes) {
+      try {
+        resolved[wt] = getModel(wt as any);
+      } catch {
+        resolved[wt] = null;
+      }
+    }
+
+    return jsonResponse(resolved);
+  })),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 //
 // ORDERING RULES (important for Effect HttpRouter):
@@ -1741,6 +1945,9 @@ export const specialistsRouteLayer = Layer.mergeAll(
   getProjectSpecialistLatestLogRoute,       // /latest-log
   postProjectSpecialistLogsCleanupRoute,    // /logs/cleanup
   postProjectSpecialistResetSessionRoute,  // /reset-session
+  postProjectReviewRestartRoute,           // /:project/:issueId/review/restart
+  postProjectReviewerRoleRestartRoute,     // /:project/:issueId/reviewer/:role/restart
+  getModelsResolveRoute,                   // /models/resolve
 );
 
 export default specialistsRouteLayer;
