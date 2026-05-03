@@ -48,3 +48,5 @@ All beads complete. Ready for verification and merge.
 - **[2026-05-03T16:57Z] verification-gate → FAILED** — `.planning/feedback/001-verification-gate-failed.md`
 - **[2026-05-03T16:57Z] verification-gate → FAILED** — `.planning/feedback/002-verification-gate-failed.md`
 - **[2026-05-03T17:01Z] verification-gate → FAILED** — `.planning/feedback/003-verification-gate-failed.md`
+- **[2026-05-03T17:12Z] verification-gate → FAILED** — `.planning/feedback/004-verification-gate-failed.md`
+- **[2026-05-03T17:13Z] verification-gate → FAILED** — `.planning/feedback/005-verification-gate-failed.md`
