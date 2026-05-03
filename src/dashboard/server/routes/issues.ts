@@ -39,6 +39,7 @@ import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue } from '.
 import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
 import { isPlanningComplete } from '../../../lib/vbrief/io.js';
 import { promoteVBriefToProposed } from '../../../lib/vbrief/lifecycle-io.js';
+import { appendSessionEntry } from '../../../lib/vbrief/continue-state.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus } from '../review-status.js';
@@ -1171,6 +1172,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     let openQuestionsCount = 0;
     if (planningDirForCheck && existsSync(planningDirForCheck)) {
       try {
+        // Legacy: check STATE.md for open questions (planning agents using old prompt)
         const stateMdPath = join(planningDirForCheck, 'STATE.md');
         if (existsSync(stateMdPath)) {
           const stateMdContent = yield* Effect.promise(() => readFile(stateMdPath, 'utf-8'));
@@ -1444,7 +1446,7 @@ const postIssueReopenRoute = HttpRouter.add(
 
     // Reset specialist pipeline state, post-merge state, and agent markers (all non-fatal)
     yield* Effect.promise(async () => {
-      // Reset specialist pipeline state, remove from queues, and update STATE.md
+      // Reset specialist pipeline state, remove from queues, and update continue file
       // via reopenWorkspaceState (shared logic with `pan reopen` CLI command)
       try {
         const teamPrefix = extractTeamPrefix(id);
@@ -1718,9 +1720,20 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
     // 4. Reset specialist pipeline states
     clearReviewStatus(id.toUpperCase());
 
-    // 5. Append "Restarted from Plan" section to STATE.md
+    // 5. Append restart entry to continue file (replaces STATE.md append)
     yield* Effect.promise(async () => {
-      const statePath = join(workspacePath, '.planning', 'STATE.md');
+      const planningDir = join(workspacePath, '.planning');
+      const upperId = id.toUpperCase();
+      try {
+        appendSessionEntry(planningDir, upperId, {
+          reason: 'resume',
+          note: `Restarted from plan — branch reset to planning commit ${resetResult.commit}. Specialist states cleared.`,
+        });
+      } catch {
+        // Non-fatal: continue file may not exist yet
+      }
+      // Legacy fallback: append to STATE.md if it exists
+      const statePath = join(planningDir, 'STATE.md');
       if (existsSync(statePath)) {
         const date = new Date().toISOString().slice(0, 10);
         const lines = [

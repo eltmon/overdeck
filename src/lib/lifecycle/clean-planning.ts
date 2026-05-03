@@ -21,6 +21,7 @@ const execFileAsync = promisify(execFile);
 /** Ephemeral planning files to remove from main after merge */
 const EPHEMERAL_PLANNING_FILES = [
   '.planning/STATE.md',
+  '.planning/continue-',
   '.planning/PRD.md',
   '.planning/WORKSPACE.md',
   '.planning/PLANNING_PROMPT.md',

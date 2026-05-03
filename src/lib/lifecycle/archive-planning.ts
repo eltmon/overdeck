@@ -179,7 +179,15 @@ export async function archiveWorkspaceArtifacts(
       details.push('Archived feedback/');
     }
 
-    // Archive STATE.md
+    // Archive continue file (replaces STATE.md)
+    const issueUpper = ctx.issueId.toUpperCase();
+    const continueFile = join(workspacePath, '.planning', `continue-${issueUpper}.vbrief.json`);
+    if (existsSync(continueFile)) {
+      await cp(continueFile, join(archiveDir, `continue-${issueUpper}.vbrief.json`));
+      details.push('Archived continue.vbrief.json');
+    }
+
+    // Legacy fallback: archive STATE.md if continue file missing
     const stateMd = join(workspacePath, '.planning', 'STATE.md');
     if (existsSync(stateMd)) {
       await cp(stateMd, join(archiveDir, 'STATE.md'));

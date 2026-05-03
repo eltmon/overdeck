@@ -71,7 +71,7 @@ interface ActivityContext {
 const LEGACY_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 /** Hide stopped legacy sessions older than 24h from the Command Deck tree.
- *  These are typically synthetic STATE.md planning placeholders or stale
+ *  These are typically synthetic planning placeholders or stale
  *  timestamp-named tmux sessions that no longer carry live context. */
 function isStaleLegacySession(s: SessionNode): boolean {
   if (s.type !== 'legacy') return false;
@@ -145,9 +145,12 @@ async function collectSessionTreeNodes(
   if (!hasPlanningSection) {
     const planningDir = join(workspacePath, '.planning');
     if (await pathExists(planningDir)) {
+      const continuePath = join(planningDir, `continue-${issueId.toUpperCase()}.vbrief.json`);
       const planningStatePath = join(planningDir, 'STATE.md');
       const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
-      const planningPathForTimestamp = await pathExists(planningStatePath)
+      const planningPathForTimestamp = await pathExists(continuePath)
+        ? continuePath
+        : await pathExists(planningStatePath)
         ? planningStatePath
         : planningPromptPath;
       const planningStat = await stat(planningPathForTimestamp).catch(() => null);

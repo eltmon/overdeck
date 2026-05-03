@@ -826,7 +826,7 @@ const postAgentPokeRoute = HttpRouter.add(
     const { message } = body as any;
     const defaultPokeMessage =
       "You seem to have been inactive for a while. If you're stuck:\n" +
-      '1. Check your current task in STATE.md\n' +
+      '1. Check your current task in continue.vbrief.json\n' +
       '2. Try an alternative approach if blocked\n' +
       '3. Ask for help if needed\n\n' +
       "What's your current status?";
@@ -1737,8 +1737,11 @@ const postAgentsRoute = HttpRouter.add(
         if (existsSync(join(gitRoot, '.beads'))) {
           yield* Effect.promise(() => execAsync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8' }));
         }
-        if (existsSync(join(gitRoot, 'STATE.md'))) {
-          yield* Effect.promise(() => execAsync(`git add STATE.md`, { cwd: gitRoot, encoding: 'utf-8' }));
+        // Stage continue files and legacy STATE.md
+        for (const planningFile of [`continue-${issueId.toUpperCase()}.vbrief.json`, 'STATE.md']) {
+          if (existsSync(join(gitRoot, planningFile))) {
+            yield* Effect.promise(() => execAsync(`git add "${planningFile}"`, { cwd: gitRoot, encoding: 'utf-8' }));
+          }
         }
         // git diff --cached --quiet exits 1 when there ARE staged changes (normal).
         // Handle exit-1 in the Promise so it never becomes an Effect failure.

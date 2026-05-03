@@ -979,7 +979,9 @@ const getPlanningStatusRoute = HttpRouter.add(
             ? legacyPlanningDir
             : null;
 
+        const hasContinueFile = planningDir ? existsSync(join(planningDir, `continue-${issueId.toUpperCase()}.vbrief.json`)) : false;
         const hasStateFile = planningDir ? existsSync(join(planningDir, 'STATE.md')) : false;
+        const hasPlanningState = hasContinueFile || hasStateFile;
         const hasPromptFile = planningDir
           ? existsSync(join(planningDir, 'PLANNING_PROMPT.md'))
           : false;
@@ -1001,7 +1003,7 @@ const getPlanningStatusRoute = HttpRouter.add(
           sessionName,
           workspacePath: existsSync(workspacePath) ? workspacePath : undefined,
           planningCompleted,
-          hasStateFile,
+          hasStateFile: hasPlanningState,
           hasPromptFile,
           hasCompletionMarker,
           isRemote,
@@ -1153,7 +1155,7 @@ const postPlanningMessageRoute = HttpRouter.add(
 **YOU SHOULD ONLY:**
 - Ask clarifying questions
 - Explore the codebase to understand context
-- Generate planning artifacts (STATE.md, vBRIEF plan at \`.planning/plan.vbrief.json\`, implementation plan at \`docs/prds/active/{issue-id-lowercase}/STATE.md\` — directory MUST be lowercase)
+- Generate planning artifacts (continue.vbrief.json at \`.planning/continue-{issue-id}.vbrief.json\`, vBRIEF plan at \`.planning/plan.vbrief.json\`)
 - Present options and tradeoffs
 
 ---

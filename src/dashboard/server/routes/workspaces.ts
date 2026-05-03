@@ -87,6 +87,8 @@ import {
 import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { findPlan, readPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
 import { findVBriefByIssue } from '../../../lib/vbrief/lifecycle-io.js';
+import { readContinueState } from '../../../lib/vbrief/continue-state.js';
+import { resolveVBriefDir } from '../../../lib/vbrief/lifecycle.js';
 import { criticalPath } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
 import { capturePaneAsync, killSessionAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
@@ -138,6 +140,28 @@ async function readWorkspacePlanningMarkdown(
     issueId: parsedIssueId,
     body: content,
   };
+}
+
+/** Read continue file from lifecycle dirs (proposed → active → completed → cancelled),
+ *  falling back to workspace .planning/. Returns JSON string or null. */
+function readWorkspaceContinueFile(
+  projectPath: string,
+  workspacePath: string,
+  issueId: string,
+): string | null {
+  const upperId = issueId.toUpperCase();
+  for (const dir of ['proposed', 'active', 'completed', 'cancelled'] as const) {
+    try {
+      const cont = readContinueState(resolveVBriefDir(projectPath, dir), upperId);
+      if (cont) return JSON.stringify(cont, null, 2);
+    } catch { /* ignore */ }
+  }
+  // Fallback to workspace .planning/
+  try {
+    const cont = readContinueState(join(workspacePath, '.planning'), upperId);
+    if (cont) return JSON.stringify(cont, null, 2);
+  } catch { /* ignore */ }
+  return null;
 }
 
 function shouldTreatAsRerun(status: Pick<ReviewStatus, 'readyForMerge' | 'reviewStatus' | 'testStatus' | 'mergeStatus'> | null | undefined): boolean {
@@ -1039,11 +1063,14 @@ const getWorkspaceRoute = HttpRouter.add(
         }
 
         let services: { name: string; url?: string }[] = [];
+        const continueFile = join(workspacePath, '.planning', `continue-${issueId.toUpperCase()}.vbrief.json`);
         const stateMd = join(workspacePath, '.planning', 'STATE.md');
         const workspaceMd = join(workspacePath, 'WORKSPACE.md');
         const dockerCompose = join(workspacePath, 'docker-compose.yml');
 
-        const urlSourceFile = existsSync(stateMd)
+        const urlSourceFile = existsSync(continueFile)
+          ? continueFile
+          : existsSync(stateMd)
           ? stateMd
           : existsSync(workspaceMd)
           ? workspaceMd
@@ -1196,6 +1223,17 @@ const getWorkspaceStateMdRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
 
+    const parsed = parseIssueId(issueId);
+    const issuePrefix = parsed?.prefix ?? extractPrefix(issueId) ?? issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const { parsedIssueId, workspacePath } = getWorkspacePathForIssue(projectPath, issueId);
+
+    const continueBody = readWorkspaceContinueFile(projectPath, workspacePath, issueId);
+    if (continueBody) {
+      return jsonResponse({ issueId: parsedIssueId, body: continueBody });
+    }
+
+    // Legacy fallback: STATE.md
     return yield* Effect.promise(() =>
       readWorkspacePlanningMarkdown(issueId, 'STATE.md')
         .then((result) => jsonResponse(result))
@@ -1207,9 +1245,9 @@ const getWorkspaceStateMdRoute = HttpRouter.add(
             && ((err as { code?: unknown }).code === 'ENOENT'
               || String((err as { message?: unknown }).message ?? '').includes('Invalid issue ID'))
           ) {
-            return jsonResponse({ error: 'STATE.md not found for this workspace' }, { status: 404 });
+            return jsonResponse({ error: 'Planning state not found for this workspace' }, { status: 404 });
           }
-          console.error('[workspaces] Failed to read STATE.md:', err);
+          console.error('[workspaces] Failed to read planning state:', err);
           return jsonResponse({ error: 'Internal server error' }, { status: 500 });
         })
     );
@@ -1763,7 +1801,9 @@ const postWorkspaceStartRoute = HttpRouter.add(
 
     // Copy planning artifacts from project root if needed
     const workspacePlanningDir = join(workspacePath, '.planning');
-    if (!existsSync(join(workspacePlanningDir, 'STATE.md'))) {
+    const hasContinueFile = existsSync(join(workspacePlanningDir, `continue-${issueId.toUpperCase()}.vbrief.json`));
+    const hasStateMd = existsSync(join(workspacePlanningDir, 'STATE.md'));
+    if (!hasContinueFile && !hasStateMd) {
       const legacyPlanningDir = join(projectPath, '.planning', issueLower);
       if (existsSync(legacyPlanningDir)) {
         try {
@@ -4347,7 +4387,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     // Step 2b: Strip ephemeral `.planning/` from the feature branch BEFORE merge (#888).
     // `.planning/` is tracked on feature branches for live workspace use, but must not
     // land on main — otherwise other active workspaces sync-main pull each other's
-    // STATE.md/feedback files and cross-contaminate. The post-merge cleanup
+    // continue/feedback files and cross-contaminate. The post-merge cleanup
     // (`cleanPlanningArtifacts`) is a safety net that runs AFTER the squash commit is
     // already public; this strip is the primary defense and runs BEFORE `gh pr merge`.
     //
