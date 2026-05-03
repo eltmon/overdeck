@@ -48,7 +48,6 @@ function LiveLastHeard({ lastActivity }: { lastActivity?: string }) {
         fontSize: 10,
         fontVariantNumeric: 'tabular-nums',
         color,
-        marginLeft: 'auto',
         flexShrink: 0,
       }}
       title={`Last heard: ${label}`}
@@ -436,10 +435,10 @@ export function SessionNode({
         >
           {deriveSessionLabel(session)}
         </span>
+        <LiveLastHeard lastActivity={lastActivity} />
         <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${session.status}`] ?? ''}`}>
           {session.status}
         </span>
-        <LiveLastHeard lastActivity={lastActivity} />
         <span className={styles.sessionDuration}>{formatDuration(session.duration)}</span>
       </button>
 
