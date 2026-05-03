@@ -1802,9 +1802,9 @@ const postAgentsRoute = HttpRouter.add(
 
     // Write initial continue state (PAN-946: workspace-44p)
     try {
-      const { stdout: branchOut } = await execAsync('git branch --show-current', { cwd: workspacePath, encoding: 'utf-8' });
-      const { stdout: shaOut } = await execAsync('git rev-parse --short HEAD', { cwd: workspacePath, encoding: 'utf-8' });
-      const { stdout: dirtyOut } = await execAsync('git status --porcelain', { cwd: workspacePath, encoding: 'utf-8' });
+      const { stdout: branchOut } = yield* Effect.promise(() => execAsync('git branch --show-current', { cwd: workspacePath, encoding: 'utf-8' }));
+      const { stdout: shaOut } = yield* Effect.promise(() => execAsync('git rev-parse --short HEAD', { cwd: workspacePath, encoding: 'utf-8' }));
+      const { stdout: dirtyOut } = yield* Effect.promise(() => execAsync('git status --porcelain', { cwd: workspacePath, encoding: 'utf-8' }));
       const branch = branchOut.trim();
       const sha = shaOut.trim();
       const dirty = dirtyOut.trim().length > 0;
