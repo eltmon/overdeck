@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo, useReducer } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Compass, Plus } from 'lucide-react';
+import { Compass, Plus, ChevronDown, ChevronRight } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { sessionMatchesFilter, type TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { DeaconStatus } from './DeaconStatus';
@@ -141,19 +141,8 @@ interface CommandDeckProps {
   onConversationViewModeChange?: (mode: ViewMode) => void;
 }
 
-type SidebarMode = 'projects' | 'conversations';
-
-const SIDEBAR_MODE_KEY = 'mc-sidebar-mode';
-
-function loadSidebarMode(): SidebarMode {
-  try {
-    const v = localStorage.getItem(SIDEBAR_MODE_KEY);
-    if (v === 'conversations') return 'conversations';
-  } catch {
-    // ignore
-  }
-  return 'projects';
-}
+const CONVS_COLLAPSED_KEY = 'mc-convs-collapsed';
+const PROJECTS_COLLAPSED_KEY = 'mc-projects-collapsed';
 
 export function CommandDeck({
   issues = [],
@@ -166,12 +155,25 @@ export function CommandDeck({
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [showBeads, setShowBeads] = useState(false);
-  const [sidebarMode, setSidebarModeState] = useState<SidebarMode>(() => loadSidebarMode());
-  const showConversations = sidebarMode === 'conversations';
-  const showProjects = sidebarMode === 'projects';
-  const setSidebarMode = useCallback((mode: SidebarMode) => {
-    setSidebarModeState(mode);
-    try { localStorage.setItem(SIDEBAR_MODE_KEY, mode); } catch { /* ignore */ }
+  const [convsCollapsed, setConvsCollapsed] = useState(() => {
+    try { return localStorage.getItem(CONVS_COLLAPSED_KEY) === 'true'; } catch { return false; }
+  });
+  const [projectsCollapsed, setProjectsCollapsed] = useState(() => {
+    try { return localStorage.getItem(PROJECTS_COLLAPSED_KEY) === 'true'; } catch { return false; }
+  });
+  const toggleConvsCollapsed = useCallback(() => {
+    setConvsCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem(CONVS_COLLAPSED_KEY, String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+  const toggleProjectsCollapsed = useCallback(() => {
+    setProjectsCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem(PROJECTS_COLLAPSED_KEY, String(next)); } catch { /* ignore */ }
+      return next;
+    });
   }, []);
   const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
@@ -217,7 +219,7 @@ export function CommandDeck({
   const { data: sessionTrees = [] } = useQuery({
     queryKey: ['session-trees', projectNamesKey],
     queryFn: () => fetchAllSessionTrees(projects.map(p => p.name)),
-    enabled: showProjects && projects.length > 0,
+    enabled: projects.length > 0,
   });
 
   const sessionTreeDataRef = useRef<Record<string, ProjectSessionTree>>({});
@@ -238,7 +240,6 @@ export function CommandDeck({
   // Track current project names key for delta handlers (avoids stale closure)
   // Subscribe to live session tree deltas for each project
   useEffect(() => {
-    if (!showProjects) return;
     const transport = getTransport();
     const unsubscribes: Array<() => void> = [];
 
@@ -273,7 +274,7 @@ export function CommandDeck({
         unsubscribe();
       }
     };
-  }, [showProjects, projectNamesKey, projects, queryClient]);
+  }, [projectNamesKey, projects, queryClient]);
 
   // Merge session trees into project features, preserving object identity
   // for features whose sessions haven't changed (avoids O(total features)
@@ -349,11 +350,10 @@ export function CommandDeck({
   const hasAutoSelected = useRef(false);
   useEffect(() => {
     if (hasAutoSelected.current) return;
-    if (!showConversations) return;
     if (conversations.length === 0 || convId || selectedConversation !== null || selectedFeature !== null) return;
     setSelectedConversation(conversations[0].name);
     hasAutoSelected.current = true;
-  }, [conversations, convId, selectedConversation, selectedFeature, showConversations]);
+  }, [conversations, convId, selectedConversation, selectedFeature]);
 
   // Sync URL when selected conversation changes (user clicks, draft promoted, etc.)
   // Use a ref to track the previous value so we only call onConvIdChange when it actually changes.
@@ -594,7 +594,7 @@ export function CommandDeck({
       const conv = await res.json() as Conversation;
       setSelectedConversation(conv.name);
       setSelectedFeature(null);
-      setSidebarMode('conversations');
+      if (convsCollapsed) setConvsCollapsed(false);
       if (onConvIdChange) {
         const newId = String(conv.id);
         onConvIdChange(newId);
@@ -605,7 +605,7 @@ export function CommandDeck({
     } catch (err) {
       console.error('[CommandDeck] Failed to create conversation:', err);
     }
-  }, [sidebarModel, queryClient, onConvIdChange, setSidebarMode]);
+  }, [sidebarModel, queryClient, onConvIdChange, convsCollapsed]);
 
   // Resizable sidebar drag handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -707,94 +707,86 @@ export function CommandDeck({
               </div>
             </div>
 
-            {/* Filter chips */}
-            <div className={styles.segmentControl}>
-              <button
-                className={`${styles.segmentButton} ${showProjects ? styles.segmentButtonActive : ''}`}
-                onClick={() => setSidebarMode('projects')}
-                aria-pressed={showProjects}
-              >
-                Projects
-                <span className={styles.segmentCount}>
-                  {projects.reduce((sum, p) => sum + p.features.length, 0)}
-                </span>
-              </button>
-              <button
-                className={`${styles.segmentButton} ${showConversations ? styles.segmentButtonActive : ''}`}
-                onClick={() => setSidebarMode('conversations')}
-                aria-pressed={showConversations}
-              >
-                Conversations
-                <span className={styles.segmentCount}>{conversations.length}</span>
-              </button>
-            </div>
-
-            {/* Tree session filter (blocker-4) */}
-            {showProjects && (
-              <div className={styles.treeFilterRow}>
-                {(['all', 'alive', 'failed'] as TreeSessionFilter[]).map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => setTreeFilter(f)}
-                    className={`${styles.treeFilterButton} ${treeFilter === f ? styles.treeFilterButtonActive : ''}`}
-                  >
-                    {f === 'all' ? 'All' : f === 'alive' ? 'Alive' : 'Failed'}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
 
-          {/* Unified sidebar content */}
+          {/* Unified sidebar — Conversations + Projects as collapsible sections */}
           <div className={styles.projectTree}>
-            {showConversations && (
+            {/* ── Conversations section ─────────────────────────────── */}
+            <div className={styles.sectionHeader} onClick={toggleConvsCollapsed}>
+              {convsCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+              <span className={styles.sectionTitle}>Conversations</span>
+              <span className={styles.segmentCount}>{conversations.length}</span>
+            </div>
+            {!convsCollapsed && (
               <ConversationList
                 selectedConversation={selectedConversation}
                 onSelectConversation={handleSelectConversation}
               />
             )}
-            {showProjects && (
-              isLoading && projects.length === 0 ? (
-                <div className={styles.skeletonList}>
-                  <div className={styles.skeletonItem} style={{ width: '60%' }} />
-                  <div className={styles.skeletonItem} style={{ width: '80%' }} />
-                  <div className={styles.skeletonItem} style={{ width: '45%' }} />
-                  <div className={styles.skeletonItem} style={{ width: '70%' }} />
+
+            {/* ── Projects section ──────────────────────────────────── */}
+            <div className={styles.sectionHeader} onClick={toggleProjectsCollapsed}>
+              {projectsCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+              <span className={styles.sectionTitle}>Projects</span>
+              <span className={styles.segmentCount}>
+                {projects.reduce((sum, p) => sum + p.features.length, 0)}
+              </span>
+            </div>
+            {!projectsCollapsed && (
+              <>
+                <div className={styles.treeFilterRow}>
+                  {(['all', 'alive', 'failed'] as TreeSessionFilter[]).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setTreeFilter(f)}
+                      className={`${styles.treeFilterButton} ${treeFilter === f ? styles.treeFilterButtonActive : ''}`}
+                    >
+                      {f === 'all' ? 'All' : f === 'alive' ? 'Alive' : 'Failed'}
+                    </button>
+                  ))}
                 </div>
-              ) : projects.length === 0 ? (
-                <div className={styles.emptyProject}>No projects configured</div>
-              ) : (
-                projectsWithSessions
-                  .filter((project) => {
-                    if (treeFilter === 'all') return project.features.length > 0;
-                    return project.features.some((feature) =>
-                      (feature.sessions ?? []).some((session) => sessionMatchesFilter(session, treeFilter)),
-                    );
-                  })
-                  .map(project => (
-                  <ProjectNode
-                    key={project.path}
-                    name={project.name}
-                    features={project.features}
-                    selectedFeature={selectedFeature}
-                    onSelectFeature={handleSelectFeature}
-                    selectedSessionId={selectedSessionId}
-                    onSelectSession={handleSelectSession}
-                    issueTitles={issueTitles}
-                    issueCosts={issueCosts}
-                    filter={treeFilter}
-                    onStopSession={handleStopSession}
-                    onViewTerminal={handleViewTerminal}
-                    onPauseSession={handlePauseSession}
-                    onResumeSession={handleResumeSession}
-                    onRestartSession={handleRestartSession}
-                    onDeepWipe={handleDeepWipe}
-                    onOpenStateDir={handleOpenStateDir}
-                    onViewJsonl={handleViewJsonl}
-                    onCleanupOrphanedResources={handleCleanupOrphanedResources}
-                  />
-                ))
-              )
+                {isLoading && projects.length === 0 ? (
+                  <div className={styles.skeletonList}>
+                    <div className={styles.skeletonItem} style={{ width: '60%' }} />
+                    <div className={styles.skeletonItem} style={{ width: '80%' }} />
+                    <div className={styles.skeletonItem} style={{ width: '45%' }} />
+                    <div className={styles.skeletonItem} style={{ width: '70%' }} />
+                  </div>
+                ) : projects.length === 0 ? (
+                  <div className={styles.emptyProject}>No projects configured</div>
+                ) : (
+                  projectsWithSessions
+                    .filter((project) => {
+                      if (treeFilter === 'all') return project.features.length > 0;
+                      return project.features.some((feature) =>
+                        (feature.sessions ?? []).some((session) => sessionMatchesFilter(session, treeFilter)),
+                      );
+                    })
+                    .map(project => (
+                    <ProjectNode
+                      key={project.path}
+                      name={project.name}
+                      features={project.features}
+                      selectedFeature={selectedFeature}
+                      onSelectFeature={handleSelectFeature}
+                      selectedSessionId={selectedSessionId}
+                      onSelectSession={handleSelectSession}
+                      issueTitles={issueTitles}
+                      issueCosts={issueCosts}
+                      filter={treeFilter}
+                      onStopSession={handleStopSession}
+                      onViewTerminal={handleViewTerminal}
+                      onPauseSession={handlePauseSession}
+                      onResumeSession={handleResumeSession}
+                      onRestartSession={handleRestartSession}
+                      onDeepWipe={handleDeepWipe}
+                      onOpenStateDir={handleOpenStateDir}
+                      onViewJsonl={handleViewJsonl}
+                      onCleanupOrphanedResources={handleCleanupOrphanedResources}
+                    />
+                  ))
+                )}
+              </>
             )}
           </div>
 
