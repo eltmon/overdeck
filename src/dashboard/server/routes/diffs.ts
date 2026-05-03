@@ -15,6 +15,8 @@ import {
   captureCheckpoint,
   diffCheckpoints,
   diffCheckpointFiles,
+  diffAgainstMain,
+  diffAgainstMainFiles,
   listCheckpoints,
 } from '../../../lib/checkpoint/checkpoint-manager.js'
 
@@ -179,6 +181,49 @@ const getFullDiffRoute = HttpRouter.add(
   }),
 )
 
+// ─── Route: GET /api/agents/:agentId/diffs/vs-main ──────────────────────────
+// Full diff of the workspace against the main branch.
+
+const getVsMainDiffRoute = HttpRouter.add(
+  'GET',
+  '/api/agents/:agentId/diffs/vs-main',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest
+    const originCheck = validateOrigin(request)
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 })
+    }
+
+    const params = yield* HttpRouter.params
+    const agentId = params.agentId
+    const readModel = yield* ReadModelService
+
+    return yield* Effect.promise(async () => {
+      try {
+        const snapshot = await Effect.runPromise(readModel.getSnapshot)
+        const agent = (snapshot.agents as any[]).find((a: any) => a.id === agentId)
+        if (!agent) {
+          return jsonResponse({ error: 'Agent not found' }, { status: 404 })
+        }
+
+        const workspace: string | null = agent.workspace ?? null
+        if (!workspace) {
+          return jsonResponse({ error: 'Agent has no workspace' }, { status: 400 })
+        }
+
+        const diff = await diffAgainstMain(workspace)
+        const files = await diffAgainstMainFiles(workspace)
+
+        return jsonResponse({ agentId, diff, files })
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error)
+        console.error('[diffs] get vs-main diff failed:', msg)
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 })
+      }
+    })
+  }),
+)
+
 // ─── Route: POST /api/agents/:agentId/diffs/test-checkpoint ─────────────────
 // Test-only: captures a checkpoint and emits a turn_diff_completed event.
 
@@ -254,6 +299,7 @@ export const diffsRouteLayer = Layer.mergeAll(
   getDiffsRoute,
   getTurnDiffRoute,
   getFullDiffRoute,
+  getVsMainDiffRoute,
   postTestCheckpointRoute,
 )
 

@@ -257,3 +257,57 @@ export async function deleteAllCheckpoints(cwd: string): Promise<void> {
     await deleteCheckpoint(cwd, turnId)
   }
 }
+
+/**
+ * Compute unified diff of the workspace against the main branch.
+ * Uses `git diff main...HEAD` (three-dot) to show changes on the
+ * feature branch since it diverged from main.
+ */
+export async function diffAgainstMain(cwd: string): Promise<string> {
+  const { stdout } = await execFileAsync('git', [
+    'diff', '--patch', '--minimal', '--no-color', 'main...HEAD',
+  ], { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
+  return stdout
+}
+
+/**
+ * Get file change summary of the workspace against the main branch.
+ */
+export async function diffAgainstMainFiles(cwd: string): Promise<TurnDiffFileChange[]> {
+  // Get additions/deletions per file
+  const { stdout: numstat } = await execFileAsync('git', [
+    'diff', '--numstat', '--no-color', 'main...HEAD',
+  ], { cwd, encoding: 'utf-8' })
+
+  // Get file status (A/M/D/R) per file
+  const { stdout: nameStatus } = await execFileAsync('git', [
+    'diff', '--name-status', '--no-color', 'main...HEAD',
+  ], { cwd, encoding: 'utf-8' })
+
+  // Parse name-status into a map
+  const statusMap = new Map<string, string>()
+  for (const line of nameStatus.split('\n')) {
+    if (!line.trim()) continue
+    const parts = line.split('\t')
+    if (parts.length >= 2) {
+      statusMap.set(parts[parts.length - 1], parts[0])
+    }
+  }
+
+  // Parse numstat and combine with status
+  const files: TurnDiffFileChange[] = []
+  for (const line of numstat.split('\n')) {
+    if (!line.trim()) continue
+    const [addStr, delStr, ...pathParts] = line.split('\t')
+    const path = pathParts.join('\t')
+    if (!path) continue
+    files.push({
+      path,
+      kind: statusMap.get(path),
+      additions: parseInt(addStr, 10) || 0,
+      deletions: parseInt(delStr, 10) || 0,
+    })
+  }
+
+  return files.sort((a, b) => a.path.localeCompare(b.path))
+}
