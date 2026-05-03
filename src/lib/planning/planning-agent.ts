@@ -15,6 +15,9 @@ import { join } from 'path';
  * - What are the tradeoffs?
  *
  * It does NOT break down work into tasks - that's the decomposition agent's job.
+ *
+ * Planning artifacts: continue.vbrief.json (structured decisions/hazards) and
+ * plan.vbrief.json (task breakdown). STATE.md is deprecated.
  */
 
 export interface PlanningOptions {
@@ -23,7 +26,7 @@ export interface PlanningOptions {
   title: string;
   description?: string;
   prdPath?: string; // Path to PRD if it exists
-  outputPath?: string; // Where to write STATE.md
+  outputPath?: string; // Where to write continue.vbrief.json (legacy: STATE.md)
 }
 
 export interface ArchitectureDecision {
@@ -48,7 +51,7 @@ export interface PlanningDocument {
 /**
  * Generate architecture-focused planning document
  *
- * This creates a STATE.md focused on architectural approach,
+ * This creates a continue.vbrief.json focused on architectural approach,
  * NOT on task breakdown (that's for decomposition agent).
  */
 export function generatePlanningDocument(options: PlanningOptions): string {
@@ -136,7 +139,7 @@ export function createPlanningDocument(options: PlanningOptions): string {
   const planningDir = join(workspace, '.planning');
   mkdirSync(planningDir, { recursive: true });
 
-  const docPath = outputPath || join(planningDir, 'STATE.md');
+  const docPath = outputPath || join(planningDir, 'STATE.md'); // TODO(PAN-946): migrate to continue-{issueId}.vbrief.json
 
   const content = generatePlanningDocument(options);
   writeFileSync(docPath, content);
@@ -183,12 +186,12 @@ Your job is to determine HOW to build something, not WHAT tasks to create.
    - What are the key design decisions?
    - What are the tradeoffs?
 
-4. Document in STATE.md:
-   - Approach and rationale
+4. Document in continue.vbrief.json:
+   - Approach and rationale (in decisions[])
    - Architecture overview
-   - Technology decisions
-   - Key design decisions with alternatives and tradeoffs
-   - Risks and mitigations
+   - Technology decisions (in decisions[])
+   - Key design decisions with alternatives and tradeoffs (in decisions[])
+   - Risks and mitigations (in hazards[])
    - Open questions
 
 5. DO NOT create task breakdowns
