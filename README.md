@@ -15,7 +15,7 @@
 
 </div>
 
-IDEs were built for humans who type code. Panopticon is built for humans who **direct** code. Command Deck puts you in the cockpit of a multi-model, multi-agent development environment — you see every change as it happens, steer agents mid-flight, swap models on the fly, diff any turn against main, fork conversations when you want to explore a different approach, and checkpoint work so nothing is lost. When you want to go fully hands-off, the specialist pipeline takes your issue from plan to merged PR without you touching the keyboard.
+IDEs were built for humans who type code. Panopticon is built for humans who **direct** code. Command Deck is a live development environment where you spawn agents, watch them work, and stay in control. You see every file change as it lands, review diffs without leaving the conversation, talk to agents to course-correct, hot-swap the model behind them when the task shifts, and branch a conversation to try a different approach without losing the original. When you like where things are headed, the built-in specialist pipeline picks it up — automated code review, tests, and merge — so you never context-switch to a separate CI tab.
 
 <div align="center">
 
@@ -49,12 +49,12 @@ Command Deck is the live development surface where you and your agents work toge
 
 ### What You Can Do
 
-- **Switch models mid-session** — open the model picker and change from Opus to Sonnet to Kimi without restarting
-- **Fork conversations** — branch into a summary fork or plain fork, with or without thinking blocks, to explore alternatives
-- **Diff any turn** — see exactly what changed file-by-file at any point in the conversation, or compare the full implementation against main
-- **Checkpoint and restore** — auto-captured snapshots of agent state let you roll back to any point
-- **Plan visually** — vBRIEF plans render as interactive DAGs with item status tracking and acceptance criteria
-- **Archive and manage** — archive conversations with inline confirmations, manage session history
+- **Live diffs as agents code** — every file change appears inline as the agent works. Open the diff panel to review changes turn by turn, or hit "vs main" to see the full picture without waiting for a PR.
+- **Talk to your agents** — type in the composer to steer an agent mid-task. Correct its approach, point it at the right file, tell it to rethink — pair-programming, not babysitting.
+- **Hot-swap models** — agent struggling? Open the model picker and switch from Sonnet to Opus (or Kimi, GPT, Gemini) without losing the conversation. Right model for each phase.
+- **Branch to explore** — fork any conversation to try an alternative approach. Keep the original intact, compare both, merge the one you like.
+- **Automatic checkpoints** — Command Deck snapshots agent state as work progresses. If an agent goes sideways, roll back to any earlier checkpoint instead of starting over.
+- **Ship without switching tabs** — when the code looks right, the specialist pipeline picks it up. Automated review, tests, and merge. No CI dashboard to babysit.
 
 ### 13 Dashboard Views
 
@@ -64,11 +64,11 @@ Project tree, activity feed, kanban board, agent status, cost analytics, convoy 
 
 ## Why Panopticon?
 
-- **You set the direction, agents do the typing.** See every change in real time, steer with messages, swap models, fork conversations — you're the conductor, not the audience.
-- **Use the right model for the job.** Opus for planning, GPT-5.5 or Kimi for implementation, Haiku for quick commands — automatic routing based on task type, capability, and budget. Override any assignment with two clicks.
-- **Work survives across sessions.** PRDs, state files, beads, checkpoints, and skills persist context so agents don't start from zero every time.
-- **One skill format, every tool.** Write a SKILL.md once and it works across Claude Code, Codex, Cursor, and Gemini CLI.
-- **Go fully hands-off when you want to.** The specialist pipeline takes an issue from plan to merged PR autonomously — review, test, inspect, UAT, merge. You just click Merge when you're satisfied.
+- **You stay in the loop without being in the way.** Watch agents code, review their diffs live, send a message when they drift. You're pair-programming, not babysitting a terminal.
+- **The right model for every phase.** Opus plans the architecture, Kimi or Sonnet writes the code, Haiku handles quick commands. Panopticon routes automatically — or you override with two clicks when you know better.
+- **Context that outlasts the conversation.** PRDs, plans, checkpoints, beads, and skills carry forward across sessions. Agents pick up where the last one left off, not from a blank slate.
+- **One skill format, every tool.** Write a SKILL.md once and it works across Claude Code, Codex, Cursor, and Gemini CLI. 70+ ship out of the box.
+- **A pipeline that ships while you move on.** When the implementation looks right, hand it to the specialist pipeline — automated code review, tests, and merge. You click Merge when you're satisfied, or keep working on the next issue.
 
 ---
 
@@ -97,24 +97,21 @@ You can drive any stage from the dashboard, the CLI, or a webhook. Engage as muc
 
 | Feature | Description |
 |:--------|:------------|
-| **Command Deck** | Live three-zone development surface with real-time updates, no refresh buttons |
-| **Model Switching** | Change models mid-conversation — Opus, Sonnet, GPT, Kimi, Gemini, and more |
-| **Conversation Forking** | Branch any conversation to explore alternatives without losing the original |
-| **Turn-by-Turn Diffs** | See exactly what changed at every step, compare against main at any point |
-| **Checkpoints** | Auto-captured agent state snapshots — roll back to any point in the work |
-| **vBRIEF Plan Viewer** | Interactive DAG visualization of work plans with status tracking and acceptance criteria |
-| **Multi-Model Routing** | Anthropic, OpenAI, Google, Kimi, MiniMax, and OpenRouter — route by task type, capability, and budget |
-| **Cloister Lifecycle Manager** | Automatic model routing, stuck detection, cost tracking, and specialist handoffs |
-| **5 Specialist Agents** | Review, test, inspect, UAT, and merge — fully automated quality pipeline |
-| **PRD-Driven Workflow** | Opus writes a PRD before implementation starts; agents are blocked without one |
-| **70+ Universal Skills** | Pre-built skills ship out of the box, auto-synced on every `pan up` — one SKILL.md works across all AI tools |
-| **Multi-Tracker Support** | GitHub Issues, Linear, GitLab, Rally — all from one dashboard |
-| **Workspaces** | Git worktree-based feature branches with Docker isolation (local and remote via Fly.io) |
-| **Convoys** | Run parallel agents on related issues with automatic synthesis |
-| **Beads** | Git-backed task tracking that survives context compaction and works offline |
-| **TLDR Code Analysis** | Token-efficient codebase analysis (500-1,200 tokens/file vs 10-25k) via semantic search and call graphs |
-| **Cost Tracking** | Per-issue, per-stage token costs with dashboard analytics |
-| **Effect.js Server** | Dashboard server built on Effect.js with typed RPC, structured concurrency, and zero sync FS calls |
+| **Command Deck** | A live workspace where you watch agents code, review diffs inline, send messages, and manage everything from one surface |
+| **Inline Diff Review** | See what changed file-by-file as the agent works, compare any turn against main — no waiting for a PR to review code |
+| **Model Hot-Swap** | Switch an agent from Sonnet to Opus to Kimi mid-conversation. Six providers, automatic routing, or manual override |
+| **Conversation Forking** | Branch a conversation to try a different approach. Keep the original, compare both, go with what works |
+| **Automatic Checkpoints** | Agent state is snapshotted as it progresses — roll back to any earlier point if something goes wrong |
+| **Visual Plans** | Work plans render as interactive DAGs so you can see dependencies, track acceptance criteria, and know what's done |
+| **Specialist Pipeline** | Five agents handle code review, testing, inspection, UAT, and merge automatically — you just click Merge |
+| **Cloister** | Lifecycle manager that routes models, detects stuck agents, tracks costs, and orchestrates specialist handoffs |
+| **PRD-Driven Workflow** | Opus writes a detailed plan before any code is written — agents can't start without one |
+| **70+ Universal Skills** | Pre-built skills synced on every `pan up` — one SKILL.md works across Claude Code, Codex, Cursor, and Gemini CLI |
+| **Multi-Tracker Support** | GitHub Issues, Linear, GitLab, Rally — all visible in one unified kanban board |
+| **Workspaces** | Isolated git worktrees per issue with optional Docker environments, local or remote via Fly.io |
+| **Convoys** | Run parallel agents on related issues with automatic result synthesis |
+| **Cost Tracking** | Per-issue, per-stage token costs with model attribution and daily rollups |
+| **TLDR Code Analysis** | Token-efficient codebase understanding (500-1,200 tokens/file vs 10-25k) so agents stay within context |
 
 ---
 
