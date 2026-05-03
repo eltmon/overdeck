@@ -5,6 +5,22 @@ import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 
 vi.mock('lucide-react', () => ({
   ChevronRight: (props: Record<string, unknown>) => <svg data-testid="project-chevron" {...props} />,
+  Zap: () => null,
+  Loader2: () => null,
+  Terminal: () => null,
+  FileCode: () => null,
+  Search: () => null,
+  Globe: () => null,
+  Wrench: () => null,
+  Circle: () => null,
+  Archive: () => null,
+  Copy: () => null,
+  Check: () => null,
+  X: () => null,
+  Pencil: () => null,
+  Star: () => null,
+  GitBranchPlus: () => null,
+  AlertCircle: () => null,
 }));
 
 vi.mock('./FeatureItem', () => ({

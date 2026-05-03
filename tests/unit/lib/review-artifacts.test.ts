@@ -21,7 +21,18 @@ vi.mock('child_process', () => {
   }
 
   (exec as any)[kCustom] = execMock;
-  return { exec };
+
+  function execFile(_file: string, _args: string[] | null, _optionsOrCb: any, maybeCallback?: any) {
+    const callback = typeof _optionsOrCb === 'function' ? _optionsOrCb : maybeCallback;
+    try {
+      callback(null, '', '');
+    } catch (err) {
+      callback(err, '', '');
+    }
+  }
+  (execFile as any)[kCustom] = () => Promise.resolve({ stdout: '', stderr: '' });
+
+  return { exec, execFile };
 });
 
 vi.mock('../../../src/lib/merge-set.js', async (importOriginal) => {
