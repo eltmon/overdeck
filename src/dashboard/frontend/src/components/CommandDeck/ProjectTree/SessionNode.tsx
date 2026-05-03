@@ -5,6 +5,8 @@ import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import { useAvailableModels, type ModelGroup } from '../../shared/ModelPicker/ModelPicker';
 import { useDashboardStore } from '../../../lib/store';
+import { useSharedTick } from '../../../lib/useSharedTick';
+import { formatRelativeTime } from '../../../lib/formatRelativeTime';
 import styles from '../styles/command-deck.module.css';
 
 function stalenessColor(ms: number): string {
@@ -14,42 +16,16 @@ function stalenessColor(ms: number): string {
   return 'var(--destructive)';
 }
 
-function formatLastHeard(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  const h = Math.floor(m / 60);
-  if (h > 0) return `${h}h ${m % 60}m ago`;
-  if (m > 0) return `${m}m ${s % 60}s ago`;
-  return `${s}s ago`;
-}
-
 function LiveLastHeard({ lastActivity }: { lastActivity?: string }) {
-  const [label, setLabel] = useState('');
-  const [color, setColor] = useState('var(--muted-foreground)');
-
-  useEffect(() => {
-    if (!lastActivity) return;
-    const update = () => {
-      const ms = Date.now() - new Date(lastActivity).getTime();
-      if (ms < 1000) { setLabel(''); return; }
-      setLabel(formatLastHeard(ms));
-      setColor(stalenessColor(ms));
-    };
-    update();
-    const t = setInterval(update, 1000);
-    return () => clearInterval(t);
-  }, [lastActivity]);
-
-  if (!lastActivity || !label) return null;
-
+  const now = useSharedTick();
+  if (!lastActivity) return null;
+  const ms = now.getTime() - new Date(lastActivity).getTime();
+  if (ms < 1000) return null;
+  const label = formatRelativeTime(lastActivity, now);
+  const color = stalenessColor(ms);
   return (
     <span
-      style={{
-        fontSize: 10,
-        fontVariantNumeric: 'tabular-nums',
-        color,
-        flexShrink: 0,
-      }}
+      style={{ fontSize: 10, fontVariantNumeric: 'tabular-nums', color, flexShrink: 0 }}
       title={`Last heard: ${label}`}
     >
       {label}
@@ -436,8 +412,8 @@ export function SessionNode({
           title={(() => {
             if (!lastActivity) return session.sessionId;
             const ms = Date.now() - new Date(lastActivity).getTime();
-            if (ms < 60_000) return session.sessionId;
-            return `${session.sessionId} · Last heard: ${formatLastHeard(ms)}`;
+            if (ms < 1000) return session.sessionId;
+            return `${session.sessionId} · Last heard: ${formatRelativeTime(lastActivity, new Date())}`;
           })()}
         >
           {deriveSessionLabel(session)}

@@ -1,4 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useSharedTick } from '../lib/useSharedTick';
+import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useDashboardStore, selectAgentList, selectSpecialistList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
@@ -68,31 +70,13 @@ function kbStalenessStyle(ms: number): { color: string; bg: string; border: stri
   return                        { color: 'text-destructive', bg: 'badge-bg-destructive', border: 'border-destructive/40' };
 }
 
-function kbFormatLastHeard(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  const h = Math.floor(m / 60);
-  if (h > 0) return `${h}h ${m % 60}m ago`;
-  if (m > 0) return `${m}m ${s % 60}s ago`;
-  return `${s}s ago`;
-}
-
 function LiveLastHeardBadge({ lastActivity }: { lastActivity?: string }) {
-  const [label, setLabel] = useState('');
-  const [style, setStyle] = useState(kbStalenessStyle(0));
-  useEffect(() => {
-    if (!lastActivity) return;
-    const update = () => {
-      const ms = Date.now() - new Date(lastActivity).getTime();
-      if (ms < 1000) { setLabel(''); return; }
-      setLabel(kbFormatLastHeard(ms));
-      setStyle(kbStalenessStyle(ms));
-    };
-    update();
-    const t = setInterval(update, 1000);
-    return () => clearInterval(t);
-  }, [lastActivity]);
-  if (!lastActivity || !label) return null;
+  const now = useSharedTick();
+  if (!lastActivity) return null;
+  const ms = now.getTime() - new Date(lastActivity).getTime();
+  if (ms < 1000) return null;
+  const label = formatRelativeTime(lastActivity, now);
+  const style = kbStalenessStyle(ms);
   return (
     <span
       className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${style.bg} ${style.color} border ${style.border}`}

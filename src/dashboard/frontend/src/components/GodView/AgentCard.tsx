@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useSharedTick } from '../../lib/useSharedTick';
+import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { motion } from 'framer-motion';
 import { Clock, GitBranch, Cpu, AlertTriangle, CheckCircle, XCircle, Minus, Radio } from 'lucide-react';
 import { CanvasTerminal } from './CanvasTerminal';
@@ -61,33 +63,14 @@ function stalenessColor(ms: number): string {
   return 'var(--gv-pink)';
 }
 
-export function formatLastHeard(ms: number): string {
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  const h = Math.floor(m / 60);
-  if (h > 0) return `${h}h ${m % 60}m ago`;
-  if (m > 0) return `${m}m ${s % 60}s ago`;
-  return `${s}s ago`;
-}
-
 function LastHeardCounter({ lastActivity }: { lastActivity?: string }) {
-  const [label, setLabel] = useState('');
-  const [color, setColor] = useState('var(--gv-text-dim)');
-  useEffect(() => {
-    if (!lastActivity) return;
-    const update = () => {
-      const ms = Date.now() - new Date(lastActivity).getTime();
-      if (ms < 1000) { setLabel(''); return; }
-      setLabel(formatLastHeard(ms));
-      setColor(stalenessColor(ms));
-    };
-    update();
-    const t = setInterval(update, 1000);
-    return () => clearInterval(t);
-  }, [lastActivity]);
-  if (!lastActivity || !label) return null;
+  const now = useSharedTick();
+  if (!lastActivity) return null;
+  const ms = now.getTime() - new Date(lastActivity).getTime();
+  if (ms < 1000) return null;
+  const label = formatRelativeTime(lastActivity, now);
   return (
-    <span className="gv-mono text-[10px]" style={{ color }}>
+    <span className="gv-mono text-[10px]" style={{ color: stalenessColor(ms) }}>
       {label}
     </span>
   );
@@ -101,11 +84,12 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
 
   const phaseColor = agent.agentPhase ? PHASE_COLORS[agent.agentPhase] || 'var(--gv-blue)' : 'var(--gv-blue)';
 
+  const now = useSharedTick();
   const lastHeardTooltip = (() => {
     if (!agent.lastActivity) return '';
-    const ms = Date.now() - new Date(agent.lastActivity).getTime();
+    const ms = now.getTime() - new Date(agent.lastActivity).getTime();
     if (ms < 1000) return '';
-    return `Last heard: ${formatLastHeard(ms)}`;
+    return `Last heard: ${formatRelativeTime(agent.lastActivity, now)}`;
   })();
   const cardTooltip = [
     agent.issueId || agent.id,

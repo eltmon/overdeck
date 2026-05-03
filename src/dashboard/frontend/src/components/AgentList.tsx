@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, useEffect } from 'react';
+import { useSharedTick } from '../lib/useSharedTick';
+import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { useDashboardStore, selectSpecialistList } from '../lib/store';
 import { Brain, Play, Square, Clock, AlertCircle, CheckCircle2, Activity, XCircle, Radio } from 'lucide-react';
 import { type SpecialistAgent } from './SpecialistAgentCard';
@@ -108,24 +109,12 @@ function stalenessClass(timestamp: string | null): string {
 }
 
 function LiveLastHeard({ timestamp, label }: { timestamp: string | null; label?: string }) {
-  const [text, setText] = useState('');
-  const [cls, setCls] = useState('text-muted-foreground');
-
-  useEffect(() => {
-    if (!timestamp) return;
-    const update = () => {
-      const ms = Date.now() - new Date(timestamp).getTime();
-      if (ms < 60_000) { setText(''); return; }
-      setText(formatTimeAgo(timestamp));
-      setCls(stalenessClass(timestamp));
-    };
-    update();
-    const t = setInterval(update, 1000);
-    return () => clearInterval(t);
-  }, [timestamp]);
-
-  if (!text) return null;
-
+  const now = useSharedTick();
+  if (!timestamp) return null;
+  const ms = now.getTime() - new Date(timestamp).getTime();
+  if (ms < 1000) return null;
+  const text = formatRelativeTime(timestamp, now);
+  const cls = stalenessClass(timestamp);
   return (
     <span className={cls} title={label ? `${label}: ${text}` : text}>
       {text}
