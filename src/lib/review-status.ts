@@ -474,7 +474,8 @@ export function fixStuckCommentedReviews(): void {
     (s.testStatus === 'passed' || s.testStatus === 'skipped') &&
     s.mergeStatus !== 'merged' &&
     s.mergeStatus !== 'failed' &&
-    s.readyForMerge === false
+    s.readyForMerge === false &&
+    s.verificationStatus !== 'failed'
   );
 
   if (candidates.length === 0) return;
