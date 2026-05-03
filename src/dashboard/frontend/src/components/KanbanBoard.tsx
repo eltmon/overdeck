@@ -1,6 +1,4 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useSharedTick } from '../lib/useSharedTick';
-import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useDashboardStore, selectAgentList, selectSpecialistList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
@@ -62,6 +60,17 @@ const DIFFICULTY_COLORS: Record<ComplexityLevel, string> = {
   complex: 'badge-bg-warning text-warning-foreground',
   expert: 'badge-bg-destructive text-destructive-foreground',
 };
+
+function kbFormatLastHeard(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
 
 function kbStalenessStyle(ms: number): { color: string; bg: string; border: string } {
   if (ms < 2 * 60_000)  return { color: 'text-success',     bg: 'badge-bg-success',     border: 'border-success/40' };
