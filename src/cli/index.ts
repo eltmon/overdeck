@@ -637,6 +637,18 @@ program
         console.log(chalk.yellow('⚠ Failed to start TLDR daemon:'), error?.message || String(error));
         console.log(chalk.dim('  TLDR will be unavailable but dashboard will work normally'));
       }
+
+      // Start the supervisor sidecar — exposes POST /restart-dashboard on a
+      // separate port so the dashboard's Force Restart button still works
+      // when the dashboard process itself has crashed.
+      try {
+        const { startSupervisorProcess, getSupervisorPort } = await import('../lib/supervisor.js');
+        startSupervisorProcess();
+        console.log(chalk.green(`✓ Supervisor listening on http://127.0.0.1:${getSupervisorPort()}`));
+      } catch (error: any) {
+        console.log(chalk.yellow('⚠ Failed to start supervisor:'), error?.message || String(error));
+        console.log(chalk.dim('  Force Restart will only work via the Electron bridge or while dashboard is responding.'));
+      }
     }
 
     if (electronAppPath) {
@@ -819,6 +831,18 @@ program
       console.log(chalk.green('✓ smee-client stopped'));
     } catch {
       console.log(chalk.dim('  smee-client not running'));
+    }
+
+    // Stop the supervisor sidecar
+    try {
+      const { stopSupervisorProcess, isSupervisorRunning } = await import('../lib/supervisor.js');
+      if (isSupervisorRunning()) {
+        console.log(chalk.dim('Stopping supervisor sidecar...'));
+        stopSupervisorProcess();
+        console.log(chalk.green('✓ Supervisor stopped'));
+      }
+    } catch {
+      // non-fatal
     }
 
     // Read config for ports and Traefik settings

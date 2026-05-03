@@ -486,7 +486,7 @@ function UserMessageRow({ message }: { message: ChatMessage }) {
         style={isPending ? { opacity: 0.6 } : undefined}
         title={isPending ? 'Pending — waiting for agent to process' : undefined}
       >
-        <p className={styles.userMessageText}>{message.text}</p>
+        <div className={styles.userMessageText}><ChatMarkdown text={message.text} /></div>
         <span className={styles.messageTimestamp}>
           {isPending ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>

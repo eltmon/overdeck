@@ -1121,7 +1121,7 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
       try {
         const stateMdPath = join(planningDirForCheck, 'STATE.md');
         if (existsSync(stateMdPath)) {
-          const stateMdContent = await readFile(stateMdPath, 'utf-8');
+          const stateMdContent = yield* Effect.promise(() => readFile(stateMdPath, 'utf-8'));
           const validation = validatePlanningDocument(stateMdContent);
           openQuestionsCount = validation.openQuestions;
         }

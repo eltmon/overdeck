@@ -120,3 +120,5 @@ apps/desktop/server/
 multica/
 *.log.1
 .panopticon/config.yaml
+.cache/
+.tldr/

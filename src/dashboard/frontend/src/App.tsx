@@ -33,7 +33,7 @@ import { StoppedAgentsBanner } from './components/StoppedAgentsBanner';
 import { CodexAuthBanner } from './components/CodexAuthBanner';
 import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { SystemHealthPill } from './components/SystemHealthPill';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useDashboardStore, selectAgentList, selectIssues, selectDashboardLifecycle } from './lib/store';
 import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
@@ -161,10 +161,16 @@ export function buildConversationUrl(
   return query ? `/conv/${id}?${query}` : `/conv/${id}`;
 }
 
+// Cached supervisor URL — populated by successful /api/version polls.
+// Used as a final fallback for Force Restart when the dashboard is dead.
+let cachedSupervisorUrl: string | null = null;
+
 async function fetchBackendHealth(): Promise<{ version: string }> {
   const res = await fetch('/api/version');
   if (!res.ok) throw new Error(`Backend returned ${res.status}`);
-  return res.json();
+  const data = await res.json();
+  if (data.supervisorUrl) cachedSupervisorUrl = data.supervisorUrl;
+  return data;
 }
 
 async function fetchTrackerStatus(): Promise<TrackerStatus> {
@@ -310,23 +316,35 @@ export default function App() {
     retryDelay: 1000,
     staleTime: 0,
   });
-  // Latched banner: appears after 2 failed polls, hides only after 2 consecutive successes.
-  // Prevents mid-outage flicker when the backend is intermittent.
-  const successStreakRef = useRef(0);
-  const [bannerLatched, setBannerLatched] = useState(false);
+  // Banner state machine for the backend health indicator.
+  //   'down'        — red banner, retrying, force-restart available
+  //   'recovering'  — yellow banner, "back up", auto-hides after a short pause
+  //   null          — hidden (steady state)
+  // The "down" entry threshold is still 2 failed polls so a single hiccup
+  // doesn't latch the banner. Recovery is one success — but rather than
+  // snapping closed we transition to a yellow confirmation that fades on a
+  // timer, so the user gets explicit feedback that things are back instead
+  // of having the banner just disappear.
+  const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [bannerState, setBannerState] = useState<'down' | 'recovering' | null>(null);
   useEffect(() => {
     if (backendDown) {
-      successStreakRef.current = 0;
-      if (backendFailureCount >= 2) setBannerLatched(true);
-    } else if (bannerLatched) {
-      successStreakRef.current += 1;
-      if (successStreakRef.current >= 2) {
-        setBannerLatched(false);
-        successStreakRef.current = 0;
+      if (recoveryTimerRef.current) {
+        clearTimeout(recoveryTimerRef.current);
+        recoveryTimerRef.current = null;
       }
+      if (backendFailureCount >= 2) setBannerState('down');
+    } else if (bannerState === 'down') {
+      setBannerState('recovering');
+      recoveryTimerRef.current = setTimeout(() => {
+        setBannerState(null);
+        recoveryTimerRef.current = null;
+      }, 2500);
     }
-  }, [backendDown, backendFailureCount, bannerLatched]);
-  const showBackendBanner = bannerLatched;
+  }, [backendDown, backendFailureCount, bannerState]);
+  useEffect(() => () => {
+    if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current);
+  }, []);
   // Restart banner: shown when dashboard is in a planned restart (lifecycle active)
   const showRestartBanner = dashboardLifecycle.active;
 
@@ -364,9 +382,11 @@ export default function App() {
     },
   });
 
-  // Force Restart for the dashboard backend. Prefers the Electron bridge
-  // (direct stop/start of the embedded server); falls back to a server-side
-  // endpoint that respawns the dashboard via `pan restart --dashboard`.
+  // Force Restart for the dashboard backend. Three-layer fallback chain:
+  // 1. Electron bridge — most direct, available only in desktop app
+  // 2. Dashboard's own endpoint — works when dashboard is wedged but responding
+  // 3. Supervisor sidecar — works even when dashboard is fully dead; URL was
+  //    cached from the last healthy /api/version poll.
   const restartBackendMutation = useMutation({
     mutationFn: async () => {
       const bridge = window.panopticonBridge;
@@ -374,8 +394,28 @@ export default function App() {
         await bridge.restartDashboard();
         return;
       }
-      const res = await fetch('/api/system/restart-dashboard', { method: 'POST' });
-      if (!res.ok) throw new Error(`Restart returned ${res.status}`);
+
+      // Layer 2 — try dashboard endpoint (short timeout since it may hang if wedged)
+      try {
+        const res = await fetch('/api/system/restart-dashboard', {
+          method: 'POST',
+          signal: AbortSignal.timeout(3000),
+        });
+        if (res.ok) return;
+      } catch {
+        // Fall through to supervisor
+      }
+
+      // Layer 3 — supervisor sidecar, independent of dashboard process
+      const supervisorUrl = cachedSupervisorUrl;
+      if (!supervisorUrl) {
+        throw new Error('Dashboard is unreachable and supervisor URL is unknown — try restarting from the CLI.');
+      }
+      const res = await fetch(`${supervisorUrl}/restart-dashboard`, {
+        method: 'POST',
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) throw new Error(`Supervisor returned ${res.status}`);
     },
     onSuccess: () => {
       toast.success('Restart requested — reconnecting…');
@@ -605,7 +645,7 @@ export default function App() {
         )}
 
         {/* Backend Offline Banner — shown when /api/version fails repeatedly AND not in a planned restart */}
-        {showBackendBanner && !showRestartBanner && (
+        {bannerState === 'down' && !showRestartBanner && (
           <div className="bg-destructive/15 border-b-2 border-destructive/50 px-4 py-3 flex items-center gap-3 shrink-0 overflow-hidden animate-slide-down-banner">
             <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
             <p className="text-destructive text-sm font-semibold flex-1">
@@ -619,6 +659,16 @@ export default function App() {
             >
               {restartBackendMutation.isPending ? 'Restarting…' : 'Force Restart'}
             </button>
+          </div>
+        )}
+
+        {/* Backend Recovered Banner — yellow confirmation, auto-hides */}
+        {bannerState === 'recovering' && !showRestartBanner && (
+          <div className="bg-warning/15 border-b-2 border-warning/50 px-4 py-3 flex items-center gap-3 shrink-0 overflow-hidden animate-slide-down-banner">
+            <CheckCircle2 className="w-5 h-5 text-warning-foreground shrink-0" />
+            <p className="text-warning-foreground text-sm font-semibold flex-1">
+              Backend is back up.
+            </p>
           </div>
         )}
 
