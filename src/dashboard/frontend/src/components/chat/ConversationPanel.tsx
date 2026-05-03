@@ -16,6 +16,7 @@ import type { ReviewerRoundMetadata } from '@panctl/contracts';
 import { DiffPanel } from '../DiffPanel';
 import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
 import { parseDiffRouteSearch } from '../../lib/diffRouteSearch';
+import { useConfirm } from '../DialogProvider';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Phase icon map ───────────────────────────────────────────────────────────
@@ -82,6 +83,7 @@ export function ConversationPanel({
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
+  const confirm = useConfirm();
   const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || getDefaultConversationModel());
   const [editingTitle, setEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
@@ -386,11 +388,24 @@ export function ConversationPanel({
             {copied ? <Check size={14} /> : <Copy size={14} />}
           </button>
 
-          {/* Archive button with inline confirmation */}
+          {/* Archive button with inline confirmation (dialog for favorited) */}
           {onArchived && !confirmArchive && (
             <button
               className={styles.copyLinkButton}
-              onClick={() => setConfirmArchive(true)}
+              onClick={async () => {
+                if (conversation.isFavorited) {
+                  const ok = await confirm({
+                    title: 'Archive favorited conversation',
+                    message: `"${conversation.title ?? conversation.name}" is favorited.\n\nArchiving will remove the favorite, end the session, and move it to the archive.`,
+                    confirmLabel: 'Archive',
+                    cancelLabel: 'Cancel',
+                    variant: 'destructive',
+                  });
+                  if (ok) handleArchive();
+                } else {
+                  setConfirmArchive(true);
+                }
+              }}
               title="Archive conversation"
             >
               <Archive size={14} />

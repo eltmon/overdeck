@@ -1894,9 +1894,15 @@
 }
 
 .conversationItem:hover .conversationActions,
-.conversationItem:focus-within .conversationActions,
-.conversationItemConfirming .conversationActions {
+.conversationItem:focus-within .conversationActions {
   max-width: 120px;
+  opacity: 1;
+  margin-left: 0;
+}
+
+.conversationItemConfirming .conversationActions {
+  max-width: none;
+  overflow: visible;
   opacity: 1;
   margin-left: 0;
 }
@@ -1984,6 +1990,7 @@
   align-items: center;
   gap: 4px;
   font-size: 10px;
+  flex-shrink: 0;
 }
 
 .archiveConfirmLabelInline {
