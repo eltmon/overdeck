@@ -362,10 +362,12 @@ function requireTrustedMutationOrigin(request: HttpServerRequest.HttpServerReque
   const port = parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
   const dashboardUrl = process.env['DASHBOARD_URL'] ?? `http://localhost:${port}`;
   const trustedOrigins = new Set<string>([dashboardUrl]);
+  // Always trust direct localhost access — the dashboard may be reached via
+  // reverse proxy (e.g. https://pan.localhost) OR directly (http://localhost:3011).
+  trustedOrigins.add(`http://localhost:${port}`);
+  trustedOrigins.add(`http://127.0.0.1:${port}`);
   if (process.env['NODE_ENV'] === 'development') {
-    trustedOrigins.add('http://localhost:3011');
     trustedOrigins.add('http://localhost:3000');
-    trustedOrigins.add('http://127.0.0.1:3011');
     trustedOrigins.add('http://127.0.0.1:3000');
   }
 

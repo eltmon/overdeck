@@ -235,6 +235,24 @@ export async function diffCheckpointFiles(
 }
 
 /**
+ * Get the committer date (ISO 8601) of a checkpoint commit.
+ * Returns current time as fallback if the ref can't be resolved.
+ */
+export async function getCheckpointTimestamp(cwd: string, turnId: string): Promise<string> {
+  try {
+    const commit = await resolveCheckpointCommit(cwd, turnId)
+    if (!commit) return new Date().toISOString()
+    const { stdout } = await execFileAsync('git', [
+      'log', '-1', '--format=%cI', commit,
+    ], { cwd, encoding: 'utf-8' })
+    const ts = stdout.trim()
+    return ts || new Date().toISOString()
+  } catch {
+    return new Date().toISOString()
+  }
+}
+
+/**
  * Get the list of checkpoint turn IDs for a workspace.
  */
 export async function listCheckpoints(cwd: string): Promise<string[]> {

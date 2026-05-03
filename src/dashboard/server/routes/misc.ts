@@ -778,7 +778,19 @@ const postDeaconPauseRoute = HttpRouter.add(
 const getVersionRoute = HttpRouter.add(
   'GET',
   '/api/version',
-  Effect.promise(() => getPanopticonVersion().then(version => jsonResponse({ version, isDev: panopticonDevMode }))),
+  Effect.promise(async () => {
+    const version = await getPanopticonVersion();
+    // Expose supervisor URL so the frontend can cache it while the dashboard
+    // is healthy, then use it as a fallback when the dashboard is dead.
+    let supervisorUrl: string | null = null;
+    try {
+      const { getSupervisorUrl } = await import('../../../lib/supervisor.js');
+      supervisorUrl = getSupervisorUrl();
+    } catch {
+      // supervisor module not available in this build — benign
+    }
+    return jsonResponse({ version, isDev: panopticonDevMode, supervisorUrl });
+  }),
 );
 
 // ─── Route: GET /api/registered-projects ─────────────────────────────────────

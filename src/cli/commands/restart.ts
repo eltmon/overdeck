@@ -106,6 +106,13 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
   try {
     switch (scope) {
       case 'dashboard': {
+        // Cycle the supervisor so it picks up the latest bundle.
+        try {
+          const { stopSupervisorProcess, startSupervisorProcess } = await import('../../lib/supervisor.js');
+          stopSupervisorProcess();
+          startSupervisorProcess();
+        } catch { /* non-fatal */ }
+
         await restartDashboard(config, () => spawnDashboardDetached(config), {
           healthTimeoutMs,
         });
@@ -166,6 +173,13 @@ async function runFullRestart(
   // Dashboard first so it doesn't spam errors while sidecars die.
   await stopDashboard(config);
 
+  try {
+    const { stopSupervisorProcess } = await import('../../lib/supervisor.js');
+    stopSupervisorProcess();
+  } catch {
+    // non-fatal
+  }
+
   if (tldrAvailable) {
     try {
       const { getTldrDaemonService } = await import('../../lib/tldr-daemon.js');
@@ -195,6 +209,13 @@ async function runFullRestart(
   await waitForDashboardHealth(config.dashboardApiPort, {
     timeoutMs: opts.healthTimeoutMs,
   });
+
+  try {
+    const { startSupervisorProcess } = await import('../../lib/supervisor.js');
+    startSupervisorProcess();
+  } catch {
+    // non-fatal
+  }
 
   if (tldrAvailable) {
     try {

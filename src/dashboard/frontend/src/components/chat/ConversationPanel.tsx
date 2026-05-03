@@ -143,13 +143,40 @@ export function ConversationPanel({
   const turnDiffSummaryByAssistantMessageId = useMemo(() => {
     const map = new Map<string, TurnDiffSummary>()
     if (!diffData?.summaries) return map
+
+    // Get assistant messages for timestamp-based matching
+    const assistantMessages = (messagesData?.messages ?? [])
+      .filter((m: any) => m.role === 'assistant')
+      .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+
     for (const summary of diffData.summaries) {
       if (summary.assistantMessageId) {
         map.set(summary.assistantMessageId, summary)
+        continue
+      }
+
+      // Match by timestamp: find the closest assistant message before the diff completed
+      if (assistantMessages.length > 0 && summary.completedAt) {
+        const diffTime = new Date(summary.completedAt).getTime()
+        let bestMatch: string | null = null
+        let bestDelta = Infinity
+        for (const msg of assistantMessages) {
+          const msgTime = new Date(msg.createdAt).getTime()
+          const delta = diffTime - msgTime
+          if (delta >= 0 && delta < bestDelta) {
+            bestDelta = delta
+            bestMatch = msg.id
+          }
+        }
+        // Only match if within 7 days — reconciled checkpoints may have been
+        // created long after the agent turn completed.
+        if (bestMatch && bestDelta < 7 * 24 * 60 * 60 * 1000) {
+          map.set(bestMatch, summary)
+        }
       }
     }
     return map
-  }, [diffData?.summaries])
+  }, [diffData?.summaries, messagesData?.messages])
 
   // Diff panel state — read from URL
   const [diffOpen, setDiffOpen] = useState(() => {

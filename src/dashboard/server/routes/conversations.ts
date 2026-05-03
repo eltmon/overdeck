@@ -292,11 +292,13 @@ function getTrustedOrigins(): string[] {
   const dashboardUrl = process.env['DASHBOARD_URL'] ?? `http://localhost:${port}`;
   const origins = new Set<string>();
   origins.add(dashboardUrl);
-  // Only trust local development origins in development mode
+  // Always trust direct localhost access — the dashboard may be reached via
+  // reverse proxy (e.g. https://pan.localhost) OR directly (http://localhost:3011).
+  origins.add(`http://localhost:${port}`);
+  origins.add(`http://127.0.0.1:${port}`);
+  // Trust additional local dev origins
   if (process.env['NODE_ENV'] === 'development') {
-    origins.add('http://localhost:3011');
     origins.add('http://localhost:3000');
-    origins.add('http://127.0.0.1:3011');
     origins.add('http://127.0.0.1:3000');
   }
   cachedTrustedOrigins = Array.from(origins);
@@ -1284,11 +1286,23 @@ const postConversationSwitchModelRoute = HttpRouter.add(
 );
 
 // Cache specialist session file lookups to avoid O(n) directory scans.
-const specialistSessionFileCache = new Map<string, string>();
+// TTL ensures restarted sessions (new UUID → new JSONL) don't serve stale data.
+const SPECIALIST_SESSION_CACHE_TTL_MS = 10_000;
+const specialistSessionFileCache = new Map<string, { path: string; timestamp: number }>();
 const SPECIALIST_SESSION_CACHE_MAX = 50;
 
+function getSpecialistSessionCache(name: string): string | undefined {
+  const entry = specialistSessionFileCache.get(name);
+  if (!entry) return undefined;
+  if (Date.now() - entry.timestamp > SPECIALIST_SESSION_CACHE_TTL_MS) {
+    specialistSessionFileCache.delete(name);
+    return undefined;
+  }
+  return entry.path;
+}
+
 function setSpecialistSessionCache(name: string, sessionFile: string): void {
-  specialistSessionFileCache.set(name, sessionFile);
+  specialistSessionFileCache.set(name, { path: sessionFile, timestamp: Date.now() });
   if (specialistSessionFileCache.size > SPECIALIST_SESSION_CACHE_MAX) {
     const firstKey = specialistSessionFileCache.keys().next().value;
     if (firstKey !== undefined) {
@@ -1318,7 +1332,7 @@ const getConversationMessagesRoute = HttpRouter.add(
         // (e.g. specialist-panopticon-cli-merge-agent) and not in the conversations DB.
         let sessionFile: string | null | undefined = conv ? resolveSessionFile(conv) : undefined;
         if (!conv) {
-          const cached = specialistSessionFileCache.get(name);
+          const cached = getSpecialistSessionCache(name);
           if (cached) {
             sessionFile = cached;
           } else if (/^(specialist-|agent-|planning-)/.test(name)) {

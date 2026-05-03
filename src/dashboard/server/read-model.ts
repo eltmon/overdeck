@@ -259,6 +259,7 @@ export const ReadModelServiceLive = Layer.effect(
             reviewStatusByIssueId: Object.fromEntries(
               Object.values(statusMap).map((status) => [status.issueId, toReviewStatusSnapshot(status)]),
             ),
+            turnDiffSummariesByAgentId: (cached as any).turnDiffSummariesByAgentId ?? {},
             issuesRaw: cached.issues ?? [],
             resources: cached.resources,
           };
@@ -404,6 +405,83 @@ export const ReadModelServiceLive = Layer.effect(
           `${Object.keys(reviewStatusByIssueId).length} review statuses, seq=${sequence}`,
         );
       }
+
+      // ── Checkpoint reconciliation (always) ───────────────────────────────────
+      // Scan all agents with workspaces for existing git checkpoints and populate
+      // turnDiffSummariesByAgentId for any that aren't already tracked. This handles:
+      // - Stale projection cache (field was added after cache was saved)
+      // - Server restart (checkpoint refs survive, but summaries were lost)
+      // - Stopped agents with historical checkpoints
+      yield* Effect.promise(async () => {
+        try {
+          const { listCheckpoints, diffCheckpointFiles, getCheckpointTimestamp } = await import('../../lib/checkpoint/checkpoint-manager.js');
+
+          const agents = Object.values(state.agentsById);
+          let reconciled = 0;
+          for (const agent of agents) {
+            const workspace = (agent as any).workspace as string | undefined;
+            if (!workspace) continue;
+
+            // Skip if already has summaries
+            const existingSummaries = state.turnDiffSummariesByAgentId[(agent as any).id];
+            if (existingSummaries && existingSummaries.length > 0) continue;
+
+            try {
+              const checkpoints = await listCheckpoints(workspace);
+              if (checkpoints.length === 0) continue;
+
+              const summaries: Array<{
+                turnId: string;
+                completedAt: string;
+                files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }>;
+                checkpointRef?: string;
+                assistantMessageId?: string;
+                checkpointTurnCount?: number;
+              }> = [];
+
+              for (let i = 0; i < checkpoints.length; i++) {
+                const turnId = checkpoints[i];
+                const prevTurnId = i > 0 ? checkpoints[i - 1] : null;
+                let files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }> = [];
+                if (prevTurnId) {
+                  try {
+                    files = await diffCheckpointFiles(workspace, prevTurnId, turnId);
+                  } catch { /* checkpoint might be stale */ }
+                }
+                // Use the actual git commit timestamp, not current time.
+                // Using current time would make timestamp-based matching against
+                // assistant messages always fail (hours/days delta > 5min window).
+                const completedAt = await getCheckpointTimestamp(workspace, turnId);
+                summaries.push({
+                  turnId,
+                  completedAt,
+                  files,
+                  checkpointRef: `refs/pan/turn/${turnId}`,
+                  checkpointTurnCount: i + 1,
+                });
+              }
+
+              if (summaries.length > 0) {
+                state = {
+                  ...state,
+                  turnDiffSummariesByAgentId: {
+                    ...state.turnDiffSummariesByAgentId,
+                    [(agent as any).id]: summaries,
+                  },
+                };
+                reconciled++;
+              }
+            } catch { /* agent workspace may not be a git repo */ }
+          }
+
+          if (reconciled > 0) {
+            console.log(`[ReadModel] Reconciled checkpoints for ${reconciled} agent(s)`);
+            projectionCache?.save(buildSnapshot());
+          }
+        } catch (err) {
+          console.warn('[ReadModel] Checkpoint reconciliation failed:', err);
+        }
+      });
 
       // ── Issue listener (always) ──────────────────────────────────────────────
       // Issues come from external trackers (Linear/GitHub) with unpredictable shapes.
