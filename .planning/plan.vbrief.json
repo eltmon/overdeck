@@ -4,7 +4,7 @@
     "created": "2026-04-30T12:00:00Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-936: Rally feature planning — end-to-end UX and pipeline",
-    "updated": "2026-05-03T11:37:48.996Z"
+    "updated": "2026-05-03T11:47:00.122Z"
   },
   "plan": {
     "id": "pan-936",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "83388e32-1afb-4b03-86ed-f4c8ab92f134",
     "author": "agent:claude-opus-4-6",
-    "sequence": 284,
+    "sequence": 299,
     "created": "2026-04-30T12:00:00Z",
-    "updated": "2026-05-03T11:37:48.996Z",
+    "updated": "2026-05-03T11:47:00.122Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/936",
@@ -97,7 +97,7 @@
             }
           }
         ],
-        "completed": "2026-05-03T11:37:48.996Z"
+        "completed": "2026-05-03T11:47:00.122Z"
       },
       {
         "id": "featurecard-click-to-select",
@@ -139,7 +139,7 @@
             }
           }
         ],
-        "completed": "2026-05-03T11:37:48.996Z"
+        "completed": "2026-05-03T11:47:00.122Z"
       },
       {
         "id": "compactchild-click-to-select",
@@ -181,7 +181,7 @@
             }
           }
         ],
-        "completed": "2026-05-03T11:37:48.996Z"
+        "completed": "2026-05-03T11:47:00.122Z"
       },
       {
         "id": "inspector-feature-actions",
@@ -223,7 +223,7 @@
             }
           }
         ],
-        "completed": "2026-05-03T11:37:48.995Z"
+        "completed": "2026-05-03T11:47:00.122Z"
       },
       {
         "id": "derivedstatus-plan-gate",
@@ -265,7 +265,7 @@
             }
           }
         ],
-        "completed": "2026-05-03T11:37:48.995Z"
+        "completed": "2026-05-03T11:47:00.121Z"
       },
       {
         "id": "get-child-issues-interface",
@@ -307,7 +307,7 @@
             }
           }
         ],
-        "completed": "2026-05-03T11:37:48.995Z"
+        "completed": "2026-05-03T11:47:00.121Z"
       },
       {
         "id": "get-child-issues-rally",
@@ -352,7 +352,7 @@
             "completed": "2026-05-01T05:11:22.386Z"
           }
         ],
-        "completed": "2026-05-03T11:37:48.993Z"
+        "completed": "2026-05-03T11:47:00.119Z"
       },
       {
         "id": "feature-detect-planning",
@@ -397,7 +397,7 @@
             "completed": "2026-05-01T05:11:22.386Z"
           }
         ],
-        "completed": "2026-05-03T11:37:48.993Z"
+        "completed": "2026-05-03T11:47:00.119Z"
       },
       {
         "id": "feature-context-injection",
@@ -442,7 +442,7 @@
             "completed": "2026-05-01T05:11:22.382Z"
           }
         ],
-        "completed": "2026-05-03T11:37:48.993Z"
+        "completed": "2026-05-03T11:47:00.119Z"
       },
       {
         "id": "vbrief-feature-edges",
@@ -487,7 +487,7 @@
             "completed": "2026-05-01T05:11:22.390Z"
           }
         ],
-        "completed": "2026-05-03T11:37:48.995Z"
+        "completed": "2026-05-03T11:47:00.121Z"
       },
       {
         "id": "test-featurecard-actions",
@@ -541,7 +541,7 @@
             "completed": "2026-05-01T05:11:22.388Z"
           }
         ],
-        "completed": "2026-05-03T11:37:48.994Z"
+        "completed": "2026-05-03T11:47:00.120Z"
       },
       {
         "id": "test-click-to-select",
@@ -586,7 +586,7 @@
             "completed": "2026-05-01T05:11:22.389Z"
           }
         ],
-        "completed": "2026-05-03T11:37:48.994Z"
+        "completed": "2026-05-03T11:47:00.120Z"
       },
       {
         "id": "test-inspector-feature",
@@ -631,7 +631,7 @@
             "completed": "2026-05-01T05:11:22.388Z"
           }
         ],
-        "completed": "2026-05-03T11:37:48.994Z"
+        "completed": "2026-05-03T11:47:00.120Z"
       },
       {
         "id": "test-get-child-issues",
@@ -676,7 +676,7 @@
             "completed": "2026-05-01T05:11:22.383Z"
           }
         ],
-        "completed": "2026-05-03T11:37:48.993Z"
+        "completed": "2026-05-03T11:47:00.119Z"
       },
       {
         "id": "test-feature-planning-pipeline",
@@ -721,7 +721,7 @@
             "completed": "2026-05-01T05:11:22.381Z"
           }
         ],
-        "completed": "2026-05-03T11:37:48.992Z"
+        "completed": "2026-05-03T11:47:00.118Z"
       }
     ],
     "edges": [
