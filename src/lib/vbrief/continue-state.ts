@@ -59,6 +59,19 @@ export interface ContinueBeadsMapping {
   [planItemId: string]: string[];
 }
 
+/** Specialist feedback entry stored on the continue file (Layer 1+). */
+export interface ContinueFeedbackEntry {
+  /** Sequence number — matches the NNN prefix of the legacy .planning/feedback/ filename. */
+  seq: number;
+  specialist: 'verification-gate' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent' | 'merge-agent';
+  /** Outcome label (e.g. "changes-requested", "approved"). */
+  outcome: string;
+  /** ISO 8601 timestamp when feedback was written. */
+  timestamp: string;
+  /** Full markdown body of the feedback (frontmatter excluded). */
+  markdownBody: string;
+}
+
 /** Reason a session ended or restarted. */
 export type ContinueSessionReason =
   | 'planning'
@@ -111,6 +124,8 @@ export interface ContinueState {
   /** Agent model for the most recent / current session. */
   agentModel?: string;
   sessionHistory: ContinueSessionEntry[];
+  /** Pending specialist feedback for the work agent. Cleared at the start of each review cycle. */
+  feedback?: ContinueFeedbackEntry[];
 }
 
 /** Build the continue filename for a given issue ID. */
@@ -196,6 +211,48 @@ export function appendSessionEntry(
   return next;
 }
 
+/**
+ * Append a feedback entry to the continue file's `feedback[]`. Creates a fresh
+ * continue state if the file doesn't yet exist. Persists atomically.
+ */
+export function appendFeedbackEntry(
+  dir: string,
+  issueId: string,
+  entry: ContinueFeedbackEntry,
+): ContinueState {
+  const existing = readContinueState(dir, issueId);
+  const now = new Date().toISOString();
+  const next: ContinueState = existing
+    ? { ...existing, feedback: [...(existing.feedback ?? []), entry] }
+    : {
+        version: '1',
+        issueId,
+        created: now,
+        updated: now,
+        gitState: {},
+        decisions: [],
+        hazards: [],
+        resumePoint: null,
+        beadsMapping: {},
+        feedback: [entry],
+        sessionHistory: [],
+      };
+  writeContinueState(dir, issueId, next);
+  return next;
+}
+
+/**
+ * Clear all feedback entries from the continue file. Returns null if the file
+ * doesn't exist. Persists atomically.
+ */
+export function clearFeedback(dir: string, issueId: string): ContinueState | null {
+  const existing = readContinueState(dir, issueId);
+  if (!existing) return null;
+  const next: ContinueState = { ...existing, feedback: [] };
+  writeContinueState(dir, issueId, next);
+  return next;
+}
+
 function validateContinueState(value: unknown, path: string): asserts value is ContinueState {
   if (!value || typeof value !== 'object') {
     throw new Error(`Continue file ${path} is not an object`);
@@ -215,5 +272,11 @@ function validateContinueState(value: unknown, path: string): asserts value is C
   }
   if (typeof v.beadsMapping !== 'object' || v.beadsMapping === null) {
     throw new Error(`Continue file ${path} has malformed beadsMapping`);
+  }
+  // feedback is optional — default to [] for files written before Layer 1
+  if (v.feedback === undefined) {
+    (v as Record<string, unknown>).feedback = [];
+  } else if (!Array.isArray(v.feedback)) {
+    throw new Error(`Continue file ${path} has malformed feedback array`);
   }
 }

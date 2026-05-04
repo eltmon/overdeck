@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { mkdir, readFile, readdir, writeFile } from 'fs/promises';
 import { join, dirname } from 'path';
-import { readContinueState, continueFilePath } from '../vbrief/continue-state.js';
+import { readContinueState, continueFilePath, type ContinueFeedbackEntry } from '../vbrief/continue-state.js';
 import { resolveVBriefDir } from '../vbrief/lifecycle.js';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeam } from '../projects.js';
@@ -73,42 +73,99 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
 }
 
 /**
- * Read pending specialist feedback from .planning/feedback/.
- * Returns a summary of the latest feedback file(s) for injection into the prompt.
+ * Read pending specialist feedback.
+ * Primary source: continue file's feedback[] (Layer 1+, inline content).
+ * Backward compat: also reads .planning/feedback/*.md for legacy entries
+ * written before Layer 1.
  */
 function readPendingFeedback(workspacePath: string): string {
+  const issueId = inferIssueIdFromWorkspace(workspacePath);
+  const projectRoot = join(workspacePath, '..', '..');
+
+  // --- Primary: continue file feedback[] ---
+  const continueEntries: ContinueFeedbackEntry[] = [];
+  if (issueId) {
+    for (const dir of ['proposed', 'active', 'completed', 'cancelled'] as const) {
+      try {
+        const lifecycleDir = resolveVBriefDir(projectRoot, dir);
+        const cont = readContinueState(lifecycleDir, issueId);
+        if (cont?.feedback?.length) {
+          continueEntries.push(...cont.feedback);
+          break;
+        }
+      } catch { /* ignore */ }
+    }
+    // Fallback: workspace .planning/ continue file
+    if (continueEntries.length === 0) {
+      try {
+        const cont = readContinueState(join(workspacePath, '.planning'), issueId);
+        if (cont?.feedback?.length) {
+          continueEntries.push(...cont.feedback);
+        }
+      } catch { /* ignore */ }
+    }
+  }
+
+  // --- Backward compat: filesystem files not already in continue file ---
+  const seqsInContinue = new Set(continueEntries.map(e => e.seq));
+  const legacyFilePaths: string[] = [];
   const feedbackDir = join(workspacePath, '.planning', 'feedback');
-  if (!existsSync(feedbackDir)) return '';
+  if (existsSync(feedbackDir)) {
+    try {
+      const files = readdirSync(feedbackDir)
+        .filter(f => f.endsWith('.md'))
+        .sort();
+      for (const file of files) {
+        const match = file.match(/^(\d{3})-/);
+        const seq = match ? parseInt(match[1], 10) : -1;
+        if (!seqsInContinue.has(seq)) {
+          legacyFilePaths.push(join(feedbackDir, file));
+        }
+      }
+    } catch { /* ignore */ }
+  }
 
-  try {
-    const files = readdirSync(feedbackDir)
-      .filter(f => f.endsWith('.md'))
-      .sort(); // NNN-prefixed, so sort gives chronological order
+  if (continueEntries.length === 0 && legacyFilePaths.length === 0) return '';
 
-    if (files.length === 0) return '';
+  const lines: string[] = [];
+  const total = continueEntries.length + legacyFilePaths.length;
 
-    // Show the latest feedback file path (agent will read it)
-    const latest = files[files.length - 1];
-    const latestPath = join(feedbackDir, latest);
-    const lines: string[] = [
-      `**${files.length} feedback file(s):**`,
-      '',
-    ];
+  // Format continue file entries inline (agent reads them directly from prompt)
+  if (continueEntries.length > 0) {
+    lines.push(`**${total} feedback item(s) from specialist pipeline:**`);
+    lines.push('');
+    for (const entry of continueEntries) {
+      const seqStr = String(entry.seq).padStart(3, '0');
+      lines.push(`### ${seqStr} — ${entry.specialist}: ${entry.outcome.toUpperCase()} (${entry.timestamp})`);
+      lines.push('');
+      lines.push(entry.markdownBody);
+      lines.push('');
+      lines.push('---');
+      lines.push('');
+    }
+  }
 
-    // List all files (most recent last)
-    for (const file of files) {
-      const filePath = join(feedbackDir, file);
-      const marker = file === latest ? ' ← **latest, read this first**' : '';
+  // Format legacy filesystem entries as file paths (agent must Read them)
+  if (legacyFilePaths.length > 0) {
+    if (continueEntries.length === 0) {
+      lines.push(`**${total} feedback file(s):**`);
+      lines.push('');
+    } else {
+      lines.push(`**${legacyFilePaths.length} legacy feedback file(s) (pre-migration, read these too):**`);
+      lines.push('');
+    }
+    const latestLegacy = legacyFilePaths[legacyFilePaths.length - 1];
+    for (const filePath of legacyFilePaths) {
+      const marker = filePath === latestLegacy && continueEntries.length === 0 ? ' ← **latest, read this first**' : '';
       lines.push(`- \`${filePath}\`${marker}`);
     }
-
-    lines.push('');
-    lines.push(`Use your Read tool to open \`${latestPath}\`, read every line, then address any issues before continuing other work.`);
-
-    return lines.join('\n');
-  } catch {
-    return '';
+    if (continueEntries.length === 0) {
+      lines.push('');
+      lines.push(`Use your Read tool to open \`${latestLegacy}\`, read every line, then address any issues before continuing other work.`);
+    }
   }
+
+  return lines.join('\n');
 }
 
 const COMMENT_BODY_LIMIT = 500;
