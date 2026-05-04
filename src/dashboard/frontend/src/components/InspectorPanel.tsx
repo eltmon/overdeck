@@ -38,6 +38,7 @@ import { ActionsSection } from './inspector/ActionsSection';
 import { PHASE_CHIP_COLORS, PHASE_LABELS, type PipelinePhase } from './inspector/TerminalTabs';
 import { SwitchModelModal } from './SwitchModelModal';
 import { useSwitchModel } from '../hooks/useSwitchModel';
+import { SensitiveText } from './SensitiveText';
 
 interface SessionCost {
   id: string;
@@ -786,7 +787,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
             <User className="w-3 h-3 shrink-0 text-muted-foreground" />
             <span className="text-foreground truncate">{issue.assignee.name}</span>
             {issue.assignee.email && (
-              <span className="text-[10px] truncate text-muted-foreground">{issue.assignee.email}</span>
+              <SensitiveText value={issue.assignee.email} className="text-[10px] truncate text-muted-foreground" />
             )}
           </div>
         )}
