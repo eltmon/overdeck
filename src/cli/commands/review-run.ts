@@ -36,6 +36,7 @@ interface ReviewRunOptions {
   prUrl?: string;
   branch?: string;
   filesChanged?: string;
+  model?: string;
 }
 
 function resolvePolyrepoGitDirs(workspacePath: string): string[] {
@@ -72,6 +73,9 @@ export async function reviewRunCommand(
   opts: ReviewRunOptions = {},
 ): Promise<void> {
   const issueId = id.toUpperCase();
+  if (opts.model) {
+    process.env.PANOPTICON_REVIEW_MODEL_OVERRIDE = opts.model;
+  }
   const cwd = opts.cwd ?? process.cwd();
   const projectConfig = findProjectByPath(cwd);
   const isPolyrepo = projectConfig?.workspace?.type === 'polyrepo';

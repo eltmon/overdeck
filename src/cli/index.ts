@@ -58,6 +58,7 @@ import { requestReviewCommand } from './commands/request-review.js';
 import { resetReviewCommand } from './commands/reset-review.js';
 import { abortReviewCommand } from './commands/abort-review.js';
 import { reviewRunCommand } from './commands/review-run.js';
+import { reviewRestartCommand } from './commands/review-restart.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
@@ -211,12 +212,20 @@ review
   .action(abortReviewCommand);
 
 review
+  .command('restart <id>')
+  .description('Kill running reviewers and dispatch fresh review pipeline')
+  .option('--model <model>', 'Override model for all reviewers (e.g. gpt-5.4, claude-sonnet-4-6)')
+  .option('--role <role>', 'Restart only a specific reviewer role (correctness/security/performance/requirements)')
+  .action(reviewRestartCommand);
+
+review
   .command('run <id>')
   .description('Run the full review pipeline (blocking): spawn reviewers → synthesize → post to GitHub. Exit codes: 0=approved, 1=changes, 2=failed.')
   .option('--cwd <path>', 'Workspace directory (default: cwd)')
   .option('--pr-url <url>', 'Override PR URL detection')
   .option('--branch <name>', 'Override branch detection')
   .option('--files-changed <list>', 'Comma-separated file list (overrides git diff)')
+  .option('--model <model>', 'Override model for all reviewers')
   .action(reviewRunCommand);
 
 // pan plan finalize <id>
