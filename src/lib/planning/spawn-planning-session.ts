@@ -436,11 +436,18 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     // Determine planning model — explicit override takes precedence over work-type router
     let settingsModel = 'claude-opus-4-6';
+    let modelSource = 'fallback';
     try {
-      const { getModelId } = await import('../work-type-router.js');
-      settingsModel = getModelId('planning-agent');
-    } catch { /* fall back to default */ }
+      const { getModel } = await import('../work-type-router.js');
+      const resolution = getModel('planning-agent');
+      settingsModel = resolution.model;
+      modelSource = resolution.source;
+      console.log(`[start-planning] Model resolution for planning-agent: model=${resolution.model} source=${resolution.source} usedFallback=${resolution.usedFallback} originalModel=${resolution.originalModel || '(none)'}`);
+    } catch (err: any) {
+      console.warn(`[start-planning] Work-type router failed for planning-agent, falling back to ${settingsModel}: ${err.message}`);
+    }
     const planningModel = modelOverride || settingsModel;
+    console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource})`);
 
     // Discover and copy PRD files to workspace
     const prdFiles = await discoverPrdFiles(workspacePath, issue.identifier);
