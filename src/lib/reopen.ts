@@ -12,8 +12,7 @@ import {
   setReviewStatus,
 } from './review-status.js';
 import { resolveProjectFromIssue } from './projects.js';
-import { resolveVBriefDir } from './vbrief/lifecycle.js';
-import { appendSessionEntry } from './vbrief/continue-state.js';
+import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 
 export interface ReopenResult {
   specialistStatesReset: boolean;
@@ -93,7 +92,6 @@ export async function reopenWorkspaceState(
   const resolved = resolveProjectFromIssue(issueId);
   if (resolved) {
     try {
-      const activeDir = resolveVBriefDir(resolved.projectPath, 'active');
       const noteParts: string[] = [`Reopened on ${new Date().toISOString().slice(0, 10)}`];
       if (options.reason) noteParts.push(`reason: ${options.reason}`);
       if (result.previousReviewStatus) {
@@ -109,7 +107,7 @@ export async function reopenWorkspaceState(
         noteParts.push('tracker context attached');
       }
 
-      appendSessionEntry(activeDir, issueId, {
+      appendContinueSessionEntryForIssue(resolved.projectPath, issueId, {
         reason: 'resume',
         note: noteParts.join('; '),
       });

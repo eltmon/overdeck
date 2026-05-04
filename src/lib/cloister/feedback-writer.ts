@@ -13,8 +13,7 @@ import { writeFile, mkdir, readdir, rm } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { resolveProjectFromIssue } from '../projects.js';
-import { resolveVBriefDir } from '../vbrief/lifecycle.js';
-import { appendSessionEntry } from '../vbrief/continue-state.js';
+import { appendContinueSessionEntryForIssue } from '../vbrief/lifecycle-io.js';
 
 export interface WriteFeedbackOptions {
   issueId: string;
@@ -176,8 +175,7 @@ export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<Wri
     const resolved = resolveProjectFromIssue(opts.issueId);
     if (resolved) {
       try {
-        const activeDir = resolveVBriefDir(resolved.projectPath, 'active');
-        appendSessionEntry(activeDir, opts.issueId, {
+        appendContinueSessionEntryForIssue(resolved.projectPath, opts.issueId, {
           reason: 'feedback',
           note: `[${shortTimestamp}] ${opts.specialist} → ${opts.outcome.toUpperCase()} — ${relativePath}`,
         });

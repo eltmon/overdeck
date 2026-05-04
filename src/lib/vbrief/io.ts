@@ -2,41 +2,33 @@
  * vBRIEF File I/O Utilities
  *
  * Read and write plan.vbrief.json from workspace .planning/ directories.
+ *
+ * IMPORTANT (PAN-946): Workspace mutations MUST NEVER reach into project-level
+ * lifecycle directories. `findPlan`, `readWorkspacePlan`, `updateItemStatus`,
+ * and `updateSubItemStatus` resolve only `<workspacePath>/.planning/plan.vbrief.json`.
+ * Lifecycle (proposed/active/completed/cancelled) lookups go through
+ * `findVBriefByIssue` in `lifecycle-io.ts` (read-only) or
+ * `findVBriefByIssueAsync` in `vbrief-index.ts` (read-only, indexed).
+ *
+ * Conflating the two surfaces caused a high-severity correctness bug where
+ * routine workspace progress updates (item status writes, beads sync) could
+ * mutate `vbrief/active`, `vbrief/completed`, or `vbrief/cancelled` files
+ * after lifecycle promotion — corrupting the archived plan.
  */
 
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
-import { basename, dirname, join } from 'path';
-import { findVBriefByIssue } from './lifecycle-io.js';
+import { join } from 'path';
 import type { VBriefDocument, VBriefItemStatus } from './types.js';
 
 const PLAN_FILENAME = 'plan.vbrief.json';
 
 /**
- * Returns the path to plan.vbrief.json for a workspace, or null if it doesn't exist.
- *
- * PAN-946: First checks the project root's lifecycle directories (proposed → active
- * → completed → cancelled) for a scope vBRIEF keyed by the issue ID. Falls back to
- * the workspace's `.planning/plan.vbrief.json` for in-progress planning sessions
- * where the vBRIEF hasn't been promoted yet. This makes lifecycle dirs the source
- * of truth once a plan has been through the pipeline.
+ * Returns the path to `<workspacePath>/.planning/plan.vbrief.json` if it
+ * exists, or null. **Workspace-only.** Does NOT scan lifecycle directories —
+ * lifecycle/discovery lookups belong in `findVBriefByIssue` /
+ * `findVBriefByIssueAsync`.
  */
 export function findPlan(workspacePath: string): string | null {
-  // Derive project root and issue ID from the workspace path:
-  // <projectPath>/workspaces/feature-<issueLower>
-  try {
-    const projectRoot = dirname(dirname(workspacePath));
-    const workspaceName = basename(workspacePath);
-    if (workspaceName.startsWith('feature-')) {
-      const issueId = workspaceName.replace(/^feature-/, '').toUpperCase();
-      const found = findVBriefByIssue(projectRoot, issueId);
-      if (found) return found.path;
-    }
-  } catch {
-    // Derivation failed — workspace path doesn't follow expected pattern.
-    // Fall through to legacy lookup.
-  }
-
-  // Legacy fallback: in-progress planning sessions that haven't been promoted.
   const planPath = join(workspacePath, '.planning', PLAN_FILENAME);
   return existsSync(planPath) ? planPath : null;
 }

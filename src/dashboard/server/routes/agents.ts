@@ -72,8 +72,7 @@ import { hasPRDDraft } from '../../../lib/prd-draft.js';
 import { findPrdAnywhere } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { isPlanningComplete } from '../../../lib/vbrief/io.js';
-import { transitionVBriefOnMain, updatePlanStatus } from '../../../lib/vbrief/lifecycle-io.js';
-import { resolveVBriefDir } from '../../../lib/vbrief/lifecycle.js';
+import { transitionVBriefOnMain, updatePlanStatus, resolveContinueStateDir } from '../../../lib/vbrief/lifecycle-io.js';
 import { readContinueState, writeContinueState } from '../../../lib/vbrief/continue-state.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
@@ -1808,8 +1807,8 @@ const postAgentsRoute = HttpRouter.add(
       const sha = shaOut.trim();
       const dirty = dirtyOut.trim().length > 0;
 
-      const activeDir = resolveVBriefDir(projectPath, 'active');
-      const existing = readContinueState(activeDir, issueId);
+      const continueDir = resolveContinueStateDir(projectPath, issueId);
+      const existing = readContinueState(continueDir, issueId);
       const now = new Date().toISOString();
       const next = existing
         ? {
@@ -1831,7 +1830,7 @@ const postAgentsRoute = HttpRouter.add(
             agentModel: spawnModel,
             sessionHistory: [{ timestamp: now, reason: 'start' as const, agentModel: spawnModel }],
           };
-      writeContinueState(activeDir, issueId, next);
+      writeContinueState(continueDir, issueId, next);
       console.log(`[start-agent] Wrote initial continue state for ${issueId}`);
     } catch (continueErr: any) {
       console.warn(`[start-agent] Failed to write continue state (non-fatal): ${continueErr?.message ?? continueErr}`);

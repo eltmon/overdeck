@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync } from 'fs';
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import Database from 'better-sqlite3';
@@ -15,6 +15,7 @@ import { initSchema } from '../../src/lib/database/schema.js';
 // ── In-memory DB injection ────────────────────────────────────────────────────
 
 let testDb: Database.Database;
+let projectStub: { projectPath: string } | null = null;
 
 vi.mock('../../src/lib/database/index.js', () => ({
   getDatabase: () => testDb,
@@ -28,6 +29,20 @@ vi.mock('../../src/lib/activity-logger.js', () => ({
   emitActivityEntry: vi.fn(),
   emitActivityTts: vi.fn(),
 }));
+
+// PAN-946 regression: the reopen flow now resolves the project path so it can
+// append a session breadcrumb beside the issue's current vBRIEF (which may live
+// in completed/ or cancelled/). Stub the resolver so the test controls the
+// project root and can seed the lifecycle layout below.
+vi.mock('../../src/lib/projects.js', async () => {
+  const actual = await vi.importActual<typeof import('../../src/lib/projects.js')>(
+    '../../src/lib/projects.js',
+  );
+  return {
+    ...actual,
+    resolveProjectFromIssue: () => projectStub,
+  };
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -76,6 +91,7 @@ beforeEach(() => {
   testDb = new Database(':memory:');
   testDb.pragma('foreign_keys = ON');
   initSchema(testDb);
+  projectStub = null;
 });
 
 afterEach(() => {
@@ -211,5 +227,106 @@ describe('reopenWorkspaceState', () => {
     expect(row.reviewed_at_commit).toBeNull();
 
     rmSync(wsDir, { recursive: true, force: true });
+  });
+
+  // PAN-946 regression: when a continue file already lives beside a vBRIEF in
+  // `vbrief/completed/` (or `vbrief/cancelled/`), reopen MUST append the resume
+  // breadcrumb to that file rather than create a new one in `vbrief/active/`.
+  // Hard-coding `resolveVBriefDir(projectRoot, 'active')` would fork session
+  // history every time a completed issue was reopened.
+  describe('lifecycle-aware continue file appends', () => {
+    function seedLifecycleVBrief(
+      projectRoot: string,
+      lifecycleDir: 'proposed' | 'active' | 'completed' | 'cancelled',
+      issueId: string,
+    ): { dir: string; continuePath: string } {
+      const dir = join(projectRoot, 'vbrief', lifecycleDir);
+      mkdirSync(dir, { recursive: true });
+      const slug = `2026-05-04-${issueId}-test-vbrief.vbrief.json`;
+      const planPath = join(dir, slug);
+      writeFileSync(
+        planPath,
+        JSON.stringify({
+          vBRIEFInfo: { version: '0.5', created: '2026-05-04T00:00:00Z' },
+          plan: { id: issueId, title: 'Test', status: 'completed', items: [], edges: [] },
+        }),
+        'utf-8',
+      );
+      const continuePath = join(dir, `continue-${issueId}.vbrief.json`);
+      writeFileSync(
+        continuePath,
+        JSON.stringify({
+          version: '1',
+          issueId,
+          created: '2026-05-04T00:00:00Z',
+          updated: '2026-05-04T00:00:00Z',
+          gitState: {},
+          decisions: [],
+          hazards: [],
+          resumePoint: null,
+          beadsMapping: {},
+          sessionHistory: [
+            { timestamp: '2026-05-04T00:00:00Z', reason: 'planning', note: 'initial seed' },
+          ],
+        }),
+        'utf-8',
+      );
+      return { dir, continuePath };
+    }
+
+    it('appends to a continue file in vbrief/completed/ rather than creating one in vbrief/active/', async () => {
+      const projectRoot = mkdtempSync(join(tmpdir(), 'pan-reopen-project-'));
+      const { continuePath } = seedLifecycleVBrief(projectRoot, 'completed', 'PAN-901');
+      const activeContinuePath = join(projectRoot, 'vbrief', 'active', 'continue-PAN-901.vbrief.json');
+      projectStub = { projectPath: projectRoot };
+
+      seedStatus({
+        'PAN-901': { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'merged', readyForMerge: false },
+      });
+      const wsDir = createWorkspace();
+
+      const result = await reopenWorkspaceState('PAN-901', wsDir, { reason: 'redo merge' });
+      expect(result.continueFileUpdated).toBe(true);
+
+      // Active dir must NOT have been auto-created with a fresh continue file.
+      expect(existsSync(activeContinuePath)).toBe(false);
+
+      // Existing completed/ continue file should have grown by exactly one entry.
+      const updated = JSON.parse(readFileSync(continuePath, 'utf-8'));
+      expect(updated.sessionHistory.length).toBe(2);
+      const last = updated.sessionHistory[1];
+      expect(last.reason).toBe('resume');
+      expect(last.timestamp).toBeTypeOf('string');
+      expect(last.note).toContain('Reopened on');
+      expect(last.note).toContain('reason: redo merge');
+      expect(last.note).toContain('review: passed → pending');
+      expect(last.note).toContain('merge: merged → pending');
+
+      rmSync(wsDir, { recursive: true, force: true });
+      rmSync(projectRoot, { recursive: true, force: true });
+    });
+
+    it('appends to a continue file in vbrief/cancelled/ rather than creating one in vbrief/active/', async () => {
+      const projectRoot = mkdtempSync(join(tmpdir(), 'pan-reopen-project-'));
+      const { continuePath } = seedLifecycleVBrief(projectRoot, 'cancelled', 'PAN-902');
+      const activeContinuePath = join(projectRoot, 'vbrief', 'active', 'continue-PAN-902.vbrief.json');
+      projectStub = { projectPath: projectRoot };
+
+      seedStatus({
+        'PAN-902': { reviewStatus: 'failed', testStatus: 'pending', readyForMerge: false },
+      });
+      const wsDir = createWorkspace();
+
+      await reopenWorkspaceState('PAN-902', wsDir);
+
+      expect(existsSync(activeContinuePath)).toBe(false);
+
+      const updated = JSON.parse(readFileSync(continuePath, 'utf-8'));
+      expect(updated.sessionHistory.length).toBe(2);
+      expect(updated.sessionHistory[1].reason).toBe('resume');
+
+      rmSync(wsDir, { recursive: true, force: true });
+      rmSync(projectRoot, { recursive: true, force: true });
+    });
   });
 });

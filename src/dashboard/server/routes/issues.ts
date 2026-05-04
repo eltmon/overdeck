@@ -38,8 +38,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
 import { isPlanningComplete } from '../../../lib/vbrief/io.js';
-import { promoteVBriefToProposed } from '../../../lib/vbrief/lifecycle-io.js';
-import { appendSessionEntry } from '../../../lib/vbrief/continue-state.js';
+import { promoteVBriefToProposed, appendContinueSessionEntryForIssue } from '../../../lib/vbrief/lifecycle-io.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus } from '../review-status.js';
@@ -1689,12 +1688,11 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
     // 4. Reset specialist pipeline states
     clearReviewStatus(id.toUpperCase());
 
-    // 5. Append restart entry to continue file
+    // 5. Append restart entry to continue file (lifecycle-aware)
     yield* Effect.promise(async () => {
-      const planningDir = join(workspacePath, '.planning');
       const upperId = id.toUpperCase();
       try {
-        appendSessionEntry(planningDir, upperId, {
+        appendContinueSessionEntryForIssue(projectPath, upperId, {
           reason: 'resume',
           note: `Restarted from plan — branch reset to planning commit ${resetResult.commit}. Specialist states cleared.`,
         });

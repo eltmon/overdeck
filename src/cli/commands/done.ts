@@ -14,9 +14,8 @@ import { updateShadowState } from '../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../core/state-mapping.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumber, resolveIssueId } from '../../lib/issue-id.js';
-import { appendSessionEntry } from '../../lib/vbrief/continue-state.js';
+import { appendContinueSessionEntryForIssue } from '../../lib/vbrief/lifecycle-io.js';
 import { resolveProjectFromIssue } from '../../lib/projects.js';
-import { resolveVBriefDir } from '../../lib/vbrief/lifecycle.js';
 
 interface DoneOptions {
   comment?: string;
@@ -401,8 +400,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     try {
       const resolved = resolveProjectFromIssue(issueId);
       if (resolved) {
-        const activeDir = resolveVBriefDir(resolved.projectPath, 'active');
-        appendSessionEntry(activeDir, issueId, {
+        appendContinueSessionEntryForIssue(resolved.projectPath, issueId, {
           reason: 'end',
           note: options.comment || 'Agent signaled work complete',
         });

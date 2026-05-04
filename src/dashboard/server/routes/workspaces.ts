@@ -86,8 +86,9 @@ import {
 } from '../../../lib/agents.js';
 import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { findPlan, readPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
-import { findVBriefByIssue } from '../../../lib/vbrief/lifecycle-io.js';
-import { readContinueState } from '../../../lib/vbrief/continue-state.js';
+import type { VBriefDocument } from '../../../lib/vbrief/types.js';
+import { findVBriefByIssueAsync, readVBriefDocumentAsync } from '../../../lib/vbrief/vbrief-index.js';
+import { continueFilePath, readContinueState } from '../../../lib/vbrief/continue-state.js';
 import { resolveVBriefDir } from '../../../lib/vbrief/lifecycle.js';
 import { criticalPath } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
@@ -142,25 +143,51 @@ async function readWorkspacePlanningMarkdown(
   };
 }
 
-/** Read continue file from lifecycle dirs (proposed → active → completed → cancelled),
- *  falling back to workspace .planning/. Returns JSON string or null. */
-function readWorkspaceContinueFile(
+/**
+ * Read continue file beside the issue's current vBRIEF, falling back to
+ * workspace `.planning/`. Async — uses the cached lifecycle index plus
+ * `fs/promises` so the dashboard event loop stays unblocked. Returns JSON
+ * string or null.
+ */
+async function readWorkspaceContinueFile(
   projectPath: string,
   workspacePath: string,
   issueId: string,
-): string | null {
+): Promise<string | null> {
   const upperId = issueId.toUpperCase();
-  for (const dir of ['proposed', 'active', 'completed', 'cancelled'] as const) {
-    try {
-      const cont = readContinueState(resolveVBriefDir(projectPath, dir), upperId);
-      if (cont) return JSON.stringify(cont, null, 2);
-    } catch { /* ignore */ }
-  }
-  // Fallback to workspace .planning/
+
+  // 1. Lifecycle dir resolved via the cached index (no per-request rescan).
   try {
-    const cont = readContinueState(join(workspacePath, '.planning'), upperId);
-    if (cont) return JSON.stringify(cont, null, 2);
+    const found = await findVBriefByIssueAsync(projectPath, upperId);
+    if (found) {
+      const lifecycleDir = resolveVBriefDir(projectPath, found.lifecycleDir);
+      const continuePath = continueFilePath(lifecycleDir, upperId);
+      try {
+        const raw = await readFile(continuePath, 'utf-8');
+        // Parse + re-stringify to match prior behavior (and surface bad JSON).
+        return JSON.stringify(JSON.parse(raw), null, 2);
+      } catch {
+        // Continue file may not exist beside the vBRIEF — fall through.
+      }
+    }
+  } catch { /* ignore index failure */ }
+
+  // 2. Bootstrap location: vbrief/active/ for sessions started before
+  // a lifecycle vBRIEF exists.
+  try {
+    const activeDir = resolveVBriefDir(projectPath, 'active');
+    const continuePath = continueFilePath(activeDir, upperId);
+    const raw = await readFile(continuePath, 'utf-8');
+    return JSON.stringify(JSON.parse(raw), null, 2);
   } catch { /* ignore */ }
+
+  // 3. Last resort: in-progress planning workspace.
+  try {
+    const continuePath = continueFilePath(join(workspacePath, '.planning'), upperId);
+    const raw = await readFile(continuePath, 'utf-8');
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch { /* ignore */ }
+
   return null;
 }
 
@@ -1225,7 +1252,7 @@ const getWorkspaceStateMdRoute = HttpRouter.add(
     const projectPath = getProjectPath(undefined, issuePrefix);
     const { parsedIssueId, workspacePath } = getWorkspacePathForIssue(projectPath, issueId);
 
-    const continueBody = readWorkspaceContinueFile(projectPath, workspacePath, issueId);
+    const continueBody = yield* Effect.promise(() => readWorkspaceContinueFile(projectPath, workspacePath, issueId));
     if (continueBody) {
       return jsonResponse({ issueId: parsedIssueId, body: continueBody });
     }
@@ -1273,29 +1300,36 @@ const getWorkspacePlanRoute = HttpRouter.add(
     const workspaceName = `feature-${issueLower}`;
     const workspacePath = join(projectPath, 'workspaces', workspaceName);
 
-    // PAN-946: resolve from lifecycle dirs first, then fall back to workspace
-    // .planning/ for in-progress planning sessions.
+    // PAN-946: resolve from lifecycle dirs first (cached/async), then fall
+    // back to workspace .planning/ for in-progress planning sessions.
     let planPath: string | null = null;
     let lifecycleDir: string | null = null;
-    const found = findVBriefByIssue(projectPath, issueId);
+    let doc: VBriefDocument | null = null;
+
+    const found = yield* Effect.promise(() => findVBriefByIssueAsync(projectPath, issueId));
     if (found) {
       planPath = found.path;
       lifecycleDir = found.lifecycleDir;
+      doc = yield* Effect.promise(() => readVBriefDocumentAsync(found.path));
     } else {
       planPath = findPlan(workspacePath);
       if (planPath) {
         lifecycleDir = 'planning';
+        const planPathConst = planPath;
+        doc = yield* Effect.promise(async () => {
+          const raw = await readFile(planPathConst, 'utf-8');
+          return JSON.parse(raw) as VBriefDocument;
+        });
       }
     }
 
-    if (!planPath) {
+    if (!doc) {
       return jsonResponse(
         { error: 'No vBRIEF plan found for this workspace' },
         { status: 404 }
       );
     }
 
-    const doc = readPlan(planPath);
     const cp = criticalPath(doc);
     return jsonResponse({ ...doc, criticalPath: cp, lifecycleDir });
   }))

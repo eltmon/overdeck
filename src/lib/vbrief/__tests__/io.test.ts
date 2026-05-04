@@ -56,16 +56,21 @@ describe('findPlan', () => {
     expect(existsSync(result!)).toBe(true);
   });
 
-  it('resolves from lifecycle dir before workspace .planning/ (PAN-946)', () => {
-    // Create a project-like structure: TEST_DIR/project/workspaces/feature-pan-1
+  it('resolves the workspace plan only, ignoring lifecycle copies (PAN-946)', () => {
+    // PAN-946: findPlan() is workspace-scoped. Workspace mutations
+    // (updateItemStatus, beads/readiness writes) MUST resolve the in-progress
+    // .planning/plan.vbrief.json — never an archived lifecycle copy that has
+    // already moved to active/, completed/, or cancelled/. Lifecycle lookups
+    // belong in findVBriefByIssue (sync) / findVBriefByIssueAsync (cached).
     const projectRoot = join(TEST_DIR, 'project');
     const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-1');
     mkdirSync(workspacePath, { recursive: true });
 
-    // Write a workspace plan
+    // Workspace plan exists at .planning/plan.vbrief.json
     writePlanDoc(workspacePath, makePlanDoc());
 
-    // Write a lifecycle plan (should win)
+    // A lifecycle plan ALSO exists for this issue — but findPlan must NOT
+    // surface it, otherwise workspace status writes would mutate the archive.
     ensureVBriefDirs(projectRoot);
     const lifecyclePlan: VBriefDocument = {
       vBRIEFInfo: { version: '0.5', created: '2026-05-03T00:00:00Z' },
@@ -85,20 +90,30 @@ describe('findPlan', () => {
 
     const result = findPlan(workspacePath);
     expect(result).not.toBeNull();
-    expect(result!).toContain('vbrief/active/');
+    expect(result!).toContain('.planning/plan.vbrief.json');
+    expect(result!).not.toContain('vbrief/active/');
     const doc = JSON.parse(readFileSync(result!, 'utf-8')) as VBriefDocument;
-    expect(doc.plan.title).toBe('Lifecycle Plan');
+    // Workspace plan title is "Test Plan" (set by makePlanDoc), not "Lifecycle Plan".
+    expect(doc.plan.title).toBe('Test Plan');
   });
 
-  it('falls back to workspace .planning/ when no lifecycle vBRIEF exists (PAN-946)', () => {
+  it('returns null when workspace lacks .planning/plan.vbrief.json even if lifecycle has one (PAN-946)', () => {
     const projectRoot = join(TEST_DIR, 'project');
-    const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-2');
+    const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-3');
     mkdirSync(workspacePath, { recursive: true });
-    writePlanDoc(workspacePath, makePlanDoc());
 
-    const result = findPlan(workspacePath);
-    expect(result).not.toBeNull();
-    expect(result!).toContain('.planning/plan.vbrief.json');
+    ensureVBriefDirs(projectRoot);
+    const lifecyclePlan: VBriefDocument = {
+      vBRIEFInfo: { version: '0.5', created: '2026-05-03T00:00:00Z' },
+      plan: { id: 'pan-3', title: 'Archived', status: 'completed', items: [], edges: [] },
+    };
+    const filename = generateVBriefFilename('PAN-3', 'test', '2026-05-03');
+    writeFileSync(
+      join(resolveVBriefDir(projectRoot, 'completed'), filename),
+      JSON.stringify(lifecyclePlan, null, 2),
+    );
+
+    expect(findPlan(workspacePath)).toBeNull();
   });
 });
 

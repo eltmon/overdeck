@@ -13,7 +13,7 @@ import { copyFileSync, existsSync, readFileSync, readdirSync, renameSync, writeF
 import { join } from 'path';
 import { promisify } from 'util';
 
-import { continueFilename, continueFilePath } from './continue-state.js';
+import { continueFilename, continueFilePath, appendSessionEntry, readContinueState, writeContinueState, type ContinueSessionEntry, type ContinueState } from './continue-state.js';
 import {
   VBRIEF_LIFECYCLE_DIRS,
   ensureVBriefDirs,
@@ -24,6 +24,7 @@ import {
   type VBriefLifecycleDir,
 } from './lifecycle.js';
 import { readPlan } from './io.js';
+import { invalidateVBriefIndex } from './vbrief-index.js';
 import type { VBriefDocument } from './types.js';
 
 const execAsync = promisify(exec);
@@ -148,6 +149,7 @@ export async function moveVBrief(
 
   await runGitAdd(projectRoot, [...adds, ...removes]);
 
+  invalidateVBriefIndex(projectRoot);
   return { from: found, toPath, movedContinue };
 }
 
@@ -194,6 +196,7 @@ export function moveVBriefFilesOnly(
   } else if (existsSync(targetContinue)) {
     movedContinue = true;
   }
+  invalidateVBriefIndex(projectRoot);
   return { from: found, toPath, movedContinue };
 }
 
@@ -204,6 +207,7 @@ export function deleteVBrief(projectRoot: string, issueId: string): boolean {
   unlinkSync(found.path);
   const continuePath = continueFilePath(resolveVBriefDir(projectRoot, found.lifecycleDir), issueId);
   if (existsSync(continuePath)) unlinkSync(continuePath);
+  invalidateVBriefIndex(projectRoot);
   return true;
 }
 
@@ -335,6 +339,10 @@ export async function transitionVBriefOnMain(
     }
   }
 
+  if (needsMove || needsStatus) {
+    invalidateVBriefIndex(projectRoot);
+  }
+
   return {
     fromDir: found.lifecycleDir,
     toDir: targetDir,
@@ -401,5 +409,67 @@ export function promoteVBriefToProposed(
     copyFileSync(sourceContinue, destContinue);
   }
 
+  invalidateVBriefIndex(projectRoot);
   return { destVBrief, destContinue, canonicalFilename };
+}
+
+/**
+ * Resolve the directory where this issue's continue file should be read/written.
+ * Returns the lifecycle directory containing the issue's scope vBRIEF when one
+ * exists (so completed/cancelled vBRIEFs keep their continue history beside
+ * them), and falls back to `vbrief/active/` for the bootstrap case where the
+ * vBRIEF hasn't been promoted yet.
+ *
+ * Use this anywhere the dashboard or pipeline writes a continue-state
+ * breadcrumb. Hard-coding `resolveVBriefDir(projectRoot, 'active')` would fork
+ * session history by dropping new entries into `active/` after the vBRIEF has
+ * already moved to `completed/` or `cancelled/`.
+ */
+export function resolveContinueStateDir(projectRoot: string, issueId: string): string {
+  const found = findVBriefByIssue(projectRoot, issueId);
+  if (found) {
+    return resolveVBriefDir(projectRoot, found.lifecycleDir);
+  }
+  return resolveVBriefDir(projectRoot, 'active');
+}
+
+/**
+ * Read the continue state for an issue from beside its current vBRIEF.
+ * Lifecycle-aware: reads from completed/ or cancelled/ if the vBRIEF moved
+ * there, otherwise from active/ (or the bootstrap location).
+ */
+export function readContinueStateForIssue(
+  projectRoot: string,
+  issueId: string,
+): ContinueState | null {
+  const dir = resolveContinueStateDir(projectRoot, issueId);
+  return readContinueState(dir, issueId);
+}
+
+/**
+ * Write the continue state beside the issue's current vBRIEF. Lifecycle-aware
+ * — replaces hard-coded `writeContinueState(resolveVBriefDir(projectPath,
+ * 'active'), ...)` calls so completed/cancelled history doesn't fork.
+ */
+export function writeContinueStateForIssue(
+  projectRoot: string,
+  issueId: string,
+  state: ContinueState,
+): void {
+  const dir = resolveContinueStateDir(projectRoot, issueId);
+  writeContinueState(dir, issueId, state);
+}
+
+/**
+ * Append a session entry beside the issue's current vBRIEF. Lifecycle-aware
+ * single source of truth — every breadcrumb write should go through this
+ * helper rather than re-resolving `vbrief/active/` in route code.
+ */
+export function appendContinueSessionEntryForIssue(
+  projectRoot: string,
+  issueId: string,
+  entry: Omit<ContinueSessionEntry, 'timestamp'> & { timestamp?: string },
+): ContinueState {
+  const dir = resolveContinueStateDir(projectRoot, issueId);
+  return appendSessionEntry(dir, issueId, entry);
 }

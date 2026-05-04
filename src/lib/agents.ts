@@ -25,8 +25,7 @@ import { getCliproxyClientEnv } from './cliproxy.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix, resolveProjectFromIssue } from './projects.js';
-import { resolveVBriefDir } from './vbrief/lifecycle.js';
-import { appendSessionEntry } from './vbrief/continue-state.js';
+import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 import { generateLauncherScript } from './launcher-generator.js';
 import { logAgentLifecycle } from './persistent-logger.js';
 import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
@@ -1648,8 +1647,7 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
       const issueId = agentState.issueId || normalizedId.replace('agent-', '').toUpperCase();
       const resolved = resolveProjectFromIssue(issueId);
       if (resolved) {
-        const activeDir = resolveVBriefDir(resolved.projectPath, 'active');
-        appendSessionEntry(activeDir, issueId, {
+        appendContinueSessionEntryForIssue(resolved.projectPath, issueId, {
           reason: 'resume',
           agentModel: agentState.model || undefined,
         });
