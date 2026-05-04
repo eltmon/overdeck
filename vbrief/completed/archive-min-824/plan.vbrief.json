@@ -1,0 +1,116 @@
+{
+  "vBRIEFInfo": { "version": "0.5", "created": "2026-04-03T12:00:00Z" },
+  "plan": {
+    "id": "MIN-824",
+    "title": "Onboarding tutorial is broken — content mismatched with UI after UX changes",
+    "status": "approved",
+    "author": "plan",
+    "tags": ["onboarding", "tutorial", "bug-fix", "frontend"],
+    "narratives": {
+      "Problem": "The onboarding tutorial has 4 broken steps: Step 1 targets a nonexistent `main h1` selector, Step 4 targets an admin-only deprecated Organizer link, Step 5's `a[href*=\"settings\"]` selector matches the Goals link instead of Settings, and Step 2's copy may reference stale voice features. First-time users see mismatched highlights and explanations.",
+      "Proposal": "Fix all selectors to use explicit `data-tour` attributes added to the correct UI elements. Update tour step content to match current UI terminology. Update E2E tests to use workspace URLs and validate the fixes.",
+      "Constraint": "Keep the existing 5-step tour structure. No new steps, no flow redesign. Only modify selectors, content text, and data-tour attributes. Frontend-only changes (no backend).",
+      "Risk": "Low risk — changes are localized to tour definitions, a few data-tour attributes on existing components, and E2E test assertions. No functional UI changes.",
+      "Alternative": "Could have redesigned the tour with new steps for Daily Debrief, Goals, etc. — rejected to keep scope minimal and ship the fix quickly."
+    },
+    "items": [
+      {
+        "id": "fix-tour-selectors",
+        "title": "Fix tour step selectors and add data-tour attributes to UI components",
+        "status": "completed",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "min-824"
+        },
+        "narrative": {
+          "Action": "Add `data-tour=\"briefing-heading\"` to the `<h2>` in Briefing.jsx. Add `data-tour=\"home-nav\"` to the Home sidebar link in PersonalSection.tsx. Add `data-tour=\"settings-nav\"` to the Settings bottom menu item in Sidebar.tsx. Update all 5 TOUR_STEPS selectors in InteractiveTour.tsx to use the new data-tour attributes: Step 1 → `[data-tour=\"briefing-heading\"]`, Step 4 → `[data-tour=\"home-nav\"]`, Step 5 → `[data-tour=\"settings-nav\"]`. Files: Briefing.jsx, PersonalSection.tsx, Sidebar.tsx, InteractiveTour.tsx."
+        },
+        "subItems": [
+          {
+            "id": "fix-tour-selectors.step1-targets-briefing",
+            "title": "Step 1 highlights the 'Today's Briefing' heading via data-tour attribute",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "fix-tour-selectors.step4-targets-home",
+            "title": "Step 4 highlights the Home nav link (not deprecated Organizer) for all users",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "fix-tour-selectors.step5-targets-settings",
+            "title": "Step 5 highlights the Settings bottom menu link, not the Goals link",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "update-tour-content",
+        "title": "Update tour step content text to match current UI",
+        "status": "completed",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "min-824"
+        },
+        "narrative": {
+          "Action": "Update Step 4 content from 'Access your personal tasks, life areas, and household features from here' to describe the Home/Daily Briefing as the daily starting point. Verify Step 2's 'voice commands' mention is still accurate — if voice input isn't accessible from the add button, remove that claim. Ensure all step titles and descriptions match what the user sees. File: InteractiveTour.tsx."
+        },
+        "subItems": [
+          {
+            "id": "update-tour-content.step4-describes-home",
+            "title": "Step 4 content accurately describes the Home navigation item and its purpose",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "update-tour-content.step2-voice-accurate",
+            "title": "Step 2 content about voice commands is verified accurate or removed",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "fix-e2e-tests",
+        "title": "Update interactive tour E2E tests for workspace URLs and new selectors",
+        "status": "completed",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "min-824"
+        },
+        "narrative": {
+          "Action": "Update tests/e2e/onboarding/interactive-tour.spec.ts: Replace hardcoded `myn.test` URLs with workspace-aware URLs using the TEST_FRONTEND_URL env var pattern (see base.fixture.ts). Update test assertions to match new step content and selectors. Ensure all 11 existing tests pass with the updated tour. File: interactive-tour.spec.ts."
+        },
+        "subItems": [
+          {
+            "id": "fix-e2e-tests.workspace-urls",
+            "title": "E2E tests use TEST_FRONTEND_URL env var instead of hardcoded myn.test",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "fix-e2e-tests.assertions-match",
+            "title": "All test assertions updated to match new step content and selectors",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "fix-e2e-tests.all-pass",
+            "title": "All 11 interactive tour E2E tests pass",
+            "status": "completed",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      { "from": "fix-tour-selectors", "to": "fix-e2e-tests", "type": "blocks" },
+      { "from": "update-tour-content", "to": "fix-e2e-tests", "type": "blocks" }
+    ]
+  }
+}
