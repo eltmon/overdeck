@@ -26,9 +26,10 @@ import {
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
-import { getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../agents.js';
+import { getAgentRuntimeBaseCommand, getProviderExportsForModel, getProviderEnvForModel } from '../agents.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
+import { injectProviderEnvOverlay } from '../claude-settings-overlay.js';
 import { appendSessionEntry } from '../vbrief/continue-state.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -482,6 +483,18 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     const providerExports = await getProviderExportsForModel(planningModel);
 
+    // Update the main project's .claude/settings.local.json with the correct
+    // provider env for this planning model. Workspaces are subdirectories of the
+    // main project, so writing to projectPath (not workspacePath) ensures Claude
+    // Code walks up to a single canonical settings file shared by all agent types,
+    // rather than finding a stale workspace-level file from a previous work agent.
+    try {
+      const providerEnv = await getProviderEnvForModel(planningModel);
+      await injectProviderEnvOverlay(projectPath, providerEnv);
+    } catch (err: any) {
+      console.warn(`[start-planning] Provider env overlay failed (falling back to launcher exports): ${err.message}`);
+    }
+
     // ── Write launcher script ──────────────────────────────────────────────
     const continueFilePath = join(planningDir, `continue-${issue.identifier.toUpperCase()}.vbrief.json`);
     const initMessage = `Please read the \`content\` field of the \`planning\` sessionHistory entry in ${continueFilePath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
@@ -510,6 +523,8 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     // ── Step 5: Launch planning session ───────────────────────────────────
     progress(5, 'Launching planning session', sessionName);
+
+    console.log(`[claude-invoke] purpose=planning-agent | model=${planningModel} | source=spawn-planning-session.ts | session=${sessionName} | command="bash '${launcherScript}'"`);
 
     await ensureTmuxRunning();
     await createSessionAsync(sessionName, workspacePath, `bash '${launcherScript}'`, {
