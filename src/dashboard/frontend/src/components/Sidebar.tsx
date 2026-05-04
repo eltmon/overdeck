@@ -295,20 +295,20 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen }: SidebarProps) 
               )}
               <DeaconPauseToggle compact />
               <button
-                onClick={toggleCollapsed}
-                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                title="Expand sidebar ([)"
-                data-testid="sidebar-collapse"
-              >
-                <ChevronsRight className="w-4 h-4" />
-              </button>
-              <button
                 onClick={toggleTheme}
                 className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                 title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                 data-testid="sidebar-theme"
               >
                 {theme === 'dark' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+              </button>
+              <button
+                onClick={toggleCollapsed}
+                className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                title="Expand sidebar ([)"
+                data-testid="sidebar-collapse"
+              >
+                <ChevronsRight className="w-4 h-4" />
               </button>
             </div>
           )}
