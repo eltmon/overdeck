@@ -42,6 +42,8 @@ export interface ReadModelState {
   shadowInferenceByIssueId: Record<string, string>
   turnDiffSummariesByAgentId: Record<string, TurnDiffSummary[]>
   dashboardLifecycle: DashboardLifecycleState
+  /** Conversation names currently undergoing Panopticon-native compaction. */
+  conversationsCompactingByName: Record<string, boolean>
 }
 
 export interface DashboardLifecycleState {
@@ -69,6 +71,7 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   ttsActivity: [],
   shadowInferenceByIssueId: {},
   turnDiffSummariesByAgentId: {},
+  conversationsCompactingByName: {},
   dashboardLifecycle: {
     active: false,
     reason: null,
@@ -139,6 +142,7 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     agentsById,
     specialistsByName,
     reviewStatusByIssueId,
+    agentRuntimeById: snapshot.agentRuntimeById ?? state.agentRuntimeById,
     resources: (snapshot.resources as ResourceStats | undefined) ?? null,
     issuesRaw: (snapshot as any).issues ?? state.issuesRaw,
   }
@@ -792,6 +796,18 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           ...state.turnDiffSummariesByAgentId,
           [p.agentId]: updated,
         },
+      }
+    }
+
+    case 'conversation.compacting_changed': {
+      const { conversationName, compacting } = event.payload
+      if (!compacting) {
+        const { [conversationName]: _removed, ...rest } = state.conversationsCompactingByName
+        return { ...state, conversationsCompactingByName: rest }
+      }
+      return {
+        ...state,
+        conversationsCompactingByName: { ...state.conversationsCompactingByName, [conversationName]: true },
       }
     }
 

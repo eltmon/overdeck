@@ -1,6 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useSharedTick } from '../lib/useSharedTick';
-import { formatRelativeTime } from '../lib/formatRelativeTime';
+import { useState, useMemo, useCallback, useEffect, useRef, createContext, useContext } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useDashboardStore, selectAgentList, selectSpecialistList, selectIssuesByCycle, selectReviewStatus } from '../lib/store';
@@ -63,6 +61,17 @@ const DIFFICULTY_COLORS: Record<ComplexityLevel, string> = {
   expert: 'badge-bg-destructive text-destructive-foreground',
 };
 
+function kbFormatLastHeard(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
 function kbStalenessStyle(ms: number): { color: string; bg: string; border: string } {
   if (ms < 2 * 60_000)  return { color: 'text-success',     bg: 'badge-bg-success',     border: 'border-success/40' };
   if (ms < 10 * 60_000) return { color: 'text-warning',     bg: 'badge-bg-warning',     border: 'border-warning/40' };
@@ -71,11 +80,11 @@ function kbStalenessStyle(ms: number): { color: string; bg: string; border: stri
 }
 
 function LiveLastHeardBadge({ lastActivity }: { lastActivity?: string }) {
-  const now = useSharedTick();
+  const tick = useKanbanTick();
   if (!lastActivity) return null;
-  const ms = now.getTime() - new Date(lastActivity).getTime();
-  if (ms < 1000) return null;
-  const label = formatRelativeTime(lastActivity, now);
+  const ms = tick - new Date(lastActivity).getTime();
+  if (ms < 2000) return null;
+  const label = kbFormatLastHeard(ms);
   const style = kbStalenessStyle(ms);
   return (
     <span
@@ -86,6 +95,13 @@ function LiveLastHeardBadge({ lastActivity }: { lastActivity?: string }) {
       {label}
     </span>
   );
+}
+
+// Shared one-second tick for all KanbanBoard child components (eliminates
+// N independent setInterval timers when many agent cards are visible).
+const KanbanTickContext = createContext<number>(Date.now());
+function useKanbanTick() {
+  return useContext(KanbanTickContext);
 }
 
 // Difficulty badge component
@@ -648,17 +664,29 @@ function TrackerShadowBadges({ issue, compact = false }: { issue: Issue; compact
 
 // Feature card — rich card for Rally Features with progress and expand/collapse
 // Children (user stories) render INSIDE the card
-function FeatureCard({
+export function FeatureCard({
   feature,
   childCount,
   isExpanded,
   onToggle,
+  isSelected,
+  onSelect,
+  onPlan,
+  onViewBeads,
+  onViewVBrief,
+  planningState: planningStateProp,
   children,
 }: {
   feature: Issue;
   childCount: number;
   isExpanded: boolean;
   onToggle: () => void;
+  isSelected?: boolean;
+  onSelect?: () => void;
+  onPlan?: () => void;
+  onViewBeads?: () => void;
+  onViewVBrief?: () => void;
+  planningState?: PlanningState;
   children?: React.ReactNode;
 }) {
   const completed = feature.completedChildCount ?? 0;
@@ -671,13 +699,16 @@ function FeatureCard({
     ((feature.derivedStatus === 'in_progress' && feature.rawTrackerState !== 'Developing') ||
      (feature.derivedStatus === 'closed' && feature.rawTrackerState !== 'Done'));
 
+  const hasPlan = planningStateProp?.hasPlan ?? feature.hasPlan ?? false;
+  const hasBeads = planningStateProp?.hasBeads ?? feature.hasBeads ?? false;
+  const planLabelExists = hasPlan || feature.labels?.some(l => l.toLowerCase() === 'planned');
+
   return (
-    <div className="bg-popover rounded-lg border-l-4 border-l-primary overflow-hidden">
+    <div className={`bg-popover rounded-lg border-l-4 border-l-primary overflow-hidden ${isSelected ? 'ring-2 ring-primary/40' : ''}`}>
       <div
-        onClick={onToggle}
         className="flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-primary/10 transition-colors"
       >
-        <div className="flex items-center gap-1 shrink-0 mt-0.5">
+        <div className="flex items-center gap-1 shrink-0 mt-0.5" onClick={(e) => { e.stopPropagation(); onToggle(); }}>
           {isExpanded ? (
             <ChevronDown className="w-4 h-4 text-primary/70" />
           ) : (
@@ -689,7 +720,7 @@ function FeatureCard({
             </span>
           )}
         </div>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0" onClick={onSelect}>
           <div className="flex items-center gap-2 flex-wrap">
             {feature.project && (
               <span
@@ -730,6 +761,47 @@ function FeatureCard({
               </span>
             </div>
           )}
+
+          {/* Action bar for features — Plan, vBRIEF, Tasks; NO Start Agent */}
+          <div className="mt-2 flex items-center gap-2 flex-wrap rounded-xl border border-border/70 bg-card/80 px-2.5 py-2">
+            {STATUS_LABELS[feature.status] !== 'done' && STATUS_LABELS[feature.status] !== 'canceled' && (
+              <button
+                data-testid={`action-plan-${feature.identifier}`}
+                onClick={(e) => { e.stopPropagation(); onPlan && onPlan(); }}
+                className={`flex items-center gap-1 text-xs transition-colors ${
+                  planLabelExists
+                    ? 'text-success hover:text-success/80'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title={planLabelExists ? 'See plan / continue planning' : 'Plan'}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                {planLabelExists ? 'See Plan' : 'Plan'}
+              </button>
+            )}
+            {(hasBeads || (hasPlan && !hasBeads)) && (
+              <button
+                data-testid={`action-tasks-${feature.identifier}`}
+                onClick={(e) => { e.stopPropagation(); onViewBeads && onViewBeads(); }}
+                className="flex items-center gap-1 text-xs text-success hover:text-success/80 transition-colors"
+                title="Tasks"
+              >
+                <List className="w-3.5 h-3.5" />
+                Tasks
+              </button>
+            )}
+            {hasPlan && (
+              <button
+                data-testid={`action-vbrief-${feature.identifier}`}
+                onClick={(e) => { e.stopPropagation(); onViewVBrief && onViewVBrief(); }}
+                className="flex items-center gap-1 text-xs text-success hover:text-success/80 transition-colors"
+                title="vBRIEF"
+              >
+                <ScrollText className="w-3.5 h-3.5" />
+                vBRIEF
+              </button>
+            )}
+          </div>
         </div>
       </div>
       {/* Child stories rendered inside the card */}
@@ -743,12 +815,16 @@ function FeatureCard({
 }
 
 // Compact child card — slim inline card for stories under a Feature
-function CompactChildCard({
+export function CompactChildCard({
   issue,
   agents,
+  isSelected,
+  onSelect,
 }: {
   issue: Issue;
   agents: Agent[];
+  isSelected?: boolean;
+  onSelect?: () => void;
 }) {
   const canonical = STATUS_LABELS[issue.status] || 'backlog';
   const dotColor = canonical === 'done' ? 'bg-success' :
@@ -762,7 +838,10 @@ function CompactChildCard({
   );
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-popover/50 transition-colors group">
+    <div
+      className={`flex items-center gap-2 px-3 py-1.5 rounded hover:bg-popover/50 transition-colors group cursor-pointer ${isSelected ? 'bg-primary/10' : ''}`}
+      onClick={onSelect}
+    >
       <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
       <a
         href={issue.url}
@@ -1016,6 +1095,13 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
   // Rally feature expand/collapse state (lifted from ColumnContent for expand/collapse all)
   const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
+
+  // Shared one-second tick for all child badges (eliminates per-badge intervals)
+  const [kanbanTick, setKanbanTick] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setKanbanTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const toggleFeature = useCallback((featureId: string) => {
     setCollapsedFeatures(prev => {
@@ -1476,7 +1562,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   };
 
 
-  const grouped = groupByStatus(filteredIssues, includeCompleted);
+  const grouped = useMemo(() => groupByStatus(filteredIssues, includeCompleted), [filteredIssues, includeCompleted]);
 
   // Planning-state is embedded in each issue from the /api/issues response
   // (computed server-side via cheap filesystem checks). No per-card fetches needed.
@@ -1507,6 +1593,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   }, [grouped, planningStateById]);
 
   return (
+    <KanbanTickContext.Provider value={kanbanTick}>
     <div className="space-y-4">
       {/* Filter bar */}
       <div className="flex flex-col gap-2">
@@ -1868,6 +1955,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         onClose={handleCloseProgress}
       />
     </div>
+    </KanbanTickContext.Provider>
   );
 }
 
@@ -1982,12 +2070,24 @@ function ColumnContent({
             childCount={group.children.length}
             isExpanded={isExpanded}
             onToggle={() => onToggleFeature(feature.identifier)}
+            isSelected={selectedIssue === feature.identifier}
+            onSelect={() => onSelectIssue(
+              selectedIssue === feature.identifier ? null : feature.identifier
+            )}
+            onPlan={() => onPlan(feature)}
+            onViewBeads={() => onViewBeads(feature)}
+            onViewVBrief={onViewVBrief ? () => onViewVBrief(feature) : undefined}
+            planningState={planningStateById?.[feature.identifier]}
           >
             {group.children.map(child => (
               <CompactChildCard
                 key={child.id}
                 issue={child}
                 agents={agents}
+                isSelected={selectedIssue === child.identifier}
+                onSelect={() => onSelectIssue(
+                  selectedIssue === child.identifier ? null : child.identifier
+                )}
               />
             ))}
           </FeatureCard>

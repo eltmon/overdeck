@@ -933,9 +933,25 @@
 }
 
 .sessionStatus_stopped,
-.sessionStatus_unknown {
+.sessionStatus_unknown,
+.sessionStatus_idle {
   color: var(--muted-foreground);
   background: var(--accent);
+}
+
+.sessionStatus_working {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+}
+
+.sessionStatus_thinking {
+  color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+}
+
+.sessionStatus_waiting {
+  color: var(--orange, #f97316);
+  background: color-mix(in srgb, var(--orange, #f97316) 12%, transparent);
 }
 
 .sessionDuration {

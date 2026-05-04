@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { WebSocket } from 'ws';
 import { addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from '../pty-hub.js';
 
@@ -29,8 +29,13 @@ function makeHub(...clients: WebSocket[]): PtyHub {
 // ── broadcastToHub ─────────────────────────────────────────────────────────────
 
 describe('broadcastToHub', () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('sends data to all OPEN ready clients', () => {
     const ws1 = makeMockWs(WebSocket.OPEN);
@@ -66,6 +71,7 @@ describe('broadcastToHub', () => {
   it('does nothing with an empty client set', () => {
     const hub = makeHub();
     expect(() => broadcastToHub(hub, 'noop')).not.toThrow();
+    vi.runAllTimers();
   });
 
   it('buffers output for clients that are not ready yet', () => {

@@ -212,9 +212,6 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
           ],
         };
       }
-      if (url === '/api/registered-projects') {
-        return { ok: true, json: async () => [] };
-      }
       if (url === '/api/version') {
         return { ok: true, json: async () => ({ version: '0.8.0' }) };
       }
@@ -409,7 +406,7 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     // Verify session view is shown
     expect(screen.getByTestId('session-panel')).toBeInTheDocument();
 
-    // Click a conversation to switch from session view to conversation view
+    // Conversations section is expanded by default — click a conversation
     fireEvent.click(screen.getByTestId('conv-test'));
 
     // Session view should be gone and conversation view should render

@@ -39,39 +39,14 @@ describe('resetReviewCommand (pan review reset)', () => {
     expect(resetSessionMock).not.toHaveBeenCalled();
   });
 
-  it('--session: errors out instead of clearing session', async () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called');
-    });
-
-    await expect(resetReviewCommand('PAN-2', { session: true })).rejects.toThrow('process.exit called');
+  it('--session: resets review but rejects session reset with error', async () => {
+    await expect(resetReviewCommand('PAN-2', { session: true })).rejects.toThrow('process.exit unexpectedly called with "1"');
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/api/review/PAN-2/reset'),
       expect.objectContaining({ method: 'POST' }),
     );
     expect(resetSessionMock).not.toHaveBeenCalled();
-    exitSpy.mockRestore();
-  });
-
-  it('--session: review reset runs before the session error', async () => {
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called');
-    });
-    const callOrder: string[] = [];
-    fetchMock.mockImplementation(async () => {
-      callOrder.push('review');
-      return {
-        ok: true,
-        json: async () => ({ success: true, message: 'Reset complete', queued: false }),
-      };
-    });
-
-    await expect(resetReviewCommand('PAN-3', { session: true })).rejects.toThrow('process.exit called');
-
-    expect(callOrder).toEqual(['review']);
-    expect(resetSessionMock).not.toHaveBeenCalled();
-    exitSpy.mockRestore();
   });
 
   it('session: false behaves like default', async () => {

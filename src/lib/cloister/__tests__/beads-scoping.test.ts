@@ -1,14 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { readBeadsTasks } from '../work-agent-prompt.js';
-
-vi.mock('../../beads-query.js', () => ({
-  queryBeadsForIssue: vi.fn().mockResolvedValue([]),
-}));
-
-import { queryBeadsForIssue } from '../../beads-query.js';
 
 let TEST_DIR: string;
 let WORKSPACE_DIR: string;
@@ -37,14 +31,13 @@ function writeBeadsJsonl(dir: string, beads: Array<{ id: string; title: string; 
 }
 
 describe('readBeadsTasks label scoping', () => {
-  beforeEach(() => {
-    vi.mocked(queryBeadsForIssue).mockReset().mockResolvedValue([]);
-  });
-
-  it('formats beads returned by queryBeadsForIssue', async () => {
-    vi.mocked(queryBeadsForIssue).mockResolvedValue([
-      { id: 'pan-001', title: 'PAN-412: Implement feature A', status: 'open', labels: ['pan-412'] },
-      { id: 'pan-002', title: 'PAN-412: Implement feature B', status: 'open', labels: ['pan-412'] },
+  it('filters beads by issue label, excluding other issues', async () => {
+    writeBeadsJsonl(PROJECT_ROOT, [
+      { id: 'pan-001', title: 'PAN-412: Implement feature A', labels: ['pan-412', 'difficulty:simple'] },
+      { id: 'pan-002', title: 'PAN-412: Implement feature B', labels: ['pan-412', 'difficulty:medium'] },
+      { id: 'pan-003', title: 'PAN-158: Unrelated task', labels: ['pan-158', 'difficulty:simple'] },
+      { id: 'pan-004', title: 'PAN-164: Another unrelated', labels: ['pan-164', 'difficulty:medium'] },
+      { id: 'pan-005', title: 'PAN-414: Yet another', labels: ['pan-414', 'difficulty:complex'] },
     ]);
 
     const tasks = await readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-412');
@@ -55,8 +48,9 @@ describe('readBeadsTasks label scoping', () => {
   });
 
   it('matches beads using labels field (not just tags)', async () => {
-    vi.mocked(queryBeadsForIssue).mockResolvedValue([
-      { id: 'pan-010', title: 'Some generic title', status: 'open', labels: ['pan-419'] },
+    writeBeadsJsonl(PROJECT_ROOT, [
+      { id: 'pan-010', title: 'Some generic title', labels: ['pan-419'] },
+      { id: 'pan-011', title: 'Another generic title', labels: ['pan-420'] },
     ]);
 
     const tasks = await readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-419');
@@ -66,24 +60,33 @@ describe('readBeadsTasks label scoping', () => {
   });
 
   it('handles legacy workspace: prefixed labels', async () => {
-    vi.mocked(queryBeadsForIssue).mockResolvedValue([
-      { id: 'pan-020', title: 'PAN-412: Implementation', status: 'open', labels: ['workspace:pan-412'] },
-      { id: 'pan-021', title: 'PAN-412: Feature', status: 'open', labels: ['pan-412'] },
+    writeBeadsJsonl(PROJECT_ROOT, [
+      { id: 'pan-020', title: 'PAN-412: Implementation', labels: ['workspace:pan-412'] },
+      { id: 'pan-021', title: 'PAN-412: Feature', labels: ['pan-412'] },
+      { id: 'pan-022', title: 'PAN-158: Other', labels: ['workspace:pan-158'] },
     ]);
 
     const tasks = await readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-412');
 
+    // Should match both workspace: prefixed and bare labels containing pan-412
     expect(tasks).toHaveLength(2);
     expect(tasks.some(t => t.includes('Implementation'))).toBe(true);
     expect(tasks.some(t => t.includes('Feature'))).toBe(true);
   });
 
-  it('returns empty array when no beads match', async () => {
-    vi.mocked(queryBeadsForIssue).mockResolvedValue([]);
+  it('deduplicates beads found in both workspace and project root', async () => {
+    // Same bead in both locations
+    writeBeadsJsonl(PROJECT_ROOT, [
+      { id: 'pan-030', title: 'PAN-412: Shared bead', labels: ['pan-412'] },
+    ]);
+    mkdirSync(join(WORKSPACE_DIR, '.beads'), { recursive: true });
+    writeBeadsJsonl(WORKSPACE_DIR, [
+      { id: 'pan-030', title: 'PAN-412: Shared bead', labels: ['pan-412'] },
+    ]);
 
     const tasks = await readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-412');
 
-    expect(tasks).toHaveLength(0);
+    expect(tasks).toHaveLength(1);
   });
 });
 

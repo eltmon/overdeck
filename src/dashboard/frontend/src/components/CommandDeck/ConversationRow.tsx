@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
-import { Circle, Archive, Copy, Check, X, Pencil, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, AlertCircle } from 'lucide-react';
+import { useDashboardStore } from '../../lib/store';
+import { Circle, Archive, Copy, Check, X, Pencil, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, AlertCircle, Scissors } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { useNow } from '../../hooks/useNow';
@@ -74,6 +75,8 @@ export function ConversationRow({
   const [confirmArchive, setConfirmArchive] = useState(false);
   const confirm = useConfirm();
   const now = useNow(60_000);
+
+  const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conv.name] ?? false);
 
   const isNested = variant === 'nested';
   const iconSize = isNested ? 10 : 11;
@@ -165,6 +168,15 @@ export function ConversationRow({
           style={{ color: 'var(--warning)' }}
           aria-label={`Forking ${conv.name}`}
         />
+      ) : isCompacting ? (
+        <span title="Compacting conversation history" style={{ display: 'contents' }}>
+          <Scissors
+            size={spinnerSize}
+            className={styles.conversationWorkingPulse}
+            style={{ color: 'var(--success)' }}
+            aria-label={`Compacting ${conv.name}`}
+          />
+        </span>
       ) : conv.isWorking ? (
         <WorkingSpinner
           size={spinnerSize}
@@ -250,7 +262,7 @@ export function ConversationRow({
         >
           <Pencil size={iconSize} />
         </span>
-        {(conv.sessionFile || conv.claudeSessionId) && !conv.forkStatus && (
+        {conv.claudeSessionId && !conv.forkStatus && (
           <span
             role="button"
             tabIndex={0}

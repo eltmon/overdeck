@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -18,9 +18,10 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
-import type { SessionNode as SessionNodeType } from '@panctl/contracts';
+import type { SessionNode as SessionNodeType, Activity, AgentRuntimeSnapshot } from '@panctl/contracts';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import { useAvailableModels, type ModelGroup } from '../../shared/ModelPicker/ModelPicker';
+import { useResolvedModels, resolveWorkTypeKey } from '../../../lib/useResolvedModels';
 import { useDashboardStore } from '../../../lib/store';
 import { useSharedTick } from '../../../lib/useSharedTick';
 import { formatRelativeTime } from '../../../lib/formatRelativeTime';
@@ -62,30 +63,16 @@ function LiveLastHeard({ lastActivity }: { lastActivity?: string }) {
   );
 }
 
-let resolvedModelsCache: Record<string, string | null> | null = null;
-let resolvedModelsFetchPromise: Promise<Record<string, string | null>> | null = null;
 
-function useResolvedModels(): Record<string, string | null> {
-  const [models, setModels] = useState<Record<string, string | null>>(resolvedModelsCache ?? {});
-
-  useEffect(() => {
-    if (resolvedModelsCache) {
-      setModels(resolvedModelsCache);
-      return;
-    }
-    if (!resolvedModelsFetchPromise) {
-      resolvedModelsFetchPromise = fetch('/api/models/resolve')
-        .then(r => r.json())
-        .then((data: Record<string, string | null>) => {
-          resolvedModelsCache = data;
-          return data;
-        })
-        .catch(() => ({}));
-    }
-    resolvedModelsFetchPromise.then(data => setModels(data)).catch(() => {});
-  }, []);
-
-  return models;
+function activityToStatus(activity: Activity): StatusDotStatus {
+  switch (activity) {
+    case 'working': return 'active';
+    case 'thinking': return 'thinking';
+    case 'waiting': return 'waiting';
+    case 'idle': return 'idle';
+    case 'stopped': return 'ended';
+    default: return 'ended';
+  }
 }
 
 function presenceToStatus(presence: SessionNodeType['presence']): StatusDotStatus {
@@ -98,15 +85,29 @@ function presenceToStatus(presence: SessionNodeType['presence']): StatusDotStatu
   }
 }
 
-function ReviewerVerdict({ session }: { session: SessionNodeType }) {
-  const latestStatus = session.roundMetadata?.latestStatus;
-  if (latestStatus === 'completed') {
+function effectiveActivity(runtime: AgentRuntimeSnapshot | undefined, presence: SessionNodeType['presence']): Activity | undefined {
+  if (!runtime?.activity) return undefined;
+  // agent.stopped sets activity="stopped" but tmux session may still be alive (pan done).
+  // If presence says alive, treat as idle — the agent finished work but isn't dead.
+  if (runtime.activity === 'stopped' && presence !== 'ended') return 'idle';
+  return runtime.activity;
+}
+
+function deriveDotStatus(runtime: AgentRuntimeSnapshot | undefined, presence: SessionNodeType['presence']): StatusDotStatus {
+  const activity = effectiveActivity(runtime, presence);
+  if (activity) return activityToStatus(activity);
+  return presenceToStatus(presence);
+}
+
+function ReviewerVerdict({ session, dotStatus }: { session: SessionNodeType; dotStatus: StatusDotStatus }) {
+  const { latestStatus, latestReviewResult } = session.roundMetadata ?? {};
+  if (latestReviewResult === 'APPROVED') {
     return <CircleCheck size={10} style={{ color: 'var(--success)', flexShrink: 0 }} />;
   }
-  if (latestStatus === 'failed') {
+  if (latestReviewResult === 'CHANGES_REQUESTED' || latestStatus === 'failed') {
     return <CircleX size={10} style={{ color: 'var(--destructive)', flexShrink: 0 }} />;
   }
-  return <StatusDot status={presenceToStatus(session.presence)} size="sm" />;
+  return <StatusDot status={dotStatus} size="sm" />;
 }
 
 interface SessionNodeProps {
@@ -169,15 +170,19 @@ function shortModel(model: string): string {
     .replace(/-latest$/, '');
 }
 
-function deriveSessionLabel(session: SessionNodeType): string {
-  const model = session.model && session.model !== 'unknown' && session.model !== 'specialist'
+function deriveSessionLabel(session: SessionNodeType, resolvedModel?: string | null): string {
+  const sessionModel = session.model && session.model !== 'unknown' && session.model !== 'specialist'
     ? shortModel(session.model)
     : '';
+  const model = sessionModel || (resolvedModel ? shortModel(resolvedModel) : '');
   switch (session.type) {
     case 'merge': return model ? `Merge (${model})` : 'Merge agent';
     case 'test': return model ? `Tests (${model})` : 'Tests';
     case 'review': return model ? `Review (${model})` : 'Review';
-    case 'reviewer': return model ? model : (session.role ? capitalize(session.role) : 'Reviewer');
+    case 'reviewer': {
+      const role = session.role ? capitalize(session.role) : 'Reviewer';
+      return model ? `${role} (${model})` : role;
+    }
     case 'work': return model ? `Work (${model})` : 'Work agent';
     case 'planning': return model ? `Planning (${model})` : 'Planning';
     case 'legacy': return 'Planning state';
@@ -254,6 +259,11 @@ export function SessionNode({
   const runtime = useDashboardStore((s) => s.agentRuntimeById[session.sessionId]);
   const lastActivity = runtime?.lastActivity;
 
+  const dotStatus = deriveDotStatus(runtime, session.presence);
+  const activity = effectiveActivity(runtime, session.presence);
+  const displayStatus = activity ?? session.status;
+  const statusCssKey = activity ?? session.status;
+
   const flashKey = `${session.sessionId}:${session.presence}:${session.status}`;
   const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
 
@@ -274,13 +284,7 @@ export function SessionNode({
     }
   }, [issueId, onDeepWipe]);
 
-  const workTypeKey = session.type === 'review' ? 'specialist-review-agent'
-    : session.type === 'reviewer' && session.role ? `review:${session.role}`
-    : session.type === 'work' ? 'issue-agent:implementation'
-    : session.type === 'planning' ? 'planning-agent'
-    : session.type === 'test' ? 'specialist-test-agent'
-    : session.type === 'merge' ? 'specialist-merge-agent'
-    : null;
+  const workTypeKey = resolveWorkTypeKey(session);
   const defaultModel = workTypeKey ? (resolvedModels[workTypeKey] ?? null) : null;
   const restartLabel = session.type === 'review' ? 'Restart all' : undefined;
 
@@ -304,7 +308,7 @@ export function SessionNode({
                 : <ChevronRight size={12} style={{ color: 'var(--muted-foreground)' }} />}
             </span>
           )}
-          <ReviewerVerdict session={session} />
+          <ReviewerVerdict session={session} dotStatus={dotStatus} />
           <TypeIcon type={session.type} role={session.role} />
           <span
             className={styles.sessionLabel}
@@ -315,11 +319,11 @@ export function SessionNode({
               return `${session.sessionId} · Last heard: ${formatRelativeTime(lastActivity, new Date())}`;
             })()}
           >
-            {deriveSessionLabel(session)}
+            {deriveSessionLabel(session, defaultModel)}
           </span>
           <LiveLastHeard lastActivity={lastActivity} />
-          <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${session.status}`] ?? ''}`}>
-            {session.status}
+          <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${statusCssKey}`] ?? ''}`}>
+            {displayStatus}
           </span>
           <span className={styles.sessionDuration}>{formatDuration(session.duration)}</span>
         </button>

@@ -86,6 +86,33 @@ export interface WorkspaceInfo {
   git?: GitStatus;
   repoGit?: { frontend: GitStatus | null; api: GitStatus | null };
   services?: { name: string; url?: string }[];
+  planningState?: {
+    hasPlan: boolean;
+    hasBeads: boolean;
+    beadsCount: number;
+    planningComplete: boolean;
+    workspacePath?: string;
+  };
+  costs?: IssueCostData;
+}
+
+export interface IssueCostData {
+  issueId: string;
+  totalCost: number;
+  resolvedTotalCost?: number;
+  aggregateCost?: number;
+  liveCost?: number;
+  totalTokens: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  sessions: { model: string; cost: number; tokens: number; durationMs?: number }[];
+  byModel: Record<string, { cost: number; tokens: number }>;
+  byStage?: Record<string, { cost: number; tokens: number }>;
+  budget?: number;
+  budgetWarning?: boolean;
+  lastUpdated?: string;
 }
 
 export interface ContainerMenuState {

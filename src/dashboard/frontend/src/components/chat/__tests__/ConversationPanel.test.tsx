@@ -8,6 +8,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConversationPanel } from '../ConversationPanel';
 import { DialogProvider } from '../../DialogProvider';
 
+// Mock DialogProvider hooks so ConversationPanel can mount without the full provider tree
+vi.mock('../../DialogProvider', () => ({
+  DialogProvider: ({ children }: { children: React.ReactNode }) => children,
+  useConfirm: () => vi.fn().mockResolvedValue(true),
+  useAlert: () => vi.fn().mockResolvedValue(undefined),
+}));
+
 // Mock heavy child components that are not under test
 vi.mock('../../XTerminal', () => ({ XTerminal: () => null }));
 vi.mock('../MessagesTimeline', () => ({ MessagesTimeline: () => null }));
@@ -111,7 +118,7 @@ describe('ConversationPanel rename flow', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   it('renders the conversation title in the header', () => {

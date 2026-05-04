@@ -74,4 +74,9 @@ export class GitLabTracker implements IssueTracker {
       'GitLab tracker is not yet implemented. Coming soon!'
     );
   }
+
+  async getChildIssues(_parentId: string): Promise<Issue[]> {
+    // GitLab tracker is not yet implemented
+    return [];
+  }
 }

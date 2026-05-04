@@ -3,7 +3,7 @@ import {
   XCircle, RefreshCw, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X, Send, ChevronRight, Box, Tag, LayoutGrid,
 } from 'lucide-react';
 import type { UseMutationResult } from '@tanstack/react-query';
-import { Agent, WorkAgentLifecycle } from '../../types';
+import { Agent, WorkAgentLifecycle, STATUS_LABELS } from '../../types';
 import type { ReviewStatus, WorkspaceInfo } from './types';
 import { ReviewPipelineSection } from './ReviewPipelineSection';
 import { isReviewPipelineStuck } from '../../lib/pipeline-state';
@@ -14,6 +14,7 @@ import { RecoverButton } from '../RecoverButton';
 import { RestartFromPlanButton } from '../RestartFromPlanButton';
 import { ArtifactLinks } from '../ArtifactLinks';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
+import { FileText } from 'lucide-react';
 
 // Convenience alias — most mutations use void variables and unknown data
 type AnyMutation = UseMutationResult<unknown, Error, void, unknown>;
@@ -52,6 +53,9 @@ interface ActionsSectionProps {
   onSwitchModel?: () => void;
   lifecycle?: WorkAgentLifecycle;
   agentLaunchState?: 'starting' | 'resuming' | null;
+  isFeature?: boolean;
+  issueStatus?: string;
+  onPlan?: () => void;
 }
 
 void COMMAND_DECK_SURFACE_REGISTRY;
@@ -88,6 +92,9 @@ export function ActionsSection({
   onSwitchModel,
   lifecycle,
   agentLaunchState,
+  isFeature,
+  issueStatus,
+  onPlan,
 }: ActionsSectionProps) {
   const [showResumeInput, setShowResumeInput] = useState(false);
   const [resumeMessage, setResumeMessage] = useState('');
@@ -220,8 +227,8 @@ export function ActionsSection({
             {isReReview ? 'Re-Review' : 'Review & Test'}
           </button>
 
-          {/* Stop Agent */}
-          {agent && agent.status !== 'stopped' && (
+          {/* Stop Agent — hidden for features (features are planned, not executed) */}
+          {agent && agent.status !== 'stopped' && !isFeature && (
             <div className="flex items-center gap-1">
               <StopAgentButton
                 agentId={agent?.id}
@@ -236,7 +243,7 @@ export function ActionsSection({
           )}
 
           {/* Switch Model — only for work agents with an active/stopped agent */}
-          {agent && onSwitchModel && (
+          {agent && onSwitchModel && !isFeature && (
             <button
               onClick={onSwitchModel}
               className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent"
@@ -263,8 +270,8 @@ export function ActionsSection({
             </div>
           )}
 
-          {/* Start/Resume Agent when no agent or stopped */}
-          {(!agent || agent.status === 'stopped') && (
+          {/* Start/Resume Agent when no agent or stopped — hidden for features */}
+          {(!agent || agent.status === 'stopped') && !isFeature && (
             <>
               <button
                 onClick={() => {
@@ -322,6 +329,22 @@ export function ActionsSection({
                  </button>
                )}
              </>
+           )}
+           {/* Feature-only actions: Plan button (features are planned, not executed) */}
+           {isFeature && onPlan && STATUS_LABELS[issueStatus ?? ''] !== 'done' && STATUS_LABELS[issueStatus ?? ''] !== 'canceled' && (
+             <button
+               onClick={onPlan}
+               className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+                 hasPlan
+                   ? 'text-success hover:text-success/80'
+                   : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+               }`}
+               title={hasPlan ? 'See plan / continue planning' : 'Plan'}
+               data-testid="inspector-plan-feature"
+             >
+               <FileText className="w-3 h-3" />
+               {hasPlan ? 'See Plan' : 'Plan'}
+             </button>
            )}
          </div>
       </div>

@@ -12,6 +12,7 @@ requires:
 optional:
   - COMMENTS_SECTION
   - SPEC_SECTION
+  - CHILD_STORIES_SECTION
   - PROJECT_STRUCTURE_SECTION
   - EFFORT_SECTION
   - PRD_REFERENCES
@@ -91,7 +92,7 @@ After `pan plan-finalize` and the user clicks **Done**, the pipeline runs withou
 
 ## Description
 {{ISSUE_DESCRIPTION}}
-{{COMMENTS_SECTION}}{{SPEC_SECTION}}{{PROJECT_STRUCTURE_SECTION}}
+{{COMMENTS_SECTION}}{{SPEC_SECTION}}{{CHILD_STORIES_SECTION}}{{PROJECT_STRUCTURE_SECTION}}
 ---
 
 ## Your Mission

@@ -102,9 +102,9 @@ export function initSchema(db: Database.Database): void {
       deacon_ignored_reason   TEXT,
       -- PAN-905: GitHub-native merge blocker reasons (JSON array)
       blocker_reasons         TEXT,
-      -- v32: track last commit verified by the test specialist (skip-redundant-tests)
+      -- PAN-938: pre-review verification gate commit SHA
       last_verified_commit    TEXT,
-      -- v32: track current merge step for UI override
+      -- PAN-938: current merge pipeline step
       merge_step              TEXT
     );
 

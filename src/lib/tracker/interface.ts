@@ -169,6 +169,12 @@ export interface IssueTracker {
    * Link a PR/MR to an issue
    */
   linkPR(issueId: string, prUrl: string): Promise<void>;
+
+  /**
+   * Get child issues for a parent issue (hierarchy support).
+   * Returns empty array for trackers that don't support hierarchy.
+   */
+  getChildIssues(parentId: string): Promise<Issue[]>;
 }
 
 /**

@@ -43,6 +43,8 @@ export interface Conversation {
   forkStatus?: string | null;
   /** Error message when forkStatus='failed'. */
   forkError?: string | null;
+  /** True when a Panopticon-native compaction is actively running for this conversation. */
+  compacting?: boolean;
 }
 
 // ─── Sort types ───────────────────────────────────────────────────────────────

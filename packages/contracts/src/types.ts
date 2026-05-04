@@ -231,6 +231,7 @@ export const DashboardSnapshot = Schema.Struct({
   issues: Schema.Array(Schema.Unknown),  // Issues are complex — pass through unvalidated
   resources: Schema.optional(Schema.Unknown),
   turnDiffSummariesByAgentId: Schema.optional(Schema.Record(Schema.String, Schema.Array(TurnDiffSummary))),
+  agentRuntimeById: Schema.optional(Schema.Record(Schema.String, AgentRuntimeSnapshot)),
   timestamp: Schema.String,
 })
 export type DashboardSnapshot = typeof DashboardSnapshot.Type
@@ -277,6 +278,7 @@ export type SessionNodeType = typeof SessionNodeType.Type
 export const ReviewerRoundSummary = Schema.Struct({
   round: Schema.Number,
   status: Schema.optional(Schema.String),
+  reviewResult: Schema.optional(Schema.String),
   startedAt: Schema.optional(Schema.String),
   endedAt: Schema.optional(Schema.String),
   durationSec: Schema.optional(Schema.Number),
@@ -290,6 +292,7 @@ export const ReviewerRoundMetadata = Schema.Struct({
   roundCount: Schema.Number,
   latestRound: Schema.Number,
   latestStatus: Schema.optional(Schema.String),
+  latestReviewResult: Schema.optional(Schema.String),
   history: Schema.Array(ReviewerRoundSummary),
 })
 export type ReviewerRoundMetadata = typeof ReviewerRoundMetadata.Type

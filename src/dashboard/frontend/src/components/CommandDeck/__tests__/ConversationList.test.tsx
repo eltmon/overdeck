@@ -8,6 +8,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConversationList, updateConversationTitle } from '../ConversationList';
 import { DialogProvider } from '../../DialogProvider';
 
+vi.mock('../../DialogProvider', () => ({
+  DialogProvider: ({ children }: { children: React.ReactNode }) => children,
+  useConfirm: () => vi.fn().mockResolvedValue(true),
+  useAlert: () => vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('lucide-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('lucide-react')>();
   return {

@@ -8,6 +8,7 @@ import { XTerminal } from '../../XTerminal';
 import { RoundCard } from '../RoundCard';
 import type { RoundData, RoundVerdict } from '../RoundCard';
 import { ReviewSummary } from './ReviewSummary';
+import { useResolvedModels, resolveWorkTypeKey } from '../../../lib/useResolvedModels';
 import styles from '../styles/command-deck.module.css';
 
 interface SessionPanelProps {
@@ -71,6 +72,7 @@ function deriveRoundData(metadata: SessionNodeType['roundMetadata']): RoundData[
 
 export function SessionPanel({ session, issueId, roundMarkers, reviewers }: SessionPanelProps) {
   const isReviewSession = session.type === 'review';
+  const resolvedModels = useResolvedModels();
   const [view, setView] = useState<PanelView>(() => {
     const stored = readView(session.sessionId);
     // Default review sessions to summary tab
@@ -85,6 +87,12 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
 
   const synthesizedConversation = useMemo<Conversation | null>(() => {
     if (!session.hasJsonl) return null;
+    const actualModel = session.model && session.model !== 'unknown' && session.model !== 'specialist'
+      ? session.model
+      : undefined;
+    const fallbackModel = !actualModel
+      ? (resolvedModels[resolveWorkTypeKey(session) ?? ''] ?? undefined)
+      : undefined;
     return {
       id: -1,
       name: session.sessionId,
@@ -97,8 +105,9 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
       lastAttachedAt: null,
       sessionAlive: session.presence !== 'ended',
       sessionFile: session.sessionId,
+      model: actualModel ?? fallbackModel,
     };
-  }, [session, issueId]);
+  }, [session, issueId, resolvedModels]);
 
   const hasJsonl = !!session.hasJsonl;
   const hasTranscript = !!session.transcript;

@@ -1128,7 +1128,7 @@ describe('spawnReviewer runtime command routing regression', () => {
       'utf-8',
     );
 
-    // Isolate the spawnSingleReviewer function body
+    // Isolate the spawnReviewer function body
     const spawnReviewerMatch = src.match(/async function spawnSingleReviewer[\s\S]*?^}/m);
     expect(spawnReviewerMatch).not.toBeNull();
     const fn = spawnReviewerMatch![0];
