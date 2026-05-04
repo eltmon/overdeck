@@ -139,6 +139,7 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     agentsById,
     specialistsByName,
     reviewStatusByIssueId,
+    agentRuntimeById: snapshot.agentRuntimeById ?? state.agentRuntimeById,
     resources: (snapshot.resources as ResourceStats | undefined) ?? null,
     issuesRaw: (snapshot as any).issues ?? state.issuesRaw,
   }

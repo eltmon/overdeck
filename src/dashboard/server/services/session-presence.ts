@@ -36,5 +36,7 @@ export async function deriveSessionPresence(
     return 'idle';
   }
 
-  return 'ended';
+  // tmux session is alive but state is completed/stopped/etc — agent finished
+  // its task but the session is still sitting at a prompt.
+  return 'idle';
 }
