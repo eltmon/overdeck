@@ -1426,10 +1426,10 @@ const getConversationMessagesRoute = HttpRouter.add(
         }
 
         try {
-          // Specialists: parse only from the last compact_boundary so the display
-          // shows only the current context window, not the full 30-day history.
-          const isSpecialist = !conv && /^specialist-/.test(name);
-          const result = await getCachedMessages(sessionFile, isSpecialist);
+          // Always parse the full file — compact boundaries render as visual
+          // dividers in MessagesTimeline; truncating at them hides the actual
+          // conversation content (root cause of empty reviewer Conversation tab).
+          const result = await getCachedMessages(sessionFile, false);
 
           // Cache cost in DB so the conversation list can show it without re-parsing
           if (result.totalCost > 0 && conv) {
