@@ -582,6 +582,34 @@ export async function parseConversationMessages(
           proposedPlan.status = 'approved';
           proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
         }
+      } else if (attachment?.type === 'queued_command' && attachment?.commandMode === 'prompt') {
+        // User message sent as an interrupt while Claude was running — stored as
+        // queued_command instead of a regular user entry. Render it in the timeline.
+        const prompt = attachment.prompt;
+        let text = '';
+        if (typeof prompt === 'string') {
+          text = prompt;
+        } else if (Array.isArray(prompt)) {
+          text = (prompt as Array<{ type?: string; text?: string }>)
+            .filter((b) => b.type === 'text' && b.text)
+            .map((b) => b.text)
+            .join('\n');
+        }
+        if (text && !isSystemInjection(text)) {
+          if (pendingAssistant) {
+            messages.push(pendingAssistant);
+            pendingAssistant = null;
+          }
+          const ts = entry.timestamp ?? new Date().toISOString();
+          lastUserTimestamp = ts;
+          messages.push({
+            id: ((entry as Record<string, unknown>).uuid as string | undefined) ?? `queued-${lineSequence}`,
+            role: 'user',
+            text,
+            createdAt: ts,
+            sequence: lineSequence,
+          });
+        }
       }
     }
   }
