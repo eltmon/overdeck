@@ -73,6 +73,7 @@ import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { registerCavemanCommands } from './commands/caveman.js';
 import { registerReleaseCommands } from './commands/release.js';
 import { resourcesCommand } from './commands/resources.js';
+import { devCommand } from './commands/dev.js';
 
 const program = new Command();
 program.enablePositionalOptions();
@@ -348,6 +349,12 @@ program
   .action(statusCommand);
 
 // Dashboard commands
+program
+  .command('dev')
+  .description('Start dashboard in development mode with Vite HMR')
+  .option('--skip-traefik', 'Skip Traefik startup')
+  .action(devCommand);
+
 program
   .command('up')
   .description('Start dashboard (and Traefik if enabled)')
