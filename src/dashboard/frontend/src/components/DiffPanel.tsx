@@ -243,8 +243,7 @@ export function DiffPanel({
   onClose,
   diffUrlPrefix,
 }: DiffPanelProps) {
-  const { theme } = useTheme()
-  const resolvedTheme = theme === 'light' ? 'light' : 'dark'
+  const { resolvedTheme } = useTheme()
   const [diffRenderMode, setDiffRenderMode] = useState<DiffRenderMode>('stacked')
   const [diffWordWrap, setDiffWordWrap] = useState(false)
   const patchViewportRef = useRef<HTMLDivElement>(null)
@@ -605,7 +604,7 @@ export function DiffPanel({
                       fileDiff={fileDiff}
                       options={{
                         diffStyle: diffRenderMode === 'split' ? 'split' : 'unified',
-                        lineDiffType: 'none',
+                        lineDiffType: 'word-alt',
                         overflow: diffWordWrap ? 'wrap' : 'scroll',
                         theme: resolveDiffThemeName(resolvedTheme),
                         themeType: resolvedTheme as DiffThemeType,

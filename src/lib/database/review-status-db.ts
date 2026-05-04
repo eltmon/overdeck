@@ -38,9 +38,11 @@ export function upsertReviewStatus(status: ReviewStatus): void {
         deacon_ignored,
         deacon_ignored_at,
         deacon_ignored_reason,
-        blocker_reasons
+        blocker_reasons,
+        last_verified_commit,
+        merge_step
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status         = excluded.review_status,
@@ -72,7 +74,9 @@ export function upsertReviewStatus(status: ReviewStatus): void {
         deacon_ignored        = excluded.deacon_ignored,
         deacon_ignored_at     = excluded.deacon_ignored_at,
         deacon_ignored_reason = excluded.deacon_ignored_reason,
-        blocker_reasons       = excluded.blocker_reasons
+        blocker_reasons       = excluded.blocker_reasons,
+        last_verified_commit  = excluded.last_verified_commit,
+        merge_step            = excluded.merge_step
     `).run(
       s.issueId,
       s.reviewStatus,
@@ -105,6 +109,8 @@ export function upsertReviewStatus(status: ReviewStatus): void {
       s.deaconIgnoredAt ?? null,
       s.deaconIgnoredReason ?? null,
       s.blockerReasons ? JSON.stringify(s.blockerReasons) : null,
+      s.lastVerifiedCommit ?? null,
+      s.mergeStep ?? null,
     );
 
     // Append new history entries (deduplicate by timestamp to avoid re-inserting)
@@ -278,6 +284,10 @@ interface DbReviewStatusRow {
   pr_number: number | null;
   // PAN-905: GitHub-native merge blocker reasons (JSON array)
   blocker_reasons: string | null;
+  // Pre-review verification gate commit SHA
+  last_verified_commit: string | null;
+  // Current merge pipeline step
+  merge_step: string | null;
 }
 
 function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]): ReviewStatus {
@@ -313,6 +323,8 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     deaconIgnoredAt: row.deacon_ignored_at ?? undefined,
     deaconIgnoredReason: row.deacon_ignored_reason ?? undefined,
     blockerReasons: row.blocker_reasons ? JSON.parse(row.blocker_reasons) : undefined,
+    lastVerifiedCommit: row.last_verified_commit ?? undefined,
+    mergeStep: row.merge_step ?? undefined,
     history: history.length > 0 ? history : undefined,
   });
 }

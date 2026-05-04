@@ -60,6 +60,10 @@ export interface ReviewStatus {
   blockerReasons?: BlockerReason[];
   /** HEAD commit SHA at the time review passed — used to detect new commits after review */
   reviewedAtCommit?: string;
+  /** HEAD commit SHA at the time the pre-review verification gate passed — used to skip redundant test-agent */
+  lastVerifiedCommit?: string;
+  /** Current merge pipeline step for granular merge progress tracking */
+  mergeStep?: string;
   /** PAN-653: workspace is stuck (e.g. main diverged mid-approve) — Deacon skips it */
   stuck?: boolean;
   /** PAN-653: reason workspace is stuck (e.g. 'main_diverged') */
@@ -274,11 +278,18 @@ export function setReviewStatus(
     if (entry?.tts) emitActivityTts({ utterance: entry.tts, priority: entry.level === 'error' ? 0 : 1, issueId });
   }
   if (update.reviewStatus && update.reviewStatus !== status.reviewStatus) {
+    let reviewMsg = `${issueId} — review started`;
+    if (update.reviewStatus === 'reviewing') {
+      const retryCount = updated.reviewRetryCount ?? 0;
+      reviewMsg = retryCount > 0
+        ? `${issueId} — review re-dispatched (retry ${retryCount})`
+        : `${issueId} — review started (4 parallel reviewers)`;
+    }
     const rMap: Record<string, { level: 'info' | 'warn' | 'error' | 'success'; msg: string; tts?: string }> = {
-      reviewing: { level: 'info',    msg: `${issueId} — review started`, tts: `${issueId} review started` },
+      reviewing: { level: 'info',    msg: reviewMsg, tts: `${issueId} review started` },
       passed:    { level: 'success', msg: `${issueId} — review passed`, tts: `${issueId} review passed` },
       failed:    { level: 'error',   msg: `${issueId} — review failed`, tts: `${issueId} review failed` },
-      blocked:   { level: 'warn',    msg: `${issueId} — review blocked`, tts: `${issueId} review blocked` },
+      blocked:   { level: 'warn',    msg: `${issueId} — review blocked (changes requested)`, tts: `${issueId} review blocked` },
     };
     const entry = rMap[update.reviewStatus];
     if (entry) emitActivityEntry({ source: 'review-specialist', level: entry.level, message: entry.msg, details: update.reviewNotes, issueId });
@@ -317,48 +328,68 @@ export function setReviewStatus(
   // This fires regardless of how setReviewStatus() is called (API or direct import),
   // ensuring test-agent is dispatched even when review-agent bypasses the specialist
   // dispatch endpoint.
+  //
+  // OPTIMIZATION: If reviewedAtCommit matches lastVerifiedCommit, no code changed
+  // between the pre-review verification gate and review completion (review is
+  // read-only). Skip the redundant test-agent and mark tests as passed directly.
+  // The post-rebase verification in triggerMerge() is the real quality gate.
   if (
     update.reviewStatus === 'passed' &&
     status.reviewStatus !== 'passed' &&
     updated.testStatus === 'pending'
   ) {
-    (async () => {
-      try {
-        const { spawnEphemeralSpecialist } = await import('./cloister/specialists.js');
-        const { resolveProjectFromIssue } = await import('./projects.js');
-        const workAgentId = `agent-${issueId.toLowerCase()}`;
-        const workStateFile = join(homedir(), '.panopticon', 'agents', workAgentId, 'state.json');
-        let workspace: string | undefined;
-        let branch: string | undefined;
-        try {
-          await access(workStateFile);
-          const workState = JSON.parse(await readFile(workStateFile, 'utf-8'));
-          workspace = workState.workspace;
-          branch = workState.branch || `feature/${issueId.toLowerCase()}`;
-        } catch {}
+    const canSkipTests =
+      updated.reviewedAtCommit &&
+      updated.lastVerifiedCommit &&
+      updated.reviewedAtCommit === updated.lastVerifiedCommit;
 
-        const resolved = resolveProjectFromIssue(issueId);
-        if (!resolved) {
-          console.warn(`[review-status] No project configured for ${issueId} — cannot dispatch test-agent`);
-          setReviewStatus(issueId, { testStatus: 'dispatch_failed', testNotes: `No project configured for ${issueId}` });
-          return;
+    if (canSkipTests) {
+      console.log(`[review-status] Skipping test-agent for ${issueId} — no code drift since verification (HEAD=${updated.reviewedAtCommit!.slice(0, 8)})`);
+      emitActivityEntry({ source: 'cloister', level: 'info', message: `${issueId} — tests skipped (no code change since verification gate)`, issueId });
+      setReviewStatus(issueId, { testStatus: 'passed', testNotes: 'Skipped: no code changed since pre-review verification gate', readyForMerge: true });
+    } else {
+      (async () => {
+        try {
+          const { spawnEphemeralSpecialist } = await import('./cloister/specialists.js');
+          const { resolveProjectFromIssue } = await import('./projects.js');
+          const workAgentId = `agent-${issueId.toLowerCase()}`;
+          const workStateFile = join(homedir(), '.panopticon', 'agents', workAgentId, 'state.json');
+          let workspace: string | undefined;
+          let branch: string | undefined;
+          try {
+            await access(workStateFile);
+            const workState = JSON.parse(await readFile(workStateFile, 'utf-8'));
+            workspace = workState.workspace;
+            branch = workState.branch || `feature/${issueId.toLowerCase()}`;
+          } catch {}
+
+          const resolved = resolveProjectFromIssue(issueId);
+          if (!resolved) {
+            console.warn(`[review-status] No project configured for ${issueId} — cannot dispatch test-agent`);
+            setReviewStatus(issueId, { testStatus: 'dispatch_failed', testNotes: `No project configured for ${issueId}` });
+            return;
+          }
+          const reason = updated.reviewedAtCommit && updated.lastVerifiedCommit
+            ? `code drift detected (verified=${updated.lastVerifiedCommit.slice(0, 8)}, reviewed=${updated.reviewedAtCommit.slice(0, 8)})`
+            : 'no verification snapshot available';
+          console.log(`[review-status] Dispatching test-agent for ${issueId} — ${reason}`);
+          const result = await spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
+            issueId,
+            workspace,
+            branch,
+          });
+          if (result.success) {
+            setReviewStatus(issueId, { testStatus: 'testing' });
+            emitActivityEntry({ source: 'cloister', level: 'info', message: `${issueId} — test-agent dispatched (${reason})`, issueId });
+          } else {
+            console.warn(`[review-status] Failed to dispatch test-agent for ${issueId}: ${result.message}`);
+            setReviewStatus(issueId, { testStatus: 'dispatch_failed', testNotes: `Dispatch failed: ${result.message}` });
+          }
+        } catch (err: any) {
+          console.warn(`[review-status] Failed to dispatch test-agent for ${issueId}: ${err.message}`);
         }
-        const result = await spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
-          issueId,
-          workspace,
-          branch,
-        });
-        if (result.success) {
-          setReviewStatus(issueId, { testStatus: 'testing' });
-          console.log(`[review-status] Dispatched test-agent for ${issueId} after review passed`);
-        } else {
-          console.warn(`[review-status] Failed to dispatch test-agent for ${issueId}: ${result.message}`);
-          setReviewStatus(issueId, { testStatus: 'dispatch_failed', testNotes: `Dispatch failed: ${result.message}` });
-        }
-      } catch (err: any) {
-        console.warn(`[review-status] Failed to dispatch test-agent for ${issueId}: ${err.message}`);
-      }
-    })();
+      })();
+    }
   }
 
   return updated;

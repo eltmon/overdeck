@@ -11,7 +11,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
-import { GitMerge, ExternalLink, Loader2, CheckCircle, AlertTriangle, ShieldAlert, XCircle, GitPullRequest, MessageSquare, FilePenLine, PenLine, ChevronDown, ChevronUp, ThumbsUp } from 'lucide-react';
+import { GitMerge, ExternalLink, Loader2, CheckCircle, AlertTriangle, ShieldAlert, XCircle, GitPullRequest, MessageSquare, FilePenLine, PenLine, ChevronDown, ChevronUp, ThumbsUp, TriangleAlert, Circle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDashboardStore, selectAwaitingMerge, selectBlockedFromMerge, selectOpenMergeRequests, selectIssues } from '../lib/store';
 import { useConfirm } from './DialogProvider';
@@ -164,6 +164,8 @@ export function AwaitingMergePage() {
                   prUrl={rs.prUrl ?? ws?.mrUrl}
                   updatedAt={rs.updatedAt}
                   mergeStatus={rs.mergeStatus}
+                  mergeStep={rs.mergeStep}
+                  mergeNotes={rs.mergeNotes}
                   onMerged={() => {
                     queryClient.invalidateQueries({
                       queryKey: ['workspace', rs.issueId],
@@ -209,42 +211,12 @@ export function AwaitingMergePage() {
             </ul>
           </div>
         )}
-        {/* Open merge requests (not yet ready for merge) */}
+        {/* Pipeline Override — PRs still in pipeline, manual merge bypasses everything */}
         {openMergeRequests.length > 0 && (
-          <div className="mt-10">
-            <header className="mb-4">
-              <div className="flex items-center gap-3 mb-1">
-                <GitPullRequest className="w-5 h-5 text-muted-foreground" />
-                <h2 className="text-lg font-semibold text-foreground">Open Merge Requests</h2>
-                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-accent text-muted-foreground">
-                  {openMergeRequests.length}
-                </span>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                PRs/MRs that have been created but are still going through review and testing.
-                Approve or review them early on GitHub/GitLab.
-              </p>
-            </header>
-            <ul className="space-y-3">
-              {openMergeRequests.map((rs) => {
-                const issue = issuesById.get(rs.issueId.toLowerCase());
-                return (
-                  <OpenMergeRequestRow
-                    key={rs.issueId}
-                    issueId={rs.issueId}
-                    identifier={issue?.identifier ?? rs.issueId}
-                    title={issue?.title ?? rs.issueId}
-                    trackerUrl={issue?.url}
-                    prUrl={rs.prUrl}
-                    reviewStatus={rs.reviewStatus}
-                    testStatus={rs.testStatus}
-                    verificationStatus={rs.verificationStatus}
-                    updatedAt={rs.updatedAt}
-                  />
-                );
-              })}
-            </ul>
-          </div>
+          <PipelineOverrideSection
+            openMergeRequests={openMergeRequests}
+            issuesById={issuesById}
+          />
         )}
       </div>
     </div>
@@ -272,7 +244,62 @@ interface RowProps {
   prUrl?: string;
   updatedAt?: string;
   mergeStatus?: string;
+  mergeStep?: string;
+  mergeNotes?: string;
   onMerged: () => void;
+}
+
+const MERGE_STEPS = [
+  { key: 'queued', label: 'Queued in merge queue' },
+  { key: 'validating-pr', label: 'Validating PR state' },
+  { key: 'rebasing', label: 'Rebasing onto main' },
+  { key: 'stripping-planning', label: 'Stripping .planning/ artifacts' },
+  { key: 'verifying', label: 'Post-rebase verification' },
+  { key: 'reporting-statuses', label: 'Reporting commit statuses' },
+  { key: 'squash-merging', label: 'Squash merge via forge' },
+  { key: 'post-merge-cleanup', label: 'Post-merge cleanup' },
+] as const;
+
+function MergeStepTracker({ mergeStep, mergeStatus, mergeNotes }: { mergeStep?: string; mergeStatus?: string; mergeNotes?: string }) {
+  if (!mergeStep && mergeStatus !== 'merging' && mergeStatus !== 'verifying' && mergeStatus !== 'queued') return null;
+
+  const currentIdx = MERGE_STEPS.findIndex(s => s.key === mergeStep);
+  const isFailed = mergeStatus === 'failed';
+
+  return (
+    <div className="mt-3 pl-1 border-l-2 border-primary/20 ml-1">
+      <div className="space-y-1.5 pl-3">
+        {MERGE_STEPS.map((step, idx) => {
+          let icon: React.ReactNode;
+          let textClass: string;
+
+          if (isFailed && idx === currentIdx) {
+            icon = <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />;
+            textClass = 'text-destructive';
+          } else if (idx < currentIdx || (mergeStatus === 'merged' && currentIdx === -1)) {
+            icon = <CheckCircle className="w-3.5 h-3.5 text-success shrink-0" />;
+            textClass = 'text-muted-foreground';
+          } else if (idx === currentIdx) {
+            icon = <Loader2 className="w-3.5 h-3.5 text-primary animate-spin shrink-0" />;
+            textClass = 'text-foreground font-medium';
+          } else {
+            icon = <Circle className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0" />;
+            textClass = 'text-muted-foreground/60';
+          }
+
+          return (
+            <div key={step.key} className="flex items-center gap-2">
+              {icon}
+              <span className={`text-[11px] ${textClass}`}>{step.label}</span>
+            </div>
+          );
+        })}
+      </div>
+      {isFailed && mergeNotes && (
+        <p className="text-[11px] text-destructive mt-2 pl-3">{mergeNotes}</p>
+      )}
+    </div>
+  );
 }
 
 function AwaitingMergeRow({
@@ -284,6 +311,8 @@ function AwaitingMergeRow({
   prUrl,
   updatedAt,
   mergeStatus,
+  mergeStep,
+  mergeNotes,
   onMerged,
 }: RowProps) {
   const mergeMutation = useMutation({
@@ -297,93 +326,106 @@ function AwaitingMergeRow({
     },
   });
 
-  const isMerging = mergeStatus === 'merging' || mergeStatus === 'queued' || mergeMutation.isPending;
+  const isMerging = mergeStatus === 'merging' || mergeStatus === 'queued' || mergeStatus === 'verifying' || mergeMutation.isPending;
   const isFailed = mergeStatus === 'failed';
 
   return (
-    <li className="border border-border rounded-lg bg-card p-4 flex items-start gap-4" data-testid={`merge-row-${identifier}`}>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          {trackerUrl ? (
+    <li className="border border-border rounded-lg bg-card p-4" data-testid={`merge-row-${identifier}`}>
+      <div className="flex items-start gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            {trackerUrl ? (
+              <a
+                href={trackerUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent text-foreground hover:underline"
+              >
+                {identifier}
+              </a>
+            ) : (
+              <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent text-foreground">
+                {identifier}
+              </span>
+            )}
+            {isFailed && (
+              <span
+                className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-destructive/15 text-destructive flex items-center gap-1"
+                title="A previous merge attempt failed"
+              >
+                <AlertTriangle className="w-3 h-3" />
+                Last merge failed
+              </span>
+            )}
+            {isMerging && (
+              <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/15 text-primary flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Merge in progress
+              </span>
+            )}
+            {updatedAt && !isMerging && (
+              <span className="text-[11px] text-muted-foreground">
+                ready {formatRelative(updatedAt)}
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-foreground truncate" title={title}>
+            {title}
+          </p>
+          {prUrl && (
             <a
-              href={trackerUrl}
+              href={prUrl}
               target="_blank"
               rel="noreferrer"
-              className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent text-foreground hover:underline"
+              className="text-[11px] text-muted-foreground hover:text-foreground hover:underline mt-1 inline-block"
+              data-testid={`merge-pr-link-${identifier}`}
             >
-              {identifier}
+              View PR ↗
             </a>
-          ) : (
-            <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent text-foreground">
-              {identifier}
-            </span>
-          )}
-          {isFailed && (
-            <span
-              className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-destructive/15 text-destructive flex items-center gap-1"
-              title="A previous merge attempt failed"
-            >
-              <AlertTriangle className="w-3 h-3" />
-              Last merge failed
-            </span>
-          )}
-          {updatedAt && (
-            <span className="text-[11px] text-muted-foreground">
-              ready {formatRelative(updatedAt)}
-            </span>
           )}
         </div>
-        <p className="text-sm text-foreground truncate" title={title}>
-          {title}
-        </p>
-        {prUrl && (
-          <a
-            href={prUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="text-[11px] text-muted-foreground hover:text-foreground hover:underline mt-1 inline-block"
-            data-testid={`merge-pr-link-${identifier}`}
+
+        <div className="flex items-center gap-2 shrink-0">
+          {frontendUrl ? (
+            <a
+              href={frontendUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-border text-foreground hover:bg-accent transition-colors"
+              title="Open the workspace frontend for UAT"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              UAT
+            </a>
+          ) : (
+            <span
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-border text-muted-foreground/60 cursor-not-allowed"
+              title="No frontend URL — workspace info unavailable"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              UAT
+            </span>
+          )}
+          <button
+            onClick={() => mergeMutation.mutate()}
+            disabled={isMerging}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid={`merge-btn-${identifier}`}
           >
-            View PR ↗
-          </a>
-        )}
+            {isMerging ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <GitMerge className="w-3.5 h-3.5" />
+            )}
+            {isMerging ? 'Merging��' : 'Merge'}
+          </button>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
-        {frontendUrl ? (
-          <a
-            href={frontendUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-border text-foreground hover:bg-accent transition-colors"
-            title="Open the workspace frontend for UAT"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            UAT
-          </a>
-        ) : (
-          <span
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-border text-muted-foreground/60 cursor-not-allowed"
-            title="No frontend URL — workspace info unavailable"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            UAT
-          </span>
-        )}
-        <button
-          onClick={() => mergeMutation.mutate()}
-          disabled={isMerging}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-          data-testid={`merge-btn-${identifier}`}
-        >
-          {isMerging ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <GitMerge className="w-3.5 h-3.5" />
-          )}
-          {isMerging ? 'Merging…' : 'Merge'}
-        </button>
-      </div>
+      {/* Inline merge step tracker — visible when merge is in progress or just failed */}
+      {(isMerging || isFailed) && (
+        <MergeStepTracker mergeStep={mergeStep} mergeStatus={mergeStatus} mergeNotes={mergeNotes} />
+      )}
     </li>
   );
 }
@@ -542,6 +584,70 @@ function pipelineStepBadge(label: string, status?: string) {
   );
 }
 
+function PipelineOverrideSection({
+  openMergeRequests,
+  issuesById,
+}: {
+  openMergeRequests: ReadonlyArray<{ issueId: string; prUrl?: string; reviewStatus?: string; testStatus?: string; verificationStatus?: string; updatedAt?: string }>;
+  issuesById: Map<string, Issue>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="mt-10">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full text-left"
+      >
+        <header className="mb-4">
+          <div className="flex items-center gap-3 mb-1">
+            <TriangleAlert className="w-5 h-5 text-amber-500" />
+            <h2 className="text-lg font-semibold text-foreground">Pipeline Override</h2>
+            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400">
+              {openMergeRequests.length}
+            </span>
+            <span className="ml-auto text-muted-foreground">
+              {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </span>
+          </div>
+          {!expanded && (
+            <p className="text-sm text-muted-foreground">
+              PRs still going through the review/test pipeline. Click to expand override actions.
+            </p>
+          )}
+        </header>
+      </button>
+      {expanded && (
+        <>
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 mb-4 text-[12px] text-amber-700 dark:text-amber-300">
+            These issues have open PRs but haven't completed the review/test pipeline.
+            Merging here bypasses Panopticon's rebase, verification, and cleanup steps.
+          </div>
+          <ul className="space-y-3">
+            {openMergeRequests.map((rs) => {
+              const issue = issuesById.get(rs.issueId.toLowerCase());
+              return (
+                <OpenMergeRequestRow
+                  key={rs.issueId}
+                  issueId={rs.issueId}
+                  identifier={issue?.identifier ?? rs.issueId}
+                  title={issue?.title ?? rs.issueId}
+                  trackerUrl={issue?.url}
+                  prUrl={rs.prUrl}
+                  reviewStatus={rs.reviewStatus}
+                  testStatus={rs.testStatus}
+                  verificationStatus={rs.verificationStatus}
+                  updatedAt={rs.updatedAt}
+                />
+              );
+            })}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
 function OpenMergeRequestRow({
   issueId,
   identifier,
@@ -569,18 +675,18 @@ function OpenMergeRequestRow({
   const mergeMutation = useMutation({
     mutationFn: () => forgeMerge(issueId),
     onSuccess: () => {
-      toast.success(`Merge started for ${identifier}`);
+      toast.success(`Force merge started for ${identifier}`);
     },
     onError: (err: Error) => {
-      toast.error(`Merge failed for ${identifier}`, { description: err.message });
+      toast.error(`Force merge failed for ${identifier}`, { description: err.message });
     },
   });
 
   const handleApprove = async () => {
     const confirmed = await confirm({
-      title: `Approve ${identifier}`,
-      message: `This will submit an approving review on ${forgeName} for all open PRs/MRs associated with ${identifier}.\n\nThe Panopticon review and test pipeline will continue running independently — this just records your human approval on the forge.`,
-      confirmLabel: 'Approve',
+      title: `Force Approve ${identifier}`,
+      message: `This bypasses Panopticon's review pipeline and submits an approving review directly on ${forgeName}.\n\nThe automated review/test pipeline will continue running independently.`,
+      confirmLabel: 'Force Approve',
     });
     if (confirmed) {
       approveMutation.mutate();
@@ -589,9 +695,9 @@ function OpenMergeRequestRow({
 
   const handleMerge = async () => {
     const confirmed = await confirm({
-      title: `Merge ${identifier}`,
-      message: `This will squash-merge all open PRs/MRs for ${identifier} directly on ${forgeName}.\n\nThis is a forge-level merge only — it does NOT run Panopticon's post-merge cleanup (workspace teardown, label updates, etc.). Use this when the issue was handled outside the automated pipeline.`,
-      confirmLabel: 'Merge',
+      title: `Force Merge ${identifier} (Skip Pipeline)`,
+      message: `This will squash-merge directly via ${forgeName}, bypassing:\n\n• Rebasing onto main\n• Post-rebase verification (typecheck/lint/test)\n• Post-merge cleanup (labels, issue close, Docker teardown)\n\nYou'll need to handle cleanup manually. Use this only when the issue was handled outside the automated pipeline.`,
+      confirmLabel: 'Force Merge',
       variant: 'destructive',
     });
     if (confirmed) {
@@ -600,7 +706,7 @@ function OpenMergeRequestRow({
   };
 
   return (
-    <li className="border border-border rounded-lg bg-card p-4 flex items-start gap-4 opacity-80">
+    <li className="border border-amber-500/20 rounded-lg bg-card p-4 flex items-start gap-4">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           {trackerUrl ? (
@@ -647,26 +753,26 @@ function OpenMergeRequestRow({
         <button
           onClick={handleApprove}
           disabled={approveMutation.isPending}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-success/15 text-success hover:bg-success/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {approveMutation.isPending ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : (
             <ThumbsUp className="w-3.5 h-3.5" />
           )}
-          Approve
+          Force Approve
         </button>
         <button
           onClick={handleMerge}
           disabled={mergeMutation.isPending}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-amber-600 text-white hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {mergeMutation.isPending ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : (
             <GitMerge className="w-3.5 h-3.5" />
           )}
-          Merge
+          Force Merge
         </button>
       </div>
     </li>

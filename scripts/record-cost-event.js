@@ -633,7 +633,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
       ON git_operations(operation, ts);
   `);
-	db.pragma(`user_version = 31`);
+	db.pragma(`user_version = 32`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -641,7 +641,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 31) return;
+	if (currentVersion === 32) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -946,7 +946,15 @@ function runMigrations(db) {
 			db.exec(`ALTER TABLE review_status ADD COLUMN pr_number INTEGER`);
 		} catch {}
 	}
-	db.pragma(`user_version = 31`);
+	if (currentVersion < 32) {
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN last_verified_commit TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN merge_step TEXT`);
+		} catch {}
+	}
+	db.pragma(`user_version = 32`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts

@@ -3813,7 +3813,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
   if (currentlyMerging && currentlyMerging !== normalizedId) {
     // Another merge is in progress — queue this one
     const position = enqueueMerge(projectKey, normalizedId);
-    setReviewStatus(issueId, { mergeStatus: 'queued' });
+    setReviewStatus(issueId, { mergeStatus: 'queued', mergeStep: 'queued' });
     console.log(`[merge] Queued ${issueId} (position ${position}, waiting for ${currentlyMerging})`);
     return {
       success: true,
@@ -3837,7 +3837,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     ? `feature/${workspaceDirName.slice('feature-'.length)}`
     : `feature/${issueLower}`;
 
-  setReviewStatus(issueId, { mergeStatus: 'merging' });
+  setReviewStatus(issueId, { mergeStatus: 'merging', mergeStep: 'validating-pr' });
 
   const normalizedMergeId = issueId.toUpperCase();
   _serverManagedMerges.add(normalizedMergeId);
@@ -4236,6 +4236,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     const agentId = `agent-${issueId.toLowerCase()}`;
     const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto ${targetBranch} and push:\n\n1. git fetch origin ${targetBranch}\n2. git rebase origin/${targetBranch}\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
 
+    setReviewStatus(issueId, { mergeStep: 'rebasing' });
     console.log(`[merge] Rebasing ${branchName} onto ${targetBranch} for ${issueId} (agent=${await sessionExistsAsync(agentId) ? 'running' : 'stopped'})...`);
 
     let rebaseResult: { success: boolean; reason?: string; conflictFiles?: string[]; newHead?: string };
@@ -4327,6 +4328,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       return { success: false, statusCode: 500, error };
     }
 
+    setReviewStatus(issueId, { mergeStep: 'stripping-planning' });
     // Step 2b: Strip ephemeral `.planning/` from the feature branch BEFORE merge (#888).
     // `.planning/` is tracked on feature branches for live workspace use, but must not
     // land on main — otherwise other active workspaces sync-main pull each other's
@@ -4365,7 +4367,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
 
     // Step 3: Post-rebase verification gate (typecheck, lint, test)
     // Ensures the rebase didn't introduce issues before merging.
-    setReviewStatus(issueId, { mergeStatus: 'verifying', mergeNotes: undefined });
+    setReviewStatus(issueId, { mergeStatus: 'verifying', mergeStep: 'verifying', mergeNotes: undefined });
     console.log(`[merge] Running post-rebase verification for ${issueId}...`);
 
     const { runVerificationForIssue } = await import(
@@ -4404,6 +4406,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
 
     // Step 4a: Report commit statuses on post-rebase HEAD (branch protection requires them).
     // Must happen AFTER rebase because rebase changes the HEAD SHA.
+    setReviewStatus(issueId, { mergeStep: 'reporting-statuses' });
     try {
       const { getPullRequestState, isGitHubAppConfigured, reportCommitStatus } = await import('../../../lib/github-app.js');
       if (githubPrRef && isGitHubAppConfigured()) {
@@ -4420,6 +4423,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     }
 
     // Step 4b: Merge the review artifact via the configured forge.
+    setReviewStatus(issueId, { mergeStep: 'squash-merging' });
     let artifactMerged = false;
     try {
       console.log(`[merge] Merging ${primaryForge} review artifact for ${issueId}...`);
@@ -4476,7 +4480,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     // Step 5: Mark merged and dequeue next BEFORE post-merge lifecycle.
     // postMergeLifecycle spawns a deploy script that may kill this server process,
     // so queue processing must happen before that point.
-    setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false });
+    setReviewStatus(issueId, { mergeStatus: 'merged', mergeStep: 'post-merge-cleanup', mergeNotes: undefined, readyForMerge: false });
     completePendingOperation(issueId, null);
 
     // Dequeue next merge before lifecycle (which may kill the process)
