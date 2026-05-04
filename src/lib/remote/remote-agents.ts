@@ -176,6 +176,8 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
     claudeCmd = `claude --dangerously-skip-permissions --permission-mode bypassPermissions --model ${model}`;
   }
 
+  console.log(`[claude-invoke] purpose=remote-agent | model=${model} | source=remote-agents.ts | vm=${vmName} | agent=${agentId} | command="${claudeCmd}"`);
+
   await ensureRemoteTmuxContext(fly, vmName);
 
   // Create tmux session on remote VM

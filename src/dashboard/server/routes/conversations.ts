@@ -77,7 +77,6 @@ import {
 } from '../../../lib/agents.js';
 import { injectProviderEnvOverlay } from '../../../lib/claude-settings-overlay.js';
 import { generateLauncherScript } from '../../../lib/launcher-generator.js';
-import { loadConfig } from '../../../lib/config-yaml.js';
 import {
   parseConversationMessages,
   parseFromLastCompactBoundary,
@@ -596,7 +595,8 @@ export async function handleConversationMessage(
   // Generate AI title for conversations created via instant-start (no message at creation)
   if (conv.titleSource === 'default') {
     void generateAiTitle(name, message).catch((err: unknown) => {
-      console.error(`[conversations] AI title generation failed for "${name}":`, err);
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[TITLE-GEN-FAILED] AI title generation FAILED for "${name}" — NO RETRY, NO FALLBACK:`, msg);
     });
   }
 
@@ -775,6 +775,8 @@ async function spawnConversationSession(
     // ignore missing stale session
   }
 
+  console.log(`[claude-invoke] purpose=conversation-session | model=${model || 'default'} | source=conversations.ts:spawnConversationSession | session=${tmuxSession} | resume=${resume} | command="${runtimeCommand}"`);
+
   // Spawn the session — blank out provider env vars (ANTHROPIC_BASE_URL,
   // ANTHROPIC_API_KEY, etc.) via tmux -e flags so the launcher script's
   // exports are the sole source of provider configuration. The tmux server
@@ -806,8 +808,8 @@ async function spawnConversationSession(
  * Runs `claude -p --output-format json --json-schema ...` with the first message
  * as input, then updates the conversation title if it hasn't been manually renamed.
  *
- * Uses the title_model from config.yaml conversations section, with proper provider
- * routing via getProviderEnvForModel. Falls back to message truncation on failure.
+ * Uses the hardcoded haiku model for fast, cheap title generation. No fallback —
+ * if generation fails the error is logged and the existing title is kept.
  */
 async function generateAiTitle(conversationName: string, firstMessage: string): Promise<void> {
   const conv = getConversationByName(conversationName);
@@ -815,88 +817,79 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
     return;
   }
 
-  const { config } = loadConfig();
-  const titleModel = config.conversations.titleModel;
+  const titleModel = 'claude-haiku-4-5-20251001';
+  console.log(`[claude-invoke] purpose=conversation-title | model=${titleModel} | source=conversations.ts:generateAiTitle | conversation=${conversationName} | promptChars=${firstMessage.length}`);
 
-  let aiTitle: string | undefined;
+  const schema = JSON.stringify({
+    type: 'object',
+    properties: { title: { type: 'string' } },
+    required: ['title'],
+  });
 
-  try {
-    const schema = JSON.stringify({
-      type: 'object',
-      properties: { title: { type: 'string' } },
-      required: ['title'],
+  const prompt = [
+    'You write concise thread titles for coding conversations.',
+    'Summarize the user\'s request in 3-8 words.',
+    'Avoid quotes, filler, prefixes, and trailing punctuation.',
+    '',
+    'User message:',
+    firstMessage,
+  ].join('\n');
+
+  // Build provider-env for the title model (same routing as conversation sessions)
+  const providerEnv = await getProviderEnvForModel(titleModel);
+  const childEnv = { ...buildChildEnv(), ...providerEnv };
+
+  const stdout = await new Promise<string>((resolve, reject) => {
+    const child = spawn(
+      'claude',
+      [
+        '-p',
+        '--output-format', 'json',
+        '--json-schema', schema,
+        '--model', titleModel,
+      ],
+      { env: childEnv },
+    );
+    let out = '';
+    let errOut = '';
+    const timeout = setTimeout(() => {
+      child.kill('SIGTERM');
+      reject(new Error('claude title generation timed out after 30s'));
+    }, 30_000);
+    child.stdout.setEncoding('utf-8');
+    child.stderr.setEncoding('utf-8');
+    child.stdout.on('data', (data: string) => { out += data; });
+    child.stderr.on('data', (data: string) => { errOut += data; });
+    child.on('error', (err: Error) => {
+      clearTimeout(timeout);
+      reject(err);
     });
-
-    const prompt = [
-      'You write concise thread titles for coding conversations.',
-      'Summarize the user\'s request in 3-8 words.',
-      'Avoid quotes, filler, prefixes, and trailing punctuation.',
-      '',
-      'User message:',
-      firstMessage,
-    ].join('\n');
-
-    // Build provider-env for the title model (same routing as conversation sessions)
-    const providerEnv = await getProviderEnvForModel(titleModel);
-    const childEnv = { ...buildChildEnv(), ...providerEnv };
-
-    const stdout = await new Promise<string>((resolve, reject) => {
-      const child = spawn(
-        'claude',
-        [
-          '-p',
-          '--output-format', 'json',
-          '--json-schema', schema,
-          '--model', titleModel,
-        ],
-        { env: childEnv },
-      );
-      let out = '';
-      let errOut = '';
-      const timeout = setTimeout(() => {
-        child.kill('SIGTERM');
-        reject(new Error('claude title generation timed out after 30s'));
-      }, 30_000);
-      child.stdout.setEncoding('utf-8');
-      child.stderr.setEncoding('utf-8');
-      child.stdout.on('data', (data: string) => { out += data; });
-      child.stderr.on('data', (data: string) => { errOut += data; });
-      child.on('error', (err: Error) => {
-        clearTimeout(timeout);
-        reject(err);
-      });
-      child.on('close', (code: number | null) => {
-        clearTimeout(timeout);
-        if (code !== 0) {
-          reject(new Error(errOut || `claude title generation exited with code ${code}`));
-        } else {
-          resolve(out);
-        }
-      });
-      try {
-        child.stdin.write(prompt, 'utf-8');
-        child.stdin.end();
-      } catch (err) {
-        clearTimeout(timeout);
-        child.kill('SIGTERM');
-        reject(err);
+    child.on('close', (code: number | null) => {
+      clearTimeout(timeout);
+      if (code !== 0) {
+        reject(new Error(errOut || `claude title generation exited with code ${code}`));
+      } else {
+        resolve(out);
       }
     });
+    try {
+      child.stdin.write(prompt, 'utf-8');
+      child.stdin.end();
+    } catch (err) {
+      clearTimeout(timeout);
+      child.kill('SIGTERM');
+      reject(err);
+    }
+  });
 
-    // Claude CLI returns { structured_output: { title: "..." }, ... } or { result: "..." }
-    const parsed = JSON.parse(stdout.trim());
-    aiTitle = parsed?.structured_output?.title ?? parsed?.title;
-  } catch {
-    // Model unavailable or timed out — fall back to message truncation
-    aiTitle = undefined;
-  }
+  // Claude CLI returns { structured_output: { title: "..." }, ... } or { result: "..." }
+  const parsed = JSON.parse(stdout.trim());
+  const aiTitle = parsed?.structured_output?.title ?? parsed?.title;
 
-  // If AI generation failed, fall back to truncating the first message
   if (!aiTitle || !aiTitle.trim()) {
-    aiTitle = firstMessage.slice(0, 60).split(/\r?\n/)[0]?.trim();
+    console.warn(`[generateAiTitle] Model returned empty title for "${conversationName}"`);
+    return;
   }
-
-  if (!aiTitle) return;
 
   // Sanitize: strip quotes, normalize whitespace, take first line only
   const sanitized = aiTitle
@@ -907,13 +900,20 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
     .trim()
     .replace(/\s+/g, ' ');
 
-  if (!sanitized) return;
+  if (!sanitized) {
+    console.warn(`[generateAiTitle] Sanitized title is empty for "${conversationName}"`);
+    return;
+  }
 
   // Re-check eligibility (may have been renamed while we waited)
   const freshConv = getConversationByName(conversationName);
-  if (!freshConv || !canReplaceTitle(freshConv)) return;
+  if (!freshConv || !canReplaceTitle(freshConv)) {
+    console.log(`[generateAiTitle] Conversation "${conversationName}" was renamed while generating title; skipping update`);
+    return;
+  }
 
   updateConversationTitle(conversationName, sanitized, 'ai');
+  console.log(`[claude-invoke] SUCCESS purpose=conversation-title | model=${titleModel} | conversation=${conversationName} | outputChars=${sanitized.length}`);
 }
 
 // ─── Route: GET /api/conversations ───────────────────────────────────────────
@@ -1125,7 +1125,8 @@ const postConversationRoute = HttpRouter.add(
         // Generate AI title in background (non-blocking)
         if (message) {
           void generateAiTitle(name, message).catch((err: unknown) => {
-            console.error(`[conversations] AI title generation failed for "${name}":`, err);
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[TITLE-GEN-FAILED] AI title generation FAILED for "${name}" — NO RETRY, NO FALLBACK:`, msg);
           });
         }
 
@@ -1955,6 +1956,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const plain = body['plain'] === true;
         const localSummaryOnly = body['localSummaryOnly'] === true;
         const includeThinkingInSummary = body['includeThinkingInSummary'] === true;
+        const customTitle = typeof body['title'] === 'string' ? body['title'].trim() : undefined;
 
         if (cwd && !(await validateCwdContainment(cwd))) {
           return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
@@ -1981,15 +1983,16 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const newName = `${timestamp}-${suffix}`;
         const newTmux = `conv-${newName}`;
         const launchModel = model || conv.model;
+        const defaultTitle = plain
+          ? `Fork: ${conv.title || conv.name}`
+          : `Summary Fork: ${conv.title || conv.name}`;
 
         const newConv = createConversation({
           name: newName,
           tmuxSession: newTmux,
           cwd: cwd || conv.cwd || process.cwd(),
           issueId: conv.issueId ?? undefined,
-          title: plain
-            ? `Fork: ${conv.title || conv.name}`
-            : `Summary Fork: ${conv.title || conv.name}`,
+          title: customTitle || defaultTitle,
           titleSource: 'manual',
           titleSeed: plain
             ? `Fork of ${conv.name}`

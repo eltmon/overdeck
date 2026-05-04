@@ -103,6 +103,8 @@ export async function wakeCommand(name: string, options: WakeOptions): Promise<v
       console.log(chalk.dim('Starting fresh session (no previous session found)'));
     }
 
+    console.log(`[claude-invoke] purpose=cli-specialist-wake | model=default | source=specialists/wake.ts | session=${tmuxSession} | specialist=${specialistName} | command="${claudeCmd}"`);
+
     // Create tmux session
     console.log(chalk.dim(`Creating tmux session: ${tmuxSession}`));
     await createSessionAsync(tmuxSession, cwd, claudeCmd);

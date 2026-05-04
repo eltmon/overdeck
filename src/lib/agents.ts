@@ -1485,7 +1485,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
 
     try {
       const { injectProviderEnvOverlay } = await import('./claude-settings-overlay.js');
-      await injectProviderEnvOverlay(agentState.workspace, providerEnv);
+      await injectProviderEnvOverlay(resolve(agentState.workspace, '..', '..'), providerEnv);
     } catch { /* non-fatal — tmux -e exports still provide partial coverage */ }
 
     const providerExports = await getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
@@ -1718,7 +1718,8 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
 
     try {
       const { injectProviderEnvOverlay } = await import('./claude-settings-overlay.js');
-      await injectProviderEnvOverlay(agentState.workspace, providerEnv);
+      const resumeProjectRoot = resolve(agentState.workspace, '..', '..');
+      await injectProviderEnvOverlay(resumeProjectRoot, providerEnv);
     } catch { /* non-fatal */ }
 
     await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {
@@ -1860,7 +1861,7 @@ export async function recoverAgent(agentId: string): Promise<AgentState | null> 
 
   try {
     const { injectProviderEnvOverlay } = await import('./claude-settings-overlay.js');
-    await injectProviderEnvOverlay(state.workspace, providerEnv);
+    await injectProviderEnvOverlay(resolve(state.workspace, '..', '..'), providerEnv);
   } catch { /* non-fatal */ }
 
   // Restart the agent with recovery context (YOLO mode - skip permissions)
