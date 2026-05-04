@@ -208,6 +208,23 @@ export function registerWorkspaceCommands(program: Command): void {
     .option('--project <path>', 'Explicit project path (overrides registry)')
     .action(destroyCommand);
 
+  // The ONLY allowed call site for `git clean -fd` against a workspace.
+  // Refuses to run if stdin is not a TTY. Lists what would be deleted, asks
+  // the user to type the issue ID to confirm, then runs the chokepointed
+  // `runGitClean(..., userInvoked: true)`. See:
+  //   src/lib/safety/dangerous-git-ops.ts
+  //   src/cli/commands/workspace-deep-clean.ts
+  workspace
+    .command('deep-clean <issueId>')
+    .description(
+      'Interactive: git clean -fd against a workspace (preserves protected paths)',
+    )
+    .option('--yes', 'Skip confirmation prompt (still requires a TTY)')
+    .action(async (issueId: string, opts: { yes?: boolean }) => {
+      const { workspaceDeepCleanCommand } = await import('./workspace-deep-clean.js');
+      await workspaceDeepCleanCommand(issueId, opts);
+    });
+
   workspace
     .command('update <issueId>')
     .description('Update skills/agents/rules in an existing workspace')
@@ -500,6 +517,18 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
         join(workspacePath, '.devcontainer', 'compose.yml'),
         join(workspacePath, '.devcontainer', 'compose.yaml'),
       ];
+
+      // Self-heal: if the workspace already exists from an earlier run but
+      // `.devcontainer/` was deleted (the original PAN-955 bug), regenerate
+      // it from the project template before looking for a compose file.
+      // Idempotent — no-op when `.devcontainer/` is already present.
+      if (!composeLocations.some(f => existsSync(f))) {
+        const { ensureDevcontainer } = await import('../../lib/workspace/ensure-devcontainer.js');
+        const ensure = ensureDevcontainer({ workspacePath, issueId });
+        if (ensure.rendered) {
+          spinner.text = 'Regenerated .devcontainer/ from project template';
+        }
+      }
 
       const composeFile = composeLocations.find(f => existsSync(f));
 
