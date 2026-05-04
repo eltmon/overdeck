@@ -199,21 +199,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
         const anyFailed = statuses.some(c => c.status?.startsWith('exited'));
         if (allRunning || (gracePeriodPassed && anyFailed)) setContainersStarting(false);
       }
-      if (data.exists) {
-        try {
-          const stashRes = await fetch(`/api/workspaces/${issueId}/stashes`);
-          if (stashRes.ok) {
-            const stashData = await stashRes.json();
-            data.salvageableStashes = stashData.salvageableStashes || [];
-          } else {
-            data.salvageableStashes = [];
-          }
-        } catch {
-          data.salvageableStashes = [];
-        }
-      } else {
-        data.salvageableStashes = [];
-      }
       return data;
     },
     refetchInterval: (workspaceCreating || containersStarting || !!agentLaunchState) ? 5000 : 30000,

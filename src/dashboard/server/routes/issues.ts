@@ -605,7 +605,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
         childStories = children.map((c) => ({
           ref: c.ref,
           title: c.title,
-          status: c.status,
+          status: c.rawState || c.state,
           description: c.description || '',
         }));
       }

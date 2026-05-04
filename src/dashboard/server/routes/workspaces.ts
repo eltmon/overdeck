@@ -1165,6 +1165,11 @@ const getWorkspaceRoute = HttpRouter.add(
           yield* Effect.promise(() => reconcileGitHubMergeStatus(issueId, reviewStatus));
         }
 
+        const stashes = yield* Effect.promise(() => listStashes(workspacePath));
+        const salvageableStashes = stashes
+          .filter(isSalvageableStash)
+          .filter((entry) => entry.issueId === issueId.toUpperCase());
+
         return jsonResponse({
           exists: true,
           issueId,
@@ -1184,6 +1189,7 @@ const getWorkspaceRoute = HttpRouter.add(
           canContainerize,
           pendingOperation,
           location,
+          salvageableStashes,
         });
   }))
 );
