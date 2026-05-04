@@ -462,11 +462,9 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // ── Step 4: Configure agent ─────────────────────────────────────────
     progress(4, 'Configuring agent', planningModel);
 
-    const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
     const planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort);
-    await writeFile(planningPromptPath, planningPrompt);
 
-    // Also capture planning prompt in continue file (Layer 2+).
+    // Capture planning prompt in continue file (Layer 2+, primary store).
     // Uses .planning/ directly since the vBRIEF hasn't been proposed yet.
     try {
       appendSessionEntry(planningDir, issue.identifier, {
@@ -486,7 +484,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     // ── Write launcher script ──────────────────────────────────────────────
     const continueFilePath = join(planningDir, `continue-${issue.identifier.toUpperCase()}.vbrief.json`);
-    const initMessage = `Please read the planning prompt at ${planningPromptPath} (or the \`content\` field of the \`planning\` entry in ${continueFilePath}) and begin the planning session for ${issue.identifier}: ${issue.title}`;
+    const initMessage = `Please read the \`content\` field of the \`planning\` sessionHistory entry in ${continueFilePath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
     const promptFile = join(agentStateDir, 'init-prompt.txt');
     const launcherScript = join(agentStateDir, 'launcher.sh');
     await writeFile(promptFile, initMessage);

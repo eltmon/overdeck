@@ -436,14 +436,19 @@ export function resolveContinueStateDir(projectRoot: string, issueId: string): s
 /**
  * Read the continue state for an issue from beside its current vBRIEF.
  * Lifecycle-aware: reads from completed/ or cancelled/ if the vBRIEF moved
- * there, otherwise from active/ (or the bootstrap location).
+ * there, otherwise from active/ (or the bootstrap location). Returns null
+ * on any error so callers get a clean fallback.
  */
 export function readContinueStateForIssue(
   projectRoot: string,
   issueId: string,
 ): ContinueState | null {
-  const dir = resolveContinueStateDir(projectRoot, issueId);
-  return readContinueState(dir, issueId);
+  try {
+    const dir = resolveContinueStateDir(projectRoot, issueId);
+    return readContinueState(dir, issueId);
+  } catch {
+    return null;
+  }
 }
 
 /**

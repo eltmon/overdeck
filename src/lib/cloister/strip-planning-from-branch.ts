@@ -15,6 +15,11 @@
  *
  * Uses `git rm --cached` so the worktree files survive (the workspace still
  * needs them until post-merge cleanup runs).
+ *
+ * @deprecated (PAN-962 Layer 3) Feedback and planning prompts are now stored in
+ * the scope vBRIEF continue file rather than .planning/. Once all remaining
+ * .planning/ artifacts (plan.vbrief.json, prd.md, FEATURE-CONTEXT.md) are
+ * migrated, this module can be removed entirely.
  */
 
 import { exec } from 'child_process';
