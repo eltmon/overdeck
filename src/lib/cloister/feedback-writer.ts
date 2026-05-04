@@ -13,7 +13,7 @@ import { writeFile, mkdir, readdir, rm } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { resolveProjectFromIssue } from '../projects.js';
-import { appendContinueSessionEntryForIssue } from '../vbrief/lifecycle-io.js';
+import { appendContinueSessionEntryForIssue, appendFeedbackEntryForIssue, clearFeedbackForIssue } from '../vbrief/lifecycle-io.js';
 
 export interface WriteFeedbackOptions {
   issueId: string;
@@ -75,6 +75,21 @@ async function getNextSequenceNumber(feedbackDir: string): Promise<number> {
  */
 export async function clearFeedbackFiles(workspacePath: string): Promise<void> {
   const feedbackDir = join(workspacePath, '.planning', 'feedback');
+
+  // Also clear the continue file's feedback[] (Layer 1+).
+  // Infer issueId from the workspace directory name (feature-<issue-id>).
+  const base = workspacePath.split('/').pop() ?? '';
+  const issueMatch = base.match(/^feature-([a-z]+-\d+)$/i);
+  if (issueMatch) {
+    const issueId = issueMatch[1].toUpperCase();
+    const projectRoot = join(workspacePath, '..', '..');
+    try {
+      clearFeedbackForIssue(projectRoot, issueId);
+    } catch (err: any) {
+      console.error(`[feedback-writer] Failed to clear continue-file feedback[] for ${issueId}:`, err.message);
+    }
+  }
+
   if (!existsSync(feedbackDir)) return;
 
   const files = await readdir(feedbackDir);
@@ -170,10 +185,24 @@ export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<Wri
 
     await writeFile(filePath, content, 'utf-8');
 
-    // Record a breadcrumb on the scope vBRIEF's continue file so future
-    // agents can reconstruct the feedback timeline from sessionHistory.
+    // Write to the scope vBRIEF's continue file: structured feedback entry
+    // (Layer 1+) and a sessionHistory breadcrumb for the timeline.
     const resolved = resolveProjectFromIssue(opts.issueId);
     if (resolved) {
+      try {
+        appendFeedbackEntryForIssue(resolved.projectPath, opts.issueId, {
+          seq,
+          specialist: opts.specialist,
+          outcome: opts.outcome,
+          timestamp,
+          markdownBody: opts.markdownBody,
+        });
+      } catch (err: any) {
+        console.error(
+          `[feedback-writer] Failed to append continue-file feedback entry for ${opts.issueId}:`,
+          err.message,
+        );
+      }
       try {
         appendContinueSessionEntryForIssue(resolved.projectPath, opts.issueId, {
           reason: 'feedback',

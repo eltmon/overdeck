@@ -56,10 +56,8 @@ Before starting any work, you MUST read these files to understand the full conte
 1. **Read `./vbrief/active/continue-{{ISSUE_ID}}.vbrief.json`** - Structured planning context: decisions, hazards, and approach from the planning agent. Replaces the old STATE.md.
 2. **Read `CLAUDE.md`** (in workspace) - Contains workspace-specific instructions and warnings.
 3. **Read `{{PROJECT_ROOT}}/CLAUDE.md`** - Contains project-wide development guidelines.
-4. **Check `.planning/feedback/`** - If this directory exists, read the latest file(s).
-   Ignore any files in `.planning/feedback/archive/` — those are from previous review cycles.
-   Only read non-archived files. These contain specialist feedback (review issues, test failures, merge blocks) requiring action.
-   The continue file's `sessionHistory` may note feedback cycles.
+4. **Check `feedback[]` in the continue file** — If the continue file has a non-empty `feedback` array, each entry contains inline specialist feedback (review issues, test failures, merge blocks) requiring action. This is the primary feedback source (Layer 1+). The `SPECIALIST FEEDBACK` section below injects these entries for you.
+   For older workspaces, check `.planning/feedback/` for legacy `.md` files not yet migrated to the continue file.
 
 These files contain critical context that may have been updated since the last session.
 {{/LOCAL}}

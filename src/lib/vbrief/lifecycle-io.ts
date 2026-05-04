@@ -13,7 +13,7 @@ import { copyFileSync, existsSync, readFileSync, readdirSync, renameSync, writeF
 import { join } from 'path';
 import { promisify } from 'util';
 
-import { continueFilename, continueFilePath, appendSessionEntry, readContinueState, writeContinueState, type ContinueSessionEntry, type ContinueState } from './continue-state.js';
+import { continueFilename, continueFilePath, appendSessionEntry, appendFeedbackEntry, clearFeedback, readContinueState, writeContinueState, type ContinueFeedbackEntry, type ContinueSessionEntry, type ContinueState } from './continue-state.js';
 import {
   VBRIEF_LIFECYCLE_DIRS,
   ensureVBriefDirs,
@@ -472,4 +472,30 @@ export function appendContinueSessionEntryForIssue(
 ): ContinueState {
   const dir = resolveContinueStateDir(projectRoot, issueId);
   return appendSessionEntry(dir, issueId, entry);
+}
+
+/**
+ * Append a feedback entry to the continue file beside the issue's current
+ * vBRIEF. Called by feedback-writer when a specialist delivers results.
+ */
+export function appendFeedbackEntryForIssue(
+  projectRoot: string,
+  issueId: string,
+  entry: ContinueFeedbackEntry,
+): ContinueState {
+  const dir = resolveContinueStateDir(projectRoot, issueId);
+  return appendFeedbackEntry(dir, issueId, entry);
+}
+
+/**
+ * Clear all pending feedback from the continue file beside the issue's current
+ * vBRIEF. Called at the start of each review cycle so the work agent only
+ * sees current-cycle feedback.
+ */
+export function clearFeedbackForIssue(
+  projectRoot: string,
+  issueId: string,
+): ContinueState | null {
+  const dir = resolveContinueStateDir(projectRoot, issueId);
+  return clearFeedback(dir, issueId);
 }
