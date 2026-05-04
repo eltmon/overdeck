@@ -126,8 +126,7 @@ export function ConversationPanel({
   const workingIconClass = isSpinnerPhase(workingPhase) ? styles.spinnerIcon : styles.pulseIcon;
 
   // Theme for diff tree icons
-  const { theme } = useTheme();
-  const resolvedTheme = theme === 'light' ? 'light' : 'dark';
+  const { resolvedTheme } = useTheme();
 
   // Fetch turn diff summaries — agent diffs (checkpoint-based) or conversation diffs (JSONL-based)
   const { data: diffData } = useQuery({
@@ -210,8 +209,10 @@ export function ConversationPanel({
     searchParams.set('diff', '1')
     searchParams.set('diffTurnId', turnId)
     if (filePath) searchParams.set('diffFilePath', filePath)
+    else searchParams.delete('diffFilePath')
     const url = `${window.location.pathname}?${searchParams.toString()}`
     window.history.pushState({}, '', url)
+    window.dispatchEvent(new PopStateEvent('popstate'))
     setDiffOpen(true)
   }, [])
 
@@ -223,6 +224,7 @@ export function ConversationPanel({
     const query = searchParams.toString()
     const url = query ? `${window.location.pathname}?${query}` : window.location.pathname
     window.history.pushState({}, '', url)
+    window.dispatchEvent(new PopStateEvent('popstate'))
     setDiffOpen(false)
   }, [])
 

@@ -470,8 +470,20 @@ export async function runVerificationForIssue(
       return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
     }
 
-    setReviewStatus(issueId, { verificationStatus: 'passed', verificationNotes: undefined });
-    console.log(`[${logPrefix}] Verification passed for ${issueId} — proceeding to review-agent`);
+    // Snapshot HEAD at verification pass time — compared with reviewedAtCommit
+    // after review to skip redundant test-agent when no code changed.
+    let lastVerifiedCommit: string | undefined;
+    try {
+      const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 });
+      lastVerifiedCommit = stdout.trim();
+    } catch { /* non-fatal — skip optimization if we can't get HEAD */ }
+
+    setReviewStatus(issueId, {
+      verificationStatus: 'passed',
+      verificationNotes: undefined,
+      ...(lastVerifiedCommit ? { lastVerifiedCommit } : {}),
+    });
+    console.log(`[${logPrefix}] Verification passed for ${issueId}${lastVerifiedCommit ? ` (HEAD=${lastVerifiedCommit.slice(0, 8)})` : ''} — proceeding to review-agent`);
     return { outcome: 'passed' };
 
   } catch (verifyErr: any) {

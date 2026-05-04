@@ -21,7 +21,7 @@ export type AgentStatus = typeof AgentStatus.Type
 export const AgentPhase = Schema.Literals(["planning", "exploration", "implementation", "testing", "documentation", "pre_push", "post_push", "review", "review-response", "merge"])
 export type AgentPhase = typeof AgentPhase.Type
 
-export const AgentResolution = Schema.Literals(["working", "done", "needs_input", "stuck", "completed", "unclear", "abandoned"])
+export const AgentResolution = Schema.Literals(["working", "done", "needs_input", "stuck", "completed", "unclear", "abandoned", "api_error"])
 export type AgentResolution = typeof AgentResolution.Type
 
 export const SpecialistType = Schema.Literals(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"])
@@ -158,6 +158,10 @@ export const ReviewStatusSnapshot = Schema.Struct({
   stuckDetails: Schema.optional(Schema.String),
   /** Commit SHA at which review passed; deacon uses this to detect new pushes after review */
   reviewedAtCommit: Schema.optional(Schema.String),
+  /** Commit SHA at which the pre-review verification gate last passed */
+  lastVerifiedCommit: Schema.optional(Schema.String),
+  /** Current merge pipeline step (granular visibility for the merge step tracker) */
+  mergeStep: Schema.optional(Schema.String),
   /** PAN-699: timestamp when review agents were dispatched */
   reviewSpawnedAt: Schema.optional(Schema.String),
   /** PAN-699: number of test-agent dispatch retries */
