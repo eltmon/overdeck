@@ -97,6 +97,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
       lastAttachedAt: null,
       sessionAlive: session.presence !== 'ended',
       sessionFile: session.sessionId,
+      model: session.model && session.model !== 'unknown' && session.model !== 'specialist' ? session.model : undefined,
     };
   }, [session, issueId]);
 
