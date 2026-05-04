@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
+import { readFile, readdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeam } from '../projects.js';
@@ -30,7 +31,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
 
   if (!ctx.skipDynamicContext && ctx.projectRoot) {
     const planningContent = readPlanningContext(ctx.workspacePath);
-    const featureContext = readFeatureContext(ctx.workspacePath);
+    const featureContext = await readFeatureContext(ctx.workspacePath, ctx.issueId);
 
     const beadsTasks = await readBeadsTasks(ctx.workspacePath, ctx.projectRoot, ctx.issueId);
     if (beadsTasks.length > 0) {
@@ -270,26 +271,24 @@ export function readPlanningContext(workspacePath: string): string | null {
 /**
  * Read FEATURE-CONTEXT.md for Rally Features so story agents receive
  * feature-level context (child stories, description, URL).
+ * Falls back to sibling workspaces, matching by issueId in the content.
  */
-export function readFeatureContext(workspacePath: string): string | null {
+export async function readFeatureContext(workspacePath: string, issueId: string): Promise<string | null> {
   const featureContextPath = join(workspacePath, '.planning', 'FEATURE-CONTEXT.md');
   if (existsSync(featureContextPath)) {
-    return readFileSync(featureContextPath, 'utf-8');
+    return readFile(featureContextPath, 'utf-8');
   }
-  // Story workspaces may not have their own FEATURE-CONTEXT.md — fall back to
-  // any sibling feature workspace that has one (e.g. a Rally Feature's context
-  // written during planning).
   const projectRoot = dirname(dirname(workspacePath));
   const workspacesDir = join(projectRoot, 'workspaces');
-  if (existsSync(workspacesDir)) {
-    for (const entry of readdirSync(workspacesDir)) {
-      if (entry.startsWith('feature-')) {
-        const siblingPath = join(workspacesDir, entry, '.planning', 'FEATURE-CONTEXT.md');
-        if (existsSync(siblingPath)) {
-          return readFileSync(siblingPath, 'utf-8');
-        }
-      }
-    }
+  if (!existsSync(workspacesDir)) return null;
+
+  const entries = await readdir(workspacesDir);
+  for (const entry of entries) {
+    if (!entry.startsWith('feature-')) continue;
+    const siblingPath = join(workspacesDir, entry, '.planning', 'FEATURE-CONTEXT.md');
+    if (!existsSync(siblingPath)) continue;
+    const content = await readFile(siblingPath, 'utf-8');
+    if (content.includes(issueId)) return content;
   }
   return null;
 }

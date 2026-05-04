@@ -1562,7 +1562,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   };
 
 
-  const grouped = groupByStatus(filteredIssues, includeCompleted);
+  const grouped = useMemo(() => groupByStatus(filteredIssues, includeCompleted), [filteredIssues, includeCompleted]);
 
   // Planning-state is embedded in each issue from the /api/issues response
   // (computed server-side via cheap filesystem checks). No per-card fetches needed.
