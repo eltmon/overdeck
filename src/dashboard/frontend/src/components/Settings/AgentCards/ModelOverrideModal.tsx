@@ -178,62 +178,9 @@ export function getAllModels(): ModelDef[] {
   return Object.values(MODELS_BY_PROVIDER).flatMap(p => p.models);
 }
 
-// Helper to find model by ID (with fuzzy matching for backend compatibility)
 export function getModelById(id: ModelId): ModelDef | undefined {
   const models = getAllModels();
-
-  // First try exact match
-  const exact = models.find(m => m.id === id);
-  if (exact) return exact;
-
-  // Fuzzy matching for backend model ID variations
-  const idLower = id.toLowerCase();
-
-  // Anthropic models
-  if (idLower.includes('opus') && idLower.includes('4')) return models.find(m => m.id === 'claude-opus-4-6');
-  if (idLower.includes('sonnet') && idLower.includes('4')) return models.find(m => m.id === 'claude-sonnet-4-6');
-  if (idLower.includes('haiku')) return models.find(m => m.id === 'claude-haiku-4-5');
-  if (idLower.includes('claude') && !idLower.includes('opus') && !idLower.includes('haiku')) return models.find(m => m.id === 'claude-sonnet-4-6');
-
-  // OpenAI models — order matters: specific patterns before broad ones
-  if (idLower.includes('gpt-5.5-nano')) return models.find(m => m.id === 'gpt-5.5-nano');
-  if (idLower.includes('gpt-5.5-mini')) return models.find(m => m.id === 'gpt-5.5-mini');
-  if (idLower.includes('gpt-5.5')) return models.find(m => m.id === 'gpt-5.5');
-  if (idLower.includes('gpt-5.4-pro')) return models.find(m => m.id === 'gpt-5.4-pro');
-  if (idLower.includes('gpt-5.4-nano')) return models.find(m => m.id === 'gpt-5.4-nano');
-  if (idLower.includes('gpt-5.4-mini')) return models.find(m => m.id === 'gpt-5.4-mini');
-  if (idLower.includes('gpt-5') || idLower.includes('codex')) return models.find(m => m.id === 'gpt-5.4');
-  if (idLower.includes('gpt-4o') || idLower === 'gpt4o') return models.find(m => m.id === 'gpt-4o');
-  if (idLower.includes('o4-mini')) return models.find(m => m.id === 'o4-mini');
-  if (idLower.includes('o3') || idLower === 'o1') return models.find(m => m.id === 'o3');
-
-  // Google models
-  if (idLower.includes('gemini') && idLower.includes('flash')) return models.find(m => m.id === 'gemini-3-flash');
-  if (idLower.includes('gemini')) return models.find(m => m.id === 'gemini-3.1-pro-preview');
-
-  // Kimi models — order matters: specific patterns before broad ones
-  if (idLower.includes('k2.6-code-preview') || idLower.includes('k2.6-code')) {
-    return models.find(m => m.id === 'K2.6-code-preview');
-  }
-  if (idLower.includes('kimi-k2.6') || idLower.includes('k2.6')) {
-    return models.find(m => m.id === 'kimi-k2.6');
-  }
-  if (idLower.includes('kimi') || idLower.includes('moonshot')) {
-    return models.find(m => m.id === 'kimi-k2.5');
-  }
-
-  // GLM models
-  if (idLower.includes('glm') || idLower.includes('zhipu') || idLower.includes('chatglm')) {
-    return models.find(m => m.id === 'glm-5.1');
-  }
-
-  // MiniMax models
-  if (idLower.includes('minimax')) {
-    if (idLower.includes('highspeed')) return models.find(m => m.id === 'minimax-m2.7-highspeed');
-    return models.find(m => m.id === 'minimax-m2.7');
-  }
-
-  return undefined;
+  return models.find(m => m.id === id);
 }
 
 // Helper to calculate capability match score
