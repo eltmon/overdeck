@@ -99,11 +99,11 @@ function presenceToStatus(presence: SessionNodeType['presence']): StatusDotStatu
 }
 
 function ReviewerVerdict({ session }: { session: SessionNodeType }) {
-  const latestStatus = session.roundMetadata?.latestStatus;
-  if (latestStatus === 'completed') {
+  const { latestStatus, latestReviewResult } = session.roundMetadata ?? {};
+  if (latestReviewResult === 'APPROVED') {
     return <CircleCheck size={10} style={{ color: 'var(--success)', flexShrink: 0 }} />;
   }
-  if (latestStatus === 'failed') {
+  if (latestReviewResult === 'CHANGES_REQUESTED' || latestStatus === 'failed') {
     return <CircleX size={10} style={{ color: 'var(--destructive)', flexShrink: 0 }} />;
   }
   return <StatusDot status={presenceToStatus(session.presence)} size="sm" />;

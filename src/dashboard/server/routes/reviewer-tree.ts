@@ -215,6 +215,7 @@ export async function readReviewerRounds(
     roundCount: history.length,
     latestRound: latest.round,
     latestStatus: latest.status,
+    latestReviewResult: latest.reviewResult,
     history,
   };
 }
