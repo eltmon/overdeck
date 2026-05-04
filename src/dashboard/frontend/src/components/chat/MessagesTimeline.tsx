@@ -22,7 +22,7 @@ import {
   memo,
 } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus, RotateCcw, XCircle, Scissors, ClipboardList } from 'lucide-react';
+import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus, RotateCcw, XCircle, Scissors, ClipboardList, ShieldCheck } from 'lucide-react';
 import type { CompactBoundary, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import type { FailedMessage } from './ConversationPanel';
 import { ChatMarkdown } from './ChatMarkdown';
@@ -451,6 +451,9 @@ const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming
   if (row.kind === 'compacting') {
     return <CompactingIndicator />;
   }
+  if (row.message.role === 'system') {
+    return <SessionPermissionsRow message={row.message} />;
+  }
   if (row.message.role === 'user') {
     return <UserMessageRow message={row.message} />;
   }
@@ -851,6 +854,18 @@ function RoundDivider({ marker }: { marker: RoundMarker }) {
           background: 'var(--border)',
         }}
       />
+    </div>
+  );
+}
+
+// ─── Session permissions banner ──────────────────────────────────────────────
+
+function SessionPermissionsRow({ message }: { message: ChatMessage }) {
+  return (
+    <div className={styles.sessionPermissionsRow}>
+      <ShieldCheck size={11} className={styles.sessionPermissionsIcon} />
+      <span className={styles.sessionPermissionsLabel}>Permissions:</span>
+      <span className={styles.sessionPermissionsTools}>{message.text}</span>
     </div>
   );
 }

@@ -4347,3 +4347,33 @@
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* ─── Session permissions banner ─────────────────────────────────────────── */
+
+.sessionPermissionsRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 10.5px;
+  color: var(--muted-foreground);
+  opacity: 0.7;
+}
+
+.sessionPermissionsIcon {
+  flex-shrink: 0;
+  color: var(--primary);
+  opacity: 0.6;
+}
+
+.sessionPermissionsLabel {
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.sessionPermissionsTools {
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
