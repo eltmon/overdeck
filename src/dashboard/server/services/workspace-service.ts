@@ -304,32 +304,20 @@ export const WorkspaceServiceLive = Layer.effect(
             const composePath = composePaths.find((p) => existsSync(p));
 
             if (!composePath) {
-              // No compose file found — generate one from project template via workspace-manager
-              const { loadProjectsConfig } = await import('../../../lib/projects.js');
-              const { projects } = loadProjectsConfig();
-              const project = resolveProjectFromIssue(issueId);
-              if (!project) {
+              // No compose file → self-heal `.devcontainer/` from the project
+              // template. This is the cheap, idempotent path; the previous
+              // implementation re-ran the full workspace-create flow (worktrees,
+              // bun install, etc.), which is the wrong granularity for
+              // "compose file is missing".
+              const { ensureDevcontainer } = await import(
+                '../../../lib/workspace/ensure-devcontainer.js'
+              );
+              const ensure = ensureDevcontainer({ workspacePath, issueId });
+              if (!ensure.step.success) {
                 throw new WorkspaceCreateError({
                   id: issueId,
-                  message: `No project configured for issue ${issueId} — cannot generate docker-compose.yml`,
-                });
-              }
-
-              const projectName = Object.entries(projects).find(
-                ([, p]) => p.path === project.path,
-              )?.[0] ?? 'unknown';
-
-              // Re-run workspace creation in dry-run=false but startDocker=false to generate compose
-              const { createWorkspace } = await import('../../../lib/workspace-manager.js');
-              const createResult = await createWorkspace({
-                projectConfig: { ...project, name: projectName },
-                featureName: issueLower,
-                startDocker: false,
-              });
-              if (!createResult.success) {
-                throw new WorkspaceCreateError({
-                  id: issueId,
-                  message: `createWorkspace failed: ${createResult.errors.join('; ')}`,
+                  message:
+                    `Could not render .devcontainer/: ${ensure.step.error ?? 'unknown error'}`,
                 });
               }
             }
