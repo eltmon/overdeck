@@ -233,56 +233,21 @@ export interface WorkspaceCreateResult {
   steps: string[];
 }
 
-/**
- * Create placeholders for template substitution
- */
-function createPlaceholders(
-  projectConfig: ProjectConfig,
-  featureName: string,
-  workspacePath: string
-): TemplatePlaceholders {
-  const featureFolder = `feature-${featureName}`;
-  const domain = projectConfig.workspace?.dns?.domain || 'localhost';
-
-  return {
-    FEATURE_NAME: featureName,
-    FEATURE_FOLDER: featureFolder,
-    BRANCH_NAME: `feature/${featureName}`,
-    COMPOSE_PROJECT: `${basename(projectConfig.path)}-${featureFolder}`,
-    DOMAIN: domain,
-    PROJECT_NAME: basename(projectConfig.path),
-    PROJECT_PATH: projectConfig.path,
-    PROJECTS_DIR: dirname(projectConfig.path),
-    WORKSPACE_PATH: workspacePath,
-    HOME: homedir(),
-  };
-}
-
-/**
- * Sanitize docker-compose files to use platform-agnostic paths
- * Replaces hardcoded /home/username paths with ${HOME}
- */
-function sanitizeComposeFile(filePath: string): void {
-  if (!existsSync(filePath)) return;
-
-  let content = readFileSync(filePath, 'utf-8');
-  const originalContent = content;
-
-  // Pattern to match hardcoded home paths like /home/username or /Users/username
-  // Replace with ${HOME} which docker-compose expands
-  const homePatterns = [
-    /\/home\/[a-zA-Z0-9_-]+\//g,      // Linux: /home/username/
-    /\/Users\/[a-zA-Z0-9_-]+\//g,     // macOS: /Users/username/
-  ];
-
-  for (const pattern of homePatterns) {
-    content = content.replace(pattern, '${HOME}/');
-  }
-
-  if (content !== originalContent) {
-    writeFileSync(filePath, content, 'utf-8');
-  }
-}
+// Placeholder construction, compose-file sanitization, and template
+// processing live in `./workspace/devcontainer-renderer.ts` so the renderer
+// is a single source of truth shared by:
+//   - the workspace-creation flow below (`createWorkspace`)
+//   - the self-heal entry point (`./workspace/ensure-devcontainer.ts`)
+//   - any future caller (e.g. `pan workspace re-render`)
+// Re-export under the legacy local name to keep diffs in this file small.
+import {
+  createWorkspacePlaceholders as createPlaceholders,
+  sanitizeComposeFile,
+  renderDevcontainer,
+} from './workspace/devcontainer-renderer.js';
+// `processTemplates` is still imported for the agent-template flow further
+// below; it lives in the same renderer module.
+import { processTemplates } from './workspace/devcontainer-renderer.js';
 
 /**
  * Validate feature name (alphanumeric and hyphens only)
@@ -440,58 +405,10 @@ function releasePort(portFile: string, featureFolder: string): boolean {
   }
 }
 
-/**
- * Process template files with placeholder replacement
- */
-function processTemplates(
-  templateDir: string,
-  targetDir: string,
-  placeholders: TemplatePlaceholders,
-  templates?: Array<{ source: string; target: string }>
-): string[] {
-  const steps: string[] = [];
-
-  if (!existsSync(templateDir)) {
-    return steps;
-  }
-
-  // If specific templates are defined, process those
-  if (templates && templates.length > 0) {
-    for (const { source, target } of templates) {
-      const sourcePath = join(templateDir, source);
-      const targetPath = join(targetDir, target);
-
-      if (existsSync(sourcePath)) {
-        const content = readFileSync(sourcePath, 'utf-8');
-        const processed = replacePlaceholders(content, placeholders);
-        mkdirSync(dirname(targetPath), { recursive: true });
-        writeFileSync(targetPath, processed);
-        steps.push(`Processed template: ${source} -> ${target}`);
-      }
-    }
-  } else {
-    // Process all .template files
-    const files = readdirSync(templateDir);
-    for (const file of files) {
-      if (file.endsWith('.template')) {
-        const sourcePath = join(templateDir, file);
-        const targetPath = join(targetDir, file.replace('.template', ''));
-
-        const content = readFileSync(sourcePath, 'utf-8');
-        const processed = replacePlaceholders(content, placeholders);
-        writeFileSync(targetPath, processed);
-        // Shell scripts need execute permission
-        const targetName = file.replace('.template', '');
-        if (targetName === 'dev' || targetName.endsWith('.sh')) {
-          chmodSync(targetPath, 0o755);
-        }
-        steps.push(`Processed template: ${file}`);
-      }
-    }
-  }
-
-  return steps;
-}
+// `processTemplates` was previously defined inline here; it now lives in
+// `./workspace/devcontainer-renderer.ts` and is imported above so the
+// devcontainer renderer and the agent-template flow share a single
+// implementation.
 
 /**
  * @deprecated Use copyProjectTemplateDirs instead. Kept for non-.claude paths.
@@ -943,50 +860,24 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     result.steps.push('Created .env file');
   }
 
-  // Process Docker compose templates
+  // Render the workspace's `.devcontainer/` from the project's compose
+  // template. All template processing, file copies, $HOME sanitization, and
+  // ./dev symlink wiring lives in `renderDevcontainer` so the same code path
+  // is used here, by `ensureDevcontainer` (self-heal), and by any future
+  // re-render command. See `./workspace/devcontainer-renderer.ts`.
   if (workspaceConfig.docker?.compose_template) {
-    const templateDir = join(projectConfig.path, workspaceConfig.docker.compose_template);
-    const devcontainerDir = join(workspacePath, '.devcontainer');
-    mkdirSync(devcontainerDir, { recursive: true });
-
-    const templateSteps = processTemplates(templateDir, devcontainerDir, placeholders);
-    result.steps.push(...templateSteps);
-
-    // Copy non-template files (like Dockerfile)
-    if (existsSync(templateDir)) {
-      const files = readdirSync(templateDir);
-      for (const file of files) {
-        if (!file.endsWith('.template')) {
-          const sourcePath = join(templateDir, file);
-          const targetPath = join(devcontainerDir, file);
-          copyFileSync(sourcePath, targetPath);
-        }
+    try {
+      const renderResult = renderDevcontainer({
+        workspacePath,
+        projectConfig,
+        featureName,
+      });
+      result.steps.push(...renderResult.steps);
+      for (const warning of renderResult.warnings) {
+        result.errors.push(warning);
       }
-    }
-
-    // Sanitize docker-compose files to use platform-agnostic paths
-    // This fixes hardcoded /home/username or /Users/username paths
-    const composeFiles = readdirSync(devcontainerDir)
-      .filter(f => f.includes('compose') && (f.endsWith('.yml') || f.endsWith('.yaml')));
-    for (const composeFile of composeFiles) {
-      sanitizeComposeFile(join(devcontainerDir, composeFile));
-    }
-    if (composeFiles.length > 0) {
-      result.steps.push(`Sanitized ${composeFiles.length} compose file(s) for platform compatibility`);
-    }
-
-    // Create ./dev symlink at workspace root pointing to .devcontainer/dev
-    // Symlink keeps changes in sync - editing ./dev updates .devcontainer/dev
-    const devScriptInContainer = join(devcontainerDir, 'dev');
-    const devScriptAtRoot = join(workspacePath, 'dev');
-    if (existsSync(devScriptInContainer) && !existsSync(devScriptAtRoot)) {
-      try {
-        symlinkSync('.devcontainer/dev', devScriptAtRoot);
-        chmodSync(devScriptInContainer, 0o755); // Make executable
-        result.steps.push('Created ./dev symlink');
-      } catch (error) {
-        result.errors.push(`Failed to create ./dev symlink: ${error}`);
-      }
+    } catch (err: any) {
+      result.errors.push(`Failed to render .devcontainer/: ${err.message ?? err}`);
     }
   }
 
