@@ -202,6 +202,7 @@ export function estimateMessagesTimelineRowHeight(
 
   // message
   const { message } = row;
+  if (message.role === 'system') return 28;
   if (message.role === 'user') {
     const bubbleWidth = Math.max(4, Math.floor((timelineWidth * 0.8 - 32) / 8.4));
     const lines = Math.max(1, Math.ceil(message.text.length / bubbleWidth));

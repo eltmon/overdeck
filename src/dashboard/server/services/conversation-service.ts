@@ -632,6 +632,22 @@ export async function parseConversationMessages(
             sequence: lineSequence,
           });
         }
+      } else if (attachment?.type === 'command_permissions') {
+        // Session start / resume record — contains the allowedTools list.
+        // Render as a system message so the user can see what permissions are in effect.
+        const tools = Array.isArray(attachment.allowedTools)
+          ? (attachment.allowedTools as unknown[]).filter((t) => typeof t === 'string').join(', ')
+          : '';
+        if (tools) {
+          const ts = entry.timestamp ?? new Date().toISOString();
+          messages.push({
+            id: ((entry as Record<string, unknown>).uuid as string | undefined) ?? `perm-${lineSequence}`,
+            role: 'system',
+            text: tools,
+            createdAt: ts,
+            sequence: lineSequence,
+          });
+        }
       }
     }
   }
