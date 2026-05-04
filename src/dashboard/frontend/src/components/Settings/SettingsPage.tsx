@@ -42,6 +42,7 @@ import { SettingsConfig, Provider, WorkTypeId, ModelId } from './types';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useCodexAuthStatus } from '../../hooks/useCodexAuthStatus';
 import { OpenRouterPage } from './OpenRouterPage';
+import { SensitiveText } from '../SensitiveText';
 import { DesktopSettingsSection } from './DesktopSettingsSection';
 import {
   ModelOverrideModal,
@@ -915,7 +916,7 @@ export function SettingsPage() {
                         )}
                         {codexAuth?.email && codexAuth.status !== 'missing' && (
                           <p className="text-[10px] text-muted-foreground mt-1.5">
-                            {codexAuth.email}
+                            <SensitiveText value={codexAuth.email} className="text-[10px] text-muted-foreground" />
                             {codexAuth.expiresAt && (
                               <span className="ml-1">
                                 · Expires {new Date(codexAuth.expiresAt).toLocaleString()}

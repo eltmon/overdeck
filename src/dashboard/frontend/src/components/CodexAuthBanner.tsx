@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { AlertTriangle, Loader2, ExternalLink } from 'lucide-react';
+import { SensitiveText } from './SensitiveText';
 import { useCodexAuthStatus } from '../hooks/useCodexAuthStatus';
 import { setReauthSessionName } from '../lib/pending-codex-spawn';
 
@@ -38,7 +39,7 @@ export function CodexAuthBanner() {
       <p className="text-warning-foreground text-sm font-semibold flex-1">
         Codex authentication {authStatus.status} — gpt-5.4 agents will fail.
         {authStatus.email && (
-          <span className="font-normal ml-1 opacity-80">({authStatus.email})</span>
+          <span className="font-normal ml-1 opacity-80">(<SensitiveText value={authStatus.email} className="text-sm" />)</span>
         )}
       </p>
       <button
