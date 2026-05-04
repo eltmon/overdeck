@@ -201,16 +201,6 @@ export const AgentSpawnerLive = Layer.effect(
             throw new WorkspaceNotFound({ id: issueId });
           }
 
-          // Create .planning directory if it doesn't exist
-          const { promises: fsp } = await import('node:fs');
-          const planningDir = join(workspacePath, '.planning');
-          await fsp.mkdir(planningDir, { recursive: true });
-
-          // Write PLANNING_PROMPT.md
-          const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
-          const { writeFile } = fsp;
-          await writeFile(planningPromptPath, opts.issue.description ?? '', 'utf-8');
-
           // Delegate to spawn-planning-session
           const sessionName = opts.sessionName ?? `planning-${issueId.toLowerCase()}`;
           const { spawnPlanningSession } = await import('../../../lib/planning/spawn-planning-session.js');

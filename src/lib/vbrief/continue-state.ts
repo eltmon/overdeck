@@ -92,6 +92,8 @@ export interface ContinueSessionEntry {
   note?: string;
   /** Agent model in use for this session (e.g. "claude-opus-4-7"). */
   agentModel?: string;
+  /** Full text content for entries that capture a document (e.g. planning prompt). */
+  content?: string;
   /** If this entry records a crash recovery, details about the crash. */
   crashInfo?: {
     detectedAt?: string;
