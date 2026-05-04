@@ -39,7 +39,7 @@ import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
  */
 
 import { exec, execFile, spawn } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { access, chmod, mkdir, readdir, readFile, stat, symlink, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, dirname, join, resolve, sep } from 'node:path';
