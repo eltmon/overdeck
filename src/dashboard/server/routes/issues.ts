@@ -116,6 +116,18 @@ function getGitHubLocalPaths(): Record<string, string> {
   return out;
 }
 
+/** Map Rally child-issue service contract into the planning-context shape. */
+export function buildChildStoriesFromRally(
+  children: readonly { ref: string; title: string; status: string; description: string }[],
+): Array<{ ref: string; title: string; status: string; description: string }> {
+  return children.map((c) => ({
+    ref: c.ref,
+    title: c.title,
+    status: c.status,
+    description: c.description || '',
+  }));
+}
+
 function getProjectPath(linearProjectId?: string, issuePrefix?: string): string {
   if (issuePrefix) {
     const issueId = `${issuePrefix}-1`;
@@ -602,12 +614,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
         const children = yield* rally.getChildIssues(id).pipe(
           Effect.catch(() => Effect.succeed([] as readonly { ref: string; title: string; status: string; description: string }[])),
         );
-        childStories = children.map((c) => ({
-          ref: c.ref,
-          title: c.title,
-          status: c.rawState || c.state,
-          description: c.description || '',
-        }));
+        childStories = buildChildStoriesFromRally(children);
       }
 
       issue = {

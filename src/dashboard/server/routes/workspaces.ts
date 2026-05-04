@@ -85,6 +85,9 @@ import {
   spawnAgent,
 } from '../../../lib/agents.js';
 import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js';
+import { getCostsForIssue } from '../../../lib/costs/index.js';
+import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
+import { getCachedRunningAgents } from '../services/running-agents-cache.js';
 import { findPlan, readPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
 import { criticalPath } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
@@ -1170,6 +1173,19 @@ const getWorkspaceRoute = HttpRouter.add(
           .filter(isSalvageableStash)
           .filter((entry) => entry.issueId === issueId.toUpperCase());
 
+        const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
+        const hasPlan = existsSync(planPath);
+        const planningComplete = existsSync(join(workspacePath, '.planning', '.planning-complete'));
+        const hasBeads = !!planningComplete;
+
+        const issueData = getCostsForIssue(issueId);
+        const agents = yield* Effect.promise(() => getCachedRunningAgents());
+        const resolvedCost = resolveIssueHeadlineCost({
+          issueId: issueId,
+          aggregateCost: issueData?.totalCost,
+          agents,
+        });
+
         return jsonResponse({
           exists: true,
           issueId,
@@ -1190,6 +1206,63 @@ const getWorkspaceRoute = HttpRouter.add(
           pendingOperation,
           location,
           salvageableStashes,
+          planningState: {
+            hasPlan,
+            hasBeads,
+            beadsCount: 0,
+            planningComplete,
+            workspacePath,
+          },
+          costs: issueData
+            ? {
+                issueId: issueId.toUpperCase(),
+                totalCost: issueData.totalCost,
+                resolvedTotalCost: resolvedCost.resolvedTotalCost,
+                aggregateCost: resolvedCost.aggregateCost,
+                liveCost: resolvedCost.liveCost,
+                totalTokens: issueData.inputTokens + issueData.outputTokens + issueData.cacheReadTokens + issueData.cacheWriteTokens,
+                inputTokens: issueData.inputTokens,
+                outputTokens: issueData.outputTokens,
+                cacheReadTokens: issueData.cacheReadTokens,
+                cacheWriteTokens: issueData.cacheWriteTokens,
+                models: issueData.models,
+                providers: issueData.providers,
+                byModel: Object.fromEntries(
+                  Object.entries(issueData.models).map(([model, stats]: [string, any]) => [
+                    model,
+                    { cost: stats.cost, tokens: stats.tokens },
+                  ])
+                ),
+                sessions: issueData.sessions ?? [],
+                byStage: Object.fromEntries(
+                  Object.entries(issueData.stages || {}).map(([stage, stats]: [string, any]) => [
+                    stage,
+                    { cost: stats.cost, tokens: stats.tokens },
+                  ])
+                ),
+                budget: issueData.budget,
+                budgetWarning: issueData.budgetWarning,
+                lastUpdated: issueData.lastUpdated,
+              }
+            : {
+                issueId: issueId.toUpperCase(),
+                totalCost: 0,
+                resolvedTotalCost: resolvedCost.resolvedTotalCost,
+                aggregateCost: resolvedCost.aggregateCost,
+                liveCost: resolvedCost.liveCost,
+                totalTokens: 0,
+                inputTokens: 0,
+                outputTokens: 0,
+                cacheReadTokens: 0,
+                cacheWriteTokens: 0,
+                models: {},
+                providers: {},
+                byModel: {},
+                sessions: [],
+                byStage: {},
+                budget: undefined,
+                budgetWarning: false,
+              },
         });
   }))
 );

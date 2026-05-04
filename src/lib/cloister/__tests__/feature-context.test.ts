@@ -17,6 +17,14 @@ vi.mock('../../tracker/factory.js', () => ({
   })),
 }));
 
+function mockTrackerResponse(storyRef: string, parentRef: string, parentTitle?: string) {
+  mockGetIssue.mockImplementation((id: string) => {
+    if (id.toUpperCase() === storyRef.toUpperCase()) return Promise.resolve({ parentRef });
+    if (id.toUpperCase() === parentRef.toUpperCase()) return Promise.resolve({ title: parentTitle || parentRef });
+    return Promise.resolve({});
+  });
+}
+
 vi.mock('../../config.js', () => ({
   loadConfig: vi.fn(() => ({
     trackers: {
@@ -54,7 +62,7 @@ describe('readFeatureContext', () => {
     const parentContent = '# Feature Context: F456\nParent context';
     writeFileSync(join(parentWorkspace, '.planning', 'FEATURE-CONTEXT.md'), parentContent, 'utf-8');
 
-    mockGetIssue.mockResolvedValue({ parentRef: 'F456' });
+    mockTrackerResponse('US123', 'F456');
 
     const result = await readFeatureContext(workspacePath, 'US123');
     expect(result).toBe(parentContent);
@@ -88,14 +96,14 @@ describe('writeStoryFeatureContext', () => {
 
   it('no-ops when local FEATURE-CONTEXT.md already exists', async () => {
     writeFileSync(join(storyWorkspace, '.planning', 'FEATURE-CONTEXT.md'), 'existing', 'utf-8');
-    mockGetIssue.mockResolvedValue({ parentRef: 'F456' });
+    mockTrackerResponse('US123', 'F456');
 
     await writeStoryFeatureContext(storyWorkspace, 'US123');
     expect(mockGetIssue).not.toHaveBeenCalled();
   });
 
   it('synthesizes context from parent plan.vbrief.json', async () => {
-    mockGetIssue.mockResolvedValue({ parentRef: 'F456' });
+    mockTrackerResponse('US123', 'F456', 'The Big Feature');
 
     const planDoc = {
       vBRIEFInfo: { version: '0.5', created: '2024-01-01T00:00:00Z' },
@@ -117,7 +125,7 @@ describe('writeStoryFeatureContext', () => {
 
     const written = readFileSync(join(storyWorkspace, '.planning', 'FEATURE-CONTEXT.md'), 'utf-8');
     expect(written).toContain('Feature Context for US123');
-    expect(written).toContain('Parent Feature:** F456');
+    expect(written).toContain('Parent Feature:** The Big Feature (F456)');
     expect(written).toContain('Problem');
     expect(written).toContain('We need widgets');
     expect(written).toContain('Cross-Story Dependencies');
@@ -128,7 +136,7 @@ describe('writeStoryFeatureContext', () => {
   });
 
   it('falls back to parent FEATURE-CONTEXT.md when plan.vbrief.json is absent', async () => {
-    mockGetIssue.mockResolvedValue({ parentRef: 'F456' });
+    mockTrackerResponse('US123', 'F456', 'The Big Feature');
     writeFileSync(join(parentWorkspace, '.planning', 'FEATURE-CONTEXT.md'), '# Parent Context\nFallback', 'utf-8');
 
     await writeStoryFeatureContext(storyWorkspace, 'US123');

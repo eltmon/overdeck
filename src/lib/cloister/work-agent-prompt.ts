@@ -335,6 +335,15 @@ export async function writeStoryFeatureContext(workspacePath: string, issueId: s
         const issue = await tracker.getIssue(issueId);
         if (!issue.parentRef) return;
 
+        // Load parent feature title for richer context
+        let parentTitle = issue.parentRef;
+        try {
+          const parentIssue = await tracker.getIssue(issue.parentRef);
+          if (parentIssue.title) parentTitle = parentIssue.title;
+        } catch {
+          // fallback to ref
+        }
+
         const projectRoot = dirname(dirname(workspacePath));
         const parentWorkspace = join(projectRoot, 'workspaces', `feature-${issue.parentRef.toLowerCase()}`);
         const parentPlanPath = join(parentWorkspace, '.planning', 'plan.vbrief.json');
@@ -368,7 +377,7 @@ export async function writeStoryFeatureContext(workspacePath: string, issueId: s
             }).join('\n');
 
             contextContent = `# Feature Context for ${issueId}\n\n` +
-              `**Parent Feature:** ${issue.parentRef}\n\n` +
+              `**Parent Feature:** ${parentTitle} (${issue.parentRef})\n\n` +
               `## Plan Narratives\n${narrativeSection || '_No narratives found._'}\n\n` +
               `## Cross-Story Dependencies\n${edgesSection || '_No dependency edges found._'}\n\n` +
               `## Related Plan Items\n${itemsSection || '_No plan items found for this story._'}\n\n` +
