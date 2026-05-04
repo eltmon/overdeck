@@ -252,14 +252,13 @@ The deep-wipe endpoint (`POST /api/agents/:id/deep-wipe`) with `deleteWorkspace:
 1. **tmux sessions** — all agent sessions killed
 2. **Agent state directories** — `~/.panopticon/agents/<id>/` removed
 3. **Entire workspace directory** — this includes:
-   - `.planning/STATE.md` — planning progress and status
-   - `.planning/plan.vbrief.json` — the **workspace-specific vBRIEF plan** with items, acceptance criteria, and dependencies (generated during planning)
+   - `.planning/plan.vbrief.json` — the **workspace-specific draft vBRIEF plan** (before promotion to `vbrief/proposed/`)
    - `.planning/beads/` — all task tracking beads
    - Any implementation work in progress
 4. **Git branches** — both local AND remote `feature/<issue-id>` branches deleted
 5. **Linear/GitHub status** — issue status reset to Todo/Open
 
-**The docs-level PRD** (e.g., `myn/docs/prds/planned/MIN-XXX-*.md`) survives because it's committed to the docs repo, but it is NOT the same as the workspace vBRIEF plan generated during planning. The two workspace planning artifacts are `plan.vbrief.json` (structured plan with acceptance criteria) and `STATE.md` (narrative context and current status).
+**The scope vBRIEF** in `vbrief/` lifecycle directories on main survives deep-wipe — it's committed to the project repo independently of the workspace. The docs-level PRD (e.g., `myn/docs/prds/planned/MIN-XXX-*.md`) also survives. The workspace `.planning/` directory (draft plan, beads) is destroyed.
 
 **Rules:**
 - **NEVER call deep-wipe programmatically** without the user explicitly requesting it
@@ -300,35 +299,45 @@ When TLDR is available, you'll have these MCP tools:
 
 **Use TLDR liberally to maximize your session effectiveness.**
 
-## vBRIEF Plans
+## vBRIEF Plans & Lifecycle
 
-Panopticon uses **vBRIEF v0.5** for machine-readable work plans. Key references:
+Panopticon uses **vBRIEF v0.5** for machine-readable work plans with a filesystem-as-state lifecycle model. Key references:
 
 - **Canonical spec:** [github.com/deftai/vBRIEF](https://github.com/deftai/vBRIEF)
 - **Our fork:** [github.com/eltmon/vBRIEF](https://github.com/eltmon/vBRIEF)
 - **Extension proposal:** [deftai/vBRIEF#1](https://github.com/deftai/vBRIEF/issues/1)
 - **Panopticon docs:** [docs/VBRIEF.md](docs/VBRIEF.md)
 
-### v0.5 Fields Implemented
+### Lifecycle Directories
 
-`vBRIEFInfo`: `author` (tool identifier), `description`
+Scope vBRIEFs live in `vbrief/` at the project root and move between directories as work progresses:
 
-`plan`: `uid` (UUID v4), `author` (agent model), `sequence` (write counter), `references` (issue URL + PRDs), `created`, `updated`
+- `vbrief/proposed/` — planning complete, awaiting approval
+- `vbrief/active/` — agent is working on it
+- `vbrief/completed/` — merged/closed
+- `vbrief/cancelled/` — abandoned
 
-`items`/`subItems`: `created`, `completed` (set on status → completed)
+Filenames are issue-keyed: `YYYY-MM-DD-<ISSUE-ID>-<slug>.vbrief.json`
+
+### Continue State
+
+`continue-<issueId>.vbrief.json` replaces STATE.md as the structured session history. Lives alongside the scope vBRIEF in the same lifecycle directory. Contains git state, decisions, hazards, resume point, beads mapping, agent model, and session history.
 
 ### Auto-Behaviors
 
 - `io.ts` (`updateItemStatus`/`updateSubItemStatus`) auto-increments `plan.sequence` and sets `updated` timestamps on every write
-- `complete-planning` copies `STATE.md` and `plan.vbrief.json` to `docs/prds/active/<issue-id>/` (skip if exists)
+- `complete-planning` promotes vBRIEF to `vbrief/proposed/` on main with an issue-keyed filename
+- `start-agent` transitions vBRIEF from `proposed/` to `active/` and sets `plan.status` to `approved`/`running`
+- `postMergeLifecycle` transitions vBRIEF from `active/` to `completed/` on main
 - `start-planning` discovers PRDs from `docs/prds/planned/` and `docs/prds/active/` matching the issue ID and copies to `.planning/prd.md`
+- `findPlan()` resolves vBRIEFs from lifecycle dirs first, falling back to workspace `.planning/plan.vbrief.json`
 
 ### Dashboard Viewer
 
 VBriefViewer components at `src/dashboard/frontend/src/components/vbrief/`:
 - Accessible via **vBRIEF button** on kanban issue cards and InspectorPanel
 - List / DAG / Raw JSON tabs
-- Fetches from `GET /api/workspaces/:issueId/plan`
+- Fetches from `GET /api/workspaces/:issueId/plan` (resolves from lifecycle dirs first, then workspace)
 
 ## Issue Creation from PRDs
 

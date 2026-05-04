@@ -9,7 +9,7 @@
 Panopticon separates **requirements** (human intent) from **plans** (structured agent output) using two distinct artifact types:
 
 - **PRD** — A human-authored markdown document describing requirements, context, and intent. Written before or alongside issue creation. Lives in `docs/prds/`.
-- **vBRIEF Plan** — A structured JSON document produced by Opus during the planning phase. Contains acceptance criteria, dependency DAGs, story decomposition, and architectural decisions. Lives in `.planning/`.
+- **vBRIEF Plan** — A structured JSON document produced by Opus during the planning phase. Contains acceptance criteria, dependency DAGs, story decomposition, and architectural decisions. Created in `.planning/` during planning, then promoted to `vbrief/` lifecycle directories.
 
 This separation resolves the historical conflation where both the human requirements doc and the agent's implementation plan were called "PRD."
 
@@ -40,12 +40,12 @@ The core principle: **plan at the highest natural unit your tracker provides, ex
 
 ## Artifact Lifecycle
 
-| Artifact | Author | Format | When Created | Purpose |
-|----------|--------|--------|-------------|---------|
-| **PRD** | Human | Markdown (`.md`) | Before or alongside issue filing | Requirements, intent, context, acceptance criteria in prose |
-| **vBRIEF Plan** | Opus | JSON (`.vbrief.json`) | During planning phase | Structured plan with validated acceptance criteria, dependency DAG, story decomposition |
-| **STATE.md** | Agent | Markdown | During execution | Operational state, decisions log, progress tracking |
-| **Beads** | Opus → Agent | git-backed DB | Planning → execution | Granular implementation tasks |
+| Artifact | Author | Format | When Created | Where It Lives | Purpose |
+|----------|--------|--------|-------------|----------------|---------|
+| **PRD** | Human | Markdown (`.md`) | Before or alongside issue filing | `docs/prds/` | Requirements, intent, context |
+| **vBRIEF Plan** | Opus | JSON (`.vbrief.json`) | During planning phase | `vbrief/{proposed,active,completed,cancelled}/` | Structured plan with acceptance criteria, dependency DAG |
+| **Continue State** | Agent/System | JSON (`.vbrief.json`) | During planning/execution | `vbrief/active/` (alongside scope vBRIEF) | Operational state, decisions, hazards, resume point, session history |
+| **Beads** | Opus → Agent | git-backed DB | Planning → execution | `.beads/` in workspace | Granular implementation tasks |
 
 ### Where Artifacts Live
 
@@ -54,10 +54,18 @@ docs/prds/
   active/MIN-630-auth-redesign.md     ← human PRD (requirements)
   completed/MIN-612-dashboard.md      ← archived after merge
 
+vbrief/
+  proposed/
+    2026-05-01-MIN-630-auth-redesign.vbrief.json  ← scope vBRIEF (awaiting approval)
+  active/
+    2026-04-28-PAN-714-bar.vbrief.json            ← scope vBRIEF (agent working)
+    continue-PAN-714.vbrief.json                  ← session state
+  completed/
+    2026-04-20-MIN-612-dashboard.vbrief.json      ← archived after merge
+
 workspaces/feature-US101/
   .planning/
-    plan.vbrief.json                  ← vBRIEF plan (agent-generated)
-    STATE.md                          ← operational state
+    plan.vbrief.json                  ← draft vBRIEF (during planning, before promotion)
   .beads/                             ← execution tasks
   src/                                ← implementation
 ```
@@ -153,7 +161,7 @@ For Rally Features, the vBRIEF plan operates at the feature level and decomposes
         "title": "US100: Database Migration",
         "status": "pending",
         "narrative": "Create auth_sessions table (Flyway V42). No UI, no API — pure schema change.",
-        "planRef": "file://workspaces/feature-US100/.planning/plan.vbrief.json",
+        "planRef": "file://vbrief/active/2026-04-15-US100-database-migration.vbrief.json",
         "metadata": { "kind": "story", "rally_ref": "US100" }
       },
       {
@@ -161,14 +169,14 @@ For Rally Features, the vBRIEF plan operates at the feature level and decomposes
         "title": "US101: Login Flow",
         "status": "pending",
         "narrative": "Implement /auth/token endpoint per AD-1. Login page UI with redirect handling.",
-        "planRef": "file://workspaces/feature-US101/.planning/plan.vbrief.json",
+        "planRef": "file://vbrief/active/2026-04-15-US101-login-flow.vbrief.json",
         "metadata": { "kind": "story", "rally_ref": "US101" }
       },
       {
         "id": "story.US102",
         "title": "US102: Token Refresh",
         "status": "pending",
-        "planRef": "file://workspaces/feature-US102/.planning/plan.vbrief.json",
+        "planRef": "file://vbrief/active/2026-04-15-US102-token-refresh.vbrief.json",
         "metadata": { "kind": "story", "rally_ref": "US102" }
       }
     ],
@@ -277,7 +285,15 @@ Markdown plans are freeform — agents can skip acceptance criteria, dependencie
 
 ### What happened to `.planning/PRD.md`?
 
-The agent-generated `.planning/PRD.md` is replaced by `.planning/plan.vbrief.json`. The human-written PRD in `docs/prds/` remains unchanged. This resolves the naming collision where two different artifacts were both called "PRD."
+The agent-generated `.planning/PRD.md` is replaced by the vBRIEF plan (created in `.planning/plan.vbrief.json` during planning, then promoted to `vbrief/proposed/`). The human-written PRD in `docs/prds/` remains unchanged. This resolves the naming collision where two different artifacts were both called "PRD."
+
+### What happened to `STATE.md`?
+
+STATE.md is replaced by `continue-<issueId>.vbrief.json` — a structured JSON file that captures the same information (decisions, hazards, resume points) in a machine-parseable format, plus git state, beads mapping, agent model, and session history. See [VBRIEF.md § Continue State](./VBRIEF.md#continue-state--structured-session-history).
+
+### Where do vBRIEFs live now?
+
+Scope vBRIEFs live in `vbrief/` lifecycle directories at the project root (`proposed/`, `active/`, `completed/`, `cancelled/`). During planning, the draft lives at `.planning/plan.vbrief.json` in the workspace. On planning completion, it's promoted to `vbrief/proposed/` with an issue-keyed filename. See [VBRIEF.md § Lifecycle Model](./VBRIEF.md#lifecycle-model).
 
 ### Why is vBRIEF at the feature level for Rally but issue level for Linear?
 
@@ -315,7 +331,7 @@ Yes. LLMs are good at producing structured JSON when given a schema and examples
 
 ## Automatic Beads Conversion
 
-When the planning agent finishes and touches `.planning/.planning-complete`, Cloister automatically converts the vBRIEF plan into beads:
+When the planning agent finishes and the vBRIEF is promoted to `vbrief/proposed/`, Cloister automatically converts the vBRIEF plan into beads:
 
 1. **Read** `plan.vbrief.json` from the workspace
 2. **Topological sort** items using Kahn's algorithm on `blocks` edges
