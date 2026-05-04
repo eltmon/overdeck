@@ -18,7 +18,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
-import type { SessionNode as SessionNodeType } from '@panctl/contracts';
+import type { SessionNode as SessionNodeType, Activity, AgentRuntimeSnapshot } from '@panctl/contracts';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import { useAvailableModels, type ModelGroup } from '../../shared/ModelPicker/ModelPicker';
 import { useDashboardStore } from '../../../lib/store';
@@ -88,6 +88,17 @@ function useResolvedModels(): Record<string, string | null> {
   return models;
 }
 
+function activityToStatus(activity: Activity): StatusDotStatus {
+  switch (activity) {
+    case 'working': return 'active';
+    case 'thinking': return 'thinking';
+    case 'waiting': return 'waiting';
+    case 'idle': return 'idle';
+    case 'stopped': return 'ended';
+    default: return 'ended';
+  }
+}
+
 function presenceToStatus(presence: SessionNodeType['presence']): StatusDotStatus {
   switch (presence) {
     case 'active': return 'active';
@@ -98,7 +109,21 @@ function presenceToStatus(presence: SessionNodeType['presence']): StatusDotStatu
   }
 }
 
-function ReviewerVerdict({ session }: { session: SessionNodeType }) {
+function effectiveActivity(runtime: AgentRuntimeSnapshot | undefined, presence: SessionNodeType['presence']): Activity | undefined {
+  if (!runtime?.activity) return undefined;
+  // agent.stopped sets activity="stopped" but tmux session may still be alive (pan done).
+  // If presence says alive, treat as idle — the agent finished work but isn't dead.
+  if (runtime.activity === 'stopped' && presence !== 'ended') return 'idle';
+  return runtime.activity;
+}
+
+function deriveDotStatus(runtime: AgentRuntimeSnapshot | undefined, presence: SessionNodeType['presence']): StatusDotStatus {
+  const activity = effectiveActivity(runtime, presence);
+  if (activity) return activityToStatus(activity);
+  return presenceToStatus(presence);
+}
+
+function ReviewerVerdict({ session, dotStatus }: { session: SessionNodeType; dotStatus: StatusDotStatus }) {
   const { latestStatus, latestReviewResult } = session.roundMetadata ?? {};
   if (latestReviewResult === 'APPROVED') {
     return <CircleCheck size={10} style={{ color: 'var(--success)', flexShrink: 0 }} />;
@@ -106,7 +131,7 @@ function ReviewerVerdict({ session }: { session: SessionNodeType }) {
   if (latestReviewResult === 'CHANGES_REQUESTED' || latestStatus === 'failed') {
     return <CircleX size={10} style={{ color: 'var(--destructive)', flexShrink: 0 }} />;
   }
-  return <StatusDot status={presenceToStatus(session.presence)} size="sm" />;
+  return <StatusDot status={dotStatus} size="sm" />;
 }
 
 interface SessionNodeProps {
@@ -258,6 +283,11 @@ export function SessionNode({
   const runtime = useDashboardStore((s) => s.agentRuntimeById[session.sessionId]);
   const lastActivity = runtime?.lastActivity;
 
+  const dotStatus = deriveDotStatus(runtime, session.presence);
+  const activity = effectiveActivity(runtime, session.presence);
+  const displayStatus = activity ?? session.status;
+  const statusCssKey = activity ?? session.status;
+
   const flashKey = `${session.sessionId}:${session.presence}:${session.status}`;
   const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
 
@@ -308,7 +338,7 @@ export function SessionNode({
                 : <ChevronRight size={12} style={{ color: 'var(--muted-foreground)' }} />}
             </span>
           )}
-          <ReviewerVerdict session={session} />
+          <ReviewerVerdict session={session} dotStatus={dotStatus} />
           <TypeIcon type={session.type} role={session.role} />
           <span
             className={styles.sessionLabel}
@@ -322,8 +352,8 @@ export function SessionNode({
             {deriveSessionLabel(session, defaultModel)}
           </span>
           <LiveLastHeard lastActivity={lastActivity} />
-          <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${session.status}`] ?? ''}`}>
-            {session.status}
+          <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${statusCssKey}`] ?? ''}`}>
+            {displayStatus}
           </span>
           <span className={styles.sessionDuration}>{formatDuration(session.duration)}</span>
         </button>
