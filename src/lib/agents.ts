@@ -1094,6 +1094,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   });
   writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
   const claudeCmd = `bash ${launcherScript}`;
+  console.log(`[claude-invoke] purpose=work-agent | model=${state.model} | source=agents.ts:spawnAgent | session=${agentId} | command="${claudeCmd}"`);
 
   // Pre-trust workspace directory in Claude Code to avoid the trust prompt
   try {
@@ -1147,12 +1148,15 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   }
 
-  // Inject provider env overlay into project-level .claude/settings.local.json.
-  // Claude Code's settings.json `env` block overrides process env, so tmux -e exports
-  // alone are insufficient when users have provider keys in ~/.claude/settings.json.
+  // Inject provider env overlay into the main project's .claude/settings.local.json.
+  // Claude Code reads settings.local.json by walking UP from CWD. Workspaces are
+  // subdirectories of the main project, so writing to the workspace would create a
+  // higher-precedence settings file that gets stale across agents using different
+  // providers. Writing to projectRoot (two levels up from the workspace) ensures all
+  // agent types share one canonical settings.local.json that is always up-to-date.
   try {
     const { injectProviderEnvOverlay } = await import('./claude-settings-overlay.js');
-    const overlayResult = await injectProviderEnvOverlay(options.workspace, providerEnv);
+    const overlayResult = await injectProviderEnvOverlay(projectRoot, providerEnv);
     if (overlayResult.keysInjected.length > 0) {
       console.log(`[${agentId}] Provider env overlay: ${overlayResult.keysInjected.join(', ')}`);
     }

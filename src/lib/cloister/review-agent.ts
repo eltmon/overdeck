@@ -13,7 +13,8 @@ import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
 import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync, isPaneDeadAsync } from '../tmux.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agents.js';
+import { getProviderExportsForModel, getAgentRuntimeBaseCommand, getProviderEnvForModel } from '../agents.js';
+import { injectProviderEnvOverlay } from '../claude-settings-overlay.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { getModelId, hasOverride } from '../work-type-router.js';
 import { AGENTS_DIR, CACHE_AGENTS_DIR, CACHE_REVIEW_PROMPTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
@@ -540,6 +541,14 @@ export async function spawnSingleReviewer(
   const claudeCmd = await getAgentRuntimeBaseCommand(model);
   const providerExports = await getProviderExportsForModel(model);
 
+  // Update the project's .claude/settings.local.json with the correct provider env.
+  try {
+    const providerEnv = await getProviderEnvForModel(model);
+    await injectProviderEnvOverlay(projectPath, providerEnv);
+  } catch (err: any) {
+    console.warn(`[review-agent] Provider env overlay failed (falling back to launcher exports): ${err.message}`);
+  }
+
   // Pre-generate the Claude session UUID and persist it to the canonical reviewer
   // agent directory BEFORE Claude starts. Without this, jsonl-resolver has nothing
   // to look up: session.id is missing, sessions.json hasn't been written yet (the
@@ -579,7 +588,7 @@ export async function spawnSingleReviewer(
   });
   await writeFile(launcherPath, launcherContent, { mode: 0o755 });
 
-  console.log(`[review-agent] Spawning reviewer ${sessionName}: model=${model}, claudeSessionId=${claudeSessionId}, launcher=${launcherPath}`);
+  console.log(`[claude-invoke] purpose=review-agent | model=${model} | source=review-agent.ts:spawnReviewer | session=${sessionName} | claudeSessionId=${claudeSessionId} | launcher=${launcherPath}`);
   console.log(`[review-agent] Launcher content:\n${launcherContent}`);
 
   await createSessionAsync(sessionName, packageRoot, `bash ${launcherPath}`, {
