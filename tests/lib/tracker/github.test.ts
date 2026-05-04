@@ -712,4 +712,12 @@ describe('GitHubTracker', () => {
       }
     });
   });
+
+  describe('getChildIssues', () => {
+    it('returns empty array (GitHub does not support parent-child hierarchy)', async () => {
+      const tracker = new GitHubTracker('token', 'owner', 'repo');
+      const result = await tracker.getChildIssues('some-parent-id');
+      expect(result).toEqual([]);
+    });
+  });
 });

@@ -993,6 +993,17 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     });
   }
 
+  // For child stories: synthesize feature context from parent feature plan
+  // before the agent starts so readFeatureContext has O(1) local access.
+  if (!options.agentType || options.agentType === 'work-agent') {
+    try {
+      const { writeStoryFeatureContext } = await import('./cloister/work-agent-prompt.js');
+      await writeStoryFeatureContext(options.workspace, options.issueId);
+    } catch (ctxErr: any) {
+      console.warn(`[agents] Could not write story feature context for ${options.issueId}: ${ctxErr.message}`);
+    }
+  }
+
   // Build prompt with FPP work if available
   let prompt = options.prompt || '';
 

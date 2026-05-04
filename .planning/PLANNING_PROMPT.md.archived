@@ -4,7 +4,7 @@
      Session summarizers should SKIP this block and focus on the agent's
      actual work, decisions, and tradeoffs that follow. -->
 
-# Planning Session: PAN-905
+# Planning Session: PAN-936
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -68,57 +68,59 @@ After `pan plan-finalize` and the user clicks **Done**, the pipeline runs withou
 ---
 
 ## Issue Details
-- **ID:** PAN-905
-- **Title:** Command Deck: add merge phase to pipeline stepper with CI detail, queue position, and retry history
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/905
+- **ID:** PAN-936
+- **Title:** Rally feature planning: end-to-end UX and pipeline
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/936
 
 ## Description
 ## Problem
 
-After clicking MERGE on a PR, the dashboard gives fragmented visibility into what's happening. The pipeline stepper in `ReviewPipelineSection` shows Build Gate → Review → Tests but stops there — merge isn't a visible phase. To track merge progress you have to bounce between the PR/Diff Tab (CI checks), the Awaiting Merge page (merge state), and the MergeButton (stuck detection). There's also useful data the backend computes that the frontend never displays.
+Rally Features are non-interactive in the dashboard. Three related issues describe different facets of the same gap:
 
-## What to build
+- **PAN-704**: FeatureCard has no action bar (Plan / See Plan / vBRIEF / Tasks)
+- **PAN-397**: Hierarchical planning pipeline (feature-level plans, story decomposition, cross-story ordering) not wired end-to-end
+- **PAN-403**: `derivedStatus` from child stories suppresses Plan button on unplanned features
 
-### 1. Add "Merge" as a 4th step in the pipeline stepper
-- Extends the existing Build Gate → Review → Tests pipeline in `ReviewPipelineSection.tsx`
-- When active, shows sub-statuses for each CI check (build: ✅, lint: ⏳, test: pending) inline
-- States: pending → CI running → merging → merged (or failed)
-- Replaces the need to open the PR/Diff Tab just to see CI progress
+Additionally, FeatureCard click only toggles expand/collapse — no detail modal. CompactChildCard (child stories) are not clickable at all. The dashboard has no way to inspect or plan Rally features.
 
-### 2. Surface merge queue position
-- Backend already computes queue position in `/api/review/:issueId/status` (`queuePosition`, `activeSpecialist`)
-- Display "Position N in merge queue" in the pipeline stepper or issue overview when queued
-- Especially useful when multiple PRs are merging concurrently
+## Design
 
-### 3. Surface `mergeNotes` and `mergeRetryCount`
-- Both fields exist in `ReviewStatus` and are returned by the API
-- Show retry count (e.g., "Attempt 2/3") in the merge step
-- Show `mergeNotes` as expandable detail — explains WHY a merge failed
+Per `docs/HIERARCHICAL-PLANNING.md`: **plan at the Feature, execute at the Story**. Feature = planning surface. Story = execution surface.
 
-### 4. Specialist log shortcut during active merge phase
-- Currently you can "View last specialist log" only after completion
-- Add a live log link while the merge specialist is actively running
-- Lets you watch the merge agent's work in real time
+## PRD
 
-## Key files
+Full PRD with phased implementation: [`docs/prds/planned/rally-feature-planning-ux.md`](docs/prds/planned/rally-feature-planning-ux.md)
 
-- `src/dashboard/frontend/src/components/inspector/ReviewPipelineSection.tsx` — pipeline stepper (add 4th step)
-- `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/PrDiffTab.tsx` — CI checks display (model for sub-statuses)
-- `src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts` — ReviewStatusData, PullRequestData interfaces
-- `src/dashboard/frontend/src/components/MergeButton.tsx` — merge state machine (stuck detection)
-- `src/dashboard/frontend/src/components/AwaitingMergePage.tsx` — merge queue UI
-- `src/dashboard/server/routes/workspaces.ts` — `/api/review/:issueId/status` (already returns mergeStatus, mergeNotes, mergeRetryCount, queuePosition)
-- `src/lib/review-status.ts` — ReviewStatus interface
+## Phases
 
-## Acceptance criteria
+### Phase 1: Interactive FeatureCard (Dashboard UI)
+- [ ] **1.1** Action bar on FeatureCard — Plan/See Plan, vBRIEF, Tasks chips (no Start Agent)
+- [ ] **1.2** Click-to-modal on FeatureCard title (expand/collapse stays on chevron)
+- [ ] **1.3** Click-to-modal on CompactChildCard (child stories open detail modal)
+- [ ] **1.4** Fix derivedStatus gate — Plan button uses feature's own state, not derived child progress
 
-- [ ] Pipeline stepper shows 4 steps: Build Gate → Review → Tests → Merge
-- [ ] Merge step shows individual CI check sub-statuses (name + pass/fail/running) when CI is in progress
-- [ ] Merge queue position displayed when issue is queued behind others
-- [ ] `mergeRetryCount` shown as "Attempt N" in the merge step
-- [ ] `mergeNotes` shown as expandable detail on failure
-- [ ] Live specialist log link available during active merge phase
-- [ ] Existing 3-step behavior unchanged when merge phase hasn't started
+### Phase 2: Feature Planning Pipeline (Backend)
+- [ ] **2.1** `getChildIssues()` on tracker interface + Rally implementation
+- [ ] **2.2** Feature-aware `pan work plan` — detect Rally Feature, fetch children, produce feature-level vBRIEF
+- [ ] **2.3** opus-plan skill v2.0 — feature-level vs story-level mode
+- [ ] **2.4** Story workspace context injection — FEATURE-CONTEXT.md into `.planning/`
+- [ ] **2.5** Cloister cross-story ordering via feature-level `blocks`/`informs`/`invalidates` edges
+
+### Phase 3: Integration Tests
+- [ ] **3.1** Dashboard tests (FeatureCard actions, modals, derivedStatus gate)
+- [ ] **3.2** Pipeline integration tests (feature plan → story workspace → agent execution)
+
+## Key Files
+
+- `KanbanBoard.tsx` — FeatureCard, CompactChildCard, IssueCard action bar, planChip
+- `issue-data-service.ts` — derivedStatus computation
+- `src/lib/tracker/interface.ts` + `rally.ts` — tracker interface, getChildIssues
+- `src/lib/cloister/work-agent-prompt.ts` — readPlanningContext, injectFeatureContext
+- `src/lib/planning/vbrief-planning.ts` — feature plan skeletons
+
+## Consolidates
+
+Closes #704, #397, #403
 
 ---
 
@@ -207,10 +209,10 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
     "version": "0.5",
     "created": "<ISO 8601 timestamp>",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-905: <issue title>"
+    "description": "Plan for PAN-936: <issue title>"
   },
   "plan": {
-    "id": "pan-905",
+    "id": "pan-936",
     "title": "<issue title>",
     "status": "approved",
     "uid": "<generate a UUID v4>",
@@ -219,7 +221,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
     "created": "<ISO 8601 timestamp — same as vBRIEFInfo.created>",
     "updated": "<ISO 8601 timestamp — same as created>",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/905", "label": "PAN-905", "type": "issue" }
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/936", "label": "PAN-936", "type": "issue" }
     ],
     "tags": ["<relevant tags>"],
     "narratives": {
@@ -235,7 +237,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
         "created": "<ISO 8601 timestamp>",
         "metadata": {
           "difficulty": "trivial|simple|medium|complex|expert",
-          "issueLabel": "pan-905"
+          "issueLabel": "pan-936"
         },
         "narrative": { "Action": "<what needs to be done>" },
         "subItems": [
@@ -257,7 +259,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
 
 **CRITICAL vBRIEF rules:**
 - The file MUST have `vBRIEFInfo` and `plan` as the ONLY top-level keys
-- `plan.id` MUST be the issue ID in lowercase (e.g., "pan-905")
+- `plan.id` MUST be the issue ID in lowercase (e.g., "pan-936")
 - `plan.uid` MUST be a freshly generated UUID v4
 - Do NOT use `issue`, `issueId`, or `issue_id` — use `plan.id`
 - `items[].status` MUST be one of: draft, proposed, approved, pending, running, completed, blocked, cancelled

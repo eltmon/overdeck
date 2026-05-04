@@ -85,6 +85,9 @@ import {
   spawnAgent,
 } from '../../../lib/agents.js';
 import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js';
+import { getCostsForIssue } from '../../../lib/costs/index.js';
+import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
+import { getCachedRunningAgents } from '../services/running-agents-cache.js';
 import { findPlan, readPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
 import { criticalPath } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
@@ -626,6 +629,33 @@ async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<st
 }
 
 /**
+ * Fallback bead reader that parses .beads/issues.jsonl directly.
+ * Used when the bd CLI is unavailable (e.g. in tests).
+ */
+async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promise<Array<{ title: string; status: string }>> {
+  try {
+    const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
+    if (!existsSync(jsonlPath)) return [];
+    const raw = await readFile(jsonlPath, 'utf-8');
+    const issueLower = issueId.toLowerCase();
+    const beads: Array<{ title: string; status: string }> = [];
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const entry = JSON.parse(line);
+        const labels = Array.isArray(entry.labels) ? entry.labels : [];
+        if (labels.some((l: string) => l.toLowerCase() === issueLower)) {
+          beads.push({ title: String(entry.title ?? ''), status: String(entry.status ?? 'open') });
+        }
+      } catch { /* skip malformed lines */ }
+    }
+    return beads;
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Build a rich PR body with issue link, beads task summary, and AC checklist
  * from the vBRIEF plan. Exported for testing.
  */
@@ -658,7 +688,11 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
 
   // Beads task summary from live Dolt database via bd CLI
   try {
-    const beads = await queryBeadsForIssue(workspacePath, issueId);
+    let beads = await queryBeadsForIssue(workspacePath, issueId);
+    if (beads.length === 0) {
+      // Fallback: read from .beads/issues.jsonl when bd CLI is unavailable
+      beads = await readBeadsFromJsonl(workspacePath, issueId);
+    }
     if (beads.length > 0) {
       lines.push('## Implementation Tasks');
       lines.push('');
@@ -1134,6 +1168,24 @@ const getWorkspaceRoute = HttpRouter.add(
           yield* Effect.promise(() => reconcileGitHubMergeStatus(issueId, reviewStatus));
         }
 
+        const stashes = yield* Effect.promise(() => listStashes(workspacePath));
+        const salvageableStashes = stashes
+          .filter(isSalvageableStash)
+          .filter((entry) => entry.issueId === issueId.toUpperCase());
+
+        const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
+        const hasPlan = existsSync(planPath);
+        const planningComplete = existsSync(join(workspacePath, '.planning', '.planning-complete'));
+        const hasBeads = !!planningComplete;
+
+        const issueData = getCostsForIssue(issueId);
+        const agents = yield* Effect.promise(() => getCachedRunningAgents());
+        const resolvedCost = resolveIssueHeadlineCost({
+          issueId: issueId,
+          aggregateCost: issueData?.totalCost,
+          agents,
+        });
+
         return jsonResponse({
           exists: true,
           issueId,
@@ -1153,6 +1205,64 @@ const getWorkspaceRoute = HttpRouter.add(
           canContainerize,
           pendingOperation,
           location,
+          salvageableStashes,
+          planningState: {
+            hasPlan,
+            hasBeads,
+            beadsCount: 0,
+            planningComplete,
+            workspacePath,
+          },
+          costs: issueData
+            ? {
+                issueId: issueId.toUpperCase(),
+                totalCost: issueData.totalCost,
+                resolvedTotalCost: resolvedCost.resolvedTotalCost,
+                aggregateCost: resolvedCost.aggregateCost,
+                liveCost: resolvedCost.liveCost,
+                totalTokens: issueData.inputTokens + issueData.outputTokens + issueData.cacheReadTokens + issueData.cacheWriteTokens,
+                inputTokens: issueData.inputTokens,
+                outputTokens: issueData.outputTokens,
+                cacheReadTokens: issueData.cacheReadTokens,
+                cacheWriteTokens: issueData.cacheWriteTokens,
+                models: issueData.models,
+                providers: issueData.providers,
+                byModel: Object.fromEntries(
+                  Object.entries(issueData.models).map(([model, stats]: [string, any]) => [
+                    model,
+                    { cost: stats.cost, tokens: stats.tokens },
+                  ])
+                ),
+                sessions: issueData.sessions ?? [],
+                byStage: Object.fromEntries(
+                  Object.entries(issueData.stages || {}).map(([stage, stats]: [string, any]) => [
+                    stage,
+                    { cost: stats.cost, tokens: stats.tokens },
+                  ])
+                ),
+                budget: issueData.budget,
+                budgetWarning: issueData.budgetWarning,
+                lastUpdated: issueData.lastUpdated,
+              }
+            : {
+                issueId: issueId.toUpperCase(),
+                totalCost: 0,
+                resolvedTotalCost: resolvedCost.resolvedTotalCost,
+                aggregateCost: resolvedCost.aggregateCost,
+                liveCost: resolvedCost.liveCost,
+                totalTokens: 0,
+                inputTokens: 0,
+                outputTokens: 0,
+                cacheReadTokens: 0,
+                cacheWriteTokens: 0,
+                models: {},
+                providers: {},
+                byModel: {},
+                sessions: [],
+                byStage: {},
+                budget: undefined,
+                budgetWarning: false,
+              },
         });
   }))
 );

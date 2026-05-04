@@ -198,7 +198,7 @@ export async function runPreflightChecks(workspacePath: string, issueId: string)
     let synced = 0;
     for (const bead of closedBeads) {
       if (bead.id) {
-        const itemId = syncBeadStatusToVBrief(bead.id, workspacePath, 'completed', bead.title);
+        const itemId = await syncBeadStatusToVBrief(bead.id, workspacePath, 'completed', bead.title);
         if (itemId) synced++;
       }
     }

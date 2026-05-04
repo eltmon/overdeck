@@ -40,7 +40,7 @@ import { encodeClaudeProjectDir } from '../../../lib/paths.js';
  *   POST   /api/specialists/:project/:type/logs/cleanup
  */
 
-import { exec } from 'node:child_process';
+import { exec, execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -74,6 +74,7 @@ import { extractPrefix } from '../../../lib/issue-id.js';
 import { createSessionAsync, killSessionAsync } from '../../../lib/tmux.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -428,7 +429,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
               // Sync bead completion to vBRIEF plan
               try {
                 const beadData = await queryBeadById(workspacePath, beadId);
-                const updatedItemId = syncBeadStatusToVBrief(beadId, workspacePath, 'completed', beadData?.title);
+                const updatedItemId = await syncBeadStatusToVBrief(beadId, workspacePath, 'completed', beadData?.title);
                 if (updatedItemId) {
                   // Check which tasks are now unblocked and wake the work agent
                   try {
@@ -544,7 +545,11 @@ const postSpecialistsDoneRoute = HttpRouter.add(
             if (prMatch) {
               const [, owner, repo, prNumber] = prMatch;
               const commentBody = `## Merge Failed\n\n${notes || 'Merge could not be completed.'}\n\nThe issue has been moved back to In Progress. The work agent needs to resolve conflicts and resubmit.`;
-              await execAsync(`gh api repos/${owner}/${repo}/issues/${prNumber}/comments -f body=${JSON.stringify(commentBody)}`, { encoding: 'utf-8' });
+              await execFileAsync(
+                'gh',
+                ['api', `repos/${owner}/${repo}/issues/${prNumber}/comments`, '--field', `body=${commentBody}`],
+                { encoding: 'utf-8' },
+              );
               console.log(`[specialists/done] Posted merge failure comment on ${prUrl}`);
             }
           }

@@ -11,6 +11,7 @@ optional:
   - PROJECT_ROOT
   - BEADS_TASKS
   - STITCH_DESIGNS
+  - FEATURE_CONTEXT
   - POLYREPO_CONTEXT
   - PENDING_FEEDBACK
   - NEW_TRACKER_CONTEXT
@@ -199,6 +200,14 @@ The planning agent created UI designs using Google Stitch. Use these assets:
 - Use `/stitch-react-components` skill with the Project/Screen IDs above
 - Or check if DESIGN.md already exists for styling guidelines
 {{/STITCH_DESIGNS}}
+
+{{#FEATURE_CONTEXT}}
+## Feature Context (Parent Feature)
+
+You are implementing a story that belongs to a larger Rally Feature. Reference this context to understand how your work fits into the broader initiative:
+
+{{FEATURE_CONTEXT}}
+{{/FEATURE_CONTEXT}}
 
 {{#PENDING_FEEDBACK}}
 ## Specialist Feedback (ACTION REQUIRED)

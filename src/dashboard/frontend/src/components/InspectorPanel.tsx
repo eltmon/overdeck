@@ -29,6 +29,7 @@ import { getFriendlyModelName, shouldForceReviewTrigger } from './inspector/util
 import { useAlert } from './DialogProvider';
 import { BeadsDialog } from './BeadsDialog';
 import { VBriefDialog } from './vbrief/VBriefDialog';
+import { PlanDialog } from './PlanDialog';
 import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
@@ -39,37 +40,6 @@ import { PHASE_CHIP_COLORS, PHASE_LABELS, type PipelinePhase } from './inspector
 import { SwitchModelModal } from './SwitchModelModal';
 import { useSwitchModel } from '../hooks/useSwitchModel';
 import { SensitiveText } from './SensitiveText';
-
-interface SessionCost {
-  id: string;
-  startedAt: string;
-  endedAt: string | null;
-  type: string;
-  model: string;
-  cost?: number;
-  tokenCount?: number;
-}
-
-interface ModelCostInfo {
-  cost: number;
-  tokens: number;
-}
-
-interface StageCostInfo {
-  cost: number;
-  tokens: number;
-}
-
-interface IssueCostData {
-  issueId: string;
-  totalCost: number;
-  totalTokens: number;
-  inputTokens?: number;
-  outputTokens?: number;
-  sessions: SessionCost[];
-  byModel: Record<string, ModelCostInfo>;
-  byStage?: Record<string, StageCostInfo>;
-}
 
 function formatCost(cost: number): string {
   if (cost >= 100) return `$${cost.toFixed(0)}`;
@@ -145,6 +115,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
   const [containersStartedAt, setContainersStartedAt] = useState(0);
   const [agentLaunchState, setAgentLaunchState] = useState<'starting' | 'resuming' | null>(null);
   const [showSwitchModel, setShowSwitchModel] = useState(false);
+  const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null);
   const [containerMenu, setContainerMenu] = useState<{
     x: number; y: number; containerName: string; isRunning: boolean;
   } | null>(null);
@@ -182,7 +153,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     });
   }, [confirm]);
 
-  const { data: workspace } = useQuery<WorkspaceInfo>({
+  const { data: workspace } = useQuery<WorkspaceInfo & { salvageableStashes?: SalvageableStashInfo[] }>({
     queryKey: ['workspace', issueId],
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}`);
@@ -200,18 +171,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       return data;
     },
     refetchInterval: (workspaceCreating || containersStarting || !!agentLaunchState) ? 5000 : 30000,
-  });
-
-  const { data: stashData } = useQuery<{ salvageableStashes: SalvageableStashInfo[] }>({
-    queryKey: ['workspace-stashes', issueId],
-    queryFn: async () => {
-      const res = await fetch(`/api/workspaces/${issueId}/stashes`);
-      if (!res.ok) throw new Error('Failed to fetch workspace stashes');
-      return res.json();
-    },
-    enabled: workspace?.exists === true,
-    refetchInterval: 60000,
-    staleTime: 30000,
   });
 
   // Self-contained review status query (shares cache key with DetailPanelLayout)
@@ -253,29 +212,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       }
     },
     staleTime: 60000,
-  });
-
-  const { data: costData } = useQuery<IssueCostData>({
-    queryKey: ['issueCosts', issueId],
-    queryFn: async () => {
-      const res = await fetch(`/api/issues/${issueId}/costs`);
-      if (!res.ok) throw new Error('Failed to fetch costs');
-      return res.json();
-    },
-    refetchInterval: 30000,
-    staleTime: 10000,
-  });
-
-  const { data: planningState } = useQuery({
-    queryKey: ['planning-state', issueId],
-    queryFn: async () => {
-      const res = await fetch(`/api/issues/${issueId}/planning-state`);
-      if (!res.ok) throw new Error('Failed to fetch planning state');
-      return res.json() as Promise<{ hasPlan: boolean; hasBeads: boolean; beadsCount: number; planningComplete: boolean }>;
-    },
-    enabled: !!issueId,
-    refetchInterval: 30000,
-    staleTime: 15000,
   });
 
   const startAgentMutation = useMutation({
@@ -803,11 +739,11 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
               This issue was completed and merged outside of Panopticon's workspace pipeline.
               No workspace, agent, or pipeline state is available.
             </p>
-            {costData && costData.totalCost > 0 && (
+            {workspace?.costs && workspace.costs.totalCost > 0 && (
               <div className="mt-2 flex items-center gap-2 text-[10px]">
                 <DollarSign className="w-3 h-3 text-success" />
                 <span className="text-muted-foreground">Total cost:</span>
-                <span className="text-success font-medium">{formatCost(costData.totalCost)}</span>
+                <span className="text-success font-medium">{formatCost(workspace.costs.totalCost)}</span>
               </div>
             )}
           </div>
@@ -865,28 +801,28 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
         </div>
 
         {/* Cost summary */}
-        {costData && costData.totalCost > 0 && (
+        {workspace?.costs && workspace.costs.totalCost > 0 && (
           <div className="px-3 py-2 border-b border-border text-xs">
             <div className="flex items-center gap-1.5 mb-2">
               <DollarSign className="w-3 h-3 text-success" />
               <span className="uppercase tracking-wider text-[10px] font-semibold text-muted-foreground">Cost</span>
-              <span className="text-success font-medium ml-auto">{formatCost(costData.totalCost)}</span>
+              <span className="text-success font-medium ml-auto">{formatCost(workspace.costs.totalCost)}</span>
             </div>
-            {costData.totalTokens > 0 && (
+            {workspace.costs.totalTokens > 0 && (
               <div className="space-y-0.5">
                 <div className="flex justify-between text-[10px]">
                   <span className="text-muted-foreground">Input tokens</span>
-                  <span className="text-foreground">{formatTokens(costData.inputTokens ?? 0)}</span>
+                  <span className="text-foreground">{formatTokens(workspace.costs.inputTokens ?? 0)}</span>
                 </div>
                 <div className="flex justify-between text-[10px]">
                   <span className="text-muted-foreground">Output tokens</span>
-                  <span className="text-foreground">{formatTokens(costData.outputTokens ?? 0)}</span>
+                  <span className="text-foreground">{formatTokens(workspace.costs.outputTokens ?? 0)}</span>
                 </div>
               </div>
             )}
-            {Object.keys(costData.byModel).length > 0 && (
+            {Object.keys(workspace.costs.byModel).length > 0 && (
               <div className="mt-1.5 space-y-0.5">
-                {Object.entries(costData.byModel).sort(([, a], [, b]) => b.cost - a.cost).map(([model, info]) => (
+                {Object.entries(workspace.costs.byModel).sort(([, a], [, b]) => b.cost - a.cost).map(([model, info]) => (
                   <div key={model} className="flex justify-between text-[10px]">
                     <span className="truncate text-muted-foreground" title={model}>{getFriendlyModelName(model)}</span>
                     <span className="text-foreground ml-2">{formatCost(info.cost)} ({formatTokens(info.tokens)})</span>
@@ -894,10 +830,10 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
                 ))}
               </div>
             )}
-            {costData.byStage && Object.keys(costData.byStage).length > 0 && (
+            {workspace.costs.byStage && Object.keys(workspace.costs.byStage).length > 0 && (
               <div className="mt-1.5 pt-1.5 border-t border-border space-y-0.5">
                 <div className="text-[10px] uppercase tracking-wider mb-1 text-muted-foreground">By Stage</div>
-                {Object.entries(costData.byStage).sort(([, a], [, b]) => b.cost - a.cost).map(([stage, info]) => (
+                {Object.entries(workspace.costs.byStage).sort(([, a], [, b]) => b.cost - a.cost).map(([stage, info]) => (
                   <div key={stage} className="flex justify-between text-[10px]">
                     <span className="truncate text-muted-foreground" title={stage}>{stage.charAt(0).toUpperCase() + stage.slice(1)}</span>
                     <span className="text-foreground ml-2">{formatCost(info.cost)} ({formatTokens(info.tokens)})</span>
@@ -1015,11 +951,11 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           </div>
         )}
 
-        {stashData?.salvageableStashes && stashData.salvageableStashes.length > 0 && (
+        {workspace?.salvageableStashes && workspace.salvageableStashes.length > 0 && (
           <div className="px-3 py-2 border-b border-border text-xs">
             <div className="uppercase tracking-wider text-[10px] mb-2 font-semibold text-muted-foreground">Salvageable Stashes</div>
             <div className="space-y-2">
-              {stashData.salvageableStashes.map((stash) => (
+              {workspace.salvageableStashes.map((stash) => (
                 <div key={stash.ref} className="rounded border border-border px-2 py-2 bg-card/40">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -1061,9 +997,9 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           reviewStatus={reviewStatus}
           reviewStatusLoading={reviewStatusLoading}
           workspace={workspace}
-          hasPlan={planningState?.hasPlan ?? false}
-          hasBeads={planningState?.hasBeads ?? false}
-          beadsCount={planningState?.beadsCount ?? 0}
+          hasPlan={workspace?.planningState?.hasPlan ?? false}
+          hasBeads={workspace?.planningState?.hasBeads ?? false}
+          beadsCount={workspace?.planningState?.beadsCount ?? 0}
           reviewMutation={reviewMutation}
           cancelMutation={cancelMutation}
           startAgentMutation={startAgentMutation}
@@ -1087,6 +1023,9 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           onSwitchModel={() => setShowSwitchModel(true)}
           lifecycle={agentLifecycle}
           agentLaunchState={agentLaunchState}
+          isFeature={issue?.artifactType?.includes('PortfolioItem') ?? false}
+          issueStatus={issue?.status}
+          onPlan={() => setPlanDialogIssue(issue ?? null)}
         />
 
         {/* Issue labels/tags for no-agent view */}
@@ -1126,6 +1065,19 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
             });
           }}
           isPending={isSwitchPending}
+        />
+      )}
+
+      {/* Plan dialog */}
+      {planDialogIssue && (
+        <PlanDialog
+          issue={planDialogIssue}
+          isOpen={true}
+          onClose={() => setPlanDialogIssue(null)}
+          onComplete={async () => {
+            setPlanDialogIssue(null);
+            await refreshDashboardState(queryClient);
+          }}
         />
       )}
 

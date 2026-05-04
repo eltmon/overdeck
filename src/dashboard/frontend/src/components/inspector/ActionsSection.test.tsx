@@ -120,7 +120,7 @@ function renderWithDialog(ui: JSX.Element) {
 const defaultProps = {
   issueId: 'PAN-331',
   hasPlan: false,
-  beadsCount: 0,
+  hasBeads: false,
   reviewMutation: makeMutation(),
   cancelMutation: makeMutation(),
   reopenMutation: makeMutation(),
@@ -365,5 +365,100 @@ describe('ActionsSection', () => {
     renderWithDialog(<ActionsSection {...defaultProps} workspace={workspace} onDismissPending={onDismissPending} />);
     expect(screen.getByText('Merge conflict detected')).toBeInTheDocument();
     expect(screen.getByText('Operation failed')).toBeInTheDocument();
+  });
+
+  it('shows Plan button for features', () => {
+    renderWithDialog(
+      <ActionsSection
+        {...defaultProps}
+        isFeature={true}
+        onPlan={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('inspector-plan-feature')).toBeInTheDocument();
+    expect(screen.getByText('Plan')).toBeInTheDocument();
+  });
+
+  it('shows See Plan button for features that already have a plan', () => {
+    renderWithDialog(
+      <ActionsSection
+        {...defaultProps}
+        isFeature={true}
+        hasPlan={true}
+        onPlan={vi.fn()}
+      />
+    );
+    expect(screen.getByTestId('inspector-plan-feature')).toBeInTheDocument();
+    expect(screen.getByText('See Plan')).toBeInTheDocument();
+  });
+
+  it('hides Start Agent button for features', () => {
+    renderWithDialog(
+      <ActionsSection
+        {...defaultProps}
+        isFeature={true}
+      />
+    );
+    expect(screen.queryByText('Start Agent')).not.toBeInTheDocument();
+  });
+
+  it('hides Stop Agent button for features', () => {
+    renderWithDialog(
+      <ActionsSection
+        {...defaultProps}
+        agent={makeAgent()}
+        isFeature={true}
+      />
+    );
+    expect(screen.queryByTestId('inspector-stop-agent')).not.toBeInTheDocument();
+  });
+
+  it('hides Switch Model button for features', () => {
+    renderWithDialog(
+      <ActionsSection
+        {...defaultProps}
+        agent={makeAgent()}
+        isFeature={true}
+        onSwitchModel={vi.fn()}
+      />
+    );
+    expect(screen.queryByTestId('inspector-switch-model')).not.toBeInTheDocument();
+  });
+
+  it('hides Resume Session button for features', () => {
+    renderWithDialog(
+      <ActionsSection
+        {...defaultProps}
+        agent={makeAgent({ status: 'stopped' })}
+        lifecycle={makeLifecycle()}
+        isFeature={true}
+      />
+    );
+    expect(screen.queryByText('Resume Session')).not.toBeInTheDocument();
+  });
+
+  it('hides Plan button for closed feature', () => {
+    renderWithDialog(
+      <ActionsSection
+        {...defaultProps}
+        isFeature={true}
+        issueStatus="Done"
+        onPlan={vi.fn()}
+      />
+    );
+    expect(screen.queryByTestId('inspector-plan-feature')).not.toBeInTheDocument();
+  });
+
+  it('calls onPlan when Plan button is clicked for a feature', () => {
+    const onPlan = vi.fn();
+    renderWithDialog(
+      <ActionsSection
+        {...defaultProps}
+        isFeature={true}
+        onPlan={onPlan}
+      />
+    );
+    fireEvent.click(screen.getByTestId('inspector-plan-feature'));
+    expect(onPlan).toHaveBeenCalledOnce();
   });
 });

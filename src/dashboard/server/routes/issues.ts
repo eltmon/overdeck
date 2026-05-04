@@ -116,6 +116,18 @@ function getGitHubLocalPaths(): Record<string, string> {
   return out;
 }
 
+/** Map Rally child-issue service contract into the planning-context shape. */
+export function buildChildStoriesFromRally(
+  children: readonly { ref: string; title: string; status: string; description: string }[],
+): Array<{ ref: string; title: string; status: string; description: string }> {
+  return children.map((c) => ({
+    ref: c.ref,
+    title: c.title,
+    status: c.status,
+    description: c.description || '',
+  }));
+}
+
 function getProjectPath(linearProjectId?: string, issuePrefix?: string): string {
   if (issuePrefix) {
     const issueId = `${issuePrefix}-1`;
@@ -562,6 +574,8 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       url: string;
       source: 'linear' | 'github' | 'rally';
       comments?: Array<{ author: string; body: string; createdAt: string }>;
+      artifactType?: string;
+      childStories?: Array<{ ref: string; title: string; status: string; description: string }>;
     };
     let newStateName = 'In Planning';
 
@@ -594,6 +608,15 @@ const postIssueStartPlanningRoute = HttpRouter.add(
     } else if (trackerTypeForIssue === 'rally') {
       const rallyIssue = yield* rally.getIssue(id);
 
+      // Fetch child stories for Rally Features
+      let childStories: Array<{ ref: string; title: string; status: string; description: string }> = [];
+      if (rallyIssue.artifactType?.includes('PortfolioItem')) {
+        const children = yield* rally.getChildIssues(id).pipe(
+          Effect.catch(() => Effect.succeed([] as readonly { ref: string; title: string; status: string; description: string }[])),
+        );
+        childStories = buildChildStoriesFromRally(children);
+      }
+
       issue = {
         id: rallyIssue.id,
         identifier: rallyIssue.ref,
@@ -601,6 +624,8 @@ const postIssueStartPlanningRoute = HttpRouter.add(
         description: rallyIssue.description || '',
         url: rallyIssue.url,
         source: 'rally',
+        artifactType: rallyIssue.artifactType,
+        childStories: childStories.length > 0 ? childStories : undefined,
       };
 
     } else {
@@ -819,7 +844,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
             const workspacePath = existsSync(featureWorkspacePath) ? featureWorkspacePath : plainWorkspacePath;
 
             if (existsSync(workspacePath)) {
-              await execAsync(`pan workspace destroy ${issueIdentifier!.toLowerCase()} --force`, {
+              await execFileAsync('pan', ['workspace', 'destroy', issueIdentifier!.toLowerCase(), '--force'], {
                 cwd: projectPath,
                 encoding: 'utf-8',
                 timeout: 120000,
