@@ -29,6 +29,7 @@ import { renderPrompt } from '../cloister/prompts.js';
 import { getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../agents.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
+import { appendSessionEntry } from '../vbrief/continue-state.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -465,6 +466,18 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort);
     await writeFile(planningPromptPath, planningPrompt);
 
+    // Also capture planning prompt in continue file (Layer 2+).
+    // Uses .planning/ directly since the vBRIEF hasn't been proposed yet.
+    try {
+      appendSessionEntry(planningDir, issue.identifier, {
+        reason: 'planning',
+        content: planningPrompt,
+        note: `Planning session started for ${issue.identifier}: ${issue.title}`,
+      });
+    } catch (err: any) {
+      console.warn(`[start-planning] Could not write planning prompt to continue file: ${err.message}`);
+    }
+
     await writeFeatureContext(planningDir, issue);
 
     const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel);
@@ -472,7 +485,8 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const providerExports = await getProviderExportsForModel(planningModel);
 
     // ── Write launcher script ──────────────────────────────────────────────
-    const initMessage = `Please read the planning prompt file at ${planningPromptPath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
+    const continueFilePath = join(planningDir, `continue-${issue.identifier.toUpperCase()}.vbrief.json`);
+    const initMessage = `Please read the planning prompt at ${planningPromptPath} (or the \`content\` field of the \`planning\` entry in ${continueFilePath}) and begin the planning session for ${issue.identifier}: ${issue.title}`;
     const promptFile = join(agentStateDir, 'init-prompt.txt');
     const launcherScript = join(agentStateDir, 'launcher.sh');
     await writeFile(promptFile, initMessage);
