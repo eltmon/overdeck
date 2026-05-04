@@ -1560,103 +1560,106 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
       }
     });
 
-    // 3. Find the planning commit and reset to it
+    // 3. Find the planning commit and reset to it.
+    //
     // Planning commits come from two sources:
     //   - complete-planning endpoint: "Complete planning for PAN-XXX"
     //   - agent start flow: "chore: planning artifacts for PAN-XXX before agent start"
     // Fall back to finding the commit that added plan.vbrief.json.
-    // If no commit is found, fall back to manual file cleanup preserving .planning/ and .beads/.
-    const resetResult = yield* Effect.promise(async (): Promise<{ success: boolean; error?: string; commit?: string; method?: string }> => {
+    //
+    // If no planning commit is found, we DO NOT auto-clean. The previous
+    // behaviour was a `git clean -fd -e .planning -e .beads` fallback that
+    // silently destroyed `.devcontainer/`, `.env`, `node_modules/`, and
+    // anything else untracked — see PAN-955/956. The fix is to surface a
+    // structured error pointing the user at `pan workspace deep-clean <id>`,
+    // which they invoke from a TTY after seeing what would be deleted.
+    type ResetOutcome =
+      | { success: true; commit: string; method: string }
+      | {
+          success: false;
+          code: 'DANGEROUS_OP_BLOCKED';
+          operation: 'git_clean';
+          reason: string;
+          recovery: string;
+        }
+      | { success: false; error: string };
+
+    const resetResult = yield* Effect.promise(async (): Promise<ResetOutcome> => {
       try {
-        let planningCommit = '';
-        let method = '';
+        const { runGitResetHard } = await import('../../../lib/safety/dangerous-git-ops.js');
 
-        // Try 1: complete-planning endpoint message
-        if (!planningCommit) {
+        async function findPlanningCommit(grep: string, label: string): Promise<{ sha: string; method: string } | null> {
           try {
             const { stdout } = await execAsync(
-              `git log --grep="Complete planning for ${id}" --format=%H -1`,
-              { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+              `git log --grep="${grep.replace(/"/g, '\\"')}" --format=%H -1`,
+              { cwd: workspacePath, encoding: 'utf-8', timeout: 10_000 },
             );
-            planningCommit = stdout.trim();
-            if (planningCommit) method = 'complete-planning message';
-          } catch { /* ignore */ }
+            const sha = stdout.trim();
+            return sha ? { sha, method: label } : null;
+          } catch {
+            return null;
+          }
         }
 
-        // Try 2: agent start flow message
-        if (!planningCommit) {
-          try {
-            const { stdout } = await execAsync(
-              `git log --grep="chore: planning artifacts for ${id}" --format=%H -1`,
-              { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
-            );
-            planningCommit = stdout.trim();
-            if (planningCommit) method = 'agent-start message';
-          } catch { /* ignore */ }
+        const found =
+          (await findPlanningCommit(`Complete planning for ${id}`, 'complete-planning message')) ??
+          (await findPlanningCommit(`chore: planning artifacts for ${id}`, 'agent-start message')) ??
+          (await (async () => {
+            try {
+              const { stdout } = await execAsync(
+                `git log --diff-filter=A --format=%H -1 -- .planning/plan.vbrief.json`,
+                { cwd: workspacePath, encoding: 'utf-8', timeout: 10_000 },
+              );
+              const sha = stdout.trim();
+              return sha ? { sha, method: 'plan.vbrief.json add' } : null;
+            } catch {
+              return null;
+            }
+          })());
+
+        if (!found) {
+          // No tracked planning state to reset to. Refuse to auto-clean —
+          // the user has to opt in via `pan workspace deep-clean <id>`.
+          return {
+            success: false,
+            code: 'DANGEROUS_OP_BLOCKED',
+            operation: 'git_clean',
+            reason:
+              `restart-from-plan could not find a planning commit for ${id}. The previous ` +
+              `behaviour was to auto-clean untracked files, which silently destroyed .devcontainer/, ` +
+              `.env, and other regenerable artifacts. That auto-clean is no longer allowed.`,
+            recovery:
+              `Run \`pan workspace deep-clean ${issueLower}\` from a terminal — it will list every ` +
+              `untracked file/dir before deleting anything and ask you to confirm. After that, retry ` +
+              `restart-from-plan.`,
+          };
         }
 
-        // Try 3: commit that added plan.vbrief.json (message-agnostic)
-        if (!planningCommit) {
-          try {
-            const { stdout } = await execAsync(
-              `git log --diff-filter=A --format=%H -1 -- .planning/plan.vbrief.json`,
-              { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
-            );
-            planningCommit = stdout.trim();
-            if (planningCommit) method = 'plan.vbrief.json add';
-          } catch { /* ignore */ }
-        }
-
-        if (planningCommit) {
-          await execAsync(`git reset --hard ${planningCommit}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
-          console.log(`[restart-from-plan] Reset branch to planning commit ${planningCommit} for ${id}`);
-          return { success: true, commit: planningCommit, method };
-        }
-
-        // Fallback: manual cleanup — preserve .planning/ and .beads/, reset everything else to main
-        console.log(`[restart-from-plan] No planning commit for ${id}, using manual cleanup`);
-        method = 'manual-cleanup';
-
-        // 3a. Save planning artifacts and beads to temp
-        const tmpDir = join(homedir(), '.panopticon', 'tmp', `restart-${issueLower}`);
-        await mkdir(tmpDir, { recursive: true });
-        const planningDir = join(workspacePath, '.planning');
-        const beadsDir = join(workspacePath, '.beads');
-        if (existsSync(planningDir)) {
-          await execAsync(`cp -r "${planningDir}" "${tmpDir}/.planning"`, { encoding: 'utf-8' });
-        }
-        if (existsSync(beadsDir)) {
-          await execAsync(`cp -r "${beadsDir}" "${tmpDir}/.beads"`, { encoding: 'utf-8' });
-        }
-
-        // 3b. Reset all tracked files to main state
-        try {
-          await execAsync(`git checkout main -- .`, { cwd: workspacePath, encoding: 'utf-8', timeout: 30000 });
-        } catch { /* main may not have all files */ }
-
-        // 3c. Remove untracked files and directories (preserve .planning and .beads)
-        try {
-          await execAsync(`git clean -fd -e .planning -e .beads`, { cwd: workspacePath, encoding: 'utf-8', timeout: 30000 });
-        } catch { /* ignore */ }
-
-        // 3d. Restore saved artifacts
-        if (existsSync(join(tmpDir, '.planning'))) {
-          await execAsync(`rm -rf "${planningDir}" && cp -r "${tmpDir}/.planning" "${planningDir}"`, { encoding: 'utf-8' });
-        }
-        if (existsSync(join(tmpDir, '.beads'))) {
-          await execAsync(`rm -rf "${beadsDir}" && cp -r "${tmpDir}/.beads" "${beadsDir}"`, { encoding: 'utf-8' });
-        }
-        // Clean up temp
-        try { await rm(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
-
-        console.log(`[restart-from-plan] Manual cleanup complete for ${id}`);
-        return { success: true, commit: 'manual-cleanup', method };
+        await runGitResetHard({
+          workspacePath,
+          ref: found.sha,
+          reason: `restart-from-plan ${id} (${found.method})`,
+        });
+        console.log(`[restart-from-plan] Reset branch to planning commit ${found.sha} for ${id}`);
+        return { success: true, commit: found.sha, method: found.method };
       } catch (err: any) {
         return { success: false, error: err.message || 'Git reset failed' };
       }
     });
 
     if (!resetResult.success) {
+      if ('code' in resetResult && resetResult.code === 'DANGEROUS_OP_BLOCKED') {
+        return jsonResponse(
+          {
+            success: false,
+            error: resetResult.reason,
+            code: resetResult.code,
+            operation: resetResult.operation,
+            recovery: resetResult.recovery,
+          },
+          { status: 409 },
+        );
+      }
       return jsonResponse({ success: false, error: resetResult.error }, { status: 400 });
     }
 
