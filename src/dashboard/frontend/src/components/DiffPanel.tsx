@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Columns2,
+  ExternalLink,
   Rows3,
   WrapText,
   X,
@@ -541,6 +542,20 @@ export function DiffPanel({
         >
           <WrapText className="size-3" />
         </ToggleButton>
+        <button
+          type="button"
+          className="inline-flex size-7 items-center justify-center rounded-md border border-border/70 bg-background/70 text-muted-foreground transition-colors hover:border-border hover:text-foreground/80"
+          onClick={() => {
+            const params = new URLSearchParams(window.location.search)
+            params.set('diff', '1')
+            if (selectedTurnId) params.set('diffTurnId', selectedTurnId)
+            window.open(`${window.location.pathname}?${params.toString()}`, '_blank', 'width=1000,height=800')
+          }}
+          aria-label="Open diff in new window"
+          title="Pop out"
+        >
+          <ExternalLink className="size-3" />
+        </button>
         {onClose && (
           <button
             type="button"

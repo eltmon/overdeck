@@ -3,10 +3,22 @@
  * Adapted from T3Code's DiffPanelShell.tsx for Panopticon (no Electron drag region).
  */
 
-import type { ReactNode } from 'react'
+import { useCallback, useRef, useState, type ReactNode } from 'react'
 import { cn } from '../lib/utils'
 
 export type DiffPanelMode = 'inline' | 'sheet' | 'sidebar'
+
+const STORAGE_KEY = 'panopticon.ui.diffPanelWidth'
+const DEFAULT_WIDTH = 560
+const MIN_WIDTH = 320
+const MAX_WIDTH_RATIO = 0.75
+
+function getStoredWidth(): number {
+  const stored = localStorage.getItem(STORAGE_KEY)
+  if (!stored) return DEFAULT_WIDTH
+  const parsed = Number(stored)
+  return Number.isFinite(parsed) && parsed >= MIN_WIDTH ? parsed : DEFAULT_WIDTH
+}
 
 function getDiffPanelHeaderRowClassName(mode: DiffPanelMode) {
   return cn(
@@ -15,20 +27,72 @@ function getDiffPanelHeaderRowClassName(mode: DiffPanelMode) {
   )
 }
 
+function ResizeHandle({ widthRef, onWidthChange }: {
+  widthRef: React.RefObject<number>
+  onWidthChange: (width: number) => void
+}) {
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      e.preventDefault()
+      const startX = e.clientX
+      const startWidth = widthRef.current ?? DEFAULT_WIDTH
+      const maxWidth = window.innerWidth * MAX_WIDTH_RATIO
+      const onMove = (me: PointerEvent) => {
+        const delta = startX - me.clientX
+        const newWidth = Math.round(Math.min(maxWidth, Math.max(MIN_WIDTH, startWidth + delta)))
+        onWidthChange(newWidth)
+      }
+      const onUp = () => {
+        document.removeEventListener('pointermove', onMove)
+        document.removeEventListener('pointerup', onUp)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+      }
+      document.addEventListener('pointermove', onMove)
+      document.addEventListener('pointerup', onUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    },
+    [widthRef, onWidthChange],
+  )
+
+  return (
+    <div
+      className="group absolute inset-y-0 left-0 z-30 flex w-2 -translate-x-1/2 cursor-col-resize items-center justify-center"
+      onPointerDown={handlePointerDown}
+    >
+      <div className="h-8 w-1 rounded-full bg-border/50 transition-colors group-hover:bg-primary/60 group-active:bg-primary" />
+    </div>
+  )
+}
+
 export function DiffPanelShell(props: {
   mode: DiffPanelMode
   header: ReactNode
   children: ReactNode
 }) {
+  const [width, setWidth] = useState(getStoredWidth)
+  const widthRef = useRef(width)
+
+  const handleWidthChange = useCallback((newWidth: number) => {
+    widthRef.current = newWidth
+    setWidth(newWidth)
+    localStorage.setItem(STORAGE_KEY, String(newWidth))
+  }, [])
+
+  const isInline = props.mode === 'inline'
+
   return (
     <div
       className={cn(
-        'flex h-full min-w-0 flex-col bg-background',
-        props.mode === 'inline'
-          ? 'w-[42vw] min-w-[360px] max-w-[560px] shrink-0 border-l border-border'
+        'relative flex h-full min-w-0 flex-col bg-background',
+        isInline
+          ? 'shrink-0 border-l border-border'
           : 'w-full',
       )}
+      style={isInline ? { width: `${width}px`, minWidth: `${MIN_WIDTH}px` } : undefined}
     >
+      {isInline && <ResizeHandle widthRef={widthRef} onWidthChange={handleWidthChange} />}
       <div className="border-b border-border">
         <div className={getDiffPanelHeaderRowClassName(props.mode)}>{props.header}</div>
       </div>
