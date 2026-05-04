@@ -235,8 +235,8 @@ function defaultThresholds(): SystemHealthThresholds {
     swapUsedCriticalPercent: Number(process.env['PAN_HEALTH_SWAP_CRITICAL_PERCENT'] ?? 50),
     cpuLoadWarningPerCore: Number(process.env['PAN_HEALTH_LOAD_WARN_PER_CORE'] ?? 1),
     cpuLoadCriticalPerCore: Number(process.env['PAN_HEALTH_LOAD_CRITICAL_PER_CORE'] ?? 1.5),
-    overcommitWarningPercent: Number(process.env['PAN_HEALTH_OVERCOMMIT_WARN_PERCENT'] ?? 90),
-    overcommitCriticalPercent: Number(process.env['PAN_HEALTH_OVERCOMMIT_CRITICAL_PERCENT'] ?? 100),
+    overcommitWarningPercent: Number(process.env['PAN_HEALTH_OVERCOMMIT_WARN_PERCENT'] ?? 150),
+    overcommitCriticalPercent: Number(process.env['PAN_HEALTH_OVERCOMMIT_CRITICAL_PERCENT'] ?? 200),
   };
 }
 
