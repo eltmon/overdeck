@@ -208,6 +208,29 @@ export function registerWorkspaceCommands(program: Command): void {
     .option('--project <path>', 'Explicit project path (overrides registry)')
     .action(destroyCommand);
 
+  // Re-render `<workspace>/.devcontainer/` from the project's compose
+  // template. Idempotent. The single source of truth for how the
+  // devcontainer files look — used by project-specific bootstrap scripts
+  // (e.g. MYN's `infra/new-feature`) instead of duplicating the render in
+  // bash + `sed`. See MIN-848.
+  workspace
+    .command('render-devcontainer <featureName>')
+    .description('Re-render <workspace>/.devcontainer/ from the project compose template')
+    .option('--project <key>', 'Project key in projects.yaml (e.g. mind-your-now)')
+    .option('--workspace <path>', 'Override the inferred workspace path')
+    .option('--json', 'Emit JSON instead of human-readable output')
+    .action(
+      async (
+        featureName: string,
+        opts: { project?: string; workspace?: string; json?: boolean },
+      ) => {
+        const { workspaceRenderDevcontainerCommand } = await import(
+          './workspace-render-devcontainer.js'
+        );
+        await workspaceRenderDevcontainerCommand(featureName, opts);
+      },
+    );
+
   // The ONLY allowed call site for `git clean -fd` against a workspace.
   // Refuses to run if stdin is not a TTY. Lists what would be deleted, asks
   // the user to type the issue ID to confirm, then runs the chokepointed
