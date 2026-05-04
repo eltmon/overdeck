@@ -2,6 +2,8 @@ import { useState, useCallback, useEffect } from 'react';
 import {
   ChevronDown,
   ChevronRight,
+  CircleCheck,
+  CircleX,
   Code2,
   Compass,
   Eye,
@@ -94,6 +96,17 @@ function presenceToStatus(presence: SessionNodeType['presence']): StatusDotStatu
     case 'ended': return 'ended';
     default: return 'ended';
   }
+}
+
+function ReviewerVerdict({ session }: { session: SessionNodeType }) {
+  const latestStatus = session.roundMetadata?.latestStatus;
+  if (latestStatus === 'completed') {
+    return <CircleCheck size={10} style={{ color: 'var(--success)', flexShrink: 0 }} />;
+  }
+  if (latestStatus === 'failed') {
+    return <CircleX size={10} style={{ color: 'var(--destructive)', flexShrink: 0 }} />;
+  }
+  return <StatusDot status={presenceToStatus(session.presence)} size="sm" />;
 }
 
 interface SessionNodeProps {
@@ -291,7 +304,7 @@ export function SessionNode({
                 : <ChevronRight size={12} style={{ color: 'var(--muted-foreground)' }} />}
             </span>
           )}
-          <StatusDot status={presenceToStatus(session.presence)} size="sm" />
+          <ReviewerVerdict session={session} />
           <TypeIcon type={session.type} role={session.role} />
           <span
             className={styles.sessionLabel}
