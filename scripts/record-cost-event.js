@@ -412,7 +412,11 @@ function initSchema(db) {
       deacon_ignored_at       TEXT,
       deacon_ignored_reason   TEXT,
       -- PAN-905: GitHub-native merge blocker reasons (JSON array)
-      blocker_reasons         TEXT
+      blocker_reasons         TEXT,
+      -- PAN-938: pre-review verification gate commit SHA
+      last_verified_commit    TEXT,
+      -- PAN-938: current merge pipeline step
+      merge_step              TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
