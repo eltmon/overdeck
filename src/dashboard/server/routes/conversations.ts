@@ -960,7 +960,9 @@ const getConversationsRoute = HttpRouter.add(
             }
           }
 
-          return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name) };
+          const convSf = resolveSessionFile(conv);
+          const compacting = convSf ? isCompacting(convSf) : false;
+          return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name), compacting };
         }));
 
         return jsonResponse(enriched);
