@@ -7,7 +7,7 @@
  * All file I/O uses fs/promises (no sync calls).
  */
 
-import { readdir, stat, watch, open } from 'node:fs/promises';
+import { readdir, readFile, stat, watch, open } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from '@panctl/contracts';
@@ -581,6 +581,28 @@ export async function parseConversationMessages(
         if (proposedPlan && proposedPlan.status === 'pending') {
           proposedPlan.status = 'approved';
           proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+        }
+      } else if (attachment?.type === 'plan_mode') {
+        // Claude Code plan_mode attachment: agent called EnterPlanMode, plan written
+        // to an external file. Always start as 'pending' — the permission-mode
+        // transition handler (plan → other) will mark it approved when that fires.
+        const planFilePath = typeof attachment.planFilePath === 'string' ? attachment.planFilePath : undefined;
+        if (planFilePath) {
+          try {
+            const planContent = (await readFile(planFilePath, 'utf-8')).trim();
+            if (planContent) {
+              const id = ((entry as Record<string, unknown>).uuid as string | undefined) ?? `plan-${lineSequence}`;
+              proposedPlan = {
+                id,
+                plan: planContent,
+                planFilePath,
+                status: 'pending',
+                createdAt: entry.timestamp ?? new Date().toISOString(),
+              };
+            }
+          } catch {
+            // Plan file not yet written — will show once the agent finishes planning
+          }
         }
       } else if (attachment?.type === 'queued_command' && attachment?.commandMode === 'prompt') {
         // User message sent as an interrupt while Claude was running — stored as
