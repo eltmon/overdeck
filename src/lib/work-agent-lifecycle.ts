@@ -53,9 +53,12 @@ export function getWorkAgentLifecycleState(agentOrIssueId: string): WorkAgentLif
   let recommendedAction: WorkAgentRecommendedAction = 'start';
   let reason: string | undefined;
 
-  if (hasLiveTmuxSession) {
+  if (hasLiveTmuxSession && agentStatus === 'running') {
     recommendedAction = 'none';
     reason = `Agent ${agentId} is already running. Use 'pan tell' to message it.`;
+  } else if (hasLiveTmuxSession && isStopped) {
+    recommendedAction = 'resume';
+    reason = `Agent ${agentId} has a live tmux session but is stopped. Use 'pan resume ${agentOrIssueId}' to continue or 'pan start ${agentOrIssueId}' will kill the session and start fresh.`;
   } else if (isOrphaned) {
     recommendedAction = 'start';
     reason = hasSavedSession
@@ -86,10 +89,10 @@ export function getWorkAgentLifecycleState(agentOrIssueId: string): WorkAgentLif
     isCrashed,
     runtimeState: runtime,
     agentStatus,
-    canStartFresh: !hasLiveTmuxSession && (!requiresSessionResetBeforeFreshStart || isOrphaned),
-    canResumeSession: hasSavedSession && !hasLiveTmuxSession && hasResumableBackingState && (isStopped || isCrashed),
-    canRestartWithContext: hasAgentState && hasWorkspace && !hasLiveTmuxSession,
-    canResetSession: hasSavedSession && !hasLiveTmuxSession && hasResumableBackingState,
+    canStartFresh: (!hasLiveTmuxSession || (hasLiveTmuxSession && isStopped)) && (!requiresSessionResetBeforeFreshStart || isOrphaned),
+    canResumeSession: hasSavedSession && hasResumableBackingState && (isStopped || isCrashed),
+    canRestartWithContext: hasAgentState && hasWorkspace,
+    canResetSession: hasSavedSession && hasResumableBackingState,
     requiresSessionResetBeforeFreshStart,
     recommendedAction,
     reason,

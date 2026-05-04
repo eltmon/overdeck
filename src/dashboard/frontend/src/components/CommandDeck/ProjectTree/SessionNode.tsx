@@ -169,15 +169,19 @@ function shortModel(model: string): string {
     .replace(/-latest$/, '');
 }
 
-function deriveSessionLabel(session: SessionNodeType): string {
-  const model = session.model && session.model !== 'unknown' && session.model !== 'specialist'
+function deriveSessionLabel(session: SessionNodeType, resolvedModel?: string | null): string {
+  const sessionModel = session.model && session.model !== 'unknown' && session.model !== 'specialist'
     ? shortModel(session.model)
     : '';
+  const model = sessionModel || (resolvedModel ? shortModel(resolvedModel) : '');
   switch (session.type) {
     case 'merge': return model ? `Merge (${model})` : 'Merge agent';
     case 'test': return model ? `Tests (${model})` : 'Tests';
     case 'review': return model ? `Review (${model})` : 'Review';
-    case 'reviewer': return model ? model : (session.role ? capitalize(session.role) : 'Reviewer');
+    case 'reviewer': {
+      const role = session.role ? capitalize(session.role) : 'Reviewer';
+      return model ? `${role} (${model})` : role;
+    }
     case 'work': return model ? `Work (${model})` : 'Work agent';
     case 'planning': return model ? `Planning (${model})` : 'Planning';
     case 'legacy': return 'Planning state';
@@ -315,7 +319,7 @@ export function SessionNode({
               return `${session.sessionId} · Last heard: ${formatRelativeTime(lastActivity, new Date())}`;
             })()}
           >
-            {deriveSessionLabel(session)}
+            {deriveSessionLabel(session, defaultModel)}
           </span>
           <LiveLastHeard lastActivity={lastActivity} />
           <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${session.status}`] ?? ''}`}>
