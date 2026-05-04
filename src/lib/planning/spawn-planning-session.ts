@@ -405,8 +405,9 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       await mkdir(join(planningDir, subdir), { recursive: true });
     }
 
-    // Clear stale STATE.md and .planning-complete from previous session
-    for (const staleFile of ['STATE.md', '.planning-complete']) {
+    // Clear stale artifacts from previous session
+    const issueUpper = issue.identifier.toUpperCase();
+    for (const staleFile of ['.planning-complete', `continue-${issueUpper}.vbrief.json`]) {
       const stalePath = join(planningDir, staleFile);
       if (existsSync(stalePath)) {
         console.log(`[start-planning] Clearing stale ${staleFile}`);

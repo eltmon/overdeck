@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { findPlan, readPlan, readWorkspacePlan, updateItemStatus, updateSubItemStatus } from '../io.js';
+import { findPlan, isPlanningComplete, isPlanningProposed, readPlan, readWorkspacePlan, updateItemStatus, updateSubItemStatus } from '../io.js';
+import { ensureVBriefDirs, generateVBriefFilename, resolveVBriefDir } from '../lifecycle.js';
 import type { VBriefDocument } from '../types.js';
 
 let TEST_DIR: string;
@@ -53,6 +54,66 @@ describe('findPlan', () => {
     expect(result).not.toBeNull();
     expect(result).toContain('plan.vbrief.json');
     expect(existsSync(result!)).toBe(true);
+  });
+
+  it('resolves the workspace plan only, ignoring lifecycle copies (PAN-946)', () => {
+    // PAN-946: findPlan() is workspace-scoped. Workspace mutations
+    // (updateItemStatus, beads/readiness writes) MUST resolve the in-progress
+    // .planning/plan.vbrief.json — never an archived lifecycle copy that has
+    // already moved to active/, completed/, or cancelled/. Lifecycle lookups
+    // belong in findVBriefByIssue (sync) / findVBriefByIssueAsync (cached).
+    const projectRoot = join(TEST_DIR, 'project');
+    const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-1');
+    mkdirSync(workspacePath, { recursive: true });
+
+    // Workspace plan exists at .planning/plan.vbrief.json
+    writePlanDoc(workspacePath, makePlanDoc());
+
+    // A lifecycle plan ALSO exists for this issue — but findPlan must NOT
+    // surface it, otherwise workspace status writes would mutate the archive.
+    ensureVBriefDirs(projectRoot);
+    const lifecyclePlan: VBriefDocument = {
+      vBRIEFInfo: { version: '0.5', created: '2026-05-03T00:00:00Z' },
+      plan: {
+        id: 'pan-1',
+        title: 'Lifecycle Plan',
+        status: 'active',
+        items: [],
+        edges: [],
+      },
+    };
+    const filename = generateVBriefFilename('PAN-1', 'test', '2026-05-03');
+    writeFileSync(
+      join(resolveVBriefDir(projectRoot, 'active'), filename),
+      JSON.stringify(lifecyclePlan, null, 2),
+    );
+
+    const result = findPlan(workspacePath);
+    expect(result).not.toBeNull();
+    expect(result!).toContain('.planning/plan.vbrief.json');
+    expect(result!).not.toContain('vbrief/active/');
+    const doc = JSON.parse(readFileSync(result!, 'utf-8')) as VBriefDocument;
+    // Workspace plan title is "Test Plan" (set by makePlanDoc), not "Lifecycle Plan".
+    expect(doc.plan.title).toBe('Test Plan');
+  });
+
+  it('returns null when workspace lacks .planning/plan.vbrief.json even if lifecycle has one (PAN-946)', () => {
+    const projectRoot = join(TEST_DIR, 'project');
+    const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-3');
+    mkdirSync(workspacePath, { recursive: true });
+
+    ensureVBriefDirs(projectRoot);
+    const lifecyclePlan: VBriefDocument = {
+      vBRIEFInfo: { version: '0.5', created: '2026-05-03T00:00:00Z' },
+      plan: { id: 'pan-3', title: 'Archived', status: 'completed', items: [], edges: [] },
+    };
+    const filename = generateVBriefFilename('PAN-3', 'test', '2026-05-03');
+    writeFileSync(
+      join(resolveVBriefDir(projectRoot, 'completed'), filename),
+      JSON.stringify(lifecyclePlan, null, 2),
+    );
+
+    expect(findPlan(workspacePath)).toBeNull();
   });
 });
 
@@ -204,5 +265,118 @@ describe('updateSubItemStatus', () => {
     expect(() => updateSubItemStatus(TEST_DIR, 'item-1', 'nonexistent', 'completed')).not.toThrow();
     const updated = readWorkspacePlan(TEST_DIR)!;
     expect(updated.plan.items[0].subItems![0].status).toBe('pending');
+  });
+});
+
+function writeMarker(workspacePath: string): void {
+  const dir = join(workspacePath, '.planning');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, '.planning-complete'), '');
+}
+
+function writePlanWithStatus(workspacePath: string, status: string): void {
+  const doc = makePlanDoc();
+  doc.plan.status = status;
+  writePlanDoc(workspacePath, doc);
+}
+
+describe('isPlanningProposed', () => {
+  it('returns true when plan.status is "proposed"', () => {
+    writePlanWithStatus(TEST_DIR, 'proposed');
+    expect(isPlanningProposed(TEST_DIR)).toBe(true);
+  });
+
+  it('returns false when plan.status is "draft"', () => {
+    writePlanWithStatus(TEST_DIR, 'draft');
+    expect(isPlanningProposed(TEST_DIR)).toBe(false);
+  });
+
+  it('returns false when plan.status is "approved"', () => {
+    writePlanWithStatus(TEST_DIR, 'approved');
+    expect(isPlanningProposed(TEST_DIR)).toBe(false);
+  });
+
+  it('returns false when plan.status is "running"', () => {
+    writePlanWithStatus(TEST_DIR, 'running');
+    expect(isPlanningProposed(TEST_DIR)).toBe(false);
+  });
+
+  it('returns false when plan.status is explicit but not "proposed", even with marker present (status wins)', () => {
+    writePlanWithStatus(TEST_DIR, 'approved');
+    writeMarker(TEST_DIR);
+    expect(isPlanningProposed(TEST_DIR)).toBe(false);
+  });
+
+  it('returns true via legacy marker when plan has no status field', () => {
+    const doc = makePlanDoc();
+    delete (doc.plan as Partial<typeof doc.plan>).status;
+    writePlanDoc(TEST_DIR, doc);
+    writeMarker(TEST_DIR);
+    expect(isPlanningProposed(TEST_DIR)).toBe(true);
+  });
+
+  it('returns true via legacy marker when there is no plan at all', () => {
+    writeMarker(TEST_DIR);
+    expect(isPlanningProposed(TEST_DIR)).toBe(true);
+  });
+
+  it('returns false when no plan and no marker', () => {
+    expect(isPlanningProposed(TEST_DIR)).toBe(false);
+  });
+
+  it('returns true via legacy marker when plan is corrupt', () => {
+    const dir = join(TEST_DIR, '.planning');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'plan.vbrief.json'), 'not json');
+    writeMarker(TEST_DIR);
+    expect(isPlanningProposed(TEST_DIR)).toBe(true);
+  });
+});
+
+describe('isPlanningComplete', () => {
+  it.each(['proposed', 'approved', 'pending', 'running', 'completed', 'blocked'])(
+    'returns true when plan.status is "%s"',
+    (status) => {
+      writePlanWithStatus(TEST_DIR, status);
+      expect(isPlanningComplete(TEST_DIR)).toBe(true);
+    },
+  );
+
+  it('returns false when plan.status is "draft"', () => {
+    writePlanWithStatus(TEST_DIR, 'draft');
+    expect(isPlanningComplete(TEST_DIR)).toBe(false);
+  });
+
+  it('returns false when plan.status is "cancelled"', () => {
+    writePlanWithStatus(TEST_DIR, 'cancelled');
+    expect(isPlanningComplete(TEST_DIR)).toBe(false);
+  });
+
+  it('returns true via legacy marker when plan has no status field', () => {
+    const doc = makePlanDoc();
+    delete (doc.plan as Partial<typeof doc.plan>).status;
+    writePlanDoc(TEST_DIR, doc);
+    writeMarker(TEST_DIR);
+    expect(isPlanningComplete(TEST_DIR)).toBe(true);
+  });
+
+  it('returns false when no plan and no marker', () => {
+    expect(isPlanningComplete(TEST_DIR)).toBe(false);
+  });
+
+  it('explicit non-finished status wins over marker', () => {
+    writePlanWithStatus(TEST_DIR, 'draft');
+    writeMarker(TEST_DIR);
+    expect(isPlanningComplete(TEST_DIR)).toBe(false);
+  });
+
+  it('accepts a planningDir override pointing to a non-standard location', () => {
+    const customPlanningDir = join(TEST_DIR, '.planning', 'foo-1');
+    mkdirSync(customPlanningDir, { recursive: true });
+    const doc = makePlanDoc();
+    doc.plan.status = 'running';
+    writeFileSync(join(customPlanningDir, 'plan.vbrief.json'), JSON.stringify(doc));
+    expect(isPlanningComplete(TEST_DIR, customPlanningDir)).toBe(true);
+    expect(isPlanningProposed(TEST_DIR, customPlanningDir)).toBe(false);
   });
 });

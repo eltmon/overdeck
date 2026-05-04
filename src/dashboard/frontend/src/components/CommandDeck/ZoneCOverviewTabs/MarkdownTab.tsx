@@ -1,7 +1,7 @@
 /**
  * MarkdownTab — renders a markdown body via ChatMarkdown with empty/loading states.
  *
- * Used for PRD / STATE.md / INFERENCE.md tabs. The actual fetch happens once at
+ * Used for PRD / STATE / INFERENCE tabs. The actual fetch happens once at
  * the ZoneCOverview level (`usePlanningQuery`) — this component only formats.
  */
 

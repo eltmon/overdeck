@@ -4,7 +4,7 @@
      Session summarizers should SKIP this block and focus on the agent's
      actual work, decisions, and tradeoffs that follow. -->
 
-# Planning Session: PAN-936
+# Planning Session: PAN-946
 
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
@@ -68,59 +68,124 @@ After `pan plan-finalize` and the user clicks **Done**, the pipeline runs withou
 ---
 
 ## Issue Details
-- **ID:** PAN-936
-- **Title:** Rally feature planning: end-to-end UX and pipeline
-- **URL:** https://github.com/eltmon/panopticon-cli/issues/936
+- **ID:** PAN-946
+- **Title:** Adopt deft vBRIEF lifecycle model for scope vBRIEFs
+- **URL:** https://github.com/eltmon/panopticon-cli/issues/946
 
 ## Description
-## Problem
+## Summary
 
-Rally Features are non-interactive in the dashboard. Three related issues describe different facets of the same gap:
+Adopt deft's vBRIEF lifecycle model into Panopticon's scope management. This replaces the current implicit state model (file-existence markers, workspace-inferred status) with explicit, structured, filesystem-as-state lifecycle management for scope vBRIEFs.
 
-- **PAN-704**: FeatureCard has no action bar (Plan / See Plan / vBRIEF / Tasks)
-- **PAN-397**: Hierarchical planning pipeline (feature-level plans, story decomposition, cross-story ordering) not wired end-to-end
-- **PAN-403**: `derivedStatus` from child stories suppresses Plan button on unplanned features
+**Context:** Panopticon already uses vBRIEF v0.5 for per-issue work plans. Today these live ephemerally in workspace `.planning/` directories and disappear on close-out. This issue promotes vBRIEFs to durable, first-class source-of-truth artifacts with explicit lifecycle transitions, structured continuation state, and auditable history.
 
-Additionally, FeatureCard click only toggles expand/collapse — no detail modal. CompactChildCard (child stories) are not clickable at all. The dashboard has no way to inspect or plan Rally features.
+**Relationship to deft:** Cherry-picks the valuable parts of deft's model (status enum, lifecycle directories, archive, structured state) while deliberately diverging on constraints incompatible with multi-agent orchestration (single plan per project, serialized changes). See "Divergence from deft" section below.
 
-## Design
+---
 
-Per `docs/HIERARCHICAL-PLANNING.md`: **plan at the Feature, execute at the Story**. Feature = planning surface. Story = execution surface.
+## Enumerated Changes
 
-## PRD
+### 1. Adopt `./vbrief/` as canonical directory
 
-Full PRD with phased implementation: [`docs/prds/planned/rally-feature-planning-ux.md`](docs/prds/planned/rally-feature-planning-ux.md)
+vBRIEFs are source-of-truth artifacts, not metadata. They live at `./vbrief/` in the project repo (for MYN polyrepo: in the meta repo `myn/meta/vbrief/`, or potentially each sub-repo for repo-scoped changes).
 
-## Phases
+### 2. Adopt lifecycle subdirectories
 
-### Phase 1: Interactive FeatureCard (Dashboard UI)
-- [ ] **1.1** Action bar on FeatureCard — Plan/See Plan, vBRIEF, Tasks chips (no Start Agent)
-- [ ] **1.2** Click-to-modal on FeatureCard title (expand/collapse stays on chevron)
-- [ ] **1.3** Click-to-modal on CompactChildCard (child stories open detail modal)
-- [ ] **1.4** Fix derivedStatus gate — Plan button uses feature's own state, not derived child progress
+```
+./vbrief/
+├── proposed/     ← planning complete, awaiting approval
+├── active/       ← agent is working on it
+├── completed/    ← merged/closed, immutable archive
+└── cancelled/    ← abandoned, immutable archive
+```
 
-### Phase 2: Feature Planning Pipeline (Backend)
-- [ ] **2.1** `getChildIssues()` on tracker interface + Rally implementation
-- [ ] **2.2** Feature-aware `pan work plan` — detect Rally Feature, fetch children, produce feature-level vBRIEF
-- [ ] **2.3** opus-plan skill v2.0 — feature-level vs story-level mode
-- [ ] **2.4** Story workspace context injection — FEATURE-CONTEXT.md into `.planning/`
-- [ ] **2.5** Cloister cross-story ordering via feature-level `blocks`/`informs`/`invalidates` edges
+Files move between directories on status transitions. This is the filesystem-as-state model from deft, adapted for our multi-issue world.
 
-### Phase 3: Integration Tests
-- [ ] **3.1** Dashboard tests (FeatureCard actions, modals, derivedStatus gate)
-- [ ] **3.2** Pipeline integration tests (feature plan → story workspace → agent execution)
+### 3. Issue-keyed filenames with optional date prefix
 
-## Key Files
+Format: `YYYY-MM-DD-<ISSUE-ID>-<slug>.vbrief.json`
 
-- `KanbanBoard.tsx` — FeatureCard, CompactChildCard, IssueCard action bar, planChip
-- `issue-data-service.ts` — derivedStatus computation
-- `src/lib/tracker/interface.ts` + `rally.ts` — tracker interface, getChildIssues
-- `src/lib/cloister/work-agent-prompt.ts` — readPlanningContext, injectFeatureContext
-- `src/lib/planning/vbrief-planning.ts` — feature plan skeletons
+Example: `2026-04-28-MIN-846-fizzy-master.vbrief.json`
 
-## Consolidates
+Date is creation date (immutable — doesn't change when the file moves between lifecycle dirs). Issue ID gives Panopticon ergonomics. Slug gives human readability. The date prefix gives chronological sorting for free and aligns with deft's archive convention.
 
-Closes #704, #397, #403
+### 4. Use `plan.status` field as the lifecycle gate
+
+Replace the `.planning-complete` boolean marker with reading `plan.status` from the vBRIEF:
+
+- `draft` — planning in progress
+- `proposed` — planning done, awaiting approval
+- `approved` — user approved, ready to start
+- `running` — agent is executing
+- `completed` — work done, merged
+- `blocked` / `cancelled` — as needed
+
+Backward compat shim during transition: if `.planning-complete` exists but `plan.status` is missing, treat as `approved`. Remove shim after one release cycle.
+
+### 5. Replace STATE.MD with structured continue checkpoint
+
+Move from prose STATE.MD to a structured `continue.vbrief.json` (or extend the scope vBRIEF itself with continuation fields). Machine-parseable resume state including:
+
+- Task completion status (from vBRIEF items)
+- Decisions made (narratives)
+- Hazards/warnings (narratives)
+- Exact resume point
+- **Extended for Panopticon:** git state, sub-repo context, beads mapping, agent model, review feedback
+
+### 6. No workspace cache — direct reference
+
+The workspace doesn't get a copy of the vBRIEF. Instead, the agent state tracks the **path** to its scope vBRIEF in `./vbrief/active/`. No copy, no drift, no reconciliation. The vBRIEF in the repo IS the source of truth, and the agent reads it from there.
+
+### 7. Scope agent (future — not in this change)
+
+A first-class agent in the specialist chain that takes a PRD (from conversation or doc) and produces a well-formed scope vBRIEF with proper `items`, `edges` (blocks/produces/consumes), `references`, and lifecycle entry in `proposed/`. This is the DAG entry point — the scope agent can also analyze overlap with other in-flight scope vBRIEFs to identify cross-issue dependencies.
+
+### 8. `pan scope:*` commands for lifecycle transitions
+
+CLI commands that move vBRIEFs between lifecycle directories and emit transition log entries:
+
+- `pan scope propose <issue>` — move to `proposed/`
+- `pan scope approve <issue>` — move to `active/`, set `plan.status: approved`
+- `pan scope complete <issue>` — move to `completed/`
+- `pan scope cancel <issue>` — move to `cancelled/`
+- `pan scope restore <issue>` — move from `completed/` or `cancelled/` back to `active/`
+
+### 9. `pan sync` audit for state disagreement
+
+Extend `pan sync` to detect filesystem/tracker/tmux/vBRIEF disagreement:
+
+- vBRIEF says `active/` but tracker says closed → flag
+- vBRIEF says `completed/` but workspace still exists → flag
+- Tracker says in-progress but no vBRIEF in `active/` → flag
+
+---
+
+## What we explicitly do NOT adopt
+
+- **`specification.vbrief.json`** — product-level spec is not our concern right now (though the DAG vision could evolve into this)
+- **`playbook-{name}.vbrief.json`** — we have skills for this
+- **Single plan per project constraint** — fundamentally incompatible with multi-agent; see divergence section
+- **`history/changes/` folder structure** — our lifecycle dirs + issue-keyed filenames serve the same purpose more naturally for multi-issue
+
+## Divergence from deft
+
+Deft's model assumes one stream of work serialized through a single `plan.vbrief.json` per project. Key quotes from their docs:
+
+- `"There is exactly ONE plan.vbrief.json at a time per project"` (vbrief.md:193)
+- `"⊗ Having multiple active changes without explicit user coordination"` (commands.md:202)
+
+Panopticon runs N concurrent agents on N issues within one project, each isolated in its own workspace. The vBRIEF format itself works perfectly — it's the "one per project" constraint and the serialized change model that breaks.
+
+Deft's `swarm.md` handles parallel tasks within one change but not parallel changes. The proposed extension: issue-keyed scope vBRIEFs in lifecycle directories, with the DAG's `edges` expressing cross-issue dependencies that their single-change model never needs to represent.
+
+This divergence should be filed upstream as a proposal for multi-agent/multi-issue support in the deft directive.
+
+---
+
+## Related Issues
+
+- PAN-944 — Make vBRIEF the durable task graph source of truth
+- PAN-945 — Path mismatch: planning writes to `api/docs/prds/planned/`, runtime reads from `.planning/`
 
 ---
 
@@ -209,10 +274,10 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
     "version": "0.5",
     "created": "<ISO 8601 timestamp>",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-936: <issue title>"
+    "description": "Plan for PAN-946: <issue title>"
   },
   "plan": {
-    "id": "pan-936",
+    "id": "pan-946",
     "title": "<issue title>",
     "status": "approved",
     "uid": "<generate a UUID v4>",
@@ -221,7 +286,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
     "created": "<ISO 8601 timestamp — same as vBRIEFInfo.created>",
     "updated": "<ISO 8601 timestamp — same as created>",
     "references": [
-      { "uri": "https://github.com/eltmon/panopticon-cli/issues/936", "label": "PAN-936", "type": "issue" }
+      { "uri": "https://github.com/eltmon/panopticon-cli/issues/946", "label": "PAN-946", "type": "issue" }
     ],
     "tags": ["<relevant tags>"],
     "narratives": {
@@ -237,7 +302,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
         "created": "<ISO 8601 timestamp>",
         "metadata": {
           "difficulty": "trivial|simple|medium|complex|expert",
-          "issueLabel": "pan-936"
+          "issueLabel": "pan-946"
         },
         "narrative": { "Action": "<what needs to be done>" },
         "subItems": [
@@ -259,7 +324,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
 
 **CRITICAL vBRIEF rules:**
 - The file MUST have `vBRIEFInfo` and `plan` as the ONLY top-level keys
-- `plan.id` MUST be the issue ID in lowercase (e.g., "pan-936")
+- `plan.id` MUST be the issue ID in lowercase (e.g., "pan-946")
 - `plan.uid` MUST be a freshly generated UUID v4
 - Do NOT use `issue`, `issueId`, or `issue_id` — use `plan.id`
 - `items[].status` MUST be one of: draft, proposed, approved, pending, running, completed, blocked, cancelled

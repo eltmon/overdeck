@@ -7,7 +7,7 @@
  * lifecycle. They are NOT supposed to land on main — `cleanPlanningArtifacts`
  * removes them post-merge, but that runs AFTER the squash-merge has already
  * published the polluted commit. Other active workspaces then `pan sync-main`
- * the contamination, overwriting their own `.planning/STATE.md` and feedback.
+ * the contamination, overwriting their own continue file and feedback.
  *
  * This module fixes the race by stripping `.planning/` from the feature branch
  * BEFORE `gh pr merge --squash` runs. The squash commit on main therefore never

@@ -1,6 +1,6 @@
 ---
 name: work
-description: Primary work-agent prompt — reads STATE.md, processes feedback, drives the bead-by-bead implementation loop until pan done.
+description: Primary work-agent prompt — reads continue.vbrief.json, processes feedback, drives the bead-by-bead implementation loop until pan done.
 requires:
   - ISSUE_ID
   - ISSUE_ID_LOWER
@@ -53,24 +53,24 @@ Your job is implementation. Reviews are handled by `pan done` → review special
 {{#LOCAL}}
 Before starting any work, you MUST read these files to understand the full context:
 
-1. **Read `.planning/STATE.md`** - Contains the full planning context, decisions made, and current status for this issue.
+1. **Read `./vbrief/active/continue-{{ISSUE_ID}}.vbrief.json`** - Structured planning context: decisions, hazards, and approach from the planning agent. Replaces the old STATE.md.
 2. **Read `CLAUDE.md`** (in workspace) - Contains workspace-specific instructions and warnings.
 3. **Read `{{PROJECT_ROOT}}/CLAUDE.md`** - Contains project-wide development guidelines.
 4. **Check `.planning/feedback/`** - If this directory exists, read the latest file(s).
    Ignore any files in `.planning/feedback/archive/` — those are from previous review cycles.
    Only read non-archived files. These contain specialist feedback (review issues, test failures, merge blocks) requiring action.
-   STATE.md's "Specialist Feedback" section lists all feedback received.
+   The continue file's `sessionHistory` may note feedback cycles.
 
 These files contain critical context that may have been updated since the last session.
 {{/LOCAL}}
 {{#REMOTE}}
 Your workspace is at /workspace. Check for planning artifacts:
-- /workspace/.planning/STATE.md - Contains the implementation plan
-- /workspace/.planning/{{ISSUE_ID_LOWER}}/STATE.md - Alternative location
+- /workspace/vbrief/active/continue-{{ISSUE_ID}}.vbrief.json - Structured planning context (decisions, hazards)
+- /workspace/vbrief/active/ - Contains the scope vBRIEF plan
 - /workspace/docs/prds/ - May contain PRD documents
 
-Start by reading the STATE.md file to understand the plan, then begin implementation.
-If no STATE.md exists, check the issue tracker for requirements.
+Start by reading the continue file to understand the plan, then begin implementation.
+If no continue file exists, check the issue tracker for requirements.
 {{/REMOTE}}
 
 ## Playwright Isolation
@@ -140,7 +140,7 @@ Read full file when:
 {{#BEADS_TASKS}}
 ## Beads Tasks
 
-Tasks created during planning (check STATE.md for which are complete):
+Tasks created during planning (check continue.vbrief.json `sessionHistory` for which are complete):
 
 {{BEADS_TASKS}}
 
@@ -156,7 +156,7 @@ will be rejected.
 2. `bd update <bead-id> --claim` — claim it
 3. Implement ONLY that bead's work
 4. `git add` and `git commit` — one bead = one commit
-5. **Update `.planning/STATE.md`** — update Current Phase, move bead to Completed Work, update Remaining Work
+5. **Update `.planning/continue-{{ISSUE_ID}}.vbrief.json`** — append a decision or hazard if you learned something new, update `resumePoint` with what the next agent should do (see continue format below)
 6. `bd close <bead-id> --reason="what you did"` — this auto-triggers inspection
 7. **WAIT** for the inspection result (delivered to your session via `pan tell`)
 8. `INSPECTION PASSED` → proceed to step 1
@@ -171,7 +171,7 @@ label filter you will see irrelevant beads from other workspaces.
 - `bd claim <bead-id>` — this command does NOT exist. Use `bd update <bead-id> --claim`
 - `bd start <bead-id>` — this command does NOT exist. Use `bd update <bead-id> --status in_progress`
 
-**Updating planning files does NOT close the bead.** After updating `.planning/STATE.md`
+**Updating planning files does NOT close the bead.** After updating `.planning/continue-{{ISSUE_ID}}.vbrief.json`
 and `plan.vbrief.json`, you MUST still run `bd close <bead-id> --reason="..."`.
 The bead is NOT done until `bd close` succeeds.
 
@@ -229,15 +229,15 @@ Do NOT `curl` any `/api/review/...` or `/api/workspaces/.../review` endpoint —
 
 **Before doing ANY work, perform these checks in order:**
 
-0. **Rebase onto latest main** (if `.planning/STATE.md` already has progress — this is a restart):
+0. **Rebase onto latest main** (if continue file or plan.vbrief.json already has progress — this is a restart):
    ```bash
    git fetch origin main && git rebase origin/main
    ```
-   - Clean rebase → continue. Simple conflicts (< 5 files) → resolve and `git rebase --continue`. Complex → `git rebase --abort` and note in STATE.md.
-   - Skip this step only if STATE.md does not exist yet (fresh start).
-1. Read `.planning/STATE.md` and check the "Remaining Work" section
-2. Check the "Specialist Feedback" section — if there's unaddressed feedback (review changes requested, test failures), address it FIRST
-3. If remaining work says "None" or "Implementation complete" AND no unaddressed feedback → work is DONE
+   - Clean rebase → continue. Simple conflicts (< 5 files) → resolve and `git rebase --continue`. Complex → `git rebase --abort` and note in continue.vbrief.json `decisions[]`.
+   - Skip this step only if no continue file exists yet (fresh start).
+1. Read `.planning/continue-{{ISSUE_ID}}.vbrief.json` and check the `resumePoint` and `sessionHistory`
+2. Check `.planning/feedback/` — if there's unaddressed feedback (review changes requested, test failures), address it FIRST
+3. If `resumePoint` says "Implementation complete" or all beads are closed AND no unaddressed feedback → work is DONE
 {{#LOCAL}}
 3. If done, signal completion immediately:
    ```bash
@@ -253,7 +253,7 @@ Do NOT `curl` any `/api/review/...` or `/api/workspaces/.../review` endpoint —
 ## Your Task
 
 1. Read the context files listed above
-2. **FIRST:** Check STATE.md for completion status (see above)
+2. **FIRST:** Check continue.vbrief.json for completion status (see above)
 3. If not complete, continue implementing the planned work using the per-bead workflow below
 
 ## MANDATORY: One Bead At A Time
@@ -268,7 +268,7 @@ and your work will be rejected.
 2. `bd update <bead-id> --claim` — claim it
 3. Implement ONLY that bead's work
 4. `git add` and `git commit` — one bead = one commit
-5. **Update `.planning/STATE.md`** — this is MANDATORY before closing the bead (see STATE.md format below)
+5. **Update `.planning/continue-{{ISSUE_ID}}.vbrief.json`** — this is MANDATORY before closing the bead (see continue format below)
 6. `bd close <bead-id> --reason="what you did"` — this auto-triggers inspection
 7. **WAIT** for the inspection result (delivered to your session via `pan tell`)
 8. `INSPECTION PASSED` → proceed to step 1
@@ -283,7 +283,7 @@ label filter you will see irrelevant beads from other workspaces.
 - `bd claim <bead-id>` — this command does NOT exist. Use `bd update <bead-id> --claim`
 - `bd start <bead-id>` — this command does NOT exist. Use `bd update <bead-id> --status in_progress`
 
-**Updating planning files does NOT close the bead.** After updating `.planning/STATE.md`
+**Updating planning files does NOT close the bead.** After updating `.planning/continue-{{ISSUE_ID}}.vbrief.json`
 and `plan.vbrief.json`, you MUST still run `bd close <bead-id> --reason="..."`.
 The bead is NOT done until `bd close` succeeds.
 
@@ -291,46 +291,49 @@ The bead is NOT done until `bd close` succeeds.
 a separate commit with a separate `bd close`. The inspection fires automatically on
 `bd close` — you do not need to call `pan inspect` manually.
 
-## CRITICAL: Keep STATE.md Updated — Crash Recovery Insurance
+## CRITICAL: Keep continue.vbrief.json Updated — Crash Recovery Insurance
 
 **You may be interrupted, crash, or be stopped at any time.** If the system crashes with 50 agents
-running, STATE.md is the ONLY way to recover without burning expensive tokens re-discovering context.
+running, continue.vbrief.json is the ONLY way to recover without burning expensive tokens re-discovering context.
 
-**STATE.md is updated as step 5 of every bead workflow — before `bd close`.** A hook enforces this:
-if STATE.md hasn't been updated since your last bead close, you'll receive a warning.
+**continue.vbrief.json is updated as step 5 of every bead workflow — before `bd close`.** A hook enforces this:
+if the continue file hasn't been updated since your last bead close, you'll receive a warning.
 
-### Required STATE.md Format
+### Required continue.vbrief.json Format
 
-Your `.planning/STATE.md` MUST contain these sections (update in-place, don't append):
+Your `.planning/continue-{{ISSUE_ID}}.vbrief.json` MUST be valid JSON with these fields:
 
-```markdown
-# {{ISSUE_ID}}: <title>
-
-## Status: <In Progress | Blocked | Implementation Complete | Ready for Merge>
-
-## Current Phase
-<What you are working on RIGHT NOW — specific enough that a new agent can pick up mid-task>
-
-## Completed Work
-- [x] <bead-id>: <what was done, 1 line> (commit: <short-sha>)
-- [x] <bead-id>: <what was done, 1 line> (commit: <short-sha>)
-
-## Remaining Work
-- [ ] <bead-id>: <what needs to be done>
-- [ ] <bead-id>: <what needs to be done>
-
-## Key Decisions
-- <D1>: <decision and why — only non-obvious ones that would surprise a new agent>
-
-## Specialist Feedback
-- [<timestamp>] <specialist> → <result> — <file path>
+```json
+{
+  "version": "1",
+  "issueId": "{{ISSUE_ID}}",
+  "created": "<ISO timestamp>",
+  "updated": "<ISO timestamp — update this on every write>",
+  "gitState": { "branch": "<current branch>", "sha": "<short sha>", "dirty": false },
+  "decisions": [
+    { "id": "D1", "summary": "<decision and why>", "recordedAt": "<ISO timestamp>" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "<risk/edge case>", "mitigation": "<how to handle>" }
+  ],
+  "resumePoint": {
+    "description": "<what the next agent should do RIGHT NOW>",
+    "beadId": "<current bead id>",
+    "filesToRead": ["<file1>", "<file2>"]
+  },
+  "beadsMapping": {},
+  "agentModel": "<your model>",
+  "sessionHistory": [
+    { "timestamp": "<ISO timestamp>", "reason": "end", "note": "<what you did this session>", "agentModel": "<your model>" }
+  ]
+}
 ```
 
-### What Makes a Good STATE.md Update
-- **Current Phase**: "Implementing bead panopticon-x8f (add retry logic to webhook handler)" — NOT "Working on implementation"
-- **Completed Work**: Include the commit SHA so a new agent can verify what's already done
-- **Remaining Work**: Sync with `bd list` output — if a bead is closed, move it to Completed
-- **Key Decisions**: Only decisions a new agent needs to know. "Used Effect.retry instead of manual loop because..." — NOT "decided to write code"
+### What Makes a Good continue.vbrief.json Update
+- **resumePoint.description**: "Implementing bead panopticon-x8f (add retry logic to webhook handler) — need to add exponential backoff to src/lib/webhook.ts and write tests" — NOT "Working on implementation"
+- **decisions**: Append new decisions as you make them. "Used Effect.retry instead of manual loop because..." — NOT "decided to write code"
+- **hazards**: Add risks you discovered. "Docker network pool exhaustion if tests don't cleanup" — " mitigation: call postMergeLifecycle docker cleanup"
+- **sessionHistory**: Append an entry at the end of every session with what you accomplished
 
 ## CRITICAL: Complete ALL Work - No Excuses
 

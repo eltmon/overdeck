@@ -394,6 +394,26 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     console.warn(`[merge-agent] Could not remove agent state dirs: ${err}`);
   }
 
+  // 5c. vBRIEF lifecycle transition: active/ → completed/ on main (PAN-946)
+  try {
+    const { transitionVBriefOnMain } = await import('../vbrief/lifecycle-io.js');
+    const result = await transitionVBriefOnMain(
+      projectPath,
+      issueId,
+      'completed',
+      'completed',
+      `scope: complete ${issueId.toUpperCase()} vBRIEF`,
+    );
+    if (result.moved) {
+      console.log(`[merge-agent] ✓ vBRIEF moved active → completed for ${issueId}`);
+    }
+    if (result.committed) {
+      console.log(`[merge-agent] ✓ Committed vBRIEF completion on main for ${issueId}`);
+    }
+  } catch (err) {
+    console.warn(`[merge-agent] vBRIEF completion transition failed (non-fatal): ${err}`);
+  }
+
   // 6. Stop Docker containers + networks to prevent network pool exhaustion (non-fatal)
   // Orphaned Docker networks accumulate when workspaces are merged but containers are never
   // torn down, eventually exhausting Docker's address pool and blocking new workspace creation.

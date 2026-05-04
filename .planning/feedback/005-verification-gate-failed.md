@@ -1,84 +1,61 @@
 ---
 specialist: verification-gate
-issueId: PAN-936
+issueId: PAN-946
 outcome: failed
-timestamp: 2026-05-01T05:12:58Z
+timestamp: 2026-05-03T17:13:23Z
 ---
 
-VERIFICATION FAILED for PAN-936 (attempt 1/10):
+VERIFICATION FAILED for PAN-946 (attempt 1/10):
 
 Failed check: test
 
-Verification FAILED at test (32049ms):
+Verification FAILED at test (35138ms):
 
-     ^
-    105|   });
-    106| 
+.ts:45:19
+     43|     const tasks = readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-412…
+     44| 
+     45|     expect(tasks).toHaveLength(2);
+       |                   ^
+     46|     expect(tasks[0]).toContain('PAN-412: Implement feature A');
+     47|     expect(tasks[1]).toContain('PAN-412: Implement feature B');
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/19]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/22]⎯
 
- FAIL |root|  src/lib/vbrief/__tests__/beads.test.ts > syncBeadStatusToVBrief > handles malformed lines in issues.jsonl gracefully
-AssertionError: expected null to be 'item-1' // Object.is equality
+ FAIL |root|  src/lib/cloister/__tests__/beads-scoping.test.ts > readBeadsTasks label scoping > matches beads using labels field (not just tags)
+AssertionError: expected Promise{…} to have property 'length'
+ ❯ src/lib/cloister/__tests__/beads-scoping.test.ts:58:19
+     56|     const tasks = readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-419…
+     57| 
+     58|     expect(tasks).toHaveLength(1);
+       |                   ^
+     59|     expect(tasks[0]).toContain('Some generic title');
+     60|   });
 
-- Expected: 
-"item-1"
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[20/22]⎯
 
-+ Received: 
-null
-
- ❯ src/lib/vbrief/__tests__/beads.test.ts:117:20
-    115| 
-    116|     const result = syncBeadStatusToVBrief('bead-1', TEST_DIR);
-    117|     expect(result).toBe('item-1');
-       |                    ^
-    118|   });
-    119| });
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/19]⎯
-
- FAIL |root|  src/dashboard/server/routes/__tests__/buildRichPRBody.test.ts > buildRichPRBody > includes beads task summary from issues.jsonl
-AssertionError: expected 'Closes #42\n' to contain '## Implementation Tasks'
-
-- Expected
-+ Received
-
-- ## Implementation Tasks
-+ Closes #42
-+
-
- ❯ src/dashboard/server/routes/__tests__/buildRichPRBody.test.ts:72:18
+ FAIL |root|  src/lib/cloister/__tests__/beads-scoping.test.ts > readBeadsTasks label scoping > handles legacy workspace: prefixed labels
+AssertionError: expected Promise{…} to have property 'length'
+ ❯ src/lib/cloister/__tests__/beads-scoping.test.ts:72:19
      70| 
-     71|     const body = await buildRichPRBody('PAN-42', workspacePath);
-     72|     expect(body).toContain('## Implementation Tasks');
-       |                  ^
-     73|     expect(body).toContain('- [x] Fix the bug');
-     74|     expect(body).toContain('- [ ] Add the feature');
+     71|     // Should match both workspace: prefixed and bare labels containin…
+     72|     expect(tasks).toHaveLength(2);
+       |                   ^
+     73|     expect(tasks.some(t => t.includes('Implementation'))).toBe(true);
+     74|     expect(tasks.some(t => t.includes('Feature'))).toBe(true);
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/19]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[21/22]⎯
 
- FAIL |root|  src/dashboard/server/routes/__tests__/buildRichPRBody.test.ts > buildRichPRBody > includes both AC checklist and beads when both exist
-AssertionError: expected 'Closes #5\n\n## Acceptance Criteria\n…' to contain '## Implementation Tasks'
+ FAIL |root|  src/lib/cloister/__tests__/beads-scoping.test.ts > readBeadsTasks label scoping > deduplicates beads found in both workspace and project root
+AssertionError: expected Promise{…} to have property 'length'
+ ❯ src/lib/cloister/__tests__/beads-scoping.test.ts:89:19
+     87|     const tasks = readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-412…
+     88| 
+     89|     expect(tasks).toHaveLength(1);
+       |                   ^
+     90|   });
+     91| });
 
-- Expected
-+ Received
-
-- ## Implementation Tasks
-+ Closes #5
-+
-+ ## Acceptance Criteria
-+
-+ - [x] AC One
-+
-
- ❯ src/dashboard/server/routes/__tests__/buildRichPRBody.test.ts:98:18
-     96|     expect(body).toContain('## Acceptance Criteria');
-     97|     expect(body).toContain('- [x] AC One');
-     98|     expect(body).toContain('## Implementation Tasks');
-       |                  ^
-     99|     expect(body).toContain('- [x] Task one');
-    100|   });
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/19]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22/22]⎯
 
 
 
@@ -88,6 +65,6 @@ AssertionError: expected 'Closes #5\n\n## Acceptance Criteria\n…' to contain '
 2. Fix the code causing the failure
 3. Run the failing check locally to verify it passes
 4. Commit every change
-5. Invoke the /rebase-and-submit skill for PAN-936 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-936 -m "Fixed test"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.
+5. Invoke the /rebase-and-submit skill for PAN-946 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-946 -m "Fixed test"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.
 
 Do NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until `pan review request` has completed successfully.

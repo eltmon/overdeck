@@ -25,7 +25,7 @@ import { httpHandler } from './http-handler.js';
 
 import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { appendFile, copyFile, mkdir, readdir, readFile, rm, writeFile, access } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/spawn-planning-session.js';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -37,6 +37,8 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
+import { isPlanningComplete } from '../../../lib/vbrief/io.js';
+import { promoteVBriefToProposed, appendContinueSessionEntryForIssue } from '../../../lib/vbrief/lifecycle-io.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus } from '../review-status.js';
@@ -58,8 +60,6 @@ import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../
 import { getAgentStateAsync, normalizeAgentId } from '../../../lib/agents.js';
 import { emitActivityEntry, emitActivityTts } from '../../../lib/activity-logger.js';
 import type { LifecycleContext, StepResult } from '../../../lib/lifecycle/types.js';
-import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
-import { validatePlanningDocument } from '../../../lib/planning/planning-agent.js';
 import {
   getCachedResourceAllocatedIssues,
   getResourceDetailIdentifiers,
@@ -288,6 +288,24 @@ async function runDestructiveIssueLifecycle(
   });
 
   cleanupLog.push(...result.steps.flatMap((step: any) => step.details || [step.error].filter(Boolean)));
+
+  // vBRIEF lifecycle transition for cancel (PAN-946): move to cancelled/ on main.
+  if (mode === 'cancel') {
+    try {
+      const { transitionVBriefOnMain } = await import('../../../lib/vbrief/lifecycle-io.js');
+      const tx = await transitionVBriefOnMain(
+        ctx.projectPath,
+        id,
+        'cancelled',
+        'cancelled',
+        `scope: cancel ${id.toUpperCase()} vBRIEF`,
+      );
+      if (tx.moved) cleanupLog.push(`vBRIEF moved ${tx.fromDir} → cancelled`);
+      if (tx.committed) cleanupLog.push(`Committed vBRIEF cancellation on main`);
+    } catch (err: any) {
+      cleanupLog.push(`vBRIEF cancel transition failed (non-fatal): ${err?.message ?? err}`);
+    }
+  }
 
   // Kill canonical reviewer/synthesis tmux sessions (PAN-915). They persist
   // across review rounds to preserve context, so reset/cancel/deep-wipe is the
@@ -1005,32 +1023,65 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
         // the planning prompt is the right place to enforce that contract.
         const beadsWarning: string | null = null;
 
-        // Auto-copy planning artifacts to docs/prds/active/<issue-id>/ (skip if already exist).
-        // MUST use canonicalPrdSubdir() (lowercase) — passing the raw `id` previously stranded
-        // PRDs in uppercase directories that downstream readers/archivers couldn't find.
+        // Copy the scope vBRIEF (and continue file if present) from the workspace's
+        // .planning/ to the project root's ./vbrief/proposed/<canonical-filename>,
+        // then commit on the main branch with `scope: propose <ID> vBRIEF`. The
+        // ./vbrief/ tree is the source of truth for plan lifecycle state — see
+        // src/lib/vbrief/lifecycle.ts. Old docs/prds/active/ copies for plan
+        // artifacts have been removed (PAN-946).
         try {
-          const issueActiveDir = canonicalPrdSubdir(gitRoot, id, 'active');
-          await mkdir(issueActiveDir, { recursive: true });
-          const stateMd = join(planningDir, 'STATE.md');
-          const planVbrief = join(planningDir, 'plan.vbrief.json');
-          const destStateMd = join(issueActiveDir, 'STATE.md');
-          const destPlanVbrief = join(issueActiveDir, 'plan.vbrief.json');
-          if (existsSync(stateMd)) {
-            const stateMdExists = await access(destStateMd).then(() => true).catch(() => false);
-            if (!stateMdExists) {
-              await copyFile(stateMd, destStateMd);
-              console.log(`[complete-planning] Copied STATE.md to ${destStateMd}`);
-            }
+          const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+          const upperIssueId = id.toUpperCase();
+          const promoted = promoteVBriefToProposed(workspacePath, projectPath, upperIssueId);
+          console.log(`[complete-planning] Copied vBRIEF to ${promoted.destVBrief}`);
+          if (promoted.destContinue) {
+            console.log(`[complete-planning] Copied continue file to ${promoted.destContinue}`);
           }
-          if (existsSync(planVbrief)) {
-            const vbriefExists = await access(destPlanVbrief).then(() => true).catch(() => false);
-            if (!vbriefExists) {
-              await copyFile(planVbrief, destPlanVbrief);
-              console.log(`[complete-planning] Copied plan.vbrief.json to ${destPlanVbrief}`);
+
+          const filesToStage = [`vbrief/proposed/${promoted.canonicalFilename}`];
+          if (promoted.destContinue) {
+            const continueBase = promoted.destContinue.split('/').pop()!;
+            filesToStage.push(`vbrief/proposed/${continueBase}`);
+          }
+
+          // Commit on main only when the project root is actually on main.
+          // Otherwise the file is left on disk for the user / a later sync to pick up.
+          try {
+            const { stdout: branchStdout } = await execAsync(
+              'git rev-parse --abbrev-ref HEAD',
+              { cwd: projectPath, encoding: 'utf-8' },
+            );
+            const currentBranch = branchStdout.trim();
+            if (currentBranch === 'main') {
+              const quoted = filesToStage.map(f => `"${f}"`).join(' ');
+              await execAsync(`git add -- ${quoted}`, { cwd: projectPath, encoding: 'utf-8' });
+              // Path-scoped commit so we don't sweep up unrelated user changes.
+              try {
+                await execAsync(`git diff --cached --quiet -- ${quoted}`, { cwd: projectPath, encoding: 'utf-8' });
+                // No staged changes for our paths — nothing to commit (file unchanged).
+              } catch {
+                await execAsync(
+                  `git commit -m "scope: propose ${upperIssueId} vBRIEF" -- ${quoted}`,
+                  { cwd: projectPath, encoding: 'utf-8' },
+                );
+                console.log(`[complete-planning] Committed vBRIEF lifecycle copy on main for ${upperIssueId}`);
+                // Push in background — non-fatal on failure.
+                try {
+                  const { stdout: remotes } = await execAsync('git remote', { cwd: projectPath, encoding: 'utf-8' });
+                  if (remotes.trim()) {
+                    const pushChild = spawn('git', ['push'], { cwd: projectPath, detached: true, stdio: 'ignore' });
+                    pushChild.unref();
+                  }
+                } catch { /* push failed — no remote or auth — non-fatal */ }
+              }
+            } else {
+              console.log(`[complete-planning] Project root not on main (${currentBranch}) — vBRIEF copied to vbrief/proposed/ but not committed on main`);
             }
+          } catch (gitErr: any) {
+            console.warn(`[complete-planning] vBRIEF lifecycle commit failed (non-fatal): ${gitErr?.message ?? gitErr}`);
           }
         } catch (copyErr: any) {
-          console.warn(`[complete-planning] Artifact copy failed (non-fatal): ${copyErr.message}`);
+          console.warn(`[complete-planning] vBRIEF lifecycle copy failed (non-fatal): ${copyErr?.message ?? copyErr}`);
         }
 
         // Sync beads
@@ -1138,46 +1189,17 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     invalidateAgentsCache();
 
     // Emit activity + TTS for planning completion
-    const planningDirForCheck = projectPath
-      ? join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning')
-      : '';
-    let openQuestionsCount = 0;
-    if (planningDirForCheck && existsSync(planningDirForCheck)) {
-      try {
-        const stateMdPath = join(planningDirForCheck, 'STATE.md');
-        if (existsSync(stateMdPath)) {
-          const stateMdContent = yield* Effect.promise(() => readFile(stateMdPath, 'utf-8'));
-          const validation = validatePlanningDocument(stateMdContent);
-          openQuestionsCount = validation.openQuestions;
-        }
-      } catch { /* non-fatal */ }
-    }
-
-    if (openQuestionsCount > 0) {
-      emitActivityEntry({
-        source: 'planning-agent',
-        level: 'warn',
-        message: `${id} planning complete with ${openQuestionsCount} open question(s) — awaiting user input`,
-        issueId: id,
-      });
-      emitActivityTts({
-        utterance: `${id} planning complete with ${openQuestionsCount} open question awaiting your input`,
-        priority: 1,
-        issueId: id,
-      });
-    } else {
-      emitActivityEntry({
-        source: 'planning-agent',
-        level: 'info',
-        message: `${id} planning complete — ready for work`,
-        issueId: id,
-      });
-      emitActivityTts({
-        utterance: `${id} planning complete, ready for work`,
-        priority: 2,
-        issueId: id,
-      });
-    }
+    emitActivityEntry({
+      source: 'planning-agent',
+      level: 'info',
+      message: `${id} planning complete — ready for work`,
+      issueId: id,
+    });
+    emitActivityTts({
+      utterance: `${id} planning complete, ready for work`,
+      priority: 2,
+      issueId: id,
+    });
 
     // Suppress unused variable warning — remoteVmName used for remote session cleanup if added later
     void isRemotePlanning; void remoteVmName;
@@ -1417,7 +1439,7 @@ const postIssueReopenRoute = HttpRouter.add(
 
     // Reset specialist pipeline state, post-merge state, and agent markers (all non-fatal)
     yield* Effect.promise(async () => {
-      // Reset specialist pipeline state, remove from queues, and update STATE.md
+      // Reset specialist pipeline state, remove from queues, and update continue file
       // via reopenWorkspaceState (shared logic with `pan reopen` CLI command)
       try {
         const teamPrefix = extractTeamPrefix(id);
@@ -1691,20 +1713,16 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
     // 4. Reset specialist pipeline states
     clearReviewStatus(id.toUpperCase());
 
-    // 5. Append "Restarted from Plan" section to STATE.md
+    // 5. Append restart entry to continue file (lifecycle-aware)
     yield* Effect.promise(async () => {
-      const statePath = join(workspacePath, '.planning', 'STATE.md');
-      if (existsSync(statePath)) {
-        const date = new Date().toISOString().slice(0, 10);
-        const lines = [
-          '',
-          `## Restarted from Plan — ${date}`,
-          '',
-          `**Branch reset to planning commit:** ${resetResult.commit}`,
-          '',
-          'All implementation work has been reset. Specialist states cleared. Resume implementation from the plan.',
-        ];
-        await appendFile(statePath, lines.join('\n') + '\n', 'utf-8');
+      const upperId = id.toUpperCase();
+      try {
+        appendContinueSessionEntryForIssue(projectPath, upperId, {
+          reason: 'resume',
+          note: `Restarted from plan — branch reset to planning commit ${resetResult.commit}. Specialist states cleared.`,
+        });
+      } catch {
+        // Non-fatal: continue file may not exist yet
       }
     });
 
@@ -2483,11 +2501,12 @@ const getIssuePlanningStateRoute = HttpRouter.add(
       : '';
     const planPath = workspacePath ? join(workspacePath, '.planning', 'plan.vbrief.json') : '';
     const hasPlan = !!planPath && existsSync(planPath);
-    const planningComplete = workspacePath && existsSync(join(workspacePath, '.planning', '.planning-complete'));
+    // planningComplete now means "plan.status indicates planning has finished" —
+    // any of proposed/approved/pending/running/completed/blocked. Falls back to
+    // the legacy `.planning-complete` marker for vBRIEFs without status fields.
+    // It's the definitive signal for "tasks have been generated from this plan."
+    const planningComplete = workspacePath ? isPlanningComplete(workspacePath) : false;
 
-    // The .planning-complete marker is written ONLY after generate-tasks succeeds
-    // (see POST /api/issues/:id/generate-tasks). It's the definitive signal for
-    // "tasks have been generated from this plan." No bd query needed — pure stat.
     const hasBeads = !!planningComplete;
 
     return jsonResponse({

@@ -267,10 +267,23 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
         cpSync(feedbackDir, join(archiveDir, 'feedback'), { recursive: true });
       }
 
-      // Archive STATE.md
-      const stateMd = join(workspacePath, '.planning', 'STATE.md');
-      if (existsSync(stateMd)) {
-        cpSync(stateMd, join(archiveDir, 'STATE.md'));
+      // Archive the scope vBRIEF's continue file. We don't know which lifecycle
+      // dir holds the active vBRIEF without project context, so we walk the
+      // workspace's `.planning/` (where the agent staged a copy during planning)
+      // and any sibling `vbrief/active/` dir found by walking up. We also
+      // copy any continue-*.vbrief.json discovered in `.planning/`.
+      const planningRoot = join(workspacePath, '.planning');
+      if (existsSync(planningRoot)) {
+        try {
+          const { readdirSync } = await import('fs');
+          for (const entry of readdirSync(planningRoot)) {
+            if (entry.startsWith('continue-') && entry.endsWith('.vbrief.json')) {
+              cpSync(join(planningRoot, entry), join(archiveDir, entry));
+            }
+          }
+        } catch {
+          // Best-effort archive — don't fail close-out if planning dir is unreadable.
+        }
       }
 
       // Archive beads/

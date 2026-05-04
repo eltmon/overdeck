@@ -28,7 +28,7 @@ optional:
 ## CRITICAL: PLANNING ONLY - NO IMPLEMENTATION
 
 **YOU ARE IN PLANNING MODE. DO NOT:**
-- Write or modify any code files (except STATE.md)
+- Write or modify any code files (except continue.vbrief.json)
 - Run implementation commands (npm install, docker compose, make, etc.)
 - Create actual features or functionality
 - Start implementing the solution
@@ -37,9 +37,8 @@ optional:
 - Ask clarifying questions (use AskUserQuestion tool)
 - Explore the codebase to understand context (read files, grep)
 - Generate planning artifacts:
-  - STATE.md (decisions, approach, architecture)
-  - vBRIEF plan at `.planning/plan.vbrief.json` (see format below)
-  - Implementation plan at `docs/prds/active/{issue-id-lowercase}/STATE.md` (copy of STATE.md, required for dashboard). The directory name MUST be lowercase (e.g. `pan-596`, not `PAN-596`) — uppercase strands the PRD where the lifecycle code can't find it.
+  - **continue.vbrief.json** at `.planning/continue-{issue-id}.vbrief.json` — structured decisions, hazards, and approach context (see format below). Replaces the old STATE.md.
+  - **vBRIEF plan** at `.planning/plan.vbrief.json` (see format below)
 - Present options and tradeoffs for the user to decide
 
 **Finalizing the session:** When your vBRIEF is written and you're ready to hand off, run:
@@ -60,7 +59,7 @@ Panopticon orchestrates several distinct agent types. **You are the planning age
 
 | Agent | Role | Working dir | CLAUDE.md auto-loaded |
 |-------|------|-------------|-----------------------|
-| **planning** (you) | Discovery, vBRIEF, STATE.md. No code. | workspace worktree | workspace |
+| **planning** (you) | Discovery, vBRIEF, continue.vbrief.json. No code. | workspace worktree | workspace |
 | **work** | Implementation from your vBRIEF + beads tasks | workspace worktree | workspace |
 | **inspect** | Per-bead spec verification mid-implementation | project root | project root |
 | **review** | Strict code review against acceptance criteria | project root | project root |
@@ -68,7 +67,7 @@ Panopticon orchestrates several distinct agent types. **You are the planning age
 | **uat** | Browser-based requirement verification (Playwright) | project root | project root |
 | **merge** | PR merge, conflict resolution, post-merge cleanup | project root | project root |
 
-**Critical asymmetry:** the workspace `CLAUDE.md` you see is NOT the one specialists see. Specialists run in the project root and auto-load the repo-tracked devroot `CLAUDE.md`. Instructions you put in `STATE.md` reach the work agent (same workspace) but not specialists. If you need a specialist to know something, put it in your vBRIEF as an acceptance criterion — that propagates through the pipeline via the role-prompt templates in `src/lib/cloister/prompts/`.
+**Critical asymmetry:** the workspace `CLAUDE.md` you see is NOT the one specialists see. Specialists run in the project root and auto-load the repo-tracked devroot `CLAUDE.md`. Instructions you put in `continue.vbrief.json` reach the work agent (same workspace) but not specialists. If you need a specialist to know something, put it in your vBRIEF as an acceptance criterion — that propagates through the pipeline via the role-prompt templates in `src/lib/cloister/prompts/`.
 
 ### Claude Code subagents (NOT Panopticon specialists)
 
@@ -115,7 +114,7 @@ Use AskUserQuestion tool to ask contextual questions:
 
 ### Playwright Isolation
 
-If the issue will require browser-based verification, encode that expectation clearly in STATE.md and acceptance criteria:
+If the issue will require browser-based verification, encode that expectation clearly in continue.vbrief.json and acceptance criteria:
 - Playwright/browser verification must use an isolated browser instance/profile.
 - Agents must not depend on another agent's Playwright session or shared browser state.
 - Any required login/setup should be reproducible inside the isolated session.
@@ -162,11 +161,10 @@ For each sub-task, estimate difficulty using this rubric:
 
 ### Phase 3: Generate Artifacts (NO CODE!)
 When discovery is complete:
-1. Create STATE.md with decisions made
-2. Copy STATE.md to implementation plan at `docs/prds/active/{issue-id-lowercase}/STATE.md` (required for dashboard). Use the LOWERCASE issue id for the directory name.
-3. Create a vBRIEF plan file at `.planning/plan.vbrief.json` — **MUST follow the exact format below**
-4. Run `pan plan-finalize` from the workspace root. This creates beads tasks from your vBRIEF and writes the `.planning/.planning-complete` marker.
-5. Summarize the plan and STOP
+1. Create **continue.vbrief.json** at `.planning/continue-{issue-id}.vbrief.json` with decisions, hazards, and approach context (see format below).
+2. Create a **vBRIEF plan** at `.planning/plan.vbrief.json` — **MUST follow the exact format below**.
+3. Run `pan plan-finalize` from the workspace root. This creates beads tasks from your vBRIEF and writes the `.planning/.planning-complete` marker.
+4. Summarize the plan and STOP
 
 **DO NOT run `bd create` commands directly.** `pan plan-finalize` is the only sanctioned way to materialize beads from a vBRIEF plan — it's deterministic and idempotent.
 
@@ -239,8 +237,40 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
 - `metadata.difficulty` and `metadata.issueLabel` are Panopticon extensions to the vBRIEF spec
 - Edge types: `blocks` (hard dependency), `informs` (soft), `invalidates`, `suggests`
 
-**IMPORTANT:** Create the plan file BEFORE creating beads tasks.
-**NOTE:** `*-spec.md` files are human-written specs — do NOT overwrite them. Your output is `*-plan.md`.
+### continue.vbrief.json Format
+
+The continue file is a **structured replacement for STATE.md**. It lives at `.planning/continue-{issue-id}.vbrief.json` and is copied to the lifecycle directory (`./vbrief/proposed/`) when planning completes.
+
+```json
+{
+  "version": "1",
+  "issueId": "{{ISSUE_ID}}",
+  "created": "<ISO 8601 timestamp>",
+  "updated": "<ISO 8601 timestamp>",
+  "gitState": { "branch": "<current branch>", "sha": "<short sha>", "dirty": false },
+  "decisions": [
+    { "id": "D1", "summary": "<decision text>", "recordedAt": "<ISO 8601 timestamp>" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "<risk/edge case>", "mitigation": "<how to handle it>" }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "{{MODEL_AUTHOR}}",
+  "sessionHistory": [
+    { "timestamp": "<ISO 8601 timestamp>", "reason": "planning", "note": "Initial planning session", "agentModel": "{{MODEL_AUTHOR}}" }
+  ]
+}
+```
+
+**Continue file rules:**
+- `version` MUST be `"1"`
+- `issueId` MUST match the issue ID in UPPERCASE (e.g., "{{ISSUE_ID}}")
+- `decisions` — every architectural or scope decision you make goes here. Future agents (work, review, merge) read these.
+- `hazards` — risks, edge cases, and gotchas the work agent should watch for.
+- `resumePoint` — leave as `null` during planning; the work agent will populate it.
+- `beadsMapping` — leave as `{}`; `pan plan-finalize` populates it when creating beads.
+- `sessionHistory` — start with one entry for this planning session.
 
 **Remember:** Be a thinking partner, not an interviewer. Ask questions that help clarify.
 

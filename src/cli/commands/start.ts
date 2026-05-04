@@ -500,45 +500,64 @@ function validatePlanMatchesIssue(workspacePath: string, issueId: string): { val
 }
 
 /**
- * Validate that STATE.md belongs to the current issue.
- * If the STATE.md is for a different issue (cross-contamination from git merge),
+ * Validate that the continue file belongs to the current issue.
+ * If the continue file is for a different issue (cross-contamination from git merge),
  * remove it to prevent the agent from working on the wrong issue.
  *
- * Returns true if STATE.md is valid (matches issue or doesn't exist).
+ * Returns valid:true if the continue file matches the current issue or doesn't exist.
  */
 function validateAndCleanStateFile(workspacePath: string, issueId: string): { valid: boolean; removed: boolean; wrongIssue?: string } {
-  const statePath = join(workspacePath, '.planning', 'STATE.md');
+  const upperId = issueId.toUpperCase();
+  const continuePath = join(workspacePath, '.planning', `continue-${upperId}.vbrief.json`);
+  const planningDir = join(workspacePath, '.planning');
 
-  if (!existsSync(statePath)) {
+  if (!existsSync(planningDir)) {
     return { valid: true, removed: false };
   }
 
+  // Look for any continue-*.vbrief.json files in the planning dir
+  let staleFiles: Array<{ path: string; staleId: string }> = [];
   try {
-    const content = readFileSync(statePath, 'utf-8');
-    const firstLine = content.split('\n')[0] || '';
-
-    // Extract issue ID from first line (format: "# ISSUE-ID: Title" or "# ISSUE-ID - Title")
-    const issueMatch = firstLine.match(/^#\s*([A-Z]+-\d+)/i);
-
-    if (issueMatch) {
-      const stateIssueId = issueMatch[1].toUpperCase();
-      const currentIssueId = issueId.toUpperCase();
-
-      if (stateIssueId !== currentIssueId) {
-        // Cross-contamination detected! Remove the stale STATE.md
-        const { unlinkSync } = require('fs');
-        unlinkSync(statePath);
-
-        console.warn(chalk.yellow(`⚠️  Removed stale STATE.md (was for ${stateIssueId}, not ${currentIssueId})`));
-        console.warn(chalk.dim('   This can happen when branches are merged. The agent will start fresh.'));
-
-        return { valid: false, removed: true, wrongIssue: stateIssueId };
+    const { readdirSync, unlinkSync } = require('fs');
+    const entries = readdirSync(planningDir) as string[];
+    for (const entry of entries) {
+      const match = entry.match(/^continue-([A-Z]+-\d+)\.vbrief\.json$/i);
+      if (match) {
+        const fileIssueId = match[1].toUpperCase();
+        if (fileIssueId !== upperId) {
+          staleFiles.push({ path: join(planningDir, entry), staleId: fileIssueId });
+        }
       }
     }
 
+    // Cross-check the canonical continue file's content if it exists
+    if (existsSync(continuePath)) {
+      try {
+        const raw = readFileSync(continuePath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (parsed.issueId && typeof parsed.issueId === 'string') {
+          const recordedId = parsed.issueId.toUpperCase();
+          if (recordedId !== upperId) {
+            staleFiles.push({ path: continuePath, staleId: recordedId });
+          }
+        }
+      } catch {
+        // Malformed JSON — leave it alone
+      }
+    }
+
+    if (staleFiles.length > 0) {
+      const firstStale = staleFiles[0];
+      for (const { path } of staleFiles) {
+        try { unlinkSync(path); } catch { /* ignore */ }
+      }
+      console.warn(chalk.yellow(`⚠️  Removed stale continue file (was for ${firstStale.staleId}, not ${upperId})`));
+      console.warn(chalk.dim('   This can happen when branches are merged. The agent will start fresh.'));
+      return { valid: false, removed: true, wrongIssue: firstStale.staleId };
+    }
+
     return { valid: true, removed: false };
-  } catch (error) {
-    // If we can't read/parse the file, leave it alone
+  } catch {
     return { valid: true, removed: false };
   }
 }
@@ -685,7 +704,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       const hasPreWorkspacePRD = hasPRDDraft(id);
       console.log('');
       console.log(chalk.bold('Context:'));
-      console.log(`  Planning:   ${planningContext ? 'Found (.planning/STATE.md)' : 'None'}`);
+      console.log(`  Planning:   ${planningContext ? 'Found (.planning/continue.vbrief.json)' : 'None'}`);
       console.log(`  Beads:      ${beadsTasks.length} tasks`);
       if (hasPreWorkspacePRD) {
         console.log(`  Pre-workspace PRD: ${chalk.green('✓')} ${getPRDDraftPath(id)}`);
@@ -693,7 +712,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       return;
     }
 
-    // Validate STATE.md belongs to this issue (prevent cross-contamination from git merges)
+    // Validate continue file belongs to this issue (prevent cross-contamination from git merges)
     spinner.text = 'Validating workspace state...';
     const stateValidation = validateAndCleanStateFile(workspace, id);
     if (stateValidation.removed) {
@@ -804,7 +823,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     if (planningContext || beadsTasks.length > 0) {
       console.log('');
       console.log(chalk.bold('Context Loaded:'));
-      if (planningContext) console.log(`  Planning:   ${chalk.green('✓')} STATE.md`);
+      if (planningContext) console.log(`  Planning:   ${chalk.green('✓')} continue.vbrief.json`);
       if (beadsTasks.length > 0) console.log(`  Beads:      ${chalk.green('✓')} ${beadsTasks.length} tasks`);
     }
 

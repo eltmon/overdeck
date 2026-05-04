@@ -71,6 +71,9 @@ import { getProviderForModel } from '../../../lib/providers.js';
 import { hasPRDDraft } from '../../../lib/prd-draft.js';
 import { findPrdAnywhere } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
+import { isPlanningComplete } from '../../../lib/vbrief/io.js';
+import { transitionVBriefOnMain, updatePlanStatus, resolveContinueStateDir } from '../../../lib/vbrief/lifecycle-io.js';
+import { readContinueState, writeContinueState } from '../../../lib/vbrief/continue-state.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
@@ -824,7 +827,7 @@ const postAgentPokeRoute = HttpRouter.add(
     const { message } = body as any;
     const defaultPokeMessage =
       "You seem to have been inactive for a while. If you're stuck:\n" +
-      '1. Check your current task in STATE.md\n' +
+      '1. Check your current task in continue.vbrief.json\n' +
       '2. Try an alternative approach if blocked\n' +
       '3. Ask for help if needed\n\n' +
       "What's your current status?";
@@ -1590,14 +1593,16 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
-    const planningComplete = join(workspacePath, '.planning', '.planning-complete');
     const hasPlan = existsSync(planPath);
-    const isComplete = existsSync(planningComplete);
+    // Planning has finished when plan.status is any of:
+    // proposed/approved/pending/running/completed/blocked. Falls back to the
+    // legacy `.planning-complete` marker for vBRIEFs without status fields.
+    const isComplete = isPlanningComplete(workspacePath);
 
     if (!hasPlan || !isComplete) {
       const reason = !hasPlan
         ? 'No plan.vbrief.json found — planning has not run for this issue.'
-        : 'Planning started but did not complete (.planning-complete marker missing).';
+        : 'Planning started but did not complete (plan.status indicates planning is still in progress).';
       return jsonResponse({
         error: reason,
         hint: 'Run planning first (click Plan button or use /plan skill). The planning agent produces a vBRIEF plan which is then converted to beads automatically.',
@@ -1733,8 +1738,10 @@ const postAgentsRoute = HttpRouter.add(
         if (existsSync(join(gitRoot, '.beads'))) {
           yield* Effect.promise(() => execAsync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8' }));
         }
-        if (existsSync(join(gitRoot, 'STATE.md'))) {
-          yield* Effect.promise(() => execAsync(`git add STATE.md`, { cwd: gitRoot, encoding: 'utf-8' }));
+        // Stage continue file
+        const continueFile = `continue-${issueId.toUpperCase()}.vbrief.json`;
+        if (existsSync(join(gitRoot, continueFile))) {
+          yield* Effect.promise(() => execAsync(`git add "${continueFile}"`, { cwd: gitRoot, encoding: 'utf-8' }));
         }
         // git diff --cached --quiet exits 1 when there ARE staged changes (normal).
         // Handle exit-1 in the Promise so it never becomes an Effect failure.
@@ -1749,6 +1756,84 @@ const postAgentsRoute = HttpRouter.add(
           pushChild.unref();
         }
       }).pipe(Effect.catch(() => Effect.void));
+    }
+
+    // Approval transition (PAN-946): move the scope vBRIEF on main from
+    // proposed/ → active/ and stamp plan.status='approved'. Idempotent: if the
+    // vBRIEF is already in active/ with status approved, this is a no-op. The
+    // commit only happens when projectPath is on main; otherwise the on-disk
+    // move still applies and a later sync will pick it up. Failure is non-fatal
+    // — agent spawn proceeds even if the lifecycle move fails.
+    yield* Effect.promise(() =>
+      transitionVBriefOnMain(
+        projectPath,
+        issueId,
+        'active',
+        'approved',
+        `scope: approve ${issueId.toUpperCase()} vBRIEF`,
+      )
+        .then((result) => {
+          if (result.moved) {
+            console.log(`[start-agent] vBRIEF moved ${result.fromDir} → active for ${issueId}`);
+          }
+          if (result.committed) {
+            console.log(`[start-agent] Committed approval transition on main for ${issueId}`);
+          }
+        })
+        .catch((err) => {
+          console.warn(`[start-agent] vBRIEF approval transition failed (non-fatal): ${err?.message ?? err}`);
+        }),
+    );
+
+    // Running transition (PAN-946): set workspace plan.status to 'running'.
+    // This is the worktree-side state — the workspace .planning/plan.vbrief.json
+    // is updated directly, and the planning artifacts commit below will pick it
+    // up. Non-fatal: agent starts even if the write fails.
+    if (existsSync(planPath)) {
+      try {
+        updatePlanStatus(planPath, 'running');
+        console.log(`[start-agent] Set plan.status=running for ${issueId}`);
+      } catch (planStatusErr: any) {
+        console.warn(`[start-agent] Failed to set plan.status=running (non-fatal): ${planStatusErr?.message ?? planStatusErr}`);
+      }
+    }
+
+    // Write initial continue state (PAN-946: workspace-44p)
+    try {
+      const { stdout: branchOut } = yield* Effect.promise(() => execAsync('git branch --show-current', { cwd: workspacePath, encoding: 'utf-8' }));
+      const { stdout: shaOut } = yield* Effect.promise(() => execAsync('git rev-parse --short HEAD', { cwd: workspacePath, encoding: 'utf-8' }));
+      const { stdout: dirtyOut } = yield* Effect.promise(() => execAsync('git status --porcelain', { cwd: workspacePath, encoding: 'utf-8' }));
+      const branch = branchOut.trim();
+      const sha = shaOut.trim();
+      const dirty = dirtyOut.trim().length > 0;
+
+      const continueDir = resolveContinueStateDir(projectPath, issueId);
+      const existing = readContinueState(continueDir, issueId);
+      const now = new Date().toISOString();
+      const next = existing
+        ? {
+            ...existing,
+            gitState: { branch, sha, dirty },
+            agentModel: spawnModel,
+            sessionHistory: [...existing.sessionHistory, { timestamp: now, reason: 'start' as const, agentModel: spawnModel }],
+          }
+        : {
+            version: '1' as const,
+            issueId,
+            created: now,
+            updated: now,
+            gitState: { branch, sha, dirty },
+            decisions: [],
+            hazards: [],
+            resumePoint: null,
+            beadsMapping: {},
+            agentModel: spawnModel,
+            sessionHistory: [{ timestamp: now, reason: 'start' as const, agentModel: spawnModel }],
+          };
+      writeContinueState(continueDir, issueId, next);
+      console.log(`[start-agent] Wrote initial continue state for ${issueId}`);
+    } catch (continueErr: any) {
+      console.warn(`[start-agent] Failed to write continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
     }
 
     const planningPromptPath = join(workspacePlanningDir, 'PLANNING_PROMPT.md');

@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { mkdir, readFile, readdir, writeFile } from 'fs/promises';
 import { join, dirname } from 'path';
+import { readContinueState, continueFilePath } from '../vbrief/continue-state.js';
+import { resolveVBriefDir } from '../vbrief/lifecycle.js';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeam } from '../projects.js';
 import { readWorkspacePlan, readPlan } from '../vbrief/io.js';
@@ -113,7 +115,7 @@ const COMMENT_BODY_LIMIT = 500;
 const TOTAL_CONTEXT_LIMIT = 2000;
 
 /**
- * Fetch tracker context (new comments + issue status) since STATE.md was last modified.
+ * Fetch tracker context (new comments + issue status) since continue file was last modified.
  * Returns a formatted markdown string for injection into the work agent prompt.
  */
 export async function getTrackerContext(
@@ -121,12 +123,22 @@ export async function getTrackerContext(
   workspacePath: string
 ): Promise<string> {
   let stateMtime: Date | null = null;
-  const statePath = join(workspacePath, '.planning', 'STATE.md');
-  if (existsSync(statePath)) {
+
+  // Find continue file mtime — check lifecycle dirs first, then workspace `.planning/`.
+  const projectRoot = join(workspacePath, '..', '..');
+  for (const dir of ['active', 'proposed', 'completed', 'cancelled'] as const) {
     try {
-      stateMtime = statSync(statePath).mtime;
-    } catch {
-      // Ignore stat errors
+      const cp = continueFilePath(resolveVBriefDir(projectRoot, dir), issueId);
+      if (existsSync(cp)) {
+        stateMtime = statSync(cp).mtime;
+        break;
+      }
+    } catch { /* ignore */ }
+  }
+  if (!stateMtime) {
+    const planningCp = continueFilePath(join(workspacePath, '.planning'), issueId);
+    if (existsSync(planningCp)) {
+      try { stateMtime = statSync(planningCp).mtime; } catch { /* ignore */ }
     }
   }
 
@@ -162,12 +174,12 @@ export async function getTrackerContext(
         }),
       ]);
 
-      // Filter to comments newer than STATE.md mtime
+      // Filter to comments newer than continue file mtime
       const newComments = stateMtime
         ? allComments.filter((c) => new Date(c.createdAt) > stateMtime!)
         : allComments;
 
-      // Detect reopened: STATE.md exists (has completion history) but issue is open
+      // Detect reopened: continue file exists (has completion history) but issue is open
       const isReopened =
         stateMtime !== null &&
         (issue.state === 'open' || issue.state === 'in_progress');
@@ -189,7 +201,7 @@ export async function getTrackerContext(
 
       if (newComments.length > 0) {
         const sinceLabel = stateMtime
-          ? `since STATE.md was last updated (${stateMtime.toISOString().slice(0, 10)})`
+          ? `since continue file was last updated (${stateMtime.toISOString().slice(0, 10)})`
           : 'all comments';
         lines.push('');
         lines.push(`**New comments ${sinceLabel}:**`);
@@ -229,7 +241,7 @@ export async function getTrackerContext(
         }
       } else if (stateMtime) {
         lines.push('');
-        lines.push('_No new comments since last STATE.md update._');
+        lines.push('_No new comments since last continue file update._');
       }
 
       const result = lines.join('\n').trim();
@@ -258,14 +270,40 @@ export async function getTrackerContext(
 }
 
 /**
- * Read planning artifacts for an issue (STATE.md, etc.)
+ * Read planning artifacts for an issue.
+ * Tries continue.vbrief.json — lifecycle dirs first (proposed → active →
+ * completed → cancelled), then the workspace `.planning/` copy.
  */
 export function readPlanningContext(workspacePath: string): string | null {
-  const statePath = join(workspacePath, '.planning', 'STATE.md');
-  if (existsSync(statePath)) {
-    return readFileSync(statePath, 'utf-8');
+  const issueId = inferIssueIdFromWorkspace(workspacePath);
+
+  // Try lifecycle dirs first (proposed → active → completed → cancelled)
+  if (issueId) {
+    const projectRoot = join(workspacePath, '..', '..');
+    for (const dir of ['proposed', 'active', 'completed', 'cancelled'] as const) {
+      try {
+        const lifecycleDir = resolveVBriefDir(projectRoot, dir);
+        const cont = readContinueState(lifecycleDir, issueId);
+        if (cont) {
+          return JSON.stringify(cont, null, 2);
+        }
+      } catch { /* ignore */ }
+    }
+
+    // Fallback to workspace .planning/
+    const planningContinue = readContinueState(join(workspacePath, '.planning'), issueId);
+    if (planningContinue) {
+      return JSON.stringify(planningContinue, null, 2);
+    }
   }
+
   return null;
+}
+
+function inferIssueIdFromWorkspace(workspacePath: string): string | null {
+  const base = workspacePath.split('/').pop() || '';
+  const match = base.match(/^feature-([a-z]+-\d+)$/i);
+  return match ? match[1].toUpperCase() : null;
 }
 
 /**
@@ -409,13 +447,13 @@ export async function writeStoryFeatureContext(workspacePath: string, issueId: s
 }
 
 /**
- * Check if STATE.md contains Stitch design information.
+ * Check if planning content contains Stitch design information.
  * Returns the Stitch section if found, null otherwise.
  */
 export function extractStitchDesigns(stateContent: string | null): string | null {
   if (!stateContent) return null;
 
-  // Look for Stitch-related sections in STATE.md
+  // Look for Stitch-related sections in planning content
   const stitchPatterns = [
     /## UI Designs[\s\S]*?(?=\n## |$)/i,
     /### Stitch Assets[\s\S]*?(?=\n### |\n## |$)/i,
@@ -459,7 +497,7 @@ export function extractStitchDesigns(stateContent: string | null): string | null
 }
 
 /**
- * Extract beads IDs from STATE.md content.
+ * Extract beads IDs from planning content.
  * Looks for patterns like `panopticon-1dg` in backticks or tables.
  */
 export function extractBeadsIdsFromState(stateContent: string): string[] {

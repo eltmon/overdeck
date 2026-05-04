@@ -278,8 +278,11 @@ export async function fetchActivityDataWithContext(
 
         if (isPlanning && !transcript) {
           const projectPath = getProjectPath(issuePrefix);
-          const stateMdText = await readOptional(join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning', 'STATE.md'));
-          if (stateMdText) transcript = `PLANNING COMPLETE\n\n${stateMdText}`;
+          const workspacePlanningDir = join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning');
+          const continueText = await readOptional(join(workspacePlanningDir, `continue-${issueId.toUpperCase()}.vbrief.json`));
+          if (continueText) {
+            transcript = `PLANNING COMPLETE\n\n${continueText}`;
+          }
         }
       }
 
@@ -316,12 +319,12 @@ export async function fetchActivityDataWithContext(
     } catch { /* skip malformed state */ }
   }
 
-  // If no planning agent but STATE.md exists, create synthetic planning section
+  // If no planning agent but continue file exists, create synthetic planning section
   if (!hasPlanningSection) {
-    const stateMdPath = join(workspacePath, '.planning', 'STATE.md');
-    const stateMdText = await readOptional(stateMdPath);
-    if (stateMdText) {
-      const fileStat = await stat(stateMdPath).catch(() => null);
+    const continuePath = join(workspacePath, '.planning', `continue-${issueId.toUpperCase()}.vbrief.json`);
+    const continueText = await readOptional(continuePath);
+    if (continueText) {
+      const fileStat = await stat(continuePath).catch(() => null);
       const sessionId = `planning-${issueLower}-state`;
       const jsonlPath = await resolveJsonlPath(sessionId, workspacePath);
       sections.push({
@@ -333,7 +336,7 @@ export async function fetchActivityDataWithContext(
           || new Date().toISOString(),
         duration: null,
         status: 'completed',
-        transcript: jsonlPath ? undefined : `PLANNING COMPLETE\n\n${stateMdText}`,
+        transcript: jsonlPath ? undefined : `PLANNING COMPLETE\n\n${continueText}`,
         presence: 'ended',
         hasJsonl: !!jsonlPath,
       });
@@ -637,7 +640,7 @@ async function fetchPlanningData(
     if (loc.format === 'flat') {
       return (await readOptional(loc.path)) ?? undefined;
     }
-    // Subdirectory format: STATE.md is the human-readable PRD content.
+    // Subdirectory format: PRD content lives in the subdirectory (historically STATE.md).
     return (await readOptional(join(loc.path, 'STATE.md'))) ?? undefined;
   };
 
@@ -663,7 +666,8 @@ async function fetchPlanningData(
     return result;
   }
 
-  result.state = await readOptional(join(planningDir, 'STATE.md')) ?? undefined;
+  const continueState = await readOptional(join(planningDir, `continue-${issueId.toUpperCase()}.vbrief.json`));
+  result.state = continueState ?? undefined;
   result.inference = await readOptional(join(planningDir, 'INFERENCE.md')) ?? undefined;
   result.hasState = Boolean(result.state);
 
@@ -814,7 +818,7 @@ async function generateStatusReview(issueId: string): Promise<
     return { type: 'err', response: { error: 'No planning directory found' }, status: 404 };
   }
 
-  const state = await readOptional(join(planningDir, 'STATE.md'));
+  const state = await readOptional(join(planningDir, `continue-${issueId.toUpperCase()}.vbrief.json`));
 
   const readPlanningSubdir = async (subdir: string, limit = 5, maxPerFile = 2000): Promise<string> => {
     const dirPath = join(planningDir, subdir);
@@ -906,8 +910,8 @@ ${issueContext ? `\n${issueContext}\n` : ''}
 - Review: ${reviewStatus}
 - Tests: ${testStatus}
 
-## STATE.md (Planning Context and Progress Notes)
-${state ? state.slice(0, 4000) : '(No STATE.md available)'}
+## Planning Context (continue.vbrief.json)
+${state ? state.slice(0, 4000) : '(No planning state available)'}
 
 ## Files Changed
 ${filesChanged.slice(0, 2000) || 'No changes detected'}

@@ -160,7 +160,7 @@ export function ZoneCOverview({
           <MarkdownTab
             body={planning.data?.state}
             isLoading={planning.isLoading}
-            emptyLabel="No STATE.md recorded for this issue."
+            emptyLabel="No continue file recorded for this issue."
           />
         )}
         {tab === 'inference' && (

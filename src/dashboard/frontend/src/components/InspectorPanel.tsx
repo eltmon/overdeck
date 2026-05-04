@@ -603,7 +603,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
   const handleReopen = async () => {
     if (await confirm({
       title: 'Reopen Issue',
-      message: `Reopen ${issueId} for re-work?\n\nThis will:\n- Move the issue to "In Progress"\n- Reset review/test/merge status to pending\n- Remove any queued specialist tasks\n- Append a "Reopened" section to STATE.md`,
+      message: `Reopen ${issueId} for re-work?\n\nThis will:\n- Move the issue to "In Progress"\n- Reset review/test/merge status to pending\n- Remove any queued specialist tasks\n- Append a "Reopened" entry to the continue file`,
       confirmLabel: 'Reopen',
     })) {
       reopenMutation.mutate(undefined);

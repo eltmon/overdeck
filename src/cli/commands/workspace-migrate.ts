@@ -289,19 +289,8 @@ async function copyPlanningStateToRemote(
       // Create directory on VM
       await provider.ssh(vmName, `mkdir -p ~/workspace/.planning/${normalizedId}`);
 
-      // Copy STATE.md if exists
-      const stateMdPath = join(planningDir, 'STATE.md');
-      if (existsSync(stateMdPath)) {
-        const content = readFileSync(stateMdPath, 'utf-8');
-        const escapedContent = content.replace(/'/g, "'\\''");
-        await provider.ssh(vmName, `cat > ~/workspace/.planning/${normalizedId}/STATE.md << 'STATEEOF'
-${content}
-STATEEOF`);
-        steps.push('Copied STATE.md');
-      }
-
-      // Copy other planning files
-      const planningFiles = readdirSync(planningDir).filter(f => f !== 'STATE.md');
+      // Copy planning files
+      const planningFiles = readdirSync(planningDir);
       for (const file of planningFiles) {
         const filePath = join(planningDir, file);
         if (existsSync(filePath)) {
@@ -365,9 +354,9 @@ async function copyPlanningStateFromRemote(
   const normalizedId = issueId.toLowerCase();
 
   // Check if planning directory exists on remote
-  const planningCheck = await provider.ssh(vmName, `ls ~/workspace/.planning/${normalizedId}/STATE.md 2>/dev/null`);
+  const planningCheck = await provider.ssh(vmName, `ls ~/workspace/.planning/${normalizedId}/ 2>/dev/null`);
 
-  if (planningCheck.exitCode === 0) {
+  if (planningCheck.exitCode === 0 && planningCheck.stdout?.trim()) {
     try {
       // Determine local planning directory
       const projectPath = projectConfig?.path;
@@ -377,17 +366,10 @@ async function copyPlanningStateFromRemote(
 
       mkdirSync(localPlanningDir, { recursive: true });
 
-      // Get STATE.md content
-      const stateMdResult = await provider.ssh(vmName, `cat ~/workspace/.planning/${normalizedId}/STATE.md`);
-      if (stateMdResult.exitCode === 0 && stateMdResult.stdout) {
-        writeFileSync(join(localPlanningDir, 'STATE.md'), stateMdResult.stdout);
-        steps.push('Copied STATE.md');
-      }
-
-      // List and copy other planning files
+      // List and copy planning files
       const lsResult = await provider.ssh(vmName, `ls ~/workspace/.planning/${normalizedId}/`);
       if (lsResult.exitCode === 0) {
-        const files = lsResult.stdout.trim().split('\n').filter(f => f && f !== 'STATE.md');
+        const files = lsResult.stdout.trim().split('\n').filter(f => f);
         for (const file of files) {
           try {
             const contentResult = await provider.ssh(vmName, `cat ~/workspace/.planning/${normalizedId}/${file}`);

@@ -1,24 +1,23 @@
 ---
 specialist: verification-gate
-issueId: PAN-936
+issueId: PAN-946
 outcome: failed
-timestamp: 2026-05-01T05:35:15Z
+timestamp: 2026-05-03T17:23:55Z
 ---
 
-VERIFICATION FAILED for PAN-936 (attempt 1/10):
+VERIFICATION FAILED for PAN-946 (attempt 1/10):
 
 Failed check: test
 
-Verification FAILED at test (28389ms):
+Verification FAILED at test (30923ms):
 
-ion(join(repoRoot, 'apps', 'desk…
-     18| 
-     19|     expect(desktopVersion).toBe(rootVersion);
-       |                            ^
-     20|   });
-     21| });
+…
+    1165|     expect(spawnReviewerMatch).not.toBeNull();
+       |                                    ^
+    1166|     const fn = spawnReviewerMatch![0];
+    1167| 
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/14]⎯
 
  FAIL |root|  src/lib/__tests__/launcher-generator.test.ts > generateLauncherScript > specialist dispatch inner script
 Error: Snapshot `generateLauncherScript > specialist dispatch inner script 1` mismatched
@@ -47,7 +46,7 @@ Error: Snapshot `generateLauncherScript > specialist dispatch inner script 1` mi
     136|       "#!/bin/bash
     137|       unset TMUX TMUX_PANE STY
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/14]⎯
 
  FAIL |root|  src/lib/__tests__/launcher-generator.test.ts > generateLauncherScript > specialist init/wake
 Error: Snapshot `generateLauncherScript > specialist init/wake 1` mismatched
@@ -75,7 +74,7 @@ Error: Snapshot `generateLauncherScript > specialist init/wake 1` mismatched
     175|       "#!/bin/bash
     176|       unset TMUX TMUX_PANE STY
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/14]⎯
 
 
 
@@ -85,6 +84,6 @@ Error: Snapshot `generateLauncherScript > specialist init/wake 1` mismatched
 2. Fix the code causing the failure
 3. Run the failing check locally to verify it passes
 4. Commit every change
-5. Invoke the /rebase-and-submit skill for PAN-936 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-936 -m "Fixed test"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.
+5. Invoke the /rebase-and-submit skill for PAN-946 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-946 -m "Fixed test"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.
 
 Do NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until `pan review request` has completed successfully.

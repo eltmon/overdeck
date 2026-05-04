@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConversationPanel } from '../ConversationPanel';
+import { DialogProvider } from '../../DialogProvider';
 
 // Mock DialogProvider hooks so ConversationPanel can mount without the full provider tree
 vi.mock('../../DialogProvider', () => ({
@@ -92,14 +93,16 @@ function renderPanel(
 ) {
   const client = makeClient();
   render(
-    <QueryClientProvider client={client}>
-      <ConversationPanel
-        conversation={conversation}
-        viewMode="conversation"
-        onArchived={() => {}}
-        {...props}
-      />
-    </QueryClientProvider>,
+    <DialogProvider>
+      <QueryClientProvider client={client}>
+        <ConversationPanel
+          conversation={conversation}
+          viewMode="conversation"
+          onArchived={() => {}}
+          {...props}
+        />
+      </QueryClientProvider>
+    </DialogProvider>,
   );
   return client;
 }
