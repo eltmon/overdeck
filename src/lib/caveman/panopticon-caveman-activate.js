@@ -38,7 +38,7 @@ const panopticonOverrides = `
 
 ## Panopticon Overrides (non-negotiable)
 
-STATE.md updates: ALWAYS use full prose with exact section headers (## Status, ## Current Phase, ## Completed Work, ## Remaining Work, ## Key Decisions, ## Specialist Feedback). Crash recovery depends on this format.
+continue.vbrief.json updates: ALWAYS use full prose for narrative fields (decisions[].rationale, hazards[].mitigation, approach, sessionHistory[].note). Crash recovery and specialist context depend on complete information in these fields.
 
 .planning/feedback/ files: ALWAYS write at full prose. The work agent that reads this file needs complete context to understand what to fix.
 

@@ -187,13 +187,6 @@ export async function archiveWorkspaceArtifacts(
       details.push('Archived continue.vbrief.json');
     }
 
-    // Legacy fallback: archive STATE.md if continue file missing
-    const stateMd = join(workspacePath, '.planning', 'STATE.md');
-    if (existsSync(stateMd)) {
-      await cp(stateMd, join(archiveDir, 'STATE.md'));
-      details.push('Archived STATE.md');
-    }
-
     // Archive plan.vbrief.json — the canonical structured plan. Moved to
     // docs/prds/completed/ above, but the workspace copy may have agent-driven
     // updates (sequence, completion timestamps) not yet copied to docs/. Preserve

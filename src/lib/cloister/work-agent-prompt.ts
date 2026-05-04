@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { readContinueState, continueFilePath } from '../vbrief/continue-state.js';
 import { resolveVBriefDir } from '../vbrief/lifecycle.js';
@@ -116,7 +116,7 @@ export async function getTrackerContext(
 ): Promise<string> {
   let stateMtime: Date | null = null;
 
-  // Try continue file first, fall back to STATE.md
+  // Find continue file mtime — check lifecycle dirs first, then workspace `.planning/`.
   const projectRoot = join(workspacePath, '..', '..');
   for (const dir of ['active', 'proposed', 'completed', 'cancelled'] as const) {
     try {
@@ -131,12 +131,6 @@ export async function getTrackerContext(
     const planningCp = continueFilePath(join(workspacePath, '.planning'), issueId);
     if (existsSync(planningCp)) {
       try { stateMtime = statSync(planningCp).mtime; } catch { /* ignore */ }
-    }
-  }
-  if (!stateMtime) {
-    const statePath = join(workspacePath, '.planning', 'STATE.md');
-    if (existsSync(statePath)) {
-      try { stateMtime = statSync(statePath).mtime; } catch { /* ignore */ }
     }
   }
 
@@ -269,7 +263,8 @@ export async function getTrackerContext(
 
 /**
  * Read planning artifacts for an issue.
- * Tries continue.vbrief.json first (lifecycle dirs → .planning/), falls back to STATE.md.
+ * Tries continue.vbrief.json — lifecycle dirs first (proposed → active →
+ * completed → cancelled), then the workspace `.planning/` copy.
  */
 export function readPlanningContext(workspacePath: string): string | null {
   const issueId = inferIssueIdFromWorkspace(workspacePath);
@@ -294,11 +289,6 @@ export function readPlanningContext(workspacePath: string): string | null {
     }
   }
 
-  // Legacy fallback: STATE.md
-  const statePath = join(workspacePath, '.planning', 'STATE.md');
-  if (existsSync(statePath)) {
-    return readFileSync(statePath, 'utf-8');
-  }
   return null;
 }
 

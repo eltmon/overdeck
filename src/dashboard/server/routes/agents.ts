@@ -1739,11 +1739,10 @@ const postAgentsRoute = HttpRouter.add(
         if (existsSync(join(gitRoot, '.beads'))) {
           yield* Effect.promise(() => execAsync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8' }));
         }
-        // Stage continue files and legacy STATE.md
-        for (const planningFile of [`continue-${issueId.toUpperCase()}.vbrief.json`, 'STATE.md']) {
-          if (existsSync(join(gitRoot, planningFile))) {
-            yield* Effect.promise(() => execAsync(`git add "${planningFile}"`, { cwd: gitRoot, encoding: 'utf-8' }));
-          }
+        // Stage continue file
+        const continueFile = `continue-${issueId.toUpperCase()}.vbrief.json`;
+        if (existsSync(join(gitRoot, continueFile))) {
+          yield* Effect.promise(() => execAsync(`git add "${continueFile}"`, { cwd: gitRoot, encoding: 'utf-8' }));
         }
         // git diff --cached --quiet exits 1 when there ARE staged changes (normal).
         // Handle exit-1 in the Promise so it never becomes an Effect failure.

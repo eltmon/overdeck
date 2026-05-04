@@ -11,8 +11,10 @@ import { promisify } from 'util';
 import type { TokenUsage } from '../runtimes/types.js';
 import type { ComplexityLevel } from './complexity.js';
 import type { AgentState } from '../agents.js';
-import { getAgentDir } from '../agents.js';
 import { renderPrompt } from './prompts.js';
+import { resolveProjectFromIssue } from '../projects.js';
+import { resolveVBriefDir } from '../vbrief/lifecycle.js';
+import { readContinueState, type ContinueState } from '../vbrief/continue-state.js';
 
 const execAsync = promisify(exec);
 
@@ -44,7 +46,8 @@ export interface HandoffContext {
   previousSessionId?: string;
 
   // Files
-  stateFile?: string;           // .planning/STATE.md content
+  /** Parsed scope continue file (replaces STATE.md). */
+  continueState?: ContinueState;
   claudeMd?: string;            // CLAUDE.md content
 
   // Git state
@@ -99,8 +102,8 @@ export async function captureHandoffContext(
     costSoFar: agentState.costSoFar || 0,
   };
 
-  // Capture files (STATE.md, CLAUDE.md)
-  await captureFiles(context, agentState.workspace);
+  // Capture files (continue file, CLAUDE.md)
+  await captureFiles(context, agentState.workspace, agentState.issueId);
 
   // Capture git state
   await captureGitState(context, agentState.workspace);
@@ -112,14 +115,37 @@ export async function captureHandoffContext(
 }
 
 /**
- * Capture workspace files (STATE.md, CLAUDE.md)
+ * Capture workspace files (continue file, CLAUDE.md)
  */
-async function captureFiles(context: HandoffContext, workspace: string): Promise<void> {
+async function captureFiles(
+  context: HandoffContext,
+  workspace: string,
+  issueId: string,
+): Promise<void> {
   try {
-    // Read STATE.md if it exists
-    const stateFile = join(workspace, '.planning/STATE.md');
-    if (existsSync(stateFile)) {
-      context.stateFile = readFileSync(stateFile, 'utf-8');
+    // Read the scope continue file: lifecycle dirs first (active → proposed →
+    // completed → cancelled), then the workspace `.planning/` copy.
+    const resolved = resolveProjectFromIssue(issueId);
+    let continueState: ContinueState | null = null;
+    if (resolved) {
+      for (const dir of ['active', 'proposed', 'completed', 'cancelled'] as const) {
+        try {
+          const lifecycleDir = resolveVBriefDir(resolved.projectPath, dir);
+          const cs = readContinueState(lifecycleDir, issueId);
+          if (cs) {
+            continueState = cs;
+            break;
+          }
+        } catch { /* ignore */ }
+      }
+    }
+    if (!continueState) {
+      try {
+        continueState = readContinueState(join(workspace, '.planning'), issueId);
+      } catch { /* ignore */ }
+    }
+    if (continueState) {
+      context.continueState = continueState;
     }
 
     // Read CLAUDE.md if it exists
@@ -255,12 +281,12 @@ export function serializeHandoffContext(context: HandoffContext): string {
     lines.push('');
   }
 
-  // STATE.md content
-  if (context.stateFile) {
-    lines.push('## Current State (STATE.md)');
+  // Continue file content (structured planning state)
+  if (context.continueState) {
+    lines.push('## Current State (continue.vbrief.json)');
     lines.push('');
-    lines.push('```markdown');
-    lines.push(context.stateFile);
+    lines.push('```json');
+    lines.push(JSON.stringify(context.continueState, null, 2));
     lines.push('```');
     lines.push('');
   }

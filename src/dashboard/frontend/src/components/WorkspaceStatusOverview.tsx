@@ -548,7 +548,7 @@ export function WorkspaceStatusOverview({
           <textarea
             value={resumeMessage || ''}
             onChange={(e) => onResumeMessageChange?.(e.target.value)}
-            placeholder="Tell the agent what to do, e.g. 'Address the PR feedback about error handling' or leave empty to let it pick up from STATE.md"
+            placeholder="Tell the agent what to do, e.g. 'Address the PR feedback about error handling' or leave empty to let it pick up from the continue file"
             className="w-full px-2 py-1.5 text-xs bg-card border border-border rounded resize-none text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
             rows={3}
             autoFocus

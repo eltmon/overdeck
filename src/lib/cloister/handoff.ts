@@ -109,7 +109,7 @@ function detectHandoffMethod(agentId: string): HandoffMethod {
  * Kill & Spawn handoff method
  *
  * Process:
- * 1. Signal agent to save state (update STATE.md)
+ * 1. Signal agent to save state (update continue file)
  * 2. Wait for idle (check for activity)
  * 3. Capture handoff context
  * 4. Kill current agent
@@ -126,7 +126,7 @@ async function performKillAndSpawn(
 ): Promise<HandoffResult> {
   try {
     // Step 1: Signal agent to save state
-    // TODO: Send message to agent asking to update STATE.md
+    // TODO: Send message to agent asking to update the continue file
     // For now, we'll capture what's there
 
     // Step 2: Wait for idle if requested

@@ -3619,7 +3619,7 @@ function ReopenSection({ issue, inline }: { issue: Issue; inline?: boolean }) {
         onClick={handleReopen}
         disabled={reopenMutation.isPending}
         className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-        title="Move issue back to In Progress: resets review/test/merge state to pending, reopens the closed (unmerged) PR, removes done/merged labels, and appends a Reopened section to STATE.md. Preserves the workspace, branch, beads, and vBRIEF."
+        title="Move issue back to In Progress: resets review/test/merge state to pending, reopens the closed (unmerged) PR, removes done/merged labels, and appends a reopen entry to the continue file. Preserves the workspace, branch, beads, and vBRIEF."
       >
         {reopenMutation.isPending ? (
           <Loader2 className="w-3.5 h-3.5 animate-spin" />

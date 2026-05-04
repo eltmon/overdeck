@@ -265,7 +265,7 @@ export async function reopenCommand(id: string, options: ReopenOptions = {}): Pr
     let trackerContext: string | undefined;
 
     if (workspacePath) {
-      // Fetch tracker context for STATE.md (reuse PAN-253 pattern)
+      // Fetch tracker context to attach to the continue file (reuse PAN-253 pattern)
       try {
         trackerContext = await getTrackerContext(id, workspacePath);
       } catch {
@@ -299,8 +299,8 @@ export async function reopenCommand(id: string, options: ReopenOptions = {}): Pr
         }
       }
 
-      if (result.stateMdUpdated) {
-        console.log(`  STATE.md updated with Reopened section`);
+      if (result.continueFileUpdated) {
+        console.log(`  Continue file updated with reopen breadcrumb`);
       }
     } else {
       console.log('');

@@ -2,8 +2,8 @@
  * clean-planning — Remove ephemeral .planning/ artifacts from main after merge.
  *
  * After a feature branch merges to main, ephemeral planning files
- * (STATE.md, PRD.md, PLANNING_PROMPT.md, .planning-complete, feedback/)
- * land on main and pollute new workspaces that inherit them.
+ * (continue.vbrief.json, PRD.md, PLANNING_PROMPT.md, .planning-complete,
+ * feedback/) land on main and pollute new workspaces that inherit them.
  *
  * This module removes those files from the git index and working tree
  * with a dedicated commit, so new workspaces start clean.
@@ -20,8 +20,7 @@ const execFileAsync = promisify(execFile);
 
 /** Ephemeral planning files to remove from main after merge */
 const EPHEMERAL_PLANNING_FILES = [
-  '.planning/STATE.md',
-  '.planning/continue-',
+  '.planning/continue-*.vbrief.json',
   '.planning/PRD.md',
   '.planning/WORKSPACE.md',
   '.planning/PLANNING_PROMPT.md',

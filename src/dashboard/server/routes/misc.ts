@@ -980,8 +980,7 @@ const getPlanningStatusRoute = HttpRouter.add(
             : null;
 
         const hasContinueFile = planningDir ? existsSync(join(planningDir, `continue-${issueId.toUpperCase()}.vbrief.json`)) : false;
-        const hasStateFile = planningDir ? existsSync(join(planningDir, 'STATE.md')) : false;
-        const hasPlanningState = hasContinueFile || hasStateFile;
+        const hasPlanningState = hasContinueFile;
         const hasPromptFile = planningDir
           ? existsSync(join(planningDir, 'PLANNING_PROMPT.md'))
           : false;

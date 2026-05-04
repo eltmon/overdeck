@@ -25,7 +25,7 @@ import { httpHandler } from './http-handler.js';
 
 import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { appendFile, copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/spawn-planning-session.js';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -61,7 +61,6 @@ import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../
 import { getAgentStateAsync, normalizeAgentId } from '../../../lib/agents.js';
 import { emitActivityEntry, emitActivityTts } from '../../../lib/activity-logger.js';
 import type { LifecycleContext, StepResult } from '../../../lib/lifecycle/types.js';
-import { validatePlanningDocument } from '../../../lib/planning/planning-agent.js';
 import {
   getCachedResourceAllocatedIssues,
   getResourceDetailIdentifiers,
@@ -1166,47 +1165,17 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     invalidateAgentsCache();
 
     // Emit activity + TTS for planning completion
-    const planningDirForCheck = projectPath
-      ? join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning')
-      : '';
-    let openQuestionsCount = 0;
-    if (planningDirForCheck && existsSync(planningDirForCheck)) {
-      try {
-        // Legacy: check STATE.md for open questions (planning agents using old prompt)
-        const stateMdPath = join(planningDirForCheck, 'STATE.md');
-        if (existsSync(stateMdPath)) {
-          const stateMdContent = yield* Effect.promise(() => readFile(stateMdPath, 'utf-8'));
-          const validation = validatePlanningDocument(stateMdContent);
-          openQuestionsCount = validation.openQuestions;
-        }
-      } catch { /* non-fatal */ }
-    }
-
-    if (openQuestionsCount > 0) {
-      emitActivityEntry({
-        source: 'planning-agent',
-        level: 'warn',
-        message: `${id} planning complete with ${openQuestionsCount} open question(s) — awaiting user input`,
-        issueId: id,
-      });
-      emitActivityTts({
-        utterance: `${id} planning complete with ${openQuestionsCount} open question awaiting your input`,
-        priority: 1,
-        issueId: id,
-      });
-    } else {
-      emitActivityEntry({
-        source: 'planning-agent',
-        level: 'info',
-        message: `${id} planning complete — ready for work`,
-        issueId: id,
-      });
-      emitActivityTts({
-        utterance: `${id} planning complete, ready for work`,
-        priority: 2,
-        issueId: id,
-      });
-    }
+    emitActivityEntry({
+      source: 'planning-agent',
+      level: 'info',
+      message: `${id} planning complete — ready for work`,
+      issueId: id,
+    });
+    emitActivityTts({
+      utterance: `${id} planning complete, ready for work`,
+      priority: 2,
+      issueId: id,
+    });
 
     // Suppress unused variable warning — remoteVmName used for remote session cleanup if added later
     void isRemotePlanning; void remoteVmName;
@@ -1720,7 +1689,7 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
     // 4. Reset specialist pipeline states
     clearReviewStatus(id.toUpperCase());
 
-    // 5. Append restart entry to continue file (replaces STATE.md append)
+    // 5. Append restart entry to continue file
     yield* Effect.promise(async () => {
       const planningDir = join(workspacePath, '.planning');
       const upperId = id.toUpperCase();
@@ -1731,20 +1700,6 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
         });
       } catch {
         // Non-fatal: continue file may not exist yet
-      }
-      // Legacy fallback: append to STATE.md if it exists
-      const statePath = join(planningDir, 'STATE.md');
-      if (existsSync(statePath)) {
-        const date = new Date().toISOString().slice(0, 10);
-        const lines = [
-          '',
-          `## Restarted from Plan — ${date}`,
-          '',
-          `**Branch reset to planning commit:** ${resetResult.commit}`,
-          '',
-          'All implementation work has been reset. Specialist states cleared. Resume implementation from the plan.',
-        ];
-        await appendFile(statePath, lines.join('\n') + '\n', 'utf-8');
       }
     });
 

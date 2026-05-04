@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs';
+import { mkdtempSync, rmSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import Database from 'better-sqlite3';
@@ -61,15 +61,12 @@ function readStatus(issueId: string): Record<string, unknown> | null {
   return testDb.prepare('SELECT * FROM review_status WHERE issue_id = ?').get(issueId) as Record<string, unknown> | null;
 }
 
-/** Create a minimal workspace with a .planning/STATE.md */
-function createWorkspace(content?: string): string {
+/** Create a minimal workspace directory (no longer used directly by reopen, but
+ * kept for parity with callers that still pass workspacePath). */
+function createWorkspace(): string {
   const wsDir = mkdtempSync(join(tmpdir(), 'pan-reopen-ws-'));
   const planningDir = join(wsDir, '.planning');
   mkdirSync(planningDir, { recursive: true });
-  writeFileSync(
-    join(planningDir, 'STATE.md'),
-    content ?? '# PAN-999\n\n**STATUS: Implementation complete**\n\nSome previous content.\n',
-  );
   return wsDir;
 }
 
@@ -126,50 +123,6 @@ describe('reopenWorkspaceState', () => {
     const row = readStatus('PAN-999')!;
     expect(row.review_status).toBe('pending');
     expect(row.test_status).toBe('pending');
-
-    rmSync(wsDir, { recursive: true, force: true });
-  });
-
-  it('appends Reopened section to STATE.md', async () => {
-    const wsDir = createWorkspace('# PAN-999\n\n**STATUS: Implementation complete**\n\nSome work.\n');
-
-    const result = await reopenWorkspaceState('PAN-999', wsDir, { reason: 'Post-merge regression' });
-
-    expect(result.stateMdUpdated).toBe(true);
-
-    const content = readFileSync(join(wsDir, '.planning', 'STATE.md'), 'utf-8');
-    expect(content).toContain('## Reopened —');
-    expect(content).toContain('Post-merge regression');
-    expect(content).toContain('**Previous status:** Implementation complete');
-    expect(content).toContain('Specialist states reset to pending');
-    expect(content).toContain('**STATUS: Implementation complete**');
-    expect(content).toContain('Some work.');
-
-    rmSync(wsDir, { recursive: true, force: true });
-  });
-
-  it('appends tracker context to STATE.md when provided', async () => {
-    const wsDir = createWorkspace();
-
-    await reopenWorkspaceState('PAN-999', wsDir, {
-      trackerContext: '## Tracker Status\n\nUser requested fix for login bug.',
-    });
-
-    const content = readFileSync(join(wsDir, '.planning', 'STATE.md'), 'utf-8');
-    expect(content).toContain('Tracker context at reopen:');
-    expect(content).toContain('User requested fix for login bug.');
-
-    rmSync(wsDir, { recursive: true, force: true });
-  });
-
-  it('does not modify STATE.md if it does not exist', async () => {
-    const wsDir = mkdtempSync(join(tmpdir(), 'pan-reopen-nows-'));
-    mkdirSync(join(wsDir, '.planning'), { recursive: true });
-
-    const result = await reopenWorkspaceState('PAN-999', wsDir);
-
-    expect(result.stateMdUpdated).toBe(false);
-    expect(existsSync(join(wsDir, '.planning', 'STATE.md'))).toBe(false);
 
     rmSync(wsDir, { recursive: true, force: true });
   });

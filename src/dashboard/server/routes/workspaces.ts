@@ -128,7 +128,7 @@ export function getWorkspacePathForIssue(projectPath: string, rawIssueId: string
 
 async function readWorkspacePlanningMarkdown(
   issueId: string,
-  fileName: 'STATE.md' | 'INFERENCE.md',
+  fileName: 'INFERENCE.md',
 ): Promise<{ issueId: string; body: string }> {
   const parsed = parseIssueId(issueId);
   const issuePrefix = parsed?.prefix ?? extractPrefix(issueId) ?? issueId.split('-')[0];
@@ -1064,14 +1064,11 @@ const getWorkspaceRoute = HttpRouter.add(
 
         let services: { name: string; url?: string }[] = [];
         const continueFile = join(workspacePath, '.planning', `continue-${issueId.toUpperCase()}.vbrief.json`);
-        const stateMd = join(workspacePath, '.planning', 'STATE.md');
         const workspaceMd = join(workspacePath, 'WORKSPACE.md');
         const dockerCompose = join(workspacePath, 'docker-compose.yml');
 
         const urlSourceFile = existsSync(continueFile)
           ? continueFile
-          : existsSync(stateMd)
-          ? stateMd
           : existsSync(workspaceMd)
           ? workspaceMd
           : null;
@@ -1233,24 +1230,7 @@ const getWorkspaceStateMdRoute = HttpRouter.add(
       return jsonResponse({ issueId: parsedIssueId, body: continueBody });
     }
 
-    // Legacy fallback: STATE.md
-    return yield* Effect.promise(() =>
-      readWorkspacePlanningMarkdown(issueId, 'STATE.md')
-        .then((result) => jsonResponse(result))
-        .catch((err: unknown) => {
-          if (
-            typeof err === 'object'
-            && err !== null
-            && ('code' in err || 'message' in err)
-            && ((err as { code?: unknown }).code === 'ENOENT'
-              || String((err as { message?: unknown }).message ?? '').includes('Invalid issue ID'))
-          ) {
-            return jsonResponse({ error: 'Planning state not found for this workspace' }, { status: 404 });
-          }
-          console.error('[workspaces] Failed to read planning state:', err);
-          return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-        })
-    );
+    return jsonResponse({ error: 'Planning state not found for this workspace' }, { status: 404 });
   }))
 );
 
@@ -1802,8 +1782,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
     // Copy planning artifacts from project root if needed
     const workspacePlanningDir = join(workspacePath, '.planning');
     const hasContinueFile = existsSync(join(workspacePlanningDir, `continue-${issueId.toUpperCase()}.vbrief.json`));
-    const hasStateMd = existsSync(join(workspacePlanningDir, 'STATE.md'));
-    if (!hasContinueFile && !hasStateMd) {
+    if (!hasContinueFile) {
       const legacyPlanningDir = join(projectPath, '.planning', issueLower);
       if (existsSync(legacyPlanningDir)) {
         try {

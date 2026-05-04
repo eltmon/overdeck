@@ -339,7 +339,7 @@ export function ActionsSection({
           <textarea
             value={resumeMessage}
             onChange={(e) => setResumeMessage(e.target.value)}
-            placeholder="Tell the agent what to do, e.g. 'Address the PR feedback about error handling' or leave empty to let it pick up from STATE.md"
+            placeholder="Tell the agent what to do, e.g. 'Address the PR feedback about error handling' or leave empty to let it pick up from the continue file"
             className="w-full px-2 py-1.5 text-xs bg-card border border-border rounded resize-none text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
             rows={3}
             autoFocus
@@ -447,14 +447,14 @@ export function ActionsSection({
               {onReopen && (
                 <div className="min-w-0">
                   <div className="text-xs font-medium text-foreground">Reopen for more work</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5" title="Moves the issue back to In Progress so the work agent can continue. Keeps the workspace, branch, PR, STATE.md, and all planning artifacts intact.">
-                    Moves the issue back to In Progress. The workspace, branch, PR, STATE.md, and all planning artifacts are preserved.
+                  <div className="text-[11px] text-muted-foreground mt-0.5" title="Moves the issue back to In Progress so the work agent can continue. Keeps the workspace, branch, PR, continue file, and all planning artifacts intact.">
+                    Moves the issue back to In Progress. The workspace, branch, PR, continue file, and all planning artifacts are preserved.
                   </div>
                   <button
                     onClick={onReopen}
                     disabled={reopenMutation?.isPending}
                     className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-warning/40 text-warning hover:bg-warning hover:text-warning-foreground transition-colors disabled:opacity-50"
-                    title="Reopen: moves issue to In Progress, keeps workspace + branch + PR + STATE.md + beads"
+                    title="Reopen: moves issue to In Progress, keeps workspace + branch + PR + continue file + beads"
                     data-testid="inspector-reopen"
                   >
                     {reopenMutation?.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
@@ -466,8 +466,8 @@ export function ActionsSection({
               {/* Restart from Plan */}
               <div className="min-w-0">
                 <div className="text-xs font-medium text-foreground">Restart from Plan</div>
-                <div className="text-[11px] text-muted-foreground mt-0.5" title="Stops any running agent, resets the feature branch to the post-planning commit, clears session state. Keeps vBRIEF, beads, STATE.md, and PRD. Moves to In Progress.">
-                  Stops agent, resets branch to post-planning commit, clears session state. Keeps vBRIEF, beads, STATE.md, and PRD. Moves to In Progress.
+                <div className="text-[11px] text-muted-foreground mt-0.5" title="Stops any running agent, resets the feature branch to the post-planning commit, clears session state. Keeps vBRIEF, beads, continue file, and PRD. Moves to In Progress.">
+                  Stops agent, resets branch to post-planning commit, clears session state. Keeps vBRIEF, beads, continue file, and PRD. Moves to In Progress.
                 </div>
                 <RestartFromPlanButton issueId={issueId} />
               </div>
@@ -478,14 +478,14 @@ export function ActionsSection({
               {/* Cancel Issue */}
               <div className="min-w-0">
                 <div className="text-xs font-medium text-foreground">Cancel this issue</div>
-                <div className="text-[11px] text-muted-foreground mt-0.5" title="Permanently stops the agent, deletes the workspace and branch (including STATE.md), closes the PR, removes beads, and moves the issue to Canceled. This cannot be undone.">
-                  Permanently stops the agent, deletes the workspace and branch (including STATE.md), closes the PR, and moves the issue to Canceled. This cannot be undone.
+                <div className="text-[11px] text-muted-foreground mt-0.5" title="Permanently stops the agent, deletes the workspace and branch (including the continue file), closes the PR, removes beads, and moves the issue to Canceled. This cannot be undone.">
+                  Permanently stops the agent, deletes the workspace and branch (including the continue file), closes the PR, and moves the issue to Canceled. This cannot be undone.
                 </div>
                 <button
                   onClick={onCancel}
                   disabled={cancelMutation.isPending}
                   className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
-                  title="Cancel Issue: permanent — stops agent, deletes workspace + branch + STATE.md, closes PR, moves to Canceled"
+                  title="Cancel Issue: permanent — stops agent, deletes workspace + branch + continue file, closes PR, moves to Canceled"
                   data-testid="inspector-cancel-issue"
                 >
                   {cancelMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}

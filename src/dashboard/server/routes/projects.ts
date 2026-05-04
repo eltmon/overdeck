@@ -146,12 +146,9 @@ async function collectSessionTreeNodes(
     const planningDir = join(workspacePath, '.planning');
     if (await pathExists(planningDir)) {
       const continuePath = join(planningDir, `continue-${issueId.toUpperCase()}.vbrief.json`);
-      const planningStatePath = join(planningDir, 'STATE.md');
       const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
       const planningPathForTimestamp = await pathExists(continuePath)
         ? continuePath
-        : await pathExists(planningStatePath)
-        ? planningStatePath
         : planningPromptPath;
       const planningStat = await stat(planningPathForTimestamp).catch(() => null);
       const sessionId = `planning-${issueLower}-state`;

@@ -7,13 +7,13 @@
  * All filesystem I/O uses fs/promises so this is safe on the dashboard event loop.
  */
 
-import { existsSync } from 'fs';
-import { readFile, appendFile } from 'fs/promises';
-import { join } from 'path';
 import {
   getReviewStatus,
   setReviewStatus,
 } from './review-status.js';
+import { resolveProjectFromIssue } from './projects.js';
+import { resolveVBriefDir } from './vbrief/lifecycle.js';
+import { appendSessionEntry } from './vbrief/continue-state.js';
 
 export interface ReopenResult {
   specialistStatesReset: boolean;
@@ -21,7 +21,8 @@ export interface ReopenResult {
   previousTestStatus: string | null;
   previousMergeStatus: string | null;
   queueItemsRemoved: Record<string, number>;
-  stateMdUpdated: boolean;
+  /** True when a `reason: 'resume'` entry was appended to the continue file. */
+  continueFileUpdated: boolean;
   reason?: string;
 }
 
@@ -35,14 +36,16 @@ export interface ReopenOptions {
  *
  * - Resets specialist states (review/test/merge → pending) via setReviewStatus
  * - Removes the issue from all specialist queues
- * - Appends a "Reopened" section to .planning/STATE.md
+ * - Appends a `reason: 'resume'` entry to the scope vBRIEF's continue file
  *
  * @param issueId - Issue identifier (e.g., "PAN-256")
- * @param workspacePath - Absolute path to workspace directory
+ * @param workspacePath - Absolute path to workspace directory (kept for callers
+ *   that derive it locally; reopen no longer uses workspace files directly).
  * @param options - Optional reason and tracker context
  */
 export async function reopenWorkspaceState(
   issueId: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   workspacePath: string,
   options: ReopenOptions = {}
 ): Promise<ReopenResult> {
@@ -52,7 +55,7 @@ export async function reopenWorkspaceState(
     previousTestStatus: null,
     previousMergeStatus: null,
     queueItemsRemoved: {},
-    stateMdUpdated: false,
+    continueFileUpdated: false,
     reason: options.reason,
   };
 
@@ -86,42 +89,34 @@ export async function reopenWorkspaceState(
   });
   result.specialistStatesReset = true;
 
-  // 2. Append "Reopened" section to STATE.md (async — safe on dashboard event loop)
-  const statePath = join(workspacePath, '.planning', 'STATE.md');
-  if (existsSync(statePath)) {
-    const previousContent = await readFile(statePath, 'utf-8');
-    const lastStatusMatch = previousContent.match(/\*\*STATUS:\s*([^*\n]+)\*\*/);
-    const previousStatus = lastStatusMatch ? lastStatusMatch[1].trim() : 'Unknown';
+  // 2. Append a reopen breadcrumb to the scope vBRIEF's continue file.
+  const resolved = resolveProjectFromIssue(issueId);
+  if (resolved) {
+    try {
+      const activeDir = resolveVBriefDir(resolved.projectPath, 'active');
+      const noteParts: string[] = [`Reopened on ${new Date().toISOString().slice(0, 10)}`];
+      if (options.reason) noteParts.push(`reason: ${options.reason}`);
+      if (result.previousReviewStatus) {
+        noteParts.push(`review: ${result.previousReviewStatus} → pending`);
+      }
+      if (result.previousTestStatus) {
+        noteParts.push(`test: ${result.previousTestStatus} → pending`);
+      }
+      if (result.previousMergeStatus) {
+        noteParts.push(`merge: ${result.previousMergeStatus} → pending`);
+      }
+      if (options.trackerContext) {
+        noteParts.push('tracker context attached');
+      }
 
-    const date = new Date().toISOString().slice(0, 10);
-    const lines: string[] = [
-      '',
-      `## Reopened — ${date}`,
-      '',
-      `**Previous status:** ${previousStatus}`,
-    ];
-
-    if (result.previousReviewStatus) {
-      lines.push(`**Previous review status:** ${result.previousReviewStatus}`);
+      appendSessionEntry(activeDir, issueId, {
+        reason: 'resume',
+        note: noteParts.join('; '),
+      });
+      result.continueFileUpdated = true;
+    } catch {
+      // Non-fatal — specialist states were still reset above.
     }
-    if (result.previousTestStatus) {
-      lines.push(`**Previous test status:** ${result.previousTestStatus}`);
-    }
-    if (options.reason) {
-      lines.push(`**Reason:** ${options.reason}`);
-    }
-    if (options.trackerContext) {
-      lines.push('');
-      lines.push('**Tracker context at reopen:**');
-      lines.push('');
-      lines.push(options.trackerContext);
-    }
-
-    lines.push('');
-    lines.push('Specialist states reset to pending. Resume implementation based on tracker context above.');
-
-    await appendFile(statePath, lines.join('\n') + '\n', 'utf-8');
-    result.stateMdUpdated = true;
   }
 
   return result;
