@@ -672,6 +672,20 @@ export const CostEventRecordedEvent = Schema.Struct({
 })
 export type CostEventRecordedEvent = typeof CostEventRecordedEvent.Type
 
+// ─── Conversation Events ──────────────────────────────────────────────────────
+
+/** Emitted (in-memory only, not persisted) when a Panopticon-native compaction starts or completes. */
+export const ConversationCompactingChangedEvent = Schema.Struct({
+  type: Schema.Literal("conversation.compacting_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    conversationName: Schema.String,
+    compacting: Schema.Boolean,
+  }),
+})
+export type ConversationCompactingChangedEvent = typeof ConversationCompactingChangedEvent.Type
+
 // ─── Union ────────────────────────────────────────────────────────────────────
 
 /** All domain events — the shape streamed via subscribeDomainEvents RPC */
@@ -732,5 +746,6 @@ export const DomainEvent = Schema.Union([
   DashboardLifecycleStartedEvent,
   DashboardLifecycleCompletedEvent,
   DashboardLifecycleFailedEvent,
+  ConversationCompactingChangedEvent,
 ])
 export type DomainEvent = typeof DomainEvent.Type

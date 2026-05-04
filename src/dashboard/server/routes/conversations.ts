@@ -570,7 +570,7 @@ export async function handleConversationMessage(
     if (!compactSessionFile || !existsSync(compactSessionFile)) {
       return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
     }
-    const result = await compactConversationNative(compactSessionFile);
+    const result = await compactConversationNative(compactSessionFile, conv.name);
     return jsonResponse({ ok: true, compacted: true, mode: 'panopticon-native', model: result.model });
   }
 
