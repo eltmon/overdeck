@@ -90,7 +90,7 @@ import {
   shouldInterceptManualCompact,
   isCompacting,
 } from '../services/conversation-compaction.js';
-import { sessionFilePath, sessionIdFromFile, encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { sessionFilePath, encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { generateSummaryForFork, generateFallbackSummary, reserveSummaryForkSession, copySessionFromCompactBoundary } from '../../../lib/conversations/summary-fork.js';
 import {
   ensureConversationAttachmentDir,
@@ -437,14 +437,11 @@ async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   console.warn(`[conversations] Timed out waiting for Claude Code prompt in ${tmuxSession}`);
 }
 
-/** Resolve the JSONL session file path for a conversation.
- *  Prefers the stored claudeSessionId (computed on demand); falls back to
- *  the legacy sessionFile column for rows created before the migration. */
 function resolveSessionFile(conv: Conversation): string | null {
   if (conv.claudeSessionId) {
     return sessionFilePath(conv.cwd, conv.claudeSessionId);
   }
-  return conv.sessionFile; // legacy fallback
+  return null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -569,10 +566,11 @@ export async function handleConversationMessage(
   }
 
   if (shouldInterceptManualCompact(message)) {
-    if (!conv.sessionFile || !existsSync(conv.sessionFile)) {
+    const compactSessionFile = resolveSessionFile(conv);
+    if (!compactSessionFile || !existsSync(compactSessionFile)) {
       return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
     }
-    const result = await compactConversationNative(conv.sessionFile);
+    const result = await compactConversationNative(compactSessionFile);
     return jsonResponse({ ok: true, compacted: true, mode: 'panopticon-native', model: result.model });
   }
 
@@ -1225,7 +1223,7 @@ const postConversationResumeRoute = HttpRouter.add(
         // Respawn: resume the previous Claude Code session using --resume
         // Resume must never mutate the JSONL — `claude --resume` loads the full raw
         // transcript. Auto-compaction here would fork the conversation (PAN-802).
-        const oldSessionId = conv.claudeSessionId ?? sessionIdFromFile(conv.sessionFile);
+        const oldSessionId = conv.claudeSessionId;
         const modelChanged = !!model && model !== conv.model;
 
         if (!(await validateCwdContainment(conv.cwd))) {
@@ -1299,7 +1297,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         if (model) setConversationModel(name, model);
 
         // Extract the session UUID from the existing session file path
-        const oldSessionId = conv.claudeSessionId ?? sessionIdFromFile(conv.sessionFile);
+        const oldSessionId = conv.claudeSessionId;
 
         // Compact (if needed) then respawn with the new model before reporting success.
         const sessionFile = resolveSessionFile(conv);
@@ -1759,7 +1757,7 @@ const postConversationRestartAllRoute = HttpRouter.add(
             await killSessionAsync(conv.tmuxSession).catch(() => {});
 
             // Re-spawn with stored model
-            const oldSessionId = conv.claudeSessionId ?? sessionIdFromFile(conv.sessionFile);
+            const oldSessionId = conv.claudeSessionId;
             const sessionFileForResume = resolveSessionFile(conv);
             const canResume = !!oldSessionId && !!sessionFileForResume && existsSync(sessionFileForResume);
             await spawnConversationSession(
