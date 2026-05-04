@@ -1,79 +1,49 @@
-# PAN-923: Command Deck v0.8 Completion
+# PAN-936: Rally Feature Planning — End-to-End UX and Pipeline
 
-**Status:** In Progress (fast-track on main)
-**Planned by:** Claude Opus 4.6
-**Date:** 2026-04-29
+## Status: In Progress
 
----
+## Current Phase
+Implementing InspectorPanel feature-specific actions (workspace-0jy)
 
-## Discovery Summary
-
-PAN-923 consolidates remaining PAN-830 phases (3-6), PAN-831 (rebrand refinish), and PAN-548 (draft persistence) into one sprint on `main`.
-
-### Already Completed (skip in vBRIEF)
-- **Tree state filter** (item 2): `[All] [Alive] [Failed]` toggle exists at `CommandDeck/index.tsx:698-711`
-- **PR/Diff tab** (item 6): `PrDiffTab.tsx` fully implemented (475 lines), backend at `/api/issues/:id/pr/details`
-- **Discussions tab** (item 7): `DiscussionsTab.tsx` fully implemented (327 lines), backend at `/api/issues/:id/discussions`
-- **Directory rename** (item 8a): `MissionControl/` → `CommandDeck/` already done
-- **Old CSS delete** (item 8b): `mission-control.module.css` already deleted
-- **DeferredTab** is dead code — no imports reference it
-
-### Key Touch Points
-
-| Component | File | What Changes |
-|-----------|------|-------------|
-| PresenceDot → StatusDot | `ProjectTree/SessionNode.tsx:21-52` | Replace inline SVG spinner + CSS classes with `<StatusDot>` |
-| Collapse logic | `ProjectTree/FeatureItem.tsx:479-484` | `defaultExpandedFromState()` becomes state-aware |
-| ZoneBActionStrip | `CommandDeck/ZoneBActionStrip.tsx:291-369` | Add overflow items from PRD spec |
-| getZoneBActions | `lib/commandDeckActions.ts:298-311` | Add overflow action keys |
-| mc- tokens (249 usages) | Many `.tsx` files | Replace `var(--mc-X, var(--Y))` → `var(--Y)` |
-| mc- definitions | `styles/command-deck.module.css:4-35` | Remove alias layer after migration |
-| text-white | `BulkActionBar.tsx` | Replace with semantic foreground token |
-| DialogProvider | `components/DialogProvider.tsx` | Backdrop blur, panel styling, animation |
-| Draft persistence | `CommandDeck/IssueComposer.tsx:56` | `useState('')` → Zustand-backed state |
-| Liveness motions | Various CommandDeck components | Verify animations fire on real events |
-
-### mc- Token Mapping (from command-deck.module.css)
-
-| mc- token | Canonical replacement |
-|-----------|---------------------|
-| `--mc-text-muted` (101 uses) | `--muted-foreground` |
-| `--mc-border` (53 uses) | `--border` |
-| `--mc-success` (25 uses) | `--success` |
-| `--mc-error` (21 uses) | `--destructive` |
-| `--mc-warning` (20 uses) | `--warning` |
-| `--mc-primary` (11 uses) | `--primary` |
-| `--mc-accent` (11 uses) | `--primary` |
-| `--mc-surface-2` (5 uses) | `color-mix(in srgb, var(--foreground) 3%, transparent)` |
-| `--mc-surface` (3 uses) | `--background` |
-| `--mc-text-secondary` (2 uses) | `--muted-foreground` |
-| `--mc-text-primary` (2 uses) | `--foreground` |
-| `--mc-primary-foreground` (2 uses) | `--primary-foreground` |
-| `--mc-bg-secondary` (2 uses) | `--muted` |
-
-Pattern: most inline styles use `var(--mc-X, var(--canonical))` with fallbacks. Replace entire expression with just `var(--canonical)`.
-
-## Key Architectural Decisions
-
-### D1: StatusDot mapping for SessionNode
-**Decision:** Map session `presence` field to StatusDot `status` prop: `active→active`, `idle→idle`, `suspended→waiting`, `ended→ended`. No `thinking` state at session level (that's a status sub-state).
-**Rationale:** StatusDot already handles these states with correct animations. The PresenceDot inline SVG duplicates this without animation consistency.
-
-### D2: Done-issue collapse default
-**Decision:** Pass feature state to `defaultExpandedFromState()`. In-flight states (stateLabel contains "progress", "review", "testing") → expanded=true with auto-select of best alive session. Done/closed → collapsed.
-**Rationale:** Users want to see active work at a glance but not be overwhelmed by completed issues.
-
-### D3: mc- token elimination approach
-**Decision:** Batch find-replace across all `.tsx` files. Replace `var(--mc-X, var(--Y))` patterns with `var(--Y)`. For bare `var(--mc-X)` without fallback, replace with canonical equivalent from mapping table. Then remove definitions from `command-deck.module.css`.
-**Rationale:** The mc- layer is 1:1 with canonical tokens — it adds indirection without value.
-
-### D4: Draft persistence via Zustand
-**Decision:** Add a `draftTexts: Record<string, string>` map to the existing dashboard Zustand store, keyed by issueId. Cleared on page refresh (not persisted to localStorage). Wire into IssueComposer via store selector.
-**Rationale:** Simplest approach that survives navigation within the SPA but doesn't persist stale drafts across sessions.
-
-### D5: Zone B overflow additions
-**Decision:** Add to getZoneBActions overflow: `viewState`, `viewVbrief`, `copySessionId`, `copyTmuxCommand`. Add corresponding ActionKey entries and ZoneBActionStrip overflow items.
-**Rationale:** PRD specifies these actions. They're utility/debug actions that belong in overflow, not primary.
+## Completed Work
+- [x] workspace-rie: Add getChildIssues() method to IssueTracker interface (commit: 24c0cf9d9)
+- [x] workspace-q8c: Implement getChildIssues() for Rally tracker (commit: 24c0cf9d9)
+- [x] workspace-lhy: Add action bar to FeatureCard with Plan/See Plan, vBRIEF, and Tasks chips (commit: 92c4ba0d4)
+- [x] workspace-nqj: Plan button on features uses feature's own status, ignoring derivedStatus (commit: 92c4ba0d4)
+- [x] workspace-6qo: FeatureCard title click opens InspectorPanel; chevron still toggles expand (commit: 92c4ba0d4)
+- [x] workspace-33x: CompactChildCard click selects child story in InspectorPanel (commit: 92c4ba0d4)
+- [x] workspace-0jy: InspectorPanel renders feature-appropriate actions (no Start Agent) (commit: eecb291e8)
 
 ## Remaining Work
-See plan.vbrief.json for the complete bead breakdown.
+- [x] workspace-dan: Planning prompt detects Rally Feature and includes child story context
+- [x] workspace-qhv: Write FEATURE-CONTEXT.md to .planning/ for story workspaces
+- [x] workspace-h72: Feature-level vBRIEF supports cross-story dependency edges
+- [x] workspace-ai7: Tests for FeatureCard action bar rendering and chip interactions
+- [x] workspace-0g1: Tests for FeatureCard and CompactChildCard click-to-select behavior
+- [x] workspace-676: Tests for InspectorPanel feature-specific actions
+- [x] workspace-b6h: Tests for getChildIssues() interface and Rally implementation
+- [x] workspace-arj: Tests for feature-aware planning prompt and context injection
+
+## Key Decisions
+- Feature planning state is independent of child progress: Plan button uses issue.status, not derivedStatus
+- Cross-story dependency edges are written to vBRIEF but NOT enforced by Cloister (deferred)
+- Reuse existing planning pipeline — no new feature-specific planning mode
+- Planning agents reference existing child stories only; no auto-creation in Rally
+- Beads dependency graph is inverted (implementation beads depend on test beads); using --force to close
+
+## Specialist Feedback
+None
+- **[2026-05-01T05:12Z] verification-gate → FAILED** — `.planning/feedback/005-verification-gate-failed.md`
+- **[2026-05-01T05:20Z] verification-gate → FAILED** — `.planning/feedback/006-verification-gate-failed.md`
+- **[2026-05-01T05:35Z] verification-gate → FAILED** — `.planning/feedback/007-verification-gate-failed.md`
+- **[2026-05-01T05:50Z] verification-gate → FAILED** — `.planning/feedback/008-verification-gate-failed.md`
+- **[2026-05-03T06:36Z] verification-gate → FAILED** — `.planning/feedback/009-verification-gate-failed.md`
+- **[2026-05-03T08:27Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/010-review-agent-changes-requested.md`
+- **[2026-05-03T10:40Z] verification-gate → FAILED** — `.planning/feedback/013-verification-gate-failed.md`
+- **[2026-05-03T11:05Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/014-review-agent-changes-requested.md`
+- **[2026-05-03T11:35Z] verification-gate → FAILED** — `.planning/feedback/015-verification-gate-failed.md`
+- **[2026-05-03T11:39Z] verification-gate → FAILED** — `.planning/feedback/016-verification-gate-failed.md`
+- **[2026-05-03T12:03Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/017-review-agent-changes-requested.md`
+- **[2026-05-03T12:30Z] review-agent → APPROVED** — `.planning/feedback/018-review-agent-approved.md`
+- **[2026-05-03T14:01Z] verification-gate → FAILED** — `.planning/feedback/019-verification-gate-failed.md`
+- **[2026-05-04T05:48Z] review-agent → CHANGES-REQUESTED** — `.planning/feedback/022-review-agent-changes-requested.md`

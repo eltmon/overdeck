@@ -25,9 +25,19 @@ export interface RallyIssue {
   readonly url: string;
   readonly state: string;
   readonly labels: ReadonlyArray<string>;
+  /** Rally artifact type, e.g. "HierarchicalRequirement" or "PortfolioItem/Feature" */
+  readonly artifactType: string;
 }
 
 // ─── Service interface ────────────────────────────────────────────────────────
+
+export interface RallyChildIssue {
+  readonly id: string;
+  readonly ref: string;
+  readonly title: string;
+  readonly status: string;
+  readonly description: string;
+}
 
 export interface RallyClientShape {
   /**
@@ -36,6 +46,13 @@ export interface RallyClientShape {
   readonly getIssue: (
     id: string,
   ) => Effect.Effect<RallyIssue, IssueNotFound | TrackerApiError>;
+
+  /**
+   * Get child issues (stories/defects) for a parent feature.
+   */
+  readonly getChildIssues: (
+    id: string,
+  ) => Effect.Effect<readonly RallyChildIssue[], TrackerApiError>;
 
   /**
    * Transition a Rally artifact to a new normalized state.
@@ -103,7 +120,23 @@ export const RallyClientLive = Layer.effect(
               url: raw.url,
               state: raw.state,
               labels: raw.labels,
+              artifactType: raw.artifactType || 'artifact',
             } satisfies RallyIssue;
+          },
+          catch: (err) => wrapRallyError(err),
+        }),
+
+      getChildIssues: (id) =>
+        Effect.tryPromise({
+          try: async () => {
+            const children = await tracker.getChildIssues(id);
+            return children.map((raw) => ({
+              id: raw.id,
+              ref: raw.ref,
+              title: raw.title,
+              status: raw.state,
+              description: raw.description,
+            })) satisfies RallyChildIssue[];
           },
           catch: (err) => wrapRallyError(err),
         }),
@@ -137,32 +170,44 @@ function getRallyClient(): RallyClientShape {
     const fail = Effect.fail(new TrackerNotConfigured({ tracker: 'rally' }));
     return {
       getIssue: () => fail,
+      getChildIssues: () => fail,
       updateState: () => fail,
       addComment: () => fail,
     };
   }
   const configKey = `${config.server}:${config.workspace}:${config.project}:${config.apiKey.slice(-4)}`;
-  if (_rallyClientConfigKey !== configKey) {
+  if (_rallyClientConfigKey !== configKey || !_rallyClientImpl) {
     _rallyClientConfigKey = configKey;
-    // Rebuild impl synchronously — RallyTracker is lazy-loaded inside makeRallyClientImpl
-    _rallyClientImpl = null; // Will be set by makeRallyClientImpl if we had one
-    // Since RallyClientLive uses dynamic import and Layer.effect, we fall back to
-    // creating a minimal impl here. For simplicity, delegate to the Layer on each call.
+    // Build a fresh impl that caches the RallyTracker instance
+    _rallyClientImpl = makeRallyClientImpl(config);
   }
-  // Return a proxy that delegates to RallyClientLive evaluation each call.
-  // Since we can't easily re-evaluate the Layer here, we create an inline impl.
+  return _rallyClientImpl;
+}
+
+function makeRallyClientImpl(config: NonNullable<ReturnType<typeof getRallyConfig>>): RallyClientShape {
+  // Lazily create the tracker on first use so we don't pay the import cost
+  // when Rally is configured but never queried.
+  let tracker: import('../../../lib/tracker/rally.js').RallyTracker | null = null;
+
+  async function getTracker() {
+    if (!tracker) {
+      const { RallyTracker } = await import('../../../lib/tracker/rally.js');
+      tracker = new RallyTracker({
+        apiKey: config.apiKey,
+        server: config.server,
+        workspace: config.workspace,
+        project: config.project,
+      });
+    }
+    return tracker;
+  }
+
   return {
     getIssue: (id) =>
       Effect.gen(function* () {
-        const { RallyTracker } = yield* Effect.promise(() => import('../../../lib/tracker/rally.js'));
-        const tracker = new RallyTracker({
-          apiKey: config.apiKey,
-          server: config.server,
-          workspace: config.workspace,
-          project: config.project,
-        });
+        const t = yield* Effect.promise(() => getTracker());
         const raw = yield* Effect.tryPromise({
-          try: () => tracker.getIssue(id),
+          try: () => t.getIssue(id),
           catch: (err) => wrapRallyError(err),
         });
         return {
@@ -173,35 +218,40 @@ function getRallyClient(): RallyClientShape {
           url: raw.url,
           state: raw.state,
           labels: raw.labels,
+          artifactType: raw.artifactType || 'artifact',
         } satisfies RallyIssue;
+      }),
+
+    getChildIssues: (id) =>
+      Effect.gen(function* () {
+        const t = yield* Effect.promise(() => getTracker());
+        const children = yield* Effect.tryPromise({
+          try: () => t.getChildIssues(id),
+          catch: (err) => wrapRallyError(err),
+        });
+        return children.map((raw) => ({
+          id: raw.id,
+          ref: raw.ref,
+          title: raw.title,
+          status: raw.state,
+          description: raw.description,
+        })) satisfies RallyChildIssue[];
       }),
 
     updateState: (id, state) =>
       Effect.gen(function* () {
-        const { RallyTracker } = yield* Effect.promise(() => import('../../../lib/tracker/rally.js'));
-        const tracker = new RallyTracker({
-          apiKey: config.apiKey,
-          server: config.server,
-          workspace: config.workspace,
-          project: config.project,
-        });
+        const t = yield* Effect.promise(() => getTracker());
         yield* Effect.tryPromise({
-          try: () => tracker.transitionIssue(id, state),
+          try: () => t.transitionIssue(id, state),
           catch: (err) => wrapRallyError(err),
         });
       }),
 
     addComment: (id, body) =>
       Effect.gen(function* () {
-        const { RallyTracker } = yield* Effect.promise(() => import('../../../lib/tracker/rally.js'));
-        const tracker = new RallyTracker({
-          apiKey: config.apiKey,
-          server: config.server,
-          workspace: config.workspace,
-          project: config.project,
-        });
+        const t = yield* Effect.promise(() => getTracker());
         yield* Effect.tryPromise({
-          try: () => tracker.addComment(id, body),
+          try: () => t.addComment(id, body),
           catch: (err) => {
             if (err instanceof RateLimited) return err;
             return new TrackerApiError({ tracker: 'rally', message: String(err), cause: err });
@@ -219,6 +269,7 @@ export const RallyClientOptionalLive = Layer.effect(
   RallyClient,
   Effect.succeed({
     getIssue: (...args) => getRallyClient().getIssue(...args),
+    getChildIssues: (...args) => getRallyClient().getChildIssues(...args),
     updateState: (...args) => getRallyClient().updateState(...args),
     addComment: (...args) => getRallyClient().addComment(...args),
   } as RallyClientShape),

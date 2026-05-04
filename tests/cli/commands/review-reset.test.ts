@@ -39,32 +39,14 @@ describe('resetReviewCommand (pan review reset)', () => {
     expect(resetSessionMock).not.toHaveBeenCalled();
   });
 
-  it('--session: resets review and then clears session', async () => {
-    await resetReviewCommand('PAN-2', { session: true });
+  it('--session: resets review but rejects session reset with error', async () => {
+    await expect(resetReviewCommand('PAN-2', { session: true })).rejects.toThrow('process.exit unexpectedly called with "1"');
 
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/api/review/PAN-2/reset'),
       expect.objectContaining({ method: 'POST' }),
     );
-    expect(resetSessionMock).toHaveBeenCalledWith('PAN-2');
-  });
-
-  it('--session: review reset runs before session reset', async () => {
-    const callOrder: string[] = [];
-    fetchMock.mockImplementation(async () => {
-      callOrder.push('review');
-      return {
-        ok: true,
-        json: async () => ({ success: true, message: 'Reset complete', queued: false }),
-      };
-    });
-    resetSessionMock.mockImplementation(async () => {
-      callOrder.push('session');
-    });
-
-    await resetReviewCommand('PAN-3', { session: true });
-
-    expect(callOrder).toEqual(['review', 'session']);
+    expect(resetSessionMock).not.toHaveBeenCalled();
   });
 
   it('session: false behaves like default', async () => {

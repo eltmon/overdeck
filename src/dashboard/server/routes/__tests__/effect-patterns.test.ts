@@ -72,12 +72,15 @@ describe('Effect.promise async FS pattern', () => {
 
 describe('EventStoreServiceLive + ReadModelServiceLive end-to-end', () => {
   it('appends and reads back an event using Live layers with real SQLite', async () => {
+    // ReadModelServiceLive bootstrap can take >10s under parallel test load
+    // (it initializes 100+ agents from SQLite). Give it room to finish.
     const tmpDir = mkdtempSync(join(tmpdir(), 'pan-470-test-'));
     const originalHome = process.env['PANOPTICON_HOME'];
     process.env['PANOPTICON_HOME'] = tmpDir;
 
     try {
       // Use vi.resetModules so initEventStore picks up PANOPTICON_HOME
+      vi.resetModules();
       const { EventStoreService: ESS, EventStoreServiceLive: ESL } = await import(
         '../../services/domain-services.js'
       );
@@ -99,7 +102,7 @@ describe('EventStoreServiceLive + ReadModelServiceLive end-to-end', () => {
       process.env['PANOPTICON_HOME'] = originalHome;
       rmSync(tmpDir, { recursive: true, force: true });
     }
-  });
+  }, 30000);
 });
 
 describe('EventStoreService.append via yield*', () => {

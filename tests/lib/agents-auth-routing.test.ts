@@ -124,8 +124,10 @@ describe('agents auth routing', () => {
 
     expect(await getProviderExportsForModel('claude-sonnet-4-6')).toBe(
       [
+        'unset ANTHROPIC_API_KEY',
         'unset ANTHROPIC_BASE_URL',
         'unset ANTHROPIC_AUTH_TOKEN',
+        'unset ANTHROPIC_DEFAULT_HAIKU_MODEL',
         'unset OPENAI_API_KEY',
         'unset GEMINI_API_KEY',
         'unset API_TIMEOUT_MS',
@@ -140,8 +142,10 @@ describe('agents auth routing', () => {
 
     expect(await getProviderExportsForModel('gpt-5.4')).toBe(
       [
+        'unset ANTHROPIC_API_KEY',
         'unset ANTHROPIC_BASE_URL',
         'unset ANTHROPIC_AUTH_TOKEN',
+        'unset ANTHROPIC_DEFAULT_HAIKU_MODEL',
         'unset OPENAI_API_KEY',
         'unset GEMINI_API_KEY',
         'unset API_TIMEOUT_MS',

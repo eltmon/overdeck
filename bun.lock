@@ -49,7 +49,7 @@
     },
     "apps/desktop": {
       "name": "@panctl/desktop",
-      "version": "0.8.4",
+      "version": "0.8.11",
       "bin": {
         "panctl": "./bin/panctl.mjs",
       },

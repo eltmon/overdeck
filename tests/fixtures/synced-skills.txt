@@ -51,6 +51,7 @@ pan-quickstart
 pan-release
 pan-reload
 pan-reopen
+pan-resources
 pan-restart
 pan-review
 pan-show
