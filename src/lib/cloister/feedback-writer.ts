@@ -1,19 +1,15 @@
 /**
- * Feedback Writer — writes specialist feedback to workspace files.
- *
- * All specialist feedback (review, test, merge) is written to
- * .planning/feedback/ in the workspace, with a breadcrumb appended to the
- * scope continue file's sessionHistory. The work agent reads these on
- * startup or after crash recovery.
+ * Feedback Writer — writes specialist feedback to the scope vBRIEF continue
+ * file and (for backward compat) cleans up legacy .planning/feedback/ files.
  *
  * All I/O is async (fs/promises) — never execSync.
  */
 
-import { writeFile, mkdir, readdir, rm } from 'fs/promises';
+import { readdir, rm } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { resolveProjectFromIssue } from '../projects.js';
-import { appendContinueSessionEntryForIssue, appendFeedbackEntryForIssue, clearFeedbackForIssue } from '../vbrief/lifecycle-io.js';
+import { appendContinueSessionEntryForIssue, appendFeedbackEntryForIssue, clearFeedbackForIssue, readContinueStateForIssue } from '../vbrief/lifecycle-io.js';
 
 export interface WriteFeedbackOptions {
   issueId: string;
@@ -126,101 +122,68 @@ export async function clearFeedbackFiles(workspacePath: string): Promise<void> {
 export const archiveFeedbackFiles = clearFeedbackFiles;
 
 /**
- * Write specialist feedback to a file in the workspace and record a
- * breadcrumb on the scope vBRIEF's continue file.
+ * Write specialist feedback to the scope vBRIEF continue file and record a
+ * sessionHistory breadcrumb. The primary data store is the continue file
+ * (Layer 3+); .planning/feedback/*.md files are no longer written.
  */
 export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<WriteFeedbackResult> {
-  // Validate workspacePath — reject project roots (must contain /workspaces/ or have .planning dir)
-  let providedPath = opts.workspacePath;
-  if (providedPath && !existsSync(join(providedPath, '.planning')) && !providedPath.includes('/workspaces/')) {
-    // Looks like a project root, not a workspace — fall back to resolution
-    providedPath = undefined;
+  const timestamp = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  const shortTimestamp = timestamp.replace(/:\d{2}Z$/, 'Z');
+
+  const resolved = resolveProjectFromIssue(opts.issueId);
+  if (!resolved) {
+    return { success: false, error: `Project not found for ${opts.issueId}` };
   }
 
-  // Guard: if the provided path looks like a workspace but the issue ID doesn't match the
-  // directory name, fall back to canonical resolution. This catches routing mismatches where
-  // e.g. PAN-645's feedback would be written into feature-pan-647's directory.
-  if (providedPath?.includes('/workspaces/feature-')) {
-    const dirName = providedPath.replace(/.*\/workspaces\/feature-/, '').replace(/\/.*$/, '');
-    const expectedSuffix = opts.issueId.toLowerCase();
-    if (!dirName.includes(expectedSuffix) && !expectedSuffix.replace(/^[a-z]+-/, '').includes(dirName)) {
-      console.error(
-        `[feedback-writer] MISMATCH: issueId=${opts.issueId} but workspacePath points to feature-${dirName} — falling back to canonical resolution`
-      );
-      providedPath = undefined;
-    }
-  }
-
-  const workspacePath = providedPath || resolveWorkspacePath(opts.issueId);
-  if (!workspacePath) {
-    return { success: false, error: `Workspace not found for ${opts.issueId}` };
-  }
-
-  const planningDir = join(workspacePath, '.planning');
-  const feedbackDir = join(planningDir, 'feedback');
-
+  // Derive sequence number from continue file (primary), synced with any
+  // legacy filesystem files for consistent numbering during transition.
+  let seq = 1;
   try {
-    await mkdir(feedbackDir, { recursive: true });
+    const existing = readContinueStateForIssue(resolved.projectPath, opts.issueId);
+    seq = (existing?.feedback?.length ?? 0) + 1;
+  } catch { /* fall back to 1 */ }
 
-    const seq = await getNextSequenceNumber(feedbackDir);
-    const seqStr = String(seq).padStart(3, '0');
-    const filename = `${seqStr}-${opts.specialist}-${opts.outcome}.md`;
-    const filePath = join(feedbackDir, filename);
-    const relativePath = `.planning/feedback/${filename}`;
-
-    const timestamp = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-    const shortTimestamp = timestamp.replace(/:\d{2}Z$/, 'Z');
-
-    const content = [
-      '---',
-      `specialist: ${opts.specialist}`,
-      `issueId: ${opts.issueId}`,
-      `outcome: ${opts.outcome}`,
-      `timestamp: ${timestamp}`,
-      '---',
-      '',
-      opts.markdownBody,
-      '',
-    ].join('\n');
-
-    await writeFile(filePath, content, 'utf-8');
-
-    // Write to the scope vBRIEF's continue file: structured feedback entry
-    // (Layer 1+) and a sessionHistory breadcrumb for the timeline.
-    const resolved = resolveProjectFromIssue(opts.issueId);
-    if (resolved) {
-      try {
-        appendFeedbackEntryForIssue(resolved.projectPath, opts.issueId, {
-          seq,
-          specialist: opts.specialist,
-          outcome: opts.outcome,
-          timestamp,
-          markdownBody: opts.markdownBody,
-        });
-      } catch (err: any) {
-        console.error(
-          `[feedback-writer] Failed to append continue-file feedback entry for ${opts.issueId}:`,
-          err.message,
-        );
-      }
-      try {
-        appendContinueSessionEntryForIssue(resolved.projectPath, opts.issueId, {
-          reason: 'feedback',
-          note: `[${shortTimestamp}] ${opts.specialist} → ${opts.outcome.toUpperCase()} — ${relativePath}`,
-        });
-      } catch (err: any) {
-        // Non-fatal — the markdown file is still written.
-        console.error(
-          `[feedback-writer] Failed to append continue-file breadcrumb for ${opts.issueId}:`,
-          err.message,
-        );
-      }
+  const workspacePath = opts.workspacePath || resolveWorkspacePath(opts.issueId);
+  if (workspacePath) {
+    const feedbackDir = join(workspacePath, '.planning', 'feedback');
+    if (existsSync(feedbackDir)) {
+      const fsSeq = await getNextSequenceNumber(feedbackDir);
+      if (fsSeq > seq) seq = fsSeq;
     }
-
-    console.log(`[feedback-writer] Wrote ${relativePath} for ${opts.issueId}`);
-    return { success: true, relativePath, filePath };
-  } catch (error: any) {
-    console.error(`[feedback-writer] Failed to write feedback for ${opts.issueId}:`, error);
-    return { success: false, error: error.message };
   }
+
+  const seqStr = String(seq).padStart(3, '0');
+  const filename = `${seqStr}-${opts.specialist}-${opts.outcome}.md`;
+  const relativePath = `.planning/feedback/${filename}`;
+
+  // Write to the scope vBRIEF's continue file (primary store, Layer 3+).
+  try {
+    appendFeedbackEntryForIssue(resolved.projectPath, opts.issueId, {
+      seq,
+      specialist: opts.specialist,
+      outcome: opts.outcome,
+      timestamp,
+      markdownBody: opts.markdownBody,
+    });
+  } catch (err: any) {
+    console.error(
+      `[feedback-writer] Failed to append continue-file feedback entry for ${opts.issueId}:`,
+      err.message,
+    );
+    return { success: false, error: err.message };
+  }
+  try {
+    appendContinueSessionEntryForIssue(resolved.projectPath, opts.issueId, {
+      reason: 'feedback',
+      note: `[${shortTimestamp}] ${opts.specialist} → ${opts.outcome.toUpperCase()} — seq ${seq}`,
+    });
+  } catch (err: any) {
+    console.error(
+      `[feedback-writer] Failed to append continue-file breadcrumb for ${opts.issueId}:`,
+      err.message,
+    );
+  }
+
+  console.log(`[feedback-writer] Wrote feedback seq ${seq} for ${opts.issueId} (${opts.specialist} → ${opts.outcome})`);
+  return { success: true, relativePath };
 }

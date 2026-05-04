@@ -23,8 +23,6 @@ const EPHEMERAL_PLANNING_FILES = [
   '.planning/continue-*.vbrief.json',
   '.planning/PRD.md',
   '.planning/WORKSPACE.md',
-  '.planning/PLANNING_PROMPT.md',
-  '.planning/PLANNING_PROMPT.md.archived',
   '.planning/plan.vbrief.json',
   '.planning/.planning-complete',
 ];
