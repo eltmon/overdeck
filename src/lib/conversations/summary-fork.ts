@@ -27,7 +27,7 @@ import { join } from 'node:path';
 
 import type { Conversation } from '../database/conversations-db.js';
 import { createConversation } from '../database/conversations-db.js';
-import { encodeClaudeProjectDir, sessionFilePath, sessionIdFromFile } from '../paths.js';
+import { encodeClaudeProjectDir, sessionFilePath } from '../paths.js';
 import { loadConfig } from '../config-yaml.js';
 import { generateSmartSummary, runModelSummary } from './smart-compaction.js';
 
@@ -253,7 +253,7 @@ export async function createSummaryFork(
 ): Promise<SummaryForkResult> {
   const sourceSessionFile = conv.claudeSessionId
     ? sessionFilePath(conv.cwd, conv.claudeSessionId)
-    : conv.sessionFile ?? null;
+    : null;
   if (!sourceSessionFile) {
     throw new Error(`No session file found for conversation ${conv.name}`);
   }
