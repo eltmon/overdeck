@@ -270,8 +270,8 @@ function parseAgentOutput(output: string): ReviewResult {
 
 /**
  * Send review feedback to the work agent.
- * Writes feedback to .planning/feedback/ in the workspace, updates STATE.md,
- * and sends a short reference via tmux.
+ * Writes feedback to .planning/feedback/ in the workspace, appends a breadcrumb
+ * to the continue file, and sends a short reference via tmux.
  */
 /**
  * Builds the markdown body for the feedback file written to the work agent.

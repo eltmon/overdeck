@@ -1,17 +1,24 @@
 /**
  * Tests for buildRichPRBody — rich PR description generator (PAN-475)
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { buildRichPRBody } from '../workspaces.js';
+
+vi.mock('../../../../lib/beads-query.js', () => ({
+  queryBeadsForIssue: vi.fn().mockResolvedValue([]),
+}));
+
+import { queryBeadsForIssue } from '../../../../lib/beads-query.js';
 
 describe('buildRichPRBody', () => {
   let workspacePath: string;
 
   beforeEach(async () => {
     workspacePath = await mkdtemp(join(tmpdir(), 'pan-test-workspace-'));
+    vi.mocked(queryBeadsForIssue).mockReset().mockResolvedValue([]);
   });
 
   afterEach(async () => {
@@ -56,28 +63,21 @@ describe('buildRichPRBody', () => {
     expect(body).toContain('- [ ] Do another thing');
   });
 
-  it('includes beads task summary from issues.jsonl', async () => {
-    await mkdir(join(workspacePath, '.beads'), { recursive: true });
+  it('includes beads task summary from bd query', async () => {
     const beads = [
       { id: 'bead-1', title: 'pan-42: Fix the bug', status: 'closed', labels: ['pan-42'] },
       { id: 'bead-2', title: 'pan-42: Add the feature', status: 'open', labels: ['pan-42'] },
-      { id: 'bead-3', title: 'pan-99: Other issue', status: 'closed', labels: ['pan-99'] },
     ];
-    await writeFile(
-      join(workspacePath, '.beads', 'issues.jsonl'),
-      beads.map(b => JSON.stringify(b)).join('\n')
-    );
+    vi.mocked(queryBeadsForIssue).mockResolvedValue(beads);
 
     const body = await buildRichPRBody('PAN-42', workspacePath);
     expect(body).toContain('## Implementation Tasks');
     expect(body).toContain('- [x] Fix the bug');
     expect(body).toContain('- [ ] Add the feature');
-    expect(body).not.toContain('Other issue');
   });
 
   it('includes both AC checklist and beads when both exist', async () => {
     await mkdir(join(workspacePath, '.planning'), { recursive: true });
-    await mkdir(join(workspacePath, '.beads'), { recursive: true });
 
     const plan = {
       vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
@@ -90,7 +90,7 @@ describe('buildRichPRBody', () => {
     await writeFile(join(workspacePath, '.planning', 'plan.vbrief.json'), JSON.stringify(plan));
 
     const bead = { id: 'b1', title: 'pan-5: Task one', status: 'closed', labels: ['pan-5'] };
-    await writeFile(join(workspacePath, '.beads', 'issues.jsonl'), JSON.stringify(bead));
+    vi.mocked(queryBeadsForIssue).mockResolvedValue([bead]);
 
     const body = await buildRichPRBody('PAN-5', workspacePath);
     expect(body).toContain('## Acceptance Criteria');

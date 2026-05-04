@@ -6,6 +6,8 @@ import { homedir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadConfig } from '../../lib/config.js';
+import { parseVBriefFilename } from '../../lib/vbrief/lifecycle.js';
+import { resolveGitHubIssue } from '../../lib/tracker-utils.js';
 import { createBackup } from '../../lib/backup.js';
 import { planSync, executeSync, refreshCache, migrateStalePersonalContent, removeLegacySkills070, planHooksSync, syncHooks, syncStatusline, mirrorProjectSkills } from '../../lib/sync.js';
 import { SYNC_TARGET, isDevMode } from '../../lib/paths.js';
@@ -558,5 +560,127 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     if (agentCleanupResult.protected.length > 0) {
       console.log(chalk.dim(`  Protected (running sessions): ${agentCleanupResult.protected.join(', ')}`));
     }
+  }
+
+  // vBRIEF state disagreement audit (PAN-946: workspace-9ny)
+  try {
+    const auditSpinner = ora('Running vBRIEF state audit...').start();
+    const disagreements: Array<{ issueId: string; problem: string; fix: string }> = [];
+    const hasGh = checkCommand('gh');
+
+    for (const { config } of projects) {
+      if (!existsSync(config.path)) continue;
+
+      const activeDir = join(config.path, 'vbrief', 'active');
+      const completedDir = join(config.path, 'vbrief', 'completed');
+
+      // (1) vBRIEF in active/ but tracker says closed
+      if (existsSync(activeDir)) {
+        const activeFiles = readdirSync(activeDir).filter(
+          f => f.endsWith('.vbrief.json') && !f.startsWith('continue-')
+        );
+        for (const file of activeFiles) {
+          const parsed = parseVBriefFilename(file);
+          if (!parsed) continue;
+          const issueId = parsed.issueId.toUpperCase();
+          const ghInfo = resolveGitHubIssue(issueId);
+          if (ghInfo.isGitHub && hasGh) {
+            try {
+              const state = execSync(
+                `gh issue view ${ghInfo.number} --repo ${ghInfo.owner}/${ghInfo.repo} --json state --jq '.state'`,
+                { encoding: 'utf-8', timeout: 10000, stdio: 'pipe' }
+              ).trim();
+              if (state.toLowerCase() === 'closed') {
+                disagreements.push({
+                  issueId,
+                  problem: 'vBRIEF in active/ but GitHub issue is closed',
+                  fix: `pan scope complete ${issueId}`,
+                });
+              }
+            } catch { /* skip if gh fails */ }
+          }
+        }
+      }
+
+      // (2) vBRIEF in completed/ but workspace still exists
+      if (existsSync(completedDir)) {
+        const completedFiles = readdirSync(completedDir).filter(
+          f => f.endsWith('.vbrief.json') && !f.startsWith('continue-')
+        );
+        for (const file of completedFiles) {
+          const parsed = parseVBriefFilename(file);
+          if (!parsed) continue;
+          const issueId = parsed.issueId.toUpperCase();
+          const workspacePath = join(config.path, 'workspaces', `feature-${issueId.toLowerCase()}`);
+          if (existsSync(workspacePath)) {
+            disagreements.push({
+              issueId,
+              problem: 'vBRIEF in completed/ but workspace worktree still exists',
+              fix: `pan close ${issueId}`,
+            });
+          }
+        }
+      }
+
+      // (3) tracker shows in-progress but no vBRIEF in active/ (scanning worktrees)
+      const workspacesDir = join(config.path, 'workspaces');
+      if (existsSync(workspacesDir)) {
+        let activeIssueIds = new Set<string>();
+        if (existsSync(activeDir)) {
+          activeIssueIds = new Set(
+            readdirSync(activeDir)
+              .filter(f => f.endsWith('.vbrief.json') && !f.startsWith('continue-'))
+              .map(f => {
+                const parsed = parseVBriefFilename(f);
+                return parsed ? parsed.issueId.toUpperCase() : '';
+              })
+              .filter(Boolean)
+          );
+        }
+
+        const worktreeEntries = readdirSync(workspacesDir, { withFileTypes: true })
+          .filter(e => e.isDirectory() && e.name.startsWith('feature-'))
+          .map(e => e.name.replace('feature-', '').toUpperCase());
+
+        for (const worktreeIssueId of worktreeEntries) {
+          if (activeIssueIds.has(worktreeIssueId)) continue;
+
+          let trackerOpen = false;
+          const ghInfo = resolveGitHubIssue(worktreeIssueId);
+          if (ghInfo.isGitHub && hasGh) {
+            try {
+              const state = execSync(
+                `gh issue view ${ghInfo.number} --repo ${ghInfo.owner}/${ghInfo.repo} --json state --jq '.state'`,
+                { encoding: 'utf-8', timeout: 10000, stdio: 'pipe' }
+              ).trim();
+              trackerOpen = state.toLowerCase() === 'open';
+            } catch { /* skip if gh fails — fall through to heuristic */ }
+          }
+
+          // Flag if tracker is open OR if we couldn't check tracker (workspace without active vBRIEF is always suspicious)
+          if (trackerOpen || !ghInfo.isGitHub || !hasGh) {
+            disagreements.push({
+              issueId: worktreeIssueId,
+              problem: trackerOpen
+                ? 'Tracker shows open but no vBRIEF in active/'
+                : 'Workspace exists but no vBRIEF in active/',
+              fix: `pan scope approve ${worktreeIssueId}`,
+            });
+          }
+        }
+      }
+    }
+
+    if (disagreements.length === 0) {
+      auditSpinner.succeed('vBRIEF state audit passed — no disagreements');
+    } else {
+      auditSpinner.warn(`Found ${disagreements.length} vBRIEF state disagreement(s)`);
+      for (const d of disagreements) {
+        console.log(chalk.yellow(`  ⚠ ${d.issueId}: ${d.problem}`));
+        console.log(chalk.dim(`    Fix: ${d.fix}`));
+      }
+    }
+  } catch (auditErr: any) {
+    console.warn(`[pan sync] vBRIEF audit failed (non-fatal): ${auditErr?.message ?? auditErr}`);
   }
 }

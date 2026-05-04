@@ -81,7 +81,7 @@ export function SwitchModelModal({
 
           {hasResumableSession && (
             <div className="text-xs text-warning bg-warning/10 border border-warning/30 rounded px-3 py-2">
-              Cannot resume across models — the saved session will be cleared. The new agent starts fresh from STATE.md.
+              Cannot resume across models — the saved session will be cleared. The new agent starts fresh from the continue file.
             </div>
           )}
 
@@ -92,7 +92,7 @@ export function SwitchModelModal({
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Tell the agent what to do, or leave empty to let it pick up from STATE.md"
+              placeholder="Tell the agent what to do, or leave empty to let it pick up from the continue file"
               className="w-full px-2 py-1.5 text-xs bg-card border border-border rounded resize-none text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
               rows={3}
             />

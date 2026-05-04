@@ -20,6 +20,7 @@ import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig }
 import type { GitHubConfig, RallyConfig } from './tracker-config.js';
 import { loadReviewStatuses } from '../../../lib/review-status.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
+import { isPlanningComplete } from '../../../lib/vbrief/io.js';
 
 /**
  * Map a raw status string to its canonical state.
@@ -116,9 +117,11 @@ function computePlanningState(identifier: string): {
       return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath };
     }
     const hasPlan = existsSync(join(workspacePath, '.planning', 'plan.vbrief.json'));
-    const planningComplete = existsSync(join(workspacePath, '.planning', '.planning-complete'));
-    // .planning-complete is written ONLY after generate-tasks succeeds.
+    // planningComplete now means "plan.status indicates planning has finished" —
+    // any of proposed/approved/pending/running/completed/blocked. Falls back to
+    // the legacy `.planning-complete` marker for vBRIEFs without status fields.
     // It's the definitive signal for "tasks have been generated." No bd query.
+    const planningComplete = isPlanningComplete(workspacePath);
     const hasBeads = planningComplete;
     return { hasPlan, hasBeads, planningComplete, workspacePath };
   } catch {

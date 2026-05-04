@@ -46,7 +46,7 @@ export function useResetIssue(issueId: string) {
   const confirmAndReset = async (): Promise<boolean> => {
     const confirmed = await confirm({
       title: 'Reset Issue',
-      message: `Reset ${issueId}?\n\nThis will:\n- Stop any running agent\n- Delete the workspace and feature branch (including STATE.md)\n- Clear all beads and vBRIEF\n- Move the issue back to Todo\n\nThe issue can be re-planned and re-worked from scratch.`,
+      message: `Reset ${issueId}?\n\nThis will:\n- Stop any running agent\n- Delete the workspace and feature branch (including the continue file)\n- Clear all beads and vBRIEF\n- Move the issue back to Todo\n\nThe issue can be re-planned and re-worked from scratch.`,
       variant: 'destructive',
       confirmLabel: 'Reset Issue',
     });

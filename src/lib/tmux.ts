@@ -461,7 +461,7 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
     // the pasted text is visible. Using the last line instead of the first
     // because large messages scroll the first line out of the capture window.
     const lines = keys.split('\n');
-    const verifyLine = (lines.findLast(l => l.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? '';
+    const verifyLine = ([...lines].reverse().find(l => l.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? '';
     const VERIFY_TIMEOUT_MS = 3_000;
     const VERIFY_INTERVAL_MS = 50;
     const deadline = Date.now() + VERIFY_TIMEOUT_MS;

@@ -35,7 +35,7 @@ export function useRestartFromPlan(issueId: string) {
   const confirmAndRestart = async (): Promise<boolean> => {
     const confirmed = await confirm({
       title: 'Restart from Plan',
-      message: `Restart ${issueId} from its planning state?\n\nThis will:\n- Stop any running agent\n- Reset the feature branch to the post-planning commit\n- Clear agent session state\n- Reset specialist pipeline states\n- Move the issue to In Progress\n\nKeeps: vBRIEF plan, beads, STATE.md, and PRD.`,
+      message: `Restart ${issueId} from its planning state?\n\nThis will:\n- Stop any running agent\n- Reset the feature branch to the post-planning commit\n- Clear agent session state\n- Reset specialist pipeline states\n- Move the issue to In Progress\n\nKeeps: vBRIEF plan, beads, continue file, and PRD.`,
       variant: 'destructive',
       confirmLabel: 'Restart from Plan',
     });

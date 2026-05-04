@@ -179,11 +179,12 @@ export async function archiveWorkspaceArtifacts(
       details.push('Archived feedback/');
     }
 
-    // Archive STATE.md
-    const stateMd = join(workspacePath, '.planning', 'STATE.md');
-    if (existsSync(stateMd)) {
-      await cp(stateMd, join(archiveDir, 'STATE.md'));
-      details.push('Archived STATE.md');
+    // Archive continue file (replaces STATE.md)
+    const issueUpper = ctx.issueId.toUpperCase();
+    const continueFile = join(workspacePath, '.planning', `continue-${issueUpper}.vbrief.json`);
+    if (existsSync(continueFile)) {
+      await cp(continueFile, join(archiveDir, `continue-${issueUpper}.vbrief.json`));
+      details.push('Archived continue.vbrief.json');
     }
 
     // Archive plan.vbrief.json — the canonical structured plan. Moved to

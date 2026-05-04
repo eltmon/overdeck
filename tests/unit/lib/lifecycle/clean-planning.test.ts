@@ -50,12 +50,12 @@ describe('cleanPlanningArtifacts', () => {
     expect(result.details?.[0]).toContain('No tracked ephemeral planning files found');
   });
 
-  it('should remove tracked STATE.md and commit', async () => {
+  it('should remove tracked continue file and commit', async () => {
     // Single ls-files call with all files — return tracked files based on args
     mockExecAsync.mockImplementation((cmd: string, args: string[]) => {
       if (args?.includes('ls-files')) {
         const tracked: string[] = [];
-        if (args.includes('.planning/STATE.md')) tracked.push('.planning/STATE.md');
+        if (args.includes('.planning/continue-*.vbrief.json')) tracked.push('.planning/continue-PAN-337.vbrief.json');
         return Promise.resolve({ stdout: tracked.join('\n'), stderr: '' });
       }
       if (args?.includes('diff') && args?.includes('--cached')) {
@@ -81,7 +81,7 @@ describe('cleanPlanningArtifacts', () => {
     );
     expect(gitRmCall).toBeDefined();
     const gitRmArgs = gitRmCall![1] as string[];
-    expect(gitRmArgs).toContain('.planning/STATE.md');
+    expect(gitRmArgs).toContain('.planning/continue-PAN-337.vbrief.json');
 
     // Verify commit was made with issueId in message
     const commitCall = mockExecAsync.mock.calls.find(
@@ -130,7 +130,7 @@ describe('cleanPlanningArtifacts', () => {
     mockExecAsync.mockImplementation((cmd: string, args: string[]) => {
       if (args?.includes('ls-files')) {
         const tracked: string[] = [];
-        if (args.includes('.planning/STATE.md')) tracked.push('.planning/STATE.md');
+        if (args.includes('.planning/continue-*.vbrief.json')) tracked.push('.planning/continue-PAN-337.vbrief.json');
         return Promise.resolve({ stdout: tracked.join('\n'), stderr: '' });
       }
       if (args?.includes('diff') && args?.includes('--cached')) {
@@ -161,7 +161,7 @@ describe('cleanPlanningArtifacts', () => {
     mockExecAsync.mockImplementation((cmd: string, args: string[]) => {
       if (args?.includes('ls-files')) {
         const tracked: string[] = [];
-        if (args.includes('.planning/STATE.md')) tracked.push('.planning/STATE.md');
+        if (args.includes('.planning/continue-*.vbrief.json')) tracked.push('.planning/continue-PAN-337.vbrief.json');
         if (args.includes('.planning/PLANNING_PROMPT.md') && !args.includes('.archived')) tracked.push('.planning/PLANNING_PROMPT.md');
         if (args.includes('.planning/feedback/')) tracked.push('.planning/feedback/001-test.md');
         return Promise.resolve({ stdout: tracked.join('\n'), stderr: '' });
@@ -184,7 +184,7 @@ describe('cleanPlanningArtifacts', () => {
     mockExecAsync.mockImplementation((cmd: string, args: string[]) => {
       if (args?.includes('ls-files')) {
         const tracked: string[] = [];
-        if (args.includes('.planning/STATE.md')) tracked.push('.planning/STATE.md');
+        if (args.includes('.planning/continue-*.vbrief.json')) tracked.push('.planning/continue-PAN-337.vbrief.json');
         return Promise.resolve({ stdout: tracked.join('\n'), stderr: '' });
       }
       if (args?.includes('rm')) {

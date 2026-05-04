@@ -1,61 +1,86 @@
 ---
 specialist: verification-gate
-issueId: PAN-936
+issueId: PAN-946
 outcome: failed
-timestamp: 2026-05-01T05:20:24Z
+timestamp: 2026-05-03T17:21:31Z
 ---
 
-VERIFICATION FAILED for PAN-936 (attempt 1/10):
+VERIFICATION FAILED for PAN-946 (attempt 1/10):
 
 Failed check: test
 
-Verification FAILED at test (30709ms):
+Verification FAILED at test (34611ms):
 
-.ts:45:19
-     43|     const tasks = readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-412…
-     44| 
-     45|     expect(tasks).toHaveLength(2);
-       |                   ^
-     46|     expect(tasks[0]).toContain('PAN-412: Implement feature A');
-     47|     expect(tasks[1]).toContain('PAN-412: Implement feature B');
+r of calls: 0
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/12]⎯
+ ❯ src/dashboard/server/__tests__/pty-hub.test.ts:41:22
+     39|     broadcastToHub(hub, 'hello');
+     40| 
+     41|     expect(ws1.send).toHaveBeenCalledWith('hello');
+       |                      ^
+     42|     expect(ws2.send).toHaveBeenCalledWith('hello');
+     43|   });
 
- FAIL |root|  src/lib/cloister/__tests__/beads-scoping.test.ts > readBeadsTasks label scoping > matches beads using labels field (not just tags)
-AssertionError: expected Promise{…} to have property 'length'
- ❯ src/lib/cloister/__tests__/beads-scoping.test.ts:58:19
-     56|     const tasks = readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-419…
-     57| 
-     58|     expect(tasks).toHaveLength(1);
-       |                   ^
-     59|     expect(tasks[0]).toContain('Some generic title');
-     60|   });
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/18]⎯
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/12]⎯
+ FAIL |root|  src/dashboard/server/__tests__/pty-hub.test.ts > broadcastToHub > skips clients that are not OPEN
+AssertionError: expected "spy" to be called with arguments: [ 'ping' ]
 
- FAIL |root|  src/lib/cloister/__tests__/beads-scoping.test.ts > readBeadsTasks label scoping > handles legacy workspace: prefixed labels
-AssertionError: expected Promise{…} to have property 'length'
- ❯ src/lib/cloister/__tests__/beads-scoping.test.ts:72:19
-     70| 
-     71|     // Should match both workspace: prefixed and bare labels containin…
-     72|     expect(tasks).toHaveLength(2);
-       |                   ^
-     73|     expect(tasks.some(t => t.includes('Implementation'))).toBe(true);
-     74|     expect(tasks.some(t => t.includes('Feature'))).toBe(true);
+Received: 
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/12]⎯
 
- FAIL |root|  src/lib/cloister/__tests__/beads-scoping.test.ts > readBeadsTasks label scoping > deduplicates beads found in both workspace and project root
-AssertionError: expected Promise{…} to have property 'length'
- ❯ src/lib/cloister/__tests__/beads-scoping.test.ts:89:19
-     87|     const tasks = readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-412…
-     88| 
-     89|     expect(tasks).toHaveLength(1);
-       |                   ^
-     90|   });
-     91| });
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/12]⎯
+Number of calls: 0
+
+ ❯ src/dashboard/server/__tests__/pty-hub.test.ts:56:23
+     54|     broadcastToHub(hub, 'ping');
+     55| 
+     56|     expect(open.send).toHaveBeenCalledWith('ping');
+       |                       ^
+     57|     expect(closed.send).not.toHaveBeenCalled();
+     58|     expect(connecting.send).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/18]⎯
+
+ FAIL |root|  src/dashboard/server/__tests__/pty-hub.test.ts > broadcastToHub > buffers output for clients that are not ready yet
+AssertionError: expected [] to deeply equal [ 'scrollback-flood' ]
+
+- Expected
++ Received
+
+- Array [
+-   "scrollback-flood",
+- ]
++ Array []
+
+ ❯ src/dashboard/server/__tests__/pty-hub.test.ts:74:49
+     72| 
+     73|     expect(open.send).not.toHaveBeenCalled();
+     74|     expect(hub.clientStates.get(open)?.pending).toEqual(['scrollback-f…
+       |                                                 ^
+     75|   });
+     76| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/18]⎯
+
+ FAIL |root|  src/dashboard/server/__tests__/pty-hub.test.ts > broadcastToHub > flushes buffered output when a client becomes ready
+AssertionError: expected "spy" to be called with arguments: [ 'normal-data' ]
+
+Received: 
+
+
+
+Number of calls: 0
+
+ ❯ src/dashboard/server/__tests__/pty-hub.test.ts:85:23
+     83|     setClientReady(hub, open);
+     84| 
+     85|     expect(open.send).toHaveBeenCalledWith('normal-data');
+       |                       ^
+     86|   });
+     87| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/18]⎯
 
 
 
@@ -65,6 +90,6 @@ AssertionError: expected Promise{…} to have property 'length'
 2. Fix the code causing the failure
 3. Run the failing check locally to verify it passes
 4. Commit every change
-5. Invoke the /rebase-and-submit skill for PAN-936 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-936 -m "Fixed test"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.
+5. Invoke the /rebase-and-submit skill for PAN-946 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-946 -m "Fixed test"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.
 
 Do NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until `pan review request` has completed successfully.

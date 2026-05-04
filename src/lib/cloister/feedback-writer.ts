@@ -2,16 +2,18 @@
  * Feedback Writer — writes specialist feedback to workspace files.
  *
  * All specialist feedback (review, test, merge) is written to
- * .planning/feedback/ in the workspace, with a breadcrumb in STATE.md.
- * The work agent reads these on startup or after crash recovery.
+ * .planning/feedback/ in the workspace, with a breadcrumb appended to the
+ * scope continue file's sessionHistory. The work agent reads these on
+ * startup or after crash recovery.
  *
  * All I/O is async (fs/promises) — never execSync.
  */
 
-import { writeFile, readFile, mkdir, readdir, rm } from 'fs/promises';
+import { writeFile, mkdir, readdir, rm } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { resolveProjectFromIssue } from '../projects.js';
+import { appendContinueSessionEntryForIssue } from '../vbrief/lifecycle-io.js';
 
 export interface WriteFeedbackOptions {
   issueId: string;
@@ -63,42 +65,6 @@ async function getNextSequenceNumber(feedbackDir: string): Promise<number> {
 }
 
 /**
- * Append a feedback entry to STATE.md's "Specialist Feedback" section.
- * Creates the section if it doesn't exist. Creates STATE.md if it doesn't exist.
- */
-async function appendToStateMd(
-  planningDir: string,
-  entry: { timestamp: string; specialist: string; outcome: string; relativePath: string; issueId: string }
-): Promise<void> {
-  const statePath = join(planningDir, 'STATE.md');
-  const line = `- **[${entry.timestamp}] ${entry.specialist} → ${entry.outcome.toUpperCase()}** — \`${entry.relativePath}\``;
-
-  let content: string;
-  try {
-    content = await readFile(statePath, 'utf-8');
-  } catch {
-    // STATE.md doesn't exist — create a minimal one
-    content = `# Agent State: ${entry.issueId}\n`;
-  }
-
-  const sectionHeader = '## Specialist Feedback';
-  const sectionIndex = content.indexOf(sectionHeader);
-
-  if (sectionIndex >= 0) {
-    // Find the end of the section (next ## or EOF)
-    const afterHeader = sectionIndex + sectionHeader.length;
-    const nextSection = content.indexOf('\n## ', afterHeader);
-    const insertPos = nextSection >= 0 ? nextSection : content.length;
-    content = content.slice(0, insertPos).trimEnd() + '\n' + line + '\n' + content.slice(insertPos);
-  } else {
-    // Append the section at the end
-    content = content.trimEnd() + '\n\n' + sectionHeader + '\n\n' + line + '\n';
-  }
-
-  await writeFile(statePath, content, 'utf-8');
-}
-
-/**
  * Clear existing feedback files from a previous review cycle.
  *
  * Deletes all NNN-*.md files in .planning/feedback/ (and any legacy
@@ -145,7 +111,8 @@ export async function clearFeedbackFiles(workspacePath: string): Promise<void> {
 export const archiveFeedbackFiles = clearFeedbackFiles;
 
 /**
- * Write specialist feedback to a file in the workspace and update STATE.md.
+ * Write specialist feedback to a file in the workspace and record a
+ * breadcrumb on the scope vBRIEF's continue file.
  */
 export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<WriteFeedbackResult> {
   // Validate workspacePath — reject project roots (must contain /workspaces/ or have .planning dir)
@@ -203,14 +170,23 @@ export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<Wri
 
     await writeFile(filePath, content, 'utf-8');
 
-    // Update STATE.md with breadcrumb
-    await appendToStateMd(planningDir, {
-      timestamp: shortTimestamp,
-      specialist: opts.specialist,
-      outcome: opts.outcome,
-      relativePath,
-      issueId: opts.issueId,
-    });
+    // Record a breadcrumb on the scope vBRIEF's continue file so future
+    // agents can reconstruct the feedback timeline from sessionHistory.
+    const resolved = resolveProjectFromIssue(opts.issueId);
+    if (resolved) {
+      try {
+        appendContinueSessionEntryForIssue(resolved.projectPath, opts.issueId, {
+          reason: 'feedback',
+          note: `[${shortTimestamp}] ${opts.specialist} → ${opts.outcome.toUpperCase()} — ${relativePath}`,
+        });
+      } catch (err: any) {
+        // Non-fatal — the markdown file is still written.
+        console.error(
+          `[feedback-writer] Failed to append continue-file breadcrumb for ${opts.issueId}:`,
+          err.message,
+        );
+      }
+    }
 
     console.log(`[feedback-writer] Wrote ${relativePath} for ${opts.issueId}`);
     return { success: true, relativePath, filePath };

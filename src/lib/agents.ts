@@ -24,7 +24,8 @@ import { getOpenAIAuthStatus, getOpenAIAuthStatusSync } from './openai-auth.js';
 import { getCliproxyClientEnv } from './cliproxy.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
-import { findProjectByPath, getIssuePrefix } from './projects.js';
+import { findProjectByPath, getIssuePrefix, resolveProjectFromIssue } from './projects.js';
+import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 import { generateLauncherScript } from './launcher-generator.js';
 import { logAgentLifecycle } from './persistent-logger.js';
 import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
@@ -1649,6 +1650,22 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
   const completedFile = join(getAgentDir(normalizedId), 'completed');
   if (existsSync(completedFile)) {
     try { unlinkSync(completedFile); } catch { /* non-fatal */ }
+  }
+
+  // Append 'resume' session entry to continue state (PAN-946: workspace-44p)
+  try {
+    if (agentState?.workspace) {
+      const issueId = agentState.issueId || normalizedId.replace('agent-', '').toUpperCase();
+      const resolved = resolveProjectFromIssue(issueId);
+      if (resolved) {
+        appendContinueSessionEntryForIssue(resolved.projectPath, issueId, {
+          reason: 'resume',
+          agentModel: agentState.model || undefined,
+        });
+      }
+    }
+  } catch (continueErr: any) {
+    console.warn(`[resumeAgent] Failed to append resume entry to continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
   }
 
   try {

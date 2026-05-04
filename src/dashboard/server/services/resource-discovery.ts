@@ -351,7 +351,7 @@ async function scanWorkspace(workspacesDir: string, workspaceName: string): Prom
     workspacePath,
     hasPlanning: workspaceEntries.has('.planning'),
     hasPrd: planningEntries.has('PLANNING_PROMPT.md'),
-    hasState: planningEntries.has('STATE.md'),
+    hasState: [...planningEntries].some(e => e.startsWith('continue-') && e.endsWith('.vbrief.json')),
     hasVbrief: planningEntries.has('plan.vbrief.json'),
     hasBeads: beadsEntries.has('issues.jsonl') || beadsEntries.has('redirect'),
   };

@@ -226,8 +226,8 @@ async function destructiveResetWorkflow(
   stepNum = 1;
 
   // Preserve PRD before workspace teardown so it survives reset/cancel.
-  // complete-planning copies STATE.md and plan.vbrief.json to docs/prds/active/
-  // but does not copy prd.md. Ensure it is preserved here.
+  // complete-planning copies the continue file and plan.vbrief.json to
+  // docs/prds/active/ but does not copy prd.md. Ensure it is preserved here.
   const issueLower = ctx.issueId.toLowerCase();
   const workspacePath = findWorkspacePath(ctx.projectPath, issueLower);
   if (workspacePath && existsSync(workspacePath)) {

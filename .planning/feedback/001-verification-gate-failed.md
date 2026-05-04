@@ -1,74 +1,39 @@
 ---
 specialist: verification-gate
-issueId: PAN-913
+issueId: PAN-946
 outcome: failed
-timestamp: 2026-04-29T00:01:11Z
+timestamp: 2026-05-03T16:57:13Z
 ---
 
-VERIFICATION FAILED for PAN-913 (attempt 1/10):
+VERIFICATION FAILED for PAN-946 (attempt 1/10):
 
 Failed check: test
 
-Verification FAILED at test (29416ms):
+Verification FAILED at test (41032ms):
 
-elper inside:
+ only
+ FAIL |panopticon-dashboard|  src/components/CommandDeck/__tests__/ConversationList.test.tsx > ConversationList rename flow > does not call API when title is unchanged
+ FAIL |panopticon-dashboard|  src/components/CommandDeck/__tests__/ConversationList.test.tsx > ConversationList rename flow > prevents double-commit when Enter is followed by blur
+ FAIL |panopticon-dashboard|  src/components/CommandDeck/__tests__/ConversationList.test.tsx > ConversationList rename flow > resets the committed guard when a new edit session starts
+Error: useConfirm must be used within DialogProvider
+ ❯ Module.useConfirm src/components/DialogProvider.tsx:35:19
+     33| export function useConfirm() {
+     34|   const ctx = useContext(DialogContext);
+     35|   if (!ctx) throw new Error('useConfirm must be used within DialogProv…
+       |                   ^
+     36|   return ctx.confirm;
+     37| }
+ ❯ ConversationRow src/components/CommandDeck/ConversationRow.tsx:75:19
+ ❯ renderWithHooks ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:15486:18
+ ❯ mountIndeterminateComponent ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:20103:13
+ ❯ beginWork ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:21626:16
+ ❯ beginWork$1 ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:27465:14
+ ❯ performUnitOfWork ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:26599:12
+ ❯ workLoopSync ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:26505:5
+ ❯ renderRootSync ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:26473:7
+ ❯ recoverFromConcurrentError ../../../node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:25889:20
 
-vi.mock(import("../../tmux.js"), async (importOriginal) => {
-  const actual = await importOriginal()
-  return {
-    ...actual,
-    // your mocked methods
-  }
-})
-
- ❯ Module.runParallelReview src/lib/cloister/review-agent.ts:962:30
-    960|     const retryable: typeof failedReviewerResults = [];
-    961|     for (const failed of failedReviewerResults) {
-    962|       const paneDead = await isPaneDeadAsync(failed.sessionName);
-       |                              ^
-    963|       if (!paneDead) continue;
-    964| 
- ❯ src/lib/cloister/__tests__/review-temp-lifecycle.test.ts:169:24
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
-
- FAIL |root|  src/dashboard/server/routes/__tests__/agents-guardrails.test.ts > evaluateSpawnGuardrails > returns acknowledgement-required warnings when work agent count is high but below the hard limit
-AssertionError: expected false to be true // Object.is equality
-
-- Expected
-+ Received
-
-- true
-+ false
-
- ❯ src/dashboard/server/routes/__tests__/agents-guardrails.test.ts:103:46
-    101| 
-    102|     expect(decision.blocked).toBe(false);
-    103|     expect(decision.requiresAcknowledgement).toBe(true);
-       |                                              ^
-    104|     expect(decision.status).toBe(409);
-    105|     expect(decision.hint).toBe('Acknowledge the system health warnings…
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
-
- FAIL |root|  src/dashboard/server/routes/__tests__/agents-guardrails.test.ts > evaluateSpawnGuardrails > escalates leaked specialists to a blocking hint when critical conditions are also present
-AssertionError: expected false to be true // Object.is equality
-
-- Expected
-+ Received
-
-- true
-+ false
-
- ❯ src/dashboard/server/routes/__tests__/agents-guardrails.test.ts:156:30
-    154|     }));
-    155| 
-    156|     expect(decision.blocked).toBe(true);
-       |                              ^
-    157|     expect(decision.requiresAcknowledgement).toBe(false);
-    158|     expect(decision.status).toBe(429);
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[32/44]⎯
 
 
 
@@ -78,6 +43,6 @@ AssertionError: expected false to be true // Object.is equality
 2. Fix the code causing the failure
 3. Run the failing check locally to verify it passes
 4. Commit every change
-5. Invoke the /rebase-and-submit skill for PAN-913 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-913 -m "Fixed test"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.
+5. Invoke the /rebase-and-submit skill for PAN-946 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-946 -m "Fixed test"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.
 
 Do NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until `pan review request` has completed successfully.

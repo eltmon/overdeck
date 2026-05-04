@@ -479,7 +479,7 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
     createWorktree(projectRoot, workspacePath, branchName);
 
     // Remove stale .planning/ directory inherited from main branch.
-    // This contains STATE.md and other planning artifacts from a PREVIOUS issue.
+    // This contains continue files and other planning artifacts from a PREVIOUS issue.
     // If left in place, the new agent reads it and works on the wrong issue.
     // SAFETY: resolve() to absolute path and verify it's under a known workspace prefix
     // to prevent path traversal from ever reaching rmSync.
