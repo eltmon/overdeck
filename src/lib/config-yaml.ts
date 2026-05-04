@@ -980,6 +980,18 @@ interface ConfigCache {
 
 let configCache: ConfigCache | null = null;
 
+/**
+ * Explicitly clear the in-memory config cache.
+ *
+ * The mtime-based cache invalidation in loadConfig() can miss rapid writes
+ * (same-millisecond save → spawn) or coarse filesystem mtime resolution.
+ * Call this after writing config.yaml to guarantee the next loadConfig()
+ * reads from disk rather than returning stale cached data.
+ */
+export function clearConfigCache(): void {
+  configCache = null;
+}
+
 function getConfigMtimes(): { global: number; project: number } {
   let globalMtime = 0;
   let projectMtime = 0;

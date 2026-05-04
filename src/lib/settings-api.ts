@@ -7,7 +7,7 @@
 
 import { writeFile } from 'fs/promises';
 import yaml from 'js-yaml';
-import { loadConfig, getGlobalConfigPath, YamlConfig } from './config-yaml.js';
+import { loadConfig, getGlobalConfigPath, YamlConfig, clearConfigCache } from './config-yaml.js';
 import { WorkTypeId } from './work-types.js';
 import { ModelId } from './settings.js';
 import { MODEL_CAPABILITIES, getModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
@@ -288,6 +288,10 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
   // saved via PUT /api/settings don't take effect until the dashboard restarts,
   // and smart-model-selector fallback can pick an unexpected model (e.g. a
   // non-Anthropic top scorer that the runtime can't resolve).
+  //
+  // We also clear the config-yaml cache because mtime-based invalidation can
+  // miss rapid writes (same-millisecond) or coarse filesystem mtime resolution.
+  clearConfigCache();
   reloadGlobalRouter();
 }
 
