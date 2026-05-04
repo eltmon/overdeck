@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -21,6 +21,7 @@ import { useLiveFlash } from '../../../lib/useLiveFlash';
 import type { SessionNode as SessionNodeType, Activity, AgentRuntimeSnapshot } from '@panctl/contracts';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import { useAvailableModels, type ModelGroup } from '../../shared/ModelPicker/ModelPicker';
+import { useResolvedModels, resolveWorkTypeKey } from '../../../lib/useResolvedModels';
 import { useDashboardStore } from '../../../lib/store';
 import { useSharedTick } from '../../../lib/useSharedTick';
 import { formatRelativeTime } from '../../../lib/formatRelativeTime';
@@ -62,31 +63,6 @@ function LiveLastHeard({ lastActivity }: { lastActivity?: string }) {
   );
 }
 
-let resolvedModelsCache: Record<string, string | null> | null = null;
-let resolvedModelsFetchPromise: Promise<Record<string, string | null>> | null = null;
-
-function useResolvedModels(): Record<string, string | null> {
-  const [models, setModels] = useState<Record<string, string | null>>(resolvedModelsCache ?? {});
-
-  useEffect(() => {
-    if (resolvedModelsCache) {
-      setModels(resolvedModelsCache);
-      return;
-    }
-    if (!resolvedModelsFetchPromise) {
-      resolvedModelsFetchPromise = fetch('/api/models/resolve')
-        .then(r => r.json())
-        .then((data: Record<string, string | null>) => {
-          resolvedModelsCache = data;
-          return data;
-        })
-        .catch(() => ({}));
-    }
-    resolvedModelsFetchPromise.then(data => setModels(data)).catch(() => {});
-  }, []);
-
-  return models;
-}
 
 function activityToStatus(activity: Activity): StatusDotStatus {
   switch (activity) {
@@ -308,13 +284,7 @@ export function SessionNode({
     }
   }, [issueId, onDeepWipe]);
 
-  const workTypeKey = session.type === 'review' ? 'specialist-review-agent'
-    : session.type === 'reviewer' && session.role ? `review:${session.role}`
-    : session.type === 'work' ? 'issue-agent:implementation'
-    : session.type === 'planning' ? 'planning-agent'
-    : session.type === 'test' ? 'specialist-test-agent'
-    : session.type === 'merge' ? 'specialist-merge-agent'
-    : null;
+  const workTypeKey = resolveWorkTypeKey(session);
   const defaultModel = workTypeKey ? (resolvedModels[workTypeKey] ?? null) : null;
   const restartLabel = session.type === 'review' ? 'Restart all' : undefined;
 
