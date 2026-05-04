@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useDashboardStore } from '../../lib/store';
 import { useTheme } from '../../hooks/useTheme';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, CheckCircle2, AlertCircle, Archive } from 'lucide-react';
@@ -620,6 +621,7 @@ export interface FailedMessage {
 }
 
 function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId }: ConversationViewProps) {
+  const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
   const [failedMessages, setFailedMessages] = useState<FailedMessage[]>([]);
   // Track count so we know when the server caught up
@@ -790,7 +792,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           onDiscardFailed={handleDiscardFailed}
           proposedPlan={data?.proposedPlan}
           compactBoundaries={data?.compactBoundaries}
-          compacting={data?.compacting}
+          compacting={isCompacting}
           conversationName={conversation.name}
           turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
           onOpenTurnDiff={onOpenTurnDiff}
