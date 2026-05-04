@@ -101,7 +101,11 @@ export function initSchema(db: Database.Database): void {
       deacon_ignored_at       TEXT,
       deacon_ignored_reason   TEXT,
       -- PAN-905: GitHub-native merge blocker reasons (JSON array)
-      blocker_reasons         TEXT
+      blocker_reasons         TEXT,
+      -- v32: track last commit verified by the test specialist (skip-redundant-tests)
+      last_verified_commit    TEXT,
+      -- v32: track current merge step for UI override
+      merge_step              TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
