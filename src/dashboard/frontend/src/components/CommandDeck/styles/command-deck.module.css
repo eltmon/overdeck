@@ -3914,6 +3914,23 @@
   gap: 4px;
 }
 
+.forkTitleInput {
+  width: 100%;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--foreground);
+  font-size: 12px;
+  padding: 5px 8px;
+  outline: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.forkTitleInput:focus {
+  border-color: var(--primary);
+}
+
 /* ─── Fork footer ────────────────────────────────────────────────────────── */
 
 .forkFooter {

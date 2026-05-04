@@ -40,8 +40,10 @@ export function createClaudeAdapter(): RuntimeAdapter {
       try {
         const { execa } = await import('execa');
         const result = await execa('which', ['claude']);
+        console.log(`[claude-invoke] purpose=runtime-check | model=n/a | source=runtime/claude.ts:isAvailable | command="which claude" | available=${result.exitCode === 0}`);
         return result.exitCode === 0;
       } catch {
+        console.log(`[claude-invoke] purpose=runtime-check | model=n/a | source=runtime/claude.ts:isAvailable | command="which claude" | available=false`);
         return false;
       }
     },
@@ -50,8 +52,11 @@ export function createClaudeAdapter(): RuntimeAdapter {
       try {
         const { execa } = await import('execa');
         const result = await execa('claude', ['--version']);
-        return result.stdout.trim();
+        const version = result.stdout.trim();
+        console.log(`[claude-invoke] purpose=runtime-check | model=n/a | source=runtime/claude.ts:getVersion | command="claude --version" | version="${version}"`);
+        return version;
       } catch {
+        console.log(`[claude-invoke] purpose=runtime-check | model=n/a | source=runtime/claude.ts:getVersion | command="claude --version" | version=null`);
         return null;
       }
     },

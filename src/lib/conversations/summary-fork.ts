@@ -140,11 +140,19 @@ export async function generateSummaryForFork(jsonlPath: string, summaryModel?: s
     summaryModel = 'claude-sonnet-4-6';
   }
 
+  console.log(`[claude-invoke] purpose=summary-fork | model=${summaryModel} | source=summary-fork.ts:generateSummaryForFork | jsonl=${jsonlPath}`);
+
   const { config } = loadConfig();
   const richMode = config.conversations.richCompaction;
 
-  const result = await generateSmartSummary({ jsonlPath, model: summaryModel, richMode, mode: 'fork', includeThinkingInSummary });
-  return { summary: result.summary + FORK_WAIT_INSTRUCTION, summaryModel };
+  try {
+    const result = await generateSmartSummary({ jsonlPath, model: summaryModel, richMode, mode: 'fork', includeThinkingInSummary });
+    console.log(`[claude-invoke] SUCCESS purpose=summary-fork | model=${summaryModel} | outputChars=${result.summary.length}`);
+    return { summary: result.summary + FORK_WAIT_INSTRUCTION, summaryModel };
+  } catch (err: any) {
+    console.error(`[claude-invoke] FAILED purpose=summary-fork | model=${summaryModel} | error="${err.message}"`);
+    throw err;
+  }
 }
 
 export async function reserveSummaryForkSession(

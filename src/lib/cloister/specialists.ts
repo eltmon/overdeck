@@ -1151,7 +1151,7 @@ ${basePrompt}`;
       currentIssue: task.issueId,
     });
 
-    console.log(`[specialist] Spawned ${specialistType} for ${projectKey}/${task.issueId} (run: ${runId})`);
+    console.log(`[claude-invoke] SUCCESS purpose=specialist-dispatch | model=${model} | source=specialists.ts:dispatchSpecialist | session=${tmuxSession} | specialist=${specialistType} | issue=${task.issueId} | run=${runId}`);
 
 
     return {
@@ -2553,6 +2553,7 @@ export async function wakeSpecialist(
         .join('; ');
       const providerSetupCmd = providerExportCmd ? `${providerExportCmd}; ` : '';
       const claudeCmd = `${PROVIDER_UNSET_CMD}; ${providerSetupCmd}export TERM=xterm-256color; export COLORTERM=truecolor; exec claude --session-id "${effectiveSessionId}" ${modelFlag} ${permissionFlags}`;
+      console.log(`[claude-invoke] purpose=specialist-wake | model=${model} | source=specialists.ts:wakeSpecialist | session=${tmuxSession} | specialist=${name} | command="exec claude ..."`);
 
       // Kill stale session first to prevent "duplicate session" error (PAN-430)
       await killSessionAsync(tmuxSession).catch(() => { /* no stale session */ });

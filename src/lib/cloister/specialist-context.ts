@@ -158,7 +158,7 @@ export async function generateContextDigest(
   const model = options.model ?? getDigestModel(projectKey, specialistType);
 
   try {
-    console.log(`[specialist-context] Generating digest for ${projectKey}/${specialistType} using ${model}...`);
+    console.log(`[claude-invoke] purpose=specialist-digest | model=${model} | source=specialist-context.ts:generateContextDigest | project=${projectKey} | specialist=${specialistType} | promptChars=${prompt.length}`);
 
     // Use Claude Code CLI to generate digest
     // Write prompt to temp file to avoid shell escaping issues
@@ -191,13 +191,13 @@ export async function generateContextDigest(
     }
 
     if (stderr && !stderr.includes('warning')) {
-      console.error(`[specialist-context] Claude stderr:`, stderr);
+      console.error(`[claude-invoke] STDERR purpose=specialist-digest | model=${model} | project=${projectKey} | specialist=${specialistType} | stderr="${stderr.slice(0, 200)}"`);
     }
 
     const digest = stdout.trim();
 
     if (!digest) {
-      console.error(`[specialist-context] Empty digest generated`);
+      console.error(`[claude-invoke] FAILED purpose=specialist-digest | model=${model} | project=${projectKey} | specialist=${specialistType} | error="empty output"`);
       return null;
     }
 
@@ -205,10 +205,10 @@ export async function generateContextDigest(
     const digestPath = getContextDigestPath(projectKey, specialistType);
     writeFileSync(digestPath, digest, 'utf-8');
 
-    console.log(`[specialist-context] Generated digest (${digest.length} chars)`);
+    console.log(`[claude-invoke] SUCCESS purpose=specialist-digest | model=${model} | project=${projectKey} | specialist=${specialistType} | outputChars=${digest.length}`);
     return digest;
   } catch (error: any) {
-    console.error(`[specialist-context] Failed to generate digest:`, error.message);
+    console.error(`[claude-invoke] FAILED purpose=specialist-digest | model=${model} | project=${projectKey} | specialist=${specialistType} | error="${error.message}"`);
     // Degrade gracefully - return null so specialist can continue without context
     return null;
   }

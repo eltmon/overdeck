@@ -605,6 +605,8 @@ Be thorough. Preserve exact file paths, function names, error messages, and code
 
 export async function runModelSummary(prompt: string, model?: string, timeoutMs?: number): Promise<string> {
   const useModel = model || DEFAULT_SUMMARY_MODEL;
+  console.log(`[claude-invoke] purpose=smart-summary | model=${useModel} | source=smart-compaction.ts:runModelSummary | promptChars=${prompt.length} | timeoutMs=${timeoutMs ?? SUMMARY_TIMEOUT_MS}`);
+
   const args = [
     '-p',
     '--model', useModel,
@@ -652,14 +654,17 @@ export async function runModelSummary(prompt: string, model?: string, timeoutMs?
       clearTimeout(timeout);
       if (code !== 0) {
         const detail = stderr.trim() || stdout.trim() || `exit code ${code}`;
+        console.error(`[claude-invoke] FAILED purpose=smart-summary | model=${useModel} | error="exit code ${code}: ${detail.slice(0, 200)}"`);
         reject(new Error(`Summary generation failed: ${detail}`));
         return;
       }
       const summary = stdout.trim();
       if (!summary) {
+        console.error(`[claude-invoke] FAILED purpose=smart-summary | model=${useModel} | error="empty output"`);
         reject(new Error(`Summary generation returned empty output`));
         return;
       }
+      console.log(`[claude-invoke] SUCCESS purpose=smart-summary | model=${useModel} | outputChars=${summary.length}`);
       resolve(summary);
     });
   });

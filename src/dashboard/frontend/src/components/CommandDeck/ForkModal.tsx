@@ -104,6 +104,7 @@ interface ForkModalProps {
     plainFork: boolean,
     localSummaryOnly: boolean,
     includeThinkingInSummary: boolean,
+    title?: string,
   ) => void;
   onClose: () => void;
   isPending: boolean;
@@ -119,9 +120,17 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
   const [includeThinkingInSummary, setIncludeThinkingInSummary] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
+  const convTitle = conversation.title ?? conversation.name;
+  const [forkTitle, setForkTitle] = useState(`Summary Fork: ${convTitle}`);
+
   useEffect(() => {
     setSummaryModel(compactionModel);
   }, [compactionModel]);
+
+  useEffect(() => {
+    setForkTitle(plainFork ? `Fork: ${convTitle}` : `Summary Fork: ${convTitle}`);
+  }, [plainFork, convTitle]);
+
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const modelChanged = launchModel !== (conversation.model || defaultModel);
@@ -182,6 +191,20 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
           </p>
 
           <div className={styles.forkFields}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
+              <label htmlFor="fork-title" style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>
+                Fork name
+              </label>
+              <input
+                id="fork-title"
+                type="text"
+                value={forkTitle}
+                onChange={(e) => setForkTitle(e.target.value)}
+                className={styles.forkTitleInput}
+                autoFocus
+              />
+            </div>
+
             <div className={styles.forkCheckboxRow}>
               <input
                 type="checkbox"
@@ -260,7 +283,7 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
           <button
             className={styles.forkConfirmBtn}
             disabled={isPending}
-            onClick={() => onConfirm(conversation, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary)}
+            onClick={() => onConfirm(conversation, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, forkTitle.trim() || undefined)}
           >
             <GitBranchPlus size={13} />
             {isPending ? 'Forking...' : 'Fork Conversation'}
