@@ -454,7 +454,7 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
   try {
     await writeFile(tmpFile, keys, 'utf-8');
     await tmuxExecAsync(['load-buffer', '-b', bufferName, tmpFile], { encoding: 'utf-8' });
-    await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-t', sessionName], { encoding: 'utf-8' });
+    await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
     await tmuxExecAsync(['delete-buffer', '-b', bufferName], { encoding: 'utf-8' }).catch(() => {});
 
     // Verify paste arrived: poll capture-pane until the last non-empty line of
@@ -468,10 +468,18 @@ export async function sendKeysAsync(sessionName: string, keys: string, caller?: 
     let pasteVerified = false;
 
     if (verifyLine.length >= 3) {
+      const verifyStart = Date.now();
       while (Date.now() < deadline) {
         const pane = await capturePaneAsync(sessionName, 10);
         if (pane.includes(verifyLine.slice(0, 40))) {
           pasteVerified = true;
+          // Ensure a minimum paste-to-Enter delay so Claude Code's TUI finishes
+          // processing the bracketed paste before Enter arrives. (PAN-699 follow-up)
+          const elapsed = Date.now() - verifyStart;
+          const minDelay = 600;
+          if (elapsed < minDelay) {
+            await new Promise(r => setTimeout(r, minDelay - elapsed));
+          }
           break;
         }
         await new Promise(r => setTimeout(r, VERIFY_INTERVAL_MS));
