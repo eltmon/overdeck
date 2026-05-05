@@ -259,12 +259,12 @@ function runPreflight(repoRoot: string): PreflightResult[] {
     detail: clean ? 'clean' : 'dirty',
   });
 
-  // The CI guardrail (.github/workflows/no-planning-on-main.yml) refuses to
-  // advance main when .planning/ paths are tracked. Mirror that here so we
-  // catch leaks BEFORE tagging, not after the release workflow fails.
-  const trackedPlanning = (() => {
+  // The CI guardrail refuses to advance main when legacy planning paths are
+  // still tracked. Mirror that here so we catch leaks BEFORE tagging, not
+  // after the release workflow fails.
+  const trackedLegacyPlanning = (() => {
     try {
-      return execFileSync('git', ['ls-files', '--', '.planning/'], {
+      return execFileSync('git', ['ls-files', '--', '.planning/', 'vbrief/'], {
         cwd: repoRoot,
         encoding: 'utf8',
       }).trim();
@@ -273,11 +273,11 @@ function runPreflight(repoRoot: string): PreflightResult[] {
     }
   })();
   results.push({
-    name: 'No .planning/ tracked',
-    ok: trackedPlanning === '',
-    detail: trackedPlanning === ''
+    name: 'No legacy planning tracked',
+    ok: trackedLegacyPlanning === '',
+    detail: trackedLegacyPlanning === ''
       ? 'clean'
-      : `${trackedPlanning.split('\n').length} file(s) tracked — strip before tagging`,
+      : `${trackedLegacyPlanning.split('\n').length} file(s) tracked — strip before tagging`,
   });
 
   try {

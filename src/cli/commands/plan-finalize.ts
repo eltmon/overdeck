@@ -1,10 +1,11 @@
 import chalk from 'chalk';
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { existsSync, renameSync, writeFileSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
 import { findPlan, readPlan } from '../../lib/vbrief/io.js';
 import { generateVBriefFilename, slugify } from '../../lib/vbrief/lifecycle.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
+import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
 
 interface PlanFinalizeOptions {
@@ -15,7 +16,7 @@ interface PlanFinalizeOptions {
 function findWorkspaceRoot(start: string): string | null {
   let dir = resolve(start);
   while (true) {
-    if (existsSync(join(dir, '.planning', 'plan.vbrief.json'))) return dir;
+    if (findPlan(dir)) return dir;
     const parent = dirname(dir);
     if (parent === dir) return null;
     dir = parent;
@@ -27,7 +28,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   const workspacePath = findWorkspaceRoot(startDir);
 
   if (!workspacePath) {
-    const msg = 'No .planning/plan.vbrief.json found in current directory or any parent. Run this from a workspace where the planning agent wrote a vBRIEF plan.';
+    const msg = 'No workspace spec found in current directory or any parent. Run this from a workspace where the planning agent wrote .pan/spec.vbrief.json.';
     if (options.json) console.log(JSON.stringify({ success: false, error: msg }));
     else console.error(chalk.red('✗ ' + msg));
     process.exit(1);
@@ -35,7 +36,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
 
   const planPath = findPlan(workspacePath);
   if (!planPath) {
-    const msg = `vBRIEF plan not readable at ${workspacePath}/.planning/plan.vbrief.json`;
+    const msg = `vBRIEF plan not readable at ${workspacePath}/.pan/spec.vbrief.json`;
     if (options.json) console.log(JSON.stringify({ success: false, error: msg }));
     else console.error(chalk.red('✗ ' + msg));
     process.exit(1);
@@ -68,11 +69,6 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     process.exit(2);
   }
 
-  // Backward-compat marker — keep writing this until plan-status-gate bead
-  // removes the last consumer of `.planning-complete`.
-  const markerPath = join(workspacePath, '.planning', '.planning-complete');
-  writeFileSync(markerPath, '', 'utf-8');
-
   emitActivityEntry({
     source: 'planning-agent',
     level: 'info',
@@ -90,7 +86,6 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       success: true,
       created: result.created,
       count: result.created.length,
-      marker: markerPath,
       canonicalFilename,
       planStatus: 'proposed',
     }));
@@ -98,7 +93,6 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     console.log(chalk.green(`✓ Created ${result.created.length} beads task${result.created.length === 1 ? '' : 's'}`));
     for (const id of result.created) console.log(chalk.dim('  • ' + id));
     console.log(chalk.green(`✓ Set plan.status=proposed (canonical: ${canonicalFilename})`));
-    console.log(chalk.green(`✓ Wrote completion marker: ${markerPath}`));
     console.log('');
     console.log(chalk.cyan('Planning is finalized. The dashboard will now show the Done button.'));
     console.log(chalk.dim('You can exit this session — the user will click Done to start implementation.'));

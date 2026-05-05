@@ -15,8 +15,8 @@
 
 import chalk from 'chalk';
 import ora from 'ora';
-import { existsSync, readdirSync, readFileSync, mkdirSync, writeFileSync } from 'fs';
-import { join, basename } from 'path';
+import { existsSync, readdirSync, readFileSync, mkdirSync, statSync } from 'fs';
+import { join, basename, dirname } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -30,6 +30,7 @@ import {
 import {
   createFlyProviderFromConfig,
 } from '../../lib/remote/index.js';
+import { PAN_CONTEXT_FILENAME, PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_FEEDBACK_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
 import { createWorkspace, removeWorkspace } from '../../lib/workspace-manager.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import type { RemoteProvider } from '../../lib/remote/interface.js';
@@ -253,66 +254,152 @@ function convertToSshUrl(url: string): string {
   return url;
 }
 
+interface MigratableWorkspaceFile {
+  localPath: string;
+  remotePath: string;
+  label: string;
+}
+
+function collectPanWorkspaceFiles(workspacePath: string): MigratableWorkspaceFile[] {
+  const panDir = join(workspacePath, PAN_DIRNAME);
+  if (!existsSync(panDir)) return [];
+
+  const files: MigratableWorkspaceFile[] = [];
+  const directFiles = [
+    { name: PAN_SPEC_FILENAME, label: 'workspace vBRIEF' },
+    { name: PAN_CONTINUE_FILENAME, label: 'continue state' },
+    { name: PAN_CONTEXT_FILENAME, label: 'feature context' },
+  ];
+
+  for (const file of directFiles) {
+    const localPath = join(panDir, file.name);
+    if (existsSync(localPath) && statSync(localPath).isFile()) {
+      files.push({
+        localPath,
+        remotePath: `~/workspace/${PAN_DIRNAME}/${file.name}`,
+        label: file.label,
+      });
+    }
+  }
+
+  const feedbackDir = join(panDir, PAN_FEEDBACK_DIRNAME);
+  if (existsSync(feedbackDir) && statSync(feedbackDir).isDirectory()) {
+    for (const entry of readdirSync(feedbackDir)) {
+      const localPath = join(feedbackDir, entry);
+      if (!statSync(localPath).isFile()) continue;
+      files.push({
+        localPath,
+        remotePath: `~/workspace/${PAN_DIRNAME}/${PAN_FEEDBACK_DIRNAME}/${entry}`,
+        label: `feedback/${entry}`,
+      });
+    }
+  }
+
+  return files;
+}
+
+async function copyWorkspacePanStateToRemote(
+  provider: RemoteProvider,
+  vmName: string,
+  workspacePath: string,
+): Promise<{ steps: string[]; errors: string[] }> {
+  const steps: string[] = [];
+  const errors: string[] = [];
+  const files = collectPanWorkspaceFiles(workspacePath);
+
+  if (files.length === 0) {
+    steps.push('No workspace .pan state found (skipped)');
+    return { steps, errors };
+  }
+
+  try {
+    await provider.ssh(vmName, `mkdir -p ~/workspace/${PAN_DIRNAME}/${PAN_FEEDBACK_DIRNAME}`);
+    for (const file of files) {
+      const remoteDir = dirname(file.remotePath.replace(/^~\//, ''));
+      await provider.ssh(vmName, `mkdir -p ~/${remoteDir}`);
+      await provider.copyToVm(vmName, file.localPath, file.remotePath);
+      steps.push(`Copied ${file.label}`);
+    }
+  } catch (error: any) {
+    errors.push(`Workspace .pan state: ${error.message}`);
+  }
+
+  return { steps, errors };
+}
+
+async function copyWorkspacePanStateFromRemote(
+  provider: RemoteProvider,
+  vmName: string,
+  workspacePath: string,
+): Promise<{ steps: string[]; errors: string[] }> {
+  const steps: string[] = [];
+  const errors: string[] = [];
+
+  const remotePanDir = `~/workspace/${PAN_DIRNAME}`;
+  const panCheck = await provider.ssh(vmName, `[ -d ${remotePanDir} ] && echo present`);
+  if (panCheck.exitCode !== 0 || !panCheck.stdout.trim()) {
+    steps.push('No workspace .pan state on remote (skipped)');
+    return { steps, errors };
+  }
+
+  const localPanDir = join(workspacePath, PAN_DIRNAME);
+  const localFeedbackDir = join(localPanDir, PAN_FEEDBACK_DIRNAME);
+  mkdirSync(localPanDir, { recursive: true });
+  mkdirSync(localFeedbackDir, { recursive: true });
+
+  const directFiles = [
+    { name: PAN_SPEC_FILENAME, label: 'workspace vBRIEF' },
+    { name: PAN_CONTINUE_FILENAME, label: 'continue state' },
+    { name: PAN_CONTEXT_FILENAME, label: 'feature context' },
+  ];
+
+  for (const file of directFiles) {
+    const remotePath = `${remotePanDir}/${file.name}`;
+    const existsResult = await provider.ssh(vmName, `[ -f ${remotePath} ] && echo present`);
+    if (existsResult.exitCode === 0 && existsResult.stdout.trim()) {
+      try {
+        await provider.copyFromVm(vmName, remotePath, join(localPanDir, file.name));
+        steps.push(`Copied ${file.label}`);
+      } catch (error: any) {
+        errors.push(`${file.label}: ${error.message}`);
+      }
+    }
+  }
+
+  const feedbackList = await provider.ssh(vmName, `ls ${remotePanDir}/${PAN_FEEDBACK_DIRNAME} 2>/dev/null`);
+  if (feedbackList.exitCode === 0 && feedbackList.stdout.trim()) {
+    for (const entry of feedbackList.stdout.trim().split('\n').filter(Boolean)) {
+      try {
+        await provider.copyFromVm(
+          vmName,
+          `${remotePanDir}/${PAN_FEEDBACK_DIRNAME}/${entry}`,
+          join(localFeedbackDir, entry),
+        );
+        steps.push(`Copied feedback/${entry}`);
+      } catch (error: any) {
+        errors.push(`feedback/${entry}: ${error.message}`);
+      }
+    }
+  }
+
+  return { steps, errors };
+}
+
 /**
- * Copy planning state (.planning/ and beads) to remote VM
+ * Copy workspace orchestration state (.pan/ and beads) to a remote VM.
  */
 async function copyPlanningStateToRemote(
   provider: RemoteProvider,
   vmName: string,
   localPath: string,
-  issueId: string,
+  _issueId: string,
   projectConfig?: any
 ): Promise<{ steps: string[]; errors: string[] }> {
-  const steps: string[] = [];
-  const errors: string[] = [];
+  const workspacePanResult = await copyWorkspacePanStateToRemote(provider, vmName, localPath);
+  const steps = [...workspacePanResult.steps];
+  const errors = [...workspacePanResult.errors];
 
-  const normalizedId = issueId.toLowerCase();
-
-  // Find .planning directory (might be in project root, not workspace)
   const projectPath = projectConfig?.path;
-  const planningLocations = [
-    projectPath ? join(projectPath, '.planning', normalizedId) : null,
-    join(localPath, '.planning', normalizedId),
-    join(localPath, '.planning'),
-  ].filter(Boolean) as string[];
-
-  let planningDir: string | null = null;
-  for (const loc of planningLocations) {
-    if (existsSync(loc)) {
-      planningDir = loc;
-      break;
-    }
-  }
-
-  if (planningDir) {
-    try {
-      // Create directory on VM
-      await provider.ssh(vmName, `mkdir -p ~/workspace/.planning/${normalizedId}`);
-
-      // Copy planning files
-      const planningFiles = readdirSync(planningDir);
-      for (const file of planningFiles) {
-        const filePath = join(planningDir, file);
-        if (existsSync(filePath)) {
-          try {
-            const content = readFileSync(filePath, 'utf-8');
-            await provider.ssh(vmName, `cat > ~/workspace/.planning/${normalizedId}/${file} << 'PLANEOF'
-${content}
-PLANEOF`);
-            steps.push(`Copied ${file}`);
-          } catch {
-            // Skip binary files
-          }
-        }
-      }
-    } catch (error: any) {
-      errors.push(`Planning state: ${error.message}`);
-    }
-  } else {
-    steps.push('No planning state found (skipped)');
-  }
-
-  // Copy beads if exists
   const beadsLocations = [
     join(localPath, '.beads'),
     projectPath ? join(projectPath, '.beads') : null,
@@ -322,7 +409,6 @@ PLANEOF`);
     if (existsSync(beadsDir)) {
       try {
         await provider.ssh(vmName, 'mkdir -p ~/workspace/.beads');
-        // Copy beads database files
         const beadsFiles = readdirSync(beadsDir).filter(f => f.endsWith('.db') || f.endsWith('.jsonl'));
         for (const file of beadsFiles) {
           await provider.copyToVm(vmName, join(beadsDir, file), `~/workspace/.beads/${file}`);
@@ -339,57 +425,19 @@ PLANEOF`);
 }
 
 /**
- * Copy planning state (.planning/ and beads) from remote VM to local
+ * Copy workspace orchestration state (.pan/ and beads) from a remote VM.
  */
 async function copyPlanningStateFromRemote(
   provider: RemoteProvider,
   vmName: string,
   localPath: string,
-  issueId: string,
-  projectConfig?: any
+  _issueId: string,
+  _projectConfig?: any
 ): Promise<{ steps: string[]; errors: string[] }> {
-  const steps: string[] = [];
-  const errors: string[] = [];
+  const workspacePanResult = await copyWorkspacePanStateFromRemote(provider, vmName, localPath);
+  const steps = [...workspacePanResult.steps];
+  const errors = [...workspacePanResult.errors];
 
-  const normalizedId = issueId.toLowerCase();
-
-  // Check if planning directory exists on remote
-  const planningCheck = await provider.ssh(vmName, `ls ~/workspace/.planning/${normalizedId}/ 2>/dev/null`);
-
-  if (planningCheck.exitCode === 0 && planningCheck.stdout?.trim()) {
-    try {
-      // Determine local planning directory
-      const projectPath = projectConfig?.path;
-      const localPlanningDir = projectPath
-        ? join(projectPath, '.planning', normalizedId)
-        : join(localPath, '.planning', normalizedId);
-
-      mkdirSync(localPlanningDir, { recursive: true });
-
-      // List and copy planning files
-      const lsResult = await provider.ssh(vmName, `ls ~/workspace/.planning/${normalizedId}/`);
-      if (lsResult.exitCode === 0) {
-        const files = lsResult.stdout.trim().split('\n').filter(f => f);
-        for (const file of files) {
-          try {
-            const contentResult = await provider.ssh(vmName, `cat ~/workspace/.planning/${normalizedId}/${file}`);
-            if (contentResult.exitCode === 0) {
-              writeFileSync(join(localPlanningDir, file), contentResult.stdout);
-              steps.push(`Copied ${file}`);
-            }
-          } catch {
-            // Skip problematic files
-          }
-        }
-      }
-    } catch (error: any) {
-      errors.push(`Planning state: ${error.message}`);
-    }
-  } else {
-    steps.push('No planning state on remote (skipped)');
-  }
-
-  // Copy beads if exists
   const beadsCheck = await provider.ssh(vmName, 'ls ~/workspace/.beads/ 2>/dev/null');
   if (beadsCheck.exitCode === 0 && beadsCheck.stdout.trim()) {
     try {

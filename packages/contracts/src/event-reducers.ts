@@ -44,6 +44,8 @@ export interface ReadModelState {
   dashboardLifecycle: DashboardLifecycleState
   /** Conversation names currently undergoing Panopticon-native compaction. */
   conversationsCompactingByName: Record<string, boolean>
+  /** Conversation names currently waiting for user permission (PermissionRequest hook). */
+  conversationsAwaitingPermissionByName: Record<string, boolean>
 }
 
 export interface DashboardLifecycleState {
@@ -72,6 +74,7 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   shadowInferenceByIssueId: {},
   turnDiffSummariesByAgentId: {},
   conversationsCompactingByName: {},
+  conversationsAwaitingPermissionByName: {},
   dashboardLifecycle: {
     active: false,
     reason: null,
@@ -808,6 +811,18 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       return {
         ...state,
         conversationsCompactingByName: { ...state.conversationsCompactingByName, [conversationName]: true },
+      }
+    }
+
+    case 'conversation.permission_changed': {
+      const { conversationName, waiting } = event.payload
+      if (!waiting) {
+        const { [conversationName]: _removed, ...rest } = state.conversationsAwaitingPermissionByName
+        return { ...state, conversationsAwaitingPermissionByName: rest }
+      }
+      return {
+        ...state,
+        conversationsAwaitingPermissionByName: { ...state.conversationsAwaitingPermissionByName, [conversationName]: true },
       }
     }
 

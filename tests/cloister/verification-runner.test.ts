@@ -129,7 +129,7 @@ describe('runVerificationForIssue', () => {
     execMock.mockResolvedValue({ stdout: 'Already up to date\n', stderr: '' });
     getReviewStatusMock.mockReturnValue(null); // no existing status → 0 cycles
     runQualityGatesMock.mockResolvedValue(makePassedResults());
-    writeFeedbackFileMock.mockResolvedValue({ success: true, relativePath: '.planning/feedback/001-verification-failed.md' });
+    writeFeedbackFileMock.mockResolvedValue({ success: true, relativePath: '.pan/feedback/001-verification-failed.md' });
     messageAgentMock.mockResolvedValue(undefined);
     findProjectByPathMock.mockReturnValue(null); // no project config → DEFAULT_GATES
     existsSyncMock.mockImplementation((p: string) => p.endsWith('/.git'));

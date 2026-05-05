@@ -7,30 +7,35 @@ import { loadSettingsApi, saveSettingsApi, validateSettingsApi, getAvailableMode
 import type { ApiSettingsConfig } from '../../src/lib/settings-api.js';
 
 // Mock the config-yaml module
-vi.mock('../../src/lib/config-yaml.js', () => ({
-  loadConfig: vi.fn(() => ({
-    config: {
-      preset: 'balanced',
-      enabledProviders: new Set(['anthropic', 'openai']),
-      apiKeys: {
-        openai: 'sk-test-123',
+vi.mock('../../src/lib/config-yaml.js', async () => {
+  const actual = await vi.importActual<typeof import('../../src/lib/config-yaml.js')>('../../src/lib/config-yaml.js');
+  return {
+    ...actual,
+    loadConfig: vi.fn(() => ({
+      config: {
+        preset: 'balanced',
+        enabledProviders: new Set(['anthropic', 'openai']),
+        apiKeys: {
+          openai: 'sk-test-123',
+        },
+        overrides: {},
+        geminiThinkingLevel: 3,
+        tmux: {
+          configMode: 'managed',
+        },
+        conversations: {
+          compactionModel: 'claude-haiku-4-5',
+          manualCompactMode: 'claude-code',
+          richCompaction: false,
+        },
+        trackerKeys: {},
       },
-      overrides: {},
-      geminiThinkingLevel: 3,
-      tmux: {
-        configMode: 'managed',
-      },
-      conversations: {
-        compactionModel: 'claude-haiku-4-5',
-        manualCompactMode: 'claude-code',
-        richCompaction: false,
-      },
-      trackerKeys: {},
-    },
-    migration: null,
-  })),
-  getGlobalConfigPath: vi.fn(() => '/test/config.yaml'),
-}));
+      migration: null,
+    })),
+    getGlobalConfigPath: vi.fn(() => '/test/config.yaml'),
+    clearConfigCache: vi.fn(),
+  };
+});
 
 // Mock fs module to prevent actual file writes
 vi.mock('fs', async () => {

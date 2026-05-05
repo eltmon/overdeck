@@ -3,13 +3,22 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs';
+import { mkdtempSync, rmSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
 describe('prd-draft', () => {
   let tempDir: string;
   let originalPanopticonHome: string | undefined;
+
+  async function registerTestProject() {
+    const { registerProject } = await import('../../src/lib/projects.js');
+    registerProject('pan', {
+      name: 'Panopticon Test',
+      path: tempDir,
+      issue_prefix: 'PAN',
+    });
+  }
 
   beforeEach(() => {
     // Create temp directory for isolated tests
@@ -22,8 +31,8 @@ describe('prd-draft', () => {
     // Clear module cache to reload with new env var
     vi.resetModules();
 
-    // Create the drafts directory structure
-    mkdirSync(join(tempDir, 'docs', 'prds', 'drafts'), { recursive: true });
+    // Create a minimal project registry with one project rooted at the temp dir
+    mkdirSync(tempDir, { recursive: true });
   });
 
   afterEach(() => {
@@ -41,6 +50,7 @@ describe('prd-draft', () => {
   describe('getPRDDraftPath', () => {
     it('should return correct path for issue ID', async () => {
       const { getPRDDraftPath } = await import('../../src/lib/prd-draft.js');
+      await registerTestProject();
       const path = getPRDDraftPath('PAN-123');
 
       expect(path).toContain('PAN-123.md');
@@ -49,6 +59,7 @@ describe('prd-draft', () => {
 
     it('should uppercase the issue ID', async () => {
       const { getPRDDraftPath } = await import('../../src/lib/prd-draft.js');
+      await registerTestProject();
       const path = getPRDDraftPath('pan-456');
 
       expect(path).toContain('PAN-456.md');
@@ -58,12 +69,14 @@ describe('prd-draft', () => {
   describe('hasPRDDraft', () => {
     it('should return false when draft does not exist', async () => {
       const { hasPRDDraft } = await import('../../src/lib/prd-draft.js');
+      await registerTestProject();
 
       expect(hasPRDDraft('PAN-NONEXISTENT')).toBe(false);
     });
 
     it('should return true when draft exists', async () => {
       const { hasPRDDraft, writePRDDraft } = await import('../../src/lib/prd-draft.js');
+      await registerTestProject();
 
       writePRDDraft('PAN-123', '# Test PRD');
 
@@ -74,12 +87,14 @@ describe('prd-draft', () => {
   describe('readPRDDraft', () => {
     it('should return null when draft does not exist', async () => {
       const { readPRDDraft } = await import('../../src/lib/prd-draft.js');
+      await registerTestProject();
 
       expect(readPRDDraft('PAN-NONEXISTENT')).toBeNull();
     });
 
     it('should return content when draft exists', async () => {
       const { readPRDDraft, writePRDDraft } = await import('../../src/lib/prd-draft.js');
+      await registerTestProject();
 
       const content = '# Test PRD\n\nThis is a test.';
       writePRDDraft('PAN-123', content);
@@ -91,6 +106,7 @@ describe('prd-draft', () => {
   describe('writePRDDraft', () => {
     it('should create draft file', async () => {
       const { writePRDDraft, hasPRDDraft } = await import('../../src/lib/prd-draft.js');
+      await registerTestProject();
 
       writePRDDraft('PAN-123', '# Test PRD');
 
@@ -99,6 +115,7 @@ describe('prd-draft', () => {
 
     it('should return the file path', async () => {
       const { writePRDDraft } = await import('../../src/lib/prd-draft.js');
+      await registerTestProject();
 
       const path = writePRDDraft('PAN-123', '# Test PRD');
 
@@ -107,6 +124,7 @@ describe('prd-draft', () => {
 
     it('should overwrite existing draft', async () => {
       const { writePRDDraft, readPRDDraft } = await import('../../src/lib/prd-draft.js');
+      await registerTestProject();
 
       writePRDDraft('PAN-123', '# Original');
       writePRDDraft('PAN-123', '# Updated');
@@ -118,12 +136,14 @@ describe('prd-draft', () => {
   describe('listPRDDrafts', () => {
     it('should return empty array when no drafts exist', async () => {
       const { listPRDDrafts } = await import('../../src/lib/prd-draft.js');
+      await registerTestProject();
 
       expect(listPRDDrafts()).toEqual([]);
     });
 
     it('should return list of draft issue IDs', async () => {
       const { listPRDDrafts, writePRDDraft } = await import('../../src/lib/prd-draft.js');
+      await registerTestProject();
 
       writePRDDraft('PAN-123', '# Test 1');
       writePRDDraft('PAN-456', '# Test 2');
@@ -138,12 +158,14 @@ describe('prd-draft', () => {
   describe('deletePRDDraft', () => {
     it('should return false when draft does not exist', async () => {
       const { deletePRDDraft } = await import('../../src/lib/prd-draft.js');
+      await registerTestProject();
 
       expect(deletePRDDraft('PAN-NONEXISTENT')).toBe(false);
     });
 
     it('should delete existing draft and return true', async () => {
       const { deletePRDDraft, writePRDDraft, hasPRDDraft } = await import('../../src/lib/prd-draft.js');
+      await registerTestProject();
 
       writePRDDraft('PAN-123', '# Test PRD');
       const result = deletePRDDraft('PAN-123');
@@ -154,12 +176,12 @@ describe('prd-draft', () => {
 
     it('should move draft to deleted folder', async () => {
       const { deletePRDDraft, writePRDDraft } = await import('../../src/lib/prd-draft.js');
-      const { PRD_DRAFTS_DIR } = await import('../../src/lib/paths.js');
+      await registerTestProject();
 
       writePRDDraft('PAN-123', '# Test PRD');
       deletePRDDraft('PAN-123');
 
-      const deletedDir = join(PRD_DRAFTS_DIR, 'deleted');
+      const deletedDir = join(tempDir, '.pan', 'drafts', 'deleted');
       const files = await import('fs').then(fs => fs.readdirSync(deletedDir));
       expect(files.some(f => f.startsWith('PAN-123-'))).toBe(true);
     });
@@ -168,6 +190,7 @@ describe('prd-draft', () => {
   describe('getPRDDraftInfo', () => {
     it('should return exists false when draft does not exist', async () => {
       const { getPRDDraftInfo } = await import('../../src/lib/prd-draft.js');
+      await registerTestProject();
 
       const info = getPRDDraftInfo('PAN-NONEXISTENT');
 
@@ -179,6 +202,7 @@ describe('prd-draft', () => {
 
     it.skip('should return correct info for existing draft', async () => {
       const { getPRDDraftInfo, writePRDDraft } = await import('../../src/lib/prd-draft.js');
+      await registerTestProject();
 
       const content = '# Test PRD\nSome content here';
       writePRDDraft('PAN-123', content);

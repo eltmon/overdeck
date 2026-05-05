@@ -5,7 +5,7 @@
  *   - The rendered devcontainer is a regenerable build artifact, not user
  *     content.
  *   - It used to be silently destroyed by an automatic `git clean -fd -e
- *     .planning -e .beads` in the restart-from-plan manual fallback. The
+ *     .pan -e .beads` in the restart-from-plan manual fallback. The
  *     api container would keep running on its old image and look healthy,
  *     while Traefik returned 502s because nobody was listening on the
  *     routed port.

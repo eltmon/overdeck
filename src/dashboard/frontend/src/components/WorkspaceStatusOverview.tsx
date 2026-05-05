@@ -120,7 +120,7 @@ export function WorkspaceStatusOverview({
     || hasVerificationState
   );
 
-  const isStandby = agent?.status === 'stopped' && agent?.agentPhase === 'review-response';
+  const isStandby = agent?.status === 'stopped' && agent?.agentPhase === 'review-response' && !!lifecycle?.hasLiveTmuxSession;
   const isRunning = agent && agent.status !== 'dead' && (agent.status !== 'stopped' || isStandby);
   const isLaunching = agentLaunchState === 'starting' || agentLaunchState === 'resuming';
   const launchLabel = agentLaunchState === 'resuming' ? 'Resuming...' : 'Starting...';

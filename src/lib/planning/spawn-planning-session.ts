@@ -30,7 +30,7 @@ import { getAgentRuntimeBaseCommand, getProviderExportsForModel, getProviderEnvF
 import { generateLauncherScript } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { injectProviderEnvOverlay } from '../claude-settings-overlay.js';
-import { appendSessionEntry } from '../vbrief/continue-state.js';
+import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext, writeWorkspaceContinue } from '../pan-dir/index.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
@@ -282,26 +282,25 @@ ${effort === 'high'
 }
 
 /**
- * Write FEATURE-CONTEXT.md for Rally Features so story work agents can
+ * Write workspace `.pan/context.md` for Rally Features so story work agents can
  * reference feature-level context (child stories, description, URL).
  */
-export async function writeFeatureContext(planningDir: string, issue: PlanningIssue): Promise<void> {
+export async function writeFeatureContext(workspacePath: string, issue: PlanningIssue): Promise<void> {
   if (!issue.artifactType?.includes('PortfolioItem')) return;
-  const featureContextPath = join(planningDir, 'FEATURE-CONTEXT.md');
   const childStoriesSection = issue.childStories && issue.childStories.length > 0
     ? issue.childStories.map(s =>
         `### ${s.ref}: ${s.title}\n- **Status:** ${s.status}\n- **Description:** ${s.description || '(none)'}`
       ).join('\n\n')
     : '_No child stories found._';
-  await writeFile(featureContextPath,
+  writeWorkspaceContext(
+    workspacePath,
     `# Feature Context: ${issue.identifier}\n\n` +
-    `**Title:** ${issue.title}\n\n` +
-    `**URL:** ${issue.url}\n\n` +
-    `## Description\n${issue.description || 'No description provided.'}\n\n` +
-    `## Child Stories\n${childStoriesSection}\n\n` +
-    `---\n` +
-    `*This file is auto-generated for story-level workspaces to reference.*\n`,
-    'utf-8',
+      `**Title:** ${issue.title}\n\n` +
+      `**URL:** ${issue.url}\n\n` +
+      `## Description\n${issue.description || 'No description provided.'}\n\n` +
+      `## Child Stories\n${childStoriesSection}\n\n` +
+      `---\n` +
+      `*This file is auto-generated for story-level workspaces to reference.*\n`,
   );
 }
 
@@ -336,7 +335,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     let workspaceCreated = false;
     if (existsSync(workspacePath)) {
       const files = await readdir(workspacePath);
-      workspaceCreated = !files.every((f: string) => f === '.planning');
+      workspaceCreated = !files.every((f: string) => f === '.pan' || f === '.beads');
     }
 
     if (!workspaceCreated) {
@@ -395,31 +394,26 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     progress(1, 'Creating workspace', workspaceCreated ? 'Workspace ready' : 'Already exists', 'complete');
 
     // ── Step 2: Prepare planning environment ──────────────────────────────
-    progress(2, 'Preparing planning environment', '.planning/ directory structure');
+    progress(2, 'Preparing planning environment', '.pan/ workspace artifacts');
 
     // Kill existing planning session if any
     await killSessionAsync(sessionName).catch(() => {});
 
-    // Create planning directory structure
-    const planningDir = join(workspacePath, '.planning');
-    await mkdir(planningDir, { recursive: true });
-    for (const subdir of ['transcripts', 'discussions', 'notes']) {
-      await mkdir(join(planningDir, subdir), { recursive: true });
-    }
+    const workspacePanPaths = ensureWorkspacePanDir(workspacePath);
+    await Promise.all(
+      ['transcripts', 'discussions', 'notes'].map((subdir) =>
+        mkdir(join(workspacePanPaths.panDir, subdir), { recursive: true }),
+      ),
+    );
 
-    // Clear stale artifacts from previous session
-    const issueUpper = issue.identifier.toUpperCase();
-    for (const staleFile of ['.planning-complete', `continue-${issueUpper}.vbrief.json`]) {
-      const stalePath = join(planningDir, staleFile);
-      if (existsSync(stalePath)) {
-        console.log(`[start-planning] Clearing stale ${staleFile}`);
-        await rm(stalePath, { force: true });
-      }
+    if (existsSync(workspacePanPaths.continuePath)) {
+      console.log('[start-planning] Clearing stale .pan/continue.json');
+      await rm(workspacePanPaths.continuePath, { force: true });
     }
 
     // Initialize Shadow Engineering if enabled
     if (shadowMode) {
-      const inferencePath = join(planningDir, 'INFERENCE.md');
+      const inferencePath = join(workspacePanPaths.panDir, 'INFERENCE.md');
       if (!existsSync(inferencePath)) {
         await writeFile(inferencePath,
           `# Inference Document - ${issue.identifier.toUpperCase()}\n\n*This document is maintained by the Shadow Engineering Monitoring Agent.*\n\n## Status\n\nAwaiting initial artifact analysis.\n`,
@@ -452,9 +446,8 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // Discover and copy PRD files to workspace
     const prdFiles = await discoverPrdFiles(workspacePath, issue.identifier);
     if (prdFiles.length > 0) {
-      const prdDestPath = join(planningDir, 'prd.md');
+      const prdDestPath = join(workspacePanPaths.panDir, 'prd.md');
       if (!existsSync(prdDestPath)) {
-        // Copy the first matching PRD (prefer active over planned)
         try {
           const prdContent = await readFile(prdFiles[0].path, 'utf-8');
           await writeFile(prdDestPath, prdContent, 'utf-8');
@@ -472,19 +465,29 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     const planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort);
 
-    // Capture planning prompt in continue file (Layer 2+, primary store).
-    // Uses .planning/ directly since the vBRIEF hasn't been proposed yet.
-    try {
-      appendSessionEntry(planningDir, issue.identifier, {
-        reason: 'planning',
-        content: planningPrompt,
-        note: `Planning session started for ${issue.identifier}: ${issue.title}`,
-      });
-    } catch (err: any) {
-      console.warn(`[start-planning] Could not write planning prompt to continue file: ${err.message}`);
-    }
+    // Capture planning prompt in workspace .pan/continue.json.
+    writeWorkspaceContinue(workspacePath, {
+      version: '1',
+      issueId: issue.identifier,
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+      gitState: {},
+      decisions: [],
+      hazards: [],
+      resumePoint: null,
+      beadsMapping: {},
+      sessionHistory: [
+        {
+          reason: 'planning',
+          content: planningPrompt,
+          note: `Planning session started for ${issue.identifier}: ${issue.title}`,
+          timestamp: new Date().toISOString(),
+        },
+      ],
+      feedback: [],
+    });
 
-    await writeFeatureContext(planningDir, issue);
+    await writeFeatureContext(workspacePath, issue);
 
     const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel);
 
@@ -503,7 +506,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     }
 
     // ── Write launcher script ──────────────────────────────────────────────
-    const continueFilePath = join(planningDir, `continue-${issue.identifier.toUpperCase()}.vbrief.json`);
+    const continueFilePath = getWorkspacePanPaths(workspacePath).continuePath;
     const initMessage = `Please read the \`content\` field of the \`planning\` sessionHistory entry in ${continueFilePath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
     const promptFile = join(agentStateDir, 'init-prompt.txt');
     const launcherScript = join(agentStateDir, 'launcher.sh');

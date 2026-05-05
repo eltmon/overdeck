@@ -75,7 +75,7 @@ You MUST complete 3 review passes. Each pass deepens your analysis. This catches
 
 **A. Read the vBRIEF plan** (primary source of truth):
 
-Check if `.planning/plan.vbrief.json` exists. If it does, read it. This is the structured work plan with items and acceptance criteria.
+Check if `.pan/spec.vbrief.json` exists. If it does, read it. This is the structured work plan with items and acceptance criteria.
 
 For each item in `plan.items`:
 - Note the `title` and `description`
@@ -131,7 +131,7 @@ Append any new findings to your output.
 
 1. **Re-read all ⚠️ (Partial) items** — for each, identify EXACTLY what's missing and whether it's a blocker or a minor gap
 2. **Check for scope creep** — look for changes NOT in the requirements (files changed that seem unrelated, new features beyond what was asked, refactors that weren't specified). Note these but don't block on them.
-3. **Check vBRIEF item status** — if `.planning/plan.vbrief.json` exists:
+3. **Check vBRIEF item status** — if `.pan/spec.vbrief.json` exists:
    - Items with `status: "completed"` should have corresponding code
    - Items with `status: "in_progress"` or `status: "pending"` that are NOT in the diff may indicate unfinished work
    - Flag any item that appears to be work-in-progress with no corresponding code change

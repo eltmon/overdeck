@@ -20,7 +20,7 @@ import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig }
 import type { GitHubConfig, RallyConfig } from './tracker-config.js';
 import { loadReviewStatuses } from '../../../lib/review-status.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
-import { isPlanningComplete } from '../../../lib/vbrief/io.js';
+import { findPlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
 
 /**
  * Map a raw status string to its canonical state.
@@ -116,7 +116,7 @@ function computePlanningState(identifier: string): {
     if (!existsSync(workspacePath)) {
       return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath };
     }
-    const hasPlan = existsSync(join(workspacePath, '.planning', 'plan.vbrief.json'));
+    const hasPlan = findPlan(workspacePath) !== null;
     // planningComplete now means "plan.status indicates planning has finished" —
     // any of proposed/approved/pending/running/completed/blocked. Falls back to
     // the legacy `.planning-complete` marker for vBRIEFs without status fields.

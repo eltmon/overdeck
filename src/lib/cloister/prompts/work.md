@@ -1,6 +1,6 @@
 ---
 name: work
-description: Primary work-agent prompt — reads continue.vbrief.json, processes feedback, drives the bead-by-bead implementation loop until pan done.
+description: Primary work-agent prompt — reads .pan/continue.json, processes feedback, drives the bead-by-bead implementation loop until pan done.
 requires:
   - ISSUE_ID
   - ISSUE_ID_LOWER
@@ -53,18 +53,18 @@ Your job is implementation. Reviews are handled by `pan done` → review special
 {{#LOCAL}}
 Before starting any work, you MUST read these files to understand the full context:
 
-1. **Read `./vbrief/active/continue-{{ISSUE_ID}}.vbrief.json`** - Structured planning context: decisions, hazards, and approach from the planning agent. Replaces the old STATE.md.
+1. **Read `./.pan/continue.json`** - Structured planning context: decisions, hazards, and approach from the planning agent. Replaces the old STATE.md.
 2. **Read `CLAUDE.md`** (in workspace) - Contains workspace-specific instructions and warnings.
 3. **Read `{{PROJECT_ROOT}}/CLAUDE.md`** - Contains project-wide development guidelines.
 4. **Check `feedback[]` in the continue file** — If the continue file has a non-empty `feedback` array, each entry contains inline specialist feedback (review issues, test failures, merge blocks) requiring action. This is the primary feedback source (Layer 1+). The `SPECIALIST FEEDBACK` section below injects these entries for you.
-   For older workspaces, check `.planning/feedback/` for legacy `.md` files not yet migrated to the continue file.
+   Also check `.pan/feedback/` for filesystem feedback entries when present.
 
 These files contain critical context that may have been updated since the last session.
 {{/LOCAL}}
 {{#REMOTE}}
 Your workspace is at /workspace. Check for planning artifacts:
-- /workspace/vbrief/active/continue-{{ISSUE_ID}}.vbrief.json - Structured planning context (decisions, hazards)
-- /workspace/vbrief/active/ - Contains the scope vBRIEF plan
+- /workspace/.pan/continue.json - Structured planning context (decisions, hazards)
+- /workspace/.pan/spec.vbrief.json - Contains the workspace vBRIEF plan
 - /workspace/docs/prds/ - May contain PRD documents
 
 Start by reading the continue file to understand the plan, then begin implementation.
@@ -138,7 +138,7 @@ Read full file when:
 {{#BEADS_TASKS}}
 ## Beads Tasks
 
-Tasks created during planning (check continue.vbrief.json `sessionHistory` for which are complete):
+Tasks created during planning (check .pan/continue.json `sessionHistory` for which are complete):
 
 {{BEADS_TASKS}}
 
@@ -154,7 +154,7 @@ will be rejected.
 2. `bd update <bead-id> --claim` — claim it
 3. Implement ONLY that bead's work
 4. `git add` and `git commit` — one bead = one commit
-5. **Update `.planning/continue-{{ISSUE_ID}}.vbrief.json`** — append a decision or hazard if you learned something new, update `resumePoint` with what the next agent should do (see continue format below)
+5. **Update `.pan/continue.json`** — append a decision or hazard if you learned something new, update `resumePoint` with what the next agent should do (see continue format below)
 6. `bd close <bead-id> --reason="what you did"` — this auto-triggers inspection
 7. **WAIT** for the inspection result (delivered to your session via `pan tell`)
 8. `INSPECTION PASSED` → proceed to step 1
@@ -169,8 +169,8 @@ label filter you will see irrelevant beads from other workspaces.
 - `bd claim <bead-id>` — this command does NOT exist. Use `bd update <bead-id> --claim`
 - `bd start <bead-id>` — this command does NOT exist. Use `bd update <bead-id> --status in_progress`
 
-**Updating planning files does NOT close the bead.** After updating `.planning/continue-{{ISSUE_ID}}.vbrief.json`
-and `plan.vbrief.json`, you MUST still run `bd close <bead-id> --reason="..."`.
+**Updating planning files does NOT close the bead.** After updating `.pan/continue.json`
+and `.pan/spec.vbrief.json`, you MUST still run `bd close <bead-id> --reason="..."`.
 The bead is NOT done until `bd close` succeeds.
 
 **Do NOT implement multiple beads before committing and closing.** Each bead must be
@@ -178,11 +178,11 @@ a separate commit with a separate `bd close`. The inspection fires automatically
 `bd close` — you do not need to call `pan inspect` manually.
 
 **CRITICAL: Update vBRIEF AC statuses as you complete each bead.** The verification gate
-checks `.planning/plan.vbrief.json` subItem statuses. If you close a bead but leave its
+checks `.pan/spec.vbrief.json` subItem statuses. If you close a bead but leave its
 acceptance criteria as `pending` in the plan, verification will FAIL. After closing each
 bead, update the corresponding item and subItem statuses to `completed`:
 ```bash
-node -e "const fs=require('fs'); const p='.planning/plan.vbrief.json'; if(fs.existsSync(p)){const d=JSON.parse(fs.readFileSync(p,'utf-8')); const items=d.plan?.items||d.items||[]; const item=items.find(i=>i.id==='ITEM_ID'); if(item){item.status='completed';(item.subItems||[]).forEach(s=>s.status='completed')}; fs.writeFileSync(p,JSON.stringify(d,null,2))}"
+node -e "const fs=require('fs'); const p='.pan/spec.vbrief.json'; if(fs.existsSync(p)){const d=JSON.parse(fs.readFileSync(p,'utf-8')); const items=d.plan?.items||d.items||[]; const item=items.find(i=>i.id==='ITEM_ID'); if(item){item.status='completed';(item.subItems||[]).forEach(s=>s.status='completed')}; fs.writeFileSync(p,JSON.stringify(d,null,2))}"
 ```
 Replace `ITEM_ID` with the plan item ID that corresponds to the bead you just closed.
 {{/BEADS_TASKS}}
@@ -227,14 +227,14 @@ Do NOT `curl` any `/api/review/...` or `/api/workspaces/.../review` endpoint —
 
 **Before doing ANY work, perform these checks in order:**
 
-0. **Rebase onto latest main** (if continue file or plan.vbrief.json already has progress — this is a restart):
+0. **Rebase onto latest main** (if `.pan/continue.json` or `.pan/spec.vbrief.json` already has progress — this is a restart):
    ```bash
    git fetch origin main && git rebase origin/main
    ```
-   - Clean rebase → continue. Simple conflicts (< 5 files) → resolve and `git rebase --continue`. Complex → `git rebase --abort` and note in continue.vbrief.json `decisions[]`.
+   - Clean rebase → continue. Simple conflicts (< 5 files) → resolve and `git rebase --continue`. Complex → `git rebase --abort` and note in .pan/continue.json `decisions[]`.
    - Skip this step only if no continue file exists yet (fresh start).
-1. Read `.planning/continue-{{ISSUE_ID}}.vbrief.json` and check the `resumePoint` and `sessionHistory`
-2. Check `.planning/feedback/` — if there's unaddressed feedback (review changes requested, test failures), address it FIRST
+1. Read `.pan/continue.json` and check the `resumePoint` and `sessionHistory`
+2. Check `.pan/feedback/` — if there's unaddressed feedback (review changes requested, test failures), address it FIRST
 3. If `resumePoint` says "Implementation complete" or all beads are closed AND no unaddressed feedback → work is DONE
 {{#LOCAL}}
 3. If done, signal completion immediately:
@@ -251,7 +251,7 @@ Do NOT `curl` any `/api/review/...` or `/api/workspaces/.../review` endpoint —
 ## Your Task
 
 1. Read the context files listed above
-2. **FIRST:** Check continue.vbrief.json for completion status (see above)
+2. **FIRST:** Check `.pan/continue.json` for completion status (see above)
 3. If not complete, continue implementing the planned work using the per-bead workflow below
 
 ## MANDATORY: One Bead At A Time
@@ -266,7 +266,7 @@ and your work will be rejected.
 2. `bd update <bead-id> --claim` — claim it
 3. Implement ONLY that bead's work
 4. `git add` and `git commit` — one bead = one commit
-5. **Update `.planning/continue-{{ISSUE_ID}}.vbrief.json`** — this is MANDATORY before closing the bead (see continue format below)
+5. **Update `.pan/continue.json`** — this is MANDATORY before closing the bead (see continue format below)
 6. `bd close <bead-id> --reason="what you did"` — this auto-triggers inspection
 7. **WAIT** for the inspection result (delivered to your session via `pan tell`)
 8. `INSPECTION PASSED` → proceed to step 1
@@ -281,25 +281,25 @@ label filter you will see irrelevant beads from other workspaces.
 - `bd claim <bead-id>` — this command does NOT exist. Use `bd update <bead-id> --claim`
 - `bd start <bead-id>` — this command does NOT exist. Use `bd update <bead-id> --status in_progress`
 
-**Updating planning files does NOT close the bead.** After updating `.planning/continue-{{ISSUE_ID}}.vbrief.json`
-and `plan.vbrief.json`, you MUST still run `bd close <bead-id> --reason="..."`.
+**Updating planning files does NOT close the bead.** After updating `.pan/continue.json`
+and `.pan/spec.vbrief.json`, you MUST still run `bd close <bead-id> --reason="..."`.
 The bead is NOT done until `bd close` succeeds.
 
 **Do NOT implement multiple beads before committing and closing.** Each bead must be
 a separate commit with a separate `bd close`. The inspection fires automatically on
 `bd close` — you do not need to call `pan inspect` manually.
 
-## CRITICAL: Keep continue.vbrief.json Updated — Crash Recovery Insurance
+## CRITICAL: Keep `.pan/continue.json` Updated — Crash Recovery Insurance
 
 **You may be interrupted, crash, or be stopped at any time.** If the system crashes with 50 agents
-running, continue.vbrief.json is the ONLY way to recover without burning expensive tokens re-discovering context.
+running, .pan/continue.json is the ONLY way to recover without burning expensive tokens re-discovering context.
 
-**continue.vbrief.json is updated as step 5 of every bead workflow — before `bd close`.** A hook enforces this:
+**.pan/continue.json is updated as step 5 of every bead workflow — before `bd close`.** A hook enforces this:
 if the continue file hasn't been updated since your last bead close, you'll receive a warning.
 
-### Required continue.vbrief.json Format
+### Required .pan/continue.json Format
 
-Your `.planning/continue-{{ISSUE_ID}}.vbrief.json` MUST be valid JSON with these fields:
+Your `.pan/continue.json` MUST be valid JSON with these fields:
 
 ```json
 {
@@ -327,7 +327,7 @@ Your `.planning/continue-{{ISSUE_ID}}.vbrief.json` MUST be valid JSON with these
 }
 ```
 
-### What Makes a Good continue.vbrief.json Update
+### What Makes a Good .pan/continue.json Update
 - **resumePoint.description**: "Implementing bead panopticon-x8f (add retry logic to webhook handler) — need to add exponential backoff to src/lib/webhook.ts and write tests" — NOT "Working on implementation"
 - **decisions**: Append new decisions as you make them. "Used Effect.retry instead of manual loop because..." — NOT "decided to write code"
 - **hazards**: Add risks you discovered. "Docker network pool exhaustion if tests don't cleanup" — " mitigation: call postMergeLifecycle docker cleanup"
@@ -393,7 +393,11 @@ pan done {{ISSUE_ID}} -c "Brief summary"      # Signal completion — creates Gi
 
 **After `pan done`, you remain on standby.** Your tmux session stays alive and the human can send you UAT tweaks via `pan tell {{ISSUE_ID}} "message"` at any time before merge. You do NOT need to be "resumed" — `pan tell` auto-wakes you. If review fails, feedback is delivered the same way.
 
-**If you make commits AFTER review already passed:** the review is automatically invalidated — the pipeline detects new commits and resets review to pending. Re-run `pan done` ONLY if you made NEW commits after receiving APPROVED feedback.\n\n**If the latest feedback says "CODE APPROVED — YOUR WORK IS COMPLETE": STOP.** Do NOT make further changes. Do NOT run `pan done` again. The pipeline handles testing and merge automatically.\n\n**If you see archived feedback files in `.planning/feedback/archive/`:** Ignore them. They are from previous review cycles. Only read the **non-archived** files in `.planning/feedback/`.
+**If you make commits AFTER review already passed:** the review is automatically invalidated — the pipeline detects new commits and resets review to pending. Re-run `pan done` ONLY if you made NEW commits after receiving APPROVED feedback.
+
+**If the latest feedback says "CODE APPROVED — YOUR WORK IS COMPLETE": STOP.** Do NOT make further changes. Do NOT run `pan done` again. The pipeline handles testing and merge automatically.
+
+**If you see feedback files in `.pan/feedback/`:** read and address them before resubmitting. Ignore obsolete legacy feedback leftovers if any remain in older workspaces.
 
 **WARNING:** Do NOT use `pan approve` — that is a supervisor-only command for humans. Agents MUST use `pan done` to signal completion.
 {{/LOCAL}}
@@ -402,7 +406,7 @@ When ALL tasks are complete, commit and push everything:
 ```bash
 npm test
 # Mark all vBRIEF acceptance criteria as completed (verification gate checks these)
-node -e "const fs=require('fs'); const p='.planning/plan.vbrief.json'; if(fs.existsSync(p)){const d=JSON.parse(fs.readFileSync(p,'utf-8')); const items=d.plan?.items||d.items||[]; items.forEach(i=>{i.status='completed';(i.subItems||[]).forEach(s=>s.status='completed')}); fs.writeFileSync(p,JSON.stringify(d,null,2))}"
+node -e "const fs=require('fs'); const p='.pan/spec.vbrief.json'; if(fs.existsSync(p)){const d=JSON.parse(fs.readFileSync(p,'utf-8')); const items=d.plan?.items||d.items||[]; items.forEach(i=>{i.status='completed';(i.subItems||[]).forEach(s=>s.status='completed')}); fs.writeFileSync(p,JSON.stringify(d,null,2))}"
 git add -A && git commit -m "feat: description"
 git push -u origin $(git branch --show-current)
 git status

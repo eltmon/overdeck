@@ -136,7 +136,7 @@ function getParentCmd(pid: number): string {
 }
 
 function detectRole(parentCmd: string, cwd: string): string {
-  if (parentCmd.includes('planning') || cwd.includes('.planning')) return 'planning';
+  if (parentCmd.includes('planning') || /\/\.(planning|pan)(\/|$)/.test(cwd)) return 'planning';
   if (parentCmd.includes('synthesis')) return 'review-synthesis';
   if (parentCmd.includes('review')) {
     const reviewType = parentCmd.match(/review-[^/]*\/([\w-]+)-claude/)?.[1];

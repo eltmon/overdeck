@@ -487,7 +487,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   // premature 'complete' transitions due to stale cache, Docker network disruption
   // (PAN-207), and PTY disconnect race conditions. The ONLY paths to 'complete' are:
   // 1. User clicks "Done" button → stopPlanningMutation.onSuccess
-  // 2. Initial check finds .planning-complete marker → step set in checking effect
+  // 2. Initial check finds completed planning state → step set in checking effect
 
   const handleStartPlanning = () => {
     startPlanningViaSSE();
@@ -1033,7 +1033,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                         <Square className="w-4 h-4" />
                         Stop
                       </button>
-                      {/* Done appears only when the planning agent has written .planning/.planning-complete via `pan plan finalize`. Tmux liveness is not consulted — Stop kills the session, Done finalizes the plan. */}
+                      {/* Done appears only when the workspace plan reports completed planning state. Tmux liveness is not consulted — Stop kills the session, Done finalizes the plan. */}
                       {(statusQuery.data && statusQuery.data.hasCompletionMarker) && (
                         <button
                           onClick={() => {

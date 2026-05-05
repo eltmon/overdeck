@@ -2,7 +2,7 @@
  * Lifecycle — Composable, idempotent post-merge operations.
  *
  * Atomic operations:
- *   archive-planning  — PRD active→completed + .planning/ preservation
+ *   archive-planning  — PRD active→completed + workspace .pan/ preservation
  *   close-issue       — IssueTracker transition + label management
  *   teardown-workspace — Full workspace cleanup (agent, worktree, Docker, tmux)
  *   compact-beads     — Beads compaction + git commit/push

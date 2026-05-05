@@ -18,15 +18,11 @@
  * Workspace state that must survive a restart-from-plan or similar op.
  *
  * If this list is incomplete, an automatic restart can destroy the agent's
- * planning artifacts, beads, and (post-PAN-946) the scope vBRIEF continuation
- * checkpoint.
+ * planning artifacts, beads, and the workspace-local orchestration state.
  */
 export const RESTART_PRESERVE = [
-  '.planning',
+  '.pan',
   '.beads',
-  // PAN-946: when scope vBRIEFs land, `vbrief/` lives in the project repo
-  // (not the workspace) so it does not appear here. The continuation checkpoint
-  // lives at .planning/continue.vbrief.json which is already covered by .planning.
 ] as const;
 
 /**

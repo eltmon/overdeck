@@ -12,7 +12,7 @@ beforeEach(() => {
   TEST_DIR = join(tmpdir(), `pan-419-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   WORKSPACE_DIR = join(TEST_DIR, 'workspaces', 'feature-pan-412');
   PROJECT_ROOT = TEST_DIR;
-  mkdirSync(join(WORKSPACE_DIR, '.planning'), { recursive: true });
+  mkdirSync(join(WORKSPACE_DIR, '.pan'), { recursive: true });
   mkdirSync(join(PROJECT_ROOT, '.beads'), { recursive: true });
 });
 

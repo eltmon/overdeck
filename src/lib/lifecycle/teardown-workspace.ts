@@ -10,7 +10,7 @@
  * In Phase 2, removeWorkspace() will delegate to this module for the common steps.
  */
 
-import { existsSync, rmSync, unlinkSync } from 'fs';
+import { existsSync, rmSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { join, basename, dirname } from 'path';
 import { homedir } from 'os';
@@ -399,20 +399,6 @@ async function clearLegacyPlanningDir(
 }
 
 /**
- * Clear .planning/.planning-complete marker from workspace.
- * Only runs if workspace still exists (before worktree removal).
- */
-async function clearPlanningMarker(workspacePath: string): Promise<StepResult> {
-  const step = 'teardown:planning-marker';
-  const markerPath = join(workspacePath, '.planning', '.planning-complete');
-  if (existsSync(markerPath)) {
-    unlinkSync(markerPath);
-    return stepOk(step, ['Cleared .planning-complete marker']);
-  }
-  return stepSkipped(step, ['No .planning-complete marker found']);
-}
-
-/**
  * Build template placeholders for project-specific cleanup (tunnel, Hume).
  */
 function buildPlaceholders(
@@ -479,12 +465,11 @@ async function removeHumeEviConfig(
  *   3. Clear legacy planning directory
  *   4. Stop TLDR daemon (if workspace exists)
  *   5. Stop Docker containers (if workspace exists)
- *   6. Clear planning marker (if workspace exists, before deletion)
- *   7. Remove tunnel config (if workspace config provided)
- *   8. Remove Hume config (if workspace config provided)
- *   9. Remove git worktree + workspace directory
- *  10. Remove agent state directories
- *  11. (Optional) Delete feature branches
+ *   6. Remove tunnel config (if workspace config provided)
+ *   7. Remove Hume config (if workspace config provided)
+ *   8. Remove git worktree + workspace directory
+ *   9. Remove agent state directories
+ *  10. (Optional) Delete feature branches
  */
 export async function teardownWorkspace(
   ctx: LifecycleContext,
@@ -522,10 +507,7 @@ export async function teardownWorkspace(
       results.push(await killOrphanedProcesses(workspacePath));
     }
 
-    // 6. Clear planning marker (before workspace deletion, or when preserving workspace)
-    results.push(await clearPlanningMarker(workspacePath));
-
-    // 6b. Beads lifecycle: sync or clear depending on context (PAN-412)
+    // 6. Beads lifecycle: sync or clear depending on context (PAN-412)
     // Normal completion (approve/closeOut): sync beads to project root to preserve history.
     // Destructive wipe: clear beads so the user starts fresh.
     if (opts.clearBeads) {

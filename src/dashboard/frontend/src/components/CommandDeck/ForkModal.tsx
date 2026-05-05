@@ -127,9 +127,6 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
     setSummaryModel(compactionModel);
   }, [compactionModel]);
 
-  useEffect(() => {
-    setForkTitle(plainFork ? `Fork: ${convTitle}` : `Summary Fork: ${convTitle}`);
-  }, [plainFork, convTitle]);
 
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -192,11 +189,11 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
 
           <div className={styles.forkFields}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
-              <label htmlFor="fork-title" style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>
+              <label htmlFor="fork-title-input" style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>
                 Fork name
               </label>
               <input
-                id="fork-title"
+                id="fork-title-input"
                 type="text"
                 value={forkTitle}
                 onChange={(e) => setForkTitle(e.target.value)}

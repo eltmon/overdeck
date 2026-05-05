@@ -5,6 +5,7 @@ import {
   ensureDefaultConversationModel,
   FALLBACK_DEFAULT_CONVERSATION_MODEL,
 } from '../../chat/defaultConversationModel';
+import { CostWarningBadge, costWarningLevel } from '../costWarning';
 import styles from './ModelPicker.module.css';
 
 export const FALLBACK_COMPACTION_MODEL = 'claude-haiku-4-5-20251001';
@@ -14,6 +15,8 @@ export interface PickerModel {
   label: string;
   provider: string;
   costDisplay?: string;
+  /** Raw cost in $/1M tokens — preserved so we can flag expensive models. */
+  costPer1MTokens?: number;
 }
 
 export interface ModelGroup {
@@ -37,9 +40,9 @@ export const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'anthropic',
     label: 'Anthropic',
     models: [
-      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'anthropic', costDisplay: '$15/1M' },
-      { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'anthropic', costDisplay: '$45/1M' },
-      { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', provider: 'anthropic', costDisplay: '$1/1M' },
+      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15 },
+      { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45 },
+      { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', provider: 'anthropic', costDisplay: '$1/1M', costPer1MTokens: 1 },
     ],
   },
 ];
@@ -90,6 +93,7 @@ export function useAvailableModels(): { groups: ModelGroup[]; compactionModel: s
               label: m.name,
               provider: prov,
               costDisplay: formatCost(m.costPer1MTokens),
+              costPer1MTokens: m.costPer1MTokens,
             })),
           });
         }
@@ -105,6 +109,7 @@ export function useAvailableModels(): { groups: ModelGroup[]; compactionModel: s
               label: m.name,
               provider: 'openrouter',
               costDisplay: formatCost(m.promptCostPer1M),
+              costPer1MTokens: m.promptCostPer1M,
             })),
           });
         }
@@ -156,6 +161,12 @@ export function ModelSelect({
           onClick={() => setOpen((o) => !o)}
         >
           <span className={styles.pickerValue}>{selected?.label ?? value}</span>
+          {(() => {
+            const lvl = costWarningLevel(selected?.costPer1MTokens);
+            return lvl
+              ? <CostWarningBadge level={lvl} compact costPer1MTokens={selected?.costPer1MTokens} />
+              : null;
+          })()}
           {selected?.costDisplay && (
             <span className={styles.pickerCost}>{selected.costDisplay}</span>
           )}
@@ -168,19 +179,23 @@ export function ModelSelect({
                 {groups.length > 1 && (
                   <div className={styles.pickerGroupHeader}>{group.label}</div>
                 )}
-                {group.models.map((model) => (
-                  <button
-                    key={model.id}
-                    type="button"
-                    className={`${styles.pickerOption} ${model.id === value ? styles.pickerOptionActive : ''}`}
-                    onClick={() => { onChange(model.id); setOpen(false); }}
-                  >
-                    <span className={styles.pickerOptionLabel}>{model.label}</span>
-                    {model.costDisplay && (
-                      <span className={styles.pickerOptionCost}>{model.costDisplay}</span>
-                    )}
-                  </button>
-                ))}
+                {group.models.map((model) => {
+                  const lvl = costWarningLevel(model.costPer1MTokens);
+                  return (
+                    <button
+                      key={model.id}
+                      type="button"
+                      className={`${styles.pickerOption} ${model.id === value ? styles.pickerOptionActive : ''}`}
+                      onClick={() => { onChange(model.id); setOpen(false); }}
+                    >
+                      <span className={styles.pickerOptionLabel}>{model.label}</span>
+                      {lvl && <CostWarningBadge level={lvl} compact costPer1MTokens={model.costPer1MTokens} />}
+                      {model.costDisplay && (
+                        <span className={styles.pickerOptionCost}>{model.costDisplay}</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             ))}
           </div>

@@ -41,7 +41,7 @@ describe('buildRichPRBody', () => {
   });
 
   it('includes AC checklist from vBRIEF plan items', async () => {
-    await mkdir(join(workspacePath, '.planning'), { recursive: true });
+    await mkdir(join(workspacePath, '.pan'), { recursive: true });
     const plan = {
       vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
       plan: {
@@ -55,7 +55,7 @@ describe('buildRichPRBody', () => {
         edges: [],
       },
     };
-    await writeFile(join(workspacePath, '.planning', 'plan.vbrief.json'), JSON.stringify(plan));
+    await writeFile(join(workspacePath, '.pan', 'spec.vbrief.json'), JSON.stringify(plan));
 
     const body = await buildRichPRBody('PAN-42', workspacePath);
     expect(body).toContain('## Acceptance Criteria');
@@ -77,7 +77,7 @@ describe('buildRichPRBody', () => {
   });
 
   it('includes both AC checklist and beads when both exist', async () => {
-    await mkdir(join(workspacePath, '.planning'), { recursive: true });
+    await mkdir(join(workspacePath, '.pan'), { recursive: true });
 
     const plan = {
       vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
@@ -87,7 +87,7 @@ describe('buildRichPRBody', () => {
         edges: [],
       },
     };
-    await writeFile(join(workspacePath, '.planning', 'plan.vbrief.json'), JSON.stringify(plan));
+    await writeFile(join(workspacePath, '.pan', 'spec.vbrief.json'), JSON.stringify(plan));
 
     const bead = { id: 'b1', title: 'pan-5: Task one', status: 'closed', labels: ['pan-5'] };
     vi.mocked(queryBeadsForIssue).mockResolvedValue([bead]);
@@ -100,8 +100,8 @@ describe('buildRichPRBody', () => {
   });
 
   it('handles malformed plan JSON gracefully (omits AC section, keeps issue ref)', async () => {
-    await mkdir(join(workspacePath, '.planning'), { recursive: true });
-    await writeFile(join(workspacePath, '.planning', 'plan.vbrief.json'), '{invalid json}');
+    await mkdir(join(workspacePath, '.pan'), { recursive: true });
+    await writeFile(join(workspacePath, '.pan', 'spec.vbrief.json'), '{invalid json}');
 
     const body = await buildRichPRBody('PAN-42', workspacePath);
     expect(body).toContain('Closes #42');

@@ -1,16 +1,9 @@
 /**
  * vBRIEF Index — async, cached issue→vBRIEF lookups for server hot paths.
  *
- * Routes like `/api/issues`, `/api/workspaces/:id/plan`, and
- * `/api/planning/:id/status` previously called `findVBriefByIssue` synchronously
- * on every request, scanning all four lifecycle directories under
- * `<projectRoot>/vbrief/` with `readdirSync`. Each scan blocks the Node event
- * loop, freezing terminal streaming and other concurrent requests.
- *
- * This module exposes async filesystem APIs and a per-project cache so route
- * handlers and `IssueDataService` can resolve vBRIEFs in O(1) for the
- * common case. Mutations elsewhere (lifecycle moves, promotions, deletes)
- * invalidate the cache via `invalidateVBriefIndex`.
+ * PAN-967 Phase 2 makes `.pan/specs/` the canonical spec store. During the
+ * migration window, legacy `vbrief/<lifecycle>/` directories remain as fallback
+ * reads when no `.pan/specs` entry exists for an issue.
  */
 import { readdir, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
@@ -24,47 +17,78 @@ import {
 } from './lifecycle.js';
 import type { VBriefDocument } from './types.js';
 import { VBriefMergeConflictError } from './io.js';
+import { PAN_DIRNAME, PAN_SPECS_DIRNAME, isPanSpecStatus } from '../pan-dir/types.js';
 
-/** TTL (ms) for cached lifecycle directory listings. */
 const CACHE_TTL_MS = 5_000;
 
-/** Single entry in the per-project lifecycle index. */
 interface IndexEntry {
-  /** Absolute path to the vBRIEF file. */
   path: string;
-  /** Lifecycle directory the vBRIEF is in. */
   lifecycleDir: VBriefLifecycleDir;
-  /** Issue ID (uppercased — matches filename). */
   issueId: string;
-  /** Slug from filename. */
   slug: string;
-  /** YYYY-MM-DD date prefix from filename. */
   date: string;
-  /** Filename only (without directory). */
   filename: string;
 }
 
 interface ProjectIndex {
-  /** issueId (UPPERCASE) → entry */
   byIssue: Map<string, IndexEntry>;
-  /** All entries (for list operations). */
   entries: IndexEntry[];
-  /** Wall-clock ms when this snapshot was built. */
   builtAt: number;
 }
 
 const projectIndexCache = new Map<string, ProjectIndex>();
 
-/**
- * Build (or rebuild) the per-project index by scanning all four lifecycle
- * directories asynchronously. Discovery priority across lifecycle dirs follows
- * `VBRIEF_LIFECYCLE_DIRS` order (proposed → active → completed → cancelled);
- * the first match for a given issue wins, matching the synchronous
- * `findVBriefByIssue` semantics.
- */
+async function scanPanSpecs(projectRoot: string): Promise<IndexEntry[]> {
+  const specsDir = join(projectRoot, PAN_DIRNAME, PAN_SPECS_DIRNAME);
+  if (!existsSync(specsDir)) return [];
+
+  let names: string[];
+  try {
+    names = await readdir(specsDir);
+  } catch {
+    return [];
+  }
+
+  const entries = await Promise.all(names.map(async (name) => {
+    const parts = parseVBriefFilename(name);
+    if (!parts) return null;
+
+    const path = join(specsDir, name);
+    try {
+      const raw = await readFile(path, 'utf-8');
+      if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
+        return null;
+      }
+      const parsed = JSON.parse(raw) as { status?: unknown };
+      if (!isPanSpecStatus(parsed.status)) {
+        return null;
+      }
+      return {
+        path,
+        lifecycleDir: parsed.status,
+        issueId: parts.issueId,
+        slug: parts.slug,
+        date: parts.date,
+        filename: name,
+      } satisfies IndexEntry;
+    } catch {
+      return null;
+    }
+  }));
+
+  return entries.filter((entry): entry is IndexEntry => entry !== null);
+}
+
 async function buildProjectIndex(projectRoot: string): Promise<ProjectIndex> {
   const byIssue = new Map<string, IndexEntry>();
   const entries: IndexEntry[] = [];
+
+  for (const entry of await scanPanSpecs(projectRoot)) {
+    entries.push(entry);
+    if (!byIssue.has(entry.issueId)) {
+      byIssue.set(entry.issueId, entry);
+    }
+  }
 
   for (const lifecycleDir of VBRIEF_LIFECYCLE_DIRS) {
     const dirPath = resolveVBriefDir(projectRoot, lifecycleDir);
@@ -77,7 +101,7 @@ async function buildProjectIndex(projectRoot: string): Promise<ProjectIndex> {
     }
     for (const name of names) {
       const parts = parseVBriefFilename(name);
-      if (!parts) continue;
+      if (!parts || byIssue.has(parts.issueId)) continue;
       const entry: IndexEntry = {
         path: join(dirPath, name),
         lifecycleDir,
@@ -87,10 +111,7 @@ async function buildProjectIndex(projectRoot: string): Promise<ProjectIndex> {
         filename: name,
       };
       entries.push(entry);
-      // First match wins, mirroring sync findVBriefByIssue priority order.
-      if (!byIssue.has(parts.issueId)) {
-        byIssue.set(parts.issueId, entry);
-      }
+      byIssue.set(parts.issueId, entry);
     }
   }
 
@@ -107,21 +128,14 @@ async function getOrBuildIndex(projectRoot: string): Promise<ProjectIndex> {
   return fresh;
 }
 
-/**
- * Manually invalidate the cached index for a project. Call this after any
- * mutation that changes which lifecycle dir holds an issue's vBRIEF (move,
- * promote, delete, transition).
- */
 export function invalidateVBriefIndex(projectRoot: string): void {
   projectIndexCache.delete(projectRoot);
 }
 
-/** Drop all cached indices. Useful for tests. */
 export function resetVBriefIndex(): void {
   projectIndexCache.clear();
 }
 
-/** Async result of a vBRIEF lookup. The document is loaded lazily on demand. */
 export interface FoundVBriefAsync {
   path: string;
   lifecycleDir: VBriefLifecycleDir;
@@ -131,14 +145,6 @@ export interface FoundVBriefAsync {
   filename: string;
 }
 
-/**
- * Async, cached version of `findVBriefByIssue`. Returns the vBRIEF location
- * for an issue, scanning lifecycle directories in priority order. Does NOT
- * read the document body — call {@link readVBriefDocumentAsync} separately if
- * you need the parsed plan (most callers only want the path/lifecycleDir).
- *
- * Returns null if no vBRIEF exists for the issue.
- */
 export async function findVBriefByIssueAsync(
   projectRoot: string,
   issueId: string,
@@ -148,20 +154,11 @@ export async function findVBriefByIssueAsync(
   return index.byIssue.get(upper) ?? null;
 }
 
-/**
- * Async list of all vBRIEFs in the project across lifecycle directories.
- * Returns location info only — caller reads documents on demand.
- */
 export async function listVBriefsAsync(projectRoot: string): Promise<FoundVBriefAsync[]> {
   const index = await getOrBuildIndex(projectRoot);
-  // Return a copy to keep the cache immutable from the caller's perspective.
   return [...index.entries];
 }
 
-/**
- * Read and parse a vBRIEF JSON file asynchronously. Surfaces merge-conflict
- * markers as a `VBriefMergeConflictError` for parity with the sync `readPlan`.
- */
 export async function readVBriefDocumentAsync(path: string): Promise<VBriefDocument> {
   const raw = await readFile(path, 'utf-8');
   if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {

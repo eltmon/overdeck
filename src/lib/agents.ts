@@ -1514,7 +1514,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     saveAgentState(agentState);
 
     const ready = await waitForReadySignal(normalizedId, 30);
-    const resumePrompt = `You are resuming work on ${agentState.issueId}. Check .planning/feedback/ for specialist feedback that arrived while you were stopped, then continue working.\n\n${message}`;
+    const resumePrompt = `You are resuming work on ${agentState.issueId}. Check .pan/feedback/ for specialist feedback that arrived while you were stopped, then continue working.\n\n${message}`;
     if (ready) {
       await sendKeysAsync(normalizedId, resumePrompt);
       console.log(`[agents] Fallback-restarted ${normalizedId} and delivered feedback`);

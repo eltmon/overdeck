@@ -117,7 +117,7 @@ You MUST complete 3 review passes. Each pass deepens your analysis. This catches
 1. Pick the 3 most complex changed files and **re-read them line by line**
 2. Focus specifically on: error handling paths, boundary conditions, missing switch/if branches, async error propagation, type narrowing gaps
 3. Check completeness:
-   - If `.planning/plan.vbrief.json` exists, read the `items` array and check each AC against the diff
+   - If `.pan/spec.vbrief.json` exists, read the `items` array and check each AC against the diff
    - If `.beads/issues.jsonl` exists, scan closed beads and verify their described changes are present
    - If a pattern is applied in some files, Grep for similar files that may be missing it
 4. Append any remaining findings to your output
@@ -183,7 +183,7 @@ Best practices and code quality improvements.
 
 ### 6. Consistency and Completeness
 - **Inconsistent pattern application** — if a pattern (e.g., a wrapper function, decorator, middleware) is applied to some files in a directory but not others that logically need it, flag the missing ones. Example: `httpHandler()` wrapping applied to 9/13 route files but missing from 4.
-- **Acceptance criteria coverage** — if a `.planning/` directory exists in the workspace, check `plan.vbrief.json` for acceptance criteria. Verify each AC is addressed by the changed files. Flag any AC that appears unimplemented.
+- **Acceptance criteria coverage** — if a `.pan/spec.vbrief.json` file exists in the workspace, check it for acceptance criteria. Verify each AC is addressed by the changed files. Flag any AC that appears unimplemented.
 - **Bead task coverage** — if `.beads/issues.jsonl` exists, check whether the closed beads' descriptions reference files that were actually modified. Flag beads that claim to change a file but show no diff for it.
 - **Partial implementations** — if a refactor touches most but not all callers/implementations, flag the missed ones. Use Grep to find all usages of the old pattern.
 

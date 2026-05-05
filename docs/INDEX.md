@@ -22,6 +22,7 @@
 |----------|-------------|
 | [AGENTS.md](./AGENTS.md) | Agent directory structure, naming patterns, standard contents, and cleanup |
 | [Architecture Diagram](./diagrams/panopticon-architecture.png) | Visual overview of Panopticon system architecture (UI → Core → Agents → Infrastructure → Pipeline)
+| [Specialist Pipeline Diagram](./diagrams/panopticon-specialist-pipeline.png) | Visual overview of the work-agent → verification gate → specialist handoff flow |
 | [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md) | Newcomer-friendly map of Panopticon agent roles, categories, and where they appear in the workflow |
 | [SPECIALIST_WORKFLOW.md](./SPECIALIST_WORKFLOW.md) | Deeper workflow guide for how the work agent and specialist agents interact |
 | [REVIEW-AGENT-ARCHITECTURE.md](./REVIEW-AGENT-ARCHITECTURE.md) | End-to-end code review architecture: work-agent-as-orchestrator, dashboard-as-view, `pan review run` CLI, prompt primitives, synthesis as the judgment layer |

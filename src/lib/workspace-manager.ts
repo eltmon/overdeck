@@ -20,6 +20,13 @@ import { addDnsEntry, removeDnsEntry, syncDnsToWindows } from './dns.js';
 import { addTunnelIngress, removeTunnelIngress } from './tunnel.js';
 import { createHumeConfig, deleteHumeConfig } from './hume.js';
 import { mergeSkillsIntoWorkspace, mergePanSkillsIntoWorkspace } from './skills-merge.js';
+import {
+  PAN_CONTEXT_FILENAME,
+  PAN_CONTINUE_FILENAME,
+  PAN_DIRNAME,
+  PAN_FEEDBACK_DIRNAME,
+  PAN_SESSIONS_FILENAME,
+} from './pan-dir/index.js';
 
 const execAsync = promisify(exec);
 
@@ -622,22 +629,33 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   progress('Creating git worktree', 'Worktree ready', 'complete');
 
-  // Remove stale .planning/ directory inherited from main branch.
-  // This contains continue files and other planning artifacts from a PREVIOUS issue.
-  // If left in place, the new agent reads it and works on the wrong issue.
+  // Clear stale workspace-local runtime state inherited from main.
+  // Keep canonical plan state (.pan/spec.vbrief.json); clear only mutable
+  // per-workspace artifacts that would belong to a previous issue/session.
   // SAFETY: resolve() to absolute path and verify it's under a known workspace prefix
   // to prevent path traversal from ever reaching rmSync.
   const resolvedWorkspace = resolve(workspacePath);
-  const resolvedPlanning = resolve(resolvedWorkspace, '.planning');
+  const resolvedPanDir = resolve(resolvedWorkspace, PAN_DIRNAME);
   const isUnderWorkspacesDir = resolvedWorkspace.match(/\/workspaces\/feature-[a-z0-9-]+$/);
-  if (
-    isUnderWorkspacesDir &&
-    resolvedPlanning === join(resolvedWorkspace, '.planning') &&
-    existsSync(join(resolvedWorkspace, '.git')) &&
-    existsSync(resolvedPlanning)
-  ) {
-    rmSync(resolvedPlanning, { recursive: true, force: true });
-    result.steps.push('Removed stale .planning/ directory from previous issue');
+  if (isUnderWorkspacesDir && existsSync(join(resolvedWorkspace, '.git'))) {
+    if (resolvedPanDir === join(resolvedWorkspace, PAN_DIRNAME) && existsSync(resolvedPanDir)) {
+      for (const filePath of [
+        join(resolvedPanDir, PAN_CONTINUE_FILENAME),
+        join(resolvedPanDir, PAN_SESSIONS_FILENAME),
+        join(resolvedPanDir, PAN_CONTEXT_FILENAME),
+      ]) {
+        if (existsSync(filePath)) {
+          unlinkSync(filePath);
+        }
+      }
+
+      const feedbackDir = join(resolvedPanDir, PAN_FEEDBACK_DIRNAME);
+      if (existsSync(feedbackDir)) {
+        rmSync(feedbackDir, { recursive: true, force: true });
+      }
+    }
+
+    result.steps.push('Cleared stale workspace-local .pan runtime state');
   }
 
   // Ensure .pan/events/, .pan/review/, .pan/prompts/ are in the project's .gitignore

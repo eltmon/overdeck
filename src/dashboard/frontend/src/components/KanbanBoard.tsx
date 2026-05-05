@@ -2684,7 +2684,7 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
 
   // Determine which agent is relevant based on issue status
   const activeAgent = workAgent;
-  const isStandby = activeAgent?.status === 'stopped' && activeAgent?.agentPhase === 'review-response';
+  const isStandby = activeAgent?.status === 'stopped' && activeAgent?.agentPhase === 'review-response' && !!activeAgent?.lifecycle?.hasLiveTmuxSession;
   const isRunning = activeAgent && activeAgent.status !== 'dead' && (activeAgent.status !== 'stopped' || isStandby);
   // Show "Watch Planning" when planning agent is starting or has a live session
   const isPlanningActive = planningAgent != null && (planningAgent.status === 'starting' || planningAgent.status === 'running' || planningAgent.status === 'healthy' || planningAgent.status === 'warning' || planningAgent.status === 'stuck');

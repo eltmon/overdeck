@@ -1,12 +1,12 @@
 /**
- * archive-planning — PRD active→completed + .planning/ preservation.
+ * archive-planning — PRD active→completed + workspace .pan/ preservation.
  *
  * Consolidates PRD moving from close-out.ts, merge-agent.ts, and the
  * approve endpoint into a single idempotent operation.
  *
  * Steps:
  *   1. Move PRD from docs/prds/active/ → docs/prds/completed/ (git mv, fallback to copy)
- *   2. Archive workspace .planning/ artifacts to ~/.panopticon/archives/<issue>/
+ *   2. Archive workspace .pan/ artifacts to ~/.panopticon/archives/<issue>/
  *   3. Rotate previous archives to prevent overwrite
  */
 
@@ -22,6 +22,14 @@ import {
   PROJECT_PRDS_ACTIVE_SUBDIR,
   PROJECT_PRDS_COMPLETED_SUBDIR,
 } from '../paths.js';
+import {
+  PAN_CONTINUE_FILENAME,
+  PAN_CONTEXT_FILENAME,
+  PAN_DIRNAME,
+  PAN_FEEDBACK_DIRNAME,
+  PAN_SESSIONS_FILENAME,
+  PAN_SPEC_FILENAME,
+} from '../pan-dir/index.js';
 import { findPrdAtStatus, canonicalPrdSubdir } from '../prd-locations.js';
 import type { LifecycleContext, StepResult, ArchiveOptions } from './types.js';
 import { stepOk, stepSkipped, stepFailed } from './types.js';
@@ -138,7 +146,7 @@ export async function movePrd(
 }
 
 /**
- * Archive workspace .planning/ artifacts to ~/.panopticon/archives/<issue>/.
+ * Archive workspace .pan/ artifacts to ~/.panopticon/archives/<issue>/.
  * Rotates previous archives to prevent overwrite.
  * Returns a hard failure if archiving fails — callers must NOT proceed with
  * workspace deletion after an archive failure.
@@ -172,44 +180,48 @@ export async function archiveWorkspaceArtifacts(
     await mkdir(archiveDir, { recursive: true });
     const details: string[] = [];
 
-    // Archive .planning/feedback/
-    const feedbackDir = join(workspacePath, '.planning', 'feedback');
+    const panDir = join(workspacePath, PAN_DIRNAME)
+
+    const feedbackDir = join(panDir, PAN_FEEDBACK_DIRNAME)
     if (existsSync(feedbackDir)) {
-      await cp(feedbackDir, join(archiveDir, 'feedback'), { recursive: true });
-      details.push('Archived feedback/');
+      await cp(feedbackDir, join(archiveDir, 'feedback'), { recursive: true })
+      details.push('Archived feedback/')
     }
 
-    // Archive continue file (replaces STATE.md)
-    const issueUpper = ctx.issueId.toUpperCase();
-    const continueFile = join(workspacePath, '.planning', `continue-${issueUpper}.vbrief.json`);
+    const continueFile = join(panDir, PAN_CONTINUE_FILENAME)
     if (existsSync(continueFile)) {
-      await cp(continueFile, join(archiveDir, `continue-${issueUpper}.vbrief.json`));
-      details.push('Archived continue.vbrief.json');
+      await cp(continueFile, join(archiveDir, PAN_CONTINUE_FILENAME))
+      details.push(`Archived ${PAN_CONTINUE_FILENAME}`)
     }
 
-    // Archive plan.vbrief.json — the canonical structured plan. Moved to
-    // docs/prds/completed/ above, but the workspace copy may have agent-driven
-    // updates (sequence, completion timestamps) not yet copied to docs/. Preserve
-    // both so the archive reflects the true final state of the workspace.
-    const vbriefJson = join(workspacePath, '.planning', 'plan.vbrief.json');
-    if (existsSync(vbriefJson)) {
-      await cp(vbriefJson, join(archiveDir, 'plan.vbrief.json'));
-      details.push('Archived plan.vbrief.json');
+    const specFile = join(panDir, PAN_SPEC_FILENAME)
+    if (existsSync(specFile)) {
+      await cp(specFile, join(archiveDir, PAN_SPEC_FILENAME))
+      details.push(`Archived ${PAN_SPEC_FILENAME}`)
     }
 
-    // Archive beads/
-    const beadsDir = join(workspacePath, '.planning', 'beads');
+    const sessionsFile = join(panDir, PAN_SESSIONS_FILENAME)
+    if (existsSync(sessionsFile)) {
+      await cp(sessionsFile, join(archiveDir, PAN_SESSIONS_FILENAME))
+      details.push(`Archived ${PAN_SESSIONS_FILENAME}`)
+    }
+
+    const contextFile = join(panDir, PAN_CONTEXT_FILENAME)
+    if (existsSync(contextFile)) {
+      await cp(contextFile, join(archiveDir, PAN_CONTEXT_FILENAME))
+      details.push(`Archived ${PAN_CONTEXT_FILENAME}`)
+    }
+
+    const prdFile = join(panDir, 'prd.md')
+    if (existsSync(prdFile)) {
+      await cp(prdFile, join(archiveDir, 'prd.md'))
+      details.push('Archived workspace prd.md')
+    }
+
+    const beadsDir = join(workspacePath, '.beads')
     if (existsSync(beadsDir)) {
-      await cp(beadsDir, join(archiveDir, 'beads'), { recursive: true });
-      details.push('Archived beads/');
-    }
-
-    // Archive PRD.md (workspace copy — the docs/prds/ copy is canonical,
-    // but this preserves the workspace-specific version with agent annotations)
-    const prdMd = join(workspacePath, '.planning', 'PRD.md');
-    if (existsSync(prdMd)) {
-      await cp(prdMd, join(archiveDir, 'PRD.md'));
-      details.push('Archived workspace PRD.md');
+      await cp(beadsDir, join(archiveDir, '.beads'), { recursive: true })
+      details.push('Archived .beads/')
     }
 
     details.push(`Archived to ${archiveDir}`);

@@ -16,11 +16,15 @@ export type { MonitoringAgentConfig, InferenceDocument } from './monitoring-agen
 export { pollPRs, generateObservation, postPRComment, generateObserverPrompt, runObserverCycle } from './observer-agent.js';
 export type { ObserverAgentConfig, PRInfo } from './observer-agent.js';
 
+import { existsSync } from 'fs';
+import { join } from 'path';
+
+import { PAN_CONTEXT_FILENAME, PAN_DIRNAME } from '../pan-dir/index.js';
+
 /**
  * Check if a workspace is in Shadow Engineering mode
  */
 export function isShadowWorkspace(workspacePath: string): boolean {
-  const { existsSync } = require('fs');
-  const { join } = require('path');
-  return existsSync(join(workspacePath, '.planning', 'INFERENCE.md'));
+  return existsSync(join(workspacePath, PAN_DIRNAME, 'INFERENCE.md'))
+    || existsSync(join(workspacePath, PAN_DIRNAME, PAN_CONTEXT_FILENAME));
 }

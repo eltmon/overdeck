@@ -1,11 +1,14 @@
-import { Effect, Layer } from 'effect';
-import { HttpRouter } from 'effect/unstable/http';
+import { Effect, Layer, Option } from 'effect';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import {
   isCliproxyRunningAsync,
   isCliproxyInstalled,
+  installCliproxyAsync,
   restartCliproxyAsync,
+  stopCliproxyAsync,
+  startCliproxyAsync,
   readPidFile,
 } from '../../../lib/cliproxy.js';
 
@@ -95,14 +98,31 @@ const postCliproxyRestartRoute = HttpRouter.add(
   '/api/cliproxy/restart',
   httpHandler(
     Effect.gen(function* () {
-      yield* Effect.promise(() => restartCliproxyAsync());
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const urlOpt = HttpServerRequest.toURL(request);
+      const searchParams = Option.isSome(urlOpt)
+        ? urlOpt.value.searchParams
+        : new URLSearchParams();
+      const force = searchParams.get('force') === 'true' || searchParams.get('force') === '1';
+
+      if (force) {
+        // Force-reinstall: stop, redownload binary at the pinned version, restart.
+        // Required when bumping CLIPROXY_RELEASE_VERSION — otherwise install* skips
+        // because the old binary is still on disk.
+        yield* Effect.promise(() => stopCliproxyAsync());
+        yield* Effect.promise(() => installCliproxyAsync(true));
+        yield* Effect.promise(() => startCliproxyAsync());
+      } else {
+        yield* Effect.promise(() => restartCliproxyAsync());
+      }
+
       yield* Effect.promise(() => refreshStatus());
       const status = lastStatus ?? {
         running: false,
         pid: null,
         checkedAt: new Date().toISOString(),
       };
-      return jsonResponse({ success: status.running, status });
+      return jsonResponse({ success: status.running, status, forced: force });
     }),
   ),
 );

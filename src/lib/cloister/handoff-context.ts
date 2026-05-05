@@ -15,6 +15,7 @@ import { renderPrompt } from './prompts.js';
 import { resolveProjectFromIssue } from '../projects.js';
 import { resolveVBriefDir } from '../vbrief/lifecycle.js';
 import { readContinueState, type ContinueState } from '../vbrief/continue-state.js';
+import { readWorkspaceContinue } from '../pan-dir/index.js';
 
 const execAsync = promisify(exec);
 
@@ -123,20 +124,24 @@ async function captureFiles(
   issueId: string,
 ): Promise<void> {
   try {
-    // Read the scope continue file: lifecycle dirs first (active → proposed →
-    // completed → cancelled), then the workspace `.planning/` copy.
-    const resolved = resolveProjectFromIssue(issueId);
+    // Read the live workspace continue state first, then migration fallbacks.
     let continueState: ContinueState | null = null;
-    if (resolved) {
-      for (const dir of ['active', 'proposed', 'completed', 'cancelled'] as const) {
-        try {
-          const lifecycleDir = resolveVBriefDir(resolved.projectPath, dir);
-          const cs = readContinueState(lifecycleDir, issueId);
-          if (cs) {
-            continueState = cs;
-            break;
-          }
-        } catch { /* ignore */ }
+    try {
+      continueState = readWorkspaceContinue(workspace);
+    } catch { /* ignore */ }
+    if (!continueState) {
+      const resolved = resolveProjectFromIssue(issueId);
+      if (resolved) {
+        for (const dir of ['active', 'proposed', 'completed', 'cancelled'] as const) {
+          try {
+            const lifecycleDir = resolveVBriefDir(resolved.projectPath, dir);
+            const cs = readContinueState(lifecycleDir, issueId);
+            if (cs) {
+              continueState = cs;
+              break;
+            }
+          } catch { /* ignore */ }
+        }
       }
     }
     if (!continueState) {

@@ -1,11 +1,10 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
-import { mkdir, readFile, readdir, writeFile } from 'fs/promises';
 import { join, dirname } from 'path';
-import { readContinueState, continueFilePath, type ContinueFeedbackEntry } from '../vbrief/continue-state.js';
-import { resolveVBriefDir } from '../vbrief/lifecycle.js';
+import type { ContinueFeedbackEntry } from '../vbrief/continue-state.js';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeam } from '../projects.js';
-import { readWorkspacePlan, readPlan } from '../vbrief/io.js';
+import { getWorkspacePanPaths, readWorkspaceContext, readFeedback, readWorkspaceContinue, writeWorkspaceContext } from '../pan-dir/index.js';
+import { findPlan, readWorkspacePlan, readPlan } from '../vbrief/io.js';
 import { extractACFromDocument } from '../vbrief/acceptance-criteria.js';
 import { loadConfig } from '../config.js';
 import { createTrackerFromConfig } from '../tracker/factory.js';
@@ -74,56 +73,34 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
 
 /**
  * Read pending specialist feedback.
- * Primary source: continue file's feedback[] (Layer 1+, inline content).
- * Backward compat: also reads .planning/feedback/*.md for legacy entries
- * written before Layer 1.
+ * Primary source: workspace `.pan/continue.json` feedback[] plus `.pan/feedback/`.
  */
 function readPendingFeedback(workspacePath: string): string {
   const issueId = inferIssueIdFromWorkspace(workspacePath);
   const projectRoot = join(workspacePath, '..', '..');
 
-  // --- Primary: continue file feedback[] ---
   const continueEntries: ContinueFeedbackEntry[] = [];
   if (issueId) {
-    for (const dir of ['proposed', 'active', 'completed', 'cancelled'] as const) {
-      try {
-        const lifecycleDir = resolveVBriefDir(projectRoot, dir);
-        const cont = readContinueState(lifecycleDir, issueId);
-        if (cont?.feedback?.length) {
-          continueEntries.push(...cont.feedback);
-          break;
-        }
-      } catch { /* ignore */ }
-    }
-    // Fallback: workspace .planning/ continue file
-    if (continueEntries.length === 0) {
-      try {
-        const cont = readContinueState(join(workspacePath, '.planning'), issueId);
-        if (cont?.feedback?.length) {
-          continueEntries.push(...cont.feedback);
-        }
-      } catch { /* ignore */ }
-    }
+    try {
+      const cont = readWorkspaceContinue(workspacePath)
+      if (cont?.feedback?.length) {
+        continueEntries.push(...cont.feedback)
+      }
+    } catch { /* ignore */ }
   }
 
   // --- Backward compat: filesystem files not already in continue file ---
   const seqsInContinue = new Set(continueEntries.map(e => e.seq));
   const legacyFilePaths: string[] = [];
-  const feedbackDir = join(workspacePath, '.planning', 'feedback');
-  if (existsSync(feedbackDir)) {
-    try {
-      const files = readdirSync(feedbackDir)
-        .filter(f => f.endsWith('.md'))
-        .sort();
-      for (const file of files) {
-        const match = file.match(/^(\d{3})-/);
-        const seq = match ? parseInt(match[1], 10) : -1;
-        if (!seqsInContinue.has(seq)) {
-          legacyFilePaths.push(join(feedbackDir, file));
-        }
+  try {
+    for (const file of readFeedback(workspacePath)) {
+      const match = file.filename.match(/^(\d{3})-/);
+      const seq = match ? parseInt(match[1], 10) : -1;
+      if (!seqsInContinue.has(seq)) {
+        legacyFilePaths.push(file.path);
       }
-    } catch { /* ignore */ }
-  }
+    }
+  } catch { /* ignore */ }
 
   if (continueEntries.length === 0 && legacyFilePaths.length === 0) return '';
 
@@ -181,23 +158,13 @@ export async function getTrackerContext(
 ): Promise<string> {
   let stateMtime: Date | null = null;
 
-  // Find continue file mtime — check lifecycle dirs first, then workspace `.planning/`.
-  const projectRoot = join(workspacePath, '..', '..');
-  for (const dir of ['active', 'proposed', 'completed', 'cancelled'] as const) {
-    try {
-      const cp = continueFilePath(resolveVBriefDir(projectRoot, dir), issueId);
-      if (existsSync(cp)) {
-        stateMtime = statSync(cp).mtime;
-        break;
-      }
-    } catch { /* ignore */ }
-  }
-  if (!stateMtime) {
-    const planningCp = continueFilePath(join(workspacePath, '.planning'), issueId);
-    if (existsSync(planningCp)) {
-      try { stateMtime = statSync(planningCp).mtime; } catch { /* ignore */ }
+  // Find continue file mtime via workspace `.pan/continue.json` first, then migration fallbacks.
+  try {
+    const workspaceContinuePath = getWorkspacePanPaths(workspacePath).continuePath
+    if (existsSync(workspaceContinuePath)) {
+      stateMtime = statSync(workspaceContinuePath).mtime
     }
-  }
+  } catch { /* ignore */ }
 
   let config: ReturnType<typeof loadConfig>;
   try {
@@ -327,32 +294,18 @@ export async function getTrackerContext(
 }
 
 /**
- * Read planning artifacts for an issue.
- * Tries continue.vbrief.json — lifecycle dirs first (proposed → active →
- * completed → cancelled), then the workspace `.planning/` copy.
+ * Read planning artifacts for an issue from workspace `.pan/continue.json`.
  */
 export function readPlanningContext(workspacePath: string): string | null {
   const issueId = inferIssueIdFromWorkspace(workspacePath);
+  if (!issueId) return null;
 
-  // Try lifecycle dirs first (proposed → active → completed → cancelled)
-  if (issueId) {
-    const projectRoot = join(workspacePath, '..', '..');
-    for (const dir of ['proposed', 'active', 'completed', 'cancelled'] as const) {
-      try {
-        const lifecycleDir = resolveVBriefDir(projectRoot, dir);
-        const cont = readContinueState(lifecycleDir, issueId);
-        if (cont) {
-          return JSON.stringify(cont, null, 2);
-        }
-      } catch { /* ignore */ }
+  try {
+    const workspaceContinue = readWorkspaceContinue(workspacePath)
+    if (workspaceContinue) {
+      return JSON.stringify(workspaceContinue, null, 2)
     }
-
-    // Fallback to workspace .planning/
-    const planningContinue = readContinueState(join(workspacePath, '.planning'), issueId);
-    if (planningContinue) {
-      return JSON.stringify(planningContinue, null, 2);
-    }
-  }
+  } catch { /* ignore */ }
 
   return null;
 }
@@ -364,14 +317,14 @@ function inferIssueIdFromWorkspace(workspacePath: string): string | null {
 }
 
 /**
- * Read FEATURE-CONTEXT.md for Rally Features so story agents receive
+ * Read workspace `.pan/context.md` for Rally Features so story agents receive
  * feature-level context (child stories, description, URL).
  * Falls back to a deterministic tracker-based parent workspace lookup.
  */
 export async function readFeatureContext(workspacePath: string, issueId: string): Promise<string | null> {
-  const featureContextPath = join(workspacePath, '.planning', 'FEATURE-CONTEXT.md');
-  if (existsSync(featureContextPath)) {
-    return readFile(featureContextPath, 'utf-8');
+  const panContext = readWorkspaceContext(workspacePath)
+  if (panContext) {
+    return panContext
   }
 
   // Deterministic O(1) lookup: query tracker for parentRef, then load directly
@@ -390,9 +343,9 @@ export async function readFeatureContext(workspacePath: string, issueId: string)
         if (issue.parentRef) {
           const projectRoot = dirname(dirname(workspacePath));
           const parentWorkspace = join(projectRoot, 'workspaces', `feature-${issue.parentRef.toLowerCase()}`);
-          const parentContextPath = join(parentWorkspace, '.planning', 'FEATURE-CONTEXT.md');
-          if (existsSync(parentContextPath)) {
-            return readFile(parentContextPath, 'utf-8');
+          const parentPanContext = readWorkspaceContext(parentWorkspace)
+          if (parentPanContext) {
+            return parentPanContext
           }
         }
       } catch {
@@ -407,14 +360,13 @@ export async function readFeatureContext(workspacePath: string, issueId: string)
 }
 
 /**
- * Synthesize and write FEATURE-CONTEXT.md into a story workspace before
- * work-agent startup. Loads the parent feature's plan.vbrief.json, extracts
- * narratives and cross-story dependency edges, and writes a synthesized
- * context file so the story agent has deterministic O(1) access.
+ * Synthesize and write feature context into a story workspace before
+ * work-agent startup. Loads the parent feature workspace spec, extracts
+ * narratives and cross-story dependency edges, and writes synthesized
+ * context so the story agent has deterministic O(1) access.
  */
 export async function writeStoryFeatureContext(workspacePath: string, issueId: string): Promise<void> {
-  const featureContextPath = join(workspacePath, '.planning', 'FEATURE-CONTEXT.md');
-  if (existsSync(featureContextPath)) return;
+  if (readWorkspaceContext(workspacePath)) return;
 
   try {
     const config = loadConfig();
@@ -441,11 +393,11 @@ export async function writeStoryFeatureContext(workspacePath: string, issueId: s
 
         const projectRoot = dirname(dirname(workspacePath));
         const parentWorkspace = join(projectRoot, 'workspaces', `feature-${issue.parentRef.toLowerCase()}`);
-        const parentPlanPath = join(parentWorkspace, '.planning', 'plan.vbrief.json');
+        const parentPlanPath = findPlan(parentWorkspace);
 
         let contextContent = '';
 
-        if (existsSync(parentPlanPath)) {
+        if (parentPlanPath) {
           try {
             const parentDoc = readPlan(parentPlanPath);
             const plan = parentDoc.plan;
@@ -476,21 +428,19 @@ export async function writeStoryFeatureContext(workspacePath: string, issueId: s
               `## Plan Narratives\n${narrativeSection || '_No narratives found._'}\n\n` +
               `## Cross-Story Dependencies\n${edgesSection || '_No dependency edges found._'}\n\n` +
               `## Related Plan Items\n${itemsSection || '_No plan items found for this story._'}\n\n` +
-              `---\n*Synthesized from parent feature plan.vbrief.json*\n`;
+              `---\n*Synthesized from parent feature workspace vBRIEF*\n`;
           } catch (planErr) {
-            console.warn(`[writeStoryFeatureContext] Could not read parent plan: ${planErr instanceof Error ? planErr.message : String(planErr)}`);
+            console.warn(`[writeStoryFeatureContext] Could not read parent workspace vBRIEF: ${planErr instanceof Error ? planErr.message : String(planErr)}`);
           }
         }
 
-        // Fallback: copy raw FEATURE-CONTEXT.md from parent workspace
-        const parentContextPath = join(parentWorkspace, '.planning', 'FEATURE-CONTEXT.md');
-        if (existsSync(parentContextPath) && !contextContent) {
-          contextContent = await readFile(parentContextPath, 'utf-8');
+        const parentPanContext = readWorkspaceContext(parentWorkspace)
+        if (parentPanContext && !contextContent) {
+          contextContent = parentPanContext
         }
 
         if (contextContent) {
-          await mkdir(join(workspacePath, '.planning'), { recursive: true });
-          await writeFile(featureContextPath, contextContent, 'utf-8');
+          writeWorkspaceContext(workspacePath, contextContent)
         }
 
         return;
@@ -667,7 +617,7 @@ export function buildPolyrepoContext(issueId: string, workspacePath: string): st
     // Check which repos actually exist in the workspace
     const existingRepos = readdirSync(workspacePath).filter(f => {
       const fullPath = join(workspacePath, f);
-      return f !== '.planning' && f !== '.claude' && f !== '.pan' && f !== '.beads' && existsSync(fullPath);
+      return f !== '.claude' && f !== '.pan' && f !== '.beads' && existsSync(fullPath);
     });
     visibleRepos = repos.filter(r => existingRepos.includes(r.name));
   }

@@ -37,7 +37,7 @@ export const CLIPROXY_PORT = 8317;
 export const CLIPROXY_AUTH_TOKEN = 'panopticon-local-cliproxy-key';
 export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
 
-const CLIPROXY_RELEASE_VERSION = 'v6.9.24';
+const CLIPROXY_RELEASE_VERSION = 'v6.9.45';
 
 export function getCliproxyDir(): string {
   return join(PANOPTICON_HOME, 'cliproxy');

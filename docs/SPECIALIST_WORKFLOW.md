@@ -18,65 +18,9 @@ Specialist agents are ephemeral Claude Code sessions that handle specific tasks:
 
 ### Full Pipeline
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  DURING IMPLEMENTATION (per-bead)                               │
-│                                                                 │
-│  Agent finishes bead                                            │
-│       │                                                         │
-│       │ pan inspect <issueId> --bead <beadId>                   │
-│       ▼                                                         │
-│  ┌──────────────────────────┐                                   │
-│  │  inspect-agent (Sonnet)  │                                   │
-│  │  - Spec fidelity check   │──── BLOCKED ──→ Agent fixes       │
-│  │  - Constraint compliance │                  and re-requests   │
-│  │  - Compile + smoke       │                                   │
-│  └──────────┬───────────────┘                                   │
-│             │ PASS                                               │
-│             │ (checkpoint saved)                                 │
-│             ▼                                                    │
-│       Agent continues to next bead                              │
-│       ... repeat for each bead ...                              │
-└─────────────────────────────────────────────────────────────────┘
+![Panopticon Specialist Pipeline](./diagrams/panopticon-specialist-pipeline.png)
 
-┌─────────────────────────────────────────────────────────────────┐
-│  AFTER ALL BEADS COMPLETE                                       │
-│                                                                 │
-│  Agent signals completion → Verification Gate                   │
-│       │                                                         │
-│       ▼                                                         │
-│  ┌──────────────────────────┐                                   │
-│  │  review-agent (Sonnet)   │                                   │
-│  │  - Full MR code review   │──── CHANGES_REQUESTED ──→ Agent   │
-│  │  - Security + perf       │                                   │
-│  │  - Test coverage         │                                   │
-│  └──────────┬───────────────┘                                   │
-│             │ APPROVED                                           │
-│             ▼                                                    │
-│  ┌──────────────────────────┐                                   │
-│  │  test-agent (Haiku)      │                                   │
-│  │  - Run test suite        │──── FAILED ──→ Agent fixes        │
-│  │  - Analyze failures      │                                   │
-│  └──────────┬───────────────┘                                   │
-│             │ PASSED                                             │
-│             ▼                                                    │
-│  ┌──────────────────────────┐                                   │
-│  │  uat-agent (Sonnet)      │                                   │
-│  │  - Real browser (PW)     │──── BLOCKED ──→ Agent fixes       │
-│  │  - CORS verification     │                                   │
-│  │  - Visual quality audit  │                                   │
-│  │  - Requirement check     │                                   │
-│  └──────────┬───────────────┘                                   │
-│             │ PASSED                                             │
-│             ▼                                                    │
-│  ┌──────────────────────────┐                                   │
-│  │  merge-agent (Sonnet)    │                                   │
-│  │  - Resolve conflicts     │                                   │
-│  │  - Validate + push       │                                   │
-│  │  - Post-merge cleanup    │                                   │
-│  └──────────────────────────┘                                   │
-└─────────────────────────────────────────────────────────────────┘
-```
+Source: [`docs/diagrams/panopticon-specialist-pipeline.excalidraw`](./diagrams/panopticon-specialist-pipeline.excalidraw)
 
 ## Inspect Specialist (PAN-382)
 

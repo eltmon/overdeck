@@ -59,6 +59,8 @@ import {
 import { httpHandler } from './http-handler.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, type ReviewerRoundMetadata } from './reviewer-tree.js';
+import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
+import { findPlan } from '../../../lib/vbrief/io.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -278,8 +280,8 @@ export async function fetchActivityDataWithContext(
 
         if (isPlanning && !transcript) {
           const projectPath = getProjectPath(issuePrefix);
-          const workspacePlanningDir = join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning');
-          const continueText = await readOptional(join(workspacePlanningDir, `continue-${issueId.toUpperCase()}.vbrief.json`));
+          const workspacePanDir = join(projectPath, 'workspaces', `feature-${issueLower}`, PAN_DIRNAME);
+          const continueText = await readOptional(join(workspacePanDir, PAN_CONTINUE_FILENAME));
           if (continueText) {
             transcript = `PLANNING COMPLETE\n\n${continueText}`;
           }
@@ -321,7 +323,7 @@ export async function fetchActivityDataWithContext(
 
   // If no planning agent but continue file exists, create synthetic planning section
   if (!hasPlanningSection) {
-    const continuePath = join(workspacePath, '.planning', `continue-${issueId.toUpperCase()}.vbrief.json`);
+    const continuePath = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
     const continueText = await readOptional(continuePath);
     if (continueText) {
       const fileStat = await stat(continuePath).catch(() => null);
@@ -617,7 +619,8 @@ async function fetchPlanningData(
 
   const projectPath = getProjectPath(issuePrefix);
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-  const planningDir = join(workspacePath, '.planning');
+  const planningDir = join(workspacePath, PAN_DIRNAME);
+  const panContinuePath = join(planningDir, PAN_CONTINUE_FILENAME);
 
   const result: {
     hasPrd: boolean;
@@ -637,14 +640,26 @@ async function fetchPlanningData(
   // Helper: read PRD content from a location, handling both flat and subdir formats.
   const readPrdContent = async (loc: PrdLocation | null): Promise<string | undefined> => {
     if (!loc) return undefined;
-    if (loc.format === 'flat') {
+    if (loc.format === 'flat' || loc.format === 'pan-draft') {
       return (await readOptional(loc.path)) ?? undefined;
     }
-    // Subdirectory format: PRD content lives in the subdirectory (historically STATE.md).
-    return (await readOptional(join(loc.path, 'STATE.md'))) ?? undefined;
+
+    const files = (await readdir(loc.path).catch(() => [] as string[]))
+      .filter((file) => file.endsWith('.md'))
+      .sort((a, b) => {
+        if (a === 'prd.md') return -1;
+        if (b === 'prd.md') return 1;
+        return a.localeCompare(b);
+      });
+    const firstMarkdown = files[0];
+    if (!firstMarkdown) return undefined;
+    return (await readOptional(join(loc.path, firstMarkdown))) ?? undefined;
   };
 
-  if (!await pathExists(planningDir)) {
+  const hasPlanningDir = await pathExists(planningDir);
+  const hasPanContinue = await pathExists(panContinuePath);
+
+  if (!hasPlanningDir && !hasPanContinue) {
     const prd = await readPrdContent(findPrdAtStatus(projectPath, issueId, 'active'));
     if (prd) {
       result.prd = prd;
@@ -666,9 +681,9 @@ async function fetchPlanningData(
     return result;
   }
 
-  const continueState = await readOptional(join(planningDir, `continue-${issueId.toUpperCase()}.vbrief.json`));
+  const continueState = await readOptional(panContinuePath);
   result.state = continueState ?? undefined;
-  result.inference = await readOptional(join(planningDir, 'INFERENCE.md')) ?? undefined;
+  result.inference = hasPlanningDir ? (await readOptional(join(planningDir, 'INFERENCE.md')) ?? undefined) : undefined;
   result.hasState = Boolean(result.state);
 
   const statusReviewPath = join(planningDir, 'STATUS_REVIEW.md');
@@ -694,6 +709,7 @@ async function fetchPlanningData(
   result.hasPrd = Boolean(result.prd);
 
   const listArtifactFiles = async (subdir: string): Promise<Array<{ filename: string; mtime: string }>> => {
+    if (!hasPlanningDir) return [];
     const dirPath = join(planningDir, subdir);
     if (!await pathExists(dirPath)) return [];
     const files = (await readdir(dirPath).catch(() => [] as string[])).filter(
@@ -722,8 +738,8 @@ async function fetchPlanningData(
 
   // Acceptance criteria progress from vBRIEF plan (PAN-847)
   try {
-    const planPath = join(planningDir, 'plan.vbrief.json');
-    if (await pathExists(planPath)) {
+    const planPath = findPlan(workspacePath);
+    if (planPath && await pathExists(planPath)) {
       const raw = await readFile(planPath, 'utf-8');
       const doc = JSON.parse(raw);
       const items: Array<{ status?: string }> = doc?.plan?.items ?? [];
@@ -812,13 +828,14 @@ async function generateStatusReview(issueId: string): Promise<
 
   const projectPath = getProjectPath(issuePrefix);
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-  const planningDir = join(workspacePath, '.planning');
+  const planningDir = join(workspacePath, PAN_DIRNAME);
+  const panContinuePath = join(planningDir, PAN_CONTINUE_FILENAME);
 
-  if (!await pathExists(planningDir)) {
-    return { type: 'err', response: { error: 'No planning directory found' }, status: 404 };
+  if (!await pathExists(planningDir) && !await pathExists(panContinuePath)) {
+    return { type: 'err', response: { error: 'No planning state found' }, status: 404 };
   }
 
-  const state = await readOptional(join(planningDir, `continue-${issueId.toUpperCase()}.vbrief.json`));
+  const state = await readOptional(panContinuePath);
 
   const readPlanningSubdir = async (subdir: string, limit = 5, maxPerFile = 2000): Promise<string> => {
     const dirPath = join(planningDir, subdir);
@@ -889,6 +906,7 @@ async function generateStatusReview(issueId: string): Promise<
     .update([state, discussionsContent, transcriptsContent, notesContent, issueContext, gitDiff, gitDiffFull, gitLog, filesChanged, reviewStatus, testStatus].filter(Boolean).join('|'))
     .digest('hex');
 
+  await mkdir(planningDir, { recursive: true });
   const hashPath = join(planningDir, '.status-review-hash');
   const statusReviewPath = join(planningDir, 'STATUS_REVIEW.md');
 
@@ -1066,7 +1084,7 @@ const postMissionControlUploadRoute = HttpRouter.add(
     const projectPath = getProjectPath(issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     const subdir = type === 'transcript' ? 'transcripts' : 'notes';
-    const dirPath = join(workspacePath, '.planning', subdir);
+    const dirPath = join(workspacePath, PAN_DIRNAME, subdir);
 
     yield* Effect.tryPromise({
       try: async () => {
@@ -1104,7 +1122,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
 
     const projectPath = getProjectPath(issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const discussionsDir = join(workspacePath, '.planning', 'discussions');
+    const discussionsDir = join(workspacePath, PAN_DIRNAME, 'discussions');
 
     yield* Effect.tryPromise({
       try: () => mkdir(discussionsDir, { recursive: true }),
@@ -1253,7 +1271,7 @@ const postMissionControlPlanningInitRoute = HttpRouter.add(
 
     const projectPath = getProjectPath(issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const planningDir = join(workspacePath, '.planning');
+    const planningDir = join(workspacePath, PAN_DIRNAME);
 
     yield* Effect.tryPromise({
       try: async () => {

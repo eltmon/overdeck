@@ -21,9 +21,9 @@ function makeTmpRepo(): string {
 }
 
 describe('protected-paths', () => {
-  it('exposes a non-empty exclude list with both .planning and .devcontainer', () => {
+  it('exposes a non-empty exclude list with both .pan and .devcontainer', () => {
     expect(GIT_CLEAN_EXCLUDES.length).toBeGreaterThan(0);
-    expect(GIT_CLEAN_EXCLUDES).toContain('.planning');
+    expect(GIT_CLEAN_EXCLUDES).toContain('.pan');
     expect(GIT_CLEAN_EXCLUDES).toContain('.beads');
     expect(GIT_CLEAN_EXCLUDES).toContain('.devcontainer');
     expect(GIT_CLEAN_EXCLUDES).toContain('.env');
@@ -48,11 +48,11 @@ describe('runGitClean', () => {
 
   beforeEach(() => {
     repo = makeTmpRepo();
-    // Three untracked items; .devcontainer and .planning must survive.
+    // Three untracked items; .devcontainer and .pan must survive.
     writeFileSync(join(repo, 'untracked.txt'), 'x');
     writeFileSync(join(repo, '.env'), 'X=1');
     execSync('mkdir .devcontainer && touch .devcontainer/keep.yml', { cwd: repo });
-    execSync('mkdir .planning && touch .planning/STATE.md', { cwd: repo });
+    execSync('mkdir -p .pan/feedback && touch .pan/continue.json', { cwd: repo });
   });
 
   afterEach(() => {
@@ -99,7 +99,7 @@ describe('runGitClean', () => {
     // Protected paths survived.
     expect(existsSync(join(repo, '.env'))).toBe(true);
     expect(existsSync(join(repo, '.devcontainer', 'keep.yml'))).toBe(true);
-    expect(existsSync(join(repo, '.planning', 'STATE.md'))).toBe(true);
+    expect(existsSync(join(repo, '.pan', 'continue.json'))).toBe(true);
   });
 
   it('dry-run lists what would be deleted without touching anything', async () => {
