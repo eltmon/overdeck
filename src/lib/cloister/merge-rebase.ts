@@ -57,29 +57,7 @@ export async function rebaseFeatureBranch(
     console.log(`${logPrefix} Fetching origin/${baseBranch}...`);
     await execAsync(`git fetch origin ${baseBranch}`, execOpts);
 
-    // Step 2: Strip tracked .planning/ artifacts before rebase.
-    // .planning/ is workspace-local and must never land on main (#888). We strip it
-    // BEFORE checking behind-count so up-to-date branches are still cleaned. We use
-    // `git rm --cached` so the worktree files survive (workspace still uses them).
-    // Preflight with `git ls-files` to skip the rm/commit work entirely when nothing
-    // is tracked — keeps the operation a true no-op for already-clean branches.
-    try {
-      const { stdout: trackedPlanning } = await execAsync(
-        'git ls-files -- .planning/',
-        execOpts,
-      );
-      if (trackedPlanning.trim().length > 0) {
-        await execAsync('git rm -r --cached --ignore-unmatch .planning/', execOpts);
-        await execAsync(
-          'git diff --cached --quiet || git commit -m "chore: strip ephemeral .planning/ artifacts before merge"',
-          execOpts,
-        );
-      }
-    } catch {
-      // Non-fatal — .planning/ might not be tracked
-    }
-
-    // Step 3: Check if rebase is needed
+    // Step 2: Check if rebase is needed
     const { stdout: behindCount } = await execAsync(
       `git rev-list --count HEAD..origin/${baseBranch}`,
       execOpts,

@@ -269,23 +269,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     console.warn(`[merge-agent] Could not move PRD: ${err}`);
   }
 
-  // 2. Remove ephemeral planning artifacts from main (via lifecycle module)
-  try {
-    const { cleanPlanningArtifacts } = await import('../lifecycle/clean-planning.js');
-    const cleanResult = await cleanPlanningArtifacts({ issueId, projectPath });
-    if (cleanResult.success && !cleanResult.skipped) {
-      console.log(`[merge-agent] ✓ ${cleanResult.details?.join('; ')}`);
-      logActivity('planning_artifacts_cleaned', cleanResult.details?.join('; ') || 'Planning artifacts removed');
-    } else if (cleanResult.skipped) {
-      console.log(`[merge-agent] Planning artifact cleanup skipped: ${cleanResult.details?.join('; ')}`);
-    } else {
-      console.warn(`[merge-agent] Planning artifact cleanup failed: ${cleanResult.error}`);
-    }
-  } catch (err) {
-    console.warn(`[merge-agent] Could not clean planning artifacts: ${err}`);
-  }
-
-  // 3. Clean up workflow labels + apply 'merged' label (non-fatal)
+  // 2. Clean up workflow labels + apply 'merged' label (non-fatal)
   // MUST run BEFORE closing the issue — once closed on GitHub, label edits fail silently.
   // This was the root cause of in-review labels persisting after merge (PAN-453 incident).
   try {
@@ -1392,9 +1376,8 @@ INSTRUCTIONS:
    echo "Commits behind origin/${baseBranch}: $BEHIND"
    \`\`\`
 4. If BEHIND is 0: skip rebase entirely — branch is already up to date. Go to step 7.
-5. If BEHIND > 0: Remove .planning/ first (ephemeral artifacts always conflict), then rebase:
+5. If BEHIND > 0: rebase onto latest base:
    \`\`\`bash
-   git rm -rf .planning/ 2>/dev/null && git commit -m "chore: remove planning artifacts before rebase" 2>/dev/null
    git rebase origin/${baseBranch}
    \`\`\`
 6. If rebase has conflicts:
