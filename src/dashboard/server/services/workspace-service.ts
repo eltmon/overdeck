@@ -62,7 +62,7 @@ export interface WorkspaceServiceShape {
   /**
    * Clean build artifacts from a workspace.
    * preview=true returns a list of artifact paths without deleting.
-   * preview=false removes artifacts but preserves .planning directory.
+   * preview=false removes artifacts but preserves orchestration metadata directories.
    * Fails with WorkspaceNotFound if the workspace does not exist.
    */
   readonly clean: (issueId: string, preview?: boolean) => Effect.Effect<CleanResult, WorkspaceNotFound | WorkspaceCreateError>;
@@ -220,7 +220,7 @@ export const WorkspaceServiceLive = Layer.effect(
               throw new WorkspaceNotFound({ id: issueId });
             }
 
-            // Artifact directories/files to clean (preserving .planning)
+            // Artifact directories/files to clean (preserving orchestration metadata)
             const artifactPatterns = [
               'node_modules',
               'dist',

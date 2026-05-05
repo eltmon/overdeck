@@ -78,7 +78,7 @@ export interface AgentSpawnerShape {
   /**
    * Start a planning agent for an issue.
    *
-   * Creates .planning directory, writes PLANNING_PROMPT.md, sets tmux options
+   * Creates the workspace planning artifacts, writes the planning prompt, and sets tmux options
    * (remain-on-exit on, destroy-unattached off), and spawns the planning session.
    */
   readonly startPlanning: (

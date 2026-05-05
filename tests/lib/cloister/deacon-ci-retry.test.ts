@@ -352,7 +352,7 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
     // Create a temp workspace with a stale merge-agent ci-failure feedback file
     tempProjectPath = mkdtempSync(join(tmpdir(), 'pan-dead-end-test-'));
     const feedbackDir = join(
-      tempProjectPath, 'workspaces', `feature-${issueLower}`, '.planning', 'feedback',
+      tempProjectPath, 'workspaces', `feature-${issueLower}`, '.pan', 'feedback',
     );
     mkdirSync(feedbackDir, { recursive: true });
     const staleFeedbackFile = join(feedbackDir, '013-merge-agent-ci-failure.md');
@@ -398,7 +398,7 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
     // Create a workspace so clearStaleCiFeedback has somewhere to look
     tempProjectPath = mkdtempSync(join(tmpdir(), 'pan-dead-end-ci-reset-'));
     mkdirSync(
-      join(tempProjectPath, 'workspaces', `feature-${issueLower}`, '.planning', 'feedback'),
+      join(tempProjectPath, 'workspaces', `feature-${issueLower}`, '.pan', 'feedback'),
       { recursive: true },
     );
 

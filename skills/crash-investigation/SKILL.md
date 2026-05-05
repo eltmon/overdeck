@@ -178,12 +178,12 @@ done
 
 #### Planning State
 ```bash
-# Check STATE.md for each workspace
+# Check .pan/continue.json for each workspace
 for ws in /path/to/project/workspaces/*/; do
-  state_file="$ws/.planning/STATE.md"
-  if [ -f "$state_file" ]; then
+  continue_file="$ws/.pan/continue.json"
+  if [ -f "$continue_file" ]; then
     echo "=== $(basename $ws) ==="
-    head -5 "$state_file"
+    head -20 "$continue_file"
     echo
   fi
 done

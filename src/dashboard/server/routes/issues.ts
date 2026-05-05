@@ -1006,20 +1006,18 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
 
       const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
       const workspacePlanPath = findPlan(workspacePath);
-      const legacyPlanningDir = join(projectPath, '.planning', issueLower);
 
       let gitRoot = '';
       if (workspacePlanPath) gitRoot = workspacePath;
-      else if (existsSync(legacyPlanningDir)) gitRoot = projectPath;
 
       if (!gitRoot) return { pushed: false, beadsWarning: null };
 
       try {
 
-        // Beads are created by the planning agent via `pan plan-finalize`, which also
-        // writes .planning/.planning-complete. By the time this endpoint runs, the marker
-        // and beads are expected to already exist. We do not create beads here — fixing
-        // the planning prompt is the right place to enforce that contract.
+        // Beads are created by the planning agent via `pan plan-finalize`.
+        // By the time this endpoint runs, the workspace spec and beads are expected
+        // to already exist. We do not create beads here — fixing the planning
+        // prompt is the right place to enforce that contract.
         const beadsWarning: string | null = null;
 
         // Copy the workspace vBRIEF into the project root's canonical
@@ -1593,7 +1591,7 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
         join(workspacePath, '.pan', 'review'),
         join(workspacePath, '.pan', 'prompts'),
         join(workspacePath, '.pan', 'events'),
-        join(workspacePath, '.planning', 'feedback'),
+        join(workspacePath, '.pan', 'feedback'),
       ];
       for (const dir of dirsToClean) {
         if (existsSync(dir)) {
@@ -1610,10 +1608,10 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
     // Planning commits come from two sources:
     //   - complete-planning endpoint: "Complete planning for PAN-XXX"
     //   - agent start flow: "chore: planning artifacts for PAN-XXX before agent start"
-    // Fall back to finding the commit that added plan.vbrief.json.
+    // Fall back to finding the commit that added `.pan/spec.vbrief.json`.
     //
     // If no planning commit is found, we DO NOT auto-clean. The previous
-    // behaviour was a `git clean -fd -e .planning -e .beads` fallback that
+    // behaviour used a broad git-clean fallback that
     // silently destroyed `.devcontainer/`, `.env`, `node_modules/`, and
     // anything else untracked — see PAN-955/956. The fix is to surface a
     // structured error pointing the user at `pan workspace deep-clean <id>`,
@@ -2500,8 +2498,7 @@ const getIssuePlanningStateRoute = HttpRouter.add(
     const planPath = workspacePath ? findPlan(workspacePath) : null;
     const hasPlan = planPath !== null;
     // planningComplete now means "plan.status indicates planning has finished" —
-    // any of proposed/approved/pending/running/completed/blocked. Falls back to
-    // the legacy `.planning-complete` marker for vBRIEFs without status fields.
+    // any of proposed/approved/pending/running/completed/blocked.
     // It's the definitive signal for "tasks have been generated from this plan."
     const planningComplete = workspacePath ? isPlanningComplete(workspacePath) : false;
 

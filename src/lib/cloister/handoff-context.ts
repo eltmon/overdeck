@@ -47,7 +47,7 @@ export interface HandoffContext {
   previousSessionId?: string;
 
   // Files
-  /** Parsed scope continue file (replaces STATE.md). */
+  /** Parsed scope continue file. */
   continueState?: ContinueState;
   claudeMd?: string;            // CLAUDE.md content
 
@@ -143,11 +143,6 @@ async function captureFiles(
           } catch { /* ignore */ }
         }
       }
-    }
-    if (!continueState) {
-      try {
-        continueState = readContinueState(join(workspace, '.planning'), issueId);
-      } catch { /* ignore */ }
     }
     if (continueState) {
       context.continueState = continueState;

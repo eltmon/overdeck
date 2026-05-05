@@ -5,8 +5,8 @@
  * All I/O is async (fs/promises) — never execSync.
  */
 
-import { readdir, rm } from 'fs/promises';
 import { existsSync } from 'fs';
+import { readdir } from 'fs/promises';
 import { join } from 'path';
 import { resolveProjectFromIssue } from '../projects.js';
 import { clearFeedback, getWorkspacePanPaths, readFeedback, writeFeedback } from '../pan-dir/index.js';
@@ -64,8 +64,7 @@ async function getNextSequenceNumber(feedbackDir: string): Promise<number> {
 /**
  * Clear existing feedback files from a previous review cycle.
  *
- * Deletes all NNN-*.md files in workspace `.pan/feedback/` and cleans any
- * legacy `.planning/feedback/` leftovers from older workspaces.
+ * Deletes all NNN-*.md files in workspace `.pan/feedback/`.
  */
 export async function clearFeedbackFiles(workspacePath: string): Promise<void> {
   const { feedbackDir } = getWorkspacePanPaths(workspacePath);
@@ -95,29 +94,6 @@ export async function clearFeedbackFiles(workspacePath: string): Promise<void> {
     }
   }
 
-  const legacyFeedbackDir = join(workspacePath, '.planning', 'feedback');
-  if (existsSync(legacyFeedbackDir)) {
-    const files = await readdir(legacyFeedbackDir);
-    const feedbackFiles = files.filter(f => /^\d{3}-/.test(f) && f.endsWith('.md'));
-
-    for (const file of feedbackFiles) {
-      try {
-        await rm(join(legacyFeedbackDir, file), { force: true });
-        clearedCount += 1;
-      } catch (err: any) {
-        console.error(`[feedback-writer] Failed to delete legacy ${file}:`, err.message);
-      }
-    }
-
-    const legacyArchiveDir = join(legacyFeedbackDir, 'archive');
-    if (existsSync(legacyArchiveDir)) {
-      try {
-        await rm(legacyArchiveDir, { recursive: true, force: true });
-      } catch (err: any) {
-        console.error(`[feedback-writer] Failed to remove legacy archive dir:`, err.message);
-      }
-    }
-  }
 
   if (clearedCount > 0) {
     console.log(`[feedback-writer] Cleared ${clearedCount} feedback file(s) from previous cycle`);
@@ -133,7 +109,7 @@ export const archiveFeedbackFiles = clearFeedbackFiles;
 /**
  * Write specialist feedback to the scope vBRIEF continue file and record a
  * sessionHistory breadcrumb. The primary data store is the continue file
- * (Layer 3+); .planning/feedback/*.md files are no longer written.
+ * (Layer 3+) with workspace mirrors in `.pan/feedback/`.
  */
 export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<WriteFeedbackResult> {
   const timestamp = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
@@ -144,8 +120,8 @@ export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<Wri
     return { success: false, error: `Project not found for ${opts.issueId}` };
   }
 
-  // Derive sequence number from continue file (primary), synced with any
-  // legacy filesystem files for consistent numbering during transition.
+  // Derive sequence number from continue-file feedback first, then keep the
+  // workspace mirror numbering aligned if feedback files already exist.
   let seq = 1;
   try {
     const existing = readContinueStateForIssue(resolved.projectPath, opts.issueId);

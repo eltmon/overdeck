@@ -180,7 +180,7 @@ tmux capture-pane -t agent-ISSUE-123 -p -S - | \
 # Create log archive for an issue
 mkdir -p ~/.panopticon/archives/ISSUE-123
 tmux capture-pane -t agent-ISSUE-123 -p -S - > ~/.panopticon/archives/ISSUE-123/agent.log
-cp workspace/.planning/STATE.md ~/.panopticon/archives/ISSUE-123/
+cp workspace/.pan/continue.json ~/.panopticon/archives/ISSUE-123/
 git -C workspace log --oneline -20 > ~/.panopticon/archives/ISSUE-123/commits.log
 ```
 

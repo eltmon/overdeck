@@ -1041,7 +1041,7 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
  * dispatch; merge → close-out removes workspace). This sweep is the safety net
  * for workspaces where those events never fired: work agent is no longer
  * running AND no review is in flight AND feedback files are still sitting in
- * `.planning/feedback/`.
+ * `.pan/feedback/`.
  *
  * The feedback is useless once consumed, so we always delete — no archive, no
  * retention. See docs/REVIEW-AGENT-ARCHITECTURE.md.
@@ -1082,8 +1082,7 @@ export async function cleanupAbandonedFeedback(): Promise<string[]> {
 
   for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
     const panFeedbackDir = join(workspacePath, '.pan', 'feedback');
-    const legacyFeedbackDir = join(workspacePath, '.planning', 'feedback');
-    if (!existsSync(panFeedbackDir) && !existsSync(legacyFeedbackDir)) continue;
+    if (!existsSync(panFeedbackDir)) continue;
 
     const issueLower = issueId.toLowerCase();
 
@@ -1109,7 +1108,7 @@ export async function cleanupAbandonedFeedback(): Promise<string[]> {
       const countFeedbackFiles = (dir: string) => existsSync(dir)
         ? readdirSync(dir).filter(f => /^\d{3}-/.test(f) && f.endsWith('.md')).length
         : 0;
-      const before = countFeedbackFiles(panFeedbackDir) + countFeedbackFiles(legacyFeedbackDir);
+      const before = countFeedbackFiles(panFeedbackDir);
       if (before === 0) continue;
       await clearFeedbackFiles(workspacePath);
       actions.push(
@@ -2369,7 +2368,7 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
 // ============================================================================
 
 /**
- * Remove stale CI-failure feedback files from a workspace's .planning/feedback/ dir.
+ * Remove stale CI-failure feedback files from a workspace's .pan/feedback/ dir.
  * These accumulate when the merge-agent retries CI-blocked merges, and cause
  * the work agent to incorrectly believe CI is still failing on resume.
  */
@@ -2384,20 +2383,15 @@ async function clearStaleCiFeedback(issueId: string): Promise<void> {
 
   // Find the workspace directory: workspaces/feature-<issueLower> under the repo
   const issueLower = issueId.toLowerCase();
-  const candidateFeedbackDirs = [
-    join(repoDir, 'workspaces', `feature-${issueLower}`, '.pan', 'feedback'),
-    join(repoDir, 'workspaces', `feature-${issueLower}`, '.planning', 'feedback'),
-  ];
+  const feedbackDir = join(repoDir, 'workspaces', `feature-${issueLower}`, '.pan', 'feedback');
 
   try {
-    for (const candidateFeedbackDir of candidateFeedbackDirs) {
-      if (!existsSync(candidateFeedbackDir)) continue;
-      const files = await readdir(candidateFeedbackDir);
-      for (const file of files) {
-        if (file.includes('merge-agent') && file.includes('ci-failure') && file.endsWith('.md')) {
-          await rm(join(candidateFeedbackDir, file));
-          console.log(`[deacon] Cleared stale CI feedback: ${file} for ${issueId}`);
-        }
+    if (!existsSync(feedbackDir)) return;
+    const files = await readdir(feedbackDir);
+    for (const file of files) {
+      if (file.includes('merge-agent') && file.includes('ci-failure') && file.endsWith('.md')) {
+        await rm(join(feedbackDir, file));
+        console.log(`[deacon] Cleared stale CI feedback: ${file} for ${issueId}`);
       }
     }
   } catch (err: unknown) {
@@ -2455,7 +2449,7 @@ export async function checkDeadEndAgents(): Promise<string[]> {
 
     for (const [key, status] of Object.entries(statuses)) {
       // Only act on blocked/failed reviews, failed tests, or CI-blocked merges.
-      // 'failed' covers verification gate errors (e.g. JSON parse error in plan.vbrief.json)
+      // 'failed' covers verification gate errors (e.g. JSON parse error in `.pan/spec.vbrief.json`)
       // that prevent the review specialist from running at all.
       const isReviewBlocked = status.reviewStatus === 'blocked' || status.reviewStatus === 'failed';
       const isTestFailed = status.testStatus === 'failed';
@@ -2547,7 +2541,7 @@ export async function checkDeadEndAgents(): Promise<string[]> {
         if (resolved) {
           const wsPath = findWorkspacePath(resolved.projectPath, issueId.toLowerCase());
           if (wsPath) {
-            const feedbackDir = join(wsPath, '.planning', 'feedback');
+            const feedbackDir = join(wsPath, '.pan', 'feedback');
             if (existsSync(feedbackDir)) {
               const files = (await readdir(feedbackDir)).filter(f => f.endsWith('.md')).sort();
               if (files.length > 0) {
@@ -2896,23 +2890,12 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
       // processed this workspace — never send a "pan work done" nudge.
       const agentStateForGate = getAgentState(agent.id);
       if (agentStateForGate?.workspace) {
-        const panFeedbackDir = join(agentStateForGate.workspace, '.pan', 'feedback');
-        if (existsSync(panFeedbackDir)) {
+        const feedbackDir = join(agentStateForGate.workspace, '.pan', 'feedback');
+        if (existsSync(feedbackDir)) {
           try {
-            const feedbackFiles = readdirSync(panFeedbackDir);
+            const feedbackFiles = readdirSync(feedbackDir);
             if (feedbackFiles.length > 0) {
               console.log(`[deacon] First-completion gate: skipping ${agent.id} — has ${feedbackFiles.length} review feedback file(s) in .pan/feedback/`);
-              continue;
-            }
-          } catch { /* can't read feedback dir */ }
-        }
-
-        const legacyFeedbackDir = join(agentStateForGate.workspace, '.planning', 'feedback');
-        if (existsSync(legacyFeedbackDir)) {
-          try {
-            const feedbackFiles = readdirSync(legacyFeedbackDir);
-            if (feedbackFiles.length > 0) {
-              console.log(`[deacon] First-completion gate: skipping ${agent.id} — has ${feedbackFiles.length} review feedback file(s) in .planning/feedback/`);
               continue;
             }
           } catch { /* can't read feedback dir */ }
