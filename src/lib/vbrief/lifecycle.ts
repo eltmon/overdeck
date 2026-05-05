@@ -92,19 +92,30 @@ export function parseVBriefFilename(filename: string): { issueId: string; slug: 
 
 /**
  * Resolve the absolute path of a specific lifecycle directory under a project's
- * `./vbrief/` root. Pure path math — does not check existence or create dirs.
+ * vBRIEF root. Pure path math — does not check existence or create dirs.
+ *
+ * @param vbriefDirname - Override the default "vbrief" dirname (from projects.yaml `vbrief_dir`).
  */
-export function resolveVBriefDir(projectRoot: string, lifecycleDir: VBriefLifecycleDir): string {
-  return join(projectRoot, VBRIEF_ROOT_DIRNAME, lifecycleDir);
+export function resolveVBriefDir(projectRoot: string, lifecycleDir: VBriefLifecycleDir, vbriefDirname?: string): string {
+  return join(projectRoot, vbriefDirname || VBRIEF_ROOT_DIRNAME, lifecycleDir);
 }
 
 /**
- * Ensure the `./vbrief/{proposed,active,completed,cancelled}/` lifecycle
- * directories exist under the given project root. Returns the absolute path
- * to the `./vbrief/` root. Idempotent.
+ * Resolve the absolute path to a project's vBRIEF root directory (without a
+ * lifecycle subdirectory). Pure path math.
  */
-export function ensureVBriefDirs(projectRoot: string): string {
-  const root = join(projectRoot, VBRIEF_ROOT_DIRNAME);
+export function resolveVBriefRoot(projectRoot: string, vbriefDirname?: string): string {
+  return join(projectRoot, vbriefDirname || VBRIEF_ROOT_DIRNAME);
+}
+
+/**
+ * Ensure the vBRIEF lifecycle directories exist under the given project root.
+ * Returns the absolute path to the vBRIEF root. Idempotent.
+ *
+ * @param vbriefDirname - Override the default "vbrief" dirname (from projects.yaml `vbrief_dir`).
+ */
+export function ensureVBriefDirs(projectRoot: string, vbriefDirname?: string): string {
+  const root = join(projectRoot, vbriefDirname || VBRIEF_ROOT_DIRNAME);
   mkdirSync(root, { recursive: true });
   for (const dir of VBRIEF_LIFECYCLE_DIRS) {
     mkdirSync(join(root, dir), { recursive: true });
