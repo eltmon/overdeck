@@ -68,6 +68,7 @@ import {
 } from '../../../lib/agents.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
 import { getProviderForModel } from '../../../lib/providers.js';
+import { validateProviderHealth, ProviderHealthError } from '../../../lib/provider-health.js';
 import { hasPRDDraft } from '../../../lib/prd-draft.js';
 import { findPrdAnywhere } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
@@ -1735,6 +1736,33 @@ const postAgentsRoute = HttpRouter.add(
           hint: 'Click "Re-authenticate" in the Codex auth banner or Settings page to refresh your OpenAI subscription tokens.',
         }, { status: 429 });
       }
+    }
+
+    // Pre-flight provider health check — detect quota/auth/network errors
+    // before spawning the agent into Claude Code's opaque retry loop.
+    try {
+      yield* Effect.promise(() => validateProviderHealth(spawnModel));
+    } catch (err) {
+      if (err instanceof ProviderHealthError) {
+        return jsonResponse({
+          success: false,
+          blocked: true,
+          skipped: true,
+          error: err.message,
+          hint: err.probeResult.kind === 'quota'
+            ? 'Top up your credits on the provider dashboard, or switch this agent to a different model.'
+            : err.probeResult.kind === 'auth'
+              ? 'Check your API key in Settings → Providers.'
+              : 'The provider may be temporarily unavailable. Try again later or switch models.',
+          providerHealth: {
+            provider: err.provider.name,
+            model: err.model,
+            kind: err.probeResult.kind,
+            status: err.probeResult.status,
+          },
+        }, { status: 429 });
+      }
+      throw err;
     }
 
     if (existsSync(workspacePanContinuePath) || existsSync(workspacePanDir)) {

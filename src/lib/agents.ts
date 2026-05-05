@@ -15,6 +15,7 @@ import { BLANKED_PROVIDER_ENV } from './child-env.js';
 import type { ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from './providers.js';
+import { validateProviderHealth } from './provider-health.js';
 import { loadConfig as loadYamlConfig } from './config-yaml.js';
 import type { NormalizedCavemanConfig } from './config-yaml.js';
 import type { AuthMode } from './subscription-types.js';
@@ -163,6 +164,7 @@ export async function getProviderEnvForModel(model: string): Promise<Record<stri
   }
 
   if (apiKey) {
+    await validateProviderHealth(model, apiKey);
     return getProviderEnv(provider, apiKey);
   }
 
