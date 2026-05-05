@@ -121,6 +121,11 @@ export interface ProjectConfig {
   /** Local workspace packages that need building before quality gates (e.g., @panctl/contracts) */
   workspace_packages?: Array<{ path: string; build_command: string }>;
   /**
+   * Directory name for vBRIEF lifecycle directories (proposed/active/completed/cancelled).
+   * Defaults to "vbrief". Relative to the project root.
+   */
+  vbrief_dir?: string;
+  /**
    * Path to the repo where per-project cost WAL files live.
    * Defaults to `path` (the project repo itself).
    * For polyrepo setups, point this at the docs/shared repo.
