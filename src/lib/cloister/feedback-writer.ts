@@ -1,6 +1,6 @@
 /**
  * Feedback Writer — writes specialist feedback to the scope vBRIEF continue
- * file and (for backward compat) cleans up legacy .planning/feedback/ files.
+ * file and mirrors it into workspace `.pan/feedback/` for agent consumption.
  *
  * All I/O is async (fs/promises) — never execSync.
  */
@@ -9,6 +9,7 @@ import { readdir, rm } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { resolveProjectFromIssue } from '../projects.js';
+import { clearFeedback, getWorkspacePanPaths, readFeedback, writeFeedback } from '../pan-dir/index.js';
 import { appendContinueSessionEntryForIssue, appendFeedbackEntryForIssue, clearFeedbackForIssue, readContinueStateForIssue } from '../vbrief/lifecycle-io.js';
 
 export interface WriteFeedbackOptions {
@@ -63,14 +64,11 @@ async function getNextSequenceNumber(feedbackDir: string): Promise<number> {
 /**
  * Clear existing feedback files from a previous review cycle.
  *
- * Deletes all NNN-*.md files in .planning/feedback/ (and any legacy
- * .planning/feedback/archive/ directory left over from the old archive-based
- * implementation). Feedback has no value once the work agent has consumed it
- * — there's no history we want to preserve here. See
- * docs/REVIEW-AGENT-ARCHITECTURE.md.
+ * Deletes all NNN-*.md files in workspace `.pan/feedback/` and cleans any
+ * legacy `.planning/feedback/` leftovers from older workspaces.
  */
 export async function clearFeedbackFiles(workspacePath: string): Promise<void> {
-  const feedbackDir = join(workspacePath, '.planning', 'feedback');
+  const { feedbackDir } = getWorkspacePanPaths(workspacePath);
 
   // Also clear the continue file's feedback[] (Layer 1+).
   // Infer issueId from the workspace directory name (feature-<issue-id>).
@@ -86,32 +84,43 @@ export async function clearFeedbackFiles(workspacePath: string): Promise<void> {
     }
   }
 
-  if (!existsSync(feedbackDir)) return;
-
-  const files = await readdir(feedbackDir);
-  const feedbackFiles = files.filter(f => /^\d{3}-/.test(f) && f.endsWith('.md'));
-
-  for (const file of feedbackFiles) {
+  let clearedCount = 0;
+  if (existsSync(feedbackDir)) {
+    const feedbackFiles = readFeedback(workspacePath).filter(f => /^\d{3}-/.test(f.filename) && f.filename.endsWith('.md'));
     try {
-      await rm(join(feedbackDir, file), { force: true });
+      clearFeedback(workspacePath);
+      clearedCount += feedbackFiles.length;
     } catch (err: any) {
-      console.error(`[feedback-writer] Failed to delete ${file}:`, err.message);
+      console.error(`[feedback-writer] Failed to clear .pan/feedback for ${workspacePath}:`, err.message);
     }
   }
 
-  // Legacy: older versions moved feedback into .planning/feedback/archive/.
-  // Nuke that tree too — we no longer keep an archive.
-  const legacyArchiveDir = join(feedbackDir, 'archive');
-  if (existsSync(legacyArchiveDir)) {
-    try {
-      await rm(legacyArchiveDir, { recursive: true, force: true });
-    } catch (err: any) {
-      console.error(`[feedback-writer] Failed to remove legacy archive dir:`, err.message);
+  const legacyFeedbackDir = join(workspacePath, '.planning', 'feedback');
+  if (existsSync(legacyFeedbackDir)) {
+    const files = await readdir(legacyFeedbackDir);
+    const feedbackFiles = files.filter(f => /^\d{3}-/.test(f) && f.endsWith('.md'));
+
+    for (const file of feedbackFiles) {
+      try {
+        await rm(join(legacyFeedbackDir, file), { force: true });
+        clearedCount += 1;
+      } catch (err: any) {
+        console.error(`[feedback-writer] Failed to delete legacy ${file}:`, err.message);
+      }
+    }
+
+    const legacyArchiveDir = join(legacyFeedbackDir, 'archive');
+    if (existsSync(legacyArchiveDir)) {
+      try {
+        await rm(legacyArchiveDir, { recursive: true, force: true });
+      } catch (err: any) {
+        console.error(`[feedback-writer] Failed to remove legacy archive dir:`, err.message);
+      }
     }
   }
 
-  if (feedbackFiles.length > 0) {
-    console.log(`[feedback-writer] Cleared ${feedbackFiles.length} feedback file(s) from previous cycle`);
+  if (clearedCount > 0) {
+    console.log(`[feedback-writer] Cleared ${clearedCount} feedback file(s) from previous cycle`);
   }
 }
 
@@ -145,7 +154,7 @@ export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<Wri
 
   const workspacePath = opts.workspacePath || resolveWorkspacePath(opts.issueId);
   if (workspacePath) {
-    const feedbackDir = join(workspacePath, '.planning', 'feedback');
+    const { feedbackDir } = getWorkspacePanPaths(workspacePath);
     if (existsSync(feedbackDir)) {
       const fsSeq = await getNextSequenceNumber(feedbackDir);
       if (fsSeq > seq) seq = fsSeq;
@@ -154,7 +163,8 @@ export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<Wri
 
   const seqStr = String(seq).padStart(3, '0');
   const filename = `${seqStr}-${opts.specialist}-${opts.outcome}.md`;
-  const relativePath = `.planning/feedback/${filename}`;
+  const relativePath = `.pan/feedback/${filename}`;
+  const filePath = workspacePath ? join(getWorkspacePanPaths(workspacePath).feedbackDir, filename) : undefined;
 
   // Write to the scope vBRIEF's continue file (primary store, Layer 3+).
   try {
@@ -184,6 +194,15 @@ export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<Wri
     );
   }
 
+  if (workspacePath) {
+    try {
+      writeFeedback(workspacePath, filename, opts.markdownBody);
+    } catch (err: any) {
+      console.error(`[feedback-writer] Failed to mirror feedback file for ${opts.issueId}:`, err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
   console.log(`[feedback-writer] Wrote feedback seq ${seq} for ${opts.issueId} (${opts.specialist} → ${opts.outcome})`);
-  return { success: true, relativePath };
+  return { success: true, relativePath, filePath };
 }

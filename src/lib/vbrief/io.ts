@@ -1,11 +1,11 @@
 /**
  * vBRIEF File I/O Utilities
  *
- * Read and write plan.vbrief.json from workspace .planning/ directories.
+ * Read and write workspace vBRIEF plans from `.pan/spec.vbrief.json`.
  *
  * IMPORTANT (PAN-946): Workspace mutations MUST NEVER reach into project-level
  * lifecycle directories. `findPlan`, `readWorkspacePlan`, `updateItemStatus`,
- * and `updateSubItemStatus` resolve only `<workspacePath>/.planning/plan.vbrief.json`.
+ * and `updateSubItemStatus` resolve only the workspace-local spec file.
  * Lifecycle (proposed/active/completed/cancelled) lookups go through
  * `findVBriefByIssue` in `lifecycle-io.ts` (read-only) or
  * `findVBriefByIssueAsync` in `vbrief-index.ts` (read-only, indexed).
@@ -18,19 +18,17 @@
 
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';
 import type { VBriefDocument, VBriefItemStatus } from './types.js';
 
-const PLAN_FILENAME = 'plan.vbrief.json';
-
 /**
- * Returns the path to `<workspacePath>/.planning/plan.vbrief.json` if it
- * exists, or null. **Workspace-only.** Does NOT scan lifecycle directories —
- * lifecycle/discovery lookups belong in `findVBriefByIssue` /
- * `findVBriefByIssueAsync`.
+ * Returns the path to the workspace-local spec file if it exists, or null.
+ * **Workspace-only.** Does NOT scan lifecycle directories — lifecycle/discovery
+ * lookups belong in `findVBriefByIssue` / `findVBriefByIssueAsync`.
  */
 export function findPlan(workspacePath: string): string | null {
-  const planPath = join(workspacePath, '.planning', PLAN_FILENAME);
-  return existsSync(planPath) ? planPath : null;
+  const panPlanPath = join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME);
+  return existsSync(panPlanPath) ? panPlanPath : null;
 }
 
 /**
@@ -91,12 +89,10 @@ const PLANNING_FINISHED_STATUSES = new Set(['proposed', 'approved', 'pending', '
  *
  * Returns true ONLY when `plan.status === 'proposed'`. Used to gate the
  * dashboard Done button which should hide once the user has approved the plan
- * (status moves out of 'proposed'). Falls back to the legacy
- * `.planning/.planning-complete` marker only when the plan is missing a
- * status field, so legacy vBRIEFs still work during the transition.
+ * (status moves out of 'proposed').
  *
- * Pass either a workspace root (helper looks in `<root>/.planning/`) or a
- * `.planning/` directory directly via `planningDir`.
+ * Pass either a workspace root (helper looks in `<root>/.pan/`) or a direct
+ * `.pan/` directory path via `planningDir`.
  */
 export function isPlanningProposed(workspacePath: string, planningDir?: string): boolean {
   return checkPlanStatus(workspacePath, planningDir, status => status === 'proposed');
@@ -107,12 +103,10 @@ export function isPlanningProposed(workspacePath: string, planningDir?: string):
  * been generated and the agent can (or already did) start work.
  *
  * Returns true when `plan.status` is any of: 'proposed', 'approved', 'pending',
- * 'running', 'completed', or 'blocked'. Falls back to the legacy
- * `.planning/.planning-complete` marker so older vBRIEFs without the status
- * field continue to gate "tasks generated" checks correctly.
+ * 'running', 'completed', or 'blocked'.
  *
- * Pass either a workspace root (helper looks in `<root>/.planning/`) or a
- * `.planning/` directory directly via `planningDir`.
+ * Pass either a workspace root (helper looks in `<root>/.pan/`) or a direct
+ * `.pan/` directory path via `planningDir`.
  */
 export function isPlanningComplete(workspacePath: string, planningDir?: string): boolean {
   return checkPlanStatus(workspacePath, planningDir, status => PLANNING_FINISHED_STATUSES.has(status));
@@ -123,21 +117,23 @@ function checkPlanStatus(
   planningDir: string | undefined,
   matchStatus: (status: string) => boolean,
 ): boolean {
-  const dir = planningDir ?? join(workspacePath, '.planning');
-  const planPath = join(dir, 'plan.vbrief.json');
-  if (existsSync(planPath)) {
+  const candidatePlanPaths = planningDir
+    ? [join(planningDir, PAN_SPEC_FILENAME)]
+    : [join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME)];
+
+  for (const planPath of candidatePlanPaths) {
+    if (!existsSync(planPath)) continue;
     try {
       const doc = readPlan(planPath);
       const status = doc.plan?.status;
       if (status && matchStatus(status)) return true;
-      // Plan exists with an explicit non-matching status — trust it. Don't
-      // fall through to the marker (which could be stale).
       if (status) return false;
     } catch {
-      // Corrupt / unreadable plan — fall through to the legacy marker.
+      // Corrupt / unreadable plan — keep checking fallbacks.
     }
   }
-  return existsSync(join(dir, '.planning-complete'));
+
+  return false;
 }
 
 

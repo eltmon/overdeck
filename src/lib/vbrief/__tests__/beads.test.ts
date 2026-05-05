@@ -3,15 +3,16 @@ import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { syncBeadStatusToVBrief, getVBriefACStatus } from '../beads.js';
+import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../pan-dir/index.js';
 import { readWorkspacePlan } from '../io.js';
 import type { VBriefDocument } from '../types.js';
 
 let TEST_DIR: string;
 
 function writePlan(workspacePath: string, doc: VBriefDocument): void {
-  const planDir = join(workspacePath, '.planning');
+  const planDir = join(workspacePath, PAN_DIRNAME);
   mkdirSync(planDir, { recursive: true });
-  writeFileSync(join(planDir, 'plan.vbrief.json'), JSON.stringify(doc));
+  writeFileSync(join(planDir, PAN_SPEC_FILENAME), JSON.stringify(doc));
 }
 
 function writeBeadsFile(workspacePath: string, beads: Array<{ id: string; title: string }>): void {

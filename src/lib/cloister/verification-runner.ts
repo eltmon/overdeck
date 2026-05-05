@@ -392,7 +392,7 @@ export async function runVerificationForIssue(
       if (vbriefErr instanceof VBriefMergeConflictError) {
         const newCycleCount = currentCycles + 1;
         const failedCheck = 'vbrief-conflicts';
-        const summary = `plan.vbrief.json has unresolved git merge conflict markers. Resolve all conflict markers in .planning/plan.vbrief.json and commit before resubmitting.`;
+        const summary = `spec.vbrief.json has unresolved git merge conflict markers. Resolve all conflict markers in .pan/spec.vbrief.json and commit before resubmitting.`;
         setReviewStatus(issueId, {
           reviewStatus: 'pending',
           verificationStatus: 'failed',
@@ -400,7 +400,7 @@ export async function runVerificationForIssue(
           verificationCycleCount: newCycleCount,
           verificationMaxCycles: VERIFICATION_MAX_CYCLES,
         });
-        const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix merge conflicts in plan.vbrief.json BEFORE resubmitting\n\n1. Open .planning/plan.vbrief.json\n2. Find and resolve all <<<<<<< HEAD / ======= / >>>>>>> conflict markers\n3. Ensure the file is valid JSON (only keep ONE version of each conflicted block)\n4. Commit the fixed file\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Resolved plan.vbrief.json merge conflict"\n\nDo NOT resubmit until plan.vbrief.json parses cleanly.`;
+        const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix merge conflicts in spec.vbrief.json BEFORE resubmitting\n\n1. Open .pan/spec.vbrief.json\n2. Find and resolve all <<<<<<< HEAD / ======= / >>>>>>> conflict markers\n3. Ensure the file is valid JSON (only keep ONE version of each conflicted block)\n4. Commit the fixed file\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Resolved spec.vbrief.json merge conflict"\n\nDo NOT resubmit until spec.vbrief.json parses cleanly.`;
         try {
           const fileResult = await writeFeedbackFile({
             issueId,

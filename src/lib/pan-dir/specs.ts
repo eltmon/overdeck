@@ -1,0 +1,165 @@
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'fs'
+import { join } from 'path'
+
+import { VBriefMergeConflictError, readPlan } from '../vbrief/io.js'
+import { generateVBriefFilename, parseVBriefFilename, slugify } from '../vbrief/lifecycle.js'
+import { invalidateVBriefIndex } from '../vbrief/vbrief-index.js'
+import type { VBriefDocument } from '../vbrief/types.js'
+import {
+  PAN_DIRNAME,
+  PAN_DRAFTS_DIRNAME,
+  PAN_SPECS_DIRNAME,
+  type PanSpecDocument,
+  type PanSpecEntry,
+  type PanSpecListOptions,
+  type PanSpecStatus,
+  isPanSpecStatus,
+  asPanSpecDocument,
+  type ProjectPanPaths,
+} from './types.js'
+
+function projectPanPaths(projectRoot: string): ProjectPanPaths {
+  return {
+    panDir: join(projectRoot, PAN_DIRNAME),
+    specsDir: join(projectRoot, PAN_DIRNAME, PAN_SPECS_DIRNAME),
+    draftsDir: join(projectRoot, PAN_DIRNAME, PAN_DRAFTS_DIRNAME),
+  }
+}
+
+export function getProjectPanPaths(projectRoot: string): ProjectPanPaths {
+  return projectPanPaths(projectRoot)
+}
+
+export function ensurePanDirs(projectRoot: string): ProjectPanPaths {
+  const paths = projectPanPaths(projectRoot)
+  mkdirSync(paths.panDir, { recursive: true })
+  mkdirSync(paths.specsDir, { recursive: true })
+  mkdirSync(paths.draftsDir, { recursive: true })
+  return paths
+}
+
+function parsePanSpecDocument(path: string): PanSpecDocument {
+  const raw = readFileSync(path, 'utf-8')
+  if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
+    throw new VBriefMergeConflictError(path)
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch (error) {
+    throw new Error(`Invalid JSON in pan spec ${path}: ${(error as Error).message}`)
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error(`Invalid pan spec format in ${path}: document is not an object`)
+  }
+
+  const doc = parsed as Record<string, unknown>
+  if (!isPanSpecStatus(doc.status)) {
+    throw new Error(`Invalid pan spec format in ${path}: missing valid root status`)
+  }
+
+  return readPlan(path) as PanSpecDocument
+}
+
+export function readSpec(path: string): PanSpecDocument {
+  return parsePanSpecDocument(path)
+}
+
+export function writeSpec(path: string, doc: PanSpecDocument): void {
+  if (!isPanSpecStatus(doc.status)) {
+    throw new Error(`Invalid pan spec status for ${path}: ${String(doc.status)}`)
+  }
+  const tmp = `${path}.tmp`
+  writeFileSync(tmp, JSON.stringify(doc, null, 2), 'utf-8')
+  renameSync(tmp, path)
+}
+
+function entryFromFile(specsDir: string, filename: string): PanSpecEntry | null {
+  const parts = parseVBriefFilename(filename)
+  if (!parts) return null
+  const path = join(specsDir, filename)
+  const document = readSpec(path)
+  return {
+    path,
+    filename,
+    issueId: parts.issueId,
+    slug: parts.slug,
+    date: parts.date,
+    status: document.status,
+    document,
+  }
+}
+
+export function listSpecs(projectRoot: string, options: PanSpecListOptions = {}): PanSpecEntry[] {
+  const { specsDir } = projectPanPaths(projectRoot)
+  if (!existsSync(specsDir)) return []
+
+  const entries = readdirSync(specsDir)
+    .map(filename => entryFromFile(specsDir, filename))
+    .filter((entry): entry is PanSpecEntry => entry !== null)
+    .filter(entry => !options.status || entry.status === options.status)
+
+  entries.sort((a, b) => a.filename.localeCompare(b.filename))
+  return entries
+}
+
+export function findSpecByIssue(projectRoot: string, issueId: string): PanSpecEntry | null {
+  const upperIssueId = issueId.toUpperCase()
+  return listSpecs(projectRoot).find(entry => entry.issueId.toUpperCase() === upperIssueId) ?? null
+}
+
+export function buildPanSpecFilename(issueId: string, slug: string, createdDate?: Date | string): string {
+  return generateVBriefFilename(issueId, slug, createdDate)
+}
+
+export function buildPanSpecPath(
+  projectRoot: string,
+  issueId: string,
+  slug: string,
+  createdDate?: Date | string,
+): string {
+  return join(projectPanPaths(projectRoot).specsDir, buildPanSpecFilename(issueId, slugify(slug), createdDate))
+}
+
+export function writeSpecForIssue(
+  projectRoot: string,
+  doc: VBriefDocument,
+  status: PanSpecStatus,
+  filename?: string,
+): PanSpecEntry {
+  const paths = ensurePanDirs(projectRoot)
+  const specDocument = asPanSpecDocument(doc, status)
+  const nextFilename = filename ?? generateVBriefFilename(doc.plan.id, doc.plan.title)
+  const path = join(paths.specsDir, nextFilename)
+  writeSpec(path, specDocument)
+  invalidateVBriefIndex(projectRoot)
+  return {
+    path,
+    filename: nextFilename,
+    issueId: doc.plan.id,
+    slug: parseVBriefFilename(nextFilename)?.slug ?? slugify(doc.plan.title),
+    date: parseVBriefFilename(nextFilename)?.date ?? new Date().toISOString().slice(0, 10),
+    status,
+    document: specDocument,
+  }
+}
+
+export function updateSpecStatus(projectRoot: string, issueId: string, newStatus: PanSpecStatus): PanSpecEntry | null {
+  const existing = findSpecByIssue(projectRoot, issueId)
+  if (!existing) return null
+  if (existing.status === newStatus) return existing
+
+  const nextDocument: PanSpecDocument = {
+    ...existing.document,
+    status: newStatus,
+  }
+  writeSpec(existing.path, nextDocument)
+  invalidateVBriefIndex(projectRoot)
+  return {
+    ...existing,
+    status: newStatus,
+    document: nextDocument,
+  }
+}

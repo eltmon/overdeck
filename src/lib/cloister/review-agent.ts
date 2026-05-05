@@ -271,7 +271,7 @@ function parseAgentOutput(output: string): ReviewResult {
 
 /**
  * Send review feedback to the work agent.
- * Writes feedback to .planning/feedback/ in the workspace, appends a breadcrumb
+ * Writes feedback to .pan/feedback/ in the workspace, appends a breadcrumb
  * to the continue file, and sends a short reference via tmux.
  */
 /**
@@ -1452,8 +1452,8 @@ export async function dispatchParallelReview(
     console.warn(`[review-agent] Idempotency check failed for ${opts.issueId}, proceeding:`, err);
   }
 
-  // Archive feedback from any previous review cycle so the work agent only
-  // sees current-cycle feedback when it reads .planning/feedback/.
+  // Clear feedback from any previous review cycle so the work agent only
+  // sees current-cycle feedback when it reads .pan/feedback/.
   try {
     const { archiveFeedbackFiles } = await import('./feedback-writer.js');
     await archiveFeedbackFiles(opts.workspace);

@@ -8,6 +8,7 @@ import {
   formatAcceptanceCriteria,
   checkAllCriteriaCompleted,
 } from '../acceptance-criteria.js';
+import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../pan-dir/index.js';
 import type { VBriefDocument } from '../types.js';
 
 let TEST_DIR: string;
@@ -40,9 +41,9 @@ function makePlanWithAC(items: Array<{
 }
 
 function writePlan(workspacePath: string, doc: VBriefDocument): void {
-  const planDir = join(workspacePath, '.planning');
+  const planDir = join(workspacePath, PAN_DIRNAME);
   mkdirSync(planDir, { recursive: true });
-  writeFileSync(join(planDir, 'plan.vbrief.json'), JSON.stringify(doc, null, 2));
+  writeFileSync(join(planDir, PAN_SPEC_FILENAME), JSON.stringify(doc, null, 2));
 }
 
 beforeEach(() => {

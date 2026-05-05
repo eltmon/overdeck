@@ -33,6 +33,7 @@ import { StoppedAgentsBanner } from './components/StoppedAgentsBanner';
 import { CodexAuthBanner } from './components/CodexAuthBanner';
 import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { SystemHealthPill } from './components/SystemHealthPill';
+import { CostWarningStyles } from './components/shared/costWarning';
 import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useDashboardStore, selectAgentList, selectIssues, selectDashboardLifecycle } from './lib/store';
@@ -609,6 +610,9 @@ export default function App() {
       {/* Event-sourced state: connects WsTransport → DashboardStore (PAN-428 B4) */}
       <EventRouter />
 
+      {/* Mounts @keyframes for the pulsing extreme-tier cost warning badge */}
+      <CostWarningStyles />
+
       {/* Collapsible sidebar navigation */}
       <Sidebar
         activeTab={activeTab}
@@ -717,7 +721,7 @@ export default function App() {
           </div>
         )}
 
-        <div className="relative z-[200] border-b border-border bg-background/95 px-4 py-2 backdrop-blur shrink-0">
+        <div className="relative border-b border-border bg-background px-4 py-2 shrink-0">
           <div className="flex items-center justify-end">
             <div className="w-full max-w-xs">
               <SystemHealthPill />

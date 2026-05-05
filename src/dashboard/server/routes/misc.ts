@@ -64,13 +64,14 @@ import { loadConfig as loadPanConfig } from '../../../lib/config.js';
 import { checkAgentHealthAsync, determineHealthStatusAsync } from '../../lib/health-filtering.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
-import { isPlanningComplete, isPlanningProposed } from '../../../lib/vbrief/io.js';
+import { findPlan, isPlanningComplete, isPlanningProposed } from '../../../lib/vbrief/io.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { ReadModelService } from '../read-model.js';
 import { getSystemHealthSnapshot } from '../services/system-health-service.js';
 import { httpHandler } from './http-handler.js';
 import { isDeaconGloballyPaused, setDeaconGloballyPaused } from '../../../lib/database/app-settings.js';
+import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 
 const execAsync = promisify(exec);
 
@@ -971,30 +972,20 @@ const getPlanningStatusRoute = HttpRouter.add(
           } catch {}
         }
 
-        const planningDirInWorkspace = join(workspacePath, '.planning');
-        const legacyPlanningDir = join(projectPath, '.planning', issueLower);
-        const planningDir = existsSync(planningDirInWorkspace)
-          ? planningDirInWorkspace
-          : existsSync(legacyPlanningDir)
-            ? legacyPlanningDir
-            : null;
-
-        const hasContinueFile = planningDir ? existsSync(join(planningDir, `continue-${issueId.toUpperCase()}.vbrief.json`)) : false;
-        const hasPlanningState = hasContinueFile;
-        const hasPromptFile = planningDir
-          ? existsSync(join(planningDir, 'PLANNING_PROMPT.md'))
-          : false;
-        // hasCompletionMarker now means "plan.status === 'proposed'" (gates the
+        const panDir = join(workspacePath, PAN_DIRNAME);
+        const panContinueFile = join(panDir, PAN_CONTINUE_FILENAME);
+        const hasContinueFile = existsSync(panContinueFile);
+        const hasPlanningState = hasContinueFile || findPlan(workspacePath) !== null;
+        const hasPromptFile = hasPlanningState;
+        // hasCompletionMarker means `plan.status === 'proposed'` (gates the
         // dashboard Done button which should hide once the user has approved).
-        // planningCompleted means "plan.status indicates planning has finished"
-        // (any of proposed/approved/pending/running/completed/blocked) — the
-        // broader check used for dialog step routing. Both fall back to the
-        // legacy `.planning-complete` marker for vBRIEFs without status fields.
-        const hasCompletionMarker = planningDir
-          ? isPlanningProposed(workspacePath, planningDir)
+        // planningCompleted means `plan.status` indicates planning has finished
+        // (any of proposed/approved/pending/running/completed/blocked).
+        const hasCompletionMarker = existsSync(panDir)
+          ? isPlanningProposed(workspacePath, panDir)
           : false;
-        const planningCompleted = planningDir
-          ? isPlanningComplete(workspacePath, planningDir)
+        const planningCompleted = existsSync(panDir)
+          ? isPlanningComplete(workspacePath, panDir)
           : false;
 
         return jsonResponse({
@@ -1067,15 +1058,8 @@ const postPlanningMessageRoute = HttpRouter.add(
         }
 
         const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-        const workspacePlanningDir = join(workspacePath, '.planning');
-        const legacyPlanningDir = join(projectPath, '.planning', issueLower);
-
-        let planningDir: string;
-        if (existsSync(workspacePlanningDir)) {
-          planningDir = workspacePlanningDir;
-        } else if (existsSync(legacyPlanningDir)) {
-          planningDir = legacyPlanningDir;
-        } else {
+        const planningDir = join(workspacePath, PAN_DIRNAME);
+        if (!existsSync(planningDir)) {
           return jsonResponse(
             { error: 'Planning directory not found', sessionEnded: true },
             { status: 404 },
@@ -1154,7 +1138,7 @@ const postPlanningMessageRoute = HttpRouter.add(
 **YOU SHOULD ONLY:**
 - Ask clarifying questions
 - Explore the codebase to understand context
-- Generate planning artifacts (continue.vbrief.json at \`.planning/continue-{issue-id}.vbrief.json\`, vBRIEF plan at \`.planning/plan.vbrief.json\`)
+- Generate planning artifacts (\`.pan/continue.json\`, \`.pan/spec.vbrief.json\`)
 - Present options and tradeoffs
 
 ---

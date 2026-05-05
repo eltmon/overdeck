@@ -189,7 +189,7 @@ async function findLastCompactBoundaryOffset(jsonlPath: string): Promise<number>
         }
       } catch { /* skip invalid lines */ }
     }
-    offset += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
+    offset += line.length + 1; // +1 for \n
   }
   return lastBoundaryOffset;
 }

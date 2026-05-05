@@ -2,6 +2,7 @@ import { exec } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { findPlan } from './vbrief/io.js';
 import { promisify } from 'node:util';
 import { queryBeadsForIssue } from './beads-query.js';
 import { getForgeAdapter } from './forge.js';
@@ -40,8 +41,8 @@ export async function buildRichReviewArtifactBody(issueId: string, workspacePath
   lines.push('');
 
   try {
-    const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
-    if (existsSync(planPath)) {
+    const planPath = findPlan(workspacePath);
+    if (planPath && existsSync(planPath)) {
       const raw = await readFile(planPath, 'utf-8');
       const doc = JSON.parse(raw);
       const items: Array<{ status: string; title: string }> = doc?.plan?.items ?? [];

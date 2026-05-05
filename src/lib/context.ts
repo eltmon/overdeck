@@ -6,7 +6,7 @@
  * - SUMMARY.md: Work artifacts
  * - Queryable history files
  *
- * Workspace-level planning state lives in `<lifecycleDir>/continue-<issueId>.vbrief.json`,
+ * Workspace-level orchestration state lives in `<workspace>/.pan/continue.json`,
  * not here.
  */
 

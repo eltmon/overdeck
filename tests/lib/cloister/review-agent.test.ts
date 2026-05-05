@@ -1138,11 +1138,9 @@ describe('spawnReviewer runtime command routing regression', () => {
     expect(fn).not.toMatch(/`claude\s+--(?:dangerously-skip-permissions|model)/);
   });
 
-  it('review-agent.ts imports getProviderExportsForModel (not getProviderEnvForModel)', async () => {
-    // getProviderExportsForModel always emits `unset ANTHROPIC_BASE_URL` lines,
-    // preventing stale parent-session env from leaking into reviewer processes.
-    // getProviderEnvForModel returns {} for Anthropic models, so tmux -e flags
-    // would add nothing and the parent ANTHROPIC_BASE_URL would not be cleared.
+  it('review-agent.ts uses both launcher exports and settings overlay helpers for provider env isolation', async () => {
+    // The current design uses launcher-script exports plus settings.local.json
+    // overlay injection so Claude settings-level env cannot override provider routing.
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const src = readFileSync(
@@ -1150,7 +1148,8 @@ describe('spawnReviewer runtime command routing regression', () => {
       'utf-8',
     );
     expect(src).toMatch(/getProviderExportsForModel/);
-    expect(src).not.toMatch(/getProviderEnvForModel/);
+    expect(src).toMatch(/getProviderEnvForModel/);
+    expect(src).toMatch(/injectProviderEnvOverlay/);
   });
 
   it('spawnReviewer uses a bash launcher script, not tmux -e env flags', async () => {
@@ -1170,9 +1169,11 @@ describe('spawnReviewer runtime command routing regression', () => {
     expect(fn).toContain('writeFile(');
     expect(fn).toMatch(/bash\s+.*launcherPath/);
 
-    // Must NOT pass provider env via tmux -e flags (old pattern that fails for Anthropic models).
-    // Panopticon identity vars may be passed as empty strings to prevent inherited env leakage.
-    expect(fn).not.toContain('getProviderEnvForModel(');
+    // Provider env now flows through launcher exports plus settings overlay injection,
+    // but must still avoid the old tmux `-e KEY=value` transport.
+    expect(fn).toContain('getProviderEnvForModel(');
+    expect(fn).toContain('injectProviderEnvOverlay(');
+    expect(fn).not.toMatch(/createSessionAsync\([\s\S]*-e\s/);
     const envMatch = fn.match(/\{\s*env\s*:[\s\S]*?\}/);
     if (envMatch) {
       expect(envMatch[0]).not.toMatch(/ANTHROPIC_BASE_URL|OPENAI_API_KEY|providerEnv/);

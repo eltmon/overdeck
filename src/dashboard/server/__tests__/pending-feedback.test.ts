@@ -29,7 +29,7 @@ describe('pending feedback recovery (PAN-585)', () => {
       issueId: 'PAN-585',
       agentId: 'agent-pan-585',
       kind: 'review-blocked',
-      filePath: '/tmp/workspaces/feature-pan-585/.planning/feedback/001-review-agent-changes-requested.md',
+      filePath: '/tmp/workspaces/feature-pan-585/.pan/feedback/001-review-agent-changes-requested.md',
       message: 'SPECIALIST FEEDBACK: review-agent reported BLOCKED for PAN-585',
       createdAt: '2026-04-27T06:00:00Z',
     }, { filePath: queueFile });
@@ -70,7 +70,7 @@ describe('pending feedback recovery (PAN-585)', () => {
       issueId: 'PAN-585',
       agentId: 'agent-pan-585',
       kind: 'test-failed',
-      filePath: '/tmp/workspaces/feature-pan-585/.planning/feedback/002-test-agent-failed.md',
+      filePath: '/tmp/workspaces/feature-pan-585/.pan/feedback/002-test-agent-failed.md',
       message: 'SPECIALIST FEEDBACK: test-agent reported FAILED for PAN-585',
       createdAt: '2026-04-27T06:00:00Z',
     }, { filePath: queueFile });
@@ -104,7 +104,7 @@ describe('pending feedback recovery (PAN-585)', () => {
       issueId: 'PAN-585',
       agentId: 'agent-pan-585',
       kind: 'review-failed',
-      filePath: '/tmp/workspaces/feature-pan-585/.planning/feedback/003-review-agent-failed.md',
+      filePath: '/tmp/workspaces/feature-pan-585/.pan/feedback/003-review-agent-failed.md',
       message: 'SPECIALIST FEEDBACK: review-agent reported FAILED for PAN-585',
       createdAt: '2026-04-27T06:00:00Z',
     }, { filePath: queueFile });

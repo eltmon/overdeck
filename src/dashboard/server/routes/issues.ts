@@ -37,8 +37,9 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
-import { isPlanningComplete } from '../../../lib/vbrief/io.js';
-import { promoteVBriefToProposed, appendContinueSessionEntryForIssue } from '../../../lib/vbrief/lifecycle-io.js';
+import { findPlan, isPlanningComplete, readPlan } from '../../../lib/vbrief/io.js';
+import { appendContinueSessionEntryForIssue } from '../../../lib/vbrief/lifecycle-io.js';
+import { asPanSpecDocument, findSpecByIssue, writeSpec, writeSpecForIssue } from '../../../lib/pan-dir/index.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus } from '../review-status.js';
@@ -1003,19 +1004,17 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     const { pushed: gitPushed, beadsWarning } = yield* Effect.promise(async (): Promise<{ pushed: boolean; beadsWarning: string | null }> => {
       if (!projectPath) return { pushed: false, beadsWarning: null };
 
-      const workspacePlanningDir = join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning');
+      const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+      const workspacePlanPath = findPlan(workspacePath);
       const legacyPlanningDir = join(projectPath, '.planning', issueLower);
 
-      let planningDir = '';
-      if (existsSync(workspacePlanningDir)) planningDir = workspacePlanningDir;
-      else if (existsSync(legacyPlanningDir)) planningDir = legacyPlanningDir;
+      let gitRoot = '';
+      if (workspacePlanPath) gitRoot = workspacePath;
+      else if (existsSync(legacyPlanningDir)) gitRoot = projectPath;
 
-      if (!planningDir) return { pushed: false, beadsWarning: null };
+      if (!gitRoot) return { pushed: false, beadsWarning: null };
 
       try {
-        const gitRoot = planningDir.includes('/workspaces/')
-          ? join(projectPath, 'workspaces', `feature-${issueLower}`)
-          : projectPath;
 
         // Beads are created by the planning agent via `pan plan-finalize`, which also
         // writes .planning/.planning-complete. By the time this endpoint runs, the marker
@@ -1023,29 +1022,29 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
         // the planning prompt is the right place to enforce that contract.
         const beadsWarning: string | null = null;
 
-        // Copy the scope vBRIEF (and continue file if present) from the workspace's
-        // .planning/ to the project root's ./vbrief/proposed/<canonical-filename>,
-        // then commit on the main branch with `scope: propose <ID> vBRIEF`. The
-        // ./vbrief/ tree is the source of truth for plan lifecycle state — see
-        // src/lib/vbrief/lifecycle.ts. Old docs/prds/active/ copies for plan
-        // artifacts have been removed (PAN-946).
+        // Copy the workspace vBRIEF into the project root's canonical
+        // .pan/specs/ store with root status=proposed, then commit that spec on
+        // main with `scope: propose <ID> vBRIEF`.
         try {
-          const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
           const upperIssueId = id.toUpperCase();
-          const promoted = promoteVBriefToProposed(workspacePath, projectPath, upperIssueId);
-          console.log(`[complete-planning] Copied vBRIEF to ${promoted.destVBrief}`);
-          if (promoted.destContinue) {
-            console.log(`[complete-planning] Copied continue file to ${promoted.destContinue}`);
+          if (!workspacePlanPath) {
+            throw new Error(`No workspace vBRIEF found for ${upperIssueId}`);
           }
 
-          const filesToStage = [`vbrief/proposed/${promoted.canonicalFilename}`];
-          if (promoted.destContinue) {
-            const continueBase = promoted.destContinue.split('/').pop()!;
-            filesToStage.push(`vbrief/proposed/${continueBase}`);
-          }
+          const workspaceDoc = readPlan(workspacePlanPath);
+          const canonicalFilename = workspaceDoc.plan.metadata?.canonicalFilename;
+          const existingSpec = findSpecByIssue(projectPath, upperIssueId);
+          const proposed = existingSpec
+            ? (() => {
+                const nextDoc = asPanSpecDocument(workspaceDoc, 'proposed');
+                writeSpec(existingSpec.path, nextDoc);
+                return { path: existingSpec.path, filename: existingSpec.filename };
+              })()
+            : writeSpecForIssue(projectPath, workspaceDoc, 'proposed', canonicalFilename);
+          console.log(`[complete-planning] Wrote pan spec to ${proposed.path}`);
 
-          // Commit on main only when the project root is actually on main.
-          // Otherwise the file is left on disk for the user / a later sync to pick up.
+          const filesToStage = [`.pan/specs/${proposed.filename}`];
+
           try {
             const { stdout: branchStdout } = await execAsync(
               'git rev-parse --abbrev-ref HEAD',
@@ -1055,17 +1054,14 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
             if (currentBranch === 'main') {
               const quoted = filesToStage.map(f => `"${f}"`).join(' ');
               await execAsync(`git add -- ${quoted}`, { cwd: projectPath, encoding: 'utf-8' });
-              // Path-scoped commit so we don't sweep up unrelated user changes.
               try {
                 await execAsync(`git diff --cached --quiet -- ${quoted}`, { cwd: projectPath, encoding: 'utf-8' });
-                // No staged changes for our paths — nothing to commit (file unchanged).
               } catch {
                 await execAsync(
                   `git commit -m "scope: propose ${upperIssueId} vBRIEF" -- ${quoted}`,
                   { cwd: projectPath, encoding: 'utf-8' },
                 );
-                console.log(`[complete-planning] Committed vBRIEF lifecycle copy on main for ${upperIssueId}`);
-                // Push in background — non-fatal on failure.
+                console.log(`[complete-planning] Committed pan spec on main for ${upperIssueId}`);
                 try {
                   const { stdout: remotes } = await execAsync('git remote', { cwd: projectPath, encoding: 'utf-8' });
                   if (remotes.trim()) {
@@ -1075,13 +1071,13 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
                 } catch { /* push failed — no remote or auth — non-fatal */ }
               }
             } else {
-              console.log(`[complete-planning] Project root not on main (${currentBranch}) — vBRIEF copied to vbrief/proposed/ but not committed on main`);
+              console.log(`[complete-planning] Project root not on main (${currentBranch}) — pan spec updated on disk but not committed on main`);
             }
           } catch (gitErr: any) {
-            console.warn(`[complete-planning] vBRIEF lifecycle commit failed (non-fatal): ${gitErr?.message ?? gitErr}`);
+            console.warn(`[complete-planning] pan spec commit failed (non-fatal): ${gitErr?.message ?? gitErr}`);
           }
         } catch (copyErr: any) {
-          console.warn(`[complete-planning] vBRIEF lifecycle copy failed (non-fatal): ${copyErr?.message ?? copyErr}`);
+          console.warn(`[complete-planning] pan spec update failed (non-fatal): ${copyErr?.message ?? copyErr}`);
         }
 
         // Sync beads
@@ -1089,9 +1085,9 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           await withBdMutex(() => execAsync('bd sync 2>/dev/null || true', { cwd: gitRoot, encoding: 'utf-8', timeout: 10000 }));
         } catch { /* bd might not be installed */ }
 
-        // The .planning-complete marker is written by `pan plan-finalize` from the
-        // planning agent, not here. The Done button is gated on its existence, so by
-        // the time this endpoint fires the marker is already on disk.
+        // The proposed planning state is written by `pan plan-finalize` from the
+        // planning agent, not here. The Done button is gated on that workspace
+        // state, so by the time this endpoint fires it is already on disk.
 
         // Git operations
         const isGitRepo = existsSync(join(gitRoot, '.git'));
@@ -1099,7 +1095,9 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           await execAsync('git init', { cwd: gitRoot, encoding: 'utf-8' });
         }
 
-        await execAsync('git add -f .planning/', { cwd: gitRoot, encoding: 'utf-8' });
+        if (existsSync(join(gitRoot, '.pan'))) {
+          await execAsync('git add -f .pan/', { cwd: gitRoot, encoding: 'utf-8' });
+        }
         if (existsSync(join(gitRoot, '.beads'))) {
           await execAsync('git add .beads/', { cwd: gitRoot, encoding: 'utf-8' });
         }
@@ -1654,11 +1652,11 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
           (await (async () => {
             try {
               const { stdout } = await execAsync(
-                `git log --diff-filter=A --format=%H -1 -- .planning/plan.vbrief.json`,
+                `git log --diff-filter=A --format=%H -1 -- .pan/spec.vbrief.json`,
                 { cwd: workspacePath, encoding: 'utf-8', timeout: 10_000 },
               );
               const sha = stdout.trim();
-              return sha ? { sha, method: 'plan.vbrief.json add' } : null;
+              return sha ? { sha, method: '.pan/spec.vbrief.json add' } : null;
             } catch {
               return null;
             }
@@ -2499,8 +2497,8 @@ const getIssuePlanningStateRoute = HttpRouter.add(
     const workspacePath = projectPath
       ? join(projectPath, 'workspaces', `feature-${issueLower}`)
       : '';
-    const planPath = workspacePath ? join(workspacePath, '.planning', 'plan.vbrief.json') : '';
-    const hasPlan = !!planPath && existsSync(planPath);
+    const planPath = workspacePath ? findPlan(workspacePath) : null;
+    const hasPlan = planPath !== null;
     // planningComplete now means "plan.status indicates planning has finished" —
     // any of proposed/approved/pending/running/completed/blocked. Falls back to
     // the legacy `.planning-complete` marker for vBRIEFs without status fields.
@@ -2521,8 +2519,8 @@ const getIssuePlanningStateRoute = HttpRouter.add(
 
 // ─── Route: POST /api/issues/:id/generate-tasks ──────────────────────────────
 //
-// Runs createBeadsFromVBrief() against the workspace, then writes the
-// .planning-complete marker. Same logic as `pan plan-finalize`, exposed so the
+// Runs createBeadsFromVBrief() against the workspace. Same logic as
+// `pan plan-finalize`, exposed so the
 // dashboard can offer a one-click "Generate Tasks" action when a vBRIEF plan
 // exists but beads were never created (e.g. plans authored before the
 // agent-driven finalize flow shipped).
@@ -2551,10 +2549,10 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
     }
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
-    if (!existsSync(planPath)) {
+    const planPath = findPlan(workspacePath);
+    if (!planPath || !existsSync(planPath)) {
       return jsonResponse(
-        { success: false, error: `No vBRIEF plan at ${planPath} — run planning first.` },
+        { success: false, error: `No vBRIEF plan at ${join(workspacePath, '.pan', 'spec.vbrief.json')} — run planning first.` },
         409,
       );
     }
@@ -2566,9 +2564,6 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
       const errors = result.errors.length > 0 ? result.errors : ['Beads creation produced no tasks'];
       return jsonResponse({ success: false, created: result.created, errors }, 500);
     }
-
-    const markerPath = join(workspacePath, '.planning', '.planning-complete');
-    yield* Effect.promise(() => writeFile(markerPath, '', 'utf-8'));
 
     return jsonResponse({
       success: true,

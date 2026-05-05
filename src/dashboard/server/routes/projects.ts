@@ -27,6 +27,7 @@ import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { getReviewStatus } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, type ReviewerRoundMetadata } from './reviewer-tree.js';
+import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../../lib/pan-dir/index.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
@@ -143,13 +144,14 @@ async function collectSessionTreeNodes(
   }
 
   if (!hasPlanningSection) {
-    const planningDir = join(workspacePath, '.planning');
-    if (await pathExists(planningDir)) {
-      const continuePath = join(planningDir, `continue-${issueId.toUpperCase()}.vbrief.json`);
-      const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
-      const planningPathForTimestamp = await pathExists(continuePath)
-        ? continuePath
-        : planningPromptPath;
+    const panContinuePath = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
+    const panSpecPath = join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME);
+    const planningPathForTimestamp = await pathExists(panContinuePath)
+      ? panContinuePath
+      : await pathExists(panSpecPath)
+        ? panSpecPath
+        : null;
+    if (planningPathForTimestamp) {
       const planningStat = await stat(planningPathForTimestamp).catch(() => null);
       const sessionId = `planning-${issueLower}-state`;
       const jsonlPath = await resolveJsonlPath(sessionId, workspacePath);
@@ -215,17 +217,17 @@ async function resolveFeatureTitle(
     return mappedTitle;
   }
 
-  // Fall back to PLANNING_PROMPT.md first line
   if (project) {
     try {
       const projectPath = (project.config as { path: string }).path;
       const workspaceConfig = (project.config as { workspace?: { workspaces_dir?: string } }).workspace;
       const workspacesDir = join(projectPath, workspaceConfig?.workspaces_dir || 'workspaces');
-      const planningDir = join(workspacesDir, `feature-${issueLower}`, '.planning');
-      const promptContent = await readOptional(join(planningDir, 'PLANNING_PROMPT.md'));
-      if (promptContent) {
-        const firstLine = promptContent.split('\n').find(l => l.trim().length > 0) || '';
-        const title = sanitizeDisplayTitle(firstLine.replace(/^#+\s*/, ''));
+      const specContent = await readOptional(
+        join(workspacesDir, `feature-${issueLower}`, PAN_DIRNAME, PAN_SPEC_FILENAME),
+      );
+      if (specContent) {
+        const parsed = JSON.parse(specContent) as { plan?: { title?: string } };
+        const title = sanitizeDisplayTitle(parsed.plan?.title ?? '');
         if (title) return title;
       }
     } catch { /* non-fatal */ }
@@ -326,10 +328,10 @@ export async function fetchProjectSessionTree(
     const results = await withConcurrencyLimit(
       featureCandidates.map((c) => async () => {
         const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${c.issueLower}`);
-        const planningDir = join(workspacesDir, c.name, '.planning');
+        const panDir = join(workspacesDir, c.name, PAN_DIRNAME);
         const [hasAgent, hasPlanning] = await Promise.all([
           pathExists(agentDir),
-          pathExists(planningDir),
+          pathExists(panDir),
         ]);
         if (!hasAgent && !hasPlanning) return null;
         try {

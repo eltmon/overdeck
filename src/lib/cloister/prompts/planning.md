@@ -37,8 +37,8 @@ optional:
 - Ask clarifying questions (use AskUserQuestion tool)
 - Explore the codebase to understand context (read files, grep)
 - Generate planning artifacts:
-  - **continue.vbrief.json** at `.planning/continue-{issue-id}.vbrief.json` — structured decisions, hazards, and approach context (see format below). Replaces the old STATE.md.
-  - **vBRIEF plan** at `.planning/plan.vbrief.json` (see format below)
+  - **continue.json** at `.pan/continue.json` — structured decisions, hazards, and approach context (see format below). Replaces the old STATE.md.
+  - **vBRIEF plan** at `.pan/spec.vbrief.json` (see format below)
 - Present options and tradeoffs for the user to decide
 
 **Finalizing the session:** When your vBRIEF is written and you're ready to hand off, run:
@@ -47,7 +47,7 @@ optional:
 pan plan-finalize
 ```
 
-This converts your `plan.vbrief.json` into beads tasks and writes the `.planning/.planning-complete` marker that lets the dashboard show the **Done** button. Do NOT run `bd create` yourself — `pan plan-finalize` does it deterministically from the vBRIEF.
+This converts your `.pan/spec.vbrief.json` into beads tasks and marks the workspace spec as `plan.status = "proposed"`, which lets the dashboard show the **Done** button. Do NOT run `bd create` yourself — `pan plan-finalize` does it deterministically from the vBRIEF.
 
 After `pan plan-finalize` succeeds, STOP. Tell the user: "Planning finalized — click Done in the dashboard to hand off to the implementation agent." Do not kill the tmux session yourself; the Stop button handles that if needed.
 
@@ -59,7 +59,7 @@ Panopticon orchestrates several distinct agent types. **You are the planning age
 
 | Agent | Role | Working dir | CLAUDE.md auto-loaded |
 |-------|------|-------------|-----------------------|
-| **planning** (you) | Discovery, vBRIEF, continue.vbrief.json. No code. | workspace worktree | workspace |
+| **planning** (you) | Discovery, vBRIEF, continue.json. No code. | workspace worktree | workspace |
 | **work** | Implementation from your vBRIEF + beads tasks | workspace worktree | workspace |
 | **inspect** | Per-bead spec verification mid-implementation | project root | project root |
 | **review** | Strict code review against acceptance criteria | project root | project root |
@@ -67,7 +67,7 @@ Panopticon orchestrates several distinct agent types. **You are the planning age
 | **uat** | Browser-based requirement verification (Playwright) | project root | project root |
 | **merge** | PR merge, conflict resolution, post-merge cleanup | project root | project root |
 
-**Critical asymmetry:** the workspace `CLAUDE.md` you see is NOT the one specialists see. Specialists run in the project root and auto-load the repo-tracked devroot `CLAUDE.md`. Instructions you put in `continue.vbrief.json` reach the work agent (same workspace) but not specialists. If you need a specialist to know something, put it in your vBRIEF as an acceptance criterion — that propagates through the pipeline via the role-prompt templates in `src/lib/cloister/prompts/`.
+**Critical asymmetry:** the workspace `CLAUDE.md` you see is NOT the one specialists see. Specialists run in the project root and auto-load the repo-tracked devroot `CLAUDE.md`. Instructions you put in `continue.json` reach the work agent (same workspace) but not specialists. If you need a specialist to know something, put it in your vBRIEF as an acceptance criterion — that propagates through the pipeline via the role-prompt templates in `src/lib/cloister/prompts/`.
 
 ### Claude Code subagents (NOT Panopticon specialists)
 
@@ -114,7 +114,7 @@ Use AskUserQuestion tool to ask contextual questions:
 
 ### Playwright Isolation
 
-If the issue will require browser-based verification, encode that expectation clearly in continue.vbrief.json and acceptance criteria:
+If the issue will require browser-based verification, encode that expectation clearly in continue.json and acceptance criteria:
 - Playwright/browser verification must use an isolated browser instance/profile.
 - Agents must not depend on another agent's Playwright session or shared browser state.
 - Any required login/setup should be reproducible inside the isolated session.
@@ -161,12 +161,12 @@ For each sub-task, estimate difficulty using this rubric:
 
 ### Phase 3: Generate Artifacts (NO CODE!)
 When discovery is complete:
-1. Create **continue.vbrief.json** at `.planning/continue-{issue-id}.vbrief.json` with decisions, hazards, and approach context (see format below).
-2. Create a **vBRIEF plan** at `.planning/plan.vbrief.json` — **MUST follow the exact format below**.
-3. Run `pan plan-finalize` from the workspace root. This creates beads tasks from your vBRIEF and writes the `.planning/.planning-complete` marker.
+1. Create **continue.json** at `.pan/continue.json` with decisions, hazards, and approach context (see format below).
+2. Create a **vBRIEF plan** at `.pan/spec.vbrief.json` — **MUST follow the exact format below**.
+3. Run `pan plan-finalize` from the workspace root. This creates beads tasks from your vBRIEF and sets `plan.status` to `proposed`.
 4. Summarize the plan and STOP
 
-**DO NOT run `bd create` commands directly.** `pan plan-finalize` is the only sanctioned way to materialize beads from a vBRIEF plan — it's deterministic and idempotent.
+**DO NOT run `bd create` commands directly.** `pan plan-finalize` is the only sanctioned way to materialize beads from a workspace vBRIEF plan — it's deterministic and idempotent.
 
 ### vBRIEF Plan Format (REQUIRED)
 
@@ -239,7 +239,7 @@ It MUST have exactly two top-level keys: `vBRIEFInfo` and `plan`.
 
 ### continue.vbrief.json Format
 
-The continue file is a **structured replacement for STATE.md**. It lives at `.planning/continue-{issue-id}.vbrief.json` and is copied to the lifecycle directory (`./vbrief/proposed/`) when planning completes.
+The continue file is a **structured replacement for STATE.md**. It lives at `.pan/continue.json` and is copied to the lifecycle continue file (`./vbrief/proposed/continue-{issue-id}.vbrief.json`) when planning completes.
 
 ```json
 {

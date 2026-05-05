@@ -41,6 +41,7 @@ export interface RestartOptions {
   cliproxy?: boolean;
   traefik?: boolean;
   full?: boolean;
+  force?: boolean;
   healthTimeout?: string;
 }
 
@@ -122,8 +123,12 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
       }
       case 'cliproxy': {
         const cliproxy = await import('../../lib/cliproxy.js');
-        await restartCliproxy(cliproxy);
-        console.log(chalk.green('✓ CLIProxy restarted'));
+        await restartCliproxy(cliproxy, { force: options.force === true });
+        if (options.force) {
+          console.log(chalk.green('✓ CLIProxy reinstalled at pinned version and restarted'));
+        } else {
+          console.log(chalk.green('✓ CLIProxy restarted'));
+        }
         console.log(chalk.dim('  Dashboard and Traefik were left running.'));
         break;
       }

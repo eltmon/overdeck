@@ -236,8 +236,8 @@ const planCmd = program
 
 planCmd
   .command('finalize')
-  .description('Materialize plan into beads, write completion marker')
-  .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .planning/)')
+  .description('Materialize plan into beads and mark the workspace spec as proposed')
+  .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .pan/)')
   .option('--json', 'Emit JSON result')
   .action(planFinalizeCommand);
 
@@ -959,6 +959,7 @@ program
   .option('--cliproxy', 'Restart only the CLIProxy sidecar')
   .option('--traefik', 'Restart only Traefik')
   .option('--full', 'Restart the entire stack (equivalent to pan down && pan up)')
+  .option('--force', 'For --cliproxy: redownload binary at the pinned version before restarting (use after bumping CLIPROXY_RELEASE_VERSION)')
   .option('--health-timeout <ms>', 'Dashboard /api/health wait budget in ms (default 15000)')
   .action(restartCommand);
 

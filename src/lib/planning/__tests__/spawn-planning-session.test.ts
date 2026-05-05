@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildPlanningPrompt, writeFeatureContext, type PlanningIssue } from '../spawn-planning-session.js';
+import { PAN_DIRNAME, PAN_CONTEXT_FILENAME } from '../../pan-dir/index.js';
 
 describe('buildPlanningPrompt', () => {
   const baseIssue: PlanningIssue = {
@@ -87,7 +88,7 @@ describe('writeFeatureContext', () => {
   it('writes FEATURE-CONTEXT.md for PortfolioItem issues', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'pan-test-'));
     await writeFeatureContext(dir, baseIssue);
-    const content = await readFile(join(dir, 'FEATURE-CONTEXT.md'), 'utf-8');
+    const content = await readFile(join(dir, PAN_DIRNAME, PAN_CONTEXT_FILENAME), 'utf-8');
     expect(content).toContain('Feature Context: F123');
     expect(content).toContain('Test Feature');
     expect(content).toContain('https://rally.example.com/F123');
@@ -107,7 +108,7 @@ describe('writeFeatureContext', () => {
     const dir = await mkdtemp(join(tmpdir(), 'pan-test-'));
     const issue = { ...baseIssue, childStories: [] };
     await writeFeatureContext(dir, issue);
-    const content = await readFile(join(dir, 'FEATURE-CONTEXT.md'), 'utf-8');
+    const content = await readFile(join(dir, PAN_DIRNAME, PAN_CONTEXT_FILENAME), 'utf-8');
     expect(content).toContain('_No child stories found._');
     await rm(dir, { recursive: true });
   });
@@ -120,7 +121,7 @@ describe('writeFeatureContext', () => {
     };
     await writeFeatureContext(dir, storyIssue);
     // File should not exist
-    await expect(readFile(join(dir, 'FEATURE-CONTEXT.md'), 'utf-8')).rejects.toThrow();
+    await expect(readFile(join(dir, PAN_DIRNAME, PAN_CONTEXT_FILENAME), 'utf-8')).rejects.toThrow();
     await rm(dir, { recursive: true });
   });
 });

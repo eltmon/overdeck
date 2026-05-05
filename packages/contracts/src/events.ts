@@ -686,6 +686,19 @@ export const ConversationCompactingChangedEvent = Schema.Struct({
 })
 export type ConversationCompactingChangedEvent = typeof ConversationCompactingChangedEvent.Type
 
+/** Emitted (in-memory only) when a PermissionRequest hook fires or resolves for a conversation. */
+export const ConversationPermissionChangedEvent = Schema.Struct({
+  type: Schema.Literal("conversation.permission_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    conversationName: Schema.String,
+    waiting: Schema.Boolean,
+    toolName: Schema.optional(Schema.String),
+  }),
+})
+export type ConversationPermissionChangedEvent = typeof ConversationPermissionChangedEvent.Type
+
 // ─── Union ────────────────────────────────────────────────────────────────────
 
 /** All domain events — the shape streamed via subscribeDomainEvents RPC */
@@ -747,5 +760,6 @@ export const DomainEvent = Schema.Union([
   DashboardLifecycleCompletedEvent,
   DashboardLifecycleFailedEvent,
   ConversationCompactingChangedEvent,
+  ConversationPermissionChangedEvent,
 ])
 export type DomainEvent = typeof DomainEvent.Type

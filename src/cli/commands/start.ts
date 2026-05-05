@@ -13,6 +13,7 @@ import { resolveProjectFromIssue, hasProjects, listProjects, ProjectConfig } fro
 import { hasPRDDraft, getPRDDraftPath } from '../../lib/prd-draft.js';
 import { isGitHubIssue, resolveGitHubIssue } from '../../lib/tracker-utils.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
+import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -473,12 +474,12 @@ export function hasBeadsTasks(workspacePath: string): boolean {
 }
 
 /**
- * Validate that plan.vbrief.json belongs to the current issue.
- * If the plan is for a different issue, the workspace contains stale planning
+ * Validate that the workspace vBRIEF belongs to the current issue.
+ * If the spec is for a different issue, the workspace contains stale planning
  * artifacts and should not be used for work until planning is re-run.
  */
 function validatePlanMatchesIssue(workspacePath: string, issueId: string): { valid: boolean; wrongIssue?: string } {
-  const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
+  const planPath = getWorkspacePanPaths(workspacePath).specPath;
 
   if (!existsSync(planPath)) {
     return { valid: true };
@@ -508,54 +509,25 @@ function validatePlanMatchesIssue(workspacePath: string, issueId: string): { val
  */
 function validateAndCleanStateFile(workspacePath: string, issueId: string): { valid: boolean; removed: boolean; wrongIssue?: string } {
   const upperId = issueId.toUpperCase();
-  const continuePath = join(workspacePath, '.planning', `continue-${upperId}.vbrief.json`);
-  const planningDir = join(workspacePath, '.planning');
+  const { continuePath } = getWorkspacePanPaths(workspacePath);
 
-  if (!existsSync(planningDir)) {
+  if (!existsSync(continuePath)) {
     return { valid: true, removed: false };
   }
 
-  // Look for any continue-*.vbrief.json files in the planning dir
-  let staleFiles: Array<{ path: string; staleId: string }> = [];
   try {
-    const { readdirSync, unlinkSync } = require('fs');
-    const entries = readdirSync(planningDir) as string[];
-    for (const entry of entries) {
-      const match = entry.match(/^continue-([A-Z]+-\d+)\.vbrief\.json$/i);
-      if (match) {
-        const fileIssueId = match[1].toUpperCase();
-        if (fileIssueId !== upperId) {
-          staleFiles.push({ path: join(planningDir, entry), staleId: fileIssueId });
-        }
+    const { unlinkSync } = require('fs');
+    const raw = readFileSync(continuePath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (parsed.issueId && typeof parsed.issueId === 'string') {
+      const recordedId = parsed.issueId.toUpperCase();
+      if (recordedId !== upperId) {
+        try { unlinkSync(continuePath); } catch { /* ignore */ }
+        console.warn(chalk.yellow(`⚠️  Removed stale continue file (was for ${recordedId}, not ${upperId})`));
+        console.warn(chalk.dim('   This can happen when branches are merged. The agent will start fresh.'));
+        return { valid: false, removed: true, wrongIssue: recordedId };
       }
     }
-
-    // Cross-check the canonical continue file's content if it exists
-    if (existsSync(continuePath)) {
-      try {
-        const raw = readFileSync(continuePath, 'utf-8');
-        const parsed = JSON.parse(raw);
-        if (parsed.issueId && typeof parsed.issueId === 'string') {
-          const recordedId = parsed.issueId.toUpperCase();
-          if (recordedId !== upperId) {
-            staleFiles.push({ path: continuePath, staleId: recordedId });
-          }
-        }
-      } catch {
-        // Malformed JSON — leave it alone
-      }
-    }
-
-    if (staleFiles.length > 0) {
-      const firstStale = staleFiles[0];
-      for (const { path } of staleFiles) {
-        try { unlinkSync(path); } catch { /* ignore */ }
-      }
-      console.warn(chalk.yellow(`⚠️  Removed stale continue file (was for ${firstStale.staleId}, not ${upperId})`));
-      console.warn(chalk.dim('   This can happen when branches are merged. The agent will start fresh.'));
-      return { valid: false, removed: true, wrongIssue: firstStale.staleId };
-    }
-
     return { valid: true, removed: false };
   } catch {
     return { valid: true, removed: false };
@@ -704,7 +676,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       const hasPreWorkspacePRD = hasPRDDraft(id);
       console.log('');
       console.log(chalk.bold('Context:'));
-      console.log(`  Planning:   ${planningContext ? 'Found (.planning/continue.vbrief.json)' : 'None'}`);
+      console.log(`  Planning:   ${planningContext ? 'Found (.pan/continue.json)' : 'None'}`);
       console.log(`  Beads:      ${beadsTasks.length} tasks`);
       if (hasPreWorkspacePRD) {
         console.log(`  Pre-workspace PRD: ${chalk.green('✓')} ${getPRDDraftPath(id)}`);
@@ -719,7 +691,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       spinner.warn(`Cleaned stale planning state from ${stateValidation.wrongIssue}`);
     }
 
-    // Validate plan.vbrief.json belongs to this issue (prevent stale .planning-complete from wrong issue)
+    // Validate spec.vbrief.json belongs to this issue (prevent stale workspace plan state from the wrong issue)
     const planValidation = validatePlanMatchesIssue(workspace, id);
     if (!planValidation.valid) {
       spinner.fail(`Workspace planning artifacts are for ${planValidation.wrongIssue}, not ${id}`);
@@ -728,7 +700,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       console.log(chalk.dim(`This can happen when a workspace is reused or a branch is repurposed.`));
       console.log('');
       console.log(chalk.bold('To fix this:'));
-      console.log(`  ${chalk.cyan(`1. Clean the workspace .planning/ directory`)}`);
+      console.log(`  ${chalk.cyan(`1. Clean the workspace planning artifacts`)}`);
       console.log(`  ${chalk.cyan(`2. Run planning again: pan plan ${id}`)}`);
       process.exit(1);
     }
@@ -736,8 +708,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // SAFEGUARD: Require beads tasks before work begins (matches dashboard start-agent enforcement)
     if (!hasBeadsTasks(workspace)) {
       // If no planning was done, this is a simple issue — auto-create a bead so the agent can start
-      const hasPlanningDir = existsSync(join(workspace, '.planning'));
-      if (!hasPlanningDir) {
+      const hasPlanningState = existsSync(getWorkspacePanPaths(workspace).specPath);
+      if (!hasPlanningState) {
         spinner.text = `Auto-creating bead for simple issue ${id}...`;
         try {
           const { execSync } = require('child_process');
@@ -823,7 +795,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     if (planningContext || beadsTasks.length > 0) {
       console.log('');
       console.log(chalk.bold('Context Loaded:'));
-      if (planningContext) console.log(`  Planning:   ${chalk.green('✓')} continue.vbrief.json`);
+      if (planningContext) console.log(`  Planning:   ${chalk.green('✓')} continue.json`);
       if (beadsTasks.length > 0) console.log(`  Beads:      ${chalk.green('✓')} ${beadsTasks.length} tasks`);
     }
 

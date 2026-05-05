@@ -71,10 +71,11 @@ import { getProviderForModel } from '../../../lib/providers.js';
 import { hasPRDDraft } from '../../../lib/prd-draft.js';
 import { findPrdAnywhere } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
-import { isPlanningComplete } from '../../../lib/vbrief/io.js';
-import { transitionVBriefOnMain, updatePlanStatus, resolveContinueStateDir } from '../../../lib/vbrief/lifecycle-io.js';
-import { readContinueState, writeContinueState } from '../../../lib/vbrief/continue-state.js';
+import { findPlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
+import { transitionVBriefOnMain, updatePlanStatus } from '../../../lib/vbrief/lifecycle-io.js';
+import type { ContinueState } from '../../../lib/vbrief/continue-state.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
+import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
@@ -111,6 +112,30 @@ async function appendAgentLifecycleLog(agentId: string, event: string, details: 
     ...details,
   });
   await appendFile(join(agentDir, 'lifecycle.log'), logLine + '\n');
+}
+
+async function readWorkspaceContinueState(workspacePath: string): Promise<ContinueState | null> {
+  const continuePath = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
+  if (!existsSync(continuePath)) return null;
+  const raw = await readFile(continuePath, 'utf-8');
+  return JSON.parse(raw) as ContinueState;
+}
+
+async function writeWorkspaceContinueState(workspacePath: string, state: ContinueState): Promise<ContinueState> {
+  const panDir = join(workspacePath, PAN_DIRNAME);
+  const continuePath = join(panDir, PAN_CONTINUE_FILENAME);
+  await mkdir(panDir, { recursive: true });
+  const now = new Date().toISOString();
+  const next: ContinueState = {
+    ...state,
+    version: '1',
+    created: state.created || now,
+    updated: now,
+  };
+  const tmpPath = `${continuePath}.tmp`;
+  await writeFile(tmpPath, JSON.stringify(next, null, 2), 'utf-8');
+  await rename(tmpPath, continuePath);
+  return next;
 }
 
 // ─── Shared IssueDataService singleton ───────────────────────────────────────
@@ -1562,25 +1587,8 @@ const postAgentsRoute = HttpRouter.add(
       }
     }
 
-    const workspacePlanningDir = join(workspacePath, '.planning');
-    const legacyPlanningDir = join(projectPath, '.planning', issueLower);
-    const homePlanningDir = join(homedir(), '.planning', issueLower);
-
-    let planningDir: string | null = null;
-    if (existsSync(workspacePlanningDir)) {
-      planningDir = workspacePlanningDir;
-    } else if (existsSync(legacyPlanningDir)) {
-      planningDir = legacyPlanningDir;
-    } else if (existsSync(homePlanningDir)) {
-      planningDir = homePlanningDir;
-    }
-
-    if (planningDir && planningDir !== workspacePlanningDir) {
-      try {
-        yield* Effect.promise(() => execAsync(`cp -r "${planningDir}" "${workspacePlanningDir}"`, { encoding: 'utf-8' }));
-        planningDir = workspacePlanningDir;
-      } catch {}
-    }
+    const workspacePanDir = join(workspacePath, PAN_DIRNAME);
+    const workspacePanContinuePath = join(workspacePanDir, PAN_CONTINUE_FILENAME);
 
     const workspaceBeadsDir = join(workspacePath, '.beads');
     if (!existsSync(workspaceBeadsDir)) {
@@ -1592,16 +1600,15 @@ const postAgentsRoute = HttpRouter.add(
       }
     }
 
-    const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
-    const hasPlan = existsSync(planPath);
+    const planPath = findPlan(workspacePath);
+    const hasPlan = planPath !== null;
     // Planning has finished when plan.status is any of:
-    // proposed/approved/pending/running/completed/blocked. Falls back to the
-    // legacy `.planning-complete` marker for vBRIEFs without status fields.
+    // proposed/approved/pending/running/completed/blocked.
     const isComplete = isPlanningComplete(workspacePath);
 
     if (!hasPlan || !isComplete) {
       const reason = !hasPlan
-        ? 'No plan.vbrief.json found — planning has not run for this issue.'
+        ? 'No workspace vBRIEF found — planning has not run for this issue.'
         : 'Planning started but did not complete (plan.status indicates planning is still in progress).';
       return jsonResponse({
         error: reason,
@@ -1612,12 +1619,15 @@ const postAgentsRoute = HttpRouter.add(
 
     try {
       const { readPlan } = yield* Effect.promise(() => import('../../../lib/vbrief/io.js'));
+      if (!planPath) {
+        throw new Error('No workspace vBRIEF found');
+      }
       const planDoc = readPlan(planPath);
       const planIssueId = planDoc?.plan?.id;
       if (planIssueId && planIssueId.toLowerCase() !== issueLower) {
         return jsonResponse({
           error: `Plan in workspace is for ${planIssueId.toUpperCase()}, not ${issueId}. The workspace contains stale planning artifacts from a different issue.`,
-          hint: 'Run planning for this issue first, or clean the workspace .planning/ directory.',
+          hint: 'Run planning for this issue first, or clean the workspace planning artifacts.',
           issueId,
           expectedIssue: issueId,
           actualIssue: planIssueId.toUpperCase(),
@@ -1727,28 +1737,23 @@ const postAgentsRoute = HttpRouter.add(
       }
     }
 
-    if (planningDir) {
-      // Commit planning artifacts before handing off to the work agent.
+    if (existsSync(workspacePanContinuePath) || existsSync(workspacePanDir)) {
+      // Commit workspace orchestration artifacts before handing off to the work agent.
       // The entire block is best-effort — never let git errors abort the agent start.
       yield* Effect.gen(function* () {
-        const gitRoot = planningDir.includes('/workspaces/')
-          ? workspacePath
-          : projectPath;
-        yield* Effect.promise(() => execAsync(`git add -f .planning/`, { cwd: gitRoot, encoding: 'utf-8' }));
+        const gitRoot = workspacePath;
+        if (existsSync(join(gitRoot, PAN_DIRNAME))) {
+          yield* Effect.promise(() => execAsync(`git add -f .pan/`, { cwd: gitRoot, encoding: 'utf-8' }));
+        }
         if (existsSync(join(gitRoot, '.beads'))) {
           yield* Effect.promise(() => execAsync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8' }));
-        }
-        // Stage continue file
-        const continueFile = `continue-${issueId.toUpperCase()}.vbrief.json`;
-        if (existsSync(join(gitRoot, continueFile))) {
-          yield* Effect.promise(() => execAsync(`git add "${continueFile}"`, { cwd: gitRoot, encoding: 'utf-8' }));
         }
         // git diff --cached --quiet exits 1 when there ARE staged changes (normal).
         // Handle exit-1 in the Promise so it never becomes an Effect failure.
         const diffResult = yield* Effect.promise(() =>
           execAsync(`git diff --cached --quiet`, { cwd: gitRoot, encoding: 'utf-8' })
-            .then(() => false)   // exit 0 → nothing staged
-            .catch(() => true)   // exit 1 → has staged changes
+            .then(() => false)
+            .catch(() => true)
         );
         if (diffResult) {
           yield* Effect.promise(() => execAsync(`git commit -m "chore: planning artifacts for ${issueId} before agent start"`, { cwd: gitRoot, encoding: 'utf-8' }));
@@ -1786,9 +1791,9 @@ const postAgentsRoute = HttpRouter.add(
     );
 
     // Running transition (PAN-946): set workspace plan.status to 'running'.
-    // This is the worktree-side state — the workspace .planning/plan.vbrief.json
-    // is updated directly, and the planning artifacts commit below will pick it
-    // up. Non-fatal: agent starts even if the write fails.
+    // This is the worktree-side state — the workspace vBRIEF resolved by
+    // findPlan() is updated directly, and the planning artifacts commit below
+    // will pick it up. Non-fatal: agent starts even if the write fails.
     if (existsSync(planPath)) {
       try {
         updatePlanStatus(planPath, 'running');
@@ -1807,18 +1812,18 @@ const postAgentsRoute = HttpRouter.add(
       const sha = shaOut.trim();
       const dirty = dirtyOut.trim().length > 0;
 
-      const continueDir = resolveContinueStateDir(projectPath, issueId);
-      const existing = readContinueState(continueDir, issueId);
+      const existing = yield* Effect.promise(() => readWorkspaceContinueState(workspacePath));
       const now = new Date().toISOString();
-      const next = existing
+      const next: ContinueState = existing
         ? {
             ...existing,
+            issueId,
             gitState: { branch, sha, dirty },
             agentModel: spawnModel,
             sessionHistory: [...existing.sessionHistory, { timestamp: now, reason: 'start' as const, agentModel: spawnModel }],
           }
         : {
-            version: '1' as const,
+            version: '1',
             issueId,
             created: now,
             updated: now,
@@ -1829,18 +1834,12 @@ const postAgentsRoute = HttpRouter.add(
             beadsMapping: {},
             agentModel: spawnModel,
             sessionHistory: [{ timestamp: now, reason: 'start' as const, agentModel: spawnModel }],
+            feedback: [],
           };
-      writeContinueState(continueDir, issueId, next);
-      console.log(`[start-agent] Wrote initial continue state for ${issueId}`);
+      yield* Effect.promise(() => writeWorkspaceContinueState(workspacePath, next));
+      console.log(`[start-agent] Wrote workspace continue state for ${issueId}`);
     } catch (continueErr: any) {
       console.warn(`[start-agent] Failed to write continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
-    }
-
-    const planningPromptPath = join(workspacePlanningDir, 'PLANNING_PROMPT.md');
-    if (existsSync(planningPromptPath)) {
-      try {
-        yield* Effect.promise(() => rename(planningPromptPath, planningPromptPath + '.archived'));
-      } catch {}
     }
 
     if (isRemote && workspaceMetadata) {
@@ -1896,7 +1895,7 @@ const postAgentsRoute = HttpRouter.add(
 
     // Local workspace
     const devScript = join(workspacePath, 'dev');
-    const hasPlanning = existsSync(join(workspacePath, '.planning'));
+    const hasPlanning = existsSync(join(workspacePath, PAN_DIRNAME));
     const phase = (body as any).phase || (hasPlanning ? 'implementation' : 'exploration');
 
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_requested', {

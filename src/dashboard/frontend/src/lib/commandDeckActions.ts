@@ -201,33 +201,63 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
       break;
     case 'verification_failing':
       primary.push('reviewTest', 'recover');
-      if (agentRunning) primary.push('stopAgent');
+      if (agentRunning) {
+        primary.push('stopAgent');
+      } else if (noAgentOrStopped) {
+        primary.push(isResume ? 'resumeSession' : 'startAgent');
+        if (isResume) secondary.push('resetSession');
+      }
       break;
     case 'in_review_reviewers_running':
       if (agentRunning) primary.push('stopAgent');
       break;
     case 'in_review_changes_requested':
       primary.push('reviewTest', 'recover');
-      if (agentRunning) primary.push('stopAgent');
+      if (agentRunning) {
+        primary.push('stopAgent');
+      } else if (noAgentOrStopped) {
+        primary.push(isResume ? 'resumeSession' : 'startAgent');
+        if (isResume) secondary.push('resetSession');
+      }
       break;
     case 'in_review_approved':
       primary.push('reviewTest');
       if (readyForMerge) primary.push('merge');
-      if (agentRunning) primary.push('stopAgent');
+      if (agentRunning) {
+        primary.push('stopAgent');
+      } else if (noAgentOrStopped) {
+        primary.push(isResume ? 'resumeSession' : 'startAgent');
+        if (isResume) secondary.push('resetSession');
+      }
       break;
     case 'testing_running':
       if (agentRunning) primary.push('stopAgent');
       break;
     case 'testing_failures':
       primary.push('reviewTest', 'recover');
-      if (agentRunning) primary.push('stopAgent');
+      if (agentRunning) {
+        primary.push('stopAgent');
+      } else if (noAgentOrStopped) {
+        primary.push(isResume ? 'resumeSession' : 'startAgent');
+        if (isResume) secondary.push('resetSession');
+      }
       break;
     case 'ready_to_merge':
       primary.push('merge', 'reviewTest');
-      if (agentRunning) primary.push('stopAgent');
+      if (agentRunning) {
+        primary.push('stopAgent');
+      } else if (noAgentOrStopped) {
+        primary.push(isResume ? 'resumeSession' : 'startAgent');
+        if (isResume) secondary.push('resetSession');
+      }
       break;
     case 'merging':
-      if (agentRunning) primary.push('stopAgent');
+      if (agentRunning) {
+        primary.push('stopAgent');
+      } else if (noAgentOrStopped) {
+        primary.push(isResume ? 'resumeSession' : 'startAgent');
+        if (isResume) secondary.push('resetSession');
+      }
       break;
     case 'merged':
       break;

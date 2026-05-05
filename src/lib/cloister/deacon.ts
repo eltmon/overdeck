@@ -1081,8 +1081,9 @@ export async function cleanupAbandonedFeedback(): Promise<string[]> {
   const { clearFeedbackFiles } = await import('./feedback-writer.js');
 
   for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
-    const feedbackDir = join(workspacePath, '.planning', 'feedback');
-    if (!existsSync(feedbackDir)) continue;
+    const panFeedbackDir = join(workspacePath, '.pan', 'feedback');
+    const legacyFeedbackDir = join(workspacePath, '.planning', 'feedback');
+    if (!existsSync(panFeedbackDir) && !existsSync(legacyFeedbackDir)) continue;
 
     const issueLower = issueId.toLowerCase();
 
@@ -1105,9 +1106,10 @@ export async function cleanupAbandonedFeedback(): Promise<string[]> {
 
     // Both gates passed — feedback is abandoned, safe to delete.
     try {
-      const before = readdirSync(feedbackDir)
-        .filter(f => /^\d{3}-/.test(f) && f.endsWith('.md'))
-        .length;
+      const countFeedbackFiles = (dir: string) => existsSync(dir)
+        ? readdirSync(dir).filter(f => /^\d{3}-/.test(f) && f.endsWith('.md')).length
+        : 0;
+      const before = countFeedbackFiles(panFeedbackDir) + countFeedbackFiles(legacyFeedbackDir);
       if (before === 0) continue;
       await clearFeedbackFiles(workspacePath);
       actions.push(
@@ -2382,15 +2384,20 @@ async function clearStaleCiFeedback(issueId: string): Promise<void> {
 
   // Find the workspace directory: workspaces/feature-<issueLower> under the repo
   const issueLower = issueId.toLowerCase();
-  const candidateFeedbackDir = join(repoDir, 'workspaces', `feature-${issueLower}`, '.planning', 'feedback');
+  const candidateFeedbackDirs = [
+    join(repoDir, 'workspaces', `feature-${issueLower}`, '.pan', 'feedback'),
+    join(repoDir, 'workspaces', `feature-${issueLower}`, '.planning', 'feedback'),
+  ];
 
   try {
-    if (!existsSync(candidateFeedbackDir)) return;
-    const files = await readdir(candidateFeedbackDir);
-    for (const file of files) {
-      if (file.includes('merge-agent') && file.includes('ci-failure') && file.endsWith('.md')) {
-        await rm(join(candidateFeedbackDir, file));
-        console.log(`[deacon] Cleared stale CI feedback: ${file} for ${issueId}`);
+    for (const candidateFeedbackDir of candidateFeedbackDirs) {
+      if (!existsSync(candidateFeedbackDir)) continue;
+      const files = await readdir(candidateFeedbackDir);
+      for (const file of files) {
+        if (file.includes('merge-agent') && file.includes('ci-failure') && file.endsWith('.md')) {
+          await rm(join(candidateFeedbackDir, file));
+          console.log(`[deacon] Cleared stale CI feedback: ${file} for ${issueId}`);
+        }
       }
     }
   } catch (err: unknown) {
@@ -2559,7 +2566,7 @@ export async function checkDeadEndAgents(): Promise<string[]> {
           ? `\n\nMUST READ: ${latestFeedbackPath}\n\nUse your Read tool to open this file, read every line, then fix the issues.`
           : '';
         const nudgeMessage = status.reviewStatus === 'failed'
-          ? `Review verification failed for ${issueId}.${feedbackPart}\n\nCommon cause: merge conflict markers in .planning/plan.vbrief.json — fix by resolving conflicts in that file, then run: pan review request ${issueId} -m "Fixed verification error"`
+          ? `Review verification failed for ${issueId}.${feedbackPart}\n\nCommon cause: merge conflict markers in .pan/spec.vbrief.json — fix by resolving conflicts in that file, then run: pan review request ${issueId} -m "Fixed verification error"`
           : isReviewBlocked
             ? `The review agent found issues in your code.${feedbackPart}\n\nFix every issue listed, commit all changes, then run: pan review request ${issueId} -m "Fixed review issues". Do NOT stop until pan review request completes successfully.`
             : `Tests failed for your changes.${feedbackPart}\n\nFix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". Do NOT stop until pan review request completes successfully.`;
@@ -2889,10 +2896,21 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
       // processed this workspace — never send a "pan work done" nudge.
       const agentStateForGate = getAgentState(agent.id);
       if (agentStateForGate?.workspace) {
-        const feedbackDir = join(agentStateForGate.workspace, '.planning', 'feedback');
-        if (existsSync(feedbackDir)) {
+        const panFeedbackDir = join(agentStateForGate.workspace, '.pan', 'feedback');
+        if (existsSync(panFeedbackDir)) {
           try {
-            const feedbackFiles = readdirSync(feedbackDir);
+            const feedbackFiles = readdirSync(panFeedbackDir);
+            if (feedbackFiles.length > 0) {
+              console.log(`[deacon] First-completion gate: skipping ${agent.id} — has ${feedbackFiles.length} review feedback file(s) in .pan/feedback/`);
+              continue;
+            }
+          } catch { /* can't read feedback dir */ }
+        }
+
+        const legacyFeedbackDir = join(agentStateForGate.workspace, '.planning', 'feedback');
+        if (existsSync(legacyFeedbackDir)) {
+          try {
+            const feedbackFiles = readdirSync(legacyFeedbackDir);
             if (feedbackFiles.length > 0) {
               console.log(`[deacon] First-completion gate: skipping ${agent.id} — has ${feedbackFiles.length} review feedback file(s) in .planning/feedback/`);
               continue;

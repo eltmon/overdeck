@@ -23,6 +23,7 @@ import {
   generateVBriefFilename,
   resolveVBriefDir,
 } from '../lifecycle.js';
+import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../pan-dir/index.js';
 import type { VBriefDocument } from '../types.js';
 
 let TEST_DIR: string;
@@ -199,10 +200,13 @@ describe('moveVBriefFilesOnly', () => {
     const result = moveVBriefFilesOnly(TEST_DIR, 'PAN-1', 'active');
     expect(existsSync(oldPath)).toBe(false);
     expect(existsSync(result.toPath)).toBe(true);
-    expect(result.toPath).toBe(join(resolveVBriefDir(TEST_DIR, 'active'), filename));
+    expect(result.toPath).toBe(join(TEST_DIR, '.pan', 'specs', filename));
     expect(existsSync(continueFilePath(resolveVBriefDir(TEST_DIR, 'active'), 'PAN-1'))).toBe(true);
     expect(existsSync(continueFilePath(resolveVBriefDir(TEST_DIR, 'proposed'), 'PAN-1'))).toBe(false);
     expect(result.movedContinue).toBe(true);
+
+    const movedDoc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as VBriefDocument & { status: string };
+    expect(movedDoc.status).toBe('active');
   });
 
   it('handles missing continue file (no-op for continue)', () => {
@@ -253,9 +257,9 @@ describe('moveVBrief (with git staging)', () => {
     const result = await moveVBrief(TEST_DIR, 'PAN-1', 'active');
     expect(existsSync(result.toPath)).toBe(true);
 
-    // Check git index reflects the move
+    // Check git index reflects the migration to canonical .pan/specs storage
     const status = execSync('git status --porcelain', { cwd: TEST_DIR, encoding: 'utf-8' });
-    expect(status).toMatch(/vbrief\/active\//);
+    expect(status).toMatch(/\.pan\/specs\//);
   });
 
   it('throws when issue has no vBRIEF', async () => {
@@ -299,10 +303,10 @@ describe('deleteVBrief', () => {
 
 describe('promoteVBriefToProposed', () => {
   function createWorkspace(workspacePath: string, plan: VBriefDocument): void {
-    const planningDir = join(workspacePath, '.planning');
-    mkdirSync(planningDir, { recursive: true });
+    const panDir = join(workspacePath, PAN_DIRNAME);
+    mkdirSync(panDir, { recursive: true });
     writeFileSync(
-      join(planningDir, 'plan.vbrief.json'),
+      join(panDir, PAN_SPEC_FILENAME),
       JSON.stringify(plan, null, 2),
       'utf-8',
     );
@@ -312,7 +316,7 @@ describe('promoteVBriefToProposed', () => {
     const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-1');
     mkdirSync(workspacePath, { recursive: true });
     expect(() => promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-1')).toThrow(
-      /No plan\.vbrief\.json/,
+      /No workspace spec found/,
     );
   });
 
@@ -326,12 +330,13 @@ describe('promoteVBriefToProposed', () => {
 
     expect(result.canonicalFilename).toBe('2026-05-03-PAN-1-foo.vbrief.json');
     expect(result.destVBrief).toBe(
-      join(TEST_DIR, 'vbrief', 'proposed', '2026-05-03-PAN-1-foo.vbrief.json'),
+      join(TEST_DIR, '.pan', 'specs', '2026-05-03-PAN-1-foo.vbrief.json'),
     );
     expect(result.destContinue).toBeNull();
     expect(existsSync(result.destVBrief)).toBe(true);
-    const copied = JSON.parse(readFileSync(result.destVBrief, 'utf-8'));
+    const copied = JSON.parse(readFileSync(result.destVBrief, 'utf-8')) as VBriefDocument & { status: string };
     expect(copied.plan.id).toBe('pan-1');
+    expect(copied.status).toBe('proposed');
   });
 
   it('generates canonical filename from plan title when metadata is absent', () => {
@@ -367,9 +372,10 @@ describe('promoteVBriefToProposed', () => {
     plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-4-with-continue.vbrief.json' };
     createWorkspace(workspacePath, plan);
 
-    // Write a continue file in the workspace .planning/
+    // Write a continue file in the workspace .pan/
     const continueFileName = 'continue-PAN-4.vbrief.json';
     const continueContent: ContinueState = {
+      version: '1',
       issueId: 'PAN-4',
       created: '2026-05-03T00:00:00Z',
       updated: '2026-05-03T00:00:00Z',
@@ -381,7 +387,7 @@ describe('promoteVBriefToProposed', () => {
       sessionHistory: [],
     };
     writeFileSync(
-      join(workspacePath, '.planning', continueFileName),
+      join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME),
       JSON.stringify(continueContent, null, 2),
       'utf-8',
     );
@@ -408,22 +414,20 @@ describe('promoteVBriefToProposed', () => {
     expect(existsSync(join(TEST_DIR, 'vbrief', 'proposed', 'continue-PAN-5.vbrief.json'))).toBe(false);
   });
 
-  it('creates lifecycle dirs if they do not exist yet', () => {
+  it('creates canonical .pan/specs storage if it does not exist yet', () => {
     const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-6');
     const plan = makePlan('PAN-6', 'first-promotion');
     plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-6-first-promotion.vbrief.json' };
     createWorkspace(workspacePath, plan);
 
-    // Confirm vbrief dirs do NOT exist before
+    expect(existsSync(join(TEST_DIR, '.pan', 'specs'))).toBe(false);
     expect(existsSync(join(TEST_DIR, 'vbrief', 'proposed'))).toBe(false);
 
     promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-6');
 
-    // All four lifecycle dirs created
-    expect(existsSync(join(TEST_DIR, 'vbrief', 'proposed'))).toBe(true);
-    expect(existsSync(join(TEST_DIR, 'vbrief', 'active'))).toBe(true);
-    expect(existsSync(join(TEST_DIR, 'vbrief', 'completed'))).toBe(true);
-    expect(existsSync(join(TEST_DIR, 'vbrief', 'cancelled'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, '.pan', 'specs'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, '.pan', 'specs', '2026-05-03-PAN-6-first-promotion.vbrief.json'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, 'vbrief', 'proposed'))).toBe(false);
   });
 
   it('overwrites existing destination file (idempotent re-runs)', () => {
@@ -437,7 +441,7 @@ describe('promoteVBriefToProposed', () => {
     // Modify the workspace plan and re-run promotion
     plan.plan.title = 'Updated title';
     writeFileSync(
-      join(workspacePath, '.planning', 'plan.vbrief.json'),
+      join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME),
       JSON.stringify(plan, null, 2),
       'utf-8',
     );
@@ -486,17 +490,21 @@ describe('transitionVBriefOnMain', () => {
     expect(log).toBe('scope: approve PAN-1 vBRIEF');
   });
 
-  it('is idempotent: no commit when already in target dir with correct status', async () => {
+  it('is idempotent once the issue already lives in .pan/specs with the target lifecycle and status', async () => {
     initGitRepo(TEST_DIR);
-    ensureVBriefDirs(TEST_DIR);
     const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
-    writePlan(
-      resolveVBriefDir(TEST_DIR, 'active'),
-      filename,
-      makePlan('PAN-1', 'foo', 'approved'),
+    const migratedPath = join(TEST_DIR, '.pan', 'specs', filename);
+    mkdirSync(join(TEST_DIR, '.pan', 'specs'), { recursive: true });
+    writeFileSync(
+      migratedPath,
+      JSON.stringify({
+        ...makePlan('PAN-1', 'foo', 'approved'),
+        status: 'active',
+      }, null, 2),
+      'utf-8',
     );
-    execSync('git add vbrief/', { cwd: TEST_DIR });
-    execSync('git -c commit.gpgsign=false commit -q -m "seed active"', { cwd: TEST_DIR });
+    execSync('git add .pan/specs/', { cwd: TEST_DIR });
+    execSync('git -c commit.gpgsign=false commit -q -m "seed pan spec"', { cwd: TEST_DIR });
 
     const result = await transitionVBriefOnMain(
       TEST_DIR,
@@ -509,8 +517,8 @@ describe('transitionVBriefOnMain', () => {
     expect(result.moved).toBe(false);
     expect(result.statusUpdated).toBe(false);
     expect(result.committed).toBe(false);
+    expect(result.toPath).toBe(migratedPath);
 
-    // git log should still show only the seed commit (init + seed = 2)
     const logCount = execSync('git rev-list --count HEAD', { cwd: TEST_DIR, encoding: 'utf-8' }).trim();
     expect(logCount).toBe('2');
   });

@@ -234,7 +234,7 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
 
   const handleViewVbrief = useCallback(() => {
     if (issueId) {
-      const path = `workspaces/feature-${issueId.toLowerCase()}/.planning/plan.vbrief.json`;
+      const path = `workspaces/feature-${issueId.toLowerCase()}/.pan/spec.vbrief.json`;
       navigator.clipboard?.writeText(path).catch(() => { /* ignore */ });
       toast.success('vBRIEF path copied');
     }

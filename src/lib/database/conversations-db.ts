@@ -139,6 +139,21 @@ export function getConversationById(id: number): Conversation | null {
   return row ? rowToConversation(row) : null;
 }
 
+export function getConversationByClaudeSessionId(claudeSessionId: string): Conversation | null {
+  const db = getDatabase();
+  const row = db
+    .prepare(
+      `SELECT id, name, tmux_session, status, cwd, issue_id,
+              created_at, ended_at, last_attached_at, claude_session_id, title,
+              title_source, title_seed, total_cost, archived_at, model, effort,
+              fork_status, fork_error
+       FROM conversations
+       WHERE claude_session_id = ?`,
+    )
+    .get(claudeSessionId) as Record<string, unknown> | undefined;
+  return row ? rowToConversation(row) : null;
+}
+
 export function listArchivedConversations(): Conversation[] {
   const db = getDatabase();
   const rows = db

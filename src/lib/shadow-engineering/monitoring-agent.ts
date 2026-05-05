@@ -14,6 +14,8 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
+import { PAN_DIRNAME } from '../pan-dir/index.js';
+
 const execAsync = promisify(exec);
 
 export interface MonitoringAgentConfig {
@@ -40,7 +42,7 @@ export async function gatherArtifacts(config: MonitoringAgentConfig): Promise<{
   notes: string[];
   codeChanges?: string;
 }> {
-  const planningDir = join(config.workspacePath, '.planning');
+  const planningDir = join(config.workspacePath, PAN_DIRNAME);
   const artifacts: {
     issueDescription?: string;
     comments: string[];
@@ -152,7 +154,7 @@ export function generateMonitoringPrompt(
   sections.push(`5. **Risks**: Potential issues or concerns`);
   sections.push(`6. **Team Patterns**: How the team works, conventions observed`);
   sections.push(`7. **Recommendations**: Suggestions for the team`);
-  sections.push(`\nWrite the INFERENCE.md content to: ${join(config.workspacePath, '.planning', 'INFERENCE.md')}`);
+  sections.push(`\nWrite the INFERENCE.md content to: ${join(config.workspacePath, PAN_DIRNAME, 'INFERENCE.md')}`);
 
   return sections.join('\n');
 }
@@ -207,16 +209,16 @@ export function generateBasicInference(
  * Update the INFERENCE.md file
  */
 export function updateInferenceDocument(workspacePath: string, content: string): void {
-  const planningDir = join(workspacePath, '.planning');
-  mkdirSync(planningDir, { recursive: true });
-  writeFileSync(join(planningDir, 'INFERENCE.md'), content, 'utf-8');
+  const panDir = join(workspacePath, PAN_DIRNAME);
+  mkdirSync(panDir, { recursive: true });
+  writeFileSync(join(panDir, 'INFERENCE.md'), content, 'utf-8');
 }
 
 /**
  * Read existing INFERENCE.md if it exists
  */
 export function readInferenceDocument(workspacePath: string): string | null {
-  const filePath = join(workspacePath, '.planning', 'INFERENCE.md');
+  const filePath = join(workspacePath, PAN_DIRNAME, 'INFERENCE.md');
   if (!existsSync(filePath)) return null;
   return readFileSync(filePath, 'utf-8');
 }

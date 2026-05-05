@@ -7,8 +7,9 @@
  * submit as a multi-step task that they sometimes drop partway.
  *
  * Conflict handling:
- *   - `.planning/*` files: auto-resolved with `--ours` (local plan state wins
+ *   - `.pan/*` files: auto-resolved with `--ours` (local workspace state wins
  *     since these are workspace-local artifacts, never shared in main).
+ *   - Legacy `.planning/*` files are treated the same during transition.
  *   - Any other conflicts: abort rebase, surface error, agent resolves manually.
  */
 
@@ -156,9 +157,10 @@ async function rebaseOneRepo(
 }
 
 /**
- * Auto-resolve rebase conflicts if they are limited to `.planning/*` files.
- * Uses `--ours` (local wins) — planning artifacts are workspace-local and
- * should never collide with upstream main in practice.
+ * Auto-resolve rebase conflicts if they are limited to workspace-local
+ * orchestration artifacts in `.pan/*` or legacy `.planning/*`.
+ * Uses `--ours` (local wins) because these files should never collide with
+ * upstream main in practice.
  */
 async function tryResolvePlanningConflicts(
   repoPath: string
@@ -179,7 +181,9 @@ async function tryResolvePlanningConflicts(
       return { resolved: false, remainingConflicts: [] };
     }
 
-    const nonPlanningConflicts = conflictFiles.filter(f => !f.startsWith('.planning/'));
+    const nonPlanningConflicts = conflictFiles.filter(
+      f => !f.startsWith('.pan/') && !f.startsWith('.planning/'),
+    );
     if (nonPlanningConflicts.length > 0) {
       return { resolved: false, remainingConflicts: nonPlanningConflicts };
     }

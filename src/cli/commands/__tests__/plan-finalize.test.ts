@@ -44,14 +44,14 @@ afterEach(() => {
 
 describe('stampPlanForFinalization', () => {
   it('sets plan.status to "proposed"', () => {
-    const path = join(TEST_DIR, 'plan.vbrief.json');
+    const path = join(TEST_DIR, 'spec.vbrief.json');
     writePlan(path, makePlanDoc({ status: 'draft' }));
     stampPlanForFinalization(path, 'PAN-946');
     expect(readDoc(path).plan.status).toBe('proposed');
   });
 
   it('generates and stamps a canonical filename derived from title + issueId', () => {
-    const path = join(TEST_DIR, 'plan.vbrief.json');
+    const path = join(TEST_DIR, 'spec.vbrief.json');
     writePlan(path, makePlanDoc({ title: 'Adopt deft vBRIEF Lifecycle' }));
     const filename = stampPlanForFinalization(path, 'PAN-946');
     expect(filename).toMatch(/^\d{4}-\d{2}-\d{2}-PAN-946-adopt-deft-vbrief-lifecycle\.vbrief\.json$/);
@@ -60,14 +60,14 @@ describe('stampPlanForFinalization', () => {
   });
 
   it('falls back to plan.id when title is empty', () => {
-    const path = join(TEST_DIR, 'plan.vbrief.json');
+    const path = join(TEST_DIR, 'spec.vbrief.json');
     writePlan(path, makePlanDoc({ title: '', id: 'pan-946' }));
     const filename = stampPlanForFinalization(path, 'PAN-946');
     expect(filename).toMatch(/PAN-946-pan-946\.vbrief\.json$/);
   });
 
   it('falls back to issueId when title and id are both empty', () => {
-    const path = join(TEST_DIR, 'plan.vbrief.json');
+    const path = join(TEST_DIR, 'spec.vbrief.json');
     writePlan(path, makePlanDoc({ title: '', id: '' }));
     const filename = stampPlanForFinalization(path, 'PAN-946');
     // slugify('PAN-946') -> 'pan-946'
@@ -75,7 +75,7 @@ describe('stampPlanForFinalization', () => {
   });
 
   it('preserves an existing canonicalFilename (idempotent date)', () => {
-    const path = join(TEST_DIR, 'plan.vbrief.json');
+    const path = join(TEST_DIR, 'spec.vbrief.json');
     const existing = '2026-04-01-PAN-946-original-slug.vbrief.json';
     writePlan(
       path,
@@ -90,9 +90,9 @@ describe('stampPlanForFinalization', () => {
   });
 
   it('increments plan.sequence and refreshes timestamps', async () => {
-    const path = join(TEST_DIR, 'plan.vbrief.json');
+    const path = join(TEST_DIR, 'spec.vbrief.json');
     writePlan(path, makePlanDoc({ sequence: 5 }));
-    await new Promise(r => setTimeout(r, 5));
+    await new Promise((r) => setTimeout(r, 5));
     stampPlanForFinalization(path, 'PAN-946');
     const after = readDoc(path);
     expect(after.plan.sequence).toBe(6);
@@ -102,14 +102,14 @@ describe('stampPlanForFinalization', () => {
   });
 
   it('writes atomically (no .tmp left behind)', () => {
-    const path = join(TEST_DIR, 'plan.vbrief.json');
+    const path = join(TEST_DIR, 'spec.vbrief.json');
     writePlan(path, makePlanDoc());
     stampPlanForFinalization(path, 'PAN-946');
     expect(existsSync(path + '.tmp')).toBe(false);
   });
 
   it('preserves other metadata fields when stamping canonicalFilename', () => {
-    const path = join(TEST_DIR, 'plan.vbrief.json');
+    const path = join(TEST_DIR, 'spec.vbrief.json');
     writePlan(
       path,
       makePlanDoc({
@@ -124,7 +124,7 @@ describe('stampPlanForFinalization', () => {
   });
 
   it('initializes sequence to 1 when previously missing', () => {
-    const path = join(TEST_DIR, 'plan.vbrief.json');
+    const path = join(TEST_DIR, 'spec.vbrief.json');
     const doc = makePlanDoc();
     delete (doc.plan as Partial<typeof doc.plan>).sequence;
     writePlan(path, doc);

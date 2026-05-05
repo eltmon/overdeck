@@ -8,7 +8,7 @@
  *
  * Design (per CLAUDE.md "no bandaids", confirmed in the original audit that
  * found `.devcontainer/` was being silently destroyed by an automatic
- * `git clean -fd -e .planning -e .beads`):
+ * `git clean -fd -e .pan -e .beads`):
  *
  *   - `git clean` is HARD-FAILED for any non-user caller. Agents and dashboard
  *     auto-flows can never trigger it. There is no `userToken`, no override,

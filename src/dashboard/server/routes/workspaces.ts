@@ -91,8 +91,6 @@ import { getCachedRunningAgents } from '../services/running-agents-cache.js';
 import { findPlan, readPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
 import type { VBriefDocument } from '../../../lib/vbrief/types.js';
 import { findVBriefByIssueAsync, readVBriefDocumentAsync } from '../../../lib/vbrief/vbrief-index.js';
-import { continueFilePath, readContinueState } from '../../../lib/vbrief/continue-state.js';
-import { resolveVBriefDir } from '../../../lib/vbrief/lifecycle.js';
 import { criticalPath } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
 import { capturePaneAsync, killSessionAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
@@ -107,6 +105,7 @@ import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js'
 import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
 import { createRecoveryBranchFromStash, dropStash, isSalvageableStash, listStashes } from '../../../lib/stashes.js';
+import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -139,7 +138,7 @@ async function readWorkspacePlanningMarkdown(
   const projectPath = getProjectPath(undefined, issuePrefix);
   const { parsedIssueId, workspacePath } = getWorkspacePathForIssue(projectPath, issueId);
 
-  const content = await readFile(join(workspacePath, '.planning', fileName), 'utf-8');
+  const content = await readFile(join(workspacePath, PAN_DIRNAME, fileName), 'utf-8');
   return {
     issueId: parsedIssueId,
     body: content,
@@ -147,51 +146,21 @@ async function readWorkspacePlanningMarkdown(
 }
 
 /**
- * Read continue file beside the issue's current vBRIEF, falling back to
- * workspace `.planning/`. Async — uses the cached lifecycle index plus
- * `fs/promises` so the dashboard event loop stays unblocked. Returns JSON
- * string or null.
+ * Read the workspace `.pan/continue.json` file asynchronously and return it as
+ * normalized JSON text, or null when it does not exist.
  */
 async function readWorkspaceContinueFile(
-  projectPath: string,
+  _projectPath: string,
   workspacePath: string,
-  issueId: string,
+  _issueId: string,
 ): Promise<string | null> {
-  const upperId = issueId.toUpperCase();
-
-  // 1. Lifecycle dir resolved via the cached index (no per-request rescan).
   try {
-    const found = await findVBriefByIssueAsync(projectPath, upperId);
-    if (found) {
-      const lifecycleDir = resolveVBriefDir(projectPath, found.lifecycleDir);
-      const continuePath = continueFilePath(lifecycleDir, upperId);
-      try {
-        const raw = await readFile(continuePath, 'utf-8');
-        // Parse + re-stringify to match prior behavior (and surface bad JSON).
-        return JSON.stringify(JSON.parse(raw), null, 2);
-      } catch {
-        // Continue file may not exist beside the vBRIEF — fall through.
-      }
-    }
-  } catch { /* ignore index failure */ }
-
-  // 2. Bootstrap location: vbrief/active/ for sessions started before
-  // a lifecycle vBRIEF exists.
-  try {
-    const activeDir = resolveVBriefDir(projectPath, 'active');
-    const continuePath = continueFilePath(activeDir, upperId);
+    const continuePath = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
     const raw = await readFile(continuePath, 'utf-8');
     return JSON.stringify(JSON.parse(raw), null, 2);
-  } catch { /* ignore */ }
-
-  // 3. Last resort: in-progress planning workspace.
-  try {
-    const continuePath = continueFilePath(join(workspacePath, '.planning'), upperId);
-    const raw = await readFile(continuePath, 'utf-8');
-    return JSON.stringify(JSON.parse(raw), null, 2);
-  } catch { /* ignore */ }
-
-  return null;
+  } catch {
+    return null;
+  }
 }
 
 function shouldTreatAsRerun(status: Pick<ReviewStatus, 'readyForMerge' | 'reviewStatus' | 'testStatus' | 'mergeStatus'> | null | undefined): boolean {
@@ -719,8 +688,8 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
 
   // Acceptance criteria checklist from vBRIEF plan items
   try {
-    const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
-    if (existsSync(planPath)) {
+    const planPath = findPlan(workspacePath);
+    if (planPath && existsSync(planPath)) {
       const raw = await readFile(planPath, 'utf-8');
       const doc = JSON.parse(raw);
       const items: Array<{ status: string; title: string }> = doc?.plan?.items ?? [];
@@ -1124,12 +1093,12 @@ const getWorkspaceRoute = HttpRouter.add(
         }
 
         let services: { name: string; url?: string }[] = [];
-        const continueFile = join(workspacePath, '.planning', `continue-${issueId.toUpperCase()}.vbrief.json`);
+        const panContinueFile = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
         const workspaceMd = join(workspacePath, 'WORKSPACE.md');
         const dockerCompose = join(workspacePath, 'docker-compose.yml');
 
-        const urlSourceFile = existsSync(continueFile)
-          ? continueFile
+        const urlSourceFile = existsSync(panContinueFile)
+          ? panContinueFile
           : existsSync(workspaceMd)
           ? workspaceMd
           : null;
@@ -1225,10 +1194,9 @@ const getWorkspaceRoute = HttpRouter.add(
           .filter(isSalvageableStash)
           .filter((entry) => entry.issueId === issueId.toUpperCase());
 
-        const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
-        const hasPlan = existsSync(planPath);
-        const planningComplete = existsSync(join(workspacePath, '.planning', '.planning-complete'));
-        const hasBeads = !!planningComplete;
+        const planPath = findPlan(workspacePath);
+        const hasPlan = planPath !== null;
+        const hasBeads = hasPlan;
 
         const issueData = getCostsForIssue(issueId);
         const agents = yield* Effect.promise(() => getCachedRunningAgents());
@@ -1410,8 +1378,8 @@ const getWorkspacePlanRoute = HttpRouter.add(
     const workspaceName = `feature-${issueLower}`;
     const workspacePath = join(projectPath, 'workspaces', workspaceName);
 
-    // PAN-946: resolve from lifecycle dirs first (cached/async), then fall
-    // back to workspace .planning/ for in-progress planning sessions.
+    // Resolve from lifecycle specs first (cached/async), then fall back to the
+    // workspace-local `.pan/spec.vbrief.json` when planning is still in progress.
     let planPath: string | null = null;
     let lifecycleDir: string | null = null;
     let doc: VBriefDocument | null = null;
@@ -1424,7 +1392,7 @@ const getWorkspacePlanRoute = HttpRouter.add(
     } else {
       planPath = findPlan(workspacePath);
       if (planPath) {
-        lifecycleDir = 'planning';
+        lifecycleDir = 'workspace';
         const planPathConst = planPath;
         doc = yield* Effect.promise(async () => {
           const raw = await readFile(planPathConst, 'utf-8');
@@ -1921,27 +1889,6 @@ const postWorkspaceStartRoute = HttpRouter.add(
 
     if (!existsSync(workspacePath)) {
       return jsonResponse({ error: 'Workspace does not exist' }, { status: 400 });
-    }
-
-    // Copy planning artifacts from project root if needed
-    const workspacePlanningDir = join(workspacePath, '.planning');
-    const hasContinueFile = existsSync(join(workspacePlanningDir, `continue-${issueId.toUpperCase()}.vbrief.json`));
-    if (!hasContinueFile) {
-      const legacyPlanningDir = join(projectPath, '.planning', issueLower);
-      if (existsSync(legacyPlanningDir)) {
-        try {
-          yield* Effect.promise(() => mkdir(workspacePlanningDir, { recursive: true }));
-          yield* Effect.promise(() => execAsync(
-            `cp -r "${legacyPlanningDir}/"* "${workspacePlanningDir}/"`,
-            { encoding: 'utf-8', shell: '/bin/bash' }
-          ));
-          console.log(
-            `[workspace/start] Copied planning from ${legacyPlanningDir} to workspace for ${issueId}`
-          );
-        } catch (e) {
-          console.warn(`[workspace/start] Could not copy planning: ${e}`);
-        }
-      }
     }
 
     const workspaceBeadsDir = join(workspacePath, '.beads');
@@ -4507,8 +4454,8 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     }
 
     setReviewStatus(issueId, { mergeStep: 'stripping-planning' });
-    // .planning/ stripping removed (PAN-946): all planning state now lives in
-    // vbrief/ lifecycle directories and merges to main naturally with the code.
+    // Planning-state stripping is gone: workspace state lives in `.pan/` and
+    // merges to main naturally with the code.
 
     // Step 3: Post-rebase verification gate (typecheck, lint, test)
     // Ensures the rebase didn't introduce issues before merging.

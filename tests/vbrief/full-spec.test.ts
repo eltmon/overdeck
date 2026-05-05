@@ -63,15 +63,15 @@ function makeFullSpecDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBrie
 }
 
 function writePlanDoc(workspacePath: string, doc: VBriefDocument): string {
-  const planDir = join(workspacePath, '.planning');
-  mkdirSync(planDir, { recursive: true });
-  const planPath = join(planDir, 'plan.vbrief.json');
+  const panDir = join(workspacePath, '.pan');
+  mkdirSync(panDir, { recursive: true });
+  const planPath = join(panDir, 'spec.vbrief.json');
   writeFileSync(planPath, JSON.stringify(doc, null, 2));
   return planPath;
 }
 
 function readPlanFromWorkspace(workspacePath: string): VBriefDocument {
-  return readPlan(join(workspacePath, '.planning', 'plan.vbrief.json'));
+  return readPlan(join(workspacePath, '.pan', 'spec.vbrief.json'));
 }
 
 beforeEach(() => {

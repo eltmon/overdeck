@@ -16,9 +16,9 @@ import {
   resolveContinueStateDir,
   type VBriefTransitionResult,
 } from '../../lib/vbrief/lifecycle-io.js';
-import { readPlan } from '../../lib/vbrief/io.js';
-import { resolveVBriefDir, VBRIEF_LIFECYCLE_DIRS, parseVBriefFilename } from '../../lib/vbrief/lifecycle.js';
+import { findPlan, readPlan } from '../../lib/vbrief/io.js';
 import { readContinueState } from '../../lib/vbrief/continue-state.js';
+import { listVBriefsAsync, readVBriefDocumentAsync } from '../../lib/vbrief/vbrief-index.js';
 import { resolveProjectFromIssue, extractTeamPrefix, findProjectByTeam, listProjects } from '../../lib/projects.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
 
@@ -91,33 +91,26 @@ function rowCreatedDate(doc: VBriefDocument | null, filenameDate: string | null,
   }
 }
 
-function collectLifecycleRows(projectKey: string, projectPath: string): ScopeRow[] {
+async function collectLifecycleRows(projectKey: string, projectPath: string): Promise<ScopeRow[]> {
   const rows: ScopeRow[] = [];
-  for (const dir of VBRIEF_LIFECYCLE_DIRS) {
-    const dirPath = resolveVBriefDir(projectPath, dir);
-    if (!existsSync(dirPath)) continue;
-    let entries: string[];
+  const entries = await listVBriefsAsync(projectPath);
+  for (const entry of entries) {
+    let doc: VBriefDocument | null = null;
     try {
-      entries = readdirSync(dirPath);
+      doc = await readVBriefDocumentAsync(entry.path);
     } catch {
-      continue;
+      doc = null;
     }
-    for (const entry of entries) {
-      const parts = parseVBriefFilename(entry);
-      if (!parts) continue;
-      const path = join(dirPath, entry);
-      const doc = safeReadPlan(path);
-      rows.push({
-        projectKey,
-        projectPath,
-        lifecycle: dir,
-        issueId: (doc?.plan?.id ?? parts.issueId).toUpperCase(),
-        title: doc?.plan?.title ?? '(untitled)',
-        status: doc?.plan?.status ?? (doc ? 'unknown' : 'corrupt'),
-        created: rowCreatedDate(doc, parts.date, path),
-        path,
-      });
-    }
+    rows.push({
+      projectKey,
+      projectPath,
+      lifecycle: entry.lifecycleDir,
+      issueId: (doc?.plan?.id ?? entry.issueId).toUpperCase(),
+      title: doc?.plan?.title ?? '(untitled)',
+      status: doc?.plan?.status ?? (doc ? 'unknown' : 'corrupt'),
+      created: rowCreatedDate(doc, entry.date, entry.path),
+      path: entry.path,
+    });
   }
   return rows;
 }
@@ -135,8 +128,8 @@ function collectInFlightRows(projectKey: string, projectPath: string): ScopeRow[
   for (const ws of dirs) {
     if (!ws.startsWith('feature-')) continue;
     const wsPath = join(workspacesDir, ws);
-    const planPath = join(wsPath, '.planning', 'plan.vbrief.json');
-    if (!existsSync(planPath)) continue;
+    const planPath = findPlan(wsPath);
+    if (!planPath) continue;
     const doc = safeReadPlan(planPath);
     const inferredId = ws.replace(/^feature-/, '').toUpperCase();
     rows.push({
@@ -249,7 +242,7 @@ async function listCommand(options: { project?: string }): Promise<void> {
   if (options.project) {
     const path = options.project;
     const key = path.split('/').filter(Boolean).pop() ?? path;
-    allRows.push(...collectLifecycleRows(key, path));
+    allRows.push(...await collectLifecycleRows(key, path));
     allRows.push(...collectInFlightRows(key, path));
   } else {
     // Enumerate ALL registered projects + their in-flight worktrees.
@@ -262,7 +255,7 @@ async function listCommand(options: { project?: string }): Promise<void> {
     }
     for (const { key, config } of projects) {
       if (!config.path || !existsSync(config.path)) continue;
-      allRows.push(...collectLifecycleRows(key, config.path));
+      allRows.push(...await collectLifecycleRows(key, config.path));
       allRows.push(...collectInFlightRows(key, config.path));
     }
   }

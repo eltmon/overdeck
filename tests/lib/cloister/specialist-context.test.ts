@@ -346,8 +346,7 @@ describe('specialist-context', () => {
       const digest = await generateContextDigest('testproject', 'review-agent');
       expect(digest).toBe('digest');
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Claude stderr'),
-        expect.any(String)
+        expect.stringContaining('[claude-invoke] STDERR purpose=specialist-digest')
       );
 
       consoleErrorSpy.mockRestore();
@@ -462,8 +461,7 @@ describe('specialist-context', () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to generate digest'),
-        expect.any(String)
+        expect.stringContaining('[claude-invoke] FAILED purpose=specialist-digest')
       );
 
       consoleErrorSpy.mockRestore();

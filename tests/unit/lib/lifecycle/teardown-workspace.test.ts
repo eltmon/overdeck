@@ -182,24 +182,6 @@ describe('teardown-workspace', () => {
     expect(branchResult).toBeUndefined();
   });
 
-  it('should clear planning marker when workspace exists', async () => {
-    // findWorkspacePath looks for workspaces/<issueLower>
-    const wsPath = join(testDir, 'workspaces', 'pan-100');
-    const markerPath = join(wsPath, '.planning', '.planning-complete');
-    mkdirSync(join(wsPath, '.planning'), { recursive: true });
-    writeFileSync(markerPath, '');
-
-    const results = await teardownWorkspace({
-      issueId: 'PAN-100',
-      projectPath: testDir,
-    });
-
-    const markerResult = results.find(r => r.step === 'teardown:planning-marker');
-    expect(markerResult).toBeDefined();
-    expect(markerResult!.success).toBe(true);
-    expect(markerResult!.skipped).toBe(false);
-  });
-
   it('should not delete workspace when deleteWorkspace is false', async () => {
     // Create workspace (findWorkspacePath looks for workspaces/<issueLower>)
     const wsPath = join(testDir, 'workspaces', 'pan-100');
