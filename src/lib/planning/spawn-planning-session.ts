@@ -26,10 +26,9 @@ import {
 } from '../tmux.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
-import { getAgentRuntimeBaseCommand, getProviderExportsForModel, getProviderEnvForModel } from '../agents.js';
+import { getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../agents.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { injectProviderEnvOverlay } from '../claude-settings-overlay.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext, writeWorkspaceContinue } from '../pan-dir/index.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -492,18 +491,6 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel);
 
     const providerExports = await getProviderExportsForModel(planningModel);
-
-    // Update the main project's .claude/settings.local.json with the correct
-    // provider env for this planning model. Workspaces are subdirectories of the
-    // main project, so writing to projectPath (not workspacePath) ensures Claude
-    // Code walks up to a single canonical settings file shared by all agent types,
-    // rather than finding a stale workspace-level file from a previous work agent.
-    try {
-      const providerEnv = await getProviderEnvForModel(planningModel);
-      await injectProviderEnvOverlay(projectPath, providerEnv);
-    } catch (err: any) {
-      console.warn(`[start-planning] Provider env overlay failed (falling back to launcher exports): ${err.message}`);
-    }
 
     // ── Write launcher script ──────────────────────────────────────────────
     const continueFilePath = getWorkspacePanPaths(workspacePath).continuePath;
