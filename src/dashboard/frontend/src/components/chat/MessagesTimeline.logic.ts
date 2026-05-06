@@ -182,11 +182,18 @@ export function deriveMessagesTimelineRows(
 
 const MAX_VISIBLE_WORK_LOG_ENTRIES = 6;
 
+export interface EstimateHeightInput {
+  timelineWidth?: number;
+  /** When true, tool-only work groups are collapsed to a single muted line. */
+  hideToolCalls?: boolean;
+}
+
 /** Estimate height in pixels for a MessagesTimelineRow. Used by useVirtualizer. */
 export function estimateMessagesTimelineRowHeight(
   row: MessagesTimelineRow,
-  timelineWidth = 800,
+  input: EstimateHeightInput = {},
 ): number {
+  const { timelineWidth = 800, hideToolCalls = false } = input;
   if (row.kind === 'working') return 40;
   if (row.kind === 'compact-boundary') return 40;
   if (row.kind === 'compacting') return 40;
@@ -196,6 +203,10 @@ export function estimateMessagesTimelineRowHeight(
   }
 
   if (row.kind === 'work') {
+    const onlyToolEntries = row.groupedEntries.every((entry) => entry.tone === 'tool');
+    if (hideToolCalls && onlyToolEntries) {
+      return 32;
+    }
     const visible = Math.min(row.groupedEntries.length, MAX_VISIBLE_WORK_LOG_ENTRIES);
     return 28 + visible * 32;
   }

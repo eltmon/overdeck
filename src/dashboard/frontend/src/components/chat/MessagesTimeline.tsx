@@ -22,7 +22,8 @@ import {
   memo,
 } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus, RotateCcw, XCircle, Scissors, ClipboardList, ShieldCheck } from 'lucide-react';
+import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus, RotateCcw, XCircle, Scissors, ClipboardList, ShieldCheck, Wrench } from 'lucide-react';
+import type { WorkingPhase } from '../../lib/workingPhase';
 import type { CompactBoundary, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import type { FailedMessage } from './ConversationPanel';
 import { ChatMarkdown } from './ChatMarkdown';
@@ -100,6 +101,10 @@ export interface MessagesTimelineProps {
   turnDiffSummaryByAssistantMessageId?: Map<string, TurnDiffSummary>;
   onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
   resolvedTheme?: 'light' | 'dark';
+  /** When true, pure tool-call work groups are collapsed to a single muted line. */
+  hideToolCalls?: boolean;
+  /** Current working phase — drives the working indicator icon. */
+  workingPhase?: WorkingPhase;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -119,6 +124,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   turnDiffSummaryByAssistantMessageId,
   onOpenTurnDiff,
   resolvedTheme,
+  hideToolCalls = false,
+  workingPhase,
 }: MessagesTimelineProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -220,11 +227,17 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     getScrollElement: () => scrollContainerRef.current,
     getItemKey: (index) => `${widthKey}:${virtualRows[index]!.id}`,
     estimateSize: (index) =>
-      estimateMessagesTimelineRowHeight(virtualRows[index]!, width),
+      estimateMessagesTimelineRowHeight(virtualRows[index]!, { timelineWidth: width, hideToolCalls }),
     measureElement: (el) => el.getBoundingClientRect().height,
     useAnimationFrameWithResizeObserver: true,
     overscan: 8,
   });
+
+  // Remeasure rows when hideToolCalls changes so the virtualizer
+  // updates heights for collapsed / expanded work groups.
+  useEffect(() => {
+    rowVirtualizer.measure();
+  }, [rowVirtualizer, hideToolCalls]);
 
   // Observe container width for height estimation accuracy
   useLayoutEffect(() => {
@@ -321,6 +334,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                     turnDiffSummary={row.kind === 'message' && row.message.role === 'assistant' ? turnDiffSummaryByAssistantMessageId?.get(row.message.id) : undefined}
                     onOpenTurnDiff={onOpenTurnDiff}
                     resolvedTheme={resolvedTheme}
+                    hideToolCalls={hideToolCalls}
+                    workingPhase={workingPhase}
                   />
                   {markersForRow?.map((marker) => (
                     <RoundDivider
@@ -346,6 +361,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                 turnDiffSummary={row.kind === 'message' && row.message.role === 'assistant' ? turnDiffSummaryByAssistantMessageId?.get(row.message.id) : undefined}
                 onOpenTurnDiff={onOpenTurnDiff}
                 resolvedTheme={resolvedTheme}
+                hideToolCalls={hideToolCalls}
+                workingPhase={workingPhase}
               />
               {markersForRow?.map((marker) => (
                 <RoundDivider
@@ -433,14 +450,16 @@ interface RowProps {
   turnDiffSummary?: TurnDiffSummary;
   onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
   resolvedTheme?: 'light' | 'dark';
+  hideToolCalls?: boolean;
+  workingPhase?: WorkingPhase;
 }
 
-const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, turnDiffSummary, onOpenTurnDiff, resolvedTheme }: RowProps) {
+const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, turnDiffSummary, onOpenTurnDiff, resolvedTheme, hideToolCalls, workingPhase }: RowProps) {
   if (row.kind === 'working') {
-    return <WorkingIndicator startedAt={row.createdAt} />;
+    return <WorkingIndicator startedAt={row.createdAt} phase={workingPhase} />;
   }
   if (row.kind === 'work') {
-    return <WorkLogGroup entries={row.groupedEntries} />;
+    return <WorkLogGroup entries={row.groupedEntries} hideToolCalls={hideToolCalls} />;
   }
   if (row.kind === 'proposed-plan') {
     return <PlanCard plan={row.plan} conversationName={conversationName ?? ''} />;
@@ -651,8 +670,34 @@ function AssistantMessageRow({
 
 // ─── Work log group ───────────────────────────────────────────────────────────
 
-function WorkLogGroup({ entries }: { entries: WorkLogEntry[] }) {
+function WorkLogGroup({ entries, hideToolCalls }: { entries: WorkLogEntry[]; hideToolCalls?: boolean }) {
   const [expanded, setExpanded] = useState(false);
+
+  const onlyToolEntries = entries.every((entry) => entry.tone === 'tool');
+  if (hideToolCalls && onlyToolEntries && !expanded) {
+    return (
+      <button
+        type="button"
+        className={styles.workLogGroup}
+        onClick={() => setExpanded(true)}
+        title={`Show ${entries.length} tool ${entries.length === 1 ? 'call' : 'calls'}`}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          cursor: 'pointer',
+          opacity: 0.5,
+          fontSize: 11,
+          transition: 'opacity 0.15s',
+        }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.85'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.5'; }}
+      >
+        <Wrench size={12} />
+        <span>{entries.length} tool {entries.length === 1 ? 'call' : 'calls'} were made</span>
+      </button>
+    );
+  }
 
   const visible = expanded ? entries : entries.slice(0, MAX_VISIBLE_WORK_LOG_ENTRIES);
   const hasOverflow = entries.length > MAX_VISIBLE_WORK_LOG_ENTRIES;
@@ -764,7 +809,7 @@ function SimpleWorkEntryRow({ entry }: { entry: WorkLogEntry }) {
 
 // ─── Working indicator ────────────────────────────────────────────────────────
 
-function WorkingIndicator({ startedAt }: { startedAt: string | null }) {
+function WorkingIndicator({ startedAt, phase }: { startedAt: string | null; phase?: WorkingPhase }) {
   const [elapsed, setElapsed] = useState(0);
   const startMs = startedAt ? new Date(startedAt).getTime() : Date.now();
 
@@ -775,13 +820,19 @@ function WorkingIndicator({ startedAt }: { startedAt: string | null }) {
     return () => clearInterval(interval);
   }, [startMs]);
 
+  const isToolPhase = phase === 'tool';
+
   return (
     <div className={styles.workingIndicator}>
-      <span className={styles.workingDots}>
-        <span />
-        <span />
-        <span />
-      </span>
+      {isToolPhase ? (
+        <Wrench size={14} className={styles.pulseIcon} aria-label="Using tool" />
+      ) : (
+        <span className={styles.workingDots}>
+          <span />
+          <span />
+          <span />
+        </span>
+      )}
       <span className={styles.workingLabel}>
         Working{elapsed > 0 ? ` for ${elapsed}s` : '…'}
       </span>
