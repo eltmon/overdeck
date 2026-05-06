@@ -48,6 +48,7 @@ interface FeatureItemProps {
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
   onCleanupOrphanedResources?: (issueId: string) => void;
+  onOpenPlanDialog?: (issueId: string) => void;
 }
 
 // ContextMenuState removed — migrated to Radix UI ContextMenu
@@ -882,7 +883,7 @@ function ReviewGroup({
   );
 }
 
-export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources }: FeatureItemProps) {
+export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog }: FeatureItemProps) {
   const trimmedTitle = title?.trim() ?? '';
   const displayTitle = trimmedTitle || '(untitled)';
   const titleClassName = trimmedTitle
@@ -1080,6 +1081,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                       onDeepWipe={onDeepWipe}
                       onOpenStateDir={onOpenStateDir}
                       onViewJsonl={onViewJsonl}
+                      onOpenPlanDialog={onOpenPlanDialog}
                     />
                   );
                 })}
