@@ -2849,9 +2849,10 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
       if (!agentId || !agentId.startsWith('agent-') || !agent.tmuxActive) continue;
       if (agentId.startsWith('specialist-')) continue;
 
-      // Skip if completion marker already exists
+      // Skip if completion marker already exists (or was already processed by cloister)
       const completedFile = join(AGENTS_DIR, agent.id, 'completed');
-      if (existsSync(completedFile)) continue;
+      const processedMarker = join(AGENTS_DIR, agent.id, 'completed.processed');
+      if (existsSync(completedFile) || existsSync(processedMarker)) continue;
 
       // Check idle duration and idle state via Stop hook
       // isAgentIdleForNudge uses FIRST_COMPLETION_IDLE_MS as the stale-active threshold:
