@@ -75,6 +75,7 @@ docker-compose.devcontainer.yml
 .claude/prompts/code-review-*.prompt-template.md
 # Workspace-specific settings (absolute paths, caveman variant — must not merge to main)
 .claude/settings.json
+.claude/settings.local.json
 .claude/.caveman-variant
 
 # Build source maps

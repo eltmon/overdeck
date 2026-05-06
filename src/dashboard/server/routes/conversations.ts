@@ -75,7 +75,6 @@ import {
   getProviderExportsForModel,
   getProviderEnvForModel,
 } from '../../../lib/agents.js';
-import { injectProviderEnvOverlay } from '../../../lib/claude-settings-overlay.js';
 import { generateLauncherScript } from '../../../lib/launcher-generator.js';
 import {
   parseConversationMessages,
@@ -1076,17 +1075,6 @@ const postConversationRoute = HttpRouter.add(
         const claudeSessionId = randomUUID();
 
         console.log(`[conversations] Creating conversation "${name}" with model=${model ?? 'default'} effort=${effort ?? 'default'} cwd=${cwd}`);
-
-        // Apply provider env overlay if user consented via the conflict dialog
-        if (applyProviderOverride && model) {
-          try {
-            const providerEnv = await getProviderEnvForModel(model);
-            const overlayResult = await injectProviderEnvOverlay(cwd, providerEnv);
-            console.log(`[conversations] Provider env overlay applied: ${overlayResult.keysInjected.join(', ')}`);
-          } catch (err) {
-            console.error('[conversations] Provider env overlay failed:', err);
-          }
-        }
 
         // Spawn tmux session with model + effort + deterministic session ID
         await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId);
