@@ -256,4 +256,22 @@ describe('estimateMessagesTimelineRowHeight', () => {
     };
     expect(estimateMessagesTimelineRowHeight(row)).toBeGreaterThan(0);
   });
+
+  it('returns 32 for a tool-only work row when hideToolCalls is true', () => {
+    const entries = [
+      work({ id: 'w1', createdAt: '2024-01-01T00:00:00Z', tone: 'tool', label: 'Bash' }),
+      work({ id: 'w2', createdAt: '2024-01-01T00:00:01Z', tone: 'tool', label: 'Read' }),
+    ];
+    const row = { kind: 'work' as const, id: 'w1', createdAt: '2024-01-01T00:00:00Z', groupedEntries: entries };
+    expect(estimateMessagesTimelineRowHeight(row, { hideToolCalls: true })).toBe(32);
+  });
+
+  it('returns normal height for a mixed-tone work row even when hideToolCalls is true', () => {
+    const entries = [
+      work({ id: 'w1', createdAt: '2024-01-01T00:00:00Z', tone: 'tool', label: 'Bash' }),
+      work({ id: 'w2', createdAt: '2024-01-01T00:00:01Z', tone: 'info', label: 'Context compacted' }),
+    ];
+    const row = { kind: 'work' as const, id: 'w1', createdAt: '2024-01-01T00:00:00Z', groupedEntries: entries };
+    expect(estimateMessagesTimelineRowHeight(row, { hideToolCalls: true })).toBe(92);
+  });
 });
