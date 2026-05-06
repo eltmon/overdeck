@@ -2,15 +2,16 @@
   "version": "1",
   "issueId": "PAN-972",
   "created": "2026-05-06T14:50:00Z",
-  "updated": "2026-05-06T14:50:00Z",
-  "gitState": { "branch": "feature/pan-972", "sha": "be3095a", "dirty": true },
+  "updated": "2026-05-06T14:55:00Z",
+  "gitState": { "branch": "feature/pan-972", "sha": "2f3f7bf", "dirty": true },
   "decisions": [
-    { "id": "D1", "summary": "Use fs/promises readFile for loadSwarmState and wrap call in Effect.promise() since it is called inside an Effect generator", "recordedAt": "2026-05-06T14:50:00Z" }
+    { "id": "D1", "summary": "Use fs/promises readFile for loadSwarmState and wrap call in Effect.promise() since it is called inside an Effect generator", "recordedAt": "2026-05-06T14:50:00Z" },
+    { "id": "D2", "summary": "Use fs/promises mkdir/writeFile for saveSwarmState and wrap call in Effect.promise()", "recordedAt": "2026-05-06T14:55:00Z" }
   ],
   "hazards": [],
   "resumePoint": {
-    "description": "Implementing bead workspace-p0r (Convert loadSwarmState to async) — done, need to commit and close. Next beads: workspace-coj (saveSwarmState) and workspace-gtm (createSlotWorktree).",
-    "beadId": "workspace-p0r",
+    "description": "Implementing bead workspace-coj (Convert saveSwarmState to async) — done, need to commit and close. Next bead: workspace-gtm (createSlotWorktree sync calls).",
+    "beadId": "workspace-coj",
     "filesToRead": ["src/dashboard/server/routes/swarm.ts"]
   },
   "beadsMapping": {},

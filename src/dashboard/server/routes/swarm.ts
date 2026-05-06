@@ -71,11 +71,11 @@ async function loadSwarmState(issueId: string): Promise<SwarmState | null> {
   }
 }
 
-function saveSwarmState(state: SwarmState): void {
+async function saveSwarmState(state: SwarmState): Promise<void> {
   const dir = getSwarmDir();
-  mkdirSync(dir, { recursive: true });
+  await mkdir(dir, { recursive: true });
   state.updatedAt = new Date().toISOString();
-  writeFileSync(getSwarmStatePath(state.issueId), JSON.stringify(state, null, 2));
+  await writeFile(getSwarmStatePath(state.issueId), JSON.stringify(state, null, 2));
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -359,7 +359,7 @@ const postSwarmRoute = HttpRouter.add(
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    saveSwarmState(state);
+    yield* Effect.promise(() => saveSwarmState(state));
 
     return jsonResponse({
       success: true,
