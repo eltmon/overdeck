@@ -353,6 +353,7 @@ export function CommandDeck({
   const issueTitles = useMemo(() => {
     const map: Record<string, string> = {};
     for (const issue of issues) {
+      if (!issue.identifier) continue;
       map[issue.identifier.toLowerCase()] = issue.title;
       map[issue.identifier] = issue.title;
     }
