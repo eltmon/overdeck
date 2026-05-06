@@ -77,6 +77,7 @@ import { registerReleaseCommands } from './commands/release.js';
 import { resourcesCommand } from './commands/resources.js';
 import { devCommand } from './commands/dev.js';
 import { registerScopeCommands } from './commands/scope.js';
+import { swarmCommand } from './commands/swarm.js';
 
 const program = new Command();
 program.enablePositionalOptions();
@@ -333,6 +334,15 @@ program
   .option('--local', 'Use local workspace (explicit override)')
   .option('--phase <phase>', 'Work phase for model routing')
   .action(startCommand);
+
+program
+  .command('swarm <id>')
+  .description('Swarm execution: spawn parallel agents across vBRIEF plan items using dependency-wave scheduling')
+  .option('--dry-run', 'Print the wave plan without spawning agents')
+  .option('--wave <n>', 'Dispatch only wave N')
+  .option('--model <model>', 'Override model for work slots (default: kimi-k2.6)')
+  .option('--max-slots <n>', 'Max concurrent agents')
+  .action(swarmCommand);
 
 // Register workspace commands (pan workspace create, pan workspace list, etc.)
 registerWorkspaceCommands(program);

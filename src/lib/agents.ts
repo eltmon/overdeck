@@ -736,6 +736,11 @@ export interface SpawnOptions {
   // Work type system (PAN-118)
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning';
   workType?: WorkTypeId; // Explicit work type ID (overrides phase-based detection)
+
+  // Swarm slot support (PAN-970): when set, session name becomes agent-<issueId>-<slotId>
+  // and the one-agent-per-issue uniqueness check is scoped to the slot.
+  slotId?: number;
+  swarmItemId?: string; // vBRIEF item ID this slot is working on
 }
 
 /**
@@ -928,9 +933,11 @@ export async function transitionIssueToInReview(issueId: string, workspacePath?:
 }
 
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
-  const agentId = `agent-${options.issueId.toLowerCase()}`;
+  const agentId = options.slotId != null
+    ? `agent-${options.issueId.toLowerCase()}-${options.slotId}`
+    : `agent-${options.issueId.toLowerCase()}`;
 
-  // Check if already running
+  // Check if already running (scoped to the exact session name, including slot suffix)
   if (await sessionExistsAsync(agentId)) {
     throw new Error(`Agent ${agentId} already running. Use 'pan tell' to message it.`);
   }

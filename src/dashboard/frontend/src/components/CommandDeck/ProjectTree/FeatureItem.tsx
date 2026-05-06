@@ -6,7 +6,7 @@ import {
   Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge,
   ChevronRight, ChevronDown, FolderOpen, FileText, Trash2, GitBranch,
   BookText, Bug, Container, Radio, Workflow, Play, RefreshCw, RotateCcw,
-  XCircle, ClipboardCheck,
+  XCircle, ClipboardCheck, Zap,
 } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
@@ -674,6 +674,26 @@ function FeatureContextMenu({
     },
   });
 
+  const swarmMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/swarm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueId: feature.issueId }),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string; dispatched?: number; slots?: unknown[] };
+      if (!res.ok) throw new Error(data.error || 'Failed to dispatch swarm');
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Swarm dispatched for ${feature.issueId}: ${(data as any).dispatched ?? 0} slot(s)`);
+      void refreshDashboardState(queryClient);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
+    },
+  });
+
   const handleDeepWipe = useCallback(() => {
     if (!onDeepWipe) return;
     const confirmed = window.confirm(
@@ -776,6 +796,17 @@ function FeatureContextMenu({
             </ContextMenuSubContent>
           </ContextMenuSub>
         </>
+      )}
+
+      {/* Swarm action */}
+      {feature.resourceDetails?.hasVbrief && (
+        <ContextMenuItem
+          onSelect={() => swarmMutation.mutate()}
+          disabled={swarmMutation.isPending}
+        >
+          {swarmMutation.isPending ? <Loader2 size={12} className="mr-2 animate-spin" /> : <Zap size={12} className="mr-2" />}
+          Swarm
+        </ContextMenuItem>
       )}
 
       {/* Utility actions */}
