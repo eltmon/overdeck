@@ -84,19 +84,19 @@
 
   /* Surfaces */
   --background: #080b10;
-  --foreground: #f3f4f6;
+  --foreground: #e5e7eb;
   --card: #0c1018;
-  --card-foreground: #f3f4f6;
+  --card-foreground: #e5e7eb;
   --popover: #0c1018;
-  --popover-foreground: #f3f4f6;
+  --popover-foreground: #e5e7eb;
 
   /* Interactive */
   --primary: oklch(0.588 0.217 264);
   --primary-foreground: #ffffff;
-  --secondary: color-mix(in srgb, white 4%, transparent);
-  --secondary-foreground: #f3f4f6;
-  --accent: color-mix(in srgb, white 4%, transparent);
-  --accent-foreground: #f3f4f6;
+  --secondary: color-mix(in srgb, white 6%, transparent);
+  --secondary-foreground: #e5e7eb;
+  --accent: color-mix(in srgb, white 8%, transparent);
+  --accent-foreground: #e5e7eb;
 
   /* Muted */
   --muted: color-mix(in srgb, white 4%, transparent);
