@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-974",
   "created": "2026-05-06T19:10:06.291Z",
-  "updated": "2026-05-06T19:10:06.291Z",
+  "updated": "2026-05-06T19:12:51.442Z",
   "gitState": {
     "branch": "feature/pan-974",
-    "sha": "be3095a1d",
+    "sha": "503cb22b4",
     "dirty": true
   },
   "decisions": [
@@ -18,22 +18,29 @@
       "id": "D2",
       "summary": "Slot session JSONL lookup must derive the workspace path from the slot number so agent-pan-<issue>-<n> resolves against workspaces/feature-<issue>-slot-<n> instead of the base workspace.",
       "recordedAt": "2026-05-06T19:10:06.291Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Frontend agent output should normalize slot work session ids with the same base-issue pattern as the server so selecting agent-<issue>-<slot> keeps ActivityView bound to the parent issue while Terminal stays bound to the slot session.",
+      "recordedAt": "2026-05-06T19:12:51.442Z"
     }
   ],
   "hazards": [
     {
       "id": "H1",
-      "summary": "Frontend issue derivation still needs to normalize slot session ids like agent-pan-969-2 back to PAN-969 anywhere issue context is inferred from the session name.",
-      "mitigation": "Finish bead workspace-52u by updating the frontend session-to-issue mapping paths and adding focused tests before final verification."
+      "summary": "Final UI verification must use the built dashboard server under Node 22, not Bun, or PTY-backed terminal behavior can fail independently of the PAN-974 code changes.",
+      "mitigation": "Run npm run build before browser verification and validate the dashboard through the Node 22 dist server path."
     }
   ],
   "resumePoint": {
-    "description": "Start bead workspace-52u: update the remaining frontend slot-aware issue/session handling so slot rows select the parent issue context and open the correct terminal/output views, then add focused tests.",
+    "description": "Both PAN-974 beads are implemented. Next: run broader verification for the session-tree slot work, then build the dashboard, verify slot selection in the browser against the Node 22 server, and only then do the final push and pan done flow.",
     "beadId": "workspace-52u",
     "filesToRead": [
+      "src/dashboard/server/routes/projects.ts",
+      "src/dashboard/server/ws-rpc.ts",
       "src/dashboard/frontend/src/components/AgentOutputPanel.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/IssueWorkbench.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx"
+      "src/dashboard/frontend/src/components/__tests__/AgentOutputPanel.test.tsx",
+      "src/dashboard/server/__tests__/swarm-slot-session-mapping.test.ts"
     ]
   },
   "beadsMapping": {
@@ -46,6 +53,12 @@
       "timestamp": "2026-05-06T19:10:06.291Z",
       "reason": "end",
       "note": "Completed bead workspace-448 implementation by adding slot-aware session discovery in projects.ts, slot-aware tmux issue extraction in ws-rpc.ts, and focused regression tests.",
+      "agentModel": "gpt-5.4"
+    },
+    {
+      "timestamp": "2026-05-06T19:12:51.442Z",
+      "reason": "end",
+      "note": "Completed bead workspace-52u by making AgentOutputPanel derive the parent issue from slot session ids and adding focused derivation/render tests for swarm slot sessions.",
       "agentModel": "gpt-5.4"
     }
   ]
