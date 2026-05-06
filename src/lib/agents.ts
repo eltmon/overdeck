@@ -373,8 +373,6 @@ export interface AgentState {
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning';
   workType?: WorkTypeId; // Current work type ID
 
-  // SageOx session tracking (PAN-278)
-  sageoxSessionPath?: string; // Path to SageOx session folder for parent linking
   preSpawnStashRef?: string;
   preSpawnStashMessage?: string;
   preSpawnBaselineHead?: string;
@@ -1123,34 +1121,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     console.warn(`[${agentId}] GitHub App config failed (falling back to SSH): ${err.message}`);
   }
 
-  // Build SageOx environment variables for session linking (only if project is SageOx-initialized)
-  // Derive project root from workspace path: <project-root>/workspaces/<branch>
-  const projectRoot = resolve(options.workspace, '..', '..');
-  const sageoxEnabled = existsSync(join(projectRoot, '.sageox'));
-  const sageoxEnv: Record<string, string> = {};
-
-  if (sageoxEnabled) {
-    sageoxEnv.OX_PROJECT_ROOT = projectRoot;
-
-    // Add issue tracking for multi-agent pipelines
-    if (options.issueId) {
-      sageoxEnv.PAN_ISSUE_ID = options.issueId;
-    }
-    if (options.phase) {
-      sageoxEnv.PAN_PHASE = options.phase;
-    }
-
-    // For non-planner agents, find the planner's session path for parent linking
-    if (options.phase && options.phase !== 'planning') {
-      const plannerAgentId = `agent-${options.issueId.toLowerCase()}`;
-      const plannerState = getAgentState(plannerAgentId);
-      if (plannerState?.sageoxSessionPath) {
-        sageoxEnv.PAN_PARENT_SESSION = plannerState.sageoxSessionPath;
-      }
-    }
-  }
-
-
   clearReadySignal(agentId);
 
   await createSessionAsync(agentId, options.workspace, claudeCmd, {
@@ -1163,7 +1133,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
       GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
       ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
-      ...sageoxEnv // Add SageOx environment variables
     }
   });
 
@@ -1225,13 +1194,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     priority: 2,
     issueId: options.issueId,
   });
-
-  // For planner agents, capture SageOx session path after it becomes available
-  if (sageoxEnabled && options.phase === 'planning') {
-    captureSageoxSessionPath(agentId, projectRoot).catch((err) => {
-      console.warn(`[agents] Could not capture SageOx session path: ${err.message}`);
-    });
-  }
 
   return state;
 }
@@ -1983,69 +1945,3 @@ function writeTaskCache(agentId: string, issueId: string): void {
   );
 }
 
-/**
- * Capture SageOx session path for a planner agent.
- * This is used for parent-child session linking in multi-agent pipelines.
- * Subsequent agents (worker, reviewer, tester, merger) will use this path
- * as their PAN_PARENT_SESSION to link their sessions to the planner's session.
- */
-async function captureSageoxSessionPath(agentId: string, projectRoot: string): Promise<void> {
-  // Wait for SageOx session to be created by the hook (up to 10 seconds)
-  const sessionsDir = join(projectRoot, '.sageox', 'sessions');
-  let attempts = 0;
-  const maxAttempts = 20;
-  const delayMs = 500;
-
-  while (attempts < maxAttempts) {
-    // Check if sessions directory exists
-    if (existsSync(sessionsDir)) {
-      // Find the most recent session directory for this agent
-      const sessions = readdirSync(sessionsDir, { withFileTypes: true })
-        .filter(d => d.isDirectory())
-        .map(d => ({
-          name: d.name,
-          path: join(sessionsDir, d.name),
-          mtime: existsSync(join(sessionsDir, d.name, '.recording.json'))
-            ? readFileSync(join(sessionsDir, d.name, '.recording.json'), 'utf-8')
-            : null
-        }))
-        .filter(s => {
-          // Check if this session belongs to our agent
-          if (!s.mtime) return false;
-          try {
-            const state = JSON.parse(s.mtime);
-            return state.agent_id === agentId || state.AgentID === agentId;
-          } catch {
-            return false;
-          }
-        })
-        .sort((a, b) => {
-          // Sort by modification time (newest first)
-          const aTime = existsSync(join(a.path, '.recording.json'))
-            ? (statSync(join(a.path, '.recording.json')).mtimeMs || 0)
-            : 0;
-          const bTime = existsSync(join(b.path, '.recording.json'))
-            ? (statSync(join(b.path, '.recording.json')).mtimeMs || 0)
-            : 0;
-          return bTime - aTime;
-        });
-
-      if (sessions.length > 0) {
-        // Update agent state with SageOx session path
-        const state = getAgentState(agentId);
-        if (state) {
-          state.sageoxSessionPath = sessions[0].path;
-          saveAgentState(state);
-          console.log(`[agents] Captured SageOx session path for ${agentId}: ${sessions[0].path}`);
-          return;
-        }
-      }
-    }
-
-    // Wait before retrying
-    await new Promise(resolve => setTimeout(resolve, delayMs));
-    attempts++;
-  }
-
-  throw new Error(`Could not find SageOx session for ${agentId} after ${maxAttempts * delayMs}ms`);
-}
