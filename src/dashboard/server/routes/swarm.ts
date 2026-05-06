@@ -6,7 +6,8 @@
  *   GET  /api/swarm/:issueId — get swarm state for an issue
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, relative } from 'node:path';
 import { exec } from 'node:child_process';
@@ -59,11 +60,12 @@ function getSwarmStatePath(issueId: string): string {
   return join(getSwarmDir(), `${issueId.toLowerCase()}.json`);
 }
 
-function loadSwarmState(issueId: string): SwarmState | null {
+async function loadSwarmState(issueId: string): Promise<SwarmState | null> {
   const path = getSwarmStatePath(issueId);
   if (!existsSync(path)) return null;
   try {
-    return JSON.parse(readFileSync(path, 'utf-8'));
+    const data = await readFile(path, 'utf-8');
+    return JSON.parse(data);
   } catch {
     return null;
   }
@@ -411,7 +413,7 @@ const getSwarmRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
 
-    const state = loadSwarmState(issueId);
+    const state = yield* Effect.promise(() => loadSwarmState(issueId));
     if (!state) {
       return jsonResponse({ error: `No swarm state for ${issueId}` }, { status: 404 });
     }

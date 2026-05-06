@@ -1,0 +1,21 @@
+{
+  "version": "1",
+  "issueId": "PAN-972",
+  "created": "2026-05-06T14:50:00Z",
+  "updated": "2026-05-06T14:50:00Z",
+  "gitState": { "branch": "feature/pan-972", "sha": "be3095a", "dirty": true },
+  "decisions": [
+    { "id": "D1", "summary": "Use fs/promises readFile for loadSwarmState and wrap call in Effect.promise() since it is called inside an Effect generator", "recordedAt": "2026-05-06T14:50:00Z" }
+  ],
+  "hazards": [],
+  "resumePoint": {
+    "description": "Implementing bead workspace-p0r (Convert loadSwarmState to async) — done, need to commit and close. Next beads: workspace-coj (saveSwarmState) and workspace-gtm (createSlotWorktree).",
+    "beadId": "workspace-p0r",
+    "filesToRead": ["src/dashboard/server/routes/swarm.ts"]
+  },
+  "beadsMapping": {},
+  "agentModel": "kimi-k2.6",
+  "sessionHistory": [
+    { "timestamp": "2026-05-06T14:50:00Z", "reason": "start", "note": "Started PAN-972. Created 3 beads and claimed workspace-p0r. Converted loadSwarmState to async.", "agentModel": "kimi-k2.6" }
+  ]
+}
