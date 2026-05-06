@@ -2,7 +2,7 @@
   "vBRIEFInfo": {
     "version": "0.5",
     "created": "2026-05-05T06:00:00Z",
-    "updated": "2026-05-05T06:00:00Z",
+    "updated": "2026-05-05T08:00:00Z",
     "author": "panopticon-cli/0.5.0",
     "description": "Directive Flow: Replace Overview tab with live DAG visualization unifying vBRIEF items and specialist pipeline"
   },
@@ -355,6 +355,45 @@
             "title": "Gate node actions (Review & Test, Sync, Stop, Approve Merge) work correctly and call existing API endpoints",
             "status": "pending",
             "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "overview-tab-replacement.node-click-selects-agent",
+            "title": "Clicking a work item node in the DAG selects its assigned agent in the project tree and switches the terminal view",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "beads-progress-wiring",
+        "title": "Wire beads task progress into enriched work nodes and summary strip",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "phase": 3
+        },
+        "narrative": {
+          "Action": "Integrate beads task data into the DAG so enriched work item nodes show real-time progress. Fetch beads status for each vBRIEF item via the plan endpoint (items are mapped to beads by createBeadsFromVBrief). Wire bd task status (open/in_progress/done) into the bead progress bar on each enriched node. When an agent closes a bead (bd close), the corresponding vBRIEF item status should update via the existing updateItemStatus() in io.ts, reflecting immediately in the DAG. Expose beads-per-item mapping in the plan API response so the frontend can render progress without a separate fetch."
+        },
+        "subItems": [
+          {
+            "id": "beads-progress-wiring.plan-api",
+            "title": "GET /api/workspaces/:issueId/plan response includes beads status per item (open/in_progress/done counts)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "beads-progress-wiring.progress-bar",
+            "title": "Enriched work item nodes show bead progress bar reflecting actual beads task completion",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "beads-progress-wiring.live-update",
+            "title": "Bead close events propagate to DAG node updates within one WebSocket event cycle",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
           }
         ]
       },
@@ -397,7 +436,9 @@
       { "from": "summary-strip", "to": "overview-tab-replacement", "type": "blocks" },
       { "from": "diff-toggle", "to": "overview-tab-replacement", "type": "blocks" },
       { "from": "escape-states", "to": "overview-tab-replacement", "type": "blocks" },
-      { "from": "no-plan-fallback", "to": "overview-tab-replacement", "type": "blocks" }
+      { "from": "no-plan-fallback", "to": "overview-tab-replacement", "type": "blocks" },
+      { "from": "live-data-wiring", "to": "beads-progress-wiring", "type": "blocks" },
+      { "from": "beads-progress-wiring", "to": "overview-tab-replacement", "type": "blocks" }
     ]
   }
 }

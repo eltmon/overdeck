@@ -1,0 +1,408 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-06T04:00:00Z",
+    "updated": "2026-05-06T04:00:00Z",
+    "author": "panopticon-cli/0.5.0",
+    "description": "Swarm: Multi-agent parallel execution with DAG-aware wave scheduling and merge cascade"
+  },
+  "plan": {
+    "id": "pan-970",
+    "title": "Swarm: Multi-agent parallel execution with DAG-aware work partitioning",
+    "status": "proposed",
+    "author": "human:eltmon+agent:claude-opus-4-6",
+    "sequence": 1,
+    "created": "2026-05-06T04:00:00Z",
+    "updated": "2026-05-06T04:00:00Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/970",
+        "label": "PAN-970",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/prds/planned/PAN-970-swarm.md",
+        "label": "PAN-970 PRD",
+        "type": "prd"
+      }
+    ],
+    "tags": ["architecture", "agents", "parallelism", "dag"],
+    "narratives": {
+      "Problem": "Panopticon runs one work agent per issue. vBRIEF DAGs often have independent parallel lanes, but items execute serially. Deft's swarm requires Warp terminal — we need a terminal-agnostic approach that leverages our existing tmux, Cloister, and worktree infrastructure.",
+      "Proposal": "Build a wave scheduler that partitions vBRIEF items by dependency waves, spawns one agent per item-group in separate git worktrees, and orchestrates merge cascades between waves. Cloister is the monitor. The specialist pipeline runs once on the final merged result.",
+      "Constraint": "Must not break single-agent mode — swarm is opt-in via `pan swarm`. Must use existing workspace, tmux, and Cloister infrastructure. Merge cascade must be serialized to avoid conflict races. File-overlap audit must prevent concurrent modification of the same files.",
+      "Risk": "Merge conflicts between worktrees in the same wave. File-overlap detection is heuristic — narrative analysis may miss implicit dependencies. Resource consumption scales linearly with agent count (RAM, API cost)."
+    },
+    "items": [
+      {
+        "id": "wave-scheduler",
+        "title": "Build wave scheduler: partition vBRIEF items into dependency waves",
+        "status": "pending",
+        "priority": "critical",
+        "metadata": {
+          "difficulty": "complex",
+          "phase": 1
+        },
+        "narrative": {
+          "Action": "Create a wave scheduler function that takes a VBriefDocument and partitions items into ordered waves using Kahn's algorithm on `blocks` edges (same foundation as criticalPath() in dag.ts). Wave 1 contains items with no unmet dependencies, wave 2 contains items whose blockers are all in wave 1, etc. Only `blocks` edges constrain wave assignment — `informs`, `suggests`, `invalidates` are ignored. Output: Wave[] with item assignments per wave, total wave count, and max parallelism (largest wave). Add to src/lib/vbrief/dag.ts alongside criticalPath()."
+        },
+        "subItems": [
+          {
+            "id": "wave-scheduler.partition",
+            "title": "Items correctly partitioned into waves using only `blocks` edges — no item appears before its blockers",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "wave-scheduler.independent",
+            "title": "Items with no blocking dependencies all land in wave 1",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "wave-scheduler.single-item",
+            "title": "Single-item and linear-chain DAGs produce one item per wave (degenerate case handled)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "file-overlap-audit",
+        "title": "Implement file-overlap audit to detect and resolve cross-agent file conflicts",
+        "status": "pending",
+        "priority": "critical",
+        "metadata": {
+          "difficulty": "complex",
+          "phase": 1
+        },
+        "narrative": {
+          "Action": "Before assigning items within a wave to separate agents, analyze which files each item is likely to touch. Sources: vBRIEF narrative text (extract file paths and component names), acceptance criteria text, and optionally historical file-touch data from prior agent runs (git log of completed items). When two items in the same wave have overlapping file sets, serialize them — move one to the next wave or group them on the same agent. Output a conflict report showing which items were regrouped and why. This is heuristic, not perfect — the goal is to catch obvious conflicts (two items both editing the same component file)."
+        },
+        "subItems": [
+          {
+            "id": "file-overlap-audit.detect",
+            "title": "Detects file path references in vBRIEF narrative and AC text and flags overlapping items",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "file-overlap-audit.regroup",
+            "title": "Overlapping items within a wave are serialized (moved to next wave or grouped on same agent)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "file-overlap-audit.report",
+            "title": "Conflict report output shows which items were regrouped and which files caused the conflict",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "agent-slot-system",
+        "title": "Extend workspace and agent infrastructure for numbered agent slots",
+        "status": "pending",
+        "priority": "critical",
+        "metadata": {
+          "difficulty": "complex",
+          "phase": 2
+        },
+        "narrative": {
+          "Action": "Extend createWorkspace() in workspace-manager.ts to support slot-numbered worktrees: `workspaces/feature-<issueId>-slot-<N>/` with branches `feature/<issueId>/slot-<N>`. Each slot gets its own bun install, build, and .pan/spec.vbrief.json. Extend agent spawn (start-agent endpoint) to accept a slot number — tmux sessions become `agent-<issueId>-<N>`. Agent state directories become `~/.panopticon/agents/agent-<issueId>-<N>/`. The full vBRIEF is copied to each slot but the agent prompt includes only its assigned item IDs. Beads are created per-slot with bd claims on the assigned items. Single-agent mode (no slot parameter) remains the default — backward compatible."
+        },
+        "subItems": [
+          {
+            "id": "agent-slot-system.worktree",
+            "title": "Slot worktrees created at `workspaces/feature-<issueId>-slot-<N>/` with correct branch naming",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "agent-slot-system.tmux",
+            "title": "Slot tmux sessions named `agent-<issueId>-<N>` and discoverable by Cloister",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "agent-slot-system.beads-claim",
+            "title": "Each slot agent has beads tasks only for its assigned vBRIEF items",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "agent-slot-system.backward-compat",
+            "title": "Single-agent mode (no slot parameter) continues to work unchanged",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "swarm-state-model",
+        "title": "Add SwarmState to read model and contracts",
+        "status": "pending",
+        "priority": "critical",
+        "metadata": {
+          "difficulty": "medium",
+          "phase": 2
+        },
+        "narrative": {
+          "Action": "Add SwarmState, Wave, and SlotAssignment types to @panctl/contracts. Add swarmStateByIssueId to the Zustand store and read model. SwarmState tracks: mode (single/swarm), waves array with per-wave status, currentWave number, mergeState (idle/cascading/conflict). Each Wave has slots with item assignments and per-slot status. Emit domain events: swarm.wave_started, swarm.slot_completed, swarm.wave_merging, swarm.wave_completed, swarm.conflict. Wire into EventRouter for real-time dashboard updates."
+        },
+        "subItems": [
+          {
+            "id": "swarm-state-model.types",
+            "title": "SwarmState, Wave, SlotAssignment types defined in @panctl/contracts with Effect Schema",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "swarm-state-model.store",
+            "title": "swarmStateByIssueId in Zustand store, updated via domain events over WebSocket",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "swarm-state-model.events",
+            "title": "Domain events emitted for wave lifecycle transitions (started, merging, completed, conflict)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "cloister-monitor",
+        "title": "Extend Cloister to orchestrate swarm waves: spawn, track, and transition",
+        "status": "pending",
+        "priority": "critical",
+        "metadata": {
+          "difficulty": "complex",
+          "phase": 3
+        },
+        "narrative": {
+          "Action": "Extend Cloister's lifecycle management to handle swarm orchestration. Add a wave state machine: idle → wave-N-running → wave-N-merging → wave-N+1-running → all-waves-complete → specialist-pipeline. On swarm start: spawn all agents for wave 1 (one per slot). Monitor all slots — existing stuck detection and health checks apply per-slot. A wave completes when ALL slots signal done. On wave completion: trigger merge cascade, then spawn next wave. On all-waves-complete: transition to specialist pipeline (VERIFY → REVIEW → TEST → MERGE) which runs once on the merged feature branch. Handle partial wave failure: if one slot is stuck and unstuck-able, allow manual override to proceed."
+        },
+        "subItems": [
+          {
+            "id": "cloister-monitor.wave-fsm",
+            "title": "Wave state machine transitions correctly through running → merging → next-wave → specialist-pipeline",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "cloister-monitor.completion-aggregation",
+            "title": "Wave marked complete only when ALL slots in that wave have signaled done",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "cloister-monitor.stuck-per-slot",
+            "title": "Stuck detection operates per-slot — one stuck agent does not block health checks on other slots",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "cloister-monitor.specialist-handoff",
+            "title": "Specialist pipeline starts only after all waves complete and final merge cascade succeeds",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "merge-cascade",
+        "title": "Implement merge cascade: rebase, verify, and squash-merge slot worktrees",
+        "status": "pending",
+        "priority": "critical",
+        "metadata": {
+          "difficulty": "complex",
+          "phase": 3
+        },
+        "narrative": {
+          "Action": "When a wave completes, run the merge cascade on all slot worktrees. Order worktrees by topological sort of their assigned items. For each worktree in order: (1) rebase onto latest feature branch, (2) run verification gate (typecheck + lint + test), (3) if verification passes squash-merge into feature branch, (4) if conflict arises attempt auto-resolution and if that fails mark the wave as 'conflict' and halt for human intervention. The cascade is serialized — no concurrent merges. After successful cascade, clean up slot worktrees and branches. Use the existing verification gate infrastructure from PAN-174."
+        },
+        "subItems": [
+          {
+            "id": "merge-cascade.order",
+            "title": "Worktrees merged in topological order of their assigned vBRIEF items",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "merge-cascade.verify",
+            "title": "Verification gate (typecheck + lint + test) runs per-worktree before merge",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "merge-cascade.conflict",
+            "title": "Merge conflicts halt the cascade and surface in dashboard with 'conflict' state",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "merge-cascade.cleanup",
+            "title": "Slot worktrees and branches cleaned up after successful merge",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "swarm-cli",
+        "title": "Add `pan swarm` CLI command",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "phase": 4
+        },
+        "narrative": {
+          "Action": "Add a new CLI command `pan swarm <issueId>` that: (1) loads the vBRIEF from .pan/specs/ or workspace, (2) runs the wave scheduler, (3) runs the file-overlap audit, (4) prints the wave plan (items per wave, agent count per wave, estimated parallelism, file-overlap adjustments), (5) confirms with the user, (6) spawns wave 1 agents via the API. Add --dry-run flag to show the plan without spawning. Add --wave N flag to re-run a specific wave (useful after conflict resolution). Register the command in the CLI command index. The command calls existing API endpoints for workspace creation and agent spawn, extended with slot parameters."
+        },
+        "subItems": [
+          {
+            "id": "swarm-cli.plan-display",
+            "title": "`pan swarm --dry-run` prints wave assignments with items, agent count, and file-overlap adjustments",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "swarm-cli.spawn",
+            "title": "`pan swarm <issueId>` spawns wave 1 agents after user confirmation",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "swarm-cli.wave-rerun",
+            "title": "`pan swarm <issueId> --wave N` re-runs a specific wave for conflict recovery",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "work-group-display",
+        "title": "Add WorkGroup component to command deck project tree for multi-agent display",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "phase": 4
+        },
+        "narrative": {
+          "Action": "Create a WorkGroup component in FeatureItem.tsx that mirrors the existing ReviewGroup pattern. When an issue has swarm state (mode='swarm'), render work agents under a collapsible '▸ Work (Wave N · X/Y items)' heading. Each agent node shows: assigned vBRIEF item titles, beads completion progress, agent status, model name. The group header shows the current wave number and aggregate progress. When mode='single', fall back to existing flat session display. Extend collectSessionTreeNodes() in projects.ts to discover slot-numbered agent sessions."
+        },
+        "subItems": [
+          {
+            "id": "work-group-display.group",
+            "title": "WorkGroup renders with collapsible header showing wave number and aggregate item progress",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "work-group-display.per-agent",
+            "title": "Each agent node in WorkGroup shows assigned items and beads completion count",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "work-group-display.single-fallback",
+            "title": "Single-agent issues render work sessions in the existing flat display (no WorkGroup wrapper)",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "directive-flow-swarm",
+        "title": "Extend Directive Flow DAG to show swarm state (slot badges, wave separators)",
+        "status": "pending",
+        "priority": "medium",
+        "metadata": {
+          "difficulty": "medium",
+          "phase": 5
+        },
+        "narrative": {
+          "Action": "Extend the PAN-969 Directive Flow DAG to render swarm state. Work item nodes get a colored slot badge when assigned to an agent (slot 1 = blue, slot 2 = green, slot 3 = orange, etc.). Multiple items glow simultaneously when their agents are running. Add subtle horizontal wave separators between dependency waves in the Dagre layout (using rank constraints). Summary strip shows wave progress: 'Wave 2/3 · 3 agents · 5/11 items'. Merge cascade state shows on the DAG as a temporary overlay between waves. When mode='single', no slot badges or wave separators render."
+        },
+        "subItems": [
+          {
+            "id": "directive-flow-swarm.slot-badges",
+            "title": "Work item nodes show colored slot badge indicating which agent owns them",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "directive-flow-swarm.wave-separator",
+            "title": "Visual wave separators appear between dependency waves in the DAG layout",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "directive-flow-swarm.summary",
+            "title": "Summary strip shows wave progress with agent count and item completion",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "directive-flow-swarm.click-selects-slot",
+            "title": "Clicking a work item node in the DAG selects the owning slot agent in the project tree and switches the terminal view",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      },
+      {
+        "id": "swarm-agent-prompt",
+        "title": "Create swarm-aware agent prompt with item scoping and coordination rules",
+        "status": "pending",
+        "priority": "high",
+        "metadata": {
+          "difficulty": "medium",
+          "phase": 2
+        },
+        "narrative": {
+          "Action": "Create a swarm variant of the work agent prompt that constrains the agent to its assigned items. The prompt includes: the full vBRIEF (for context), the list of item IDs this agent owns, explicit instruction to only modify files related to its items, instruction to use bd claim to mark items in_progress and bd close on completion, and coordination notes (other agents are working on other items simultaneously — do not modify shared files outside your scope). The prompt template lives alongside the existing agent prompt templates. The agent still sees the full DAG so it understands how its work fits into the larger picture."
+        },
+        "subItems": [
+          {
+            "id": "swarm-agent-prompt.scoping",
+            "title": "Agent prompt explicitly lists assigned item IDs and instructs agent to work only on those items",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "swarm-agent-prompt.coordination",
+            "title": "Prompt includes coordination notes about concurrent agents and file-scope constraints",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          },
+          {
+            "id": "swarm-agent-prompt.beads",
+            "title": "Prompt instructs agent to use bd claim and bd close for its assigned tasks",
+            "status": "pending",
+            "metadata": { "kind": "acceptance_criterion" }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      { "from": "wave-scheduler", "to": "agent-slot-system", "type": "blocks" },
+      { "from": "wave-scheduler", "to": "swarm-state-model", "type": "blocks" },
+      { "from": "file-overlap-audit", "to": "agent-slot-system", "type": "blocks" },
+      { "from": "agent-slot-system", "to": "cloister-monitor", "type": "blocks" },
+      { "from": "swarm-state-model", "to": "cloister-monitor", "type": "blocks" },
+      { "from": "swarm-agent-prompt", "to": "cloister-monitor", "type": "blocks" },
+      { "from": "agent-slot-system", "to": "merge-cascade", "type": "blocks" },
+      { "from": "cloister-monitor", "to": "swarm-cli", "type": "blocks" },
+      { "from": "merge-cascade", "to": "swarm-cli", "type": "blocks" },
+      { "from": "swarm-state-model", "to": "work-group-display", "type": "blocks" },
+      { "from": "swarm-state-model", "to": "directive-flow-swarm", "type": "blocks" },
+      { "from": "cloister-monitor", "to": "directive-flow-swarm", "type": "informs" },
+      { "from": "wave-scheduler", "to": "file-overlap-audit", "type": "informs" }
+    ]
+  }
+}
