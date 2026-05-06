@@ -96,7 +96,7 @@ async function createSlotWorktree(
   projectPath: string,
   issueId: string,
   slotNum: number,
-): Promise<{ success: boolean; workspacePath: string; branch: string; error?: string }> {
+): Promise<{ success: boolean; workspacePath: string; branch: string; parentBranch: string; error?: string }> {
   const issueLower = issueId.toLowerCase();
   const featureBranch = `feature/${issueLower}`;
   const slotBranch = `feature/${issueLower}/slot-${slotNum}`;
@@ -104,7 +104,7 @@ async function createSlotWorktree(
   const workspacePath = join(projectPath, 'workspaces', slotWorkspaceName);
 
   if (existsSync(workspacePath)) {
-    return { success: true, workspacePath, branch: slotBranch };
+    return { success: true, workspacePath, branch: slotBranch, parentBranch: featureBranch };
   }
 
   try {
@@ -154,9 +154,9 @@ async function createSlotWorktree(
       await execAsync('bun install', { cwd: workspacePath, timeout: 60000 });
     } catch {}
 
-    return { success: true, workspacePath, branch: slotBranch };
+    return { success: true, workspacePath, branch: slotBranch, parentBranch: featureBranch };
   } catch (err: any) {
-    return { success: false, workspacePath, branch: slotBranch, error: err.message };
+    return { success: false, workspacePath, branch: slotBranch, parentBranch: featureBranch, error: err.message };
   }
 }
 
@@ -322,7 +322,15 @@ const postSwarmRoute = HttpRouter.add(
       }
 
       // Build the slot-specific prompt
-      const itemPrompt = buildSlotPrompt(item.id, item.title, doc.plan.id, waveIndex, slotNum);
+      const itemPrompt = buildSlotPrompt(
+        item.id,
+        item.title,
+        doc.plan.id,
+        waveIndex,
+        slotNum,
+        worktreeResult.branch,
+        worktreeResult.parentBranch,
+      );
 
       try {
         const spawnOptions: SpawnOptions = {
@@ -387,7 +395,15 @@ const postSwarmRoute = HttpRouter.add(
   })),
 );
 
-function buildSlotPrompt(itemId: string, itemTitle: string, planId: string, waveIndex: number, slotNum: number): string {
+function buildSlotPrompt(
+  itemId: string,
+  itemTitle: string,
+  planId: string,
+  waveIndex: number,
+  slotNum: number,
+  slotBranch: string,
+  parentBranch: string,
+): string {
   return [
     `You are swarm slot ${slotNum} working on wave ${waveIndex} of plan ${planId}.`,
     `Your assigned task is: **${itemId}: ${itemTitle}**`,
@@ -395,11 +411,15 @@ function buildSlotPrompt(itemId: string, itemTitle: string, planId: string, wave
     'Focus ONLY on this specific task from the vBRIEF plan.',
     'The plan is in .pan/spec.vbrief.json — read it for full context, acceptance criteria, and dependencies.',
     '',
+    `Your slot branch: **${slotBranch}**`,
+    `Parent feature branch (merge target): **${parentBranch}**`,
+    '',
     'When your task is complete:',
-    `1. Commit your changes to this slot branch`,
+    `1. Commit your changes to branch \`${slotBranch}\``,
     `2. Find your bead: \`bd list -l ${planId.toLowerCase()} --status open\` and look for the one matching "${itemTitle}"`,
     `3. Close it: \`bd close <bead-id>\``,
-    `4. Push your branch so it can be merged into the parent feature branch`,
+    `4. Push branch \`${slotBranch}\``,
+    `5. Create a PR targeting \`${parentBranch}\` — do NOT target main`,
     '',
     `Do NOT run \`pan done\` — that closes the entire issue. You are one slot in a parallel swarm.`,
     'Other slots are working on sibling tasks in parallel. Stay within your task scope.',
