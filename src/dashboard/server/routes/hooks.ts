@@ -60,6 +60,8 @@ const postPermissionEventRoute = HttpRouter.add(
       return jsonResponse({ ok: true });
     }
 
+    console.log(`[hooks] ${hookEvent} session=${sessionId} conv=${conv.name} waiting=${waiting}${toolName ? ` tool=${toolName}` : ''}`);
+
     getEventStore().emitOnly({
       type: 'conversation.permission_changed',
       timestamp: new Date().toISOString(),
