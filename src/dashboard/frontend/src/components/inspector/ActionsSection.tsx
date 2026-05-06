@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  XCircle, RefreshCw, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X, Send, ChevronRight, Box, Tag, LayoutGrid,
+  XCircle, RefreshCw, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X, Send, ChevronRight, ChevronDown, Box, Tag, LayoutGrid,
 } from 'lucide-react';
 import type { UseMutationResult } from '@tanstack/react-query';
 import { Agent, WorkAgentLifecycle, STATUS_LABELS } from '../../types';
@@ -15,6 +15,8 @@ import { RestartFromPlanButton } from '../RestartFromPlanButton';
 import { ArtifactLinks } from '../ArtifactLinks';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { FileText } from 'lucide-react';
+import { useAvailableModels } from '../shared/ModelPicker/ModelPicker';
+import { useSwitchModel } from '../../hooks/useSwitchModel';
 
 // Convenience alias — most mutations use void variables and unknown data
 type AnyMutation = UseMutationResult<unknown, Error, void, unknown>;
@@ -102,6 +104,10 @@ export function ActionsSection({
   const isLifecycleUnresolved = !!agent && agent.status === 'stopped' && !lifecycle;
   const isLaunching = agentLaunchState === 'starting' || agentLaunchState === 'resuming';
   const launchLabel = agentLaunchState === 'resuming' ? 'Resuming...' : 'Starting...';
+
+  const [showResumeModelDropdown, setShowResumeModelDropdown] = useState(false);
+  const { groups } = useAvailableModels();
+  const { switchMutation, isPending: isSwitchingModel } = useSwitchModel(agent?.id, issueId);
 
   const isPipelineStuck = isReviewPipelineStuck(reviewStatus);
   const hasVerificationState = !!reviewStatus?.verificationStatus && reviewStatus.verificationStatus !== 'pending';
@@ -273,26 +279,79 @@ export function ActionsSection({
           {/* Start/Resume Agent when no agent or stopped — hidden for features */}
           {(!agent || agent.status === 'stopped') && !isFeature && (
             <>
-              <button
-                onClick={() => {
-                  if (isResume) {
-                    setShowResumeInput(true);
-                  } else {
-                    onStartAgent();
-                  }
-                }}
-                disabled={isLaunching || showResumeInput || isLifecycleUnresolved}
-                className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-60 ${
-                  isLifecycleUnresolved
-                    ? 'text-destructive cursor-not-allowed'
-                    : 'text-primary hover:text-primary/80'
-                }`}
-                title={isLifecycleUnresolved ? 'Checking for resumable session…' : undefined}
-                data-testid={isResume ? 'inspector-resume-session' : 'inspector-start-agent'}
-              >
-                {(isLaunching || isLifecycleUnresolved) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                <span>{isLaunching ? launchLabel : isLifecycleUnresolved ? 'Checking…' : (isResume ? 'Resume Session' : 'Start Agent')}</span>
-              </button>
+              <div className="flex items-center relative">
+                <button
+                  onClick={() => {
+                    if (isResume) {
+                      setShowResumeInput(true);
+                    } else {
+                      onStartAgent();
+                    }
+                  }}
+                  disabled={isLaunching || showResumeInput || isLifecycleUnresolved || isSwitchingModel}
+                  className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-60 ${
+                    isLifecycleUnresolved
+                      ? 'text-destructive cursor-not-allowed'
+                      : 'text-primary hover:text-primary/80'
+                  }`}
+                  title={isLifecycleUnresolved ? 'Checking for resumable session…' : undefined}
+                  data-testid={isResume ? 'inspector-resume-session' : 'inspector-start-agent'}
+                >
+                  {(isLaunching || isLifecycleUnresolved || isSwitchingModel) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                  <span>{isLaunching ? launchLabel : isLifecycleUnresolved ? 'Checking…' : isSwitchingModel ? 'Switching…' : (isResume ? 'Resume Session' : 'Start Agent')}</span>
+                </button>
+                {isResume && (
+                  <>
+                    <button
+                      data-testid="inspector-resume-model-dropdown"
+                      onClick={() => setShowResumeModelDropdown(v => !v)}
+                      disabled={isLaunching || isSwitchingModel}
+                      className="flex items-center px-1 py-0.5 text-xs text-primary hover:text-primary/80 disabled:opacity-60 ml-0.5"
+                      title="Resume with a different model"
+                    >
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                    {showResumeModelDropdown && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setShowResumeModelDropdown(false)}
+                        />
+                        <div
+                          className="absolute left-0 top-full mt-1 min-w-[200px] bg-popover border border-border rounded-md shadow-lg z-50 max-h-64 overflow-y-auto"
+                        >
+                          <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Resume with model…
+                          </div>
+                          {groups.map((group) => (
+                            <div key={group.provider}>
+                              <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground/80 border-t border-border">
+                                {group.label}
+                              </div>
+                              {group.models.map((m) => (
+                                <button
+                                  key={m.id}
+                                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent flex items-center justify-between"
+                                  onClick={() => {
+                                    setShowResumeModelDropdown(false);
+                                    switchMutation.mutate({ model: m.id, message: resumeMessage || undefined });
+                                  }}
+                                  disabled={isSwitchingModel}
+                                >
+                                  <span>{m.label}</span>
+                                  {m.costDisplay && (
+                                    <span className="text-[10px] opacity-50 ml-2">{m.costDisplay}</span>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
               {/* Reset Session — only when resuming (has a saved session) */}
               {isResume && (
                 <button
