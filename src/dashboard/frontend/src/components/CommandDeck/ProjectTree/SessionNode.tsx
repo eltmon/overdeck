@@ -123,6 +123,7 @@ interface SessionNodeProps {
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
+  onOpenPlanDialog?: (issueId: string) => void;
   expandable?: boolean;
   expanded?: boolean;
   onToggleExpand?: () => void;
@@ -249,6 +250,7 @@ export function SessionNode({
   onDeepWipe,
   onOpenStateDir,
   onViewJsonl,
+  onOpenPlanDialog,
   expandable,
   expanded,
   onToggleExpand,
@@ -303,6 +305,11 @@ export function SessionNode({
         <button
           className={`${styles.sessionNode} ${isSelected ? styles.sessionNodeSelected : ''} ${flashClass}`}
           onClick={() => onClick?.()}
+          onDoubleClick={() => {
+            if (session.type === 'planning' && issueId && onOpenPlanDialog) {
+              onOpenPlanDialog(issueId);
+            }
+          }}
         >
           {expandable && (
             <span

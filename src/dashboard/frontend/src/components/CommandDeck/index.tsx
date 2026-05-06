@@ -7,6 +7,7 @@ import { sessionMatchesFilter, type TreeSessionFilter } from './ProjectTree/Feat
 import { DeaconStatus } from './DeaconStatus';
 import { IssueWorkbench } from './IssueWorkbench';
 import { BeadsDialog } from '../BeadsDialog';
+import { PlanDialog } from '../PlanDialog';
 import { ConversationList, type Conversation } from './ConversationList';
 import { useConversationMutations } from './useConversationMutations';
 import { ForkModal } from './ForkModal';
@@ -171,6 +172,7 @@ export function CommandDeck({
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [showBeads, setShowBeads] = useState(false);
+  const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null);
   const [convsCollapsed, setConvsCollapsed] = useState(() => {
     try { return localStorage.getItem(CONVS_COLLAPSED_KEY) === 'true'; } catch { return false; }
   });
@@ -659,6 +661,11 @@ export function CommandDeck({
     navigator.clipboard?.writeText(path).catch(() => { /* ignore */ });
   }, []);
 
+  const handleOpenPlanDialog = useCallback((issueId: string) => {
+    const issue = issues.find(i => i.identifier.toLowerCase() === issueId.toLowerCase());
+    if (issue) setPlanDialogIssue(issue);
+  }, [issues]);
+
   const handleViewJsonl = useCallback((sessionId: string) => {
     // Select the session so the conversation panel shows its JSONL transcript
     for (const project of projectsWithSessions) {
@@ -960,6 +967,7 @@ export function CommandDeck({
                       onOpenStateDir={handleOpenStateDir}
                       onViewJsonl={handleViewJsonl}
                       onCleanupOrphanedResources={handleCleanupOrphanedResources}
+                      onOpenPlanDialog={handleOpenPlanDialog}
                       onNewConversation={handleNewProjectConversation}
                       conversations={projectConversations[project.name] ?? []}
                       selectedConversation={selectedConversation}
@@ -1051,6 +1059,18 @@ export function CommandDeck({
           issueId={selectedFeature}
           isOpen={showBeads}
           onClose={() => setShowBeads(false)}
+        />
+      )}
+
+      {planDialogIssue && (
+        <PlanDialog
+          issue={planDialogIssue}
+          isOpen={true}
+          onClose={() => setPlanDialogIssue(null)}
+          onComplete={async () => {
+            setPlanDialogIssue(null);
+            await refreshDashboardState(queryClient);
+          }}
         />
       )}
     </div>
