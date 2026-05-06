@@ -142,9 +142,9 @@ async function createSlotWorktree(
       const redirectPath = join(worktreeBeadsDir, 'redirect');
       if (!existsSync(redirectPath)) {
         try {
-          mkdirSync(worktreeBeadsDir, { recursive: true });
+          await mkdir(worktreeBeadsDir, { recursive: true });
           const relPath = relative(workspacePath, sourceBeadsDir);
-          writeFileSync(redirectPath, relPath, 'utf-8');
+          await writeFile(redirectPath, relPath, 'utf-8');
         } catch {}
       }
     }
@@ -308,15 +308,17 @@ const postSwarmRoute = HttpRouter.add(
       // Copy the vBRIEF plan into the slot workspace
       const planPath = findPlan(mainWorkspace);
       if (planPath) {
-        const slotPanDir = join(worktreeResult.workspacePath, '.pan');
-        mkdirSync(slotPanDir, { recursive: true });
-        const slotPlanPath = join(slotPanDir, 'spec.vbrief.json');
-        if (!existsSync(slotPlanPath)) {
-          try {
-            const planContent = readFileSync(planPath, 'utf-8');
-            writeFileSync(slotPlanPath, planContent);
-          } catch {}
-        }
+        yield* Effect.promise(async () => {
+          const slotPanDir = join(worktreeResult.workspacePath, '.pan');
+          await mkdir(slotPanDir, { recursive: true });
+          const slotPlanPath = join(slotPanDir, 'spec.vbrief.json');
+          if (!existsSync(slotPlanPath)) {
+            try {
+              const planContent = await readFile(planPath, 'utf-8');
+              await writeFile(slotPlanPath, planContent);
+            } catch {}
+          }
+        });
       }
 
       // Build the slot-specific prompt
