@@ -289,14 +289,17 @@ export function DiffPanel({
     queryKey: isVsMain
       ? ['diff-vs-main', agentId]
       : selectedTurn
-        ? ['diff-turn', agentId, selectedTurn.turnId]
+        ? ['diff-turn', agentId, selectedTurn.turnId, selectedFilePath ?? null]
         : ['diff-full', agentId],
     queryFn: async () => {
-      const url = isVsMain
+      let url = isVsMain
         ? `${baseUrl}/vs-main`
         : selectedTurn
           ? `${baseUrl}/${encodeURIComponent(selectedTurn.turnId)}`
           : `${baseUrl}/full`
+      if (selectedFilePath && selectedTurn) {
+        url += `?file=${encodeURIComponent(selectedFilePath)}`
+      }
       const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to fetch diff')
       return res.json() as Promise<{ diff?: string }>

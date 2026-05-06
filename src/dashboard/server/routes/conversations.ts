@@ -2311,6 +2311,8 @@ const getConversationDiffTurnRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const name = params['name'] ?? '';
     const turnId = params['turnId'] ?? '';
+    const reqUrl = new URL(request.url, 'http://localhost');
+    const fileFilter = reqUrl.searchParams.get('file') ?? undefined;
     return yield* Effect.promise(async () => {
       try {
         const conv = getConversationByName(name);
@@ -2323,7 +2325,7 @@ const getConversationDiffTurnRoute = HttpRouter.add(
           // For in-repo conversations, the single summary has turnId='conversation-diff'
           const baseCommit = await findCommitAtTime(cwd, conv.createdAt);
           if (!baseCommit) return jsonResponse({ diff: '' });
-          const diff = await diffPatchSinceCommit(cwd, baseCommit);
+          const diff = await diffPatchSinceCommit(cwd, baseCommit, fileFilter);
           return jsonResponse({ turnId, diff });
         }
 
@@ -2351,6 +2353,7 @@ const getConversationDiffTurnRoute = HttpRouter.add(
           }
           if (!repoRoot) continue;
           const relativePath = edit.filePath.startsWith(repoRoot + '/') ? edit.filePath.slice(repoRoot.length + 1) : edit.filePath;
+          if (fileFilter && relativePath !== fileFilter) continue;
           let repoFiles = filesByRepo.get(repoRoot);
           if (!repoFiles) { repoFiles = []; filesByRepo.set(repoRoot, repoFiles); }
           if (!repoFiles.includes(relativePath)) repoFiles.push(relativePath);
