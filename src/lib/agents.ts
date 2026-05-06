@@ -1150,21 +1150,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   }
 
-  // Inject provider env overlay into the main project's .claude/settings.local.json.
-  // Claude Code reads settings.local.json by walking UP from CWD. Workspaces are
-  // subdirectories of the main project, so writing to the workspace would create a
-  // higher-precedence settings file that gets stale across agents using different
-  // providers. Writing to projectRoot (two levels up from the workspace) ensures all
-  // agent types share one canonical settings.local.json that is always up-to-date.
-  try {
-    const { injectProviderEnvOverlay } = await import('./claude-settings-overlay.js');
-    const overlayResult = await injectProviderEnvOverlay(projectRoot, providerEnv);
-    if (overlayResult.keysInjected.length > 0) {
-      console.log(`[${agentId}] Provider env overlay: ${overlayResult.keysInjected.join(', ')}`);
-    }
-  } catch (err: any) {
-    console.warn(`[${agentId}] Provider env overlay failed (falling back to tmux -e): ${err.message}`);
-  }
 
   clearReadySignal(agentId);
 
@@ -1485,11 +1470,6 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
       try { await killSessionAsync(normalizedId); } catch { /* ignore */ }
     }
 
-    try {
-      const { injectProviderEnvOverlay } = await import('./claude-settings-overlay.js');
-      await injectProviderEnvOverlay(resolve(agentState.workspace, '..', '..'), providerEnv);
-    } catch { /* non-fatal — tmux -e exports still provide partial coverage */ }
-
     const providerExports = await getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
     const fallbackLauncher = join(getAgentDir(normalizedId), 'launcher.sh');
     const fallbackContent = generateLauncherScript({
@@ -1718,12 +1698,6 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
     const claudeCmd = `bash ${launcherScript}`;
 
-    try {
-      const { injectProviderEnvOverlay } = await import('./claude-settings-overlay.js');
-      const resumeProjectRoot = resolve(agentState.workspace, '..', '..');
-      await injectProviderEnvOverlay(resumeProjectRoot, providerEnv);
-    } catch { /* non-fatal */ }
-
     await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {
       env: {
         ...BLANKED_PROVIDER_ENV,
@@ -1860,11 +1834,6 @@ export async function recoverAgent(agentId: string): Promise<AgentState | null> 
       clearCredentialFileAuth(state.workspace);
     }
   }
-
-  try {
-    const { injectProviderEnvOverlay } = await import('./claude-settings-overlay.js');
-    await injectProviderEnvOverlay(resolve(state.workspace, '..', '..'), providerEnv);
-  } catch { /* non-fatal */ }
 
   // Restart the agent with recovery context (YOLO mode - skip permissions)
   const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model)} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
