@@ -570,14 +570,30 @@ export function CommandDeck({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
-      const resumeData = await resumeRes.json().catch(() => ({})) as { success?: boolean; error?: string; lifecycle?: { canResumeSession?: boolean; hasLiveTmuxSession?: boolean } };
+      const resumeData = await resumeRes.json().catch(() => ({})) as { success?: boolean; error?: string; lifecycle?: { canResumeSession?: boolean; hasLiveTmuxSession?: boolean; isRunning?: boolean } };
       if (resumeRes.ok) {
         toast.success('Agent resumed');
         await refreshDashboardState(queryClient);
         return;
       }
-      // Only fall through to start-fresh when there is genuinely no session to resume
-      // and the agent is not already running.
+      // Agent is currently running — true restart: stop it, then resume from saved session.
+      if (resumeData.lifecycle?.isRunning) {
+        const stopRes = await fetch(`/api/agents/${sessionId}`, { method: 'DELETE' });
+        if (!stopRes.ok) throw new Error('Failed to stop agent before restart');
+        const resumeRetryRes = await fetch(`/api/agents/${sessionId}/resume`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        if (!resumeRetryRes.ok) {
+          const retryData = await resumeRetryRes.json().catch(() => ({})) as { error?: string };
+          throw new Error(retryData.error || 'Failed to restart agent');
+        }
+        toast.success('Agent restarted');
+        await refreshDashboardState(queryClient);
+        return;
+      }
+      // Only fall through to start-fresh when there is genuinely no session to resume.
       const noSession = resumeData.lifecycle?.canResumeSession === false && !resumeData.lifecycle?.hasLiveTmuxSession;
       if (!noSession) {
         throw new Error(resumeData.error || 'Failed to resume agent');
