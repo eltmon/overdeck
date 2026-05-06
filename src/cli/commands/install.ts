@@ -33,7 +33,6 @@ export function registerInstallCommand(program: Command): void {
     .option('--skip-docker', 'Skip Docker network setup')
     .option('--skip-beads', 'Skip beads CLI installation')
     .option('--skip-claudish', 'Skip claudish installation')
-    .option('--skip-sageox', 'Skip SageOx CLI installation')
     .action(installCommand);
 }
 
@@ -44,7 +43,6 @@ interface InstallOptions {
   skipDocker?: boolean;
   skipBeads?: boolean;
   skipClaudish?: boolean;
-  skipSageox?: boolean;
 }
 
 interface PrereqResult {
@@ -171,15 +169,6 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
     fix: 'brew install claudish  # macOS, or download from github.com/eltmon/claudish/releases',
   });
 
-  // SageOx CLI (optional - will be auto-installed)
-  const hasOx = checkCommand('ox');
-  results.push({
-    name: 'SageOx CLI (ox)',
-    passed: hasOx,
-    message: hasOx ? 'installed' : 'not found (will auto-install)',
-    fix: 'curl -sL https://github.com/eltmon/ox/releases/download/latest/ox-linux-amd64 -o ~/.local/bin/ox && chmod +x ~/.local/bin/ox',
-  });
-
   // jq (JSON processor — used by statusline, beads, merge-agent, review-agent, dashboard)
   const hasJq = checkCommand('jq');
   results.push({
@@ -201,7 +190,7 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
   return {
     results,
     // mkcert, ttyd, beads, and claudish are optional (will be auto-installed or skipped)
-    allPassed: results.filter((r) => r.name !== 'mkcert' && r.name !== 'ttyd' && r.name !== 'Beads CLI (bd)' && r.name !== 'claudish' && r.name !== 'SageOx CLI (ox)').every((r) => r.passed),
+    allPassed: results.filter((r) => r.name !== 'mkcert' && r.name !== 'ttyd' && r.name !== 'Beads CLI (bd)' && r.name !== 'claudish').every((r) => r.passed),
   };
 }
 
@@ -470,33 +459,6 @@ async function installCommand(options: InstallOptions): Promise<void> {
       }
     } else {
       spinner.info('claudish already installed');
-    }
-  }
-
-  // Step 5d: Install SageOx CLI (team context capture)
-  if (options.skipSageox) {
-    spinner.info('Skipping SageOx installation (--skip-sageox)');
-  } else {
-    const hasOxNow = checkCommand('ox');
-    if (!hasOxNow) {
-      spinner.start('Installing SageOx CLI (ox)...');
-      try {
-        const binDir = join(homedir(), '.local', 'bin');
-        mkdirSync(binDir, { recursive: true });
-        const oxPath = join(binDir, 'ox');
-        const arch = process.arch === 'x64' ? 'amd64' : process.arch;
-        const plat = detectPlatform();
-        const platform = plat === 'darwin' ? 'darwin' : 'linux';
-        execSync(`curl -sL "https://github.com/eltmon/ox/releases/download/latest/ox-${platform}-${arch}" -o "${oxPath}" && chmod +x "${oxPath}"`, {
-          stdio: 'pipe',
-          timeout: 60000,
-        });
-        spinner.succeed(`SageOx CLI installed to ${oxPath}`);
-      } catch {
-        spinner.warn('SageOx installation failed - install manually from https://github.com/eltmon/ox/releases');
-      }
-    } else {
-      spinner.info('SageOx CLI already installed');
     }
   }
 
