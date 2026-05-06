@@ -26,6 +26,23 @@ vi.mock('lucide-react', async (importOriginal) => {
   };
 });
 
+vi.mock('@tanstack/react-query', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-query')>();
+  return {
+    ...actual,
+    useQueryClient: () => ({ invalidateQueries: vi.fn(), refetchQueries: vi.fn() }),
+    useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  };
+});
+
+vi.mock('../../shared/ModelPicker/ModelPicker', () => ({
+  useAvailableModels: () => ({ groups: [] }),
+}));
+
+vi.mock('../../../lib/refresh-dashboard-state', () => ({
+  refreshDashboardState: vi.fn(),
+}));
+
 vi.mock('./SessionNode', () => ({
   SessionNode: ({ session, isSelected, onClick }: {
     session: SessionNodeType;
