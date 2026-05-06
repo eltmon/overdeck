@@ -71,6 +71,7 @@ import { restartCommand } from './commands/restart.js';
 import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
+import { planDoneCommand } from './commands/plan-done.js';
 import { registerCavemanCommands } from './commands/caveman.js';
 import { registerReleaseCommands } from './commands/release.js';
 import { resourcesCommand } from './commands/resources.js';
@@ -232,7 +233,7 @@ review
 // pan plan finalize <id>
 const planCmd = program
   .command('plan')
-  .description('Finalize an existing plan');
+  .description('Planning lifecycle commands');
 
 planCmd
   .command('finalize')
@@ -240,6 +241,11 @@ planCmd
   .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .pan/)')
   .option('--json', 'Emit JSON result')
   .action(planFinalizeCommand);
+
+planCmd
+  .command('done <id>')
+  .description('Complete planning — promote vBRIEF to proposed, sync beads, transition issue to Planned')
+  .action(planDoneCommand);
 
 // Lifecycle verbs: pan start, pan tell, pan kill, pan fork, pan resume, pan recover, pan sync-main, pan done, pan reopen, pan wipe, pan close
 program

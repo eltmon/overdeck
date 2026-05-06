@@ -1,10 +1,31 @@
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
-import { Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge, ChevronRight, ChevronDown, FolderOpen, FileText, Trash2, GitBranch, BookText, Bug, Container, Radio, Workflow } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import {
+  Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge,
+  ChevronRight, ChevronDown, FolderOpen, FileText, Trash2, GitBranch,
+  BookText, Bug, Container, Radio, Workflow, Play, RefreshCw, RotateCcw,
+  XCircle, ClipboardCheck,
+} from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
 import { SessionNode } from './SessionNode';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
+import { useAvailableModels } from '../../shared/ModelPicker/ModelPicker';
+import {
+  ContextMenuRoot,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuDestructiveItem,
+  ContextMenuSeparator,
+  ContextMenuLabel,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuSubContent,
+} from '../../shared/ContextMenu';
+import { refreshDashboardState } from '../../../lib/refresh-dashboard-state';
 import styles from '../styles/command-deck.module.css';
 
 export type TreeSessionFilter = 'all' | 'alive' | 'failed';
@@ -29,11 +50,7 @@ interface FeatureItemProps {
   onCleanupOrphanedResources?: (issueId: string) => void;
 }
 
-interface ContextMenuState {
-  x: number;
-  y: number;
-  open: boolean;
-}
+// ContextMenuState removed — migrated to Radix UI ContextMenu
 
 const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'vbrief', 'beads', 'pr', 'docker'];
 
@@ -514,160 +531,279 @@ export function sessionMatchesFilter(session: SessionNodeType, filter: TreeSessi
   return true;
 }
 
-function FeatureMenu({
-  x,
-  y,
-  onClose,
-  feature,
-  bestSessionId,
-  hasJsonl,
-  onOpenStateDir,
-  onDeepWipe,
-  onViewJsonl,
-}: {
-  x: number;
-  y: number;
-  onClose: () => void;
+interface FeatureContextMenuProps {
   feature: ProjectFeature;
-  bestSessionId: string | null;
+  workSessionId: string | null;
   hasJsonl: boolean;
   onOpenStateDir?: (sessionId: string) => void;
-  onDeepWipe?: (issueId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
-}) {
-  const menuRef = useRef<HTMLDivElement>(null);
+  onDeepWipe?: (issueId: string) => void;
+  onStopSession?: (sessionId: string) => void;
+  onResumeSession?: (sessionId: string) => void;
+  onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => void;
+}
 
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    const handleScroll = () => onClose();
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('scroll', handleScroll, true);
-    return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('scroll', handleScroll, true);
-    };
-  }, [onClose]);
+function StartModelSubmenu({
+  onStart,
+}: {
+  onStart: (model?: string) => void;
+}) {
+  const { groups } = useAvailableModels();
 
   return (
-    <div
-      ref={menuRef}
-      style={{
-        position: 'fixed',
-        left: x,
-        top: y,
-        zIndex: 1000,
-        background: 'var(--card)',
-        border: '1px solid var(--border)',
-        borderRadius: 6,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-        padding: '4px 0',
-        minWidth: 160,
-        fontSize: 12,
-      }}
-    >
-      {bestSessionId && onOpenStateDir && (
-        <button
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            width: '100%',
-            padding: '6px 12px',
-            border: 'none',
-            background: 'none',
-            textAlign: 'left',
-            cursor: 'pointer',
-            color: 'var(--foreground)',
-            fontSize: 12,
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.background = 'var(--accent)';
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.background = 'transparent';
-          }}
-          onClick={() => {
-            onOpenStateDir(bestSessionId);
-            onClose();
-          }}
-        >
-          <FolderOpen size={14} />
-          Open State Dir
-        </button>
+    <ContextMenuSub>
+      <ContextMenuSubTrigger>Start with Model…</ContextMenuSubTrigger>
+      <ContextMenuSubContent>
+        <ContextMenuItem onSelect={() => onStart()}>
+          <span className="flex-1">Default model</span>
+        </ContextMenuItem>
+        {groups.map((group) => (
+          <div key={group.provider}>
+            <ContextMenuLabel>{group.label}</ContextMenuLabel>
+            {group.models.map((m) => (
+              <ContextMenuItem key={m.id} onSelect={() => onStart(m.id)}>
+                <span className="flex-1">{m.label}</span>
+                {m.costDisplay && (
+                  <span className="ml-2 shrink-0 text-[10px] opacity-50">{m.costDisplay}</span>
+                )}
+              </ContextMenuItem>
+            ))}
+          </div>
+        ))}
+      </ContextMenuSubContent>
+    </ContextMenuSub>
+  );
+}
+
+function FeatureContextMenu({
+  feature,
+  workSessionId,
+  hasJsonl,
+  onOpenStateDir,
+  onViewJsonl,
+  onDeepWipe,
+  onStopSession,
+  onResumeSession,
+  onRestartSession,
+}: FeatureContextMenuProps) {
+  const queryClient = useQueryClient();
+  const { groups } = useAvailableModels();
+
+  const agentRunning = feature.agentStatus === 'running';
+  const agentStopped = feature.agentStatus === 'stopped';
+  const hasAgent = !!feature.agentStatus;
+
+  const startAgentMutation = useMutation({
+    mutationFn: async (model?: string) => {
+      const body: Record<string, unknown> = { issueId: feature.issueId };
+      if (model) body.model = model;
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok) throw new Error(data.error || 'Failed to start agent');
+      return data;
+    },
+    onSuccess: () => {
+      void refreshDashboardState(queryClient);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
+    },
+  });
+
+  const reviewMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/review/${encodeURIComponent(feature.issueId)}/trigger`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string; success?: boolean; message?: string };
+      if (!res.ok) throw new Error(data.error || 'Failed to start review');
+      if (data.success === false) throw new Error(data.message || 'Review was not started');
+      return data;
+    },
+    onSuccess: () => {
+      void refreshDashboardState(queryClient);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
+    },
+  });
+
+  const recoverMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/review/${encodeURIComponent(feature.issueId)}/reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rerun: true }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error || 'Failed to recover pipeline');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      void refreshDashboardState(queryClient);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
+    },
+  });
+
+  const completePlanningMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/issues/${encodeURIComponent(feature.issueId)}/complete-planning`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok) throw new Error(data.error || 'Failed to complete planning');
+      return data;
+    },
+    onSuccess: () => {
+      toast.success(`Planning complete for ${feature.issueId}`);
+      void refreshDashboardState(queryClient);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
+    },
+  });
+
+  const handleDeepWipe = useCallback(() => {
+    if (!onDeepWipe) return;
+    const confirmed = window.confirm(
+      `Deep wipe will destroy all data for ${feature.issueId} including workspace, state, and git branches. This cannot be undone.\n\nAre you absolutely sure?`,
+    );
+    if (confirmed) {
+      onDeepWipe(feature.issueId);
+    }
+  }, [feature.issueId, onDeepWipe]);
+
+  const isRecoverable = feature.sessions?.some(
+    s => (s.type === 'review' || s.type === 'reviewer') && isErrorSession(s),
+  ) ?? false;
+
+  return (
+    <ContextMenuContent>
+      {/* Lifecycle actions */}
+      {agentRunning && workSessionId && onStopSession && (
+        <ContextMenuItem onSelect={() => onStopSession(workSessionId)}>
+          <XCircle size={12} className="mr-2" />
+          Stop Agent
+        </ContextMenuItem>
       )}
-      {hasJsonl && bestSessionId && onViewJsonl && (
-        <button
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            width: '100%',
-            padding: '6px 12px',
-            border: 'none',
-            background: 'none',
-            textAlign: 'left',
-            cursor: 'pointer',
-            color: 'var(--foreground)',
-            fontSize: 12,
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.background = 'var(--accent)';
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.background = 'transparent';
-          }}
-          onClick={() => {
-            onViewJsonl(bestSessionId);
-            onClose();
-          }}
-        >
-          <FileText size={14} />
-          View JSONL
-        </button>
+
+      {agentStopped && workSessionId && onResumeSession && (
+        <ContextMenuItem onSelect={() => onResumeSession(workSessionId)}>
+          <Play size={12} className="mr-2" />
+          Resume Session
+        </ContextMenuItem>
       )}
-      {onDeepWipe && (
+
+      {!hasAgent && (
+        <ContextMenuItem onSelect={() => startAgentMutation.mutate(undefined)} disabled={startAgentMutation.isPending}>
+          {startAgentMutation.isPending ? <Loader2 size={12} className="mr-2 animate-spin" /> : <Play size={12} className="mr-2" />}
+          Start Agent
+        </ContextMenuItem>
+      )}
+
+      {/* Start/Resume with Model submenu */}
+      {(!hasAgent || agentStopped) && (
+        <StartModelSubmenu onStart={(model) => startAgentMutation.mutate(model)} />
+      )}
+
+      {agentRunning && workSessionId && onRestartSession && (
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>Switch Model…</ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            {groups.map((group) => (
+              <div key={group.provider}>
+                <ContextMenuLabel>{group.label}</ContextMenuLabel>
+                {group.models.map((m) => (
+                  <ContextMenuItem key={m.id} onSelect={() => onRestartSession(workSessionId, feature.issueId, 'work', undefined, m.id)}>
+                    <span className="flex-1">{m.label}</span>
+                    {m.costDisplay && (
+                      <span className="ml-2 shrink-0 text-[10px] opacity-50">{m.costDisplay}</span>
+                    )}
+                  </ContextMenuItem>
+                ))}
+              </div>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      )}
+
+      {/* Pipeline actions */}
+      {(agentRunning || agentStopped || !hasAgent) && (
         <>
-          <div style={{ height: 1, background: 'var(--border)', margin: '4px 8px' }} />
-          <button
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              width: '100%',
-              padding: '6px 12px',
-              border: 'none',
-              background: 'none',
-              textAlign: 'left',
-              cursor: 'pointer',
-              color: 'var(--destructive)',
-              fontSize: 12,
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.background = 'var(--accent)';
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.background = 'transparent';
-            }}
-            onClick={() => {
-              const confirmed = window.confirm(
-                `Deep wipe will destroy all data for ${feature.issueId} including workspace, state, and git branches. This cannot be undone.\n\nAre you absolutely sure?`,
-              );
-              if (confirmed) {
-                onDeepWipe(feature.issueId);
-              }
-              onClose();
-            }}
-          >
-            <Trash2 size={14} />
-            Deep Wipe
-          </button>
+          <ContextMenuSeparator />
+          <ContextMenuItem onSelect={() => reviewMutation.mutate()} disabled={reviewMutation.isPending}>
+            {reviewMutation.isPending ? <Loader2 size={12} className="mr-2 animate-spin" /> : <RefreshCw size={12} className="mr-2" />}
+            Review & Test
+          </ContextMenuItem>
         </>
       )}
-    </div>
+
+      {isRecoverable && (
+        <ContextMenuItem onSelect={() => recoverMutation.mutate()} disabled={recoverMutation.isPending}>
+          {recoverMutation.isPending ? <Loader2 size={12} className="mr-2 animate-spin" /> : <RotateCcw size={12} className="mr-2" />}
+          Recover
+        </ContextMenuItem>
+      )}
+
+      {/* Plan actions */}
+      {(feature.hasPlanning || feature.resourceDetails?.hasVbrief) && (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>
+              <BookText size={12} className="mr-2" />
+              Plan
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+              <ContextMenuItem
+                onSelect={() => completePlanningMutation.mutate()}
+                disabled={completePlanningMutation.isPending || !feature.resourceDetails?.hasVbrief || !feature.resourceDetails?.hasBeads}
+              >
+                {completePlanningMutation.isPending ? <Loader2 size={12} className="mr-2 animate-spin" /> : <ClipboardCheck size={12} className="mr-2" />}
+                Done Planning
+              </ContextMenuItem>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        </>
+      )}
+
+      {/* Utility actions */}
+      <ContextMenuSeparator />
+
+      {workSessionId && onOpenStateDir && (
+        <ContextMenuItem onSelect={() => onOpenStateDir(workSessionId)}>
+          <FolderOpen size={12} className="mr-2" />
+          Open State Dir
+        </ContextMenuItem>
+      )}
+
+      {hasJsonl && workSessionId && onViewJsonl && (
+        <ContextMenuItem onSelect={() => onViewJsonl(workSessionId)}>
+          <FileText size={12} className="mr-2" />
+          View JSONL
+        </ContextMenuItem>
+      )}
+
+      {onDeepWipe && (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuDestructiveItem onSelect={handleDeepWipe}>
+            <Trash2 size={12} className="mr-2" />
+            Deep Wipe
+          </ContextMenuDestructiveItem>
+        </>
+      )}
+    </ContextMenuContent>
   );
 }
 
@@ -757,7 +893,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     const persisted = readExpanded(feature.issueId);
     return persisted ?? defaultExpandedFromState(feature.stateLabel);
   });
-  const [menu, setMenu] = useState<ContextMenuState>({ x: 0, y: 0, open: false });
 
   // Derive best session once per data change instead of on every click (PAN-821 review)
   // Respect the tree filter so auto-select picks a visible session.
@@ -775,6 +910,9 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     () => visibleSessions.some((session) => session.hasJsonl),
     [visibleSessions],
   );
+
+  const workSession = feature.sessions?.find((s) => s.type === 'work');
+  const workSessionId = workSession?.sessionId ?? bestSessionId ?? null;
 
   const aggregateSessions = feature.sessions?.filter(isWorkOrSpecialistSession) ?? [];
   const activityState = getAggregateActivityState(aggregateSessions);
@@ -806,40 +944,31 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     }
   }, [onSelect, expanded, feature.issueId]);
 
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setMenu({ x: e.clientX, y: e.clientY, open: true });
-  }, []);
-
-  const closeMenu = useCallback(() => {
-    setMenu((m) => ({ ...m, open: false }));
-  }, []);
-
   const progressPct = feature.isRally && feature.childCount && feature.childCount > 0
     ? Math.round((feature.completedCount || 0) / feature.childCount * 100)
     : null;
 
   return (
-    <div className={`${styles.featureItemWrapper} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}>
-      <div className={styles.featureItemRow}>
-        {hasVisibleSessions ? (
-          <button
-            className={styles.featureItemCaret}
-            onClick={handleToggleExpanded}
-            aria-label={expanded ? 'Collapse sessions' : 'Expand sessions'}
-            title={expanded ? 'Collapse sessions' : 'Expand sessions'}
-          >
-            {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          </button>
-        ) : (
-          <span className={styles.featureItemCaretPlaceholder} />
-        )}
-        <button
-          className={`${styles.featureItem} ${isSelected ? styles.featureItemSelected : ''}`}
-          onClick={handleRowClick}
-          onContextMenu={handleContextMenu}
-        >
+    <ContextMenuRoot>
+      <div className={`${styles.featureItemWrapper} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}>
+        <div className={styles.featureItemRow}>
+          {hasVisibleSessions ? (
+            <button
+              className={styles.featureItemCaret}
+              onClick={handleToggleExpanded}
+              aria-label={expanded ? 'Collapse sessions' : 'Expand sessions'}
+              title={expanded ? 'Collapse sessions' : 'Expand sessions'}
+            >
+              {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            </button>
+          ) : (
+            <span className={styles.featureItemCaretPlaceholder} />
+          )}
+          <ContextMenuTrigger asChild>
+            <button
+              className={`${styles.featureItem} ${isSelected ? styles.featureItemSelected : ''}`}
+              onClick={handleRowClick}
+            >
           <span className={styles.featureStatus}>
             {feature.isShadow ? (
               <Eye size={14} style={{ color: 'var(--primary)' }} />
@@ -900,22 +1029,9 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             <span className={styles.featureCost}>{formatCost(cost)}</span>
           )}
         </button>
-        <ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} />
+      </ContextMenuTrigger>
+      <ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} />
       </div>
-
-      {menu.open && (
-        <FeatureMenu
-          x={menu.x}
-          y={menu.y}
-          onClose={closeMenu}
-          feature={feature}
-          bestSessionId={bestSessionId}
-          hasJsonl={hasJsonl}
-          onOpenStateDir={onOpenStateDir}
-          onDeepWipe={onDeepWipe}
-          onViewJsonl={onViewJsonl}
-        />
-      )}
 
       {expanded && hasVisibleSessions && (
         <div className={styles.sessionList}>
@@ -973,5 +1089,17 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
         </div>
       )}
     </div>
-  );
+    <FeatureContextMenu
+      feature={feature}
+      workSessionId={workSessionId}
+      hasJsonl={hasJsonl}
+      onOpenStateDir={onOpenStateDir}
+      onViewJsonl={onViewJsonl}
+      onDeepWipe={onDeepWipe}
+      onStopSession={onStopSession}
+      onResumeSession={onResumeSession}
+      onRestartSession={onRestartSession}
+    />
+  </ContextMenuRoot>
+);
 }
