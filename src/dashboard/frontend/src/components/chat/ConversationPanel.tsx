@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useDashboardStore } from '../../lib/store';
 import { useTheme } from '../../hooks/useTheme';
+import { useConversationUiState } from '../../hooks/useConversationUiState';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, CheckCircle2, AlertCircle, Archive } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
@@ -11,7 +12,7 @@ import { ComposerFooter } from './ComposerFooter';
 import { ModelPicker, saveStoredModel } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, CompactBoundary, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
-import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase } from '../../lib/workingPhase';
+import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, type WorkingPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import type { ReviewerRoundMetadata } from '@panctl/contracts';
 import { DiffPanel } from '../DiffPanel';
@@ -308,6 +309,9 @@ export function ConversationPanel({
     onViewModeChange?.(mode);
   }, [onViewModeChange]);
 
+  // Per-conversation UI state (client-only, localStorage)
+  const { hideToolCalls, toggleHideToolCalls } = useConversationUiState(conversation.name);
+
   const handleCopyLink = useCallback(() => {
     const params = new URLSearchParams();
     if (viewMode === 'terminal') {
@@ -396,6 +400,17 @@ export function ConversationPanel({
             {copied ? <Check size={14} /> : <Copy size={14} />}
           </button>
 
+          {/* Hide tool calls toggle */}
+          <button
+            className={styles.copyLinkButton}
+            onClick={toggleHideToolCalls}
+            title={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
+            aria-label={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
+            style={hideToolCalls ? { color: 'var(--primary)' } : undefined}
+          >
+            <Wrench size={14} />
+          </button>
+
           {/* Archive button with inline confirmation (dialog for favorited) */}
           {onArchived && !confirmArchive && (
             <button
@@ -477,6 +492,8 @@ export function ConversationPanel({
               onOpenTurnDiff={handleOpenTurnDiff}
               resolvedTheme={resolvedTheme}
               agentId={agentId}
+              hideToolCalls={hideToolCalls}
+              workingPhase={isWorking ? workingPhase : undefined}
               modelPicker={!embedded ? (
                 <ModelPicker
                   value={selectedModel}
@@ -612,6 +629,10 @@ interface ConversationViewProps {
   resolvedTheme?: 'light' | 'dark';
   /** Agent ID for agent sessions (uses /api/agents/* endpoints instead of /api/conversations/*) */
   agentId?: string;
+  /** When true, pure tool-call work groups are collapsed to a single muted line. */
+  hideToolCalls?: boolean;
+  /** Current working phase — drives the working indicator icon. */
+  workingPhase?: WorkingPhase;
 }
 
 export interface FailedMessage {
@@ -620,7 +641,7 @@ export interface FailedMessage {
   createdAt: string;
 }
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
   const [failedMessages, setFailedMessages] = useState<FailedMessage[]>([]);
@@ -797,6 +818,8 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
           onOpenTurnDiff={onOpenTurnDiff}
           resolvedTheme={resolvedTheme}
+          hideToolCalls={hideToolCalls}
+          workingPhase={workingPhase}
         />
       )}
       {isForking ? null : onResume ? (
