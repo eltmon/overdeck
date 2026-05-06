@@ -28,6 +28,7 @@ interface ClaudeSettings {
     PreCompact?: HookConfig[];
     PostCompact?: HookConfig[];
     UserPromptSubmit?: HookConfig[];
+    PermissionRequest?: HookConfig[];
   };
   mcpServers?: Record<string, McpServer>;
   [key: string]: any;
@@ -166,6 +167,7 @@ export async function setupHooksCommand(): Promise<void> {
     'record-cost-event.js',
     'tldr-read-enforcer',
     'tldr-post-edit',
+    'permission-event-hook',   // PermissionRequest — emits conversation.permission_changed(waiting)
   ];
   const { fileURLToPath } = await import('url');
   const { dirname } = await import('path');
@@ -290,6 +292,9 @@ export async function setupHooksCommand(): Promise<void> {
   addHookIfMissing('UserPromptSubmit', 'user-prompt-submit-hook');
   addHookIfMissing('PreCompact', 'pre-compact-hook');
   addHookIfMissing('PostCompact', 'post-compact-hook');
+  addHookIfMissing('PermissionRequest', 'permission-event-hook');
+  addHookIfMissing('PostToolUse', 'permission-event-hook');
+  addHookIfMissing('Stop', 'permission-event-hook');
 
   // TLDR helpers (optional — only when python3 is available).
   if (python3Available) {

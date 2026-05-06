@@ -1,0 +1,24 @@
+#!/bin/bash
+# ~/.panopticon/bin/permission-event-hook
+#
+# Fires on Claude Code PermissionRequest, PostToolUse, and Stop hooks.
+# POSTs the raw payload (stdin) to the dashboard's /api/hooks/permission-event
+# endpoint so the dashboard can show/clear a "waiting for permission" indicator.
+#
+# Works for both conversation sessions (looked up by session_id) and agent
+# sessions — the dashboard server handles routing internally.
+
+set +e
+
+PAN_DASHBOARD_URL="${PANOPTICON_DASHBOARD_URL:-http://localhost:3011}"
+PAYLOAD=$(cat 2>/dev/null || echo '{}')
+
+curl -sf \
+  --max-time 1 \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d "$PAYLOAD" \
+  "${PAN_DASHBOARD_URL}/api/hooks/permission-event" \
+  >/dev/null 2>&1 || true
+
+exit 0
