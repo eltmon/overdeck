@@ -87,6 +87,49 @@ interface SessionTreeContext {
   tmuxSessionNames: Set<string>;
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function getSlotWorkSessionPattern(issueLower: string): RegExp {
+  return new RegExp(`^agent-${escapeRegExp(issueLower)}-(\\d+)$`, 'i');
+}
+
+export function getSlotWorkSessionNumber(sessionId: string, issueLower: string): number | null {
+  const match = sessionId.match(getSlotWorkSessionPattern(issueLower));
+  if (!match) return null;
+  return Number.parseInt(match[1]!, 10);
+}
+
+export function getSessionTreeWorkspacePath(
+  issueLower: string,
+  baseWorkspacePath: string,
+  projectPath: string,
+  sessionId: string,
+): string {
+  const slotNumber = getSlotWorkSessionNumber(sessionId, issueLower);
+  if (slotNumber === null) return baseWorkspacePath;
+  return join(projectPath, 'workspaces', `feature-${issueLower}-slot-${slotNumber}`);
+}
+
+export function compareSessionTreeSessionIds(a: string, b: string, issueLower: string): number {
+  const planningAgentId = `planning-${issueLower}`;
+  const workAgentId = `agent-${issueLower}`;
+  const rank = (sessionId: string): [number, number, string] => {
+    if (sessionId === planningAgentId) return [0, 0, sessionId];
+    if (sessionId === workAgentId) return [1, 0, sessionId];
+    const slotNumber = getSlotWorkSessionNumber(sessionId, issueLower);
+    if (slotNumber !== null) return [2, slotNumber, sessionId];
+    return [3, 0, sessionId];
+  };
+
+  const [aRank, aSlot, aId] = rank(a);
+  const [bRank, bSlot, bId] = rank(b);
+  if (aRank !== bRank) return aRank - bRank;
+  if (aSlot !== bSlot) return aSlot - bSlot;
+  return aId.localeCompare(bId);
+}
+
 async function collectSessionTreeNodes(
   issueId: string,
   workspacePath: string,
@@ -98,10 +141,27 @@ async function collectSessionTreeNodes(
   const agentsDir = join(homedir(), '.panopticon', 'agents');
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
+  const slotWorkSessionPattern = getSlotWorkSessionPattern(issueLower);
   const sections: SessionNode[] = [];
   let hasPlanningSection = false;
 
-  for (const checkId of [planningAgentId, agentId]) {
+  const candidateSessionIds = new Set<string>([planningAgentId, agentId]);
+  const agentEntries = await readdir(agentsDir, { withFileTypes: true }).catch(() => []);
+
+  for (const entry of agentEntries) {
+    if (!entry.isDirectory()) continue;
+    if (slotWorkSessionPattern.test(entry.name)) {
+      candidateSessionIds.add(entry.name);
+    }
+  }
+
+  for (const sessionName of context.tmuxSessionNames) {
+    if (slotWorkSessionPattern.test(sessionName)) {
+      candidateSessionIds.add(sessionName);
+    }
+  }
+
+  for (const checkId of [...candidateSessionIds].sort((a, b) => compareSessionTreeSessionIds(a, b, issueLower))) {
     const agentDir = join(agentsDir, checkId);
     if (!await pathExists(agentDir)) continue;
     const stateText = await readOptional(join(agentDir, 'state.json'));
@@ -114,7 +174,8 @@ async function collectSessionTreeNodes(
       if (isPlanning) hasPlanningSection = true;
       const rtState = await getAgentRuntimeStateAsync(checkId);
       const presence = await deriveSessionPresence(checkId, rtState, context.tmuxSessionNames);
-      const jsonlPath = await resolveJsonlPath(checkId, workspacePath);
+      const sessionWorkspacePath = getSessionTreeWorkspacePath(issueLower, workspacePath, projectPath, checkId);
+      const jsonlPath = await resolveJsonlPath(checkId, sessionWorkspacePath);
       sections.push({
         type: sectionType,
         sessionId: checkId,
