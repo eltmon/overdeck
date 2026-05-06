@@ -1607,16 +1607,9 @@ const postAgentsRoute = HttpRouter.add(
     // proposed/approved/pending/running/completed/blocked.
     const isComplete = isPlanningComplete(workspacePath);
 
-    if (!hasPlan || !isComplete) {
-      const reason = !hasPlan
-        ? 'No workspace vBRIEF found — planning has not run for this issue.'
-        : 'Planning started but did not complete (plan.status indicates planning is still in progress).';
-      return jsonResponse({
-        error: reason,
-        hint: 'Run planning first (click Plan button or use /plan skill). The planning agent produces a vBRIEF plan which is then converted to beads automatically.',
-        issueId,
-      }, { status: 422 });
-    }
+    // vBRIEF no longer blocks agent start — agents can begin without a plan.
+    void hasPlan;
+    void isComplete;
 
     try {
       const { readPlan } = yield* Effect.promise(() => import('../../../lib/vbrief/io.js'));
@@ -1681,12 +1674,7 @@ const postAgentsRoute = HttpRouter.add(
       const errorDetail = recoveryError
         ? ` Recovery failed: ${recoveryError}.`
         : '';
-      return jsonResponse({
-        error: `No beads tasks found for ${issueId}. Planning artifacts exist but beads creation failed —${errorDetail} Re-run planning to regenerate.`,
-        hint: 'Click the Plan button to re-run planning, which will recreate beads from the vBRIEF plan.',
-        issueId,
-        recoveryError,
-      }, { status: 422 });
+      console.warn(`[agents] No beads for ${issueId} — starting anyway.${errorDetail}`);
     }
 
     const health = yield* readModel.getSnapshot.pipe(
@@ -2287,7 +2275,7 @@ const postAgentsRoute = HttpRouter.add(
       phase,
       workspacePath,
     }));
-    const activityId = yield* Effect.promise(() => spawnPanCommand(['start', issueId, '--local', '--phase', phase], workspacePath));
+    const activityId = yield* Effect.promise(() => spawnPanCommand(['start', issueId, '--local', '--phase', phase, '--model', spawnModel], workspacePath));
 
     // Write early state.json so the dashboard immediately shows agent-<id> as the
     // active agent. Without this there's a race window between spawnPanCommand returning
