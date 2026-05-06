@@ -148,7 +148,7 @@ export async function deleteCheckpoint(cwd: string, turnId: string): Promise<voi
  * Compute unified diff between two checkpoints.
  * Returns the raw git diff output.
  */
-export async function diffCheckpoints(cwd: string, fromTurnId: string, toTurnId: string): Promise<string> {
+export async function diffCheckpoints(cwd: string, fromTurnId: string, toTurnId: string, filePath?: string): Promise<string> {
   const fromCommit = await resolveCheckpointCommit(cwd, fromTurnId)
   const toCommit = await resolveCheckpointCommit(cwd, toTurnId)
 
@@ -156,9 +156,10 @@ export async function diffCheckpoints(cwd: string, fromTurnId: string, toTurnId:
     throw new Error(`Checkpoint ref unavailable for diff: from=${fromTurnId}(${fromCommit}) to=${toTurnId}(${toCommit})`)
   }
 
-  const { stdout } = await execFileAsync('git', [
-    'diff', '--patch', '--minimal', '--no-color', fromCommit, toCommit,
-  ], { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
+  const args = ['diff', '--patch', '--minimal', '--no-color', fromCommit, toCommit]
+  if (filePath) args.push('--', filePath)
+
+  const { stdout } = await execFileAsync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
 
   return stdout
 }
@@ -364,10 +365,10 @@ export async function diffFilesAgainstHead(cwd: string, filePaths: string[]): Pr
   return parseNumstatWithStatus(numstatResult.stdout, nameStatusResult.stdout)
 }
 
-export async function diffPatchSinceCommit(cwd: string, baseCommit: string): Promise<string> {
-  const { stdout } = await execFileAsync('git', [
-    'diff', '--patch', '--minimal', '--no-color', baseCommit,
-  ], { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
+export async function diffPatchSinceCommit(cwd: string, baseCommit: string, filePath?: string): Promise<string> {
+  const args = ['diff', '--patch', '--minimal', '--no-color', baseCommit]
+  if (filePath) args.push('--', filePath)
+  const { stdout } = await execFileAsync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
   return stdout
 }
 
