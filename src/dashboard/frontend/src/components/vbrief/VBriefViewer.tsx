@@ -63,8 +63,8 @@ export function VBriefViewer({ doc, initialTab }: VBriefViewerProps) {
         ))}
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Content — DAG tab needs overflow-hidden so ReactFlow gets a real height */}
+      <div className={`flex-1 ${tab === 'dag' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         {tab === 'list' && (
           <>
             <VBriefHeader doc={doc} />
@@ -77,7 +77,7 @@ export function VBriefViewer({ doc, initialTab }: VBriefViewerProps) {
         )}
 
         {tab === 'dag' && (
-          <div className="h-full p-4">
+          <div className="h-full">
             <DAGPlaceholder issueId={doc.plan.id} />
           </div>
         )}
