@@ -33,8 +33,6 @@ import { httpHandler } from './http-handler.js';
 import { getProviderEnvForModel } from '../../../lib/agents.js';
 import {
   detectProviderEnvConflicts,
-  injectProviderEnvOverlay,
-  removeProviderEnvOverlay,
 } from '../../../lib/claude-settings-overlay.js';
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -700,57 +698,6 @@ const getProviderEnvConflictsRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: POST /api/settings/provider-env-overlay ─────────────────────────
-
-const postProviderEnvOverlayRoute = HttpRouter.add(
-  'POST',
-  '/api/settings/provider-env-overlay',
-  httpHandler(Effect.gen(function* () {
-    const body = yield* readJsonBody;
-    return yield* Effect.promise(async () => {
-      const { model, workingDir } = body as { model?: string; workingDir?: string };
-      if (!model || !SAFE_MODEL_PATTERN.test(model)) {
-        return jsonResponse({ error: 'Valid model is required' }, { status: 400 });
-      }
-      if (!workingDir || typeof workingDir !== 'string') {
-        return jsonResponse({ error: 'workingDir is required' }, { status: 400 });
-      }
-
-      try {
-        const providerEnv = await getProviderEnvForModel(model);
-        const result = await injectProviderEnvOverlay(workingDir, providerEnv);
-        return jsonResponse(result);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return jsonResponse({ error: msg }, { status: 500 });
-      }
-    });
-  })),
-);
-
-// ─── Route: DELETE /api/settings/provider-env-overlay ────────────────────────
-
-const deleteProviderEnvOverlayRoute = HttpRouter.add(
-  'DELETE',
-  '/api/settings/provider-env-overlay',
-  httpHandler(Effect.gen(function* () {
-    const body = yield* readJsonBody;
-    return yield* Effect.promise(async () => {
-      const { workingDir } = body as { workingDir?: string };
-      if (!workingDir || typeof workingDir !== 'string') {
-        return jsonResponse({ error: 'workingDir is required' }, { status: 400 });
-      }
-
-      try {
-        await removeProviderEnvOverlay(workingDir);
-        return jsonResponse({ success: true });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return jsonResponse({ error: msg }, { status: 500 });
-      }
-    });
-  })),
-);
 
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
@@ -769,8 +716,6 @@ export const settingsRouteLayer = Layer.mergeAll(
   putOpenRouterApiKeyRoute,
   postOpenRouterTestKeyRoute,
   getProviderEnvConflictsRoute,
-  postProviderEnvOverlayRoute,
-  deleteProviderEnvOverlayRoute,
 );
 
 export default settingsRouteLayer;
