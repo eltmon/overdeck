@@ -14,7 +14,7 @@ import { useState, useMemo } from 'react';
 import {
   Play, RefreshCw, RotateCcw, FolderPlus, Check, Loader2,
   MoreHorizontal, FileText, ListTodo, ScrollText, Brain, MessageSquare,
-  Upload, Send, XCircle, GitMerge,
+  Upload, Send, XCircle, GitMerge, ChevronDown,
 } from 'lucide-react';
 import type { Agent, Issue } from '../../types';
 import { getZoneAActions, type ActionKey } from '../../lib/commandDeckActions';
@@ -24,6 +24,8 @@ import { StopAgentButton } from '../StopAgentButton';
 import { RecoverButton } from '../RecoverButton';
 import { RestartFromPlanButton } from '../RestartFromPlanButton';
 import { ResetIssueButton } from '../ResetIssueButton';
+import { useAvailableModels } from '../shared/ModelPicker/ModelPicker';
+import { useSwitchModel } from '../../hooks/useSwitchModel';
 
 interface ZoneActionStripProps {
   issueId: string;
@@ -46,6 +48,7 @@ export function ZoneActionStrip({
   const [showOverflow, setShowOverflow] = useState(false);
   const [showResumeInput, setShowResumeInput] = useState(false);
   const [resumeMessage, setResumeMessage] = useState('');
+  const [showResumeModelDropdown, setShowResumeModelDropdown] = useState(false);
 
   const {
     workspace,
@@ -71,6 +74,9 @@ export function ZoneActionStrip({
     onCopySettings,
     onSyncMain,
   } = useZoneAActions(issueId, agent, issue);
+
+  const { groups } = useAvailableModels();
+  const { switchMutation, isPending: isSwitchingModel } = useSwitchModel(agent?.id, issueId);
 
   const layout = useMemo(() => {
     if (reviewStatusLoading) {
@@ -172,8 +178,8 @@ export function ZoneActionStrip({
         ) : null;
 
       case 'startAgent':
-      case 'resumeSession':
-        return (
+      case 'resumeSession': {
+        const baseButton = (
           <button
             key={key}
             data-testid="zone-a-start-resume"
@@ -184,7 +190,7 @@ export function ZoneActionStrip({
                 onStartAgent();
               }
             }}
-            disabled={isLaunching || showResumeInput || isLifecycleUnresolved}
+            disabled={isLaunching || showResumeInput || isLifecycleUnresolved || isSwitchingModel}
             className={`flex items-center gap-1 px-2 py-1 text-xs rounded disabled:opacity-60 ${
               isLifecycleUnresolved
                 ? 'text-destructive cursor-not-allowed'
@@ -192,12 +198,68 @@ export function ZoneActionStrip({
             }`}
             title={isLifecycleUnresolved ? 'Checking for resumable session…' : undefined}
           >
-            {(isLaunching || isLifecycleUnresolved)
+            {(isLaunching || isLifecycleUnresolved || isSwitchingModel)
               ? <Loader2 className="w-3 h-3 animate-spin" />
               : <Play className="w-3 h-3" />}
-            <span>{isLaunching ? launchLabel : isLifecycleUnresolved ? 'Checking…' : (isResume ? 'Resume Session' : 'Start Agent')}</span>
+            <span>{isLaunching ? launchLabel : isLifecycleUnresolved ? 'Checking…' : isSwitchingModel ? 'Switching…' : (isResume ? 'Resume Session' : 'Start Agent')}</span>
           </button>
         );
+
+        if (!isResume) return baseButton;
+
+        return (
+          <div key={key} className="flex items-center relative">
+            {baseButton}
+            <button
+              data-testid="zone-a-resume-model-dropdown"
+              onClick={() => setShowResumeModelDropdown(v => !v)}
+              disabled={isLaunching || isSwitchingModel}
+              className="flex items-center px-1 py-1 text-xs rounded-r bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 border-l border-primary-foreground/20"
+              title="Resume with a different model"
+            >
+              <ChevronDown className="w-3 h-3" />
+            </button>
+            {showResumeModelDropdown && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowResumeModelDropdown(false)}
+                />
+                <div
+                  className="absolute left-0 top-full mt-1 min-w-[200px] bg-popover border border-border rounded-md shadow-lg z-50 max-h-64 overflow-y-auto"
+                >
+                  <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Resume with model…
+                  </div>
+                  {groups.map((group) => (
+                    <div key={group.provider}>
+                      <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground/80 border-t border-border">
+                        {group.label}
+                      </div>
+                      {group.models.map((m) => (
+                        <button
+                          key={m.id}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent flex items-center justify-between"
+                          onClick={() => {
+                            setShowResumeModelDropdown(false);
+                            switchMutation.mutate({ model: m.id, message: resumeMessage || undefined });
+                          }}
+                          disabled={isSwitchingModel}
+                        >
+                          <span>{m.label}</span>
+                          {m.costDisplay && (
+                            <span className="text-[10px] opacity-50 ml-2">{m.costDisplay}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        );
+      }
 
       case 'resetSession':
         return (

@@ -251,11 +251,58 @@ export const ReadModelServiceLive = Layer.effect(
           }
 
           const allAgents = [...validAgents, ...newAgents];
+
+          // Reconcile cached agent statuses against ground truth (state.json + tmux).
+          // The projection cache may be stale if an agent's tmux session died while
+          // the server was down — the cache still says 'running' but state.json says
+          // 'stopped'. Without this step the dashboard shows incorrect action buttons.
+          const { listRunningAgentsAsync: listRunningForReconcile } = yield* Effect.promise(
+            () => import('../../lib/agents.js'),
+          );
+          const groundTruthAgents = yield* Effect.promise(() => listRunningForReconcile());
+          const cachedAgentById = new Map(allAgents.map((a: any) => [a.id, a]));
+          const agentsById: Record<string, AgentSnapshot> = {};
+          for (const a of groundTruthAgents) {
+            const cachedAgent = cachedAgentById.get(a.id);
+            let reconciled = a.status as AgentStatus | string;
+            if (a.tmuxActive && a.status === 'stopped') {
+              reconciled = 'running';
+              logDeaconEvent(`readModel cache-reconcile: ${a.id} stopped→running (tmux session alive, resumed outside API)`);
+            } else if (!a.tmuxActive && a.status === 'running') {
+              reconciled = 'stopped';
+              logDeaconEvent(`readModel cache-reconcile: ${a.id} running→stopped (tmux session dead, likely reboot/crash)`);
+            }
+            if (cachedAgent && cachedAgent.status !== toAgentStatus(reconciled)) {
+              console.log(`[ReadModel] Reconciled ${a.id}: ${cachedAgent.status} → ${reconciled} (tmux=${a.tmuxActive}, state=${a.status})`);
+            }
+            agentsById[a.id] = {
+              ...cachedAgent,
+              id: a.id,
+              issueId: a.issueId,
+              workspace: a.workspace || undefined,
+              runtime: a.runtime || undefined,
+              model: a.model || undefined,
+              status: toAgentStatus(reconciled),
+              startedAt: a.startedAt || undefined,
+              lastActivity: a.lastActivity || undefined,
+              branch: a.branch || undefined,
+              costSoFar: a.costSoFar,
+              sessionId: a.sessionId || undefined,
+              phase: toAgentPhase(a.phase),
+              runtimeState: cachedAgent?.runtimeState,
+              agentPhase: cachedAgent?.agentPhase,
+              hasPendingQuestion: cachedAgent?.hasPendingQuestion,
+              pendingQuestionCount: cachedAgent?.pendingQuestionCount,
+              resolution: cachedAgent?.resolution,
+              resolutionCount: cachedAgent?.resolutionCount,
+            };
+          }
+
           const statusMap = loadReviewStatuses();
           state = {
             ...INITIAL_READ_MODEL_STATE,
             sequence: cached.sequence,
-            agentsById: Object.fromEntries(allAgents.map((a: any) => [a.id, a])),
+            agentsById,
             specialistsByName: Object.fromEntries((cached.specialists ?? []).map((s) => [s.name, s])),
             reviewStatusByIssueId: Object.fromEntries(
               Object.values(statusMap).map((status) => [status.issueId, toReviewStatusSnapshot(status)]),

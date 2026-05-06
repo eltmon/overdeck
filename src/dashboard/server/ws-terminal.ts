@@ -403,6 +403,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
 
         ptyProcess.onExit(({ exitCode }) => {
           console.log(`[ws-terminal] PTY for ${sessionName} exited with code ${exitCode}`);
+          clearInterval(ptyDiagInterval);
           activePtyHubs.delete(sessionName);
           for (const client of hub.clients) {
             if (client.readyState === WebSocket.OPEN) {
