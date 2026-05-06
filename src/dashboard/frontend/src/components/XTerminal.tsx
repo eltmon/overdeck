@@ -498,10 +498,10 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
           term!.write(control.data, () => {
             term!.scrollToBottom();
             readyForLiveData.current = true;
+            sendResizeIfNeeded();
           });
           reconnectAttempts.current = 0;
           ws.send(JSON.stringify({ type: 'ready' }));
-          sendResizeIfNeeded();
           return;
         }
 

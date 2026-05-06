@@ -146,7 +146,7 @@ export function useConversationMutations(
     archive: (name) => archiveMutation.mutate(name),
     stop: (name) => { if (!stopMutation.isPending) stopMutation.mutate(name); },
     rename: (opts) => renameMutation.mutate(opts),
-    toggleFavorite: (opts) => favoriteMutation.mutate(opts),
+    toggleFavorite: (opts) => { if (!favoriteMutation.isPending) favoriteMutation.mutate(opts); },
     openForkModal,
     submitFork,
     forkTarget,
