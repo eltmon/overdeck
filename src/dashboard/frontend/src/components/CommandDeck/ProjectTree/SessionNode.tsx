@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -259,20 +259,28 @@ export function SessionNode({
   const runtime = useDashboardStore((s) => s.agentRuntimeById[session.sessionId]);
   const lastActivity = runtime?.lastActivity;
 
+  const [isStopping, setIsStopping] = useState(false);
+
   const dotStatus = deriveDotStatus(runtime, session.presence);
   const activity = effectiveActivity(runtime, session.presence);
-  const displayStatus = activity ?? session.status;
-  const statusCssKey = activity ?? session.status;
+  const isLive = session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended';
+  const displayStatus = (isStopping && isLive) ? 'stopping' : (activity ?? session.status);
+  const statusCssKey = (isStopping && isLive) ? 'stopping' : (activity ?? session.status);
 
   const flashKey = `${session.sessionId}:${session.presence}:${session.status}`;
   const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
 
   const canPause = session.presence === 'active' && onPauseSession;
   const canResume = session.presence === 'suspended' && onResumeSession;
-  const canStop = (session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended') && onStopSession;
+  const canStop = isLive && !!onStopSession;
   const canRestart = onRestartSession && issueId != null;
   const canDeepWipe = onDeepWipe && issueId != null;
   const hasLifecycleActions = canPause || canResume || canStop || canRestart;
+
+  const handleStop = useCallback(() => {
+    setIsStopping(true);
+    onStopSession!(session.sessionId);
+  }, [session.sessionId, onStopSession]);
 
   const handleDeepWipe = useCallback(() => {
     if (!issueId || !onDeepWipe) return;
@@ -286,7 +294,8 @@ export function SessionNode({
 
   const workTypeKey = resolveWorkTypeKey(session);
   const defaultModel = workTypeKey ? (resolvedModels[workTypeKey] ?? null) : null;
-  const restartLabel = session.type === 'review' ? 'Restart all' : undefined;
+  // Use "Start" label when session has ended (agent stopped); "Restart" when live
+  const restartLabel = session.type === 'review' ? 'Restart all' : !isLive ? 'Start' : undefined;
 
   return (
     <ContextMenuRoot>
@@ -341,8 +350,8 @@ export function SessionNode({
           </ContextMenuItem>
         )}
         {canStop && (
-          <ContextMenuItem onSelect={() => onStopSession!(session.sessionId)}>
-            Stop
+          <ContextMenuItem onSelect={handleStop} disabled={isStopping}>
+            {isStopping ? 'Stopping...' : 'Stop'}
           </ContextMenuItem>
         )}
         {canRestart && (
