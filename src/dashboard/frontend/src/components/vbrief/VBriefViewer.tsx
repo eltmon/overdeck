@@ -77,7 +77,7 @@ export function VBriefViewer({ doc, initialTab }: VBriefViewerProps) {
         )}
 
         {tab === 'dag' && (
-          <div className="h-full">
+          <div style={{ height: 'calc(100vh - 280px)', minHeight: 400 }}>
             <DAGPlaceholder issueId={doc.plan.id} />
           </div>
         )}
