@@ -1,65 +1,119 @@
 {
   "version": "1",
-  "issueId": "PAN-974",
-  "created": "2026-05-06T19:10:06.291Z",
-  "updated": "2026-05-06T19:12:51.442Z",
-  "gitState": {
-    "branch": "feature/pan-974",
-    "sha": "503cb22b4",
-    "dirty": true
-  },
+  "issueId": "PAN-985",
+  "created": "2026-05-07T03:42:01.126Z",
+  "updated": "2026-05-07T04:25:00.000Z",
+  "gitState": { "branch": "feature/pan-985", "sha": "9b15d68ef", "dirty": true },
   "decisions": [
     {
       "id": "D1",
-      "summary": "Session-tree slot support belongs in the server session discovery layer, not the React tree, because FeatureItem and SessionNode already render multiple per-issue sessions and route selection by sessionId.",
-      "recordedAt": "2026-05-06T19:10:06.291Z"
+      "summary": "Channels integration is opt-in and experimental, off by default. Add a single experimental boolean to settings (key: experimental.claudeCodeChannels) rendered at the bottom of the dashboard Settings page in a clearly-marked Experimental section. When the flag is off, every code path behaves exactly as it does today (tmux send-keys). When on, work-agent launches add --dangerously-load-development-channels server:panopticon-bridge plus an MCP config that wires the bridge as a stdio server, and message delivery for those agents goes through the bridge over a Unix socket. The flag controls only work-agent launches in this issue; specialists, conversation panel input, pan tell, and any non-Claude-Code runtime continue to use sendKeysAsync regardless of the flag's value. Rationale: research-preview API is unstable, the dev-channels confirmation dialog is visible UX friction, and Anthropic-auth-only eligibility excludes Bedrock/Vertex/Foundry and non-Claude runtimes. Hiding it under Experimental, default off, lets us validate end-to-end without committing the rest of the system to a moving target.",
+      "recordedAt": "2026-05-07T04:25:00.000Z"
     },
     {
       "id": "D2",
-      "summary": "Slot session JSONL lookup must derive the workspace path from the slot number so agent-pan-<issue>-<n> resolves against workspaces/feature-<issue>-slot-<n> instead of the base workspace.",
-      "recordedAt": "2026-05-06T19:10:06.291Z"
+      "summary": "Bridge is a per-agent stdio MCP subprocess spawned by Claude Code itself, not a long-lived shared daemon. Each agent's launcher writes a workspace-scoped MCP config that points at a single bridge entrypoint script (a Bun script shipped in the repo), parameterised by PANOPTICON_AGENT_ID via the env block in the MCP config. The bridge listens on a Unix domain socket at ${PANOPTICON_HOME}/sockets/agent-<id>.sock. The dashboard server keeps a registry of agent_id to socket path. Rationale: matches Channels architecture exactly (Claude spawns the channel as its own child); no port allocation; OS-level file permissions gate access; lifecycle is automatic (when claude exits, the bridge dies with it); zero impact on agents launched without the flag because the launcher omits both the --channels flag and the MCP config when the flag is off. Bun is the runtime per Claude Code docs and project standard; tsx has documented delivery bugs.",
+      "recordedAt": "2026-05-07T04:25:00.000Z"
     },
     {
       "id": "D3",
-      "summary": "Frontend agent output should normalize slot work session ids with the same base-issue pattern as the server so selecting agent-<issue>-<slot> keeps ActivityView bound to the parent issue while Terminal stays bound to the slot session.",
-      "recordedAt": "2026-05-06T19:12:51.442Z"
+      "summary": "Dev-channels confirmation dialog is dismissed via a one-shot tmux send-keys C-m at agent startup. Empirically verified: --dangerously-load-development-channels triggers a TUI dialog 'WARNING: Loading development channels' on every interactive launch with options 1) accept 2) exit; the binary has no env-var or settings-file bypass for this dialog (searched cli.exe strings for autoAccept, trustedChannel, hasAcknowledgedDevChannels, etc). The dialog is rendered only when authenticated; print/-p mode skips it. Plan: after the work-agent launcher script reaches the claude command and the dialog renders, the existing tmux orchestration sends a single Enter to accept. Once accepted, channels are live for the rest of the session and all subsequent prompt delivery flows through the bridge. This means tmux is still required for the bootstrap step; we are not removing the tmux dependency, only removing it from the hot prompt-delivery path.",
+      "recordedAt": "2026-05-07T04:25:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Eligibility check at launch time decides whether the channel path is even attempted, even when the experimental flag is on. Eligible: agentType is 'work', runtime is Claude Code, auth provider is claude.ai OAuth or Console API key. Ineligible (silent fall-through to tmux): runtime is Codex/Cursor/Gemini/Cliproxy-routed-GPT, or auth is Bedrock/Vertex/Foundry. The eligibility decision is logged once per agent launch under a clear category (e.g. 'channels:eligible' / 'channels:ineligible:<reason>') so users can see why the bridge did or did not engage. Rationale: Channels is not a universal replacement for sendKeysAsync; framing the issue as 'replace tmux' overstates what is achievable. tmux send-keys remains the permanent path for ineligible runtimes.",
+      "recordedAt": "2026-05-07T04:25:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Bidirectional reply tool and dashboard-routed permission relay are explicitly out of scope for PAN-985. The bridge declares only the claude/channel capability (no tools, no claude/channel/permission). Two follow-up issues are recorded as hazards (H4, H5) so they aren't lost. Rationale: keep this issue reviewable end-to-end, validate the inbound delivery mechanism on its own before adding outbound semantics, and avoid bundling dashboard UI work for permission relay into a runtime-mechanism issue.",
+      "recordedAt": "2026-05-07T04:25:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Delivery API surface lives in src/lib/agents.ts as a new exported function deliverAgentMessage(agentId, message, caller?) that is the new single entry point for all callers that today reach for sendKeysAsync to talk to a work agent (messageAgent, the in-process resume/CI nudge sites, pan tell). Internally it: (a) checks agent eligibility from the agent state record written at launch, (b) if channel-eligible, POSTs to the agent's Unix socket and verifies a 200 response, (c) on socket failure (ENOENT, ECONNREFUSED, non-2xx, timeout) falls back to sendKeysAsync with a logged reason. sendKeysAsync stays untouched as the fallback and as the path for non-work-agent callers. Rationale: callers should not have to know whether channels is on; the delivery primitive owns the eligibility and fallback policy.",
+      "recordedAt": "2026-05-07T04:25:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Settings UI: a new Experimental section appended at the very bottom of SettingsPage.tsx, visually distinct (warning-toned heading, beaker/flask icon, short blurb explaining 'Research preview features that may break or be removed'). Inside it, one toggle 'Use Claude Code Channels for prompt delivery (work agents only)' with sub-text linking to the upstream Channels docs and a one-line caveat that Anthropic auth is required and a confirmation dialog appears at agent startup. Persisted via the existing /api/settings POST flow into config.yaml under an 'experimental' top-level key. Reading the flag at agent-launch time goes through loadConfig() in src/lib/config-yaml.ts; no caching layer needed because launch is infrequent.",
+      "recordedAt": "2026-05-07T04:25:00.000Z"
     }
   ],
   "hazards": [
     {
       "id": "H1",
-      "summary": "Final UI verification must use the built dashboard server under Node 22, not Bun, or PTY-backed terminal behavior can fail independently of the PAN-974 code changes.",
-      "mitigation": "Run npm run build before browser verification and validate the dashboard through the Node 22 dist server path."
-    }
-  ],
-  "resumePoint": {
-    "description": "Both PAN-974 beads are implemented. Next: run broader verification for the session-tree slot work, then build the dashboard, verify slot selection in the browser against the Node 22 server, and only then do the final push and pan done flow.",
-    "beadId": "workspace-52u",
-    "filesToRead": [
-      "src/dashboard/server/routes/projects.ts",
-      "src/dashboard/server/ws-rpc.ts",
-      "src/dashboard/frontend/src/components/AgentOutputPanel.tsx",
-      "src/dashboard/frontend/src/components/__tests__/AgentOutputPanel.test.tsx",
-      "src/dashboard/server/__tests__/swarm-slot-session-mapping.test.ts"
-    ]
-  },
-  "beadsMapping": {
-    "workspace-448": "Server-side slot session discovery, issue mapping, and slot workspace JSONL resolution",
-    "workspace-52u": "Frontend slot-aware issue/session handling and tests"
-  },
-  "agentModel": "gpt-5.4",
-  "sessionHistory": [
-    {
-      "timestamp": "2026-05-06T19:10:06.291Z",
-      "reason": "end",
-      "note": "Completed bead workspace-448 implementation by adding slot-aware session discovery in projects.ts, slot-aware tmux issue extraction in ws-rpc.ts, and focused regression tests.",
-      "agentModel": "gpt-5.4"
+      "summary": "Dev-channels TUI confirmation dialog must be dismissed before any prompt delivery is attempted, otherwise the agent appears hung and the channel listener never registers.",
+      "mitigation": "Launcher orchestration sends a single tmux Enter (C-m) after the claude process is detected to be at the dev-channels prompt. Detection: poll capturePaneAsync for the literal string 'WARNING: Loading development channels' with a 5s timeout. If the string is not found within timeout, log a warning and proceed (auth-skip path renders no dialog). The bootstrap keystroke must NOT use sendKeysAsync's load-buffer/paste-buffer machinery (that submits text); use sendRawKeystrokeAsync(session, 'C-m') which is exactly the right primitive for this case."
     },
     {
-      "timestamp": "2026-05-06T19:12:51.442Z",
-      "reason": "end",
-      "note": "Completed bead workspace-52u by making AgentOutputPanel derive the parent issue from slot session ids and adding focused derivation/render tests for swarm slot sessions.",
-      "agentModel": "gpt-5.4"
+      "id": "H2",
+      "summary": "Bridge subprocess can die (panic, OOM, dependency error) mid-session, leaving the channel listener registered on the Claude side but no one listening on the socket.",
+      "mitigation": "deliverAgentMessage detects socket failures (ENOENT, ECONNREFUSED, EPIPE, write timeout >2s) and falls back to sendKeysAsync immediately for that one delivery, recording the reason in the existing sendKeys log. Subsequent deliveries retry the socket first (no permanent disable) so a transient bridge restart self-heals. The bridge process itself logs to ${PANOPTICON_HOME}/logs/bridge-<agent-id>.log so users can debug crashes."
+    },
+    {
+      "id": "H3",
+      "summary": "Research-preview API contract may change in a future Claude Code release, breaking the bridge silently (e.g. notification method renamed, capability key changed).",
+      "mitigation": "Version-pin the @modelcontextprotocol/sdk dependency. On bridge startup log the Claude Code version (read from PATH-resolved 'claude --version'). Add an integration test that spawns claude --dangerously-load-development-channels server:panopticon-bridge with -p mode and a canned MCP config, asserts a known-text channel notification appears in the printed output, and runs in CI. When that test breaks we discover the API drift before users do. The experimental-off-by-default posture means a silent break is not a P0 outage."
+    },
+    {
+      "id": "H4",
+      "summary": "Out-of-scope: bidirectional reply tool. The issue mentions Claude calling a reply tool to send structured status back to the orchestrator, which would let us replace Claude-output-pane scraping with a typed event stream. This is real value but is its own design problem (event schema, reducer wiring, backwards compat with existing scrapers).",
+      "mitigation": "File a follow-up issue 'PAN-985-followup: bidirectional channel reply tool for orchestrator status events' that depends on PAN-985 landing. The bridge code in this issue is structured so adding a tools entry to the Server constructor and a reply tool handler is additive and does not require restructuring."
+    },
+    {
+      "id": "H5",
+      "summary": "Out-of-scope: dashboard-routed permission relay. Adding the claude/channel/permission capability would let permission prompts surface in the dashboard instead of the agent's tmux pane, which is a meaningful UX win, but the dashboard side (modal, route, allow/deny verdict path back to the bridge) is its own design problem.",
+      "mitigation": "File a follow-up issue 'PAN-985-followup: route Claude permission prompts through dashboard' that depends on PAN-985 landing. Note explicitly that anyone with bridge access can approve tool use, so the dashboard side must reuse the existing dashboard auth gate."
+    },
+    {
+      "id": "H6",
+      "summary": "Anthropic auth requirement excludes Bedrock/Vertex/Foundry deployments and all non-Claude runtimes. Users on those paths will toggle the experimental flag and see no behavior change, which is confusing.",
+      "mitigation": "Eligibility check at launch logs the result with a human-readable reason. The settings UI sub-text explicitly states 'Requires Claude Code with claude.ai or Console API auth; Bedrock/Vertex/Foundry and non-Claude runtimes will continue using tmux'. No silent failure modes."
+    },
+    {
+      "id": "H7",
+      "summary": "Test environment for channel delivery is non-trivial: a real claude binary, real Anthropic auth, real Bun, and the dev-channels confirmation dialog all need to be in scope. CI cannot easily run interactive Claude sessions.",
+      "mitigation": "Two layers of testing. (a) Unit tests for the bridge isolated: mock StdioServerTransport, send a notification through mcp.notification(), assert the JSON-RPC frame matches the documented schema. (b) Unit tests for deliverAgentMessage: mock the socket POST endpoint, assert eligibility logic and fallback behavior. End-to-end with a real claude binary is a manual smoke-test step in the work-agent's verification gate, not a CI requirement. Add a SMOKE_TEST.md in the bridge directory documenting the manual steps."
+    },
+    {
+      "id": "H8",
+      "summary": "Bridge launcher integration must not regress agents launched with the flag off. Any change to generateLauncherScript or its callers risks breaking the existing tmux path.",
+      "mitigation": "Branch on the flag at the LauncherConfig builder level (in agents.ts where the LauncherConfig is constructed), not inside generateLauncherScript itself. generateLauncherScript stays a pure function over its config; the new fields (mcpConfigPath, channelsArg) are optional and absent for flag-off agents. Existing launcher-generator unit tests must continue to pass byte-for-byte for any LauncherConfig that does not set the new fields."
+    },
+    {
+      "id": "H9",
+      "summary": "Unix socket path collisions and stale sockets across agent restarts. If a previous bridge crashed without unlinking its socket file, the next bridge bind will EADDRINUSE.",
+      "mitigation": "Bridge unlinks its socket path on startup before bind (idempotent: ENOENT is fine). On clean shutdown it unlinks again. The directory ${PANOPTICON_HOME}/sockets/ is created with 0o700 on first use. Document this in the bridge file's header comment so a maintainer doesn't 'fix' the unlink-on-startup as defensive code."
+    },
+    {
+      "id": "H10",
+      "summary": "Docker workspace path: agents launched inside a workspace container do not share the host's PANOPTICON_HOME directly. Unix socket inside container won't be reachable from dashboard server on host.",
+      "mitigation": "For Docker-runtime agents, eligibility check returns ineligible with reason 'channels:ineligible:docker-not-supported-yet'. Document as known limitation. Future work (separate issue) can mount a socket dir bind-mount into the container or switch to TCP-localhost for the Docker path. PAN-985 ships native-only."
+    },
+    {
+      "id": "H11",
+      "summary": "Agent state file shape is unverified at planning time. The bead 'work-agent-launch-wires-bridge' specifies writing channelsEnabled to ${PANOPTICON_HOME}/agents/<id>/state.json, but the planning agent has not opened this file or the writer that produces it. The actual schema, current writer location, and whether a state.json even exists today (vs scattered files like a manifest or per-agent JSONL) is not confirmed.",
+      "mitigation": "The implementer must first grep the codebase for the existing agent-state writer — start with src/lib/agents.ts (especially around launchAgent/messageAgent), src/lib/agent-directory-cleanup.ts, and src/lib/agent-runtime-mirror.ts. Either extend the existing record additively (preferred — keep the file shape stable), or if there is no canonical state.json, write a sibling channels.json under ${PANOPTICON_HOME}/agents/<id>/ scoped specifically to channels metadata. Do NOT blindly create a new state.json that conflicts with an existing one. Update the deliverAgentMessage reader to match whatever shape is actually written."
     }
-  ]
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-07T03:42:01.126Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-985: Replace tmux send-keys with Claude Code Channels for prompt delivery. Initial spec described Channels as a clean drop-in replacement for tmux send-keys with a custom MCP-server bridge.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T04:25:00.000Z",
+      "reason": "planning",
+      "note": "Discovery completed. Key findings: (1) Channels is research-preview, requires Anthropic auth (excludes Bedrock/Vertex/Foundry and non-Claude runtimes), and gates custom MCP-server channels behind --dangerously-load-development-channels which shows a TUI confirmation dialog at every interactive startup with no env-var bypass found in the binary. (2) Verified empirically: dialog renders interactively, can be dismissed with one tmux Enter; dialog is suppressed in non-interactive print mode. (3) The Anthropic-auth gate is in the compiled Claude Code binary, not on the wire — channels is local stdio JSON-RPC; no extra Anthropic traffic vs tmux. The user explicitly considered an alternative (--input-format=stream-json subprocess instead of TUI) and rejected it: keep tmux UX intact, add Channels as opt-in experimental. (4) User decision: ship Channels as an experimental opt-in setting, default off, hidden at the bottom of the Settings page. Work agents only this issue; specialists/conversations/pan tell remain on tmux. Reply tool and permission relay are follow-up issues. (5) Architecture: per-agent Bun bridge spawned by claude as stdio MCP child, listening on a Unix socket; new deliverAgentMessage primitive with eligibility check and tmux fallback; one-shot tmux Enter at startup to dismiss the dev-channels dialog.",
+      "agentModel": "agent:claude-opus-4-7"
+    }
+  ],
+  "feedback": []
 }
