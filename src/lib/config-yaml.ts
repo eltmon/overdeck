@@ -177,6 +177,26 @@ export interface YamlConfig {
 
   /** Resource thresholds for dashboard health + spawn guardrails */
   resources?: ResourcesConfig;
+
+  /** Experimental, opt-in features. Each flag is research-preview and may be removed. */
+  experimental?: ExperimentalConfig;
+}
+
+/**
+ * Experimental, opt-in feature flags. All default to false.
+ *
+ * Flags here gate research-preview features that may break or be removed in future
+ * releases. Code paths gated by these flags must always degrade silently to the
+ * existing default behaviour when the flag is off.
+ */
+export interface ExperimentalConfig {
+  /**
+   * Use Claude Code Channels (research-preview MCP capability) for prompt delivery
+   * to eligible work agents. When enabled, eligible agents receive prompts via a
+   * per-agent MCP bridge over a Unix socket; ineligible agents and all non-work
+   * delivery sites continue to use tmux send-keys. Default: false.
+   */
+  claudeCodeChannels?: boolean;
 }
 
 /**
@@ -312,6 +332,17 @@ export interface NormalizedConfig {
     agentWarnCount: number;
     agentBlockCount: number;
   };
+
+  /** Experimental flag values, normalised (always defined, never undefined). */
+  experimental: NormalizedExperimentalConfig;
+}
+
+/**
+ * Normalized experimental flags — every flag has a concrete boolean value.
+ */
+export interface NormalizedExperimentalConfig {
+  /** Whether Claude Code Channels prompt delivery is enabled for eligible work agents. */
+  claudeCodeChannels: boolean;
 }
 
 /**
@@ -411,6 +442,9 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     memoryBlockGb: 2,
     agentWarnCount: 8,
     agentBlockCount: 10,
+  },
+  experimental: {
+    claudeCodeChannels: false,
   },
 };
 
@@ -614,6 +648,9 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       memoryBlockGb: DEFAULT_CONFIG.resources.memoryBlockGb,
       agentWarnCount: DEFAULT_CONFIG.resources.agentWarnCount,
       agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount,
+    },
+    experimental: {
+      claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
     },
   };
 
@@ -859,6 +896,12 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       }
       if (typeof config.resources.agent_block_count === 'number') {
         result.resources.agentBlockCount = config.resources.agent_block_count;
+      }
+    }
+
+    if (config.experimental) {
+      if (typeof config.experimental.claudeCodeChannels === 'boolean') {
+        result.experimental.claudeCodeChannels = config.experimental.claudeCodeChannels;
       }
     }
   }

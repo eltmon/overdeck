@@ -2,8 +2,8 @@
   "version": "1",
   "issueId": "PAN-985",
   "created": "2026-05-07T03:42:01.126Z",
-  "updated": "2026-05-07T04:25:00.000Z",
-  "gitState": { "branch": "feature/pan-985", "sha": "9b15d68ef", "dirty": true },
+  "updated": "2026-05-07T05:30:00.000Z",
+  "gitState": { "branch": "feature/pan-985", "sha": "97d4a122d", "dirty": true },
   "decisions": [
     {
       "id": "D1",
@@ -98,7 +98,11 @@
       "mitigation": "The implementer must first grep the codebase for the existing agent-state writer — start with src/lib/agents.ts (especially around launchAgent/messageAgent), src/lib/agent-directory-cleanup.ts, and src/lib/agent-runtime-mirror.ts. Either extend the existing record additively (preferred — keep the file shape stable), or if there is no canonical state.json, write a sibling channels.json under ${PANOPTICON_HOME}/agents/<id>/ scoped specifically to channels metadata. Do NOT blindly create a new state.json that conflicts with an existing one. Update the deliverAgentMessage reader to match whatever shape is actually written."
     }
   ],
-  "resumePoint": null,
+  "resumePoint": {
+    "description": "Bead workspace-ryjv complete (config schema for experimental.claudeCodeChannels added to src/lib/config-yaml.ts: YamlConfig.experimental, NormalizedConfig.experimental, DEFAULT_CONFIG defaults, init copy in load-merge, and merge-from-source block). Next bead: workspace-mnx3 — extend GET/POST /api/settings to read and persist the experimental.claudeCodeChannels flag through the same flow that already persists other settings to ~/.panopticon/config.yaml.",
+    "beadId": "workspace-mnx3",
+    "filesToRead": ["src/dashboard/server/routes/settings.ts", "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx", "src/lib/config-yaml.ts"]
+  },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
   "sessionHistory": [
@@ -112,6 +116,12 @@
       "timestamp": "2026-05-07T04:25:00.000Z",
       "reason": "planning",
       "note": "Discovery completed. Key findings: (1) Channels is research-preview, requires Anthropic auth (excludes Bedrock/Vertex/Foundry and non-Claude runtimes), and gates custom MCP-server channels behind --dangerously-load-development-channels which shows a TUI confirmation dialog at every interactive startup with no env-var bypass found in the binary. (2) Verified empirically: dialog renders interactively, can be dismissed with one tmux Enter; dialog is suppressed in non-interactive print mode. (3) The Anthropic-auth gate is in the compiled Claude Code binary, not on the wire — channels is local stdio JSON-RPC; no extra Anthropic traffic vs tmux. The user explicitly considered an alternative (--input-format=stream-json subprocess instead of TUI) and rejected it: keep tmux UX intact, add Channels as opt-in experimental. (4) User decision: ship Channels as an experimental opt-in setting, default off, hidden at the bottom of the Settings page. Work agents only this issue; specialists/conversations/pan tell remain on tmux. Reply tool and permission relay are follow-up issues. (5) Architecture: per-agent Bun bridge spawned by claude as stdio MCP child, listening on a Unix socket; new deliverAgentMessage primitive with eligibility check and tmux fallback; one-shot tmux Enter at startup to dismiss the dev-channels dialog.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:30:00.000Z",
+      "reason": "implementation",
+      "note": "Resumed after system reboot. Resolved a stuck merge from the prior session (.pan/continue.json conflicted with PAN-979 content from main; took ours; bun.lock took theirs). Closed bead workspace-ryjv: added experimental.claudeCodeChannels boolean to the config schema (YamlConfig.experimental of type ExperimentalConfig and NormalizedConfig.experimental of type NormalizedExperimentalConfig, both new exports) and threaded it through DEFAULT_CONFIG, the init block in loadAndMergeConfigs, and the per-source merge so a config.yaml top-level experimental: { claudeCodeChannels: true } is read and surfaced at result.experimental.claudeCodeChannels. Default is false; flag is fully optional in YamlConfig but always defined and boolean in NormalizedConfig. tsc --noEmit passes with no new errors. Next: workspace-mnx3 to expose this flag through the dashboard /api/settings endpoint.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],
