@@ -68,6 +68,7 @@ export function ContainerSection({
               serviceHealth === 'healthy' ? 'badge-bg-success text-success' :
               serviceHealth === 'unhealthy' ? 'badge-bg-destructive text-destructive' :
               serviceHealth === 'starting' ? 'badge-bg-warning text-warning animate-pulse' :
+              serviceHealth === 'unknown' ? 'bg-card text-muted-foreground' :
               'badge-bg-success text-success';
             const icon =
               isStarting || isControlling || serviceHealth === 'starting' ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> :
@@ -79,6 +80,7 @@ export function ContainerSection({
               name,
               status.running && status.uptime ? `Up ${status.uptime}` : null,
               serviceHealth ? `Health: ${serviceHealth}` : null,
+              status.lastProbeAt ? `Last probe: ${new Date(status.lastProbeAt).toLocaleString()}` : null,
               status.lastFailureReason ? `Last failure: ${status.lastFailureReason}` : null,
               status.ports?.length ? `Ports: ${status.ports.join(', ')}` : null,
             ].filter(Boolean).join(' • ');
@@ -92,7 +94,7 @@ export function ContainerSection({
                 >
                   {icon}
                   {name}
-                  {status.running && status.uptime && (serviceHealth === 'unknown' || !serviceHealth) && <span className="ml-1 text-muted-foreground">{status.uptime}</span>}
+                  {status.running && status.uptime && <span className="ml-1 text-muted-foreground">{status.uptime}</span>}
                   {isFailed && <span className="text-destructive ml-1">{status.status}</span>}
                 </span>
                 {expandedContainer === name && (
