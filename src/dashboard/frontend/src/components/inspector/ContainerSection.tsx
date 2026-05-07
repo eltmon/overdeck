@@ -104,7 +104,10 @@ export function ContainerSection({
                       </div>
                     )}
                     {status.lastProbeAt && (
-                      <div>Last probe: {new Date(status.lastProbeAt).toLocaleString()}</div>
+                      <div>Last probe: {(() => {
+                        const d = new Date(status.lastProbeAt);
+                        return Number.isNaN(d.getTime()) ? 'Invalid Date' : d.toLocaleString();
+                      })()}</div>
                     )}
                     {status.lastFailureReason && (
                       <div className="text-destructive">Last failure: {status.lastFailureReason}</div>
