@@ -15,8 +15,18 @@ export const EDITORS = [
 export type EditorEntry = (typeof EDITORS)[number]
 export type EditorId = EditorEntry["id"]
 
-const EDITOR_IDS = EDITORS.map((e) => e.id) as unknown as [EditorId, ...EditorId[]]
-export const EditorIdSchema = Schema.Literal(...EDITOR_IDS)
+const EDITOR_IDS: [EditorId, ...EditorId[]] = [
+  "cursor",
+  "windsurf",
+  "trae",
+  "vscode",
+  "vscode-insiders",
+  "vscodium",
+  "zed",
+  "antigravity",
+  "file-manager",
+]
+export const EditorIdSchema = Schema.Literals(EDITOR_IDS)
 
 export const OpenInEditorInput = Schema.Struct({
   cwd: Schema.String,

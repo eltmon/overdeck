@@ -427,7 +427,16 @@ export async function runQualityGates(
       resolvedCommand = `docker exec ${envFlags} -w "${containerWorkdir}" "${containerName}" ${gate.command}`;
       console.log(`[quality-gate] Running in container: ${containerName} (workdir: ${containerWorkdir})`);
     } else {
-      resolvedCommand = gate.command;
+      // Wrap the local gate in `nice -n 19 sh -c '<cmd>'` so a CPU-bound
+      // build (tsdown/vite) can't starve the dashboard process that is
+      // its parent — when it does, the event-loop tick check reports
+      // 600ms+ "stalls" that are really just scheduler delay.
+      if (process.platform === 'win32') {
+        resolvedCommand = gate.command;
+      } else {
+        const escaped = gate.command.replace(/'/g, `'\\''`);
+        resolvedCommand = `nice -n 19 sh -c '${escaped}'`;
+      }
     }
 
     try {
