@@ -240,7 +240,7 @@
       {
         "id": "pi-launcher-support",
         "title": "Launcher generator emits Pi command lines (--mode rpc, --no-context-files, --extension)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-07T04:10:00.000Z",
         "metadata": {
@@ -254,7 +254,7 @@
           {
             "id": "pi-launcher-support.ac1",
             "title": "generateLauncherScript with harness='pi' includes `--mode rpc`, `--no-context-files`, and the absolute path to packages/pi-extension/dist/index.js as `--extension`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -262,7 +262,7 @@
           {
             "id": "pi-launcher-support.ac2",
             "title": "When config.harness === 'pi', the emitted command is `exec pi ... < <fifoPath>` (stdin redirected from the named pipe)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -270,7 +270,7 @@
           {
             "id": "pi-launcher-support.ac3",
             "title": "When config.harness === 'claude-code' (or unset), the existing claude/claudish output is bit-for-bit unchanged (covered by snapshot test)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -278,7 +278,7 @@
           {
             "id": "pi-launcher-support.ac4",
             "title": "Pi launcher does NOT emit --dangerously-skip-permissions or --permission-mode flags (Pi has no permission system)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

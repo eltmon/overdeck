@@ -9,9 +9,26 @@ export type LauncherAgentType =
   | 'runtime'
   | 'resume';
 
+export type LauncherHarness = 'claude-code' | 'pi';
+
 export interface LauncherConfig {
   agentType: LauncherAgentType;
   workingDir: string;
+
+  /**
+   * Which coding-agent harness this launcher targets. Defaults to
+   * 'claude-code' when omitted so existing call sites stay bit-for-bit
+   * unchanged. When 'pi', the generator emits a Pi command line and
+   * redirects stdin from piFifoPath instead of leaving stdin attached
+   * to the tmux pane.
+   */
+  harness?: LauncherHarness;
+  /** Absolute path to packages/pi-extension/dist/index.js. Required for harness='pi'. */
+  piExtensionPath?: string;
+  /** Absolute path to ~/.panopticon/agents/<id>/rpc.in. Required for harness='pi'. */
+  piFifoPath?: string;
+  /** Absolute path to per-agent Pi session-dir (Pi --session-dir). Required for harness='pi'. */
+  piSessionDir?: string;
 
   // Command construction
   /**
@@ -322,6 +339,10 @@ function buildCommand(config: LauncherConfig): string[] {
  * extra args, and prompt references.
  */
 function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): string[] {
+  if (config.harness === 'pi') {
+    return buildPiCommand(config, useExec);
+  }
+
   const parts: string[] = [];
   if (!config.baseCommand) return parts;
 
@@ -361,4 +382,59 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
 
   parts.push(useExec ? `exec ${cmd.trim()}` : cmd.trim());
   return parts;
+}
+
+/**
+ * Build a Pi command line.
+ *
+ *   pi --mode rpc \
+ *      --model <model> \
+ *      --session-dir <piSessionDir> \
+ *      --extension <piExtensionPath> \
+ *      --no-context-files \
+ *      [--session <resumeSessionId>] \
+ *      [--append-system-prompt "$prompt"] \
+ *      < <piFifoPath>
+ *
+ * Pi has no permission system, so permissionFlags are intentionally
+ * dropped (AC4). baseCommand is ignored — Pi launchers always start with
+ * the literal `pi` so callers cannot accidentally smuggle in claude flags.
+ */
+function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
+  if (!config.piExtensionPath) {
+    throw new Error('Pi launcher requires piExtensionPath');
+  }
+  if (!config.piFifoPath) {
+    throw new Error('Pi launcher requires piFifoPath');
+  }
+  if (!config.piSessionDir) {
+    throw new Error('Pi launcher requires piSessionDir');
+  }
+
+  const tokens: string[] = ['pi', '--mode', 'rpc'];
+  if (config.model) {
+    tokens.push('--model', config.model);
+  }
+  tokens.push('--session-dir', shellQuote(config.piSessionDir));
+  tokens.push('--extension', shellQuote(config.piExtensionPath));
+  tokens.push('--no-context-files');
+
+  if (config.resumeSessionId) {
+    tokens.push('--session', shellQuote(config.resumeSessionId));
+  }
+  if (config.extraArgs) {
+    tokens.push(config.extraArgs);
+  }
+  if (config.promptFile) {
+    tokens.push('--append-system-prompt', '"$prompt"');
+  } else if (config.promptInline) {
+    tokens.push('--append-system-prompt', shellQuote(config.promptInline));
+  }
+
+  // stdin redirection from the per-agent fifo. Pi reads JSONL RPC commands
+  // from stdin in --mode rpc.
+  const stdinRedirect = `< ${shellQuote(config.piFifoPath)}`;
+  const cmd = `${tokens.join(' ')} ${stdinRedirect}`.replace(/\s+/g, ' ').trim();
+
+  return [useExec ? `exec ${cmd}` : cmd];
 }

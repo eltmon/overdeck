@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-636",
   "created": "2026-05-07T03:42:36.488Z",
-  "updated": "2026-05-07T05:06:23.480Z",
+  "updated": "2026-05-07T05:09:02.205Z",
   "gitState": {
     "branch": "feature/pan-636",
     "sha": "9b15d68ef",
@@ -138,11 +138,11 @@
     }
   ],
   "resumePoint": {
-    "description": "pi-fifo-ipc bead complete (createPiFifo via mkfifo -m 600 idempotent, destroyPiFifo no-op when missing, writePiCommand with PiNotReady when ready.json absent or O_WRONLY|O_NONBLOCK fails ENXIO; integration test with O_RDWR Node reader confirms round-trip; 8 tests pass). Next bead: workspace-f9y (launcher generator emits Pi command lines with --mode rpc, --no-context-files, --extension <vendored-pi-extension-dist>).",
-    "beadId": "workspace-c0q",
+    "description": "pi-launcher-support bead complete (LauncherConfig.harness + buildPiCommand emits pi --mode rpc --model X --session-dir Y --extension Z --no-context-files [--session resumeId] [--append-system-prompt prompt] < fifo; permission flags dropped on Pi path; default/claude-code path bit-for-bit unchanged). Next: workspace-sur (persist harness on agent state and route base command builder).",
+    "beadId": "workspace-f9y",
     "filesToRead": [
-      "src/lib/runtimes/pi-fifo.ts",
-      "src/lib/runtimes/__tests__/pi-fifo.test.ts"
+      "src/lib/launcher-generator.ts",
+      "src/lib/__tests__/launcher-generator.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -189,6 +189,12 @@
       "timestamp": "2026-05-07T05:06:23.480Z",
       "reason": "continue",
       "note": "Closed bead workspace-c0q (pi-fifo-ipc). Created src/lib/runtimes/pi-fifo.ts with createPiFifo/destroyPiFifo/writePiCommand. createPiFifo uses execAsync(mkfifo -m 600 ...) since Node has no native mkfifo; idempotent (unlinks any existing inode at the path so a stale regular file from a crashed agent gets replaced cleanly). destroyPiFifo unlinks and tolerates ENOENT. writePiCommand checks ready.json existsSync, throws PiNotReady (no block) when missing per AC4. Opens writer with O_WRONLY|O_NONBLOCK so reader-less fifo throws ENXIO -> typed PiNotReady, allowing the adapter to recycle the agent rather than retry. Writes one JSONL line + newline. Integration test uses an O_RDWR Node reader (kept open across writer lifecycles, mirroring how Pi keeps stdin open for the whole session) — earlier attempt with cat fifo > out failed because waitForReader probe closed the lone reader fd. 8 tests pass: mode 0600, idempotent recreate, replaces stale regular file, destroy is no-op, PiNotReady when ready missing, PiNotReady on ENXIO, round-trip JSONL through kernel pipe. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:09:02.205Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-f9y (pi-launcher-support). Extended LauncherConfig with harness?: claude-code|pi (default claude-code), piExtensionPath, piFifoPath, piSessionDir. buildNonConversationCommand branches early to buildPiCommand when harness===pi. Pi command shape: pi --mode rpc --model <model> --session-dir <piSessionDir> --extension <piExtensionPath> --no-context-files [--session <resumeSessionId>] [<extraArgs>] [--append-system-prompt ] < <piFifoPath>. permissionFlags ignored on Pi path (Pi has no permission system, AC4). baseCommand also ignored on Pi path so callers cannot smuggle claude flags. Throws when piExtensionPath/piFifoPath/piSessionDir missing. AC3 invariant verified by direct equality test: harness unset vs harness=claude-code produce identical output. 22 tests pass total. typecheck + lint clean.",
       "agentModel": "claude-opus-4-7"
     }
   ],
