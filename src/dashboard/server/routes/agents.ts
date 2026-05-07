@@ -57,6 +57,7 @@ import {
   getSessionId,
   getLatestSessionId,
   resumeAgent,
+  restartAgent,
   messageAgent,
   stopAgent,
   stopAgentAsync,
@@ -1300,6 +1301,126 @@ const postAgentResumeRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/agents/:id/restart ──────────────────────────────────────
+//
+// Restart an agent with optional model override. Graceful mode sends a 30s
+// warning then restarts; quick mode kills and relaunches immediately.
+// Returns 202 for graceful (async work), 200 for quick.
+
+const postAgentRestartRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/restart',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const body = yield* readJsonBody;
+    const eventStore = yield* EventStoreService;
+
+    const { model, graceful = true, message } = body as {
+      model?: string;
+      graceful?: boolean;
+      message?: string;
+    };
+
+    const agentState = yield* Effect.promise(() => getAgentStateAsync(id));
+    if (!agentState) {
+      return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
+    }
+
+    yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.restart_requested', {
+      model: model || agentState.model,
+      graceful,
+      hasMessage: !!message,
+    }));
+
+    if (graceful) {
+      // Kick off async restart — don't block the HTTP response for 30s
+      (async () => {
+        try {
+          await Effect.runPromise(eventStore.append({
+            type: 'agent.stopped',
+            timestamp: new Date().toISOString(),
+            payload: { agentId: id },
+          }));
+
+          const result = await restartAgent(id, { model, graceful: true, message });
+
+          if (result.success) {
+            const updatedState = getAgentState(id);
+            await Effect.runPromise(eventStore.append({
+              type: 'agent.started',
+              timestamp: new Date().toISOString(),
+              payload: {
+                agentId: id,
+                issueId: updatedState?.issueId || agentState.issueId,
+                restarted: true,
+                agent: {
+                  id,
+                  issueId: updatedState?.issueId || agentState.issueId,
+                  workspace: updatedState?.workspace || agentState.workspace,
+                  runtime: updatedState?.runtime || agentState.runtime,
+                  model: model || updatedState?.model || agentState.model,
+                  status: 'running',
+                  startedAt: updatedState?.startedAt || agentState.startedAt,
+                  lastActivity: new Date().toISOString(),
+                  phase: updatedState?.phase || agentState.phase,
+                },
+              },
+            }));
+            invalidateAgentsCache();
+          }
+          await appendAgentLifecycleLog(id, 'agent.restart_completed', {
+            success: result.success,
+            error: result.error,
+          });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`[agents] Graceful restart failed for ${id}: ${msg}`);
+          await appendAgentLifecycleLog(id, 'agent.restart_failed', { error: msg });
+        }
+      })();
+
+      return jsonResponse({ accepted: true, graceful: true, agentId: id }, { status: 202 });
+    }
+
+    // Quick restart — synchronous
+    const result = yield* Effect.promise(() => restartAgent(id, { model, graceful: false, message }));
+
+    if (result.success) {
+      const updatedState = yield* Effect.promise(() => getAgentStateAsync(id));
+      yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+        type: 'agent.stopped',
+        timestamp: new Date().toISOString(),
+        payload: { agentId: id },
+      })));
+      yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+        type: 'agent.started',
+        timestamp: new Date().toISOString(),
+        payload: {
+          agentId: id,
+          issueId: updatedState?.issueId || agentState.issueId,
+          restarted: true,
+          agent: {
+            id,
+            issueId: updatedState?.issueId || agentState.issueId,
+            workspace: updatedState?.workspace || agentState.workspace,
+            runtime: updatedState?.runtime || agentState.runtime,
+            model: model || updatedState?.model || agentState.model,
+            status: 'running',
+            startedAt: updatedState?.startedAt || agentState.startedAt,
+            lastActivity: new Date().toISOString(),
+            phase: updatedState?.phase || agentState.phase,
+          },
+        },
+      })));
+      invalidateAgentsCache();
+      return jsonResponse({ success: true, restarted: true, agentId: id, model: model || agentState.model });
+    }
+
+    return jsonResponse({ error: result.error }, { status: 500 });
+  })),
+);
+
 // ─── Route: GET /api/agents/:id/cloister-health ──────────────────────────────
 
 const getAgentCloisterHealthRoute = HttpRouter.add(
@@ -2348,9 +2469,8 @@ const getAgentTmuxAliveRoute = HttpRouter.add(
 
 // ─── Route: POST /api/agents/restart-all ──────────────────────────────────────
 //
-// Stop all running workspace agents, then re-start each by POSTing to
-// the start-agent endpoint internally. Cloister handles model routing,
-// workspace setup, and beads enforcement.
+// Restart all running workspace agents using restartAgent() directly.
+// Quick mode (no graceful delay) to avoid serializing 30s waits across N agents.
 
 const postAgentsRestartAllRoute = HttpRouter.add(
   'POST',
@@ -2363,23 +2483,11 @@ const postAgentsRestartAllRoute = HttpRouter.add(
 
         for (const agent of running) {
           try {
-            // Stop the agent (captures output, kills tmux, marks stopped)
-            await stopAgentAsync(agent.id);
-
-            // Re-start via internal API call — reuses all existing start-agent logic.
-            // Use 127.0.0.1 (not localhost): /etc/hosts may resolve localhost to ::1,
-            // and Node's fetch() does not auto-fall-back to IPv4 like curl does.
-            const res = await fetch('http://127.0.0.1:3011/api/agents', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ issueId: agent.issueId }),
-            });
-
-            if (res.ok) {
+            const result = await restartAgent(agent.id, { graceful: false });
+            if (result.success) {
               results.push({ id: agent.id, issueId: agent.issueId, model: agent.model, status: 'restarted' });
             } else {
-              const err = await res.json().catch(() => ({ error: res.statusText }));
-              results.push({ id: agent.id, issueId: agent.issueId, model: agent.model, status: `failed: ${(err as any).error ?? res.statusText}` });
+              results.push({ id: agent.id, issueId: agent.issueId, model: agent.model, status: `failed: ${result.error}` });
             }
           } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -2576,6 +2684,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentTimelineRoute,
   postAgentSuspendRoute,
   postAgentResumeRoute,
+  postAgentRestartRoute,
   getAgentCloisterHealthRoute,
   getAgentHandoffSuggestionRoute,
   postAgentHandoffRoute,
