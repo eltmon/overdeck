@@ -107,7 +107,7 @@ describe('ProjectionCache.save', () => {
     const row = db.prepare(`SELECT * FROM projection_cache WHERE key = 'dashboard'`).get()
     expect(row).toBeUndefined()
 
-    // Advance past 100ms debounce
+    // Advance past 2s debounce
     vi.advanceTimersByTime(2100)
 
     const savedRow = db.prepare(`SELECT sequence FROM projection_cache WHERE key = 'dashboard'`).get() as { sequence: number } | undefined
