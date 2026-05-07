@@ -552,7 +552,7 @@
       {
         "id": "specialist-config-harness",
         "title": "Extend cloister specialist_models config with per-role harness",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T04:10:00.000Z",
         "metadata": {
@@ -566,7 +566,7 @@
           {
             "id": "specialist-config-harness.ac1",
             "title": "ModelSelectionConfig.specialist_harnesses exists with the same five role keys as specialist_models",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -574,7 +574,7 @@
           {
             "id": "specialist-config-harness.ac2",
             "title": "Default config returns harness='claude-code' for every role when no user override is set",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -582,7 +582,7 @@
           {
             "id": "specialist-config-harness.ac3",
             "title": "Settings persistence round-trips specialist_harnesses through the same yaml/json path as specialist_models (no schema migration needed for absent keys)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-636",
   "created": "2026-05-07T03:42:36.488Z",
-  "updated": "2026-05-07T05:22:02.476Z",
+  "updated": "2026-05-07T05:24:23.611Z",
   "gitState": {
     "branch": "feature/pan-636",
     "sha": "9b15d68ef",
@@ -138,11 +138,12 @@
     }
   ],
   "resumePoint": {
-    "description": "agent-state-harness bead complete (AgentState carries harness?, SpawnOptions accepts harness with claude-code default, getAgentRuntimeBaseCommand(model, harness) — pi branch returns pi --mode rpc --model X, claude-code preserves pre-PAN-636 output bit-for-bit, all 4 call sites pass explicit harness). Next: workspace-pal (cloister specialist_models config extends with per-role harness) or workspace-anvh (ModelRouter.getSpecialistHarness helper) or workspace-sdf0 (resolveSpecialistBaseCommand) — these three are inter-related specialist routing beads.",
-    "beadId": "workspace-sur",
+    "description": "specialist-config-harness bead complete (ModelSelectionConfig.specialist_harnesses optional block with same 5 role keys as specialist_models; defaults to empty so unset roles fall through to claude-code on read; deepMerge round-trips through cloister.toml). Next: workspace-anvh (ModelRouter.getSpecialistHarness helper).",
+    "beadId": "workspace-pal",
     "filesToRead": [
-      "src/lib/agents.ts",
-      "src/lib/planning/spawn-planning-session.ts"
+      "src/lib/cloister/config.ts",
+      "src/lib/cloister/__tests__/specialist-harnesses-config.test.ts",
+      "src/lib/cloister/router.ts"
     ]
   },
   "beadsMapping": {},
@@ -213,6 +214,12 @@
       "timestamp": "2026-05-07T05:22:02.476Z",
       "reason": "continue",
       "note": "Closed bead workspace-sur (agent-state-harness). Added harness?: claude-code|pi to AgentState (forward compat — readers default unset/legacy via getHarness). SpawnOptions accepts harness, defaults to claude-code in spawnAgent.state. Refactored getAgentRuntimeBaseCommand(model) -> (model, harness=claude-code default) — pi branch returns pi --mode rpc --model X (no permission flags), claude-code branch preserves the existing claude/claudish output bit-for-bit. Updated 4 call sites: agents.ts:1100/1450/1808 pass state.harness ?? claude-code; planning/spawn-planning-session.ts:491 takes opts.harness (added to SpawnPlanningOptions). Other call sites (review-agent, conversations, conversation-compaction) keep the default — those will be re-routed through resolveSpecialistBaseCommand by bead workspace-sdf0. 4 tests pass: default-vs-explicit equality (AC3), claude-code legacy output exact match, pi --mode rpc --model X (AC4), pi has no permission flags. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:24:23.611Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-pal (specialist-config-harness). Extended ModelSelectionConfig with optional specialist_harnesses block: { merge_agent?, review_agent?, test_agent?, inspect_agent?, uat_agent? } each typed claude-code|pi. Defaults to {} (every role falls through to claude-code on read via getSpecialistHarness helper coming in bead anvh). DEFAULT_CLOISTER_CONFIG.model_selection.specialist_harnesses set to empty object so cloister.toml round-trips correctly. Persistence via existing TOML load/save path; no schema migration needed for absent keys (deepMerge fills defaults). 3 tests pass: empty default block, round-trip review_agent=pi+test_agent=claude-code, legacy config without the key still loads. typecheck + lint clean.",
       "agentModel": "claude-opus-4-7"
     }
   ],
