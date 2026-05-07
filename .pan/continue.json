@@ -2,8 +2,8 @@
   "version": "1",
   "issueId": "PAN-985",
   "created": "2026-05-07T03:42:01.126Z",
-  "updated": "2026-05-07T05:45:00.000Z",
-  "gitState": { "branch": "feature/pan-985", "sha": "28eb79602", "dirty": true },
+  "updated": "2026-05-07T06:05:00.000Z",
+  "gitState": { "branch": "feature/pan-985", "sha": "014ed7269", "dirty": false },
   "decisions": [
     {
       "id": "D1",
@@ -99,9 +99,9 @@
     }
   ],
   "resumePoint": {
-    "description": "Beads workspace-ryjv and workspace-mnx3 implemented in code. ryjv: experimental.claudeCodeChannels schema + isClaudeCodeChannelsEnabled helper in src/lib/config-yaml.ts. mnx3: ApiSettingsConfig.experimental added in src/lib/settings-api.ts; loadSettingsApi reads it (defensive fallback to false) and saveSettingsApi writes it through to YamlConfig.experimental; validateSettingsApi rejects non-boolean experimental.claudeCodeChannels with a 400-shaped error string consumed by the existing PUT /api/settings handler. settings-api.test.ts unchanged and passing. Next bead: workspace-sohg — add the Experimental section at the bottom of SettingsPage with the Claude Code Channels toggle wired through the same /api/settings PUT flow.",
-    "beadId": "workspace-sohg",
-    "filesToRead": ["src/dashboard/frontend/src/components/Settings/SettingsPage.tsx", "src/dashboard/frontend/src/components/Settings/__tests__/SettingsPage.test.ts"]
+    "description": "Implementation complete. All 14 PAN-985 beads implemented and closed. Full vitest suite passes 4292/4292. Two follow-up GitHub issues filed for out-of-scope work (#986 reply tool, #987 permission relay). Ready for pan done — next step is to push feature/pan-985 and signal the review pipeline.",
+    "beadId": null,
+    "filesToRead": []
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -128,6 +128,12 @@
       "timestamp": "2026-05-07T05:45:00.000Z",
       "reason": "implementation",
       "note": "Implemented bead workspace-mnx3. Settings API (src/lib/settings-api.ts) now exposes the experimental block to consumers of GET/PUT /api/settings: ApiSettingsConfig has an optional experimental: { claudeCodeChannels?: boolean }; loadSettingsApi populates it with a defensive fallback to false (so partial test mocks of NormalizedConfig that do not set experimental still work); saveSettingsApi persists it into YamlConfig.experimental which the loader already understands; validateSettingsApi rejects non-boolean experimental.claudeCodeChannels with a clear error message that the existing PUT /api/settings handler returns as a 400. updateSettingsApi (the partial-merge path) also threads experimental so subsequent PUTs do not clobber an unrelated field. The route file (src/dashboard/server/routes/settings.ts) needs no changes because it already pipes body → validate → save through the helpers. Existing tests/lib/settings-api.test.ts passes 29/29 with 2 skipped, no test code changed. tsc --noEmit clean. Beads ryjv and mnx3 still cannot bd close because the bead graph dependency direction (ryjv DEPENDS ON clbj, mnx3, ufzv) requires those to close first; will close all beads at the end after the deeper dependents land. Next: workspace-sohg, the Experimental section UI on SettingsPage.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T06:05:00.000Z",
+      "reason": "end",
+      "note": "PAN-985 implementation complete. 14 beads closed. Commits on feature/pan-985 in dependency order: ryjv (config schema), mnx3 (settings API), sohg (Settings UI Experimental section + Playwright spec), 3vt6 (panopticon-bridge MCP scaffold + @modelcontextprotocol/sdk dep), bvzr (Bun.serve unix listener with 0o600 socket, JSON validation, SIGTERM cleanup, bridge log), clbj (deliverAgentMessage primitive in src/lib/agents.ts: state-driven eligibility, node:net HTTP/1.1 socket POST with 2s timeout, sendKeysAsync fallback on every error mode + 5 unit tests), d79y (LauncherConfig.channelsBridgeMcpConfig + channelsBridgeServerName, --mcp-config and --dangerously-load-development-channels appended before --session-id, byte-identical regression test for the flag-off path), ufzv (decideChannelsForWorkAgent eligibility gate inside spawnAgent: writes <workspace>/.pan/agent-mcp.json and sets state.channelsEnabled when eligible, logs channels:eligible / channels:ineligible:<reason>), 02v7 (dismissDevChannelsDialog polling sendRawKeystrokeAsync C-m with 20s budget for cold-start claude+TLDR+Playwright), u1z4 (replaced four work-agent sendKeysAsync sites with deliverAgentMessage; cloister/runtimes/dashboard routes intentionally untouched), qoj8 (panopticon-bridge unit + subprocess integration tests covering frame shape, malformed input, log writes, socket mode 0o600, SIGTERM unlink), 3ql7 (CLAUDE.md Channels section after tmux Message Delivery), 5z2n (src/lib/channels/SMOKE_TEST.md five-step manual procedure with expected log signatures and revert path), grnu (followup GitHub issues #986 reply tool and #987 permission relay). Full vitest suite 4292 passed / 48 skipped / 0 failed. tsc clean. All vBRIEF item statuses set to completed. Working tree clean.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

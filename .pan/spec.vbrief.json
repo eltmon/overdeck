@@ -48,7 +48,7 @@
       {
         "id": "scaffold-bridge-package",
         "title": "Scaffold panopticon-bridge as a Bun MCP server entrypoint in src/lib/channels/",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T04:25:00.000Z",
         "metadata": {
@@ -62,7 +62,7 @@
           {
             "id": "scaffold-bridge-package.ac1",
             "title": "src/lib/channels/panopticon-bridge.ts exists and runs cleanly under Bun (bun run src/lib/channels/panopticon-bridge.ts) without immediate exit when stdin is open",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -70,7 +70,7 @@
           {
             "id": "scaffold-bridge-package.ac2",
             "title": "@modelcontextprotocol/sdk is added to root package.json dependencies and bun install completes successfully",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -78,7 +78,7 @@
           {
             "id": "scaffold-bridge-package.ac3",
             "title": "Server constructor declares capabilities.experimental['claude/channel'] = {} and OMITS capabilities.tools and capabilities.experimental['claude/channel/permission'] (one-way, no reply tool, no permission relay)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -86,7 +86,7 @@
           {
             "id": "scaffold-bridge-package.ac4",
             "title": "Bridge process exits with non-zero code and a clear error message when PANOPTICON_AGENT_ID env var is unset",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -94,7 +94,7 @@
           {
             "id": "scaffold-bridge-package.ac5",
             "title": "Header comment in panopticon-bridge.ts documents the Bun-runtime requirement, the Channels reference URL, and the fact that the socket-unlink-on-startup is intentional (not defensive)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -104,7 +104,7 @@
       {
         "id": "bridge-unix-socket-listener",
         "title": "Add Unix-socket inbound listener to panopticon-bridge that pushes channel notifications",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T04:25:00.000Z",
         "metadata": {
@@ -118,7 +118,7 @@
           {
             "id": "bridge-unix-socket-listener.ac1",
             "title": "Bridge binds to ${PANOPTICON_HOME}/sockets/agent-<PANOPTICON_AGENT_ID>.sock with file mode 0o600 (owner-only)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -126,7 +126,7 @@
           {
             "id": "bridge-unix-socket-listener.ac2",
             "title": "POST to the socket with body {\"content\": \"hello\"} returns 200 'ok' and is observable as an mcp.notification call (verified via stdio frame inspection in unit test with a fake transport)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -134,7 +134,7 @@
           {
             "id": "bridge-unix-socket-listener.ac3",
             "title": "POST with missing content field returns 400 with a JSON error body and does NOT call mcp.notification",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -142,7 +142,7 @@
           {
             "id": "bridge-unix-socket-listener.ac4",
             "title": "Bridge unlinks any pre-existing socket file before bind (no EADDRINUSE on restart) and unlinks again on SIGTERM",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -150,7 +150,7 @@
           {
             "id": "bridge-unix-socket-listener.ac5",
             "title": "Every push is logged to ${PANOPTICON_HOME}/logs/bridge-<agent-id>.log with ISO timestamp, content length, meta key list",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -160,7 +160,7 @@
       {
         "id": "bridge-unit-tests",
         "title": "Unit tests for panopticon-bridge: notification frame shape and socket protocol",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T04:25:00.000Z",
         "metadata": {
@@ -174,7 +174,7 @@
           {
             "id": "bridge-unit-tests.ac1",
             "title": "Test file exists at src/lib/channels/__tests__/panopticon-bridge.test.ts and is picked up by vitest",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -182,7 +182,7 @@
           {
             "id": "bridge-unit-tests.ac2",
             "title": "Test asserts the JSON-RPC notification frame method is exactly 'notifications/claude/channel' and params.content survives round-trip unchanged",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -190,7 +190,7 @@
           {
             "id": "bridge-unit-tests.ac3",
             "title": "Test asserts socket file mode is 0o600 (owner-only) after bind",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -198,7 +198,7 @@
           {
             "id": "bridge-unit-tests.ac4",
             "title": "Test asserts malformed-JSON and missing-content POSTs return 400 and emit zero notification frames",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -206,7 +206,7 @@
           {
             "id": "bridge-unit-tests.ac5",
             "title": "All tests pass under `npm test` with no real claude binary, no real Anthropic auth, no network access required",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -216,7 +216,7 @@
       {
         "id": "config-experimental-flag",
         "title": "Add experimental.claudeCodeChannels boolean to config schema and loader",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T04:25:00.000Z",
         "metadata": {
@@ -230,7 +230,7 @@
           {
             "id": "config-experimental-flag.ac1",
             "title": "YamlConfig type in src/lib/config-yaml.ts has an optional `experimental?: { claudeCodeChannels?: boolean }` field",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -238,7 +238,7 @@
           {
             "id": "config-experimental-flag.ac2",
             "title": "loadConfig() returns experimental.claudeCodeChannels === false when the key is absent from config.yaml (no warning, no error)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -246,7 +246,7 @@
           {
             "id": "config-experimental-flag.ac3",
             "title": "isClaudeCodeChannelsEnabled() helper exists in src/lib/config-yaml.ts (or co-located helper module) and returns boolean",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -254,7 +254,7 @@
           {
             "id": "config-experimental-flag.ac4",
             "title": "All existing config-yaml unit tests continue to pass without modification",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -264,7 +264,7 @@
       {
         "id": "deliver-agent-message-primitive",
         "title": "Add deliverAgentMessage primitive in src/lib/agents.ts with eligibility check and tmux fallback",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T04:25:00.000Z",
         "metadata": {
@@ -278,7 +278,7 @@
           {
             "id": "deliver-agent-message-primitive.ac1",
             "title": "deliverAgentMessage exported from src/lib/agents.ts with signature (agentId: string, message: string, caller?: string) => Promise<void>",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -286,7 +286,7 @@
           {
             "id": "deliver-agent-message-primitive.ac2",
             "title": "When agent state.channelsEnabled is false or state file missing, deliverAgentMessage delegates to sendKeysAsync exactly once and never attempts a socket connection",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -294,7 +294,7 @@
           {
             "id": "deliver-agent-message-primitive.ac3",
             "title": "When channelsEnabled is true and socket POST returns 200, sendKeysAsync is NOT called and the channel-path log line is written",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -302,7 +302,7 @@
           {
             "id": "deliver-agent-message-primitive.ac4",
             "title": "When channelsEnabled is true and socket POST fails (any error mode), deliverAgentMessage falls back to sendKeysAsync and writes a fallback-reason log line; the user-visible behavior is identical to a tmux-only delivery",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -310,7 +310,7 @@
           {
             "id": "deliver-agent-message-primitive.ac5",
             "title": "Implementation uses fs/promises and node:net (or fetch with unix-socket dispatcher) — no readFileSync/writeFileSync/execSync in this code path",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -318,7 +318,7 @@
           {
             "id": "deliver-agent-message-primitive.ac6",
             "title": "Unit tests in src/lib/__tests__/deliver-agent-message.test.ts cover: (a) flag-off pure-tmux path, (b) flag-on socket-success path, (c) flag-on socket-ENOENT fallback, (d) flag-on socket-timeout fallback. Each test mocks both the socket and sendKeysAsync.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -328,7 +328,7 @@
       {
         "id": "launcher-channels-args",
         "title": "Extend LauncherConfig and generateLauncherScript to accept channels MCP config and dev-channels flag",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T04:25:00.000Z",
         "metadata": {
@@ -342,7 +342,7 @@
           {
             "id": "launcher-channels-args.ac1",
             "title": "LauncherConfig has optional fields channelsBridgeMcpConfig?: string and channelsBridgeServerName?: string with documented defaults",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -350,7 +350,7 @@
           {
             "id": "launcher-channels-args.ac2",
             "title": "generateLauncherScript output is byte-for-byte identical to the current behavior when channelsBridgeMcpConfig is undefined (regression test asserts string equality against a known fixture)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -358,7 +358,7 @@
           {
             "id": "launcher-channels-args.ac3",
             "title": "When channelsBridgeMcpConfig is set, generated command includes --mcp-config <quoted-path> --dangerously-load-development-channels server:panopticon-bridge in that order, before --session-id/--model, and does NOT include --strict-mcp-config",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -366,7 +366,7 @@
           {
             "id": "launcher-channels-args.ac4",
             "title": "Existing launcher-generator unit tests pass without modification; new tests added for both flag-off-regression and flag-on cases, including an explicit assertion that --strict-mcp-config is absent",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -376,7 +376,7 @@
       {
         "id": "work-agent-launch-wires-bridge",
         "title": "Wire the experimental flag into work-agent launch in src/lib/agents.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T04:25:00.000Z",
         "metadata": {
@@ -390,7 +390,7 @@
           {
             "id": "work-agent-launch-wires-bridge.ac1",
             "title": "isEligibleForChannels helper returns false for non-Claude-Code runtimes (codex, cursor, gemini), false for Bedrock/Vertex/Foundry auth, false for Docker workspaces, true otherwise",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -398,7 +398,7 @@
           {
             "id": "work-agent-launch-wires-bridge.ac2",
             "title": "When experimental flag is off, launching a work agent produces zero new files (no .mcp.json, no state.channelsEnabled change) — regression test asserts directory contents",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -406,7 +406,7 @@
           {
             "id": "work-agent-launch-wires-bridge.ac3",
             "title": "When experimental flag is on AND eligible, launch writes <workspace>/.pan/agent-mcp.json with the documented schema and writes channelsEnabled: true to ${PANOPTICON_HOME}/agents/<id>/state.json",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -414,7 +414,7 @@
           {
             "id": "work-agent-launch-wires-bridge.ac4",
             "title": "When experimental flag is on AND ineligible, launch logs 'channels:ineligible:<reason>' and behaves identically to flag-off (no .mcp.json, no state mutation)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -422,7 +422,7 @@
           {
             "id": "work-agent-launch-wires-bridge.ac5",
             "title": "Eligibility log lines appear exactly once per launch (not per delivery) and contain the agent id and the reason",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -432,7 +432,7 @@
       {
         "id": "dismiss-dev-channels-dialog",
         "title": "Dismiss the dev-channels confirmation dialog at agent startup with one Enter keystroke",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T04:25:00.000Z",
         "metadata": {
@@ -446,7 +446,7 @@
           {
             "id": "dismiss-dev-channels-dialog.ac1",
             "title": "dismissDevChannelsDialog runs only when the agent state has channelsEnabled: true; flag-off launches skip it entirely",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -454,7 +454,7 @@
           {
             "id": "dismiss-dev-channels-dialog.ac2",
             "title": "When the dialog text is detected within 20s, exactly one sendRawKeystrokeAsync(C-m) is fired (verified by checking the send-keys log)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -462,7 +462,7 @@
           {
             "id": "dismiss-dev-channels-dialog.ac3",
             "title": "When the dialog text is NOT detected within 20s, the launch continues (does not block forever) and a 'channels:dismiss:dialog-not-detected' log line is written",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -470,7 +470,7 @@
           {
             "id": "dismiss-dev-channels-dialog.ac4",
             "title": "Implementation uses sendRawKeystrokeAsync, NOT sendKeysAsync (no load-buffer/paste-buffer machinery for a single keystroke)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -478,7 +478,7 @@
           {
             "id": "dismiss-dev-channels-dialog.ac5",
             "title": "Dismissal completes before any deliverAgentMessage is called for that agent (test asserts ordering with a fake clock or call-order assertion)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -488,7 +488,7 @@
       {
         "id": "switch-work-agent-callers-to-deliver",
         "title": "Switch work-agent prompt-delivery call sites in agents.ts to deliverAgentMessage",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T04:25:00.000Z",
         "metadata": {
@@ -502,7 +502,7 @@
           {
             "id": "switch-work-agent-callers-to-deliver.ac1",
             "title": "All four agents.ts call sites (1174, 1470, 1525, 1689 by current numbering) call deliverAgentMessage instead of sendKeysAsync, preserving original caller strings",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -510,7 +510,7 @@
           {
             "id": "switch-work-agent-callers-to-deliver.ac2",
             "title": "Zero call-site changes in src/lib/cloister/, src/lib/runtimes/claude-code.ts, src/dashboard/server/routes/conversations.ts, src/dashboard/server/routes/misc.ts (verified by git diff scope)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -518,7 +518,7 @@
           {
             "id": "switch-work-agent-callers-to-deliver.ac3",
             "title": "Existing tests for messageAgent and the launchAgent flow continue to pass without modification (deliverAgentMessage with flag-off is a behavior-preserving substitution)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -528,7 +528,7 @@
       {
         "id": "settings-api-experimental-block",
         "title": "Extend GET/POST /api/settings to read and persist the experimental.claudeCodeChannels flag",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T04:25:00.000Z",
         "metadata": {
@@ -542,7 +542,7 @@
           {
             "id": "settings-api-experimental-block.ac1",
             "title": "GET /api/settings returns experimental.claudeCodeChannels in its response, defaulting to false when the config has no experimental block",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -550,7 +550,7 @@
           {
             "id": "settings-api-experimental-block.ac2",
             "title": "POST /api/settings with { experimental: { claudeCodeChannels: true } } persists the value to config.yaml such that a subsequent GET returns true and a fresh loadConfig() in another process also sees true",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -558,7 +558,7 @@
           {
             "id": "settings-api-experimental-block.ac3",
             "title": "POST with experimental.claudeCodeChannels of a non-boolean type (string, number, object) returns 400 with a clear error and does not write to config.yaml",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -566,7 +566,7 @@
           {
             "id": "settings-api-experimental-block.ac4",
             "title": "Implementation uses fs/promises throughout — no readFileSync/writeFileSync in the new code paths",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -576,7 +576,7 @@
       {
         "id": "settings-ui-experimental-section",
         "title": "Add Experimental section at the bottom of SettingsPage with the Claude Code Channels toggle",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T04:25:00.000Z",
         "metadata": {
@@ -590,7 +590,7 @@
           {
             "id": "settings-ui-experimental-section.ac1",
             "title": "The Experimental section is rendered as the LAST section on SettingsPage (no other section appears below it visually or in DOM order)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -598,7 +598,7 @@
           {
             "id": "settings-ui-experimental-section.ac2",
             "title": "The toggle 'Use Claude Code Channels for prompt delivery (work agents only)' defaults to off and reflects the GET /api/settings value on initial render",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -606,7 +606,7 @@
           {
             "id": "settings-ui-experimental-section.ac3",
             "title": "Sub-text under the toggle includes the runtime-eligibility caveat and a link to https://code.claude.com/docs/en/channels",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -614,7 +614,7 @@
           {
             "id": "settings-ui-experimental-section.ac4",
             "title": "Toggling the switch issues a POST to /api/settings with body { experimental: { claudeCodeChannels: true|false } } (verified by Playwright network assertion)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -622,7 +622,7 @@
           {
             "id": "settings-ui-experimental-section.ac5",
             "title": "Section heading includes a visually distinct treatment (warning-tone color or border) and the Beaker icon",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -632,7 +632,7 @@
       {
         "id": "smoke-test-doc",
         "title": "Add SMOKE_TEST.md documenting the manual end-to-end channel-delivery verification",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-07T04:25:00.000Z",
         "metadata": {
@@ -646,7 +646,7 @@
           {
             "id": "smoke-test-doc.ac1",
             "title": "src/lib/channels/SMOKE_TEST.md exists and contains the five-step procedure with expected outputs and revert instructions",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -654,7 +654,7 @@
           {
             "id": "smoke-test-doc.ac2",
             "title": "Doc references the bridge log path, the eligibility log category, and the tmux pane location for visual confirmation of the dev-channels dialog",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -664,7 +664,7 @@
       {
         "id": "claude-md-channels-section",
         "title": "Document the Channels architecture in CLAUDE.md",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-07T04:25:00.000Z",
         "metadata": {
@@ -678,7 +678,7 @@
           {
             "id": "claude-md-channels-section.ac1",
             "title": "CLAUDE.md has a new section titled 'Claude Code Channels (experimental)' positioned immediately after the 'tmux Message Delivery' section",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -686,7 +686,7 @@
           {
             "id": "claude-md-channels-section.ac2",
             "title": "The section describes opt-in posture, eligibility criteria (Claude Code runtime + Anthropic auth + non-Docker), and explicitly notes which call sites do NOT migrate (cloister, conversations, non-Claude runtimes)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -694,7 +694,7 @@
           {
             "id": "claude-md-channels-section.ac3",
             "title": "The section references src/lib/channels/panopticon-bridge.ts, deliverAgentMessage in src/lib/agents.ts, and the Channels reference URL",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -704,7 +704,7 @@
       {
         "id": "followup-issues-filed",
         "title": "File two follow-up GitHub issues for reply tool and permission relay",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-07T04:25:00.000Z",
         "metadata": {
@@ -718,7 +718,7 @@
           {
             "id": "followup-issues-filed.ac1",
             "title": "Two GitHub issues exist with titles starting 'Channels: bidirectional reply tool...' and 'Channels: route Claude permission prompts...' and both reference PAN-985 as a dependency",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -726,7 +726,7 @@
           {
             "id": "followup-issues-filed.ac2",
             "title": "Each issue has a context paragraph explaining the Channels mechanism and links to the relevant channels-reference section",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -734,7 +734,7 @@
           {
             "id": "followup-issues-filed.ac3",
             "title": "The PR description for PAN-985 lists both follow-up issue numbers under a 'Follow-up work' heading",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
