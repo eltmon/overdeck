@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-636",
   "created": "2026-05-07T03:42:36.488Z",
-  "updated": "2026-05-07T04:40:10.210Z",
+  "updated": "2026-05-07T04:53:40.606Z",
   "gitState": {
     "branch": "feature/pan-636",
     "sha": "9b15d68ef",
@@ -138,12 +138,13 @@
     }
   ],
   "resumePoint": {
-    "description": "harness-types bead complete (RuntimeName widened, getHarness helper added, frontend reads migrated, event-reducers writes claude-code, KanbanBoard fixtures updated, unit test passes). Next ready bead: workspace-ef4 (canUseHarness ToS gate helper) — pure-function, no deps. After that: workspace-y4r (pi-parser).",
-    "beadId": "workspace-h5c",
+    "description": "tos-gate bead complete (canUseHarness in src/lib/harness-policy.ts blocks pi+anthropic+subscription, allows everything else; 2x5x3 matrix test passes). Next ready bead: workspace-y4r (pi-parser) — pure cost parser walking Pi tree-format JSONL active branch into SessionUsage. Need fixtures under src/lib/cost-parsers/__tests__/fixtures/.",
+    "beadId": "workspace-ef4",
     "filesToRead": [
-      "packages/contracts/src/types.ts",
-      "src/lib/runtimes/types.ts",
-      "src/lib/__tests__/harness.test.ts"
+      "src/lib/harness-policy.ts",
+      "src/lib/__tests__/harness-policy.test.ts",
+      "src/lib/providers.ts",
+      "src/lib/subscription-types.ts"
     ]
   },
   "beadsMapping": {},
@@ -166,6 +167,12 @@
       "timestamp": "2026-05-07T04:40:10.210Z",
       "reason": "continue",
       "note": "Closed bead workspace-h5c (harness-types). Widened RuntimeName to claude-code|pi in src/lib/runtimes/types.ts. Added Harness type and getHarness() normalizer in packages/contracts/src/types.ts (legacy claude → claude-code, unknowns → claude-code). Migrated three frontend reads (IssueAgentCard, AgentInfoSection, ResourceCard) to call getHarness(agent). Fixed event-reducers.ts:431 default-fill claude → claude-code. Updated KanbanBoard.test.tsx fixtures. Added 6-case unit test src/lib/__tests__/harness.test.ts; all pass. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T04:53:40.606Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-ef4 (tos-gate). Created src/lib/harness-policy.ts exporting canUseHarness(harness, model, authMode) -> { allowed, reason? }. Single blocked cell: pi+anthropic-model+subscription. claude-code is always allowed; pi+non-Anthropic always allowed; pi+anthropic+api-key allowed; pi+anthropic+undefined-authMode allowed (no subscription is in play). Reason string is human-readable for picker tooltip use. Test src/lib/__tests__/harness-policy.test.ts covers the 2x5x3 matrix (claude-code|pi x anthropic|openai|google|minimax|openrouter x api-key|subscription|undefined) with explicit per-cell assertions plus targeted tests for the block reason. 13 tests pass. typecheck + lint clean.",
       "agentModel": "claude-opus-4-7"
     }
   ],

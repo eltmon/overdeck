@@ -96,7 +96,7 @@
       {
         "id": "tos-gate",
         "title": "canUseHarness(harness, model, authMode) ToS gate helper",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-07T04:10:00.000Z",
         "metadata": {
@@ -110,7 +110,7 @@
           {
             "id": "tos-gate.ac1",
             "title": "canUseHarness exists and returns allowed=false with a non-empty reason for {harness:'pi', anthropic-model, authMode:'subscription'}",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -118,7 +118,7 @@
           {
             "id": "tos-gate.ac2",
             "title": "canUseHarness returns allowed=true for {harness:'pi', anthropic-model, authMode:'api-key'}",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -126,7 +126,7 @@
           {
             "id": "tos-gate.ac3",
             "title": "canUseHarness returns allowed=true for every {harness:'pi', non-anthropic-model, *} cell (openai/google/mistral/ollama/openrouter)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -134,7 +134,7 @@
           {
             "id": "tos-gate.ac4",
             "title": "canUseHarness returns allowed=true for every {harness:'claude-code', *, *} cell",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -142,7 +142,7 @@
           {
             "id": "tos-gate.ac5",
             "title": "Vitest covers a 2 x 5 x 3 matrix (harness x provider x authMode) with explicit assertions per cell",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
