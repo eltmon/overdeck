@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync } from 'fs';
 import { readFile, readdir } from 'fs/promises';
-import { join, resolve } from 'path';
+import { join, resolve, dirname } from 'path';
 import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
@@ -16,7 +16,7 @@ import type { ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from './providers.js';
 import { validateProviderHealth } from './provider-health.js';
-import { loadConfig as loadYamlConfig } from './config-yaml.js';
+import { loadConfig as loadYamlConfig, isClaudeCodeChannelsEnabled } from './config-yaml.js';
 import type { NormalizedCavemanConfig } from './config-yaml.js';
 import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
@@ -597,6 +597,129 @@ export async function deliverAgentMessage(
     await sendKeysAsync(normalizedId, message);
     return;
   }
+}
+
+/**
+ * Inputs to the channels eligibility decision. We pass through agentId,
+ * SpawnOptions, and the in-construction AgentState so this function can be
+ * called from the spawn path without re-reading the state file.
+ */
+interface ChannelsDecision {
+  eligible: boolean;
+  reason?: string;
+}
+
+/**
+ * Decide whether to enable Claude Code Channels for a work-agent launch.
+ *
+ * Eligibility (all required):
+ *   - experimental.claudeCodeChannels is true in the merged config
+ *   - the agent is a work agent (specialists/conversations stay on tmux)
+ *   - the runtime is Claude Code (not Codex/Cursor/Gemini/Cliproxy-routed-GPT)
+ *   - auth provider is Anthropic-direct (excludes Bedrock/Vertex/Foundry)
+ *   - the workspace is not running inside a Docker container
+ *
+ * Logs the decision exactly once with a category prefix so users can see why
+ * the bridge did or did not engage. The function is otherwise side-effect
+ * free; the caller is responsible for writing the .mcp.json and mutating
+ * state.channelsEnabled when eligible is true.
+ */
+export function decideChannelsForWorkAgent(
+  agentId: string,
+  options: SpawnOptions,
+  state: AgentState,
+): ChannelsDecision {
+  const log = (eligible: boolean, reason?: string): void => {
+    const tag = eligible ? 'channels:eligible' : `channels:ineligible:${reason ?? 'unknown'}`;
+    console.log(`[${agentId}] ${tag}`);
+  };
+
+  if (!isClaudeCodeChannelsEnabled()) {
+    // Flag-off path is the silent default: no log line, no work. The bead
+    // explicitly limits eligibility logs to launches where the flag is on so
+    // the signal is meaningful.
+    return { eligible: false, reason: 'flag-off' };
+  }
+
+  if (options.agentType && options.agentType !== 'work-agent') {
+    log(false, 'not-a-work-agent');
+    return { eligible: false, reason: 'not-a-work-agent' };
+  }
+
+  // Runtime gate. The runtime field is 'claude' for Claude Code; specialised
+  // launchers set it to 'codex' / 'cursor' / 'gemini' / 'claudish' and those
+  // are not Channel-capable.
+  const runtime = state.runtime;
+  if (runtime !== 'claude' && runtime !== 'claude-code') {
+    log(false, `runtime-${runtime}`);
+    return { eligible: false, reason: `runtime-${runtime}` };
+  }
+
+  // Auth gate. The Channels capability is gated by Anthropic auth in the
+  // compiled Claude Code binary; we only attempt the bridge when the model
+  // routes to the anthropic provider.
+  const provider = getProviderForModel(state.model as ModelId);
+  if (provider.name !== 'anthropic') {
+    log(false, `provider-${provider.name}`);
+    return { eligible: false, reason: `provider-${provider.name}` };
+  }
+
+  if (
+    process.env.CLAUDE_CODE_USE_BEDROCK === '1' ||
+    process.env.CLAUDE_CODE_USE_VERTEX === '1' ||
+    process.env.CLAUDE_CODE_USE_FOUNDRY === '1'
+  ) {
+    log(false, 'auth-bedrock-vertex-foundry');
+    return { eligible: false, reason: 'auth-bedrock-vertex-foundry' };
+  }
+
+  // Docker workspace gate. We do not yet share a socket dir between host and
+  // container; deferred to a follow-up issue (see hazards H10).
+  if (
+    process.env.PANOPTICON_DOCKER_WORKSPACE === '1' ||
+    process.env.PAN_DOCKER === '1'
+  ) {
+    log(false, 'docker-not-supported-yet');
+    return { eligible: false, reason: 'docker-not-supported-yet' };
+  }
+
+  log(true);
+  return { eligible: true };
+}
+
+/**
+ * Write the per-agent MCP config that points claude at the panopticon-bridge
+ * stdio server. The path is the workspace-local <workspace>/.pan/agent-mcp.json
+ * — one config per agent, never shared, never reused.
+ */
+async function writeChannelsBridgeMcpConfig(
+  configPath: string,
+  agentId: string,
+): Promise<void> {
+  const fsp = await import('fs/promises');
+  await fsp.mkdir(dirname(configPath), { recursive: true });
+  // Resolve the bridge entrypoint relative to this module so the config is
+  // valid no matter where the workspace lives. We write the path of the
+  // checked-in bridge script — the launcher invokes it with `bun run`.
+  const repoBridgePath = join(
+    // src/lib/agents.ts → src/lib/channels/panopticon-bridge.ts
+    dirname(import.meta.url.replace('file://', '')),
+    'channels',
+    'panopticon-bridge.ts',
+  );
+  const mcpConfig = {
+    mcpServers: {
+      'panopticon-bridge': {
+        command: 'bun',
+        args: ['run', repoBridgePath],
+        env: {
+          PANOPTICON_AGENT_ID: agentId,
+          PANOPTICON_HOME: process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon'),
+        },
+      },
+    },
+  };
+  await fsp.writeFile(configPath, JSON.stringify(mcpConfig, null, 2), 'utf-8');
 }
 
 function markAgentRunning(state: AgentState): void {
@@ -1253,6 +1376,22 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     options.phase === 'planning'
   );
 
+  // Channels gate: when the experimental flag is on AND this work agent is
+  // eligible, write a per-agent .mcp.json that wires the panopticon-bridge as
+  // a stdio MCP server, set channelsEnabled in the agent state record, and
+  // pass the bridge MCP path through to the launcher so claude is started with
+  // --mcp-config + --dangerously-load-development-channels. When the flag is
+  // off OR the agent is ineligible we touch nothing here — same code path,
+  // same files on disk, as before PAN-985.
+  const channelsDecision = decideChannelsForWorkAgent(agentId, options, state);
+  let channelsBridgeMcpConfig: string | undefined;
+  if (channelsDecision.eligible) {
+    channelsBridgeMcpConfig = join(options.workspace, '.pan', 'agent-mcp.json');
+    await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, agentId);
+    state.channelsEnabled = true;
+    saveAgentState(state);
+  }
+
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
   const launcherContent = generateLauncherScript({
     agentType: 'work',
@@ -1263,6 +1402,12 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     providerExports,
     cavemanExports,
     baseCommand: await getAgentRuntimeBaseCommand(state.model),
+    ...(channelsBridgeMcpConfig
+      ? {
+          channelsBridgeMcpConfig,
+          channelsBridgeServerName: 'panopticon-bridge',
+        }
+      : {}),
   });
   writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
   const claudeCmd = `bash ${launcherScript}`;
