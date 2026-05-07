@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-636",
   "created": "2026-05-07T03:42:36.488Z",
-  "updated": "2026-05-07T04:53:40.606Z",
+  "updated": "2026-05-07T04:58:48.768Z",
   "gitState": {
     "branch": "feature/pan-636",
     "sha": "9b15d68ef",
@@ -138,13 +138,12 @@
     }
   ],
   "resumePoint": {
-    "description": "tos-gate bead complete (canUseHarness in src/lib/harness-policy.ts blocks pi+anthropic+subscription, allows everything else; 2x5x3 matrix test passes). Next ready bead: workspace-y4r (pi-parser) — pure cost parser walking Pi tree-format JSONL active branch into SessionUsage. Need fixtures under src/lib/cost-parsers/__tests__/fixtures/.",
-    "beadId": "workspace-ef4",
+    "description": "pi-parser bead complete (parsePiSession walks Pi v3 JSONL active branch via parentId, returns SessionUsage). 6 tests pass covering linear/forked/model-change/compaction/unknown-events/missing-file. Next ready bead: workspace-neg (vendor @panopticon/pi-extension at packages/pi-extension/) — needs lifecycle hooks (session_start, tool_execution_end, turn_end, /pan-done command) writing heartbeats to ~/.panopticon/agents/<id>/ and ~/.panopticon/heartbeats/. Pi extension API ref: ~/Projects/pi-mono/packages/coding-agent/docs/extensions.md.",
+    "beadId": "workspace-y4r",
     "filesToRead": [
-      "src/lib/harness-policy.ts",
-      "src/lib/__tests__/harness-policy.test.ts",
-      "src/lib/providers.ts",
-      "src/lib/subscription-types.ts"
+      "src/lib/cost-parsers/pi-parser.ts",
+      "src/lib/cost-parsers/__tests__/fixtures/pi/",
+      "~/Projects/pi-mono/packages/coding-agent/docs/extensions.md"
     ]
   },
   "beadsMapping": {},
@@ -173,6 +172,12 @@
       "timestamp": "2026-05-07T04:53:40.606Z",
       "reason": "continue",
       "note": "Closed bead workspace-ef4 (tos-gate). Created src/lib/harness-policy.ts exporting canUseHarness(harness, model, authMode) -> { allowed, reason? }. Single blocked cell: pi+anthropic-model+subscription. claude-code is always allowed; pi+non-Anthropic always allowed; pi+anthropic+api-key allowed; pi+anthropic+undefined-authMode allowed (no subscription is in play). Reason string is human-readable for picker tooltip use. Test src/lib/__tests__/harness-policy.test.ts covers the 2x5x3 matrix (claude-code|pi x anthropic|openai|google|minimax|openrouter x api-key|subscription|undefined) with explicit per-cell assertions plus targeted tests for the block reason. 13 tests pass. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T04:58:48.768Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-y4r (pi-session-parser). Created src/lib/cost-parsers/pi-parser.ts: parsePiSession(filePath) reads Pi v3 JSONL line-by-line, builds Map<id, entry> + childrenOf index, finds latest leaf by max timestamp among childless entries, walks leaf->root via parentId, sums per-message usage along active branch into existing SessionUsage shape from jsonl-parser.ts. Pi reports per-call usage deltas (not cumulative) so summing along the branch is correct without compaction subtraction. Pi inline cost.total is the canonical figure for cost_v2 (cost.ts pricing tables may diverge for non-Anthropic providers). Unknown event types are deduped + logged via console.debug. Compaction count logged for observability. Added 4 fixtures (linear/forked/model-change/compaction/unknown-event) and 6 tests covering AC1-5 + missing-file. typecheck + lint clean.",
       "agentModel": "claude-opus-4-7"
     }
   ],

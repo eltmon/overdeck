@@ -336,7 +336,7 @@
       {
         "id": "pi-session-parser",
         "title": "src/lib/cost-parsers/pi-parser.ts: walk Pi tree JSONL active branch into SessionUsage",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-07T04:10:00.000Z",
         "metadata": {
@@ -350,7 +350,7 @@
           {
             "id": "pi-session-parser.ac1",
             "title": "parsePiSession(filePath) returns a valid SessionUsage object for a linear (no-fork) Pi v3 JSONL file with correct totals",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -358,7 +358,7 @@
           {
             "id": "pi-session-parser.ac2",
             "title": "For a forked Pi session with two branches, parsePiSession returns totals for ONLY the active branch (latest leaf), not the union of all branches",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -366,7 +366,7 @@
           {
             "id": "pi-session-parser.ac3",
             "title": "For a session with one model_change entry, modelBreakdown contains both models with their respective tokens/cost",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -374,7 +374,7 @@
           {
             "id": "pi-session-parser.ac4",
             "title": "For a session with a compaction entry, input_tokens are NOT double-counted across the compaction boundary",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -382,7 +382,7 @@
           {
             "id": "pi-session-parser.ac5",
             "title": "Unknown event types are logged once per session and do not throw; parser returns whatever it could compute",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -390,7 +390,7 @@
           {
             "id": "pi-session-parser.ac6",
             "title": "cost_v2 equals the sum of entry.usage.cost.total along the active branch (Pi's inline cost is the canonical figure)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
