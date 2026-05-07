@@ -108,7 +108,8 @@ export function DetailPanelLayout({ agent, workAgents = [], issueId, issueUrl, i
 
   // The currently displayed session: pinned overrides auto
   const selectedSession = pinned ? pinnedSession : activeSession;
-  const selectedSessionAgent = workAgents.find((workAgent) => workAgent.id === selectedSession) ?? agent;
+  const selectedSessionAgent = workAgents.find((workAgent) => workAgent.id === selectedSession);
+  const terminalAgent = selectedSessionAgent ?? agent ?? workAgents[0] ?? null;
 
   const handleSelectSession = useCallback((sessionName: string | null) => {
     setPinnedSession(sessionName);
@@ -187,7 +188,7 @@ export function DetailPanelLayout({ agent, workAgents = [], issueId, issueUrl, i
 
   if (panelState.panelMode === 'closed') return null;
 
-  const showTerminal = panelState.panelMode === 'inspector+terminal' && !!agent && !suppressTerminal;
+  const showTerminal = panelState.panelMode === 'inspector+terminal' && terminalAgent != null && !suppressTerminal;
   const defaultWidth = showTerminal ? 760 : 360;
   const minWidth = showTerminal ? 480 : 280;
   const maxWidth = 1200;
@@ -295,14 +296,14 @@ export function DetailPanelLayout({ agent, workAgents = [], issueId, issueUrl, i
             ) : selectedSession ? (
               <TerminalPanel
                 key={selectedSession}
-                agent={selectedSessionAgent}
+                agent={terminalAgent}
                 onClose={closeTerminal}
                 sessionName={selectedSession}
                 title={selectedSession}
                 onSessionEnded={markSessionDead}
               />
             ) : (
-              <TerminalPanel key={agent.id} agent={selectedSessionAgent ?? agent} onClose={closeTerminal} />
+              <TerminalPanel key={terminalAgent.id} agent={terminalAgent} onClose={closeTerminal} />
             )}
           </div>
         </div>
