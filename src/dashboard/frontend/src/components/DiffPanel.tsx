@@ -25,7 +25,7 @@ import {
 } from 'react'
 import { cn } from '../lib/utils'
 import { useTheme } from '../hooks/useTheme'
-import { useDiffPreferences, type DiffRenderMode } from '../hooks/useDiffPreferences'
+import { useDiffPreferences } from '../hooks/useDiffPreferences'
 import { parseDiffRouteSearch } from '../lib/diffRouteSearch'
 import { buildPatchCacheKey, resolveDiffThemeName } from '../lib/diffRendering'
 import type { TurnDiffFileChange, TurnDiffSummary } from './chat/chat-types'
