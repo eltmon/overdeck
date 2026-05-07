@@ -265,12 +265,18 @@ describe('panopticon-bridge subprocess (Bun.serve unix listener)', () => {
       const mode = statSync(sockPath).mode & 0o777;
       expect(mode).toBe(0o600);
 
-      // SIGTERM should unlink and exit cleanly.
-      const exitPromise = new Promise<number | null>((resolve) => {
-        proc?.once('exit', (code) => resolve(code));
-      });
+      // SIGTERM should terminate the bridge and unlink the socket. Bun may
+      // report either an explicit code 0 (handler calls process.exit) or a
+      // signal-based exit, so assert termination plus cleanup rather than one
+      // exact exit-shape.
+      const exitPromise = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
+        (resolve) => {
+          proc?.once('exit', (code, signal) => resolve({ code, signal }));
+        },
+      );
       proc.kill('SIGTERM');
-      expect(await exitPromise).toBe(0);
+      const exit = await exitPromise;
+      expect(exit.code === 0 || exit.signal === 'SIGTERM').toBe(true);
       for (let i = 0; i < 30 && existsSync(sockPath); i++) {
         await new Promise((r) => setTimeout(r, 100));
       }
