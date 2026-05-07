@@ -2,8 +2,8 @@
   "version": "1",
   "issueId": "pan-939",
   "created": "2026-05-07T13:10:00Z",
-  "updated": "2026-05-07T13:15:00Z",
-  "gitState": { "branch": "feature/pan-939", "sha": "a0edf1784", "dirty": false },
+  "updated": "2026-05-07T13:20:00Z",
+  "gitState": { "branch": "feature/pan-939", "sha": "bdbaec15f", "dirty": false },
   "decisions": [
     { "id": "D1", "summary": "Move withBdMutex to src/lib/bd-mutex.ts so both dashboard and cloister can use it", "recordedAt": "2026-05-07T13:10:00Z" }
   ],
@@ -11,9 +11,9 @@
     { "id": "H1", "summary": "Cloister files cannot import from src/dashboard/server/utils/", "mitigation": "Move bd-mutex.ts to src/lib/ which is accessible from both" }
   ],
   "resumePoint": {
-    "description": "Moved bd-mutex to src/lib/. Next: wrap agents.ts bd list call with withBdMutex (bead workspace-6wb9)",
-    "beadId": "workspace-6wb9",
-    "filesToRead": ["src/dashboard/server/routes/agents.ts"]
+    "description": "agents.ts wrapped. Next: wrap cloister bd calls in triggers.ts, handoff-context.ts, and inspect-agent.ts with withBdMutex (bead workspace-0ynp)",
+    "beadId": "workspace-0ynp",
+    "filesToRead": ["src/lib/cloister/triggers.ts", "src/lib/cloister/handoff-context.ts", "src/lib/cloister/inspect-agent.ts"]
   },
   "beadsMapping": {
     "workspace-qgfg": "Move bd-mutex to shared lib location",
