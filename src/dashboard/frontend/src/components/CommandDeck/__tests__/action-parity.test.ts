@@ -88,19 +88,17 @@ describe('Command Deck action parity', () => {
     'Recover': 'recover',
     'Resume session': 'resumeSession',
     'Reset session': 'resetSession',
+    'Restart agent': 'restartAgent',
     'Restart from plan': 'restartFromPlan',
     'Reset issue': 'resetIssue',
 
     // BadgeBar artifact buttons
-    'PRD': 'prd',
-    'State': 'state',
     'Beads': 'beads',
     'Transcripts': 'transcripts',
     'Discussions': 'discussions',
     'Upload': 'upload',
 
     // Zone A secondary actions
-    'vBRIEF': 'vbrief',
     'Inference': 'inference',
     'Sync discussions': 'syncDiscussions',
     'Sync main': 'syncMain',

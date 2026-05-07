@@ -34,6 +34,7 @@ import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
+import { PanOpenInPicker } from './PanOpenInPicker';
 import { ContainerSection } from './inspector/ContainerSection';
 import { ActionsSection } from './inspector/ActionsSection';
 import { PHASE_CHIP_COLORS, PHASE_LABELS, type PipelinePhase } from './inspector/TerminalTabs';
@@ -774,9 +775,10 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
         {!agent && workspace?.exists && workspace.path && (
           <div className="px-3 py-2 border-b border-border text-xs">
             <div className="flex items-center gap-1.5 text-muted-foreground">
-              <span className="font-mono truncate text-[10px]" title={workspace.path}>
+              <span className="font-mono truncate text-[10px] flex-1" title={workspace.path}>
                 {workspace.path}
               </span>
+              <PanOpenInPicker cwd={workspace.path} />
             </div>
           </div>
         )}

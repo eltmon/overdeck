@@ -146,6 +146,51 @@ await execAsync(`tmux send-keys -t ${session} C-m`);  // Enter
 
 Raw `tmux send-keys "text"` followed immediately by `C-m` is unreliable — Enter arrives before text is processed.
 
+## Claude Code Channels (experimental)
+
+Reference: https://code.claude.com/docs/en/channels
+
+Claude Code Channels is a research-preview MCP capability that delivers
+orchestrator-to-agent messages over a stdio JSON-RPC transport instead of
+tmux send-keys. It exists because tmux paste-buffer delivery has a long
+tail of failure modes (paste before render, dropped Enter, partial text)
+that surface as silently-unanswered prompts; Channels removes the timing
+race entirely.
+
+The integration in this repo is **opt-in and off by default**, gated
+behind a single experimental flag in the dashboard Settings page
+(`experimental.claudeCodeChannels`). Eligibility is narrow on purpose:
+the path engages only for **work agents** running the **Claude Code**
+runtime with **Anthropic auth** (claude.ai OAuth or Console API key) on
+**non-Docker workspaces**. Codex, Cursor, Gemini, Cliproxy-routed-GPT,
+Bedrock, Vertex, Foundry, and Docker workspaces all stay on tmux send-keys
+unconditionally.
+
+**Architecture:**
+
+- `src/lib/channels/panopticon-bridge.ts` — per-agent Bun stdio MCP server.
+  Spawned by `claude --dangerously-load-development-channels server:panopticon-bridge`
+  using a workspace-local `.pan/agent-mcp.json`. Listens on
+  `${PANOPTICON_HOME}/sockets/agent-<id>.sock` (mode 0o600), accepts POSTs
+  of `{ content, meta? }`, and forwards each as a
+  `notifications/claude/channel` MCP frame.
+- `deliverAgentMessage(agentId, message, caller?)` in `src/lib/agents.ts`
+  is the **single delivery primitive** — eligibility check, socket POST
+  with 2s timeout, automatic tmux fallback on any failure mode (state
+  missing, socket missing, ENOENT, ECONNREFUSED, EPIPE, non-2xx, write
+  timeout). Callers stay caller-agnostic; the primitive owns the policy.
+- The dev-channels confirmation TUI dialog (`WARNING: Loading development
+  channels`) is dismissed automatically at agent startup via one
+  `sendRawKeystrokeAsync(C-m)` call, gated on `state.channelsEnabled`.
+
+**Scope:** only the work-agent prompt-delivery sites in `src/lib/agents.ts`
+migrate. The following intentionally stay on `sendKeysAsync`:
+`src/lib/cloister/` (specialists, deacon, review, merge), `src/lib/runtimes/`
+(non-Claude-Code runtimes), `src/dashboard/server/routes/conversations.ts`,
+and `src/dashboard/server/routes/misc.ts`. Bidirectional reply tools and
+dashboard-routed permission relay are out of scope and tracked as separate
+follow-up issues.
+
 ## Dashboard Server Architecture (Effect + Raw WebSocket)
 
 The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus a

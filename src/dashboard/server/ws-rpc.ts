@@ -10,6 +10,7 @@ import { Effect, Layer, Queue, Stream } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
 import { PanRpcGroup, PanRpcError, WS_METHODS } from '@panctl/contracts';
+import { PanOpen } from './services/open.js';
 import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
@@ -257,6 +258,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
     const eventStore = yield* EventStoreService;
     const readModel = yield* ReadModelService;
     const terminalService = yield* TerminalService;
+    const panOpen = yield* PanOpen;
 
     return PanRpcGroup.of({
       // ── subscribeDomainEvents ────────────────────────────────────────────────
@@ -397,6 +399,16 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
           return Stream.merge(eventDeltas, pollDeltas);
         }).pipe(Stream.unwrap),
+
+      // ── shellOpenInEditor — open workspace in editor (PAN-966) ──────────────
+      [WS_METHODS.shellOpenInEditor]: (input) =>
+        panOpen.openInEditor(input),
+
+      // ── getAvailableEditors — list detected editors (PAN-966) ───────────────
+      [WS_METHODS.getAvailableEditors]: () =>
+        panOpen.getAvailableEditors().pipe(
+          Effect.map((editors) => ({ editors })),
+        ),
     });
   }),
 );

@@ -14,11 +14,22 @@ vi.mock('../config.js', () => ({
   })),
 }))
 
+// PAN-982 widened the signature to (model, agentName?, agentType?, harness?).
+// resolveSpecialistBaseCommand now forwards all four. We branch on the 4th
+// positional (harness) and ignore the agentName/agentType args here since
+// this test asserts the harness-routing behavior, not the --agent emission.
 vi.mock('../../agents.js', () => ({
-  getAgentRuntimeBaseCommand: vi.fn(async (model: string, harness: string) => {
-    if (harness === 'pi') return `pi --mode rpc --model ${model}`
-    return `claude --dangerously-skip-permissions --permission-mode bypassPermissions --model ${model}`
-  }),
+  getAgentRuntimeBaseCommand: vi.fn(
+    async (
+      model: string,
+      _agentName: string | undefined,
+      _agentType: string | undefined,
+      harness: string | undefined,
+    ) => {
+      if (harness === 'pi') return `pi --mode rpc --model ${model}`
+      return `claude --dangerously-skip-permissions --permission-mode bypassPermissions --model ${model}`
+    },
+  ),
   getProviderAuthMode: vi.fn(async () => 'subscription'),
   // Required for router.ts side-effects on import — not used in this test.
   getProviderExportsForModel: vi.fn(),
@@ -56,7 +67,7 @@ describe('resolveSpecialistBaseCommand (PAN-636)', () => {
   it('explicit harness override beats config', async () => {
     resetGlobalRouter()
     // merge-agent is configured as claude-code; explicitly pass pi.
-    const cmd = await resolveSpecialistBaseCommand('merge-agent', 'gpt-5.5-mini', 'pi')
+    const cmd = await resolveSpecialistBaseCommand('merge-agent', 'gpt-5.5-mini', undefined, 'pi')
     expect(cmd).toBe('pi --mode rpc --model gpt-5.5-mini')
   })
 })

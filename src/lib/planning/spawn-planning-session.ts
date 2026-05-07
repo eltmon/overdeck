@@ -490,7 +490,11 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     await writeFeatureContext(workspacePath, issue);
 
-    const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel, opts.harness ?? 'claude-code');
+    // PAN-982: emit 'claude --agent pan-planning-agent --name <sessionName>'.
+    // PAN-636: thread harness through so a planning kickoff with --harness pi
+    // produces a `pi --mode rpc --model <id>` line and skips the --agent flag
+    // (Pi has no agent-definition system).
+    const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel, sessionName, 'planning', opts.harness ?? 'claude-code');
 
     const providerExports = await getProviderExportsForModel(planningModel);
 

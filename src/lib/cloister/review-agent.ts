@@ -538,7 +538,11 @@ export async function spawnSingleReviewer(
   promptFile: string,
   projectPath: string,
 ): Promise<void> {
-  const claudeCmd = await resolveSpecialistBaseCommand('review-agent', model);
+  // PAN-982 + PAN-636: emit 'claude --agent pan-review-agent --name <sessionName>'
+  // on the claude-code path, or fall back to Pi when configured. The harness
+  // routing + ToS gate live inside resolveSpecialistBaseCommand so a stale
+  // Settings selection cannot bypass the gate.
+  const claudeCmd = await resolveSpecialistBaseCommand('review-agent', model, sessionName);
   const providerExports = await getProviderExportsForModel(model);
 
   // Pre-generate the Claude session UUID and persist it to the canonical reviewer

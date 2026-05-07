@@ -1089,6 +1089,11 @@ ${basePrompt}`;
     );
 
     const providerExportLines = buildProviderExportLines(providerEnv);
+    // PAN-982: Each specialist now has a matching .claude/agents/pan-<specialistType>.md
+    // definition (pan-review-agent, pan-test-agent, pan-inspect-agent, pan-uat-agent,
+    // pan-merge-agent) that declares model, permissionMode, tools, and per-agent hooks.
+    // SpecialistType already ends in '-agent' (e.g. 'review-agent') so we just prepend 'pan-'.
+    const specialistAgentName = `pan-${specialistType}`;
     writeFileSync(
       innerScript,
       generateLauncherScript({
@@ -1102,8 +1107,13 @@ ${basePrompt}`;
         panopticonEnv: { agentId: tmuxSession, issueId: task.issueId, sessionType: sessionTypeLabel },
         cavemanExports: specialistCavemanExports,
         promptFile,
+        // PAN-982: emit `claude --agent ${specialistAgentName}` on the claude-code
+        // path (the agent frontmatter declares model/permissions/tools/hooks, so
+        // we drop --model and --permission flags entirely). PAN-636 routes through
+        // resolveSpecialistBaseCommand so a Pi-configured specialist gets a
+        // `pi --mode rpc --model <model>` line instead, with the ToS gate falling
+        // back to claude-code for the blocked Pi+Anthropic+subscription cell.
         baseCommand: await resolveSpecialistBaseCommand(specialistType, model),
-        permissionFlags: permissionFlags.split(' '),
         sessionId,
         model,
       }),
@@ -2306,6 +2316,9 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
     writeFileSync(promptFile, identityPrompt);
     const newSessionId = randomUUID();
     const initProviderExportLines = buildProviderExportLines(providerEnv);
+    // PAN-982: --agent pan-<specialistType> selects the matching .claude/agents/pan-*.md
+    // definition. SpecialistType already ends in '-agent' so we just prepend 'pan-'.
+    const specialistAgentName = `pan-${name}`;
     writeFileSync(
       launcherScript,
       generateLauncherScript({
@@ -2314,8 +2327,10 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
         unsetProviderEnv: true,
         providerExports: initProviderExportLines,
         promptFile,
+        // Same PAN-982 + PAN-636 handling as the dispatch path above —
+        // resolveSpecialistBaseCommand emits the --agent form on claude-code and
+        // a pi --mode rpc line when the role is configured for Pi.
         baseCommand: await resolveSpecialistBaseCommand(name, model),
-        permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
         sessionId: newSessionId,
         model,
       }),

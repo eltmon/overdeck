@@ -83,6 +83,28 @@ interface TrackerState {
 }
 
 /**
+ * Cheap change detection for issue arrays.
+ * Compares length + the most recent updatedAt timestamp instead of
+ * serializing the entire array with JSON.stringify (which caused
+ * 600-900ms event loop stalls on large issue sets).
+ */
+function issuesChanged(newIssues: any[], oldIssues: any[]): boolean {
+  if (newIssues.length !== oldIssues.length) return true;
+  if (newIssues.length === 0) return false;
+
+  // Find the most recent updatedAt in each set
+  let newMax = '';
+  let oldMax = '';
+  for (const issue of newIssues) {
+    if (issue.updatedAt && issue.updatedAt > newMax) newMax = issue.updatedAt;
+  }
+  for (const issue of oldIssues) {
+    if (issue.updatedAt && issue.updatedAt > oldMax) oldMax = issue.updatedAt;
+  }
+  return newMax !== oldMax;
+}
+
+/**
  * Map normalized IssueState (open/in_progress/closed) to canonical dashboard status.
  * The Rally tracker already normalizes raw Rally states to IssueState in rally.ts.
  */
@@ -576,9 +598,9 @@ export class IssueDataService {
       }
     }
 
-    // Check if data actually changed
+    // Check if data actually changed (cheap length + updatedAt check)
     const oldData = this.trackers.github.lastFetchedIssues;
-    const changed = JSON.stringify(allIssues) !== JSON.stringify(oldData);
+    const changed = issuesChanged(allIssues, oldData);
 
     this.trackers.github.lastFetchedIssues = allIssues;
     this.trackers.github.lastFetchedAt = new Date().toISOString();
@@ -763,7 +785,7 @@ export class IssueDataService {
       }
 
       const oldData = this.trackers.linear.lastFetchedIssues;
-      const changed = JSON.stringify(allIssues) !== JSON.stringify(oldData);
+      const changed = issuesChanged(allIssues, oldData);
 
       this.trackers.linear.lastFetchedIssues = allIssues;
       this.trackers.linear.lastFetchedAt = new Date().toISOString();
@@ -1121,7 +1143,7 @@ export class IssueDataService {
       allFormatted = this.computeDerivedFeatureStatus(allFormatted);
 
       const oldData = this.trackers.rally.lastFetchedIssues;
-      const changed = JSON.stringify(allFormatted) !== JSON.stringify(oldData);
+      const changed = issuesChanged(allFormatted, oldData);
 
       this.trackers.rally.lastFetchedIssues = allFormatted;
       this.trackers.rally.lastFetchedAt = new Date().toISOString();

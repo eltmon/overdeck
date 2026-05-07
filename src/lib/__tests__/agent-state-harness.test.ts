@@ -8,25 +8,30 @@ import { getAgentRuntimeBaseCommand } from '../agents.js'
 //
 // AC4: harness='pi' produces a `pi --mode rpc ...` command.
 
+// PAN-982 widened the signature to (model, agentName?, agentType?, harness?).
+// The `harness` slot is now the 4th positional. We pass undefined for the
+// PAN-982 args (no agent definition / no --name) so the legacy claude-code
+// path is exercised — that is the surface PAN-636 must keep bit-for-bit.
+
 describe('getAgentRuntimeBaseCommand harness routing (PAN-636)', () => {
   it('claude-code default and explicit are identical (AC3)', async () => {
     const a = await getAgentRuntimeBaseCommand('claude-sonnet-4-6')
-    const b = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'claude-code')
+    const b = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', undefined, undefined, 'claude-code')
     expect(a).toBe(b)
   })
 
   it('claude-code branch builds the legacy "claude --dangerously-skip-permissions ... --model X" command for an Anthropic model', async () => {
-    const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'claude-code')
+    const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', undefined, undefined, 'claude-code')
     expect(cmd).toBe('claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6')
   })
 
   it('pi harness emits a `pi --mode rpc --model <model>` command (AC4)', async () => {
-    const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'pi')
+    const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', undefined, undefined, 'pi')
     expect(cmd).toBe('pi --mode rpc --model claude-sonnet-4-6')
   })
 
   it('pi harness emits no claude permission flags', async () => {
-    const cmd = await getAgentRuntimeBaseCommand('gpt-5.5-mini', 'pi')
+    const cmd = await getAgentRuntimeBaseCommand('gpt-5.5-mini', undefined, undefined, 'pi')
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/--permission-mode/)
     expect(cmd).toMatch(/^pi --mode rpc /)

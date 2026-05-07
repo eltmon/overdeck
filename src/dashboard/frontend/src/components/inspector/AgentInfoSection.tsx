@@ -4,6 +4,7 @@ import type { WorkspaceInfo } from './types';
 import { getFriendlyModelName } from './utils';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 import { getHarness } from '@panctl/contracts';
+import { PanOpenInPicker } from '../PanOpenInPicker';
 
 interface AgentInfoSectionProps {
   agent: Agent;
@@ -72,9 +73,10 @@ export function AgentInfoSection({ agent, duration, workspace, syncMainPending, 
         <div className="px-3 py-2 border-b border-border text-xs">
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Folder className="w-3 h-3 shrink-0" />
-            <span className="font-mono truncate text-[10px]" title={agent.workspace}>
+            <span className="font-mono truncate text-[10px] flex-1" title={agent.workspace}>
               {agent.workspace}
             </span>
+            <PanOpenInPicker cwd={agent.workspace} />
           </div>
         </div>
       )}

@@ -35,6 +35,7 @@ import { isReviewPipelineStuck } from '../../../lib/pipeline-state';
 import { useConfirm } from '../../DialogProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { GitPullRequest, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Box, Link2, Terminal, Play, Pause, ExternalLink, Code2, Loader2, RotateCcw } from 'lucide-react';
+import { PlanDAGViewer } from '../../PlanDAG.js';
 
 interface OverviewTabProps {
   issueId: string;
@@ -411,7 +412,21 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         </div>
       </section>
 
-      {/* 2. Tile grid */}
+      {/* 2. Directive DAG — front-loaded plan visualization */}
+      <section
+        data-testid="overview-dag"
+        style={{
+          borderRadius: 10,
+          border: '1px solid var(--border)',
+          overflow: 'hidden',
+          height: 520,
+          background: '#111827',
+        }}
+      >
+        <PlanDAGViewer issueId={issueId} reviewStatus={reviewStatus.data ?? undefined} />
+      </section>
+
+      {/* 3. Tile grid */}
       <div
         data-testid="overview-tile-grid"
         style={{
@@ -1097,8 +1112,6 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
       >
         {(
           [
-            ['prd', 'View PRD'],
-            ['vbrief', 'View vBRIEF'],
             ['beads', 'View Beads'],
             ['costs', 'View Costs'],
             ['activity', 'View Activity'],
