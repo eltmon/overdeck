@@ -128,6 +128,10 @@ export interface ApiSettingsConfig {
     gitlab?: string;
     rally?: string;
   };
+  experimental?: {
+    /** Use Claude Code Channels for prompt delivery to eligible work agents. */
+    claudeCodeChannels?: boolean;
+  };
   deprecation_warnings?: ApiDeprecationWarning[];
 }
 
@@ -218,6 +222,9 @@ export function loadSettingsApi(): ApiSettingsConfig {
       title_model: config.conversations.titleModel,
     },
     tracker_keys: config.trackerKeys,
+    experimental: {
+      claudeCodeChannels: config.experimental?.claudeCodeChannels ?? false,
+    },
     deprecation_warnings: deprecationWarnings.length > 0 ? deprecationWarnings : undefined,
   };
 }
@@ -272,6 +279,9 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
     tmux: settings.tmux,
     conversations: settings.conversations,
     tracker_keys: settings.tracker_keys,
+    experimental: settings.experimental
+      ? { claudeCodeChannels: settings.experimental.claudeCodeChannels }
+      : undefined,
   };
 
   // Write to YAML file
@@ -334,6 +344,10 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
     tracker_keys: {
       ...current.tracker_keys,
       ...updates.tracker_keys,
+    },
+    experimental: {
+      ...current.experimental,
+      ...updates.experimental,
     },
   };
 
@@ -406,6 +420,18 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     const level = settings.models.gemini_thinking_level;
     if (level < 1 || level > 4) {
       errors.push('Gemini thinking level must be between 1 and 4');
+    }
+  }
+
+  // Validate experimental flags — every flag must be a boolean if present.
+  if (settings.experimental !== undefined) {
+    if (typeof settings.experimental !== 'object' || settings.experimental === null) {
+      errors.push('experimental must be an object');
+    } else {
+      const ccc = (settings.experimental as { claudeCodeChannels?: unknown }).claudeCodeChannels;
+      if (ccc !== undefined && typeof ccc !== 'boolean') {
+        errors.push('experimental.claudeCodeChannels must be a boolean');
+      }
     }
   }
 

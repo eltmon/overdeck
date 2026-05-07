@@ -1,12 +1,12 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync } from 'fs';
 import { readFile, readdir } from 'fs/promises';
-import { join, resolve } from 'path';
+import { join, resolve, dirname } from 'path';
 import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
-import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync, waitForClaudePrompt } from './tmux.js';
+import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sendRawKeystrokeAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync, waitForClaudePrompt } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
@@ -16,7 +16,7 @@ import type { ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from './providers.js';
 import { validateProviderHealth } from './provider-health.js';
-import { loadConfig as loadYamlConfig } from './config-yaml.js';
+import { loadConfig as loadYamlConfig, isClaudeCodeChannelsEnabled } from './config-yaml.js';
 import type { NormalizedCavemanConfig } from './config-yaml.js';
 import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
@@ -376,6 +376,15 @@ export interface AgentState {
   preSpawnStashRef?: string;
   preSpawnStashMessage?: string;
   preSpawnBaselineHead?: string;
+
+  /**
+   * Whether this work agent was launched with the experimental Claude Code
+   * Channels prompt-delivery path enabled. Set at launch time after the
+   * eligibility check; never mutated after. Read by deliverAgentMessage to
+   * decide whether to attempt the bridge socket before falling back to
+   * sendKeysAsync. Absent or false means tmux-only delivery (current default).
+   */
+  channelsEnabled?: boolean;
 }
 
 export function getAgentDir(agentId: string): string {
@@ -432,6 +441,326 @@ export function saveAgentState(state: AgentState): void {
   if (oldStatus && oldStatus !== state.status) {
     logAgentLifecycle(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentState)`);
   }
+}
+
+/**
+ * Resolve PANOPTICON_HOME — same fallback semantics as panopticon-bridge.
+ */
+function panopticonHomeForChannels(): string {
+  return process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon');
+}
+
+/**
+ * Append a delivery-event log line to the per-agent bridge log. Best-effort.
+ */
+async function appendChannelDeliveryLog(
+  agentId: string,
+  entry: { path: 'channel' | 'tmux'; reason?: string; caller?: string },
+): Promise<void> {
+  try {
+    const home = panopticonHomeForChannels();
+    const dir = join(home, 'logs');
+    await (await import('fs/promises')).mkdir(dir, { recursive: true });
+    const line = JSON.stringify({
+      ts: new Date().toISOString(),
+      agentId,
+      ...entry,
+    });
+    await (await import('fs/promises')).appendFile(
+      join(dir, `bridge-${agentId}.log`),
+      `${line}\n`,
+      'utf-8',
+    );
+  } catch {
+    // Non-critical
+  }
+}
+
+/**
+ * POST a JSON body to a Unix-domain socket using node:net + a hand-rolled
+ * minimal HTTP/1.1 request. Resolves on a 200-class response, rejects on any
+ * error including socket-not-found, connection refused, write timeout, or
+ * non-2xx status. Kept tiny on purpose: this is a hot path, only one caller,
+ * and the whole point of a fallback to tmux is that we do not need a robust
+ * HTTP client here.
+ */
+async function postUnixSocketJson(
+  socketPath: string,
+  body: unknown,
+  timeoutMs: number,
+): Promise<{ status: number; body: string }> {
+  const { connect } = await import('node:net');
+  return new Promise((resolveCall, reject) => {
+    const payload = Buffer.from(JSON.stringify(body), 'utf-8');
+    const request =
+      `POST / HTTP/1.1\r\n` +
+      `Host: localhost\r\n` +
+      `Content-Type: application/json\r\n` +
+      `Content-Length: ${payload.byteLength}\r\n` +
+      `Connection: close\r\n` +
+      `\r\n`;
+
+    const socket = connect(socketPath);
+    let responseBuf = Buffer.alloc(0);
+    const timer = setTimeout(() => {
+      socket.destroy(new Error('socket POST timeout'));
+    }, timeoutMs);
+
+    socket.once('connect', () => {
+      socket.write(request);
+      socket.write(payload);
+    });
+    socket.on('data', (chunk: Buffer) => {
+      responseBuf = Buffer.concat([responseBuf, chunk]);
+    });
+    socket.once('error', (err: Error) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    socket.once('close', () => {
+      clearTimeout(timer);
+      const text = responseBuf.toString('utf-8');
+      const m = /^HTTP\/1\.[01] (\d{3})/.exec(text);
+      if (!m) {
+        reject(new Error('socket POST: invalid HTTP response'));
+        return;
+      }
+      const status = parseInt(m[1], 10);
+      const split = text.indexOf('\r\n\r\n');
+      const respBody = split >= 0 ? text.slice(split + 4) : '';
+      if (status >= 200 && status < 300) {
+        resolveCall({ status, body: respBody });
+      } else {
+        reject(new Error(`socket POST: status ${status}: ${respBody.slice(0, 100)}`));
+      }
+    });
+  });
+}
+
+/**
+ * Single delivery primitive for orchestrator-to-work-agent messages. When the
+ * target agent has channelsEnabled set in its state.json AND the per-agent
+ * bridge socket exists AND the POST returns 200, the message goes through the
+ * bridge and tmux is not involved. In every other case (flag off, state file
+ * missing, socket missing, socket POST failure for any reason) the call falls
+ * back to sendKeysAsync — the user-visible behaviour is identical to today's
+ * tmux-only delivery. Internal callers that today reach for sendKeysAsync to
+ * talk to a work agent should call this primitive instead so the eligibility
+ * and fallback policy live in one place.
+ */
+export async function deliverAgentMessage(
+  agentId: string,
+  message: string,
+  caller: string = 'unknown',
+): Promise<void> {
+  const normalizedId = normalizeAgentId(agentId);
+
+  let channelsEnabled = false;
+  try {
+    const state = await getAgentStateAsync(normalizedId);
+    channelsEnabled = Boolean(state?.channelsEnabled);
+  } catch {
+    channelsEnabled = false;
+  }
+
+  if (!channelsEnabled) {
+    await sendKeysAsync(normalizedId, message);
+    return;
+  }
+
+  const socketPath = join(panopticonHomeForChannels(), 'sockets', `agent-${normalizedId}.sock`);
+  if (!existsSync(socketPath)) {
+    await appendChannelDeliveryLog(normalizedId, {
+      path: 'tmux',
+      reason: 'socket-missing',
+      caller,
+    });
+    await sendKeysAsync(normalizedId, message);
+    return;
+  }
+
+  try {
+    await postUnixSocketJson(
+      socketPath,
+      { content: message, meta: { caller } },
+      2000,
+    );
+    await appendChannelDeliveryLog(normalizedId, { path: 'channel', caller });
+    return;
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    await appendChannelDeliveryLog(normalizedId, {
+      path: 'tmux',
+      reason: `socket-post-failed: ${reason}`,
+      caller,
+    });
+    await sendKeysAsync(normalizedId, message);
+    return;
+  }
+}
+
+/**
+ * Inputs to the channels eligibility decision. We pass through agentId,
+ * SpawnOptions, and the in-construction AgentState so this function can be
+ * called from the spawn path without re-reading the state file.
+ */
+interface ChannelsDecision {
+  eligible: boolean;
+  reason?: string;
+}
+
+/**
+ * Decide whether to enable Claude Code Channels for a work-agent launch.
+ *
+ * Eligibility (all required):
+ *   - experimental.claudeCodeChannels is true in the merged config
+ *   - the agent is a work agent (specialists/conversations stay on tmux)
+ *   - the runtime is Claude Code (not Codex/Cursor/Gemini/Cliproxy-routed-GPT)
+ *   - auth provider is Anthropic-direct (excludes Bedrock/Vertex/Foundry)
+ *   - the workspace is not running inside a Docker container
+ *
+ * Logs the decision exactly once with a category prefix so users can see why
+ * the bridge did or did not engage. The function is otherwise side-effect
+ * free; the caller is responsible for writing the .mcp.json and mutating
+ * state.channelsEnabled when eligible is true.
+ */
+export function decideChannelsForWorkAgent(
+  agentId: string,
+  options: SpawnOptions,
+  state: AgentState,
+): ChannelsDecision {
+  const log = (eligible: boolean, reason?: string): void => {
+    const tag = eligible ? 'channels:eligible' : `channels:ineligible:${reason ?? 'unknown'}`;
+    console.log(`[${agentId}] ${tag}`);
+  };
+
+  if (!isClaudeCodeChannelsEnabled()) {
+    // Flag-off path is the silent default: no log line, no work. The bead
+    // explicitly limits eligibility logs to launches where the flag is on so
+    // the signal is meaningful.
+    return { eligible: false, reason: 'flag-off' };
+  }
+
+  if (options.agentType && options.agentType !== 'work-agent') {
+    log(false, 'not-a-work-agent');
+    return { eligible: false, reason: 'not-a-work-agent' };
+  }
+
+  // Runtime gate. The runtime field is 'claude' for Claude Code; specialised
+  // launchers set it to 'codex' / 'cursor' / 'gemini' / 'claudish' and those
+  // are not Channel-capable.
+  const runtime = state.runtime;
+  if (runtime !== 'claude' && runtime !== 'claude-code') {
+    log(false, `runtime-${runtime}`);
+    return { eligible: false, reason: `runtime-${runtime}` };
+  }
+
+  // Auth gate. The Channels capability is gated by Anthropic auth in the
+  // compiled Claude Code binary; we only attempt the bridge when the model
+  // routes to the anthropic provider.
+  const provider = getProviderForModel(state.model as ModelId);
+  if (provider.name !== 'anthropic') {
+    log(false, `provider-${provider.name}`);
+    return { eligible: false, reason: `provider-${provider.name}` };
+  }
+
+  if (
+    process.env.CLAUDE_CODE_USE_BEDROCK === '1' ||
+    process.env.CLAUDE_CODE_USE_VERTEX === '1' ||
+    process.env.CLAUDE_CODE_USE_FOUNDRY === '1'
+  ) {
+    log(false, 'auth-bedrock-vertex-foundry');
+    return { eligible: false, reason: 'auth-bedrock-vertex-foundry' };
+  }
+
+  // Docker workspace gate. We do not yet share a socket dir between host and
+  // container; deferred to a follow-up issue (see hazards H10).
+  if (
+    process.env.PANOPTICON_DOCKER_WORKSPACE === '1' ||
+    process.env.PAN_DOCKER === '1'
+  ) {
+    log(false, 'docker-not-supported-yet');
+    return { eligible: false, reason: 'docker-not-supported-yet' };
+  }
+
+  log(true);
+  return { eligible: true };
+}
+
+/**
+ * Write the per-agent MCP config that points claude at the panopticon-bridge
+ * stdio server. The path is the workspace-local <workspace>/.pan/agent-mcp.json
+ * — one config per agent, never shared, never reused.
+ */
+async function writeChannelsBridgeMcpConfig(
+  configPath: string,
+  agentId: string,
+): Promise<void> {
+  const fsp = await import('fs/promises');
+  await fsp.mkdir(dirname(configPath), { recursive: true });
+  // Resolve the bridge entrypoint relative to this module so the config is
+  // valid no matter where the workspace lives. We write the path of the
+  // checked-in bridge script — the launcher invokes it with `bun run`.
+  const repoBridgePath = join(
+    // src/lib/agents.ts → src/lib/channels/panopticon-bridge.ts
+    dirname(import.meta.url.replace('file://', '')),
+    'channels',
+    'panopticon-bridge.ts',
+  );
+  const mcpConfig = {
+    mcpServers: {
+      'panopticon-bridge': {
+        command: 'bun',
+        args: ['run', repoBridgePath],
+        env: {
+          PANOPTICON_AGENT_ID: agentId,
+          PANOPTICON_HOME: process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon'),
+        },
+      },
+    },
+  };
+  await fsp.writeFile(configPath, JSON.stringify(mcpConfig, null, 2), 'utf-8');
+}
+
+/**
+ * Dismiss the dev-channels confirmation TUI dialog rendered by
+ * `claude --dangerously-load-development-channels`. The dialog text
+ * 'WARNING: Loading development channels' must be on screen before any prompt
+ * is delivered, otherwise the channel listener never registers and every
+ * early channel push silently falls back to tmux.
+ *
+ * Polling budget is 20s because cold-start claude with TLDR + Playwright MCP
+ * servers attached commonly takes 8–15s to render the first frame; a tighter
+ * budget false-negatives. If the dialog is not detected within the timeout,
+ * we proceed — the dialog is suppressed in some auth states (e.g. when the
+ * binary takes a non-interactive code path), and the launch must not block
+ * forever.
+ *
+ * Uses sendRawKeystrokeAsync intentionally: sendKeysAsync's load-buffer +
+ * paste-buffer machinery is for typing message bodies, not for a single
+ * Enter on a TUI prompt where mistimed paste can fire before the dialog
+ * accepts input.
+ */
+export async function dismissDevChannelsDialog(agentId: string): Promise<void> {
+  const TIMEOUT_MS = 20_000;
+  const POLL_INTERVAL_MS = 200;
+  const NEEDLE = 'WARNING: Loading development channels';
+  const start = Date.now();
+  while (Date.now() - start < TIMEOUT_MS) {
+    try {
+      const pane = await capturePaneAsync(agentId, 50);
+      if (pane.includes(NEEDLE)) {
+        await sendRawKeystrokeAsync(agentId, 'C-m', 'channels:dismiss-dev-dialog');
+        await new Promise((r) => setTimeout(r, 500));
+        return;
+      }
+    } catch {
+      // Capture failures are transient (tmux session not yet visible to
+      // the new pane); keep polling within the budget.
+    }
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+  }
+  console.log(`[${agentId}] channels:dismiss:dialog-not-detected`);
 }
 
 function markAgentRunning(state: AgentState): void {
@@ -944,6 +1273,10 @@ export async function buildAgentLaunchConfig(opts: {
   agentType: 'work' | 'resume';
   resumeSessionId?: string;
   isPlanning?: boolean;
+  /** Per-agent .mcp.json path for the experimental Channels bridge. */
+  channelsBridgeMcpConfig?: string;
+  /** MCP server name to load as a Channel; defaults to 'panopticon-bridge'. */
+  channelsBridgeServerName?: string;
 }): Promise<AgentLaunchConfig> {
   const model = opts.model;
 
@@ -989,6 +1322,12 @@ export async function buildAgentLaunchConfig(opts: {
     providerExports,
     cavemanExports,
     baseCommand: await getAgentRuntimeBaseCommand(model),
+    ...(opts.channelsBridgeMcpConfig
+      ? {
+          channelsBridgeMcpConfig: opts.channelsBridgeMcpConfig,
+          channelsBridgeServerName: opts.channelsBridgeServerName ?? 'panopticon-bridge',
+        }
+      : {}),
   });
 
   return { launcherContent, providerEnv };
@@ -1117,12 +1456,29 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Clear ready signal before spawning (clean slate for PAN-87 fix)
   clearReadySignal(agentId);
 
+  // Channels gate: when the experimental flag is on AND this work agent is
+  // eligible, write a per-agent .mcp.json that wires the panopticon-bridge as
+  // a stdio MCP server, set channelsEnabled in the agent state record, and
+  // pass the bridge MCP path through to buildAgentLaunchConfig so claude is
+  // started with --mcp-config + --dangerously-load-development-channels. When
+  // the flag is off OR the agent is ineligible we touch nothing here — same
+  // code path, same files on disk, as before PAN-985.
+  const channelsDecision = decideChannelsForWorkAgent(agentId, options, state);
+  let channelsBridgeMcpConfig: string | undefined;
+  if (channelsDecision.eligible) {
+    channelsBridgeMcpConfig = join(options.workspace, '.pan', 'agent-mcp.json');
+    await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, agentId);
+    state.channelsEnabled = true;
+    saveAgentState(state);
+  }
+
   const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
     agentId,
     model: selectedModel,
     workspace: options.workspace,
     agentType: 'work',
     isPlanning: options.phase === 'planning',
+    channelsBridgeMcpConfig,
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
@@ -1170,6 +1526,14 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   });
 
+  // Channels: dismiss the dev-channels confirmation dialog before any prompt
+  // delivery. Must run while we are still in the launch path so the channel
+  // listener is registered before deliverAgentMessage starts preferring the
+  // socket. Skipped when the agent was not eligible at launch time.
+  if (state.channelsEnabled) {
+    await dismissDevChannelsDialog(agentId);
+  }
+
   // Send the initial prompt after Claude's interactive prompt is ready.
   // Wait for the session to be ready by polling tmux output for Claude's prompt.
   if (prompt) {
@@ -1198,7 +1562,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     if (ready) {
       // Small delay after ready to ensure Claude is fully rendered and accepting input
       await new Promise(r => setTimeout(r, 500));
-      await sendKeysAsync(agentId, prompt);
+      await deliverAgentMessage(agentId, prompt, 'spawnAgent:initial-prompt');
     } else {
       console.error(`[${agentId}] Claude did not become ready within 30s`);
     }
@@ -1494,7 +1858,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     const ready = await waitForReadySignal(normalizedId, 30);
     const resumePrompt = `You are resuming work on ${agentState.issueId}. Check .pan/feedback/ for specialist feedback that arrived while you were stopped, then continue working.\n\n${message}`;
     if (ready) {
-      await sendKeysAsync(normalizedId, resumePrompt);
+      await deliverAgentMessage(normalizedId, resumePrompt, 'resumeAgent:resume-prompt');
       console.log(`[agents] Fallback-restarted ${normalizedId} and delivered feedback`);
     } else {
       console.warn(`[agents] Fallback-restarted ${normalizedId} but ready signal not detected — feedback in mail queue`);
@@ -1549,7 +1913,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     console.warn(`[agents] ${normalizedId} not at ready prompt after 5s — sending message anyway`);
   }
 
-  await sendKeysAsync(normalizedId, message);
+  await deliverAgentMessage(normalizedId, message, 'messageAgent:pan-tell');
 
   // Also save to mail queue
   const mailDir = join(getAgentDir(normalizedId), 'mail');
@@ -1690,7 +2054,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
 
       if (ready) {
         // Send message
-        await sendKeysAsync(normalizedId, message);
+        await deliverAgentMessage(normalizedId, message, 'recoverAgent:ci-nudge');
         messageDelivered = true;
       } else {
         console.error('Claude SessionStart hook did not fire during resume, message not sent');
