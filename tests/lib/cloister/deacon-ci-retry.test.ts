@@ -290,6 +290,13 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
       );
 
       // On the next patrol: checkFailedMergeRetry should now treat this as a fresh start
+      // Reset mock to read from the file (mockReturnValue above overrode mockImplementation)
+      mockLoadReviewStatuses.mockImplementation(() => {
+        if (existsSync(REVIEW_STATUS_FILE)) {
+          return JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
+        }
+        return {};
+      });
       // Write a CI-failed status so checkFailedMergeRetry has something to act on
       writeStatusFile({ [ISSUE_ID]: CI_FAILED_STATUS });
       const retryActions = await checkFailedMergeRetry();

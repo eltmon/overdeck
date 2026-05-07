@@ -104,11 +104,13 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   sendKeysAsync: vi.fn(),
 }));
 
-vi.mock('../../../../src/lib/review-status.js', () => ({
-  setReviewStatus: vi.fn(),
-  loadReviewStatuses: vi.fn(() => _statusData),
-  getReviewStatus: vi.fn((id: string) => _statusData[id] ?? null),
-}));
+vi.mock('../../../../src/lib/review-status.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/review-status.js')>();
+  return {
+    ...actual,
+    loadReviewStatuses: vi.fn(() => _statusData),
+  };
+});
 
 // Import after mocks are in place
 import { checkReadyForMergeStuck, setMergeReadyNotifier } from '../../../../src/lib/cloister/deacon.js';
