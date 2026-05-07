@@ -3,6 +3,7 @@ import * as Rpc from "effect/unstable/rpc/Rpc"
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup"
 import { DomainEvent } from "./events"
 import { AgentStatus, DashboardSnapshot, IssueId, SequenceNumber, SessionNodePresence, WorkspaceDetail } from "./types"
+import { EditorIdSchema, OpenInEditorInput } from "./editor"
 
 // ─── RPC method names ─────────────────────────────────────────────────────────
 
@@ -33,6 +34,10 @@ export const WS_METHODS = {
   deepWipe: "pan.deepWipe",
   sendTerminalInput: "pan.sendTerminalInput",
   resizeTerminal: "pan.resizeTerminal",
+
+  // Editor integration (PAN-966)
+  shellOpenInEditor: "pan.shellOpenInEditor",
+  getAvailableEditors: "pan.getAvailableEditors",
 } as const
 
 // ─── Error types ──────────────────────────────────────────────────────────────
@@ -269,9 +274,21 @@ export const SubscribeProjectSessionTreeRpc = Rpc.make(WS_METHODS.subscribeProje
   stream: true,
 })
 
+/** 18. Open a workspace in an editor (PAN-966) */
+export const ShellOpenInEditorRpc = Rpc.make(WS_METHODS.shellOpenInEditor, {
+  payload: OpenInEditorInput,
+  error: PanRpcError,
+})
+
+/** 19. Get available (installed) editors (PAN-966) */
+export const GetAvailableEditorsRpc = Rpc.make(WS_METHODS.getAvailableEditors, {
+  success: Schema.Struct({ editors: Schema.Array(EditorIdSchema) }),
+  error: PanRpcError,
+})
+
 // ─── RPC Group ────────────────────────────────────────────────────────────────
 
-/** All 17 Panopticon WebSocket RPC methods */
+/** All 19 Panopticon WebSocket RPC methods */
 export const PanRpcGroup = RpcGroup.make(
   SubscribeDomainEventsRpc,
   SubscribeTerminalRpc,
@@ -290,5 +307,7 @@ export const PanRpcGroup = RpcGroup.make(
   ResizeTerminalRpc,
   SubscribeConversationMessagesRpc,
   SubscribeProjectSessionTreeRpc,
+  ShellOpenInEditorRpc,
+  GetAvailableEditorsRpc,
 )
 export type PanRpcGroup = typeof PanRpcGroup
