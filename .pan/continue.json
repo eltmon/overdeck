@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-636",
   "created": "2026-05-07T03:42:36.488Z",
-  "updated": "2026-05-07T05:25:39.852Z",
+  "updated": "2026-05-07T05:28:59.389Z",
   "gitState": {
     "branch": "feature/pan-636",
     "sha": "9b15d68ef",
@@ -138,11 +138,10 @@
     }
   ],
   "resumePoint": {
-    "description": "router-harness bead complete (ModelRouter.getSpecialistHarness mirrors getSpecialistModel: dash->underscore normalize, reads specialist_harnesses, falls back to claude-code; getSpecialistHarness convenience export). Next: workspace-sdf0 (resolveSpecialistBaseCommand single helper replacing 3 hardcoded claude sites).",
-    "beadId": "workspace-anvh",
+    "description": "specialist-base-command bead complete (resolveSpecialistBaseCommand single producer; replaces 3 hardcoded sites — specialists.ts:1104/2316 baseCommand:claude literals + review-agent.ts:540 getAgentRuntimeBaseCommand call; ToS gate fallback to claude-code with console.warn). Beads remaining (12): UI surfaces fjs9/0c2/3ir/lg47/dbf, CLI r63/63b, system uem, niceties 3119/8qco/w1o0/6oe.",
+    "beadId": "workspace-sdf0",
     "filesToRead": [
       "src/lib/cloister/router.ts",
-      "src/lib/cloister/__tests__/specialist-harness-router.test.ts",
       "src/lib/cloister/specialists.ts",
       "src/lib/cloister/review-agent.ts"
     ]
@@ -227,6 +226,12 @@
       "timestamp": "2026-05-07T05:25:39.852Z",
       "reason": "continue",
       "note": "Closed bead workspace-anvh (router-harness). Added ModelRouter.getSpecialistHarness(specialistName) mirroring getSpecialistModel: normalizes dash->underscore (review-agent -> review_agent), reads config.model_selection.specialist_harnesses, falls back to claude-code for unknown specialists OR absent overrides. Added getSpecialistHarness top-level convenience function via getGlobalRouter. 5 tests pass: configured pi specialist, dash<->underscore equivalence, unknown name fallback, missing override fallback, global function. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:28:59.389Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-sdf0 (specialist-base-command). Added resolveSpecialistBaseCommand(role, model, harness?) in router.ts using dynamic imports of harness-policy + agents (avoids circular import with specialists.ts). Helper resolves harness from getSpecialistHarness when not explicit, evaluates canUseHarness against the model + getProviderAuthMode result, falls back to claude-code with a console.warn on block. Replaced 3 hardcoded sites: specialists.ts:1104 (specialist-dispatch inner script — uses specialistType as role), specialists.ts:2316 (specialist-init launcher — uses name as role), review-agent.ts:540 (spawnSingleReviewer — uses literal role review-agent). Removed now-unused getAgentRuntimeBaseCommand import from review-agent.ts. Verified AC1: grep for baseCommand:claude literals in cloister/ returns nothing. 4 vitest cases cover claude-code branch, pi branch (ToS allows non-Anthropic), pi+Anthropic+subscription fallback with warn, explicit harness override beats config. typecheck + lint clean.",
       "agentModel": "claude-opus-4-7"
     }
   ],

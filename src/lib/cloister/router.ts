@@ -189,6 +189,40 @@ export function getSpecialistHarness(specialistName: string): 'claude-code' | 'p
 }
 
 /**
+ * Resolve a specialist's launcher base command (PAN-636).
+ *
+ * Single producer of `LauncherConfig.baseCommand` strings for all
+ * specialist dispatch sites in cloister/. Routes by harness and gates
+ * the harness/model combination through canUseHarness; if the gate
+ * blocks the request, the helper falls back to claude-code and logs a
+ * warning with the human-readable reason.
+ *
+ * @param role     specialist role name ('review-agent', 'merge-agent', etc.)
+ * @param model    model id for the specialist
+ * @param harness  optional harness override; defaults to the role's
+ *                 configured harness via getSpecialistHarness
+ */
+export async function resolveSpecialistBaseCommand(
+  role: string,
+  model: string,
+  harness?: 'claude-code' | 'pi',
+): Promise<string> {
+  const { canUseHarness } = await import('../harness-policy.js')
+  const { getAgentRuntimeBaseCommand, getProviderAuthMode } = await import('../agents.js')
+
+  const requested = harness ?? getSpecialistHarness(role)
+  const authMode = await getProviderAuthMode(model)
+  const decision = canUseHarness(requested, model, authMode)
+  if (!decision.allowed) {
+    console.warn(
+      `[router] specialist ${role}: canUseHarness(${requested},${model},${authMode}) blocked — ${decision.reason}. Falling back to claude-code.`,
+    )
+    return getAgentRuntimeBaseCommand(model, 'claude-code')
+  }
+  return getAgentRuntimeBaseCommand(model, requested)
+}
+
+/**
  * Convenience function to get default model using the global router
  *
  * @returns Default model name

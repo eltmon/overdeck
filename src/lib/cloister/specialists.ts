@@ -24,6 +24,7 @@ import { getModelId, WorkTypeId } from '../work-type-router.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { getProviderEnvForModel } from '../agents.js';
 import { generateLauncherScript, generateLauncherWrapper } from '../launcher-generator.js';
+import { resolveSpecialistBaseCommand } from './router.js';
 import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery, createSessionAsync, killSessionAsync, buildTmuxCommandString, listPaneValuesAsync, listSessionNamesAsync, sessionExistsAsync } from '../tmux.js';
 import { notifyPipeline } from '../pipeline-notifier.js';
 import { isTaskReady } from './task-readiness.js';
@@ -1101,7 +1102,7 @@ ${basePrompt}`;
         panopticonEnv: { agentId: tmuxSession, issueId: task.issueId, sessionType: sessionTypeLabel },
         cavemanExports: specialistCavemanExports,
         promptFile,
-        baseCommand: 'claude',
+        baseCommand: await resolveSpecialistBaseCommand(specialistType, model),
         permissionFlags: permissionFlags.split(' '),
         sessionId,
         model,
@@ -2313,7 +2314,7 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
         unsetProviderEnv: true,
         providerExports: initProviderExportLines,
         promptFile,
-        baseCommand: 'claude',
+        baseCommand: await resolveSpecialistBaseCommand(name, model),
         permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
         sessionId: newSessionId,
         model,

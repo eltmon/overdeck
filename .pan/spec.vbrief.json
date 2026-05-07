@@ -624,7 +624,7 @@
       {
         "id": "specialist-base-command",
         "title": "Single resolveSpecialistBaseCommand(role, model, harness) and replace 3 hardcoded sites",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-07T04:10:00.000Z",
         "metadata": {
@@ -638,7 +638,7 @@
           {
             "id": "specialist-base-command.ac1",
             "title": "resolveSpecialistBaseCommand exists and is the only producer of specialist baseCommand strings (no remaining literal 'claude' baseCommand assignments in cloister/)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -646,7 +646,7 @@
           {
             "id": "specialist-base-command.ac2",
             "title": "When canUseHarness returns allowed=false for the role's configured harness/model/auth combination, the helper falls back to harness='claude-code' and logs a warning with the reason",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -654,7 +654,7 @@
           {
             "id": "specialist-base-command.ac3",
             "title": "Vitest covers both harness branches AND the fallback path",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
