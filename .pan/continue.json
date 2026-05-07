@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-636",
   "created": "2026-05-07T03:42:36.488Z",
-  "updated": "2026-05-07T05:03:10.329Z",
+  "updated": "2026-05-07T05:06:23.480Z",
   "gitState": {
     "branch": "feature/pan-636",
     "sha": "9b15d68ef",
@@ -138,12 +138,11 @@
     }
   ],
   "resumePoint": {
-    "description": "pi-extension-package bead complete (vendored @panopticon/pi-extension at packages/pi-extension/, builds to dist/index.js, registers session_start/tool_execution_end/turn_end hooks plus /pan-done command writing to ~/.panopticon/agents/<id>/{ready.json,completed} and ~/.panopticon/heartbeats/<id>.json; agentId from PANOPTICON_AGENT_ID, no default; private package, no npm publish; 9 tests pass). Next: workspace-c0q (mkfifo named pipe lifecycle for Pi RPC stdin).",
-    "beadId": "workspace-neg",
+    "description": "pi-fifo-ipc bead complete (createPiFifo via mkfifo -m 600 idempotent, destroyPiFifo no-op when missing, writePiCommand with PiNotReady when ready.json absent or O_WRONLY|O_NONBLOCK fails ENXIO; integration test with O_RDWR Node reader confirms round-trip; 8 tests pass). Next bead: workspace-f9y (launcher generator emits Pi command lines with --mode rpc, --no-context-files, --extension <vendored-pi-extension-dist>).",
+    "beadId": "workspace-c0q",
     "filesToRead": [
-      "packages/pi-extension/src/index.ts",
-      "packages/pi-extension/package.json",
-      "packages/pi-extension/tsdown.config.ts"
+      "src/lib/runtimes/pi-fifo.ts",
+      "src/lib/runtimes/__tests__/pi-fifo.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -184,6 +183,12 @@
       "timestamp": "2026-05-07T05:03:10.329Z",
       "reason": "continue",
       "note": "Closed bead workspace-neg (pi-extension-package). Created packages/pi-extension/ as a private workspace package (added to root package.json workspaces). Source at src/index.ts: default export panopticonPiExtension(pi) registers four hooks. session_start writes ~/.panopticon/agents/<agentId>/ready.json with sessionId/reason/pid/timestamp. tool_execution_end writes ~/.panopticon/heartbeats/<agentId>.json with timestamp/tool/last_action/pid (last_action=tool_error when isError). turn_end refreshes the same heartbeat path with last_action=turn_end. /pan-done command writes ~/.panopticon/agents/<agentId>/completed with trimmed summary. agentId comes EXCLUSIVELY from process.env.PANOPTICON_AGENT_ID — when unset, the extension returns silently and registers nothing (so two parallel pi -e instances launched outside Panopticon cannot collide on heartbeat or ready files). Filesystem failures are swallowed inside try/catch so Pi cannot crash. tsdown builds dist/index.js (4kB ESM) + dist/index.d.ts. 9 vitest cases cover all four hooks, the disjoint-paths invariant for AC3, and the empty-agentId no-op behavior. typecheck + lint clean. private:true so no npm publish.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:06:23.480Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-c0q (pi-fifo-ipc). Created src/lib/runtimes/pi-fifo.ts with createPiFifo/destroyPiFifo/writePiCommand. createPiFifo uses execAsync(mkfifo -m 600 ...) since Node has no native mkfifo; idempotent (unlinks any existing inode at the path so a stale regular file from a crashed agent gets replaced cleanly). destroyPiFifo unlinks and tolerates ENOENT. writePiCommand checks ready.json existsSync, throws PiNotReady (no block) when missing per AC4. Opens writer with O_WRONLY|O_NONBLOCK so reader-less fifo throws ENXIO -> typed PiNotReady, allowing the adapter to recycle the agent rather than retry. Writes one JSONL line + newline. Integration test uses an O_RDWR Node reader (kept open across writer lifecycles, mirroring how Pi keeps stdin open for the whole session) — earlier attempt with cat fifo > out failed because waitForReader probe closed the lone reader fd. 8 tests pass: mode 0600, idempotent recreate, replaces stale regular file, destroy is no-op, PiNotReady when ready missing, PiNotReady on ENXIO, round-trip JSONL through kernel pipe. typecheck + lint clean.",
       "agentModel": "claude-opus-4-7"
     }
   ],

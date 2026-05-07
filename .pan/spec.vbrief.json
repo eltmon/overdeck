@@ -288,7 +288,7 @@
       {
         "id": "pi-fifo-ipc",
         "title": "Per-agent mkfifo named pipe creation and lifecycle",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-07T04:10:00.000Z",
         "metadata": {
@@ -302,7 +302,7 @@
           {
             "id": "pi-fifo-ipc.ac1",
             "title": "createPiFifo(agentId) creates ~/.panopticon/agents/<agentId>/rpc.in with mode 0600 and is idempotent (unlinks existing fifo first)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -310,7 +310,7 @@
           {
             "id": "pi-fifo-ipc.ac2",
             "title": "destroyPiFifo(agentId) unlinks the fifo and is safe to call when the fifo does not exist",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -318,7 +318,7 @@
           {
             "id": "pi-fifo-ipc.ac3",
             "title": "writePiCommand(agentId, json) opens the writer fd lazily, writes one JSONL line, and closes — covered by integration test that pre-creates a reader (cat fifo.in > out.log) and asserts the line appears",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -326,7 +326,7 @@
           {
             "id": "pi-fifo-ipc.ac4",
             "title": "writePiCommand returns a typed error (PiNotReady) — and does NOT block — when ready.json is not present yet",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
