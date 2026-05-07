@@ -1,5 +1,8 @@
 import { useMemo } from 'react';
-import { ExternalLink, AlertTriangle, ShieldCheck, Package } from 'lucide-react';
+import {
+  ExternalLink, AlertTriangle, ShieldCheck, Package,
+  CheckCircle2, Loader2, AlertCircle, CircleDot,
+} from 'lucide-react';
 import { isReviewPipelineStuck } from '../../../lib/pipeline-state';
 import { ActivitySparkline, type SparklineEvent } from '../ActivitySparkline';
 import {
@@ -22,32 +25,63 @@ interface IssueHeaderProps {
 
 type StageStatus = 'done' | 'current' | 'pending' | 'failed' | 'running';
 
-interface StageDotProps {
+interface StagePillProps {
   label: string;
   stage: StageStatus;
+  isLast?: boolean;
 }
 
-function StageDot({ label, stage }: StageDotProps) {
-  const color =
-    stage === 'done'
-      ? 'var(--success)'
-      : stage === 'current' || stage === 'running'
-        ? 'var(--warning)'
-        : stage === 'failed'
-          ? 'var(--destructive)'
-          : 'var(--border)';
+const STAGE_CONFIG: Record<StageStatus, { bg: string; border: string; text: string; icon: React.ElementType; glow?: string }> = {
+  done:    { bg: 'color-mix(in srgb, var(--success) 12%, transparent)', border: 'var(--success)', text: 'var(--success)', icon: CheckCircle2 },
+  current: { bg: 'color-mix(in srgb, var(--warning) 15%, transparent)', border: 'var(--warning)', text: 'var(--warning)', icon: Loader2, glow: '0 0 12px color-mix(in srgb, var(--warning) 40%, transparent)' },
+  running: { bg: 'color-mix(in srgb, var(--primary) 15%, transparent)', border: 'var(--primary)', text: 'var(--primary)', icon: Loader2, glow: '0 0 12px color-mix(in srgb, var(--primary) 40%, transparent)' },
+  failed:  { bg: 'color-mix(in srgb, var(--destructive) 12%, transparent)', border: 'var(--destructive)', text: 'var(--destructive)', icon: AlertCircle },
+  pending: { bg: 'transparent', border: 'var(--border)', text: 'var(--muted-foreground)', icon: CircleDot },
+};
+
+function StagePill({ label, stage, isLast }: StagePillProps) {
+  const cfg = STAGE_CONFIG[stage];
+  const Icon = cfg.icon;
+  const isActive = stage === 'current' || stage === 'running';
 
   return (
-    <span className={styles.pipelineDotGroup} title={`${label}: ${stage}`}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
       <span
-        className={styles.pipelineDot}
+        title={`${label}: ${stage}`}
         style={{
-          background: color,
-          boxShadow: stage === 'current' ? `0 0 0 2px ${color}40` : undefined,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 5,
+          padding: '5px 10px',
+          borderRadius: 999,
+          border: `1.5px solid ${cfg.border}`,
+          background: cfg.bg,
+          color: cfg.text,
+          fontSize: 11,
+          fontWeight: 600,
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+          boxShadow: isActive ? cfg.glow : undefined,
+          whiteSpace: 'nowrap',
+          transition: 'all 0.2s ease',
         }}
-      />
-      <span className={styles.pipelineDotLabel}>{label}</span>
-    </span>
+      >
+        <Icon size={13} className={isActive ? 'animate-spin' : undefined} style={{ flexShrink: 0 }} />
+        {label}
+      </span>
+      {!isLast && (
+        <span
+          style={{
+            display: 'inline-block',
+            width: 16,
+            height: 2,
+            background: stage === 'done' ? 'var(--success)' : 'var(--border)',
+            margin: '0 4px',
+            flexShrink: 0,
+          }}
+        />
+      )}
+    </div>
   );
 }
 
@@ -184,7 +218,7 @@ export function IssueHeader({ issueId, title, url }: IssueHeaderProps) {
 
   return (
     <div className={styles.issueHeader} data-testid="issue-header" data-issue={issueId}>
-      {/* Row 1: ID + title + pipeline + cost + sparkline */}
+      {/* Row 1: ID + title + metadata */}
       <div className={styles.issueHeaderRow}>
         <div className={styles.issueHeaderLeft}>
           {url ? (
@@ -203,12 +237,6 @@ export function IssueHeader({ issueId, title, url }: IssueHeaderProps) {
           <span className={styles.issueHeaderTitle}>{title}</span>
         </div>
         <div className={styles.issueHeaderRight}>
-          {/* Six stage dots (PAN-830 high-2) */}
-          <div className={styles.pipelineDots}>
-            {stageStatuses.map((s) => (
-              <StageDot key={s.label} label={s.label} stage={s.stage} />
-            ))}
-          </div>
           {/* Quality-gate mini-badge (PAN-847) */}
           {qgColor && (
             <span
@@ -285,6 +313,22 @@ export function IssueHeader({ issueId, title, url }: IssueHeaderProps) {
             <span className={styles.issueHeaderCost} data-testid="zone-a-cost">{formatCost(resolvedTotalCost)}</span>
           )}
         </div>
+      </div>
+
+      {/* Row 2: Prominent pipeline progress tracker */}
+      <div
+        data-testid="issue-pipeline"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0,
+          padding: '8px 0',
+          overflowX: 'auto',
+        }}
+      >
+        {stageStatuses.map((s, i) => (
+          <StagePill key={s.label} label={s.label} stage={s.stage} isLast={i === stageStatuses.length - 1} />
+        ))}
       </div>
 
       {/* Stuck warning ribbon (PAN-830 high-2) */}

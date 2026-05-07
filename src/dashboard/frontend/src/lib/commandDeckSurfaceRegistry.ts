@@ -35,7 +35,6 @@ export const COMMAND_DECK_PARITY_SURFACES: readonly SurfaceDescriptor[] = [
 export const COMMAND_DECK_SURFACE_REGISTRY: readonly SurfaceActionRegistration[] = [
   // KanbanBoard.tsx card actions
   { surface: 'KanbanBoard', actionKey: 'beads', source: 'ArtifactLinks' },
-  { surface: 'KanbanBoard', actionKey: 'vbrief', source: 'ArtifactLinks' },
   { surface: 'KanbanBoard', actionKey: 'recover', source: 'RecoverButton' },
   { surface: 'KanbanBoard', actionKey: 'merge', source: 'MergeButton' },
   { surface: 'KanbanBoard', actionKey: 'resetIssue', source: 'ResetIssueButton' },
@@ -55,7 +54,6 @@ export const COMMAND_DECK_SURFACE_REGISTRY: readonly SurfaceActionRegistration[]
   { surface: 'ActionsSection', actionKey: 'createWorkspace', source: 'inspector-create-workspace' },
   { surface: 'ActionsSection', actionKey: 'copySettings', source: 'Copy Settings' },
   { surface: 'ActionsSection', actionKey: 'beads', source: 'ArtifactLinks' },
-  { surface: 'ActionsSection', actionKey: 'vbrief', source: 'ArtifactLinks' },
   { surface: 'ActionsSection', actionKey: 'reopen', source: 'inspector-reopen' },
   { surface: 'ActionsSection', actionKey: 'restartFromPlan', source: 'RestartFromPlanButton' },
   { surface: 'ActionsSection', actionKey: 'resetIssue', source: 'ResetIssueButton' },
@@ -73,8 +71,6 @@ export const COMMAND_DECK_SURFACE_REGISTRY: readonly SurfaceActionRegistration[]
 
   // CommandDeck/FeatureMetadata/BadgeBar.tsx planning artifact actions
   { surface: 'BadgeBar', actionKey: 'beads', source: 'Tasks badge' },
-  { surface: 'BadgeBar', actionKey: 'state', source: 'STATE badge' },
-  { surface: 'BadgeBar', actionKey: 'prd', source: 'PRD badge' },
   { surface: 'BadgeBar', actionKey: 'statusReview', source: 'Status badge' },
   { surface: 'BadgeBar', actionKey: 'inference', source: 'Inference badge' },
   { surface: 'BadgeBar', actionKey: 'discussions', source: 'Discussions badge' },
