@@ -24,7 +24,7 @@ const ALL_ACTION_KEYS: readonly ActionKey[] = [
   'merge', 'reviewTest', 'recover', 'stopAgent',
   'startAgent', 'resumeSession', 'resetSession',
   'createWorkspace', 'copySettings',
-  'beads', 'vbrief', 'state', 'prd', 'inference',
+  'beads', 'inference',
   'discussions', 'transcripts', 'upload', 'syncDiscussions', 'syncMain', 'statusReview',
   'reopen', 'restartFromPlan', 'resetIssue', 'cancel',
   'stopSession', 'viewTerminal',
@@ -244,20 +244,17 @@ describe('getZoneAActions', () => {
     expect(layout.secondary).toContain('createWorkspace');
   });
 
-  it('hasPlan + beadsCount surfaces beads + vbrief', () => {
+  it('hasPlan + beadsCount surfaces beads', () => {
     const layout = getZoneAActions({
       ...baseZoneA,
       hasPlan: true,
       beadsCount: 5,
     });
     expect(layout.secondary).toContain('beads');
-    expect(layout.secondary).toContain('vbrief');
   });
 
-  it('always surfaces planning artifact buttons (state, prd, status, sync, upload)', () => {
+  it('always surfaces planning artifact buttons (status, sync, upload)', () => {
     const layout = getZoneAActions(baseZoneA);
-    expect(layout.secondary).toContain('state');
-    expect(layout.secondary).toContain('prd');
     expect(layout.secondary).toContain('statusReview');
     expect(layout.secondary).toContain('syncDiscussions');
     expect(layout.secondary).toContain('upload');

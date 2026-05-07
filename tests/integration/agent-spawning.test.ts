@@ -334,7 +334,7 @@ describe('agent spawning with work types', () => {
       }
     });
 
-    it('should pass OX_PROJECT_ROOT when .sageox/ exists', async () => {
+    it('should pass standard Panopticon env vars when .sageox/ exists', async () => {
       const { createSessionAsync } = await import('../../src/lib/tmux.js');
 
       const options: SpawnOptions = {
@@ -349,7 +349,9 @@ describe('agent spawning with work types', () => {
       const callArgs = vi.mocked(createSessionAsync).mock.calls[0];
       const envArg = callArgs[3]?.env as Record<string, string>;
 
-      expect(envArg.OX_PROJECT_ROOT).toBe(sageoxProjectRoot);
+      // SageOx-specific vars were removed from the agent spawner
+      expect(envArg.OX_PROJECT_ROOT).toBeUndefined();
+      expect(envArg.PANOPTICON_AGENT_ID).toBe('agent-pan-sagox-1');
     });
 
     it('should NOT set SageOx vars when .sageox/ does not exist', async () => {
@@ -382,7 +384,7 @@ describe('agent spawning with work types', () => {
       rmSync(noSageoxRoot, { recursive: true, force: true });
     });
 
-    it('should pass PAN_ISSUE_ID and PAN_PHASE for multi-agent pipeline', async () => {
+    it('should pass PANOPTICON_ISSUE_ID and PANOPTICON_SESSION_TYPE for multi-agent pipeline', async () => {
       const { createSessionAsync } = await import('../../src/lib/tmux.js');
 
       const options: SpawnOptions = {
@@ -396,11 +398,11 @@ describe('agent spawning with work types', () => {
       const callArgs = vi.mocked(createSessionAsync).mock.calls[0];
       const envArg = callArgs[3]?.env as Record<string, string>;
 
-      expect(envArg.PAN_ISSUE_ID).toBe('PAN-SAGOX-2');
-      expect(envArg.PAN_PHASE).toBe('review');
+      expect(envArg.PANOPTICON_ISSUE_ID).toBe('PAN-SAGOX-2');
+      expect(envArg.PANOPTICON_SESSION_TYPE).toBe('review');
     });
 
-    it('should include SageOx vars alongside existing env vars', async () => {
+    it('should include standard Panopticon env vars', async () => {
       const { createSessionAsync } = await import('../../src/lib/tmux.js');
 
       const options: SpawnOptions = {
@@ -414,15 +416,13 @@ describe('agent spawning with work types', () => {
       const callArgs = vi.mocked(createSessionAsync).mock.calls[0];
       const envArg = callArgs[3]?.env as Record<string, string>;
 
-      // Check existing Panopticon vars are still present
+      // Check standard Panopticon vars are present
       expect(envArg.PANOPTICON_AGENT_ID).toBe('agent-pan-sagox-3');
       expect(envArg.PANOPTICON_ISSUE_ID).toBe('PAN-SAGOX-3');
       expect(envArg.PANOPTICON_SESSION_TYPE).toBe('planning');
 
-      // Check SageOx vars are present
-      expect(envArg.OX_PROJECT_ROOT).toBe(sageoxProjectRoot);
-      expect(envArg.PAN_ISSUE_ID).toBe('PAN-SAGOX-3');
-      expect(envArg.PAN_PHASE).toBe('planning');
+      // SageOx-specific vars were removed from the agent spawner
+      expect(envArg.OX_PROJECT_ROOT).toBeUndefined();
     });
 
     it('should not set PAN_PARENT_SESSION for planner agents', async () => {
