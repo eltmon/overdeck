@@ -106,7 +106,7 @@
       {
         "id": "define-review-agent",
         "title": "Create pan-review-agent.md definition",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-07T02:30:00.000Z",
         "metadata": {
@@ -120,7 +120,7 @@
           {
             "id": "define-review-agent.ac1",
             "title": "pan-review-agent.md exists with tools restricted to Read, Grep, Glob, Bash and permissionMode plan",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -128,7 +128,7 @@
           {
             "id": "define-review-agent.ac2",
             "title": "claude --agent pan-review-agent --print runs on opus with plan permissions (verified via --output-format json)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
