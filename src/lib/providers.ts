@@ -60,12 +60,10 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   kimi: {
     name: 'kimi',
     displayName: 'Kimi (Moonshot AI)',
-    compatibility: 'direct',
-    baseUrl: 'https://api.kimi.com/coding/',
-    authType: 'static',
+    compatibility: 'claudish',
     models: ['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'],
     tested: true,
-    description: 'Anthropic-compatible API via Kimi subscription API key',
+    description: 'Route via claudish: kimi@model or bare model (auto-detected)',
   },
 
   openai: {
@@ -89,45 +87,42 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   minimax: {
     name: 'minimax',
     displayName: 'MiniMax',
-    compatibility: 'direct',
-    baseUrl: 'https://api.minimax.io/anthropic',
+    compatibility: 'claudish',
     models: ['minimax-m2.7', 'minimax-m2.7-highspeed'],
     haikuModel: 'minimax-m2.7-highspeed',
     tested: true,
-    description: 'Anthropic-compatible API via MiniMax API',
+    description: 'Route via claudish: mm@model or bare model (auto-detected)',
   },
 
   zai: {
     name: 'zai',
     displayName: 'Z.AI',
-    compatibility: 'direct',
-    baseUrl: 'https://api.z.ai/api/anthropic',
+    compatibility: 'claudish',
     models: ['glm-5.1', 'glm-4.7', 'glm-4.7-flash'],
     haikuModel: 'glm-4.7-flash',
     tested: true,
-    description: 'Anthropic-compatible API via Z.AI GLM models',
+    description: 'Route via claudish: zai@model or bare model (auto-detected)',
   },
 
   mimo: {
     name: 'mimo',
     displayName: 'Xiaomi MiMo',
-    compatibility: 'direct',
+    compatibility: 'claudish',
     baseUrl: 'https://token-plan-sgp.xiaomimimo.com/anthropic',
     authType: 'static',
     models: ['mimo-v2.5-pro', 'mimo-v2.5'],
     haikuModel: 'mimo-v2.5',
     tested: true,
-    description: 'Anthropic-compatible API via Xiaomi MiMo (pay-as-you-go or Token Plan)',
+    description: 'Route via claudish custom URL: https://token-plan-sgp.xiaomimimo.com/anthropic/<model>',
   },
 
   openrouter: {
     name: 'openrouter',
     displayName: 'OpenRouter',
-    compatibility: 'direct',
-    baseUrl: 'https://openrouter.ai/api',
+    compatibility: 'claudish',
     models: [], // Dynamic models fetched from OpenRouter API; IDs contain '/'
     tested: true,
-    description: 'Anthropic-compatible API aggregator. Model IDs contain \'/\' (e.g. qwen/qwen3.6-plus:free)',
+    description: 'Route via claudish: or@model (e.g. or@qwen/qwen3.6-plus:free)',
   },
 };
 
@@ -264,6 +259,26 @@ export function getProviderEnv(
 
     if (provider.name === 'google') {
       return { GEMINI_API_KEY: apiKey };
+    }
+
+    if (provider.name === 'kimi') {
+      return { KIMI_API_KEY: apiKey };
+    }
+
+    if (provider.name === 'minimax') {
+      return { MINIMAX_API_KEY: apiKey };
+    }
+
+    if (provider.name === 'zai') {
+      return { ZHIPU_API_KEY: apiKey };
+    }
+
+    if (provider.name === 'mimo') {
+      return { ANTHROPIC_API_KEY: apiKey };
+    }
+
+    if (provider.name === 'openrouter') {
+      return { OPENROUTER_API_KEY: apiKey };
     }
 
     return {};
