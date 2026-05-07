@@ -653,6 +653,14 @@ const getSwarmRoute = HttpRouter.add(
 
 ensureSwarmAutoAdvanceLoop();
 
+export const __testInternals = {
+  refreshSwarmSlotStatuses,
+  dispatchSwarmWave,
+  pollSwarmAutoAdvance,
+  buildStructuredSlotTaskInput,
+  buildSlotPrompt,
+};
+
 export const swarmRouteLayer = Layer.mergeAll(
   postSwarmRoute,
   getSwarmRoute,
