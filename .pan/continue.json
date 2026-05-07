@@ -1,0 +1,34 @@
+{
+  "version": "1",
+  "issueId": "PAN-965",
+  "created": "2026-05-07T02:55:00Z",
+  "updated": "2026-05-07T03:04:00Z",
+  "gitState": { "branch": "feature/pan-965", "sha": "68d1e21", "dirty": false },
+  "decisions": [
+    { "id": "D1", "summary": "No beads existed for PAN-965 — created 8 beads from PRD phases and linked dependencies.", "recordedAt": "2026-05-07T02:55:00Z" },
+    { "id": "D2", "summary": "Container status mapping: running→active, unhealthy→waiting, restarting→thinking, stopped→ended. Reuses StatusDot component.", "recordedAt": "2026-05-07T02:55:00Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "Large CSS file (4396 lines) — append new styles at end to avoid conflicts.", "mitigation": "Use Edit with tail context, not offset-based insertion." },
+    { "id": "H2", "summary": "FeatureItem.tsx is 1234 lines — risk of merge conflicts during rebase.", "mitigation": "Keep changes localized to render output section and props." }
+  ],
+  "resumePoint": {
+    "description": "Bead workspace-h3no complete. Next: claim workspace-z5sm (ContainerNode) and implement ContainerNode.tsx with status dot, metrics, sparkline, context menu.",
+    "beadId": "workspace-z5sm",
+    "filesToRead": ["src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ContainerNode.tsx"]
+  },
+  "beadsMapping": {
+    "workspace-h3no": "InlineSparkline component",
+    "workspace-z5sm": "ContainerNode component",
+    "workspace-no38": "BranchNode and PrNode components",
+    "workspace-vwmn": "ResourcesGroup component",
+    "workspace-7htl": "FeatureItem integration + CSS",
+    "workspace-xgjy": "Server container action endpoints",
+    "workspace-6hyy": "parseContainerServiceName utility + tests",
+    "workspace-ioyj": "Data enrichment and polling"
+  },
+  "agentModel": "kimi-k2.6",
+  "sessionHistory": [
+    { "timestamp": "2026-05-07T02:55:00Z", "reason": "start", "note": "Created beads, continue.json, and started implementation of PAN-965.", "agentModel": "kimi-k2.6" }
+  ]
+}

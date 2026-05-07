@@ -12,6 +12,7 @@ import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
 import { SessionNode } from './SessionNode';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
+import { ResourcesGroup } from './ResourcesGroup';
 import { useAvailableModels } from '../../shared/ModelPicker/ModelPicker';
 import {
   ContextMenuRoot,
@@ -1016,6 +1017,39 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     return persisted ?? defaultExpandedFromState(feature.stateLabel);
   });
 
+  const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
+
+  useEffect(() => {
+    if (!expanded) return;
+    if (!feature.issueId) return;
+    if (detailIdentifiers) return;
+
+    let cancelled = false;
+    void fetch(`/api/issues/${encodeURIComponent(feature.issueId)}/resource-details`)
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return response.json() as Promise<ProjectFeatureResourceIdentifiers>;
+      })
+      .then((payload) => {
+        if (cancelled || !payload) return;
+        setDetailIdentifiers(payload);
+      })
+      .catch(() => {
+        // ignore
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, feature.issueId, detailIdentifiers]);
+
+  const hasResources = feature.resourceDetails && (
+    feature.resourceDetails.dockerContainerCount > 0 ||
+    feature.resourceDetails.prs.length > 0 ||
+    feature.resourceDetails.localBranchCount > 0 ||
+    feature.resourceDetails.remoteBranchCount > 0
+  );
+
   // Derive best session once per data change instead of on every click (PAN-821 review)
   // Respect the tree filter so auto-select picks a visible session.
   const visibleSessions = useMemo(
@@ -1216,6 +1250,30 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             );
           })()}
         </div>
+      )}
+
+      {expanded && hasResources && detailIdentifiers && (
+        <ResourcesGroup
+          issueId={feature.issueId}
+          defaultExpanded={aggregateSessions.length > 0 && activityState !== 'ended'}
+          containers={(detailIdentifiers.dockerContainerNames ?? []).map((name) => ({
+            name,
+            serviceName: name.split('-').pop()?.replace(/^\d+$/, '') || name,
+            status: 'running' as const,
+            cpuPercent: 0,
+            memoryUsage: 0,
+          }))}
+          branches={[
+            ...(detailIdentifiers.localBranchNames ?? []).map((name) => ({ name, isLocal: true as const })),
+            ...(detailIdentifiers.remoteBranchNames ?? []).map((name) => ({ name, isLocal: false as const })),
+          ]}
+          prs={(detailIdentifiers.prs ?? feature.resourceDetails?.prs ?? []).map((pr) => ({
+            number: pr.number,
+            title: pr.title,
+            state: pr.state,
+            isDraft: pr.isDraft,
+          }))}
+        />
       )}
     </div>
     <FeatureContextMenu
