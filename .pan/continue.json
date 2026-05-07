@@ -2,27 +2,31 @@
   "version": "1",
   "issueId": "PAN-953",
   "created": "2026-05-07T04:30:00Z",
-  "updated": "2026-05-07T04:30:00Z",
-  "gitState": { "branch": "feature/pan-953", "sha": "c2d06040", "dirty": false },
+  "updated": "2026-05-07T04:45:00Z",
+  "gitState": { "branch": "feature/pan-953", "sha": "14f5e6b", "dirty": false },
   "decisions": [
     { "id": "D1", "summary": "Create 5 beads covering all missing inspector parity items", "recordedAt": "2026-05-07T04:30:00Z" },
-    { "id": "D2", "summary": "Reuse existing inspector components (ContainerSection, ReviewPipelineSection) where possible to avoid duplication", "recordedAt": "2026-05-07T04:30:00Z" }
+    { "id": "D2", "summary": "Reuse existing inspector components (ContainerSection, ReviewPipelineSection) where possible to avoid duplication", "recordedAt": "2026-05-07T04:30:00Z" },
+    { "id": "D3", "summary": "Thread agent/issue props through ZoneCOverview to OverviewTab so child tabs can access full agent data", "recordedAt": "2026-05-07T04:45:00Z" }
   ],
   "hazards": [
     { "id": "H1", "summary": "OverviewTab uses inline styles while inspector uses Tailwind classes — mixing may look inconsistent", "mitigation": "Style ContainerSection and pipeline to match command deck aesthetic using inline styles, or wrap inspector components" }
   ],
   "resumePoint": {
-    "description": "Implement bead workspace-8k4p (Fix Agent tile: show runtime, uptime, workspace path). Thread agent/issue props through ZoneCOverview to OverviewTab, then fix Agent tile to show actual runtime harness, uptime duration, and workspace path.",
-    "beadId": "workspace-8k4p",
+    "description": "Implement bead workspace-qm53 (Add Containers section with right-click menu to OverviewTab). Add container chips with right-click context menu (restart/stop/start) to OverviewTab tile grid or as a new section. Reuse ContainerSection from inspector/ or create inline equivalent styled for command deck.",
+    "beadId": "workspace-qm53",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverview.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/IssueWorkbench.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx"
+      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx",
+      "src/dashboard/frontend/src/components/inspector/ContainerSection.tsx",
+      "src/dashboard/frontend/src/components/inspector/types.ts"
     ]
   },
-  "beadsMapping": {},
+  "beadsMapping": {
+    "workspace-8k4p": "Fix Agent tile: show runtime, uptime, workspace path"
+  },
   "agentModel": "kimi-k2.6",
   "sessionHistory": [
-    { "timestamp": "2026-05-07T04:30:00Z", "reason": "start", "note": "Started PAN-953 implementation. Created 5 beads. Rebased onto latest main. No existing continue file.", "agentModel": "kimi-k2.6" }
+    { "timestamp": "2026-05-07T04:30:00Z", "reason": "start", "note": "Started PAN-953 implementation. Created 5 beads. Rebased onto latest main. No existing continue file.", "agentModel": "kimi-k2.6" },
+    { "timestamp": "2026-05-07T04:45:00Z", "reason": "bead", "note": "Completed workspace-8k4p: threaded agent/issue props through IssueWorkbench→ZoneCOverview→OverviewTab. Fixed Agent tile to show actual runtime harness (getHarness), uptime (formatRuntime), friendly model name, and workspace path. Added workspace path to Workspace tile.", "agentModel": "kimi-k2.6" }
   ]
 }

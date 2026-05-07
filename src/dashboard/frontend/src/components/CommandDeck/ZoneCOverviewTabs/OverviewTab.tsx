@@ -35,6 +35,9 @@ import { refreshDashboardState } from '../../../lib/refresh-dashboard-state';
 import { isReviewPipelineStuck } from '../../../lib/pipeline-state';
 import { useConfirm } from '../../DialogProvider';
 import { useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
+import { ContainerSection } from '../../inspector/ContainerSection';
+import type { ContainerMenuState } from '../../inspector/types';
 import { GitPullRequest, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Box, Link2, Terminal, Play, Pause, ExternalLink, Code2, Loader2, RotateCcw } from 'lucide-react';
 import { PlanDAGViewer } from '../../PlanDAG.js';
 import { getFriendlyModelName } from '../../inspector/utils';
@@ -216,6 +219,41 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
   const queryClient = useQueryClient();
   const [isRecoverPending, setIsRecoverPending] = useState(false);
   const [isSpawnPending, setIsSpawnPending] = useState(false);
+  const [containerMenu, setContainerMenu] = useState<ContainerMenuState | null>(null);
+
+  const containerControlMutation = useMutation({
+    mutationFn: async ({ containerName, action }: { containerName: string; action: 'start' | 'stop' | 'restart' }) => {
+      const res = await fetch(`/api/workspaces/${issueId}/containers/${containerName}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `Failed to ${action} container`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setContainerMenu(null);
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['workspace', issueId] }), 2000);
+    },
+  });
+
+  const refreshDbMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/refresh-db`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to refresh database');
+      }
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workspace', issueId] }),
+  });
+
   const planning = usePlanningSummaryQuery(issueId);
   const activity = useActivityQuery(issueId);
   const costs = useIssueCostsQuery(issueId);
@@ -259,6 +297,11 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
 
   const isRecoverable = isReviewPipelineStuck(reviewStatus.data ?? undefined);
   const recentEvents = useMemo(() => sections.slice(-10).reverse(), [sections]);
+
+  const handleContainerContextMenu = (e: React.MouseEvent, containerName: string, isRunning: boolean) => {
+    e.preventDefault();
+    setContainerMenu({ x: e.clientX, y: e.clientY, containerName, isRunning });
+  };
 
   return (
     <div
@@ -765,24 +808,6 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                 {workspace.data.path}
               </span>
             )}
-            {workspace.data?.containers && workspace.data.containers.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {workspace.data.containers.map((c) => (
-                  <div key={c.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-                    <span
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: '50%',
-                        background: c.status === 'running' ? 'var(--success)' : 'var(--destructive)',
-                      }}
-                    />
-                    <span>{c.name}</span>
-                    <span style={{ color: 'var(--muted-foreground)', marginLeft: 'auto' }}>{c.status}</span>
-                  </div>
-                ))}
-              </div>
-            )}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {workspace.data?.hasDocker && (
                 <button
@@ -890,7 +915,27 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         </Tile>
       </div>
 
-      {/* 3. Reviewer summary */}
+      {/* 3. Containers */}
+      {workspace.data?.containers && Object.keys(workspace.data.containers).length > 0 && (
+        <Section title="Containers" rightSlot={<span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>right-click</span>}>
+          <ContainerSection
+            containers={workspace.data.containers}
+            startPending={false}
+            containersStarting={false}
+            containerControlPending={containerControlMutation.isPending}
+            controllingContainer={containerMenu?.containerName}
+            containerMenu={containerMenu}
+            onContainerContextMenu={handleContainerContextMenu}
+            onSetContainerMenu={setContainerMenu}
+            onContainerControl={(name, action) => containerControlMutation.mutate({ containerName: name, action })}
+            onRefreshDb={() => refreshDbMutation.mutate()}
+            refreshDbPending={refreshDbMutation.isPending}
+            confirm={confirm}
+          />
+        </Section>
+      )}
+
+      {/* 4. Reviewer summary */}
       {reviewerSections.length > 0 && (
         <Section title="Reviewer summary">
           <div
