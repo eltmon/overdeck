@@ -592,7 +592,7 @@
       {
         "id": "router-harness",
         "title": "ModelRouter.getSpecialistHarness helper",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T04:10:00.000Z",
         "metadata": {
@@ -606,7 +606,7 @@
           {
             "id": "router-harness.ac1",
             "title": "getSpecialistHarness('review-agent') returns the configured harness for review_agent (normalizing dash to underscore)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -614,7 +614,7 @@
           {
             "id": "router-harness.ac2",
             "title": "Unknown specialist names fall back to 'claude-code'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-636",
   "created": "2026-05-07T03:42:36.488Z",
-  "updated": "2026-05-07T05:24:23.611Z",
+  "updated": "2026-05-07T05:25:39.852Z",
   "gitState": {
     "branch": "feature/pan-636",
     "sha": "9b15d68ef",
@@ -138,12 +138,13 @@
     }
   ],
   "resumePoint": {
-    "description": "specialist-config-harness bead complete (ModelSelectionConfig.specialist_harnesses optional block with same 5 role keys as specialist_models; defaults to empty so unset roles fall through to claude-code on read; deepMerge round-trips through cloister.toml). Next: workspace-anvh (ModelRouter.getSpecialistHarness helper).",
-    "beadId": "workspace-pal",
+    "description": "router-harness bead complete (ModelRouter.getSpecialistHarness mirrors getSpecialistModel: dash->underscore normalize, reads specialist_harnesses, falls back to claude-code; getSpecialistHarness convenience export). Next: workspace-sdf0 (resolveSpecialistBaseCommand single helper replacing 3 hardcoded claude sites).",
+    "beadId": "workspace-anvh",
     "filesToRead": [
-      "src/lib/cloister/config.ts",
-      "src/lib/cloister/__tests__/specialist-harnesses-config.test.ts",
-      "src/lib/cloister/router.ts"
+      "src/lib/cloister/router.ts",
+      "src/lib/cloister/__tests__/specialist-harness-router.test.ts",
+      "src/lib/cloister/specialists.ts",
+      "src/lib/cloister/review-agent.ts"
     ]
   },
   "beadsMapping": {},
@@ -220,6 +221,12 @@
       "timestamp": "2026-05-07T05:24:23.611Z",
       "reason": "continue",
       "note": "Closed bead workspace-pal (specialist-config-harness). Extended ModelSelectionConfig with optional specialist_harnesses block: { merge_agent?, review_agent?, test_agent?, inspect_agent?, uat_agent? } each typed claude-code|pi. Defaults to {} (every role falls through to claude-code on read via getSpecialistHarness helper coming in bead anvh). DEFAULT_CLOISTER_CONFIG.model_selection.specialist_harnesses set to empty object so cloister.toml round-trips correctly. Persistence via existing TOML load/save path; no schema migration needed for absent keys (deepMerge fills defaults). 3 tests pass: empty default block, round-trip review_agent=pi+test_agent=claude-code, legacy config without the key still loads. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:25:39.852Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-anvh (router-harness). Added ModelRouter.getSpecialistHarness(specialistName) mirroring getSpecialistModel: normalizes dash->underscore (review-agent -> review_agent), reads config.model_selection.specialist_harnesses, falls back to claude-code for unknown specialists OR absent overrides. Added getSpecialistHarness top-level convenience function via getGlobalRouter. 5 tests pass: configured pi specialist, dash<->underscore equivalence, unknown name fallback, missing override fallback, global function. typecheck + lint clean.",
       "agentModel": "claude-opus-4-7"
     }
   ],
