@@ -2,8 +2,8 @@
   "version": "1",
   "issueId": "PAN-954",
   "created": "2026-05-07T04:40:00Z",
-  "updated": "2026-05-07T05:05:00Z",
-  "gitState": { "branch": "feature/pan-954", "sha": "5c4cdefd5", "dirty": false },
+  "updated": "2026-05-07T05:10:00Z",
+  "gitState": { "branch": "feature/pan-954", "sha": "76ef52ccf", "dirty": false },
   "decisions": [
     { "id": "D1", "summary": "Use existing CommandDeck queries (useActivityQuery, usePrQuery) in InspectorPanel to share cache and avoid duplicate backend work.", "recordedAt": "2026-05-07T04:40:00Z" },
     { "id": "D2", "summary": "Port reviewer summary, test cycle counter, PR status, last activity, session count, and pipeline stuck banner from OverviewTab to InspectorPanel. Keep inspector compact — use condensed layouts.", "recordedAt": "2026-05-07T04:40:00Z" },
@@ -11,18 +11,20 @@
     { "id": "D4", "summary": "Reviewer summary uses compact 5-col grid with colored dots and round numbers instead of full RoundCard. Fits narrow inspector slide-out.", "recordedAt": "2026-05-07T04:50:00Z" },
     { "id": "D5", "summary": "Tests cycle counter already existed in ReviewPipelineSection but was hidden at cycle 0. Changed condition to show whenever verificationMaxCycles is defined, matching CommandDeck behavior.", "recordedAt": "2026-05-07T04:55:00Z" },
     { "id": "D6", "summary": "Added explicit vscode://file/ links in both agent and no-agent workspace path sections, complementing PanOpenInPicker which may be unavailable when RPC fails.", "recordedAt": "2026-05-07T05:00:00Z" },
-    { "id": "D7", "summary": "Added PR link/status section to InspectorPanel using usePrQuery. Shows PR number, title, state badge, additions/deletions, changed files, and review decision.", "recordedAt": "2026-05-07T05:05:00Z" }
+    { "id": "D7", "summary": "Added PR link/status section to InspectorPanel using usePrQuery. Shows PR number, title, state badge, additions/deletions, changed files, and review decision.", "recordedAt": "2026-05-07T05:05:00Z" },
+    { "id": "D8", "summary": "Added pipeline stuck banner to InspectorPanel with warning styling and one-click RecoverButton. Placed prominently after assignee section.", "recordedAt": "2026-05-07T05:10:00Z" }
   ],
   "hazards": [
     { "id": "H1", "summary": "InspectorPanel is rendered in a narrow slide-out. Adding too much content could make it unwieldy.", "mitigation": "Keep new sections compact. Use horizontal layouts where possible. Only show reviewer summary when data exists." },
     { "id": "H2", "summary": "Activity query polling could be expensive if many inspectors are open.", "mitigation": "Shared QueryClient cache means only one fetch per issue regardless of how many components query it. Use same query keys as OverviewTab." }
   ],
   "resumePoint": {
-    "description": "Implementing bead workspace-a55e — add pipeline stuck banner to InspectorPanel. Need to show a prominent banner when pipeline is stuck, with one-click Recover button. Use isReviewPipelineStuck helper.",
+    "description": "All 6 beads implemented. Need to run full test suite (npm test), ensure all changes committed, push branch, and call pan done.",
     "beadId": "workspace-a55e",
     "filesToRead": [
       "src/dashboard/frontend/src/components/InspectorPanel.tsx",
-      "src/dashboard/frontend/src/components/inspector/ActionsSection.tsx"
+      "src/dashboard/frontend/src/components/inspector/AgentInfoSection.tsx",
+      "src/dashboard/frontend/src/components/inspector/ReviewPipelineSection.tsx"
     ]
   },
   "beadsMapping": {
@@ -30,7 +32,8 @@
     "workspace-r490": "completed",
     "workspace-o1gi": "completed",
     "workspace-yj23": "completed",
-    "workspace-bnlk": "completed"
+    "workspace-bnlk": "completed",
+    "workspace-a55e": "completed"
   },
   "agentModel": "kimi-k2.6",
   "sessionHistory": [
@@ -39,6 +42,7 @@
     { "timestamp": "2026-05-07T04:50:00Z", "reason": "checkpoint", "note": "Completed bead workspace-r490 — added compact 5-col reviewer summary snapshot to InspectorPanel using activity reviewer sections. Typecheck passed.", "agentModel": "kimi-k2.6" },
     { "timestamp": "2026-05-07T04:55:00Z", "reason": "checkpoint", "note": "Completed bead workspace-o1gi — fixed ReviewPipelineSection to show tests cycle counter even at cycle 0, matching CommandDeck behavior. Typecheck passed.", "agentModel": "kimi-k2.6" },
     { "timestamp": "2026-05-07T05:00:00Z", "reason": "checkpoint", "note": "Completed bead workspace-yj23 — added explicit Open VS Code button via vscode://file/ protocol in both agent and no-agent workspace path sections. Typecheck passed.", "agentModel": "kimi-k2.6" },
-    { "timestamp": "2026-05-07T05:05:00Z", "reason": "checkpoint", "note": "Completed bead workspace-bnlk — added PR link/status section to InspectorPanel using usePrQuery. Shows PR number, title, state, diff stats, review decision. Typecheck passed.", "agentModel": "kimi-k2.6" }
+    { "timestamp": "2026-05-07T05:05:00Z", "reason": "checkpoint", "note": "Completed bead workspace-bnlk — added PR link/status section to InspectorPanel using usePrQuery. Shows PR number, title, state, diff stats, review decision. Typecheck passed.", "agentModel": "kimi-k2.6" },
+    { "timestamp": "2026-05-07T05:10:00Z", "reason": "checkpoint", "note": "Completed bead workspace-a55e — added pipeline stuck banner with warning styling and one-click RecoverButton to InspectorPanel. Typecheck passed. All beads complete.", "agentModel": "kimi-k2.6" }
   ]
 }
