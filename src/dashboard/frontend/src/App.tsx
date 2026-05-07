@@ -298,7 +298,9 @@ export default function App() {
   useEffect(() => {
     if (!selectedIssue) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSelectedIssue(null);
+      if (event.key === 'Escape') {
+        setSelectedIssue(null);
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
