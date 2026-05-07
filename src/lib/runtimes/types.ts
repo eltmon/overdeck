@@ -11,9 +11,13 @@
  */
 
 /**
- * Supported runtime types for agent execution
+ * Supported runtime types for agent execution.
+ *
+ * PAN-636 widened this union to include 'pi' alongside Claude Code. Reads of
+ * AgentSnapshot.runtime should go through getHarness() from @panctl/contracts
+ * so unknown or legacy values normalize to 'claude-code'.
  */
-export type RuntimeName = 'claude-code';
+export type RuntimeName = 'claude-code' | 'pi';
 
 /**
  * Health state of an agent
@@ -183,11 +187,13 @@ export interface AgentRuntime {
    * Kill an agent (terminate the session)
    *
    * This typically kills the tmux session and cleans up any state files.
+   * May be sync or async depending on the runtime; new runtimes should
+   * prefer async to avoid blocking the dashboard event loop.
    *
    * @param agentId - The agent identifier
    * @throws Error if agent cannot be killed
    */
-  killAgent(agentId: string): void;
+  killAgent(agentId: string): void | Promise<void>;
 
   /**
    * Spawn a new agent
@@ -209,12 +215,15 @@ export interface AgentRuntime {
   listSessions(workspace?: string): Session[];
 
   /**
-   * Check if an agent is running
+   * Check if an agent is running.
+   *
+   * May be sync or async depending on the runtime; new runtimes should
+   * prefer async to avoid blocking the dashboard event loop.
    *
    * @param agentId - The agent identifier
    * @returns True if agent has an active tmux session
    */
-  isRunning(agentId: string): boolean;
+  isRunning(agentId: string): boolean | Promise<boolean>;
 }
 
 /**

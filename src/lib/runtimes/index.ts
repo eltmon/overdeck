@@ -7,6 +7,7 @@
 
 export * from './types.js';
 export { ClaudeCodeRuntime, createClaudeCodeRuntime } from './claude-code.js';
+export { PiRuntime, createPiRuntime, PiSpawnTimeout } from './pi.js';
 
 import type {
   AgentRuntime,
@@ -15,6 +16,7 @@ import type {
 } from './types.js';
 import { getAgentState } from '../agents.js';
 import { createClaudeCodeRuntime } from './claude-code.js';
+import { createPiRuntime } from './pi.js';
 
 /**
  * Runtime registry implementation
@@ -46,18 +48,23 @@ export class RuntimeRegistry implements RuntimeRegistryInterface {
   }
 
   /**
-   * Get the runtime for a specific agent
+   * Get the runtime for a specific agent.
    *
-   * Looks up the agent's state file to determine which runtime it's using.
+   * Reads the agent's state file and dispatches by `state.harness`. When
+   * the harness field is missing or carries a legacy value (e.g. 'claude'
+   * from pre-PAN-636 wire format), we fall back to the claude-code runtime
+   * to preserve back-compat (PAN-636 ac2).
    */
   getRuntimeForAgent(agentId: string): AgentRuntime | null {
     const state = getAgentState(agentId);
     if (!state) {
       return null;
     }
-
-    // All agents use claude-code runtime
-    return this.get('claude-code') || null;
+    const harness = (state as { harness?: RuntimeName }).harness;
+    if (harness === 'pi') {
+      return this.get('pi') ?? null;
+    }
+    return this.get('claude-code') ?? null;
   }
 }
 
@@ -76,10 +83,9 @@ export function getGlobalRegistry(): RuntimeRegistry {
   if (!globalRegistry) {
     globalRegistry = new RuntimeRegistry();
 
-    // Register Claude Code runtime by default
+    // Register Claude Code (default) and Pi runtimes (PAN-636).
     globalRegistry.register(createClaudeCodeRuntime());
-
-    // Claude Code is the sole supported runtime
+    globalRegistry.register(createPiRuntime());
   }
   return globalRegistry;
 }

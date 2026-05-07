@@ -120,11 +120,28 @@ export function panopticonAgentName(type: PanopticonAgentType): string {
   return `pan-${type}-agent`;
 }
 
+/**
+ * Build the base command that the launcher will exec for an agent.
+ *
+ * The `harness` parameter (PAN-636) selects between Claude Code (default)
+ * and Pi. When `harness === 'pi'` the function short-circuits to a
+ * `pi --mode rpc --model <model>` line; the launcher generator then layers
+ * --session-dir, --extension, --no-context-files, and the stdin-from-fifo
+ * redirect on top via generateLauncherScript. The `agentName` (PAN-982:
+ * --name) and `agentType` (PAN-982: --agent) parameters only apply to the
+ * Claude Code path — Pi has no agent-definition system.
+ */
 export async function getAgentRuntimeBaseCommand(
   model: string,
   agentName?: string,
   agentType?: PanopticonAgentType,
+  harness: 'claude-code' | 'pi' = 'claude-code',
 ): Promise<string> {
+  if (harness === 'pi') {
+    return `pi --mode rpc --model ${model}`;
+  }
+
+
   const provider = getProviderForModel(model);
   const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
@@ -397,6 +414,13 @@ export interface AgentState {
   issueId: string;
   workspace: string;
   runtime: string;
+  /**
+   * Coding-agent harness this agent runs under (PAN-636).
+   * Optional for forward compat with state.json files written before
+   * harness existed; readers must default unset/legacy values to
+   * 'claude-code' (see getHarness in @panctl/contracts).
+   */
+  harness?: 'claude-code' | 'pi';
   model: string;
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: string;
@@ -1102,6 +1126,8 @@ export interface SpawnOptions {
   issueId: string;
   workspace: string;
   runtime?: string;
+  /** Coding-agent harness (PAN-636). Defaults to 'claude-code' when omitted. */
+  harness?: 'claude-code' | 'pi';
   model?: string;
   prompt?: string;
   difficulty?: ComplexityLevel;
@@ -1322,6 +1348,14 @@ export async function buildAgentLaunchConfig(opts: {
   channelsBridgeMcpConfig?: string;
   /** MCP server name to load as a Channel; defaults to 'panopticon-bridge'. */
   channelsBridgeServerName?: string;
+  /**
+   * Coding-agent harness (PAN-636). Defaults to 'claude-code' when omitted —
+   * preserves bit-for-bit pre-PAN-636 behavior. When 'pi', the launcher is
+   * built via the Pi command-line generator instead of the claude path; opts
+   * like agentId-as-name and agent-frontmatter are ignored because Pi has
+   * no agent-definition system.
+   */
+  harness?: 'claude-code' | 'pi';
 }): Promise<AgentLaunchConfig> {
   const model = opts.model;
 
@@ -1363,6 +1397,10 @@ export async function buildAgentLaunchConfig(opts: {
 
   // PAN-982: pass agentType + agentId through getAgentRuntimeBaseCommand so it
   // emits 'claude --agent pan-<work|planning>-agent --name <agentId>'.
+  // PAN-636: when harness === 'pi' the helper short-circuits to a pi --mode rpc
+  // line and the agentName/panAgentType arguments are ignored (Pi has no agent
+  // definitions). The launcher generator's pi branch then layers --session-dir
+  // and the fifo redirect on top.
   const panAgentType: PanopticonAgentType = opts.isPlanning ? 'planning' : 'work';
   const launcherContent = generateLauncherScript({
     agentType: 'work',
@@ -1372,7 +1410,7 @@ export async function buildAgentLaunchConfig(opts: {
     setTerminalEnv: true,
     providerExports,
     cavemanExports,
-    baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, panAgentType),
+    baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, panAgentType, opts.harness ?? 'claude-code'),
     ...(opts.channelsBridgeMcpConfig
       ? {
           channelsBridgeMcpConfig: opts.channelsBridgeMcpConfig,
@@ -1427,6 +1465,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     issueId: options.issueId,
     workspace: options.workspace,
     runtime: options.runtime || 'claude',
+    harness: options.harness ?? 'claude-code',
     model: selectedModel,
     status: 'starting',
     startedAt: new Date().toISOString(),
@@ -1530,6 +1569,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     agentType: 'work',
     isPlanning: options.phase === 'planning',
     channelsBridgeMcpConfig,
+    harness: state.harness ?? 'claude-code',
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
@@ -1889,7 +1929,12 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
       changeDir: false,
       setCi: true,
       providerExports,
-      baseCommand: await getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6', normalizedId, 'work'),
+      baseCommand: await getAgentRuntimeBaseCommand(
+        agentState.model || 'claude-sonnet-4-6',
+        normalizedId,
+        'work',
+        agentState.harness ?? 'claude-code',
+      ),
     });
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
     await createSessionAsync(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
@@ -2328,7 +2373,7 @@ export async function recoverAgent(agentId: string): Promise<AgentState | null> 
   }
 
   // Restart the agent with recovery context (YOLO mode - skip permissions)
-  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model, agentId, 'work')} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
+  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model, agentId, 'work', state.harness ?? 'claude-code')} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
   createSession(normalizedId, state.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: normalizedId,

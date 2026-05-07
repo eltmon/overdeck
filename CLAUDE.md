@@ -75,6 +75,12 @@ These block the Node.js event loop, freezing all HTTP requests, WebSocket connec
 - CLI commands only: sync calls are acceptable since they run in their own process
 - `sleep` via `execSync('sleep 0.3')` is NEVER acceptable in server code — use `await new Promise(r => setTimeout(r, 300))`
 
+## Harnesses
+
+Panopticon supports two coding-agent harnesses: `claude-code` (default) and `pi` (alternative, multi-provider). The harness is picked per spawn at plan kickoff, work agent start, and the conversation panel; specialists read per-role defaults from Settings. Pi + Anthropic + subscription auth is the only blocked combination (ToS gate in `src/lib/harness-policy.ts`).
+
+See [docs/HARNESSES.md](docs/HARNESSES.md) for installation, picker locations, ToS rules, and troubleshooting.
+
 ## Project Structure
 
 - **Stack**: TypeScript, Node.js 22+, React dashboard, SQLite, Effect.js

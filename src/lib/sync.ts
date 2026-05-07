@@ -918,3 +918,82 @@ export function mirrorProjectSkills(
 
   return result;
 }
+
+/**
+ * Result of syncing the Pi agent settings file.
+ *
+ * `status` is one of:
+ *   - "skipped" — Pi binary not on PATH; we never touch ~/.pi/agent/settings.json
+ *   - "created" — settings file did not exist; we wrote a new one
+ *   - "updated" — file existed but the skills entry was missing/stale; we merged it
+ *   - "unchanged" — file already contained the expected skills entry
+ */
+export interface PiSettingsSyncResult {
+  status: 'skipped' | 'created' | 'updated' | 'unchanged';
+  path: string;
+  reason?: string;
+}
+
+const PI_SKILLS_PATH = join(homedir(), '.claude', 'skills');
+
+function isPiOnPath(): boolean {
+  try {
+    execSync('which pi', { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Ensure ~/.pi/agent/settings.json contains a `skills` array that includes
+ * ~/.claude/skills, so Pi reads the same skills tree that Claude Code does
+ * (PAN-636 workspace-63b).
+ *
+ * Idempotent: existing keys outside `skills` are preserved untouched, and an
+ * already-correct `skills` entry yields status "unchanged". When Pi is not on
+ * PATH the function returns status "skipped" without ever opening the file —
+ * we never overwrite user config for a tool they have not installed.
+ */
+export function syncPiSettings(): PiSettingsSyncResult {
+  const settingsPath = join(homedir(), '.pi', 'agent', 'settings.json');
+
+  if (!isPiOnPath()) {
+    return { status: 'skipped', path: settingsPath, reason: 'pi not on PATH' };
+  }
+
+  let existing: Record<string, unknown> = {};
+  if (existsSync(settingsPath)) {
+    try {
+      const raw = readFileSync(settingsPath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        existing = parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Malformed JSON — leave the file alone rather than risk clobbering user content.
+      return { status: 'skipped', path: settingsPath, reason: 'existing settings.json is not valid JSON' };
+    }
+  }
+
+  const currentSkills = Array.isArray(existing['skills'])
+    ? (existing['skills'] as unknown[]).filter((s): s is string => typeof s === 'string')
+    : [];
+
+  const fileExistedBefore = existsSync(settingsPath);
+  const alreadyPresent = currentSkills.includes(PI_SKILLS_PATH);
+  if (alreadyPresent && fileExistedBefore) {
+    return { status: 'unchanged', path: settingsPath };
+  }
+
+  const nextSkills = alreadyPresent ? currentSkills : [...currentSkills, PI_SKILLS_PATH];
+  const next = { ...existing, skills: nextSkills };
+
+  mkdirSync(dirname(settingsPath), { recursive: true });
+  writeFileSync(settingsPath, JSON.stringify(next, null, 2) + '\n', 'utf-8');
+
+  return {
+    status: fileExistedBefore ? 'updated' : 'created',
+    path: settingsPath,
+  };
+}

@@ -560,3 +560,82 @@ describe('generateLauncherWrapper', () => {
     });
   });
 });
+
+describe('generateLauncherScript — Pi harness (PAN-636)', () => {
+  it('emits pi --mode rpc with --no-context-files, --extension, and stdin from fifo (AC1, AC2, AC4)', () => {
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      agentType: 'work',
+      harness: 'pi',
+      model: 'anthropic/claude-sonnet-4-6',
+      piExtensionPath: '/abs/packages/pi-extension/dist/index.js',
+      piFifoPath: '/home/u/.panopticon/agents/agent-pan-636/rpc.in',
+      piSessionDir: '/home/u/.panopticon/agents/agent-pan-636/sessions',
+      // Pi has no permission system — these flags must be DROPPED (AC4).
+      permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
+      promptFile: '/tmp/prompt.txt',
+    });
+    // AC4: no claude permission flags leak into the pi command line.
+    expect(script).not.toMatch(/--dangerously-skip-permissions/);
+    expect(script).not.toMatch(/--permission-mode/);
+    // AC1: rpc + extension + no-context-files all present.
+    expect(script).toMatch(/pi --mode rpc/);
+    expect(script).toMatch(/--no-context-files/);
+    expect(script).toMatch(/--extension '\/abs\/packages\/pi-extension\/dist\/index\.js'/);
+    // AC2: stdin redirected from the fifo.
+    expect(script).toMatch(/< '\/home\/u\/\.panopticon\/agents\/agent-pan-636\/rpc\.in'/);
+    expect(script).toMatchInlineSnapshot(`
+      "#!/bin/bash
+      unset TMUX TMUX_PANE STY
+      command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
+      cd -- '/workspace/project'
+      prompt=$(cat '/tmp/prompt.txt')
+      exec pi --mode rpc --model anthropic/claude-sonnet-4-6 --session-dir '/home/u/.panopticon/agents/agent-pan-636/sessions' --extension '/abs/packages/pi-extension/dist/index.js' --no-context-files --append-system-prompt "$prompt" < '/home/u/.panopticon/agents/agent-pan-636/rpc.in'
+      "
+    `);
+  });
+
+  it('appends --session for resumeSessionId on pi launchers', () => {
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      agentType: 'resume',
+      harness: 'pi',
+      model: 'gpt-5.5-mini',
+      piExtensionPath: '/x/dist/index.js',
+      piFifoPath: '/x/rpc.in',
+      piSessionDir: '/x/sessions',
+      resumeSessionId: 'sess-pi-123',
+    });
+    expect(script).toMatch(/--session 'sess-pi-123'/);
+    expect(script).toMatch(/exec pi --mode rpc --model gpt-5.5-mini/);
+  });
+
+  it('throws when pi launcher is missing required path config', () => {
+    expect(() =>
+      generateLauncherScript({
+        ...DEFAULT_CONFIG,
+        agentType: 'work',
+        harness: 'pi',
+        model: 'gpt-5.5-mini',
+        // missing piExtensionPath
+      }),
+    ).toThrow(/piExtensionPath/);
+  });
+
+  it('claude-code (default) output is bit-for-bit unchanged when harness is unset (AC3)', () => {
+    const a = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      agentType: 'work',
+      setCi: true,
+      baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
+    });
+    const b = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      agentType: 'work',
+      setCi: true,
+      harness: 'claude-code',
+      baseCommand: 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
+    });
+    expect(a).toBe(b);
+  });
+});

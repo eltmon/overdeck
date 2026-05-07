@@ -3,6 +3,7 @@ import { Agent } from '../../types';
 import type { WorkspaceInfo } from './types';
 import { getFriendlyModelName } from './utils';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
+import { getHarness } from '@panctl/contracts';
 import { PanOpenInPicker } from '../PanOpenInPicker';
 
 interface AgentInfoSectionProps {
@@ -24,7 +25,7 @@ export function AgentInfoSection({ agent, duration, workspace, syncMainPending, 
         <div className="space-y-1.5">
           {[
             { label: 'Model', value: getFriendlyModelName(agent.model) },
-            { label: 'Runtime', value: agent.runtime },
+            { label: 'Runtime', value: getHarness(agent) },
             { label: 'Uptime', value: duration },
           ].map(({ label, value }) => (
             <div key={label} className="flex items-center justify-between">

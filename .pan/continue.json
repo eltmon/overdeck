@@ -1,35 +1,280 @@
 {
   "version": "1",
-  "issueId": "PAN-963",
-  "created": "2026-05-07T00:45:00Z",
-  "updated": "2026-05-07T01:00:00Z",
-  "gitState": { "branch": "feature/pan-963", "sha": "fe2b7ca", "dirty": true },
+  "issueId": "PAN-636",
+  "created": "2026-05-07T03:42:36.488Z",
+  "updated": "2026-05-07T05:51:00.000Z",
+  "gitState": {
+    "branch": "feature/pan-636",
+    "sha": "1c8cd305b",
+    "dirty": true
+  },
   "decisions": [
-    { "id": "D1", "summary": "7-bead decomposition: primitives → shell → providers → model-routing → conversations+terminal → trackers+appearance+maintenance+desktop → polish. Each bead = one commit for inspector verification.", "recordedAt": "2026-05-07T00:45:00Z" },
-    { "id": "D2", "summary": "Don't touch modal/editor flows (ModelOverrideModal, OpenRouterModelBrowser, OpenRouterPage) — only rebuild the page shell around them per PRD §impl guidance.", "recordedAt": "2026-05-07T00:45:00Z" },
-    { "id": "D3", "summary": "Anchor-based section navigation (single page with active-state syncing) rather than route-based subpages. PRD §4 accepts either; anchors are simpler and avoid routing complexity.", "recordedAt": "2026-05-07T00:48:00Z" }
+    {
+      "id": "D1",
+      "summary": "Pi Coding Agent ships as an additive harness alongside Claude Code; Claude Code remains the default. No claudish removal in this issue.",
+      "recordedAt": "2026-05-07T04:10:00.000Z",
+      "rationale": "User confirmed Pi is additive. Claudish path in getAgentRuntimeBaseCommand may be unused in practice, but removing it expands scope and risks an unreachable-but-still-wired regression. PAN-636 ships Pi as a parallel adapter; a separate follow-up can audit/retire claudish."
+    },
+    {
+      "id": "D2",
+      "summary": "Harness+model are picked per-spawn at three user-initiated kickoff surfaces: plan kickoff, work agent start (pan start CLI + dashboard Start button), and conversation panel. There is no per-issue harness lock.",
+      "recordedAt": "2026-05-07T04:10:00.000Z",
+      "rationale": "User wants maximum flexibility. Pipeline-internal specialist spawns (review/test/merge/inspect/uat) do NOT prompt at spawn time; they read configured per-role harness+model from Settings. Mixing Pi work with Claude review on the same issue is allowed."
+    },
+    {
+      "id": "D3",
+      "summary": "Per-specialist harness+model defaults live in the existing Settings page (per-role model section). A 'harness' dropdown is added next to the existing model dropdown for each of: review_agent, test_agent, merge_agent, inspect_agent, uat_agent. cloister/config.ts ModelSelectionConfig.specialist_models is extended (or paralleled) to carry harness as well as model.",
+      "recordedAt": "2026-05-07T04:10:00.000Z",
+      "rationale": "User picked 'Extend existing per-role model settings'. Avoids a parallel Harness section that would split related config across two UI surfaces."
+    },
+    {
+      "id": "D4",
+      "summary": "ToS gate canUseHarness(harness, model, authMode) blocks Pi from running Anthropic models only when Anthropic auth mode is 'subscription' (Claude Code OAuth). Pi+Anthropic via API key is allowed. Pi+non-Anthropic providers is always allowed regardless of Anthropic auth state.",
+      "recordedAt": "2026-05-07T04:10:00.000Z",
+      "rationale": "Compliance with Anthropic Claude Code subscription terms. User confirmed: Pi+non-Anthropic always OK; Pi+Anthropic OK on API key, blocked on subscription. The gate is evaluated at every spawn entry point (plan kickoff, work start, conversation panel, specialist routing) so a stale Settings selection cannot bypass it."
+    },
+    {
+      "id": "D5",
+      "summary": "Anthropic auth must be exclusively subscription OR API key, never both. If Anthropic subscription is logged in, Panopticon will not honor an Anthropic API key for any spawn (existing behavior reaffirmed). Pi inherits the same rule.",
+      "recordedAt": "2026-05-07T04:10:00.000Z",
+      "rationale": "User stated explicitly. Removes ambiguity in Anthropic ToS gate evaluation: authMode is a single value at any moment, not a per-call choice."
+    },
+    {
+      "id": "D6",
+      "summary": "@panopticon/pi-extension is vendored at packages/pi-extension/ inside this monorepo. The Pi launcher loads it by absolute path (--extension /abs/path/to/dist/index.js). Not published to npm. Versioned in lockstep with panopticon-cli.",
+      "recordedAt": "2026-05-07T04:10:00.000Z",
+      "rationale": "User picked vendored. No release/publish coupling, no version drift between cli and extension, and the user does not need a separate install step."
+    },
+    {
+      "id": "D7",
+      "summary": "Pi RPC IPC uses a named pipe (mkfifo) at ~/.panopticon/agents/<agentId>/rpc.in. The launcher creates the fifo before spawning, runs `exec pi --mode rpc ... < <fifo>` so Pi reads stdin from the fifo. The runtime adapter writes JSONL commands to the fifo. Pi's stdout (structured events) is captured by tmux as normal so users can attach for visual debugging.",
+      "recordedAt": "2026-05-07T04:10:00.000Z",
+      "rationale": "User picked named pipe. Eliminates the load-buffer/paste-buffer/verify pattern. Keeps Pi inside tmux for crash isolation and visual attach. Stdout-as-JSONL is fine because users only need 'attach to debug', not 'attach to chat'."
+    },
+    {
+      "id": "D8",
+      "summary": "Pi binary install is a documented prereq, not auto-installed by Panopticon. `pan doctor` adds a Pi check that warns when the binary is missing, the version is below the supported minimum, or the @panopticon/pi-extension dist is not built.",
+      "recordedAt": "2026-05-07T04:10:00.000Z",
+      "rationale": "User picked 'Document prereq + pan doctor check'. Mirrors how Claude Code is treated. Avoids fragile auto-install in CI/sandbox environments."
+    },
+    {
+      "id": "D9",
+      "summary": "Pi session JSONL is parsed by a new src/lib/cost-parsers/pi-parser.ts that walks Pi's tree-structured v3 format along the active branch (chain from latest leaf through parentId). It outputs the existing SessionUsage interface unchanged so all upstream consumers (cost monitor, cost monitor route, dashboard cost views) keep working. Pi's inline cost.total field is preferred over local recomputation.",
+      "recordedAt": "2026-05-07T04:10:00.000Z",
+      "rationale": "Multi-format parser (PRD Option B). Keeps each harness on its native format; Panopticon does the unification. Trusting Pi's inline cost avoids drift from Anthropic-only pricing tables in cost.ts when Pi routes to OpenAI/Google/etc. A delta metric vs locally recomputed cost is emitted for observability so we can detect Pi pricing-table drift."
+    },
+    {
+      "id": "D10",
+      "summary": "Runtime selection is recorded as `harness` on agent state and on each spawn surface (plan kickoff, work start, conversation panel). The runtime registry stops returning claude-code unconditionally and instead reads agent state to dispatch. AgentRuntime.RuntimeName is widened to 'claude-code' | 'pi' across types.ts, contracts (AgentSnapshot.runtime), and reducers.",
+      "recordedAt": "2026-05-07T04:10:00.000Z",
+      "rationale": "Today getRuntimeForAgent always returns claude-code (runtimes/index.ts:60). Real harness dispatch is a precondition for everything else."
+    }
   ],
   "hazards": [
-    { "id": "H1", "summary": "Must preserve formData/hasChanges/saveMutation state model verbatim — refactor layout around it, not the state logic.", "mitigation": "Keep all state hooks and handlers in the top-level SettingsPage component, pass as props to section components." }
+    {
+      "id": "H1",
+      "summary": "Named-pipe stdin race: if the adapter writes to the fifo before Pi has opened it for reading, the write blocks. If the launcher script is slow to exec pi, the dashboard's first prompt-injection can deadlock.",
+      "mitigation": "Adapter MUST wait for Pi's `session_start` event on stdout (surfaced via the @panopticon/pi-extension writing ready.json) before issuing the first RPC write. Add a 30s timeout with a clear error. Document the ordering invariant in pi.ts and cover with a vitest that races spawn vs. immediate sendMessage."
+    },
+    {
+      "id": "H2",
+      "summary": "Pi version drift — PRD targets v0.73.0. RPC mode flag names, event names, and JSONL schema can change between Pi minor releases.",
+      "mitigation": "pan doctor pins a supported-min Pi version constant. The Pi runtime adapter records `pi --version` output on agent state at spawn time so post-mortem analysis can correlate format anomalies to a Pi version. Parser is defensive: unknown event types are logged once per session and ignored, never thrown."
+    },
+    {
+      "id": "H3",
+      "summary": "Pi tree-format JSONL supports branching/forking via parentId. A naive line-by-line walk would double-count tokens across abandoned branches.",
+      "mitigation": "pi-parser builds a parentId map, identifies the latest leaf (by timestamp), and walks back to root counting only entries on that single chain. Snapshot test fixture under src/lib/cost-parsers/__tests__/fixtures/ with a forked session covering: linear, single fork (one branch active), two-deep fork. Compaction entries on the active branch are accounted explicitly (do not re-add pre-compaction input tokens)."
+    },
+    {
+      "id": "H4",
+      "summary": "Pi reports cost inline (cost.total). Pi's pricing tables may diverge from Panopticon's cost.ts pricing — risk of inconsistent cost figures across the Pi vs Claude Code halves of the dashboard.",
+      "mitigation": "Trust Pi's inline cost as the canonical figure for Pi sessions. Emit a debug-level log line per parse with the delta between Pi's cost.total and a local recomputation using cost.ts pricing. Add a follow-up issue (out of scope here) to consolidate pricing tables once we see real-world drift."
+    },
+    {
+      "id": "H5",
+      "summary": "Specialist baseCommand is hardcoded to 'claude' in three places: src/lib/cloister/specialists.ts:1104, src/lib/cloister/specialists.ts:2316, and src/lib/cloister/review-agent.ts:577 calls getAgentRuntimeBaseCommand which returns 'claude' or 'claudish'. None of these go through a harness-aware command builder.",
+      "mitigation": "Introduce a single resolveSpecialistBaseCommand(role, model, harness) helper. Replace all three call sites. Helper internally branches between Claude Code and Pi command builders. Acceptance criteria explicitly cover all three sites."
+    },
+    {
+      "id": "H6",
+      "summary": "AgentRuntime registry currently returns claude-code unconditionally (runtimes/index.ts:60). All callers of getRuntimeForAgent silently receive a Claude runtime even if the agent is Pi.",
+      "mitigation": "Update RuntimeRegistry.getRuntimeForAgent to read state.harness and dispatch. Audit every caller (grep for getRuntimeForAgent and getRuntime) and confirm none assume claude-code. Add a vitest that registers two runtimes, sets harness=pi on state, and verifies dispatch."
+    },
+    {
+      "id": "H7",
+      "summary": "ToS gate could be bypassed if any single spawn entry point forgets to call canUseHarness. Plan kickoff, work start (CLI + dashboard), conversation panel, and specialist routing are five separate code paths.",
+      "mitigation": "Centralize the gate in a single function `canUseHarness(harness, model, authMode)` and call it from every spawn entry point AND from the harness picker UI (to disable invalid combos before submit). Add a vitest matrix: {claude-code, pi} x {anthropic, openai, google, mistral, ollama} x {subscription, api-key, none}, asserting gate decisions for all 30 cells."
+    },
+    {
+      "id": "H8",
+      "summary": "When the user logs in/out of Anthropic subscription mid-session, an already-running Pi+Anthropic agent could become non-compliant.",
+      "mitigation": "Gate is evaluated at SPAWN time only (no retroactive kill). Document this in docs/HARNESSES.md. Auth-state changes through Settings emit a banner reminding the user to stop in-flight Pi+Anthropic agents if they just logged in to subscription. Out of scope: automatic kill — too disruptive."
+    },
+    {
+      "id": "H9",
+      "summary": "Pi's --no-context-files flag is required (PRD §7) so Panopticon controls system-prompt injection. Without it, Pi loads its own AGENTS.md/CLAUDE.md discovery and double-injects context.",
+      "mitigation": "Pi launcher hardcodes --no-context-files. The append-system-prompt path stays the single source of injected context. Vitest covers the launcher generator output to assert the flag is present."
+    },
+    {
+      "id": "H10",
+      "summary": "Pi extension lifecycle hooks (session_start, tool_execution_end, turn_end, /pan-done) write to ~/.panopticon/agents/<id>/ and ~/.panopticon/heartbeats/. Two concurrent agents on the same machine must not collide.",
+      "mitigation": "Files are namespaced by PANOPTICON_AGENT_ID, which the launcher exports per agent. Extension reads agentId from process.env exactly once at session_start; never falls back to a default. Vitest spins up two extensions in-process with different agentIds and verifies both heartbeat files are written."
+    },
+    {
+      "id": "H11",
+      "summary": "Skill sync (pan sync) currently targets ~/.claude/skills/. Pi reads from ~/.claude/skills (per PRD) by configuration. Misconfiguration would leave Pi without skills.",
+      "mitigation": "pan sync writes/maintains ~/.pi/agent/settings.json with `\"skills\": [\"~/.claude/skills\"]` when Pi is detected. Idempotent: existing entries are preserved. Acceptance covers a fresh ~/.pi/agent/ AND a pre-existing settings.json with unrelated keys."
+    },
+    {
+      "id": "H12",
+      "summary": "AgentSnapshot.runtime in packages/contracts/src/types.ts is currently `Schema.optional(Schema.String)` and reducers default-fill 'claude' (event-reducers.ts:431). Adding 'pi' as a valid value across the read model requires reducer + dashboard updates.",
+      "mitigation": "Tighten the schema to Schema.Literal('claude-code', 'pi') OR keep open-string but add a runtime check in the reducers + dashboard helpers that maps any unknown to 'claude-code' for graceful degradation. Picked: keep optional string but introduce a single helper getHarness(snapshot) that normalizes; consumers call the helper, not the raw field."
+    },
+    {
+      "id": "H13",
+      "summary": "Playwright/UAT specialist running under Pi — Pi's extension and Playwright MCP both spawn child processes; environment isolation between them must be preserved.",
+      "mitigation": "Pi spawn uses an isolated browser profile per agentId (Playwright user-data-dir under ~/.panopticon/agents/<id>/playwright-profile). Acceptance criterion: two concurrent UAT-on-Pi agents do not share login state, cookies, or service workers."
+    }
   ],
   "resumePoint": {
-    "description": "Bead 2 (shell+nav) complete. Next: beads 3-6 (section redesigns). Bead 3 = providers summary-first. Bead 4 = model routing presets. Bead 5 = conversations+terminal. Bead 6 = tracker+appearance+maintenance+desktop.",
-    "beadId": "workspace-0hx1",
-    "filesToRead": ["src/dashboard/frontend/src/components/Settings/SettingsPage.tsx"]
+    "description": "pi-resume-flow bead complete: pi-extension handleSessionStart now writes ~/.panopticon/agents/<id>/session.id (plain text, just the id) on every session_start with a non-null sessionId — null is intentionally skipped because it would defeat resume (AC1). PiRuntime.spawnAgent reads session.id via readStoredSessionId and forwards it as resumeSessionId so the launcher emits `pi --session <id>` (AC2). The hadPriorSpawn detector (sessions/ contains at least one .jsonl) gates the warning so the AC3 path emits a console.warn only when the JSONL invariant says we DID run before but the resume hint is gone — first-ever spawns stay silent. Beads remaining (5): w1o0 (e2e), UI bundle fjs9/0c2/3ir/lg47.",
+    "beadId": "workspace-3119",
+    "filesToRead": [
+      "src/lib/runtimes/pi.ts",
+      "src/lib/runtimes/__tests__/pi.test.ts"
+    ]
   },
-  "beadsMapping": {
-    "workspace-0oxv": "bead 1: settings primitives",
-    "workspace-jf4d": "bead 2: page shell and navigation",
-    "workspace-0hx1": "bead 3: providers redesign",
-    "workspace-tt6m": "bead 4: model routing redesign",
-    "workspace-ze9u": "bead 5: conversations and terminal",
-    "workspace-wymy": "bead 6: tracker keys, appearance, maintenance, desktop",
-    "workspace-fq8g": "bead 7: polish and accessibility"
-  },
-  "agentModel": "claude-opus-4-6",
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-7",
+  "approach": "Pi Agent ships as a second AgentRuntime adapter parallel to ClaudeCodeRuntime. The adapter spawns Pi inside tmux with its stdin redirected from a per-agent named pipe (mkfifo at ~/.panopticon/agents/<id>/rpc.in) so the dashboard can deliver structured RPC commands without touching tmux paste-buffers. A vendored extension at packages/pi-extension/ provides Panopticon's lifecycle signals (session_start ready, tool_execution_end heartbeat, /pan-done completion). A new src/lib/cost-parsers/pi-parser.ts walks Pi's tree-structured JSONL along the active branch and emits the existing SessionUsage interface, leaving cost-monitor and dashboard cost views untouched. Harness+model selection is exposed at three user-initiated spawn points (plan kickoff, work start, conversation panel) and recorded on agent state; specialists read per-role harness+model from Settings. A single canUseHarness(harness, model, authMode) gate is invoked from every spawn entry point and from picker UIs to disable invalid combos before submit; the only blocked combination is Pi + Anthropic-model + auth=subscription. pan doctor adds a Pi-binary version check; pan sync writes ~/.pi/agent/settings.json so Pi reads skills from ~/.claude/skills. End-to-end smoke test spawns a Pi agent, drives it through one prompt, and asserts ready/heartbeat/cost/session-resume all wired correctly.",
   "sessionHistory": [
-    { "timestamp": "2026-05-07T00:45:00Z", "reason": "start", "note": "Fresh session for PAN-963 Settings UI redesign. Merged with main, created 7 beads with dependency chain.", "agentModel": "claude-opus-4-6" },
-    { "timestamp": "2026-05-07T00:50:00Z", "reason": "progress", "note": "Completed bead 1: created primitives/SettingsLayout, SettingsSection, SettingsRow, SettingsSidebarNav, SettingsCardSection, SettingsRowStatus + barrel index + 22 passing tests.", "agentModel": "claude-opus-4-6" },
-    { "timestamp": "2026-05-07T00:57:00Z", "reason": "progress", "note": "Completed bead 2: restructured SettingsPage with SettingsLayout+SettingsHeader+SettingsSidebarNav. Removed dual headers, removed hero section, removed standalone Claude Code section. Reordered sections per PRD. Moved preset buttons into Model Routing section. All 51 tests pass.", "agentModel": "claude-opus-4-6" }
-  ]
+    {
+      "timestamp": "2026-05-07T03:42:36.488Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-636: Pi Coding Agent support as alternative harness to Claude Code",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T04:10:00.000Z",
+      "reason": "planning",
+      "note": "Discovery complete. User confirmed: ship full integration in PAN-636 (no phasing); harness+model picker exposed at plan kickoff, work agent start, and conversation panel only (specialists configured in Settings); per-spawn picking with no per-issue lock; ToS gate blocks Pi+Anthropic only when Anthropic auth=subscription; Anthropic auth is exclusively subscription OR API key, never both; Pi extension vendored at packages/pi-extension/; RPC IPC via mkfifo named pipe; Pi binary install is a documented prereq with pan doctor check; Settings extends existing per-role model section with a harness column. Claudish removal is NOT in scope. continue.json + spec.vbrief.json being written.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T04:40:10.210Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-h5c (harness-types). Widened RuntimeName to claude-code|pi in src/lib/runtimes/types.ts. Added Harness type and getHarness() normalizer in packages/contracts/src/types.ts (legacy claude → claude-code, unknowns → claude-code). Migrated three frontend reads (IssueAgentCard, AgentInfoSection, ResourceCard) to call getHarness(agent). Fixed event-reducers.ts:431 default-fill claude → claude-code. Updated KanbanBoard.test.tsx fixtures. Added 6-case unit test src/lib/__tests__/harness.test.ts; all pass. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T04:53:40.606Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-ef4 (tos-gate). Created src/lib/harness-policy.ts exporting canUseHarness(harness, model, authMode) -> { allowed, reason? }. Single blocked cell: pi+anthropic-model+subscription. claude-code is always allowed; pi+non-Anthropic always allowed; pi+anthropic+api-key allowed; pi+anthropic+undefined-authMode allowed (no subscription is in play). Reason string is human-readable for picker tooltip use. Test src/lib/__tests__/harness-policy.test.ts covers the 2x5x3 matrix (claude-code|pi x anthropic|openai|google|minimax|openrouter x api-key|subscription|undefined) with explicit per-cell assertions plus targeted tests for the block reason. 13 tests pass. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T04:58:48.768Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-y4r (pi-session-parser). Created src/lib/cost-parsers/pi-parser.ts: parsePiSession(filePath) reads Pi v3 JSONL line-by-line, builds Map<id, entry> + childrenOf index, finds latest leaf by max timestamp among childless entries, walks leaf->root via parentId, sums per-message usage along active branch into existing SessionUsage shape from jsonl-parser.ts. Pi reports per-call usage deltas (not cumulative) so summing along the branch is correct without compaction subtraction. Pi inline cost.total is the canonical figure for cost_v2 (cost.ts pricing tables may diverge for non-Anthropic providers). Unknown event types are deduped + logged via console.debug. Compaction count logged for observability. Added 4 fixtures (linear/forked/model-change/compaction/unknown-event) and 6 tests covering AC1-5 + missing-file. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:03:10.329Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-neg (pi-extension-package). Created packages/pi-extension/ as a private workspace package (added to root package.json workspaces). Source at src/index.ts: default export panopticonPiExtension(pi) registers four hooks. session_start writes ~/.panopticon/agents/<agentId>/ready.json with sessionId/reason/pid/timestamp. tool_execution_end writes ~/.panopticon/heartbeats/<agentId>.json with timestamp/tool/last_action/pid (last_action=tool_error when isError). turn_end refreshes the same heartbeat path with last_action=turn_end. /pan-done command writes ~/.panopticon/agents/<agentId>/completed with trimmed summary. agentId comes EXCLUSIVELY from process.env.PANOPTICON_AGENT_ID — when unset, the extension returns silently and registers nothing (so two parallel pi -e instances launched outside Panopticon cannot collide on heartbeat or ready files). Filesystem failures are swallowed inside try/catch so Pi cannot crash. tsdown builds dist/index.js (4kB ESM) + dist/index.d.ts. 9 vitest cases cover all four hooks, the disjoint-paths invariant for AC3, and the empty-agentId no-op behavior. typecheck + lint clean. private:true so no npm publish.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:06:23.480Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-c0q (pi-fifo-ipc). Created src/lib/runtimes/pi-fifo.ts with createPiFifo/destroyPiFifo/writePiCommand. createPiFifo uses execAsync(mkfifo -m 600 ...) since Node has no native mkfifo; idempotent (unlinks any existing inode at the path so a stale regular file from a crashed agent gets replaced cleanly). destroyPiFifo unlinks and tolerates ENOENT. writePiCommand checks ready.json existsSync, throws PiNotReady (no block) when missing per AC4. Opens writer with O_WRONLY|O_NONBLOCK so reader-less fifo throws ENXIO -> typed PiNotReady, allowing the adapter to recycle the agent rather than retry. Writes one JSONL line + newline. Integration test uses an O_RDWR Node reader (kept open across writer lifecycles, mirroring how Pi keeps stdin open for the whole session) — earlier attempt with cat fifo > out failed because waitForReader probe closed the lone reader fd. 8 tests pass: mode 0600, idempotent recreate, replaces stale regular file, destroy is no-op, PiNotReady when ready missing, PiNotReady on ENXIO, round-trip JSONL through kernel pipe. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:09:02.205Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-f9y (pi-launcher-support). Extended LauncherConfig with harness?: claude-code|pi (default claude-code), piExtensionPath, piFifoPath, piSessionDir. buildNonConversationCommand branches early to buildPiCommand when harness===pi. Pi command shape: pi --mode rpc --model <model> --session-dir <piSessionDir> --extension <piExtensionPath> --no-context-files [--session <resumeSessionId>] [<extraArgs>] [--append-system-prompt ] < <piFifoPath>. permissionFlags ignored on Pi path (Pi has no permission system, AC4). baseCommand also ignored on Pi path so callers cannot smuggle claude flags. Throws when piExtensionPath/piFifoPath/piSessionDir missing. AC3 invariant verified by direct equality test: harness unset vs harness=claude-code produce identical output. 22 tests pass total. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:14:55.491Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-ui5c (pi-runtime-adapter). Created src/lib/runtimes/pi.ts implementing AgentRuntime (name=pi). Spawn flow: mkdir agent dir + sessions, createPiFifo, optional prompt file, generateLauncherScript({harness:pi,...}) -> ~/.panopticon/agents/<id>/pi-launcher.sh (chmod 755), createSessionAsync(tmux, bash launcher.sh, env PANOPTICON_AGENT_ID), waitForReady polling ready.json (100ms cadence, 30s timeout -> PiSpawnTimeout typed error). sendMessage: throws PiNotReady when ready.json absent, otherwise writes {cmd:prompt,text} JSONL via writePiCommand. killAgent: best-effort {cmd:abort} via fifo (swallow PiNotReady), then killSessionAsync if tmux session exists, then destroyPiFifo. Heartbeat priority: active heartbeat (<60s old, source=active-heartbeat confidence=high) > jsonl mtime (source=jsonl confidence=medium) > tmux session created timestamp (source=tmux confidence=low). getSessionCost: parsePiSession on latest .jsonl under <agentDir>/sessions/ (recursive walk by mtime), returns CostBreakdown with totalCost from Pi inline cost.total. listSessions walks all agent session dirs. PiRuntime registered in getGlobalRegistry alongside Claude Code. Widened AgentRuntime.killAgent and isRunning return types to allow async (claude-code keeps sync; pi uses async per project rule). 9 tests cover registry registration, sendMessage PiNotReady, spawn precondition, PiSpawnTimeout class shape, three heartbeat sources, getSessionCost via fixture, killAgent unlinks fifo. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:18:30.116Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-nap (runtime-registry-dispatch). Replaced hardcoded return this.get(claude-code) in getRuntimeForAgent with: read state.harness; pi -> this.get(pi); anything else (claude-code, missing, legacy unknown value) -> this.get(claude-code). AC4 audit: only one external getRuntime(claude-code) hit and it lives in the unit test (allowed by AC). 5 vitest cases register two stub runtimes via vi.mock(paths.js) -> /tmp tmp dir, write state.json fixtures, and assert dispatch on pi/claude-code/missing/legacy/no-state branches. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:22:02.476Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-sur (agent-state-harness). Added harness?: claude-code|pi to AgentState (forward compat — readers default unset/legacy via getHarness). SpawnOptions accepts harness, defaults to claude-code in spawnAgent.state. Refactored getAgentRuntimeBaseCommand(model) -> (model, harness=claude-code default) — pi branch returns pi --mode rpc --model X (no permission flags), claude-code branch preserves the existing claude/claudish output bit-for-bit. Updated 4 call sites: agents.ts:1100/1450/1808 pass state.harness ?? claude-code; planning/spawn-planning-session.ts:491 takes opts.harness (added to SpawnPlanningOptions). Other call sites (review-agent, conversations, conversation-compaction) keep the default — those will be re-routed through resolveSpecialistBaseCommand by bead workspace-sdf0. 4 tests pass: default-vs-explicit equality (AC3), claude-code legacy output exact match, pi --mode rpc --model X (AC4), pi has no permission flags. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:24:23.611Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-pal (specialist-config-harness). Extended ModelSelectionConfig with optional specialist_harnesses block: { merge_agent?, review_agent?, test_agent?, inspect_agent?, uat_agent? } each typed claude-code|pi. Defaults to {} (every role falls through to claude-code on read via getSpecialistHarness helper coming in bead anvh). DEFAULT_CLOISTER_CONFIG.model_selection.specialist_harnesses set to empty object so cloister.toml round-trips correctly. Persistence via existing TOML load/save path; no schema migration needed for absent keys (deepMerge fills defaults). 3 tests pass: empty default block, round-trip review_agent=pi+test_agent=claude-code, legacy config without the key still loads. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:25:39.852Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-anvh (router-harness). Added ModelRouter.getSpecialistHarness(specialistName) mirroring getSpecialistModel: normalizes dash->underscore (review-agent -> review_agent), reads config.model_selection.specialist_harnesses, falls back to claude-code for unknown specialists OR absent overrides. Added getSpecialistHarness top-level convenience function via getGlobalRouter. 5 tests pass: configured pi specialist, dash<->underscore equivalence, unknown name fallback, missing override fallback, global function. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:28:59.389Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-sdf0 (specialist-base-command). Added resolveSpecialistBaseCommand(role, model, harness?) in router.ts using dynamic imports of harness-policy + agents (avoids circular import with specialists.ts). Helper resolves harness from getSpecialistHarness when not explicit, evaluates canUseHarness against the model + getProviderAuthMode result, falls back to claude-code with a console.warn on block. Replaced 3 hardcoded sites: specialists.ts:1104 (specialist-dispatch inner script — uses specialistType as role), specialists.ts:2316 (specialist-init launcher — uses name as role), review-agent.ts:540 (spawnSingleReviewer — uses literal role review-agent). Removed now-unused getAgentRuntimeBaseCommand import from review-agent.ts. Verified AC1: grep for baseCommand:claude literals in cloister/ returns nothing. 4 vitest cases cover claude-code branch, pi branch (ToS allows non-Anthropic), pi+Anthropic+subscription fallback with warn, explicit harness override beats config. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:32:00.501Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-r63 (work-start-picker-cli). Added --harness <claude-code|pi> option to pan start command in src/cli/index.ts. Extended IssueOptions with harness?. issueCommand validates the flag up front: unknown value exits non-zero with Invalid --harness on stderr; canUseHarness(harness, model, await getProviderAuthMode(model)) is consulted before any workspace setup, so a Pi+Anthropic+subscription combo exits non-zero with the typed reason text and no half-prepared workspace. requestedHarness defaults to claude-code (no breaking change for existing scripts) and is passed to spawnAgent so AgentState.harness round-trips. Local spawn path passes harness; remote spawn path leaves a comment that Pi is local-only until the Fly worker bundles the pi binary (separate concern). 2 vitest cases cover: pi+Anthropic+subscription rejection with reason on stderr, and unknown --harness rejection. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:34:03.317Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-8qco (pi-termination-flow). Replaced minimal killAgent with the full TERM->KILL escalation ladder: (1) writePiCommand({cmd:abort}) — graceful so Pi can flush session.jsonl; (2) pollUntilSessionGone with 2s budget (100ms cadence); (3) tmux send-keys C-c + pkill -TERM -f agent-id=<id> (best-effort); (4) pollUntilSessionGone with 5s budget; (5) tmux kill-session as SIGKILL fallback. cleanupPiTransientFiles always runs at the end and removes rpc.in (via destroyPiFifo), ready.json, completed marker, and ~/.panopticon/heartbeats/<id>.json — but NEVER touches <agentDir>/sessions/*.jsonl per the JSONL-is-sacred rule in CLAUDE.md. 2 new pi.test cases verify the cleanup invariant (sacred jsonl survives) and the exit-fast-when-no-tmux invariant (<3.5s). 10 tests pass total. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:51:00.000Z",
+      "reason": "continue",
+      "note": "Resumed after context compaction. Ran full vitest: 14 failures broken down: 4 review-agent.test.ts cases were broken by the PAN-636 swap from getAgentRuntimeBaseCommand to resolveSpecialistBaseCommand and by leftover injectProviderEnvOverlay assertions (helper was removed in main commit 9fdb84258 but this stale-base branch still referenced it); fixed by porting main's updated assertions (test now expects resolveSpecialistBaseCommand from router.js, generateLauncherScript + BLANKED_PROVIDER_ENV references, no overlay). Remaining 10 failures (deacon-ci-retry, agent-spawning SageOx, release-monorepo-version, pan-344-auto-merge) verified to PASS on origin/main and are the side effect of feature/pan-636 being branched before those fixes landed — not caused by my changes; they will resolve on the next sync-with-main cycle. Closed bead workspace-uem (pi-doctor-prereq): extracted checkPi(strict) helper from doctorCommand, added SUPPORTED_PI_VERSION_MIN=0.73.0 constant + compareSemver, readPiVersion uses 2>&1 to capture Pi's stderr-printed version, --strict CLI option wired through doctorCommand options, --strict escalates Pi-missing from warn to error per AC3, packages/pi-extension/dist/index.js existence check warns with the build command per AC2. 6 vitest cases (doctor-pi.test.ts) cover OK/too-old/missing-warn/missing-strict/extension-missing/stderr-version-parse. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:55:00.000Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-63b (pan-sync-pi-skills). Added syncPiSettings() to src/lib/sync.ts. The helper checks `which pi` first and returns status='skipped' immediately when Pi is not on PATH so we never overwrite user config for a tool the user has not installed (AC3). When Pi IS on PATH, it reads ~/.pi/agent/settings.json (or starts from {} when absent), merges in a skills array containing ~/.claude/skills while preserving every other key in the existing file (AC2), and writes the merged JSON with a trailing newline. A second invocation with the entry already present returns status='unchanged' (idempotent). Malformed JSON in the existing file is left untouched and surfaces as status='skipped' with reason='not valid JSON'. Wired into syncCommand in src/cli/commands/sync.ts after the existing checks; created/updated/malformed cases each get a colored console line. 5 vitest cases cover the three ACs plus the idempotent and malformed branches. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T06:00:00.000Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-dbf (pan-status-harness). pan status human-readable output now prints `Harness:  <claude-code|pi>` between Runtime and Duration for each running agent, defaulting to 'claude-code' when AgentState.harness is undefined so legacy pre-PAN-636 state.json files keep rendering correctly (AC1). The JSON mode (`pan status --json`) already inherits agent.harness from AgentState verbatim. Dashboard IssueAgentCard renders the harness as a colored badge — pi gets purple-500/15 + purple-300, claude-code gets blue-500/15 + blue-300 — wrapped in a span tagged data-testid='agent-harness-badge' and titled with 'Coding-agent harness: <name>'. Source comes from getHarness(agent) (the legacy normalizer in @panctl/contracts), not the raw runtime field, so mixed-harness boards stay legible (AC2). 3 status-harness tests via mocked listRunningAgents + 2 source-grep frontend tests (mounting IssueAgentCard pulls in DialogProvider + react-query + Zustand which is out of scope for this AC; the source-grep regression guard is the existing pattern in this codebase per review-agent.test.ts). typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T06:05:00.000Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-6oe (docs-harnesses). Wrote docs/HARNESSES.md (6 sections matching the bead spec: supported harnesses table, install Pi with pan doctor + pan sync workflow, where the harness is picked at the four user-initiated surfaces, ToS rules with the explicit truth table showing pi+Anthropic+subscription as the single blocked cell and the canUseHarness fallback behavior, troubleshooting incl. PAN_E2E=1 gating for the smoke test, tradeoffs RPC vs paste-buffer and Pi multi-provider vs CLIProxy). The 'See also' footer points at the actual files (pi.ts, pi-fifo.ts, pi-parser.ts, harness-policy.ts, packages/pi-extension/) so future readers land on canonical sources, not stale doc copies. Linked from CLAUDE.md via a new 4-line Harnesses section placed between the no-blocking-calls rule and the Project Structure header (AC2). typecheck + lint pass (no source changes — docs only).",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T06:10:00.000Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-3119 (pi-resume-flow). Extended pi-extension's panopticonPathsFor to include sessionIdPath (~/.panopticon/agents/<id>/session.id) and made handleSessionStart write the plain-text sessionId there on every session_start with a non-null id (AC1). Null/undefined sessionIds are intentionally skipped because writing 'null' to that file would silently defeat resume on the next spawn. PiRuntime gained readStoredSessionId(agentId) that returns the trimmed contents or null on absence/empty/error. PiRuntime.spawnAgent reads session.id BEFORE mkdir creates the agent dir (so the hadPriorSpawn detector can use the existence of sessions/*.jsonl as proof of a prior run, since killAgent preserves session jsonls per the JSONL-is-sacred rule) and forwards the id as resumeSessionId; the launcher-generator pi branch already emits `pi --session <id>` when resumeSessionId is set (AC2). When session.id is absent BUT a prior session jsonl exists, console.warn fires with the agent id and the message 'session.id is missing — spawning a fresh Pi session' so the dashboard can surface the divergence; the spawn itself does not fail (AC3). First-ever spawns stay silent. cleanupPiTransientFiles intentionally does NOT delete session.id so kill+respawn reuses the same session. 3 new pi.test cases drive spawnAgent end-to-end with mocked tmux (createSessionAsync/sessionExistsAsync/killSessionAsync set to no-ops) and a pre-created ready.json that lets waitForReady return immediately, then read the launcher script that was written to disk and assert it contains/omits `--session <id>`. 2 new pi-extension tests assert sessionIdPath gets written on non-null sessionId and stays absent on missing sessionId. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    }
+  ],
+  "feedback": []
 }

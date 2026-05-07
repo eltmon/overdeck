@@ -77,6 +77,8 @@ import { assertCanStartFresh } from '../../lib/work-agent-lifecycle.js';
 
 interface IssueOptions {
   model: string;
+  /** PAN-636 — coding-agent harness override. Defaults to claude-code. */
+  harness?: 'claude-code' | 'pi';
   dryRun?: boolean;
   shadow?: boolean;
   remote?: boolean;
@@ -307,6 +309,10 @@ async function handleRemoteWorkspace(
     const remoteAgent = await spawnRemoteAgent({
       issueId,
       workspace: remoteMetadata,
+      // harness flows in once the remote-spawn path supports it; the front-end
+      // gate still rejects invalid combos before we reach this call so the
+      // remote agent will see harness=claude-code today (Pi is local-only
+      // until the Fly worker image bundles the pi binary — tracked separately).
       model: options.model,
       prompt,
     });
@@ -535,6 +541,26 @@ function validateAndCleanStateFile(workspacePath: string, issueId: string): { va
 }
 
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
+  // PAN-636 — validate --harness up front. canUseHarness gates the
+  // {harness, model, authMode} combination; invalid combos exit non-zero
+  // with the human-readable reason text on stderr (no spinner, no
+  // workspace setup) so callers don't get a half-prepared workspace
+  // when they pick something the gate refuses.
+  const requestedHarness: 'claude-code' | 'pi' = options.harness ?? 'claude-code';
+  if (requestedHarness !== 'claude-code' && requestedHarness !== 'pi') {
+    process.stderr.write(`Invalid --harness value: ${options.harness}. Expected 'claude-code' or 'pi'.\n`);
+    process.exit(1);
+  }
+  if (options.model) {
+    const { canUseHarness } = await import('../../lib/harness-policy.js');
+    const { getProviderAuthMode } = await import('../../lib/agents.js');
+    const decision = canUseHarness(requestedHarness, options.model, await getProviderAuthMode(options.model));
+    if (!decision.allowed) {
+      process.stderr.write(`${decision.reason}\n`);
+      process.exit(1);
+    }
+  }
+
   const spinner = ora(`Preparing workspace for ${id}...`).start();
 
   try {
@@ -764,6 +790,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     const agent = await spawnAgent({
       issueId: id,
       workspace,
+      harness: requestedHarness,
       model: options.model,
       phase: (options.phase || 'implementation') as SpawnOptions['phase'],
       prompt,

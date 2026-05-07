@@ -15,9 +15,8 @@ export const EDITORS = [
 export type EditorEntry = (typeof EDITORS)[number]
 export type EditorId = EditorEntry["id"]
 
-export const EditorIdSchema = Schema.Literal(
-  ...EDITORS.map((e) => e.id) as [EditorId, ...EditorId[]]
-)
+const EDITOR_IDS = EDITORS.map((e) => e.id) as unknown as [EditorId, ...EditorId[]]
+export const EditorIdSchema = Schema.Literal(...EDITOR_IDS)
 
 export const OpenInEditorInput = Schema.Struct({
   cwd: Schema.String,

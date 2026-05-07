@@ -10,9 +10,89 @@ import {
   COMMANDS_DIR,
   AGENTS_DIR,
   CLAUDE_DIR,
+  packageRoot,
 } from '../../lib/paths.js';
 
-interface CheckResult {
+// Minimum supported Pi binary version for the Pi harness (PAN-636).
+// Bump in lockstep with packages/pi-extension API surface compatibility.
+export const SUPPORTED_PI_VERSION_MIN = '0.73.0';
+
+function compareSemver(a: string, b: string): number {
+  const pa = a.split('.').map((n) => parseInt(n, 10));
+  const pb = b.split('.').map((n) => parseInt(n, 10));
+  for (let i = 0; i < 3; i++) {
+    const da = pa[i] ?? 0;
+    const db = pb[i] ?? 0;
+    if (da !== db) return da - db;
+  }
+  return 0;
+}
+
+export function checkPi(strict: boolean): CheckResult[] {
+  const out: CheckResult[] = [];
+  if (!checkCommand('pi')) {
+    out.push({
+      name: 'Pi Coding Agent',
+      status: strict ? 'error' : 'warn',
+      message: 'Not installed (optional alternative harness)',
+      fix: 'Install: npm install -g @mariozechner/pi-coding-agent',
+    });
+    return out;
+  }
+
+  const version = readPiVersion();
+  if (!version) {
+    out.push({
+      name: 'Pi Coding Agent',
+      status: 'warn',
+      message: 'Detected but `pi --version` did not return a version string',
+      fix: 'Reinstall: npm install -g @mariozechner/pi-coding-agent',
+    });
+  } else if (compareSemver(version, SUPPORTED_PI_VERSION_MIN) < 0) {
+    out.push({
+      name: 'Pi Coding Agent',
+      status: 'error',
+      message: `v${version} (too old — requires >= ${SUPPORTED_PI_VERSION_MIN})`,
+      fix: 'Upgrade: npm install -g @mariozechner/pi-coding-agent@latest',
+    });
+  } else {
+    out.push({
+      name: 'Pi Coding Agent',
+      status: 'ok',
+      message: `v${version}`,
+    });
+  }
+
+  const extensionDist = join(packageRoot, 'packages', 'pi-extension', 'dist', 'index.js');
+  if (!existsSync(extensionDist)) {
+    out.push({
+      name: 'Pi Extension Bundle',
+      status: 'warn',
+      message: 'packages/pi-extension/dist/index.js not found',
+      fix: 'Build it: cd packages/pi-extension && npm run build',
+    });
+  } else {
+    out.push({
+      name: 'Pi Extension Bundle',
+      status: 'ok',
+      message: 'packages/pi-extension/dist/index.js present',
+    });
+  }
+  return out;
+}
+
+function readPiVersion(): string | null {
+  // Pi prints its version to stderr, not stdout — merge both streams.
+  try {
+    const out = execSync('pi --version 2>&1', { encoding: 'utf-8', stdio: 'pipe' }).trim();
+    const m = out.match(/(\d+\.\d+\.\d+)/);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface CheckResult {
   name: string;
   status: 'ok' | 'warn' | 'error';
   message: string;
@@ -41,7 +121,11 @@ function countItems(path: string): number {
   }
 }
 
-export async function doctorCommand(): Promise<void> {
+export interface DoctorOptions {
+  strict?: boolean;
+}
+
+export async function doctorCommand(options: DoctorOptions = {}): Promise<void> {
   console.log(chalk.bold('\nPanopticon Doctor\n'));
   console.log(chalk.dim('Checking system health...\n'));
 
@@ -77,6 +161,11 @@ export async function doctorCommand(): Promise<void> {
       checks.push({ name, status: 'warn', message: 'Not installed (optional)', fix });
     }
   }
+
+  // Pi Coding Agent (alternative harness — PAN-636).
+  // Pi is optional: missing → warn (or error under --strict). When installed, version
+  // is compared against SUPPORTED_PI_VERSION_MIN and the bundled extension is checked.
+  for (const c of checkPi(options.strict ?? false)) checks.push(c);
 
   // Check Panopticon directories
   const directories = [
@@ -288,4 +377,11 @@ export async function doctorCommand(): Promise<void> {
     console.log(chalk.green('All systems operational!'));
   }
   console.log('');
+
+  if (hasErrors) {
+    process.exit(1);
+  }
+  if (options.strict && hasWarnings) {
+    process.exit(1);
+  }
 }

@@ -1110,17 +1110,17 @@ describe('dispatch failure reviewStatus regression', () => {
 // providers (OpenAI, Google) get routed correctly instead of using the old
 // hardcoded `claude --model` which only works for direct Anthropic-compatible providers.
 describe('spawnReviewer runtime command routing regression', () => {
-  it('review-agent.ts imports getAgentRuntimeBaseCommand from agents.js', async () => {
+  it('review-agent.ts imports resolveSpecialistBaseCommand from router.js (PAN-636: harness-aware routing)', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const src = readFileSync(
       resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
       'utf-8',
     );
-    expect(src).toMatch(/import\s*\{[^}]*getAgentRuntimeBaseCommand[^}]*\}\s*from\s*['"]\.\.\/agents\.js['"]/);
+    expect(src).toMatch(/import\s*\{[^}]*resolveSpecialistBaseCommand[^}]*\}\s*from\s*['"]\.\/router\.js['"]/);
   });
 
-  it('spawnReviewer body uses getAgentRuntimeBaseCommand, not a hardcoded claude --model string', async () => {
+  it('spawnReviewer body uses resolveSpecialistBaseCommand, not a hardcoded claude --model string', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const src = readFileSync(
@@ -1133,8 +1133,9 @@ describe('spawnReviewer runtime command routing regression', () => {
     expect(spawnReviewerMatch).not.toBeNull();
     const fn = spawnReviewerMatch![0];
 
-    // Must use the routing helper — not a bare `claude --model` string
-    expect(fn).toContain('getAgentRuntimeBaseCommand(');
+    // Must use the harness-aware routing helper — not a bare `claude --model` string.
+    // resolveSpecialistBaseCommand wraps getAgentRuntimeBaseCommand and adds harness/ToS routing.
+    expect(fn).toContain('resolveSpecialistBaseCommand(');
     expect(fn).not.toMatch(/`claude\s+--(?:dangerously-skip-permissions|model)/);
   });
 

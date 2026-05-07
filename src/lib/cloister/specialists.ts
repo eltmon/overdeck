@@ -24,6 +24,7 @@ import { getModelId, WorkTypeId } from '../work-type-router.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { getProviderEnvForModel } from '../agents.js';
 import { generateLauncherScript, generateLauncherWrapper } from '../launcher-generator.js';
+import { resolveSpecialistBaseCommand } from './router.js';
 import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery, createSessionAsync, killSessionAsync, buildTmuxCommandString, listPaneValuesAsync, listSessionNamesAsync, sessionExistsAsync } from '../tmux.js';
 import { notifyPipeline } from '../pipeline-notifier.js';
 import { isTaskReady } from './task-readiness.js';
@@ -1106,7 +1107,13 @@ ${basePrompt}`;
         panopticonEnv: { agentId: tmuxSession, issueId: task.issueId, sessionType: sessionTypeLabel },
         cavemanExports: specialistCavemanExports,
         promptFile,
-        baseCommand: `claude --agent ${specialistAgentName}`,
+        // PAN-982: emit `claude --agent ${specialistAgentName}` on the claude-code
+        // path (the agent frontmatter declares model/permissions/tools/hooks, so
+        // we drop --model and --permission flags entirely). PAN-636 routes through
+        // resolveSpecialistBaseCommand so a Pi-configured specialist gets a
+        // `pi --mode rpc --model <model>` line instead, with the ToS gate falling
+        // back to claude-code for the blocked Pi+Anthropic+subscription cell.
+        baseCommand: await resolveSpecialistBaseCommand(specialistType, model),
         sessionId,
         model,
       }),
@@ -2320,7 +2327,10 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
         unsetProviderEnv: true,
         providerExports: initProviderExportLines,
         promptFile,
-        baseCommand: `claude --agent ${specialistAgentName}`,
+        // Same PAN-982 + PAN-636 handling as the dispatch path above —
+        // resolveSpecialistBaseCommand emits the --agent form on claude-code and
+        // a pi --mode rpc line when the role is configured for Pi.
+        baseCommand: await resolveSpecialistBaseCommand(name, model),
         sessionId: newSessionId,
         model,
       }),

@@ -13,7 +13,8 @@ import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
 import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync, isPaneDeadAsync } from '../tmux.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agents.js';
+import { getProviderExportsForModel } from '../agents.js';
+import { resolveSpecialistBaseCommand } from './router.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { getModelId, hasOverride } from '../work-type-router.js';
 import { AGENTS_DIR, CACHE_AGENTS_DIR, CACHE_REVIEW_PROMPTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
@@ -537,10 +538,11 @@ export async function spawnSingleReviewer(
   promptFile: string,
   projectPath: string,
 ): Promise<void> {
-  // PAN-982: spawnSingleReviewer is the canonical reviewer path (PAN-830 long-lived
-  // sessions). Pass agentType='review' + sessionName so getAgentRuntimeBaseCommand()
-  // emits 'claude --agent pan-review-agent --name <sessionName>'.
-  const claudeCmd = await getAgentRuntimeBaseCommand(model, sessionName, 'review');
+  // PAN-982 + PAN-636: emit 'claude --agent pan-review-agent --name <sessionName>'
+  // on the claude-code path, or fall back to Pi when configured. The harness
+  // routing + ToS gate live inside resolveSpecialistBaseCommand so a stale
+  // Settings selection cannot bypass the gate.
+  const claudeCmd = await resolveSpecialistBaseCommand('review-agent', model, sessionName);
   const providerExports = await getProviderExportsForModel(model);
 
   // Pre-generate the Claude session UUID and persist it to the canonical reviewer

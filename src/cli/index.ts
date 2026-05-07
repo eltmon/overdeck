@@ -335,6 +335,7 @@ program
   .command('start <id>')
   .description('Create workspace and spawn agent for an issue')
   .option('--model <model>', 'Model to use (sonnet/opus/haiku/kimi-k2.5/etc) - defaults to Cloister config')
+  .option('--harness <harness>', 'Coding-agent harness: claude-code (default) | pi')
   .option('--dry-run', 'Show what would be created')
   .option('--shadow', 'Enable shadow mode')
   .option('--no-shadow', 'Disable shadow mode')
@@ -1030,7 +1031,8 @@ program
 program
   .command('doctor')
   .description('Check system health and dependencies')
-  .action(doctorCommand);
+  .option('--strict', 'Exit non-zero if any optional dependency is missing (e.g. Pi binary)')
+  .action((options) => doctorCommand(options));
 
 // Resources command
 program

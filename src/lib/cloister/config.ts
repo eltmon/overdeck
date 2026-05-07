@@ -118,6 +118,18 @@ export interface ModelSelectionConfig {
     inspect_agent?: 'opus' | 'sonnet' | 'haiku';
     uat_agent?: 'opus' | 'sonnet' | 'haiku';
   };
+  /**
+   * PAN-636 — per-role coding-agent harness override. Defaults to
+   * 'claude-code' for every role when unset. Absent keys are normal
+   * (forward compat with config files written before harness existed).
+   */
+  specialist_harnesses?: {
+    merge_agent?: 'claude-code' | 'pi';
+    review_agent?: 'claude-code' | 'pi';
+    test_agent?: 'claude-code' | 'pi';
+    inspect_agent?: 'claude-code' | 'pi';
+    uat_agent?: 'claude-code' | 'pi';
+  };
 }
 
 /**
@@ -274,6 +286,11 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     specialist_models: {
       // PAN-754: no hardcoded defaults. User config.yaml overrides are authoritative.
       // Resolution falls through to work-type-router, then to the global fallback model.
+    },
+    specialist_harnesses: {
+      // PAN-636: every role defaults to 'claude-code' when not overridden in
+      // config.yaml. Reads through ModelRouter.getSpecialistHarness which
+      // returns 'claude-code' for missing keys.
     },
   },
   handoffs: {

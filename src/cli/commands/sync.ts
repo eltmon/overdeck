@@ -9,7 +9,7 @@ import { loadConfig } from '../../lib/config.js';
 import { parseVBriefFilename } from '../../lib/vbrief/lifecycle.js';
 import { resolveGitHubIssue } from '../../lib/tracker-utils.js';
 import { createBackup } from '../../lib/backup.js';
-import { planSync, executeSync, refreshCache, migrateStalePersonalContent, removeLegacySkills070, planHooksSync, syncHooks, syncStatusline, mirrorProjectSkills } from '../../lib/sync.js';
+import { planSync, executeSync, refreshCache, migrateStalePersonalContent, removeLegacySkills070, planHooksSync, syncHooks, syncStatusline, mirrorProjectSkills, syncPiSettings } from '../../lib/sync.js';
 import { SYNC_TARGET, isDevMode } from '../../lib/paths.js';
 import { getDevrootPath } from '../../lib/config.js';
 import { listProjects } from '../../lib/projects.js';
@@ -508,6 +508,17 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
         }
       }
     }
+  }
+
+  // Pi harness — point Pi's settings file at ~/.claude/skills so it sees the
+  // same skills tree we just synced. No-op when Pi is not on PATH (PAN-636).
+  const piResult = syncPiSettings();
+  if (piResult.status === 'created') {
+    console.log(chalk.cyan(`Pi settings: created ${piResult.path.replace(homedir(), '~')}`));
+  } else if (piResult.status === 'updated') {
+    console.log(chalk.cyan(`Pi settings: merged skills entry into ${piResult.path.replace(homedir(), '~')}`));
+  } else if (piResult.status === 'skipped' && piResult.reason === 'existing settings.json is not valid JSON') {
+    console.log(chalk.yellow(`Pi settings: ${piResult.path.replace(homedir(), '~')} is not valid JSON — left untouched`));
   }
 
   // Mirror project-level skills/ → .claude/skills/ against the devroot when
