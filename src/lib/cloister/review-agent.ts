@@ -11,7 +11,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
-import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync, isPaneDeadAsync } from '../tmux.js';
+import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync, isPaneDeadAsync, listPaneValuesAsync } from '../tmux.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { getProviderExportsForModel } from '../agents.js';
 import { resolveSpecialistBaseCommand } from './router.js';
@@ -755,6 +755,82 @@ export async function killAllReviewerSessions(
   return { killed, failed };
 }
 
+/**
+ * Check whether a review coordinator session is actually alive (not just a tmux
+ * pane kept open by remain-on-exit). Gets the pane PID and verifies the process
+ * still exists in the process table. This catches the case where the underlying
+ * bash process has exited but tmux reports pane_dead=0 because a child process
+ * or tmux itself is keeping the pane alive.
+ */
+async function isCoordinatorAliveAsync(sessionName: string): Promise<boolean> {
+  try {
+    const pids = await listPaneValuesAsync(sessionName, '#{pane_pid}');
+    if (pids.length === 0) return false;
+    const pid = parseInt(pids[0], 10);
+    if (!Number.isFinite(pid) || pid <= 0) return false;
+    // kill -0 checks if the process exists and we have permission to signal it.
+    // This is a fast syscall — comparable to existsSync — and does not block on I/O.
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Kill ALL review-related tmux sessions on the panopticon socket.
+ *
+ * Called by `pan down` to prevent stale coordinator/reviewer sessions from
+ * surviving a dashboard restart and blocking new review dispatch (PAN-931).
+ *
+ * Targets:
+ *   - review-coordinator-<issueId>-<timestamp>
+ *   - specialist-<projectKey>-<issueId>-review-<role> (canonical PAN-830)
+ *   - review-<issueId>-<timestamp>-<role> (legacy PAN-821)
+ *
+ * Returns the list of sessions killed and any that failed to kill.
+ */
+export async function killAllReviewSessions(): Promise<{ killed: string[]; failed: string[] }> {
+  const killed: string[] = [];
+  const failed: string[] = [];
+
+  let allSessions: string[];
+  try {
+    allSessions = await listSessionNamesAsync();
+  } catch (err) {
+    console.warn('[review-agent] Failed to list tmux sessions during review cleanup:', err instanceof Error ? err.message : String(err));
+    return { killed, failed };
+  }
+
+  const reviewPatterns = [
+    /^review-coordinator-/,
+    /^specialist-.+-review-/,
+    /^review-[A-Z0-9]+-\d+-\d+/, // legacy: review-PAN-999-1713456789000-correctness
+  ];
+
+  const sessionsToKill = allSessions.filter(s => reviewPatterns.some(p => p.test(s)));
+  if (sessionsToKill.length === 0) {
+    return { killed, failed };
+  }
+
+  console.log(`[review-agent] Killing ${sessionsToKill.length} review session(s) during shutdown`);
+
+  await Promise.all(
+    sessionsToKill.map(async (sessionName) => {
+      try {
+        await killSessionAsync(sessionName);
+        console.log(`[review-agent] Killed review session ${sessionName}`);
+        killed.push(sessionName);
+      } catch (err) {
+        console.log(`[review-agent] Session ${sessionName} already gone or failed to kill: ${err instanceof Error ? err.message : String(err)}`);
+        failed.push(sessionName);
+      }
+    }),
+  );
+
+  return { killed, failed };
+}
+
 type ReviewerOutcome = { role: string; status: 'completed' | 'failed'; outputFile: string; sessionName?: string };
 
 /**
@@ -1426,14 +1502,19 @@ export async function dispatchParallelReview(
   // reviewer agents — doubling or tripling the cost.
   // PAN-912 follow-up: also check pane_dead — remain-on-exit keeps the session
   // alive after the coordinator dies, so sessionExists alone is not enough.
+  // PAN-931 follow-up: also verify the pane PID is still alive in the process
+  // table. A child process can keep tmux from reporting pane_dead=1 even when
+  // the coordinator bash script has exited, so pane_dead alone is not enough.
   try {
     const sessions = await listSessionNamesAsync();
     const existingCoordinator = sessions.find(
       (s) => s.startsWith(`review-coordinator-${opts.issueId}-`),
     );
     if (existingCoordinator) {
-      if (await isPaneDeadAsync(existingCoordinator)) {
-        console.log(`[review-agent] Idempotency guard: coordinator ${existingCoordinator} pane is dead — killing stale session and proceeding with dispatch`);
+      const paneDead = await isPaneDeadAsync(existingCoordinator);
+      const actuallyAlive = !paneDead && (await isCoordinatorAliveAsync(existingCoordinator));
+      if (paneDead || !actuallyAlive) {
+        console.log(`[review-agent] Idempotency guard: coordinator ${existingCoordinator} is dead (paneDead=${paneDead}, alive=${actuallyAlive}) — killing stale session and proceeding with dispatch`);
         await killSessionAsync(existingCoordinator).catch(() => {});
       } else {
         console.log(`[review-agent] Idempotency guard: coordinator ${existingCoordinator} already running for ${opts.issueId} — skipping dispatch`);

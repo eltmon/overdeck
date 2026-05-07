@@ -175,9 +175,51 @@ export function copyPanopticonSettingsToWorkspace(workspacePath: string): { copi
         }
       }
 
+      // Validate hook paths — remove hooks that reference non-existent absolute paths
+      // to prevent Claude Code from hanging when executing broken hooks.
+      function isBrokenHookCommand(command: string): boolean {
+        const tokens = command.split(/\s+/);
+        for (let token of tokens) {
+          token = token.replace(/^["'`]+|["'`]+$/g, '').replace(/[;|&<>]+$/, '');
+          if (token.startsWith('/')) {
+            try {
+              if (!existsSync(token)) return true;
+            } catch {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      for (const [category, hookList] of Object.entries(mergedHooks)) {
+        if (!Array.isArray(hookList)) continue;
+        const validHooks = (hookList as Array<{ command?: string }>).filter((hook) => {
+          if (typeof hook.command !== 'string') return true;
+          if (!hook.command.trim()) return true;
+          const hasAbsolutePath = hook.command.split(/\s+/).some((t) => {
+            const clean = t.replace(/^["'`]+|["'`]+$/g, '').replace(/[;|&<>]+$/, '');
+            return clean.startsWith('/');
+          });
+          if (!hasAbsolutePath) return true; // relative / shell-only, skip validation
+          if (isBrokenHookCommand(hook.command)) {
+            result.errors.push(`Removed broken hook from workspace settings: ${category} → ${hook.command}`);
+            return false;
+          }
+          return true;
+        });
+        if (validHooks.length === 0) {
+          delete mergedHooks[category];
+        } else {
+          mergedHooks[category] = validHooks;
+        }
+      }
+
       const merged = { ...globalSettings, ...workspaceSettings };
       if (Object.keys(mergedHooks).length > 0) {
         merged.hooks = mergedHooks;
+      } else {
+        delete (merged as Record<string, unknown>).hooks;
       }
 
       writeFileSync(workspaceSettingsPath, JSON.stringify(merged, null, 2), 'utf-8');

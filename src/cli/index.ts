@@ -921,6 +921,25 @@ program
       console.log(chalk.dim('  No dashboard processes found'));
     }
 
+    // Kill review coordinator and reviewer sessions so they don't survive
+    // dashboard restart and block new review dispatch (PAN-931).
+    console.log(chalk.dim('Stopping review sessions...'));
+    try {
+      const { killAllReviewSessions } = await import('../lib/cloister/review-agent.js');
+      const { killed, failed } = await killAllReviewSessions();
+      if (killed.length > 0) {
+        console.log(chalk.green(`✓ Stopped ${killed.length} review session(s)`));
+      }
+      if (failed.length > 0) {
+        console.log(chalk.yellow(`⚠ Failed to stop ${failed.length} review session(s)`));
+      }
+      if (killed.length === 0 && failed.length === 0) {
+        console.log(chalk.dim('  No review sessions running'));
+      }
+    } catch {
+      console.log(chalk.dim('  Review session cleanup skipped'));
+    }
+
     // Stop Traefik if enabled
     if (traefikEnabled && !options.skipTraefik) {
       const traefikDir = join(process.env.HOME || '', '.panopticon', 'traefik');

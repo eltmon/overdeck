@@ -172,11 +172,11 @@ export function ReviewPipelineSection({ reviewStatus, issueId, onViewLog }: Revi
           ))}
         </div>
 
-        {/* Verification attempt counter */}
-        {(reviewStatus.verificationCycleCount ?? 0) > 0 && (
+        {/* Verification cycle counter */}
+        {reviewStatus.verificationCycleCount !== undefined && reviewStatus.verificationMaxCycles !== undefined && (
           <div className="mt-1.5 flex items-center gap-1.5 text-[10px]">
             <Info className="w-3 h-3 text-muted-foreground" />
-            <span className="text-muted-foreground">Verification attempt</span>
+            <span className="text-muted-foreground">Cycle</span>
             <span className={`font-medium ${
               (reviewStatus.verificationCycleCount ?? 0) >= verificationMaxCycles
                 ? 'text-destructive'

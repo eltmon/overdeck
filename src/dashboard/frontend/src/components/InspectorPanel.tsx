@@ -20,6 +20,7 @@ import {
   Box,
   Play,
   GitMerge,
+  GitPullRequest,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
@@ -33,6 +34,8 @@ import { PlanDialog } from './PlanDialog';
 import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
+import { isReviewPipelineStuck } from '../lib/pipeline-state';
+import { RecoverButton } from './RecoverButton';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
 import { PanOpenInPicker } from './PanOpenInPicker';
 import { ContainerSection } from './inspector/ContainerSection';
@@ -41,6 +44,7 @@ import { PHASE_CHIP_COLORS, PHASE_LABELS, type PipelinePhase } from './inspector
 import { SwitchModelModal } from './SwitchModelModal';
 import { useSwitchModel } from '../hooks/useSwitchModel';
 import { SensitiveText } from './SensitiveText';
+import { useActivityQuery, usePrQuery } from './CommandDeck/ZoneCOverviewTabs/queries';
 
 function formatCost(cost: number): string {
   if (cost >= 100) return `$${cost.toFixed(0)}`;
@@ -214,6 +218,30 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     },
     staleTime: 60000,
   });
+
+  // Activity query — shared cache with CommandDeck overview
+  const { data: activityData } = useActivityQuery(issueId);
+  const sections = activityData?.sections ?? [];
+  const sessionCount = sections.length;
+  const lastActivity = (() => {
+    let latest = 0;
+    for (const s of sections) {
+      const t = Date.parse(s.startedAt);
+      if (!Number.isNaN(t) && t > latest) latest = t;
+    }
+    if (!latest) return null;
+    const ageMs = Date.now() - latest;
+    if (ageMs < 60_000) return `last activity ${Math.round(ageMs / 1000)}s ago`;
+    if (ageMs < 3_600_000) return `last activity ${Math.round(ageMs / 60_000)}m ago`;
+    return `last activity ${Math.round(ageMs / 3_600_000)}h ago`;
+  })();
+
+  // Reviewer summary data
+  const reviewerSections = sections.filter((s) => s.type === 'reviewer');
+
+  // PR query — shared cache with CommandDeck overview
+  const { data: prData } = usePrQuery(issueId);
+  const pr = prData?.pr;
 
   const startAgentMutation = useMutation({
     mutationFn: async (message?: string) => {
@@ -729,6 +757,20 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           </div>
         )}
 
+        {/* Pipeline stuck banner */}
+        {reviewStatusProp && isReviewPipelineStuck(reviewStatusProp) && (
+          <div className="px-3 py-2 border-b border-border bg-warning/10">
+            <div className="flex items-center gap-2 mb-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
+              <span className="text-xs font-medium text-warning">Pipeline Stuck</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-2">
+              Review/test/merge pipeline is stuck and needs recovery.
+            </p>
+            <RecoverButton issueId={issueId} reviewStatus={reviewStatusProp} variant="inspector" />
+          </div>
+        )}
+
         {/* Merged status banner for issues without workspaces */}
         {!agent && !workspace?.exists && issue?.labels?.some(l => l.toLowerCase() === 'merged') && (
           <div className="px-3 py-3 border-b border-border">
@@ -778,8 +820,93 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
               <span className="font-mono truncate text-[10px] flex-1" title={workspace.path}>
                 {workspace.path}
               </span>
+              <a
+                href={`vscode://file/${workspace.path}`}
+                className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded bg-card text-primary hover:text-primary/80 border border-border"
+                title="Open in VS Code"
+              >
+                <ExternalLink className="w-2.5 h-2.5" />
+                VS Code
+              </a>
               <PanOpenInPicker cwd={workspace.path} />
             </div>
+          </div>
+        )}
+
+        {/* Activity summary */}
+        {(sessionCount > 0 || lastActivity) && (
+          <div className="px-3 py-2 border-b border-border text-xs">
+            <div className="uppercase tracking-wider text-[10px] mb-1.5 font-semibold text-muted-foreground">Activity</div>
+            <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+              {sessionCount > 0 && (
+                <span>{sessionCount} session{sessionCount === 1 ? '' : 's'}</span>
+              )}
+              {lastActivity && <span>{lastActivity}</span>}
+            </div>
+          </div>
+        )}
+
+        {/* Reviewer summary */}
+        {reviewerSections.length > 0 && (
+          <div className="px-3 py-2 border-b border-border text-xs">
+            <div className="uppercase tracking-wider text-[10px] mb-1.5 font-semibold text-muted-foreground">Reviewer Summary</div>
+            <div className="grid grid-cols-5 gap-1">
+              {(['correctness', 'security', 'performance', 'requirements', 'synthesis'] as const).map((role) => {
+                const sec = reviewerSections.find((s) => s.role === role);
+                const meta = sec?.roundMetadata;
+                const latest = meta?.history?.find((r) => r.round === meta.latestRound);
+                const isRunning = sec?.status === 'running' || sec?.status === 'active';
+                let color = 'bg-muted-foreground';
+                let label = '—';
+                if (isRunning) { color = 'bg-primary'; label = `R${(meta?.latestRound ?? 0) + 1}`; }
+                else if (latest) {
+                  const status = latest.status?.toLowerCase();
+                  if (status === 'passed' || status === 'approved') { color = 'bg-success'; label = `R${latest.round}`; }
+                  else if (status === 'failed' || status === 'blocked') { color = 'bg-destructive'; label = `R${latest.round}`; }
+                  else { color = 'bg-warning'; label = `R${latest.round}`; }
+                }
+                return (
+                  <div key={role} className="flex flex-col items-center gap-0.5">
+                    <span className="text-[9px] text-muted-foreground capitalize truncate w-full text-center">{role.slice(0, 3)}</span>
+                    <span className={`inline-block w-2 h-2 rounded-full ${color}`} title={`${role}: ${label}`} />
+                    <span className="text-[9px] text-muted-foreground">{label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* PR link / status */}
+        {pr && (
+          <div className="px-3 py-2 border-b border-border text-xs">
+            <div className="uppercase tracking-wider text-[10px] mb-1.5 font-semibold text-muted-foreground">Pull Request</div>
+            <div className="flex items-center gap-1.5">
+              <GitPullRequest className="w-3 h-3 text-primary" />
+              <a href={pr.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 truncate text-[10px] font-medium">
+                #{pr.number} {pr.title}
+              </a>
+              <span className={`text-[10px] px-1 py-0.5 rounded ml-auto ${
+                pr.state === 'OPEN' ? 'bg-success/20 text-success' :
+                pr.state === 'MERGED' ? 'bg-primary/20 text-primary' :
+                'bg-muted-foreground/20 text-muted-foreground'
+              }`}>
+                {pr.state?.toLowerCase()}
+              </span>
+            </div>
+            {(pr.additions !== undefined || pr.deletions !== undefined || pr.changedFiles !== undefined) && (
+              <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+                {pr.additions !== undefined && pr.deletions !== undefined && (
+                  <span>+{pr.additions} -{pr.deletions}</span>
+                )}
+                {pr.changedFiles !== undefined && (
+                  <span>{pr.changedFiles} file{pr.changedFiles === 1 ? '' : 's'}</span>
+                )}
+                {pr.reviewDecision && (
+                  <span className="capitalize">{pr.reviewDecision.replace(/_/g, ' ')}</span>
+                )}
+              </div>
+            )}
           </div>
         )}
 
