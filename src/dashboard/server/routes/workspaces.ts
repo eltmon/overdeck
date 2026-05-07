@@ -1017,6 +1017,9 @@ const getWorkspaceRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
@@ -1325,6 +1328,9 @@ const getWorkspaceStateMdRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const parsed = parseIssueId(issueId);
     const issuePrefix = parsed?.prefix ?? extractPrefix(issueId) ?? issueId.split('-')[0];
@@ -1346,6 +1352,9 @@ const getWorkspaceInferenceMdRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     return yield* Effect.promise(() =>
       readWorkspacePlanningMarkdown(issueId, 'INFERENCE.md')
@@ -1373,6 +1382,9 @@ const getWorkspacePlanRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
@@ -1420,6 +1432,9 @@ const getWorkspaceStashesRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const workspacePath = resolveWorkspacePath(issueId);
 
     if (!workspacePath || !existsSync(workspacePath)) {
@@ -1453,6 +1468,9 @@ const postWorkspaceRecoverStashRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const stashRef = decodeURIComponent(params['stashRef'] ?? '');
     const workspacePath = resolveWorkspacePath(issueId);
 
@@ -1487,6 +1505,9 @@ const deleteWorkspaceStashRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const stashRef = decodeURIComponent(params['stashRef'] ?? '');
     const workspacePath = resolveWorkspacePath(issueId);
 
@@ -1513,6 +1534,9 @@ const getWorkspaceCleanPreviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
@@ -1685,6 +1709,9 @@ const postWorkspaceCleanRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const { createBackup } = body as { createBackup?: boolean };
 
@@ -1754,6 +1781,9 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
@@ -1883,6 +1913,9 @@ const postWorkspaceStartRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
@@ -2191,6 +2224,9 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const containerName = params['containerName'] ?? '';
     const action = params['action'] ?? '';
 
@@ -2355,6 +2391,9 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const teamPrefix = extractTeamPrefix(issueId);
     const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
@@ -2507,6 +2546,9 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const status = getReviewStatus(issueId);
     const base: ReviewStatus = status || {
@@ -2572,6 +2614,9 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
     const { reviewStatus, testStatus, mergeStatus, reviewNotes, testNotes, verificationStatus, readyForMerge } = body as {
@@ -2769,6 +2814,9 @@ const postWorkspaceReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const request = yield* HttpServerRequest.HttpServerRequest;
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
@@ -3021,6 +3069,9 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const { message } = body as { message?: string };
     const eventStore = yield* EventStoreService;
@@ -3444,6 +3495,9 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
 
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
@@ -3529,6 +3583,9 @@ const postWorkspaceAbortReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = (params['issueId'] ?? '').toUpperCase();
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     if (!issueId) {
       return jsonResponse({ success: false, error: 'Missing issueId' }, { status: 400 });
     }
@@ -3699,6 +3756,9 @@ const postWorkspaceUnstickRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
     const current = getReviewStatus(issueId);
@@ -3736,6 +3796,9 @@ const postWorkspaceDeaconIgnoreRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = (params['issueId'] ?? '').toUpperCase();
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     if (!issueId) {
       return jsonResponse({ success: false, error: 'Missing issueId' }, { status: 400 });
     }
@@ -3771,6 +3834,9 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
@@ -4610,6 +4676,9 @@ const postWorkspaceMergeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     if (!/^[A-Z]+-\d+$/i.test(issueId)) {
       return jsonResponse({ error: 'Invalid issue ID format' }, { status: 400 });
     }
@@ -4639,6 +4708,9 @@ const postForgeApproveRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     if (!/^[A-Z]+-\d+$/i.test(issueId)) {
       return jsonResponse({ error: 'Invalid issue ID format' }, { status: 400 });
     }
@@ -4738,6 +4810,9 @@ const postForgeMergeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     if (!/^[A-Z]+-\d+$/i.test(issueId)) {
       return jsonResponse({ error: 'Invalid issue ID format' }, { status: 400 });
     }
@@ -4841,6 +4916,9 @@ const postWorkspaceApproveRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const existingStatus = getReviewStatus(issueId);
     if (
@@ -5172,6 +5250,9 @@ const deleteWorkspacePendingRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     clearPendingOperation(issueId);
     return jsonResponse({ success: true });
   }))
@@ -5185,6 +5266,9 @@ const getWorkspaceTldrRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     return yield* Effect.promise(async () => {
         const projectRoot = process.cwd();
@@ -5228,6 +5312,9 @@ const postWorkspaceRefreshTokenRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const issueLower = issueId.toLowerCase();
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
