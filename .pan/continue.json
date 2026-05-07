@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-636",
   "created": "2026-05-07T03:42:36.488Z",
-  "updated": "2026-05-07T05:32:00.501Z",
+  "updated": "2026-05-07T05:34:03.317Z",
   "gitState": {
     "branch": "feature/pan-636",
     "sha": "9b15d68ef",
@@ -138,11 +138,11 @@
     }
   ],
   "resumePoint": {
-    "description": "work-start-picker-cli bead complete (pan start <id> --harness <claude-code|pi> flag added; canUseHarness gate runs before workspace setup; invalid combos exit non-zero with reason on stderr; harness flows to spawnAgent so AgentState is persisted). Beads remaining (11): UI fjs9/0c2/3ir/lg47/dbf, system uem/63b, niceties 3119/8qco/w1o0/6oe.",
-    "beadId": "workspace-r63",
+    "description": "pi-termination-flow bead complete (killAgent ladder: RPC abort -> 2s poll -> SIGTERM via Ctrl-C + pkill -TERM -> 5s poll -> tmux kill-session; cleanupPiTransientFiles unlinks rpc.in/ready.json/completed/heartbeat but never touches session JSONLs). 10 pi.test cases pass. Beads remaining (10): 3119 (resume), uem (doctor), 63b (pan sync settings), dbf (status display), 6oe (docs), w1o0 (e2e), UI bundle fjs9/0c2/3ir/lg47.",
+    "beadId": "workspace-8qco",
     "filesToRead": [
-      "src/cli/commands/start.ts",
-      "src/cli/index.ts"
+      "src/lib/runtimes/pi.ts",
+      "src/lib/runtimes/__tests__/pi.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -237,6 +237,12 @@
       "timestamp": "2026-05-07T05:32:00.501Z",
       "reason": "continue",
       "note": "Closed bead workspace-r63 (work-start-picker-cli). Added --harness <claude-code|pi> option to pan start command in src/cli/index.ts. Extended IssueOptions with harness?. issueCommand validates the flag up front: unknown value exits non-zero with Invalid --harness on stderr; canUseHarness(harness, model, await getProviderAuthMode(model)) is consulted before any workspace setup, so a Pi+Anthropic+subscription combo exits non-zero with the typed reason text and no half-prepared workspace. requestedHarness defaults to claude-code (no breaking change for existing scripts) and is passed to spawnAgent so AgentState.harness round-trips. Local spawn path passes harness; remote spawn path leaves a comment that Pi is local-only until the Fly worker bundles the pi binary (separate concern). 2 vitest cases cover: pi+Anthropic+subscription rejection with reason on stderr, and unknown --harness rejection. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:34:03.317Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-8qco (pi-termination-flow). Replaced minimal killAgent with the full TERM->KILL escalation ladder: (1) writePiCommand({cmd:abort}) — graceful so Pi can flush session.jsonl; (2) pollUntilSessionGone with 2s budget (100ms cadence); (3) tmux send-keys C-c + pkill -TERM -f agent-id=<id> (best-effort); (4) pollUntilSessionGone with 5s budget; (5) tmux kill-session as SIGKILL fallback. cleanupPiTransientFiles always runs at the end and removes rpc.in (via destroyPiFifo), ready.json, completed marker, and ~/.panopticon/heartbeats/<id>.json — but NEVER touches <agentDir>/sessions/*.jsonl per the JSONL-is-sacred rule in CLAUDE.md. 2 new pi.test cases verify the cleanup invariant (sacred jsonl survives) and the exit-fast-when-no-tmux invariant (<3.5s). 10 tests pass total. typecheck + lint clean.",
       "agentModel": "claude-opus-4-7"
     }
   ],

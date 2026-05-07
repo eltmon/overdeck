@@ -158,17 +158,41 @@ describe('PiRuntime.getSessionCost (AC5)', () => {
   })
 })
 
-describe('PiRuntime.killAgent unlinks the fifo', () => {
+describe('PiRuntime.killAgent escalation ladder + cleanup (PAN-636 bead 8qco)', () => {
   let h: ReturnType<typeof withFakeHome>
   beforeEach(() => { h = withFakeHome() })
   afterEach(() => h.cleanup())
 
-  it('removes rpc.in and tolerates a missing tmux session', async () => {
+  it('removes rpc.in, ready.json, completed, and heartbeat — but NEVER session JSONL files', async () => {
     const r = new PiRuntime()
     await createPiFifo('agent-K')
-    const fifo = join(h.home, '.panopticon', 'agents', 'agent-K', 'rpc.in')
-    expect(require('node:fs').existsSync(fifo)).toBe(true)
+    const agentDir = join(h.home, '.panopticon', 'agents', 'agent-K')
+    const heartbeatsRoot = join(h.home, '.panopticon', 'heartbeats')
+    const sessRoot = join(agentDir, 'sessions')
+    require('node:fs').mkdirSync(sessRoot, { recursive: true })
+    require('node:fs').mkdirSync(heartbeatsRoot, { recursive: true })
+    require('node:fs').writeFileSync(join(agentDir, 'ready.json'), '{}')
+    require('node:fs').writeFileSync(join(agentDir, 'completed'), '{}')
+    require('node:fs').writeFileSync(join(heartbeatsRoot, 'agent-K.json'), '{}')
+    // Sacred — must survive killAgent.
+    const sacredJsonl = join(sessRoot, '019df-x.jsonl')
+    require('node:fs').writeFileSync(sacredJsonl, '{"type":"session"}\n')
+
     await r.killAgent('agent-K')
-    expect(require('node:fs').existsSync(fifo)).toBe(false)
+
+    expect(require('node:fs').existsSync(join(agentDir, 'rpc.in'))).toBe(false)
+    expect(require('node:fs').existsSync(join(agentDir, 'ready.json'))).toBe(false)
+    expect(require('node:fs').existsSync(join(agentDir, 'completed'))).toBe(false)
+    expect(require('node:fs').existsSync(join(heartbeatsRoot, 'agent-K.json'))).toBe(false)
+    // The sacred-JSONL invariant: session jsonls survive killAgent.
+    expect(require('node:fs').existsSync(sacredJsonl)).toBe(true)
+  })
+
+  it('exits within ~3s when there is no tmux session to escalate against', async () => {
+    const r = new PiRuntime()
+    await createPiFifo('agent-K2')
+    const start = Date.now()
+    await r.killAgent('agent-K2')
+    expect(Date.now() - start).toBeLessThan(3_500)
   })
 })

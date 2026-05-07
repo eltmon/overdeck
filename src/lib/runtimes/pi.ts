@@ -23,7 +23,7 @@
  *   3. tmux pane activity timestamp
  */
 
-import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync, chmodSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync, chmodSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { tmpdir } from 'node:os'
@@ -203,25 +203,59 @@ export class PiRuntime implements AgentRuntime {
     writePiCommand(agentId, { cmd: 'prompt', text: message })
   }
 
+  /**
+   * Kill a Pi agent via the documented escalation ladder (PAN-636 bead 8qco).
+   *
+   *   1. Send {cmd:'abort'} via the RPC fifo (graceful — Pi can flush
+   *      session.jsonl and write any pending heartbeat).
+   *   2. Wait up to 2s for the tmux session to disappear on its own.
+   *   3. SIGTERM the Pi process group via tmux send-signal -s TERM.
+   *   4. Wait up to 5s for the tmux session to disappear.
+   *   5. tmux kill-session (effectively SIGKILL on the pane).
+   *   6. Always unlink rpc.in, ready.json, heartbeat, and completed marker.
+   *      NEVER touch session JSONL files under <agentDir>/sessions/ — per
+   *      the JSONL-is-sacred rule in CLAUDE.md.
+   */
   async killAgent(agentId: string): Promise<void> {
-    // Best-effort graceful abort via RPC, then fall back to tmux kill.
-    // The bead workspace-8qco implements the full TERM->KILL escalation
-    // ladder; this minimal path makes basic kill safe right now.
+    // Step 1: graceful RPC abort.
     try {
       writePiCommand(agentId, { cmd: 'abort' })
     } catch {
-      // No reader / not ready yet — proceed straight to tmux kill.
+      // No reader / not ready — fall through to signal escalation.
     }
+
+    // Step 2: poll for tmux exit up to 2s.
+    if (await pollUntilSessionGone(agentId, 2_000)) {
+      cleanupPiTransientFiles(agentId)
+      return
+    }
+
+    // Step 3: SIGTERM via tmux. Best-effort — if it fails the kill-session
+    // fallback below will still take the pane down.
+    try {
+      await execAsync(`tmux -L panopticon send-keys -t ${agentId} C-c 2>/dev/null || true`)
+    } catch {
+      // ignore
+    }
+    try {
+      await execAsync(`pkill -TERM -f "agent-id=${agentId}" 2>/dev/null || true`)
+    } catch {
+      // ignore
+    }
+
+    // Step 4: poll for tmux exit up to another 5s (7s total budget).
+    if (await pollUntilSessionGone(agentId, 5_000)) {
+      cleanupPiTransientFiles(agentId)
+      return
+    }
+
+    // Step 5: SIGKILL fallback via tmux kill-session.
     try {
       if (await sessionExistsAsync(agentId)) {
         await killSessionAsync(agentId)
       }
     } finally {
-      try {
-        destroyPiFifo(agentId)
-      } catch {
-        // ignore
-      }
+      cleanupPiTransientFiles(agentId)
     }
   }
 
@@ -315,6 +349,36 @@ export function createPiRuntime(): PiRuntime {
 // ────────────────────────────────────────────────────────────────────────
 // helpers
 // ────────────────────────────────────────────────────────────────────────
+
+async function pollUntilSessionGone(agentId: string, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (!(await sessionExistsAsync(agentId))) return true
+    await new Promise(r => setTimeout(r, 100))
+  }
+  return false
+}
+
+/**
+ * Remove Pi's transient per-agent files: rpc.in fifo, ready.json,
+ * heartbeats/<id>.json, completed marker. Never touches session JSONLs
+ * under <agentDir>/sessions/ — those are sacred (CLAUDE.md).
+ */
+function cleanupPiTransientFiles(agentId: string): void {
+  try { destroyPiFifo(agentId) } catch { /* ignore */ }
+  const dir = agentDirFor(agentId)
+  for (const transient of ['ready.json', 'completed']) {
+    const path = join(dir, transient)
+    if (existsSync(path)) {
+      try { unlinkSync(path) } catch { /* ignore */ }
+    }
+  }
+  const heartbeatPath = join(heartbeatsDir(), `${agentId}.json`)
+  if (existsSync(heartbeatPath)) {
+    try { unlinkSync(heartbeatPath) } catch { /* ignore */ }
+  }
+  // Sacred: NEVER touch <dir>/sessions/*.jsonl — JSONLs are conversation history.
+}
 
 function readReady(agentId: string): { sessionId?: string; reason?: string } | null {
   const path = readyPathFor(agentId)

@@ -976,7 +976,7 @@
       {
         "id": "pi-termination-flow",
         "title": "PiRuntime.killAgent: graceful RPC abort then SIGTERM then SIGKILL",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T04:10:00.000Z",
         "metadata": {
@@ -990,7 +990,7 @@
           {
             "id": "pi-termination-flow.ac1",
             "title": "killAgent on a healthy Pi process exits within 3s and the tmux session is gone",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -998,7 +998,7 @@
           {
             "id": "pi-termination-flow.ac2",
             "title": "killAgent on a hung Pi process (ignoring abort) escalates to SIGTERM after 2s and SIGKILL after 7s total",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1006,7 +1006,7 @@
           {
             "id": "pi-termination-flow.ac3",
             "title": "killAgent unlinks rpc.in, ready.json, heartbeat, and completed marker but does NOT delete the session JSONL under <agentDir>/sessions/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
