@@ -2,6 +2,7 @@ import { jsonResponse } from "../http-helpers.js";
 import { httpHandler } from "./http-handler.js";
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
+import { withBdMutex } from '../../../lib/bd-mutex.js';
 /**
  * Agents route module — Effect HttpRouter.Layer (PAN-428 B7)
  *
@@ -1761,10 +1762,10 @@ const postAgentsRoute = HttpRouter.add(
 
     let hasBeads = false;
     try {
-      const { stdout: bdOutput } = yield* Effect.promise(() => execAsync(
+      const { stdout: bdOutput } = yield* Effect.promise(() => withBdMutex(() => execAsync(
         `bd list --json -l ${issueId.toLowerCase()} --status all --limit 1`,
         { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
-      ));
+      )));
       const bdTasks = JSON.parse(bdOutput.trim() || '[]');
       hasBeads = bdTasks.length > 0;
     } catch {}
