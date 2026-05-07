@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-986",
   "created": "2026-05-07T14:20:00Z",
-  "updated": "2026-05-07T14:35:00Z",
+  "updated": "2026-05-07T14:45:00Z",
   "gitState": {
     "branch": "feature/pan-986",
-    "sha": "e261a2e16",
+    "sha": "59065c36f",
     "dirty": true
   },
   "decisions": [
@@ -18,6 +18,11 @@
       "id": "D2",
       "summary": "Accepted `channel_reply` payloads now enter the same typed runtime-event pipeline as hook heartbeats instead of being stored only in bridge-local logs. The dashboard reducer records the latest structured reply on `AgentRuntimeSnapshot.channelReply`, and the reducer also projects `done` and `needs_input` replies onto the existing runtime resolution fields so current consumers can benefit without waiting for a separate UI migration.",
       "recordedAt": "2026-05-07T14:35:00Z"
+    },
+    {
+      "id": "D3",
+      "summary": "The work-agent stop hook now treats the latest structured `channel_reply` runtime signal as authoritative for `done` and `needs_input` before it falls back to tmux capture and LLM inference. This replaces one of the brittle pane-scrape paths the issue targeted while preserving the old heuristic as a safety net for sessions that never emit structured replies.",
+      "recordedAt": "2026-05-07T14:45:00Z"
     }
   ],
   "hazards": [
@@ -28,17 +33,14 @@
     }
   ],
   "resumePoint": {
-    "description": "Finish bead workspace-teyh by committing the runtime event plumbing for `channel_reply`, closing the bead, and then claim workspace-jyh4 to replace the work-agent stop-hook pane scrape with the new structured runtime signal.",
-    "beadId": "workspace-teyh",
+    "description": "Commit and close bead workspace-jyh4, then run the full PAN-986 quality gates (`npm run typecheck`, `npm run lint`, and `npm test`) before pushing the branch and calling `pan done pan-986`.",
+    "beadId": "workspace-jyh4",
     "filesToRead": [
+      "scripts/work-agent-stop-hook",
+      "tests/scripts/work-agent-stop-hook.test.ts",
       "src/lib/channels/panopticon-bridge.ts",
       "src/lib/agent-runtime.ts",
-      "src/dashboard/server/routes/agents.ts",
-      "packages/contracts/src/types.ts",
-      "packages/contracts/src/events.ts",
-      "packages/contracts/src/event-reducers.ts",
-      "tests/contracts/heartbeat-ingestion.test.ts",
-      "src/dashboard/frontend/src/__tests__/store.test.ts"
+      "packages/contracts/src/types.ts"
     ]
   },
   "beadsMapping": {
@@ -64,6 +66,12 @@
       "timestamp": "2026-05-07T14:35:00Z",
       "reason": "manual",
       "note": "Closed workspace-78h8 after landing the bridge tool surface. Claimed workspace-teyh and wired accepted `channel_reply` payloads into the typed runtime heartbeat path, extended the shared contracts and reducer, rebuilt `@panctl/contracts`, and verified the focused contract, bridge, and frontend reducer tests all pass.",
+      "agentModel": "claude-code"
+    },
+    {
+      "timestamp": "2026-05-07T14:45:00Z",
+      "reason": "manual",
+      "note": "Claimed workspace-jyh4 and updated `scripts/work-agent-stop-hook` so it checks the structured `channelReply` runtime snapshot before tmux pane capture and Claude fallback. Added end-to-end script tests with mocked curl, tmux, and claude commands to prove that `done` and `needs_input` replies emit the expected runtime resolution without invoking pane scraping.",
       "agentModel": "claude-code"
     }
   ]
