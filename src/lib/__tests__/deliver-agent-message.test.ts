@@ -35,7 +35,7 @@ vi.mock('../paths.js', async (importOriginal) => {
   };
 });
 
-import { deliverAgentMessage, type AgentState } from '../agents.js';
+import { deliverAgentMessage, deliverAgentPermissionDecision, type AgentState } from '../agents.js';
 import { sendKeysAsync } from '../tmux.js';
 
 function writeAgentState(agentId: string, partial: Partial<AgentState>): void {
@@ -96,7 +96,7 @@ function startFakeBridge(socketPath: string, opts: FakeBridgeOptions): Promise<N
   });
 }
 
-describe('deliverAgentMessage', () => {
+describe('channel bridge delivery', () => {
   beforeEach(() => {
     tmpHome = mkdtempSync(join(tmpdir(), 'pan-deliver-'));
     stateDir = join(tmpHome, 'agents');
@@ -112,7 +112,7 @@ describe('deliverAgentMessage', () => {
     rmSync(tmpHome, { recursive: true, force: true });
   });
 
-  it('flag-off: delegates to sendKeysAsync exactly once with no socket attempt', async () => {
+  it('deliverAgentMessage flag-off: delegates to sendKeysAsync exactly once with no socket attempt', async () => {
     const agentId = 'agent-flag-off';
     writeAgentState(agentId, { channelsEnabled: false });
     await deliverAgentMessage(agentId, 'hello', 'test');
@@ -164,4 +164,41 @@ describe('deliverAgentMessage', () => {
       await new Promise<void>((r) => server.close(() => r()));
     }
   }, 10_000);
+
+  it('deliverAgentPermissionDecision posts permission_response payload to bridge', async () => {
+    const agentId = 'agent-perm-ok';
+    writeAgentState(agentId, { channelsEnabled: true });
+    const socketPath = join(socketDir, `agent-${agentId}.sock`);
+    const capture: { lastBody?: string } = {};
+    const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
+    try {
+      await deliverAgentPermissionDecision(agentId, 'perm-123', 'deny');
+      expect(vi.mocked(sendKeysAsync)).not.toHaveBeenCalled();
+      expect(capture.lastBody).toBeDefined();
+      const parsed = JSON.parse(capture.lastBody!);
+      expect(parsed).toEqual({
+        type: 'permission_response',
+        requestId: 'perm-123',
+        behavior: 'deny',
+      });
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('deliverAgentPermissionDecision throws when channels are disabled', async () => {
+    const agentId = 'agent-perm-disabled';
+    writeAgentState(agentId, { channelsEnabled: false });
+    await expect(deliverAgentPermissionDecision(agentId, 'perm-123', 'allow')).rejects.toThrow(
+      /not using Claude channels/,
+    );
+  });
+
+  it('deliverAgentPermissionDecision throws when bridge socket is missing', async () => {
+    const agentId = 'agent-perm-no-sock';
+    writeAgentState(agentId, { channelsEnabled: true });
+    await expect(deliverAgentPermissionDecision(agentId, 'perm-123', 'allow')).rejects.toThrow(
+      /bridge socket missing/,
+    );
+  });
 });

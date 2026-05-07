@@ -8,6 +8,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
 import {
   pushChannelNotification,
+  pushPermissionDecisionNotification,
   getSocketPath,
   getBridgeLogPath,
   getPanopticonHome,
@@ -36,7 +37,7 @@ function createMockServer(): { server: Server; frames: Array<{ method: string; p
   // for unit-level tests we monkey-patch .notification to record frames.
   const server = new Server(
     { name: 'test-bridge', version: '0.0.0' },
-    { capabilities: { experimental: { 'claude/channel': {} } } },
+    { capabilities: { experimental: { 'claude/channel': {}, 'claude/channel/permission': {} } } },
   );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (server as any).notification = vi.fn(async (frame: { method: string; params?: unknown }) => {
@@ -69,6 +70,32 @@ describe('pushChannelNotification (in-process protocol)', () => {
     expect(params.source).toBe('panopticon-bridge');
     expect(params.content).toBe('hello world');
     expect(params.meta).toEqual({ agent_id: 'a-1' });
+  });
+
+  it('permission response payload emits exactly one notifications/claude/channel/permission frame', async () => {
+    const { server, frames } = createMockServer();
+    const result = await pushPermissionDecisionNotification(
+      server,
+      { type: 'permission_response', requestId: 'perm-1', behavior: 'allow' },
+      'a-1',
+    );
+    expect(result).toEqual({ ok: true, status: 200, body: 'ok' });
+    expect(frames).toHaveLength(1);
+    expect(frames[0].method).toBe('notifications/claude/channel/permission');
+    const params = frames[0].params as { request_id: string; behavior: string };
+    expect(params).toEqual({ request_id: 'perm-1', behavior: 'allow' });
+  });
+
+  it('invalid permission response returns 400 and emits zero frames', async () => {
+    const { server, frames } = createMockServer();
+    const result = await pushPermissionDecisionNotification(
+      server,
+      { type: 'permission_response', requestId: '', behavior: 'maybe' },
+      'a-1',
+    );
+    expect(result.status).toBe(400);
+    expect(result.ok).toBe(false);
+    expect(frames).toHaveLength(0);
   });
 
   it('missing content returns 400 and emits zero frames', async () => {

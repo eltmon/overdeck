@@ -45,6 +45,7 @@ const baseSpec: SpecialistSnapshot = {
 
 const emptyState: DashboardState = {
   bootstrapComplete: false,
+  snapshotTimestamp: null,
   sequence: 0,
   agentsById: {},
   agentRuntimeById: {},
@@ -54,7 +55,23 @@ const emptyState: DashboardState = {
   agentOutputById: {},
   issuesRaw: [],
   recentActivity: [],
+  detailedActivity: [],
+  ttsActivity: [],
   shadowInferenceByIssueId: {},
+  turnDiffSummariesByAgentId: {},
+  channelPermissionRequestsById: {},
+  dashboardLifecycle: {
+    active: false,
+    reason: null,
+    issueId: null,
+    trigger: null,
+    startedAt: null,
+    completedAt: null,
+    failedAt: null,
+    error: null,
+  },
+  conversationsCompactingByName: {},
+  conversationsAwaitingPermissionByName: {},
 }
 
 function makeSnapshot(seq = 5): DashboardSnapshot {
@@ -63,6 +80,8 @@ function makeSnapshot(seq = 5): DashboardSnapshot {
     agents: [baseAgent],
     specialists: [baseSpec],
     reviewStatuses: [],
+    issues: [],
+    channelPermissionRequests: [],
     timestamp: '2026-01-01T00:00:00Z',
   }
 }

@@ -107,6 +107,51 @@ describe('PAN-800 runtime reducer', () => {
     expect(s.agentRuntimeById[AGENT].activity).toBe('waiting')
   })
 
+  it('agent.permission_requested stores pending permission requests by requestId', () => {
+    const next = applyEvent(INITIAL_READ_MODEL_STATE, at(1, {
+      type: 'agent.permission_requested',
+      payload: {
+        requestId: 'perm-1',
+        agentId: AGENT,
+        issueId: 'PAN-800',
+        toolName: 'Bash',
+        description: 'Run npm test',
+        inputPreview: '{"command":"npm test"}',
+        createdAt: TS,
+      },
+    } as any))
+    expect(next.channelPermissionRequestsById['perm-1']).toMatchObject({
+      requestId: 'perm-1',
+      agentId: AGENT,
+      toolName: 'Bash',
+    })
+  })
+
+  it('agent.permission_resolved removes pending permission requests', () => {
+    let s = applyEvent(INITIAL_READ_MODEL_STATE, at(1, {
+      type: 'agent.permission_requested',
+      payload: {
+        requestId: 'perm-1',
+        agentId: AGENT,
+        issueId: 'PAN-800',
+        toolName: 'Bash',
+        description: 'Run npm test',
+        inputPreview: '{"command":"npm test"}',
+        createdAt: TS,
+      },
+    } as any))
+    s = applyEvent(s, at(2, {
+      type: 'agent.permission_resolved',
+      payload: {
+        requestId: 'perm-1',
+        agentId: AGENT,
+        issueId: 'PAN-800',
+        behavior: 'allow',
+      },
+    } as any))
+    expect(s.channelPermissionRequestsById['perm-1']).toBeUndefined()
+  })
+
   it('agent.message_received bumps lastMessageAt without changing activity', () => {
     let s = applyEvent(INITIAL_READ_MODEL_STATE, at(1, {
       type: 'agent.activity_changed',

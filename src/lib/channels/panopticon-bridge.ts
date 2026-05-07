@@ -19,50 +19,25 @@
  *     workspace. PANOPTICON_AGENT_ID is supplied through the MCP config's
  *     env block; this script fail-fasts if the variable is missing.
  *   - Listens on a Unix domain socket at ${PANOPTICON_HOME}/sockets/agent-<id>.sock
- *     so the dashboard server can post inbound messages that this bridge
- *     forwards as channel notifications. The listener itself lands in the
- *     follow-up bead workspace-bvzr; this file currently scaffolds the MCP
- *     server and leaves the socket as a TODO.
+ *     so the dashboard server can post inbound messages and permission decisions
+ *     that this bridge forwards as Claude channel notifications.
+ *   - Receives Claude-originated permission requests over stdio and relays them
+ *     back to the dashboard through an authenticated internal HTTP route.
  *   - Unlinks its socket path on startup before binding. This is INTENTIONAL,
  *     not defensive — a previous bridge crash can leave a stale socket file
  *     that would otherwise cause EADDRINUSE on rebind. Do not "fix" the
  *     unlink-on-startup; it is part of the documented lifecycle.
  *   - When `claude` exits, this child process exits with it. No daemon mode.
- *
- * Capability scope (PAN-985):
- *   - `experimental['claude/channel'] = {}` — one-way notifications to Claude.
- *   - NO tools, NO `claude/channel/permission`. Bidirectional reply tool and
- *     dashboard-routed permission relay are explicitly out of scope and
- *     tracked as separate follow-up issues (see hazards H4 and H5 in the
- *     PAN-985 vBRIEF).
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  type CallToolResult,
-  type ListToolsResult,
-  type Tool,
-} from '@modelcontextprotocol/sdk/types.js';
 import { chmod, mkdir, unlink, appendFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { dirname, join } from 'node:path';
 
-import {
-  CHANNEL_REPLY_KIND_VALUES,
-  MAX_CHANNEL_REPLY_ARTIFACT_LABEL_LENGTH,
-  MAX_CHANNEL_REPLY_ARTIFACT_REFS,
-  MAX_CHANNEL_REPLY_ARTIFACT_URI_LENGTH,
-  MAX_CHANNEL_REPLY_SUMMARY_LENGTH,
-  normalizeChannelReplyPayload,
-  type ChannelReplyArtifactRef as ContractChannelReplyArtifactRef,
-} from '@panctl/contracts';
-
-import { emitChannelReply } from '../agent-runtime.js';
+import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
 
 /**
  * Resolve the per-agent ID from env. Tests import this module to call the
@@ -86,90 +61,77 @@ function resolveAgentIdOrExit(): string {
 const INSTRUCTIONS = [
   'Panopticon orchestrator bridge.',
   '',
-  'When you receive a `notifications/claude/channel` message with',
-  '`params.source` set to `panopticon-bridge`, the body is operator-supplied',
-  'text from the Panopticon dashboard or CLI that is being delivered',
-  'out-of-band of the normal user-prompt input stream. Treat the body as if',
-  'the user had typed it into the prompt and continue the conversation',
-  'accordingly.',
+  'When you receive a `notifications/channel` message with `params.source` set',
+  'to `panopticon-bridge`, the body is operator-supplied text from the',
+  'Panopticon dashboard or CLI that is being delivered out-of-band of the',
+  'normal user-prompt input stream. Treat the body as if the user had typed',
+  'it into the prompt and continue the conversation accordingly.',
   '',
-  'When you reach a meaningful status boundary, call `channel_reply` with a',
-  'structured payload instead of relying on terminal prose alone. Use',
-  '`kind: "done"` when implementation is complete and you are ready for the',
-  'orchestrator to treat the work as finished. Use `kind: "needs_input"` when',
-  'you are blocked on a human answer. Use `kind: "status"` for non-terminal',
-  'progress updates. Include a terse `summary` and optional `artifactRefs`',
-  'entries when you want the dashboard to link to specific files or artefacts.',
+  'When you receive a `notifications/claude/channel/permission` message from',
+  'the same source, treat it as the operator verdict for a previously-issued',
+  '`notifications/claude/channel/permission_request` and resume the suspended',
+  'tool call accordingly.',
 ].join('\n');
 
-export const CHANNEL_REPLY_KINDS = CHANNEL_REPLY_KIND_VALUES;
-export type ChannelReplyKind = (typeof CHANNEL_REPLY_KINDS)[number];
-export type ChannelReplyArtifactRef = ContractChannelReplyArtifactRef;
-
-export interface ChannelReplyPayload {
-  kind: ChannelReplyKind;
-  summary: string;
-  artifactRefs?: ChannelReplyArtifactRef[];
+interface ChannelPermissionRequestNotification {
+  method: 'notifications/claude/channel/permission_request';
+  params: {
+    request_id: string;
+    tool_name: string;
+    description: string;
+    input_preview: string;
+  };
 }
 
-export interface AcceptedChannelReply {
-  kind: ChannelReplyKind;
-  summary: string;
-  artifactRefs: ChannelReplyArtifactRef[];
+export interface ChannelPermissionRequest {
+  requestId: string;
+  toolName: string;
+  description: string;
+  inputPreview: string;
 }
 
-export const CHANNEL_REPLY_TOOL: Tool = {
-  name: 'channel_reply',
-  title: 'Send structured status to Panopticon',
-  description:
-    'Send structured agent status back to Panopticon. `kind` is one of `status`, `done`, or `needs_input`; `summary` is terse human-readable status text; `artifactRefs` optionally links files, logs, or PRs by URI.',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      kind: {
-        type: 'string',
-        enum: [...CHANNEL_REPLY_KINDS],
-        description: 'Status class: status, done, or needs_input.',
-      },
-      summary: {
-        type: 'string',
-        maxLength: MAX_CHANNEL_REPLY_SUMMARY_LENGTH,
-        description: 'Terse human-readable status summary for the orchestrator and dashboard.',
-      },
-      artifactRefs: {
-        type: 'array',
-        maxItems: MAX_CHANNEL_REPLY_ARTIFACT_REFS,
-        description: 'Optional artefact references such as file:// paths, PR URLs, or log URLs.',
-        items: {
-          type: 'object',
-          properties: {
-            uri: {
-              type: 'string',
-              maxLength: MAX_CHANNEL_REPLY_ARTIFACT_URI_LENGTH,
-              description: 'URI or absolute path for the related artefact.',
-            },
-            label: {
-              type: 'string',
-              maxLength: MAX_CHANNEL_REPLY_ARTIFACT_LABEL_LENGTH,
-              description: 'Optional short display label for the artefact.',
-            },
-          },
-          required: ['uri'],
-        },
-      },
-    },
-    required: ['kind', 'summary'],
-  },
-  annotations: {
-    destructiveHint: false,
-    idempotentHint: false,
-    openWorldHint: false,
-    readOnlyHint: false,
-  },
-};
+export interface PermissionDecisionPushPayload {
+  type: 'permission_response';
+  requestId: string;
+  behavior: 'allow' | 'deny';
+}
 
-export function listBridgeTools(): ListToolsResult {
-  return { tools: [CHANNEL_REPLY_TOOL] };
+function parsePermissionRequestNotification(payload: unknown): ChannelPermissionRequestNotification {
+  if (
+    payload === null ||
+    typeof payload !== 'object' ||
+    (payload as { method?: unknown }).method !== 'notifications/claude/channel/permission_request'
+  ) {
+    throw new Error('invalid permission request notification method');
+  }
+
+  const params = (payload as { params?: unknown }).params;
+  if (
+    params === null ||
+    typeof params !== 'object' ||
+    typeof (params as { request_id?: unknown }).request_id !== 'string' ||
+    !((params as { request_id: string }).request_id.length > 0) ||
+    typeof (params as { tool_name?: unknown }).tool_name !== 'string' ||
+    !((params as { tool_name: string }).tool_name.length > 0) ||
+    typeof (params as { description?: unknown }).description !== 'string' ||
+    !((params as { description: string }).description.length > 0) ||
+    typeof (params as { input_preview?: unknown }).input_preview !== 'string'
+  ) {
+    throw new Error('invalid permission request notification params');
+  }
+
+  return payload as ChannelPermissionRequestNotification;
+}
+
+function normalizePermissionRequest(
+  notification: ChannelPermissionRequestNotification,
+): ChannelPermissionRequest {
+  return {
+    requestId: notification.params.request_id,
+    toolName: notification.params.tool_name,
+    description: notification.params.description,
+    inputPreview: notification.params.input_preview,
+  };
 }
 
 export const server: Server = new Server(
@@ -181,26 +143,32 @@ export const server: Server = new Server(
     capabilities: {
       experimental: {
         'claude/channel': {},
+        'claude/channel/permission': {},
       },
-      tools: {},
     },
     instructions: INSTRUCTIONS,
   },
 );
 
-server.setRequestHandler(ListToolsRequestSchema, async () => listBridgeTools());
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  if (request.params.name !== 'channel_reply') {
-    throw new Error(`Unknown tool: ${request.params.name}`);
+function installPermissionRequestHandler(mcp: Server): void {
+  const handlers = (mcp as unknown as {
+    _notificationHandlers?: Map<string, (notification: unknown) => Promise<void>>;
+  })._notificationHandlers;
+  if (!handlers) {
+    throw new Error('panopticon-bridge: MCP server does not expose notification handlers map');
   }
-  const agentId = resolveAgentIdOrExit();
-  return handleChannelReplyCall(request.params.arguments ?? {}, agentId, async (reply) => {
-    const ok = await emitChannelReply(agentId, reply);
-    if (!ok) {
-      throw new Error('Failed to emit channel_reply into agent runtime event stream');
+
+  handlers.set('notifications/claude/channel/permission_request', async (notification) => {
+    const agentId = process.env.PANOPTICON_AGENT_ID;
+    if (!agentId) {
+      throw new Error('PANOPTICON_AGENT_ID missing while handling permission request');
     }
+    const parsed = parsePermissionRequestNotification(notification);
+    await forwardPermissionRequestToDashboard(agentId, normalizePermissionRequest(parsed));
   });
-});
+}
+
+installPermissionRequestHandler(server);
 
 /**
  * Resolve PANOPTICON_HOME with the same fallback semantics as the rest of the
@@ -218,15 +186,8 @@ export function getBridgeLogPath(agentId: string): string {
   return join(getPanopticonHome(), 'logs', `bridge-${agentId}.log`);
 }
 
-const preparedBridgeLogDirs = new Set<string>();
-
-async function ensureBridgeLogDir(agentId: string): Promise<void> {
-  const logDir = dirname(getBridgeLogPath(agentId));
-  if (preparedBridgeLogDirs.has(logDir)) {
-    return;
-  }
-  await mkdir(logDir, { recursive: true });
-  preparedBridgeLogDirs.add(logDir);
+function getDashboardBaseUrl(): string {
+  return process.env.DASHBOARD_URL || 'http://localhost:3011';
 }
 
 export interface ChannelPushPayload {
@@ -238,34 +199,6 @@ export interface ChannelPushResult {
   ok: boolean;
   status: number;
   body: unknown;
-}
-
-export function validateChannelReplyPayload(payload: unknown): AcceptedChannelReply {
-  return normalizeChannelReplyPayload(payload, 'channel_reply');
-}
-
-export async function handleChannelReplyCall(
-  payload: unknown,
-  agentId: string,
-  sink: (reply: AcceptedChannelReply) => Promise<void>,
-): Promise<CallToolResult> {
-  const reply = validateChannelReplyPayload(payload);
-  await sink(reply);
-  await ensureBridgeLogDir(agentId);
-  await appendBridgeLog(agentId, {
-    direction: 'outbound',
-    kind: reply.kind,
-    summaryLength: reply.summary.length,
-    artifactCount: reply.artifactRefs.length,
-  });
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `channel_reply accepted (${reply.kind})`,
-      },
-    ],
-  };
 }
 
 /**
@@ -301,9 +234,8 @@ export async function pushChannelNotification(
     },
   });
 
-  await ensureBridgeLogDir(agentId);
   await appendBridgeLog(agentId, {
-    direction: 'inbound',
+    kind: 'channel_message_sent',
     contentLength: content.length,
     metaKeys: meta ? Object.keys(meta) : [],
   });
@@ -311,13 +243,95 @@ export async function pushChannelNotification(
   return { ok: true, status: 200, body: 'ok' };
 }
 
-async function appendBridgeLog(
+export async function pushPermissionDecisionNotification(
+  mcp: Server,
+  payload: unknown,
   agentId: string,
-  entry:
-    | { direction: 'inbound'; contentLength: number; metaKeys: string[] }
-    | { direction: 'outbound'; kind: ChannelReplyKind; summaryLength: number; artifactCount: number },
+): Promise<ChannelPushResult> {
+  if (
+    payload === null ||
+    typeof payload !== 'object' ||
+    (payload as { type?: unknown }).type !== 'permission_response' ||
+    typeof (payload as { requestId?: unknown }).requestId !== 'string' ||
+    !((payload as { requestId: string }).requestId.length > 0) ||
+    (((payload as { behavior?: unknown }).behavior !== 'allow') &&
+      ((payload as { behavior?: unknown }).behavior !== 'deny'))
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      body: { error: 'permission_response requires requestId and behavior=allow|deny' },
+    };
+  }
+
+  const { requestId, behavior } = payload as PermissionDecisionPushPayload;
+
+  await mcp.notification({
+    method: 'notifications/claude/channel/permission',
+    params: {
+      request_id: requestId,
+      behavior,
+    },
+  });
+
+  await appendBridgeLog(agentId, {
+    kind: 'permission_decision_sent',
+    requestId,
+    behavior,
+  });
+
+  return { ok: true, status: 200, body: 'ok' };
+}
+
+export async function forwardPermissionRequestToDashboard(
+  agentId: string,
+  request: ChannelPermissionRequest,
 ): Promise<void> {
+  const token = getInternalToken();
+  if (!token) {
+    throw new Error('internal token unavailable; dashboard permission relay not configured');
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 2_000);
+
+  try {
+    const res = await fetch(
+      `${getDashboardBaseUrl()}/api/internal/agents/${encodeURIComponent(agentId)}/permissions/request`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          [INTERNAL_TOKEN_HEADER]: token,
+        },
+        body: JSON.stringify({
+          requestId: request.requestId,
+          toolName: request.toolName,
+          description: request.description,
+          inputPreview: request.inputPreview,
+        }),
+        signal: controller.signal,
+      },
+    );
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`dashboard returned ${res.status}${body ? `: ${body.slice(0, 200)}` : ''}`);
+    }
+
+    await appendBridgeLog(agentId, {
+      kind: 'permission_request_forwarded',
+      requestId: request.requestId,
+      toolName: request.toolName,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function appendBridgeLog(agentId: string, entry: Record<string, unknown>): Promise<void> {
   const logPath = getBridgeLogPath(agentId);
+  await mkdir(dirname(logPath), { recursive: true });
   const line = JSON.stringify({
     ts: new Date().toISOString(),
     agentId,
@@ -335,6 +349,17 @@ interface BunGlobal {
     unix: string;
     fetch: (req: Request) => Response | Promise<Response>;
   }) => UnixHttpServer;
+}
+
+async function handleUnixPost(mcp: Server, payload: unknown, agentId: string): Promise<ChannelPushResult> {
+  if (
+    payload !== null &&
+    typeof payload === 'object' &&
+    (payload as { type?: unknown }).type === 'permission_response'
+  ) {
+    return pushPermissionDecisionNotification(mcp, payload, agentId);
+  }
+  return pushChannelNotification(mcp, payload, agentId);
 }
 
 async function startUnixListener(mcp: Server, agentId: string): Promise<UnixHttpServer> {
@@ -372,7 +397,7 @@ async function startUnixListener(mcp: Server, agentId: string): Promise<UnixHttp
           headers: { 'content-type': 'application/json' },
         });
       }
-      const result = await pushChannelNotification(mcp, parsed, agentId);
+      const result = await handleUnixPost(mcp, parsed, agentId);
       const headers = { 'content-type': result.status === 200 ? 'text/plain' : 'application/json' };
       const body =
         typeof result.body === 'string' ? result.body : JSON.stringify(result.body);
@@ -386,7 +411,6 @@ async function startUnixListener(mcp: Server, agentId: string): Promise<UnixHttp
 
 async function main(): Promise<void> {
   const agentId = resolveAgentIdOrExit();
-  await ensureBridgeLogDir(agentId);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
@@ -415,14 +439,12 @@ async function main(): Promise<void> {
 
 // Entrypoint: only run when invoked directly. Tests import the module to
 // inspect the server instance without spawning the transport.
-export function isDirectInvocation(importMetaUrl: string, argvPath: string | undefined): boolean {
-  if (typeof importMetaUrl !== 'string' || !argvPath) {
-    return false;
-  }
-  return importMetaUrl === pathToFileURL(resolve(argvPath)).href;
-}
+const isDirectInvocation =
+  typeof import.meta.url === 'string' &&
+  Boolean(process.argv[1]) &&
+  import.meta.url === new URL(`file://${process.argv[1]}`).href;
 
-if (isDirectInvocation(import.meta.url, process.argv[1])) {
+if (isDirectInvocation) {
   main().catch((err) => {
     process.stderr.write(
       `panopticon-bridge: fatal error during MCP server startup: ${err instanceof Error ? err.message : String(err)}\n`,

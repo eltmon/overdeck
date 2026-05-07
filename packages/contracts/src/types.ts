@@ -87,6 +87,12 @@ export const WaitingReason = Schema.Literals([
 ])
 export type WaitingReason = typeof WaitingReason.Type
 
+export const ClaudeChannelPermissionBehavior = Schema.Literals([
+  "allow",
+  "deny",
+])
+export type ClaudeChannelPermissionBehavior = typeof ClaudeChannelPermissionBehavior.Type
+
 export const ThinkingState = Schema.Struct({
   since: Schema.String,        // ISO timestamp
   lastToolAt: Schema.String,   // timestamp of the tool that preceded this thinking state
@@ -243,6 +249,17 @@ export const AgentRuntimeSnapshot = Schema.Struct({
 })
 export type AgentRuntimeSnapshot = typeof AgentRuntimeSnapshot.Type
 
+export const ChannelPermissionRequestSnapshot = Schema.Struct({
+  requestId: Schema.String,
+  agentId: AgentId,
+  issueId: Schema.optional(IssueId),
+  toolName: Schema.String,
+  description: Schema.String,
+  inputPreview: Schema.String,
+  createdAt: Schema.String,
+})
+export type ChannelPermissionRequestSnapshot = typeof ChannelPermissionRequestSnapshot.Type
+
 // ─── Agent ────────────────────────────────────────────────────────────────────
 
 export const AgentSnapshot = Schema.Struct({
@@ -376,6 +393,7 @@ export const DashboardSnapshot = Schema.Struct({
   resources: Schema.optional(Schema.Unknown),
   turnDiffSummariesByAgentId: Schema.optional(Schema.Record(Schema.String, Schema.Array(TurnDiffSummary))),
   agentRuntimeById: Schema.optional(Schema.Record(Schema.String, AgentRuntimeSnapshot)),
+  channelPermissionRequests: Schema.optional(Schema.Array(ChannelPermissionRequestSnapshot)),
   timestamp: Schema.String,
 })
 export type DashboardSnapshot = typeof DashboardSnapshot.Type

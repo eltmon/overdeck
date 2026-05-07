@@ -642,6 +642,45 @@ export async function deliverAgentMessage(
   }
 }
 
+export async function deliverAgentPermissionDecision(
+  agentId: string,
+  requestId: string,
+  behavior: 'allow' | 'deny',
+): Promise<void> {
+  const normalizedId = normalizeAgentId(agentId);
+
+  let state: AgentState | null = null;
+  try {
+    state = await getAgentStateAsync(normalizedId);
+  } catch {
+    state = null;
+  }
+
+  if (!state?.channelsEnabled) {
+    throw new Error(`agent ${normalizedId} is not using Claude channels`);
+  }
+
+  const socketPath = join(panopticonHomeForChannels(), 'sockets', `agent-${normalizedId}.sock`);
+  if (!existsSync(socketPath)) {
+    throw new Error(`bridge socket missing for ${normalizedId}`);
+  }
+
+  await postUnixSocketJson(
+    socketPath,
+    {
+      type: 'permission_response',
+      requestId,
+      behavior,
+    },
+    2000,
+  );
+
+  await appendChannelDeliveryLog(normalizedId, {
+    path: 'channel',
+    caller: `permission-response:${requestId}:${behavior}`,
+  });
+}
+
 /**
  * Inputs to the channels eligibility decision. We pass through agentId,
  * SpawnOptions, and the in-construction AgentState so this function can be

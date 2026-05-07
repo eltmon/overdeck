@@ -7,8 +7,8 @@ import {
   AgentRuntimeSnapshot,
   AgentSnapshot,
   AgentStatus,
-  ChannelReplyArtifactRef,
-  ChannelReplyKind,
+  ChannelPermissionRequestSnapshot,
+  ClaudeChannelPermissionBehavior,
   IssueId,
   ResourceStats,
   ReviewStatusSnapshot,
@@ -146,6 +146,27 @@ export const AgentWaitingClearedEvent = Schema.Struct({
 })
 export type AgentWaitingClearedEvent = typeof AgentWaitingClearedEvent.Type
 
+export const AgentPermissionRequestedEvent = Schema.Struct({
+  type: Schema.Literal("agent.permission_requested"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: ChannelPermissionRequestSnapshot,
+})
+export type AgentPermissionRequestedEvent = typeof AgentPermissionRequestedEvent.Type
+
+export const AgentPermissionResolvedEvent = Schema.Struct({
+  type: Schema.Literal("agent.permission_resolved"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    requestId: Schema.String,
+    agentId: AgentId,
+    issueId: Schema.optional(IssueId),
+    behavior: ClaudeChannelPermissionBehavior,
+  }),
+})
+export type AgentPermissionResolvedEvent = typeof AgentPermissionResolvedEvent.Type
+
 export const AgentMessageReceivedEvent = Schema.Struct({
   type: Schema.Literal("agent.message_received"),
   sequence: SequenceNumber,
@@ -157,21 +178,6 @@ export const AgentMessageReceivedEvent = Schema.Struct({
   }),
 })
 export type AgentMessageReceivedEvent = typeof AgentMessageReceivedEvent.Type
-
-export const AgentChannelReplyEvent = Schema.Struct({
-  type: Schema.Literal("agent.channel_reply"),
-  sequence: SequenceNumber,
-  timestamp: Schema.String,
-  payload: Schema.Struct({
-    agentId: AgentId,
-    reply: Schema.Struct({
-      kind: ChannelReplyKind,
-      summary: Schema.String,
-      artifactRefs: Schema.Array(ChannelReplyArtifactRef),
-    }),
-  }),
-})
-export type AgentChannelReplyEvent = typeof AgentChannelReplyEvent.Type
 
 export const AgentModelSetEvent = Schema.Struct({
   type: Schema.Literal("agent.model_set"),
@@ -732,8 +738,9 @@ export const DomainEvent = Schema.Union([
   AgentThinkingStoppedEvent,
   AgentWaitingStartedEvent,
   AgentWaitingClearedEvent,
+  AgentPermissionRequestedEvent,
+  AgentPermissionResolvedEvent,
   AgentMessageReceivedEvent,
-  AgentChannelReplyEvent,
   AgentModelSetEvent,
   AgentCurrentIssueSetEvent,
   AgentResolutionChangedEvent,

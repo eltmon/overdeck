@@ -1,64 +1,65 @@
 {
   "version": "1",
-  "issueId": "PAN-1028",
-  "created": "2026-05-07T22:45:00Z",
-  "updated": "2026-05-08T09:24:33Z",
+  "issueId": "PAN-987",
+  "created": "2026-05-07T18:25:44Z",
+  "updated": "2026-05-07T18:25:44Z",
   "gitState": {
-    "branch": "feature/pan-1028",
-    "sha": "d5b8ed9e5",
+    "branch": "feature/pan-987",
+    "sha": "4127d8786",
     "dirty": true
   },
   "decisions": [
     {
       "id": "D1",
-      "summary": "The actual bug fix must be applied to eltmon-stream/tts_daemon.py (external to this workspace). The daemon's play_audio() was using per-utterance aplay with a fixed 400ms silence prepend, which is insufficient for PipeWire + USB DAC resume (~500ms). The fix replaces aplay with a persistent pw-play stdin stream, keeps it open for 10s after the last utterance, and adapts silence prepend based on sink state (600ms for SUSPENDED, 50ms for RUNNING).",
-      "recordedAt": "2026-05-07T22:45:00Z"
+      "summary": "Implemented Claude channel permission relay at the bridge boundary instead of inventing a parallel dashboard-only permission path, so operator decisions travel over the same MCP notification protocol that Claude Code already understands.",
+      "recordedAt": "2026-05-07T18:25:44Z"
     },
     {
       "id": "D2",
-      "summary": "Since eltmon-stream has no GitHub remote and the issue is tracked in panopticon-cli, the fix was committed locally in eltmon-stream and a documentation update was committed in panopticon-cli (skills/pan-tts/SKILL.md) to reflect the correct split architecture and document the PipeWire suspend mitigation.",
-      "recordedAt": "2026-05-07T22:45:00Z"
+      "summary": "Modeled pending permission prompts as first-class domain events and read-model state (`agent.permission_requested` and `agent.permission_resolved`) so the dashboard snapshot, event stream, and activity log stay consistent from one source of truth.",
+      "recordedAt": "2026-05-07T18:25:44Z"
     },
     {
       "id": "D3",
-      "summary": "Review follow-up hardened the bundled tts_daemon.py: lazy model initialization now uses a shared double-checked lock, warm pw-play reuse skips redundant pactl probes, request bodies must be JSON objects, null fields collapse to defaults/empty strings, negative Content-Length clamps to zero, and empty voice-clone prompts return 422 instead of indexing past an empty list.",
-      "recordedAt": "2026-05-08T09:24:33Z"
+      "summary": "Used only the protocol-supported decision verbs `allow` and `deny`. The issue wording mentions richer choices, but Claude's current channel permission protocol exposes only those two behaviors, so the implementation must match protocol reality rather than invent unsupported semantics.",
+      "recordedAt": "2026-05-07T18:25:44Z"
     }
   ],
   "hazards": [
     {
       "id": "H1",
-      "summary": "The workspace was created on panopticon-cli but the actual code to fix is in eltmon-stream (a separate local git repo with no remote). The normal pan done / PR flow targets panopticon-cli.",
-      "mitigation": "Committed the daemon fix in eltmon-stream locally, committed a documentation update in panopticon-cli to reflect the architecture, and pushed the panopticon-cli branch for PR creation."
+      "summary": "The MCP SDK path for custom notification registration is awkward here and the bridge currently installs the permission-request handler by reaching into the server notification-handlers map.",
+      "mitigation": "Keep the payload parser strict, cover the behavior with bridge tests, and do not widen the handler to unrelated notifications without first replacing this hook with an upstream-supported API."
+    },
+    {
+      "id": "H2",
+      "summary": "The bridge/backend plumbing is done, but dashboard UI work is still separate. Backend snapshots and events now carry pending permission requests, yet operators still need the modal bead to make the flow usable end to end.",
+      "mitigation": "After this bead passes inspection, implement workspace-ksbv by wiring the frontend store and permission modal directly to the new pending-request state and response endpoint."
     }
   ],
   "resumePoint": {
-    "description": "Review feedback fixes are staged in the workspace. Next step: commit the tts_daemon.py hardening changes, then invoke /rebase-and-submit for PAN-1028 to push and rerun review.",
-    "beadId": null,
+    "description": "Bead workspace-g86b implementation is complete and locally verified. Next step: stage only the bridge/backend plumbing files, create one commit for workspace-g86b, close the bead, and wait for inspection before touching workspace-ksbv.",
+    "beadId": "workspace-g86b",
     "filesToRead": [
-      "skills/pan-tts/scripts/tts_daemon.py",
-      ".pan/review/review-PAN-1028-1778224511722/correctness.md"
+      "src/lib/channels/panopticon-bridge.ts",
+      "src/lib/agents.ts",
+      "src/dashboard/server/routes/agents.ts",
+      "packages/contracts/src/events.ts",
+      "packages/contracts/src/event-reducers.ts"
     ]
   },
-  "beadsMapping": {},
-  "agentModel": "claude-code",
+  "beadsMapping": {
+    "workspace-g86b": "Bridge + backend permission relay plumbing",
+    "workspace-ksbv": "Dashboard modal + permission request state",
+    "workspace-kmfs": "Tests + finish permission relay"
+  },
+  "agentModel": "claude-opus-4-7",
   "sessionHistory": [
     {
-      "timestamp": "2026-05-07T22:45:00Z",
+      "timestamp": "2026-05-07T18:25:44Z",
       "reason": "resume",
-      "note": "Found workspace with no PAN-1028 beads and a deleted stale PAN-986 continue.json. Identified the issue as TTS audio clipping in eltmon-stream/tts_daemon.py. Implemented persistent pw-play stream with adaptive silence prepend (600ms cold start, 50ms warm). Committed fix in eltmon-stream and updated panopticon-cli skill docs.",
-      "agentModel": "claude-code"
-    },
-    {
-      "timestamp": "2026-05-08T03:32:36.585Z",
-      "reason": "end",
-      "note": "Fix TTS audio clipping: persistent pw-play stream + adaptive silence prepend for PipeWire suspend"
-    },
-    {
-      "timestamp": "2026-05-08T09:24:33Z",
-      "reason": "resume",
-      "note": "Recovered from crash, verified the branch state, fixed remaining tts_daemon review findings (env parsing, JSON body validation, null handling, empty prompt guard, warm-player sink probing), and reran local verification before resubmission.",
-      "agentModel": "claude-code"
+      "note": "Rebuilt the missing PAN-987 continue state, verified the claimed workspace-g86b bead remains scoped to bridge/backend permission relay plumbing, and confirmed local typecheck plus targeted tests were already green before commit/close.",
+      "agentModel": "claude-opus-4-7"
     }
   ],
   "feedback": []

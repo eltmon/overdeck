@@ -12,6 +12,7 @@
 import type {
   AgentRuntimeSnapshot,
   AgentSnapshot,
+  ChannelPermissionRequestSnapshot,
   DashboardSnapshot,
   DomainEvent,
   ResourceStats,
@@ -41,6 +42,7 @@ export interface ReadModelState {
   ttsActivity: unknown[]
   shadowInferenceByIssueId: Record<string, string>
   turnDiffSummariesByAgentId: Record<string, TurnDiffSummary[]>
+  channelPermissionRequestsById: Record<string, ChannelPermissionRequestSnapshot>
   dashboardLifecycle: DashboardLifecycleState
   /** Conversation names currently undergoing Panopticon-native compaction. */
   conversationsCompactingByName: Record<string, boolean>
@@ -73,6 +75,7 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   ttsActivity: [],
   shadowInferenceByIssueId: {},
   turnDiffSummariesByAgentId: {},
+  channelPermissionRequestsById: {},
   conversationsCompactingByName: {},
   conversationsAwaitingPermissionByName: {},
   dashboardLifecycle: {
@@ -139,6 +142,11 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     reviewStatusByIssueId[rs.issueId] = rs
   }
 
+  const channelPermissionRequestsById: Record<string, ChannelPermissionRequestSnapshot> = {}
+  for (const request of snapshot.channelPermissionRequests ?? []) {
+    channelPermissionRequestsById[request.requestId] = request
+  }
+
   return {
     ...state,
     sequence: snapshot.sequence,
@@ -146,6 +154,7 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     specialistsByName,
     reviewStatusByIssueId,
     agentRuntimeById: snapshot.agentRuntimeById ?? state.agentRuntimeById,
+    channelPermissionRequestsById,
     resources: (snapshot.resources as ResourceStats | undefined) ?? null,
     issuesRaw: (snapshot as any).issues ?? state.issuesRaw,
   }
@@ -222,11 +231,17 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
             },
           }
         : runtimeById
+      const nextPermissionRequestsById = Object.fromEntries(
+        Object.entries(state.channelPermissionRequestsById).filter(
+          ([, request]) => request.agentId !== event.payload.agentId,
+        ),
+      )
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentsById: rest,
         agentRuntimeById: nextRuntimeById,
+        channelPermissionRequestsById: nextPermissionRequestsById,
       }
     }
 
@@ -607,6 +622,27 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         sequence: Math.max(state.sequence, event.sequence),
         agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
         agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
+      }
+    }
+
+    case 'agent.permission_requested': {
+      const request = event.payload
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        channelPermissionRequestsById: {
+          ...state.channelPermissionRequestsById,
+          [request.requestId]: request,
+        },
+      }
+    }
+
+    case 'agent.permission_resolved': {
+      const { [event.payload.requestId]: _removed, ...rest } = state.channelPermissionRequestsById
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        channelPermissionRequestsById: rest,
       }
     }
 
