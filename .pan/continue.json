@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "pan-1014",
   "created": "2026-05-07T13:50:00.000Z",
-  "updated": "2026-05-07T13:56:00.000Z",
+  "updated": "2026-05-07T14:00:00.000Z",
   "gitState": {
     "branch": "feature/pan-1014",
     "sha": "4127d87",
@@ -33,12 +33,9 @@
     }
   ],
   "resumePoint": {
-    "description": "Bead workspace-bvqq (lifecycle fix) complete. Next: claim bead workspace-b15a and fix the resume route in src/dashboard/server/routes/agents.ts to gate on canResumeSession||isRunningButStuck and return {before,after} lifecycle in the response.",
-    "beadId": "workspace-b15a",
-    "filesToRead": [
-      "src/dashboard/server/routes/agents.ts",
-      "src/lib/work-agent-lifecycle.ts"
-    ]
+    "description": "Both beads complete. Run full test suite, then pan done.",
+    "beadId": null,
+    "filesToRead": []
   },
   "beadsMapping": {
     "workspace-bvqq": "Fix getWorkAgentLifecycleState: add isRunningButStuck, fix canResumeSession, fix recommendedAction precedence",
@@ -50,6 +47,12 @@
       "timestamp": "2026-05-07T13:56:00.000Z",
       "reason": "bead-complete",
       "note": "Implemented bead workspace-bvqq: added isRunningButStuck to WorkAgentLifecycleState interface and computation; fixed canResumeSession to include &&!isRunning; fixed recommendedAction branch ordering so isRunningButStuck check fires before the generic running+live-tmux='none' branch; updated assertCanResumeSession to accept isRunningButStuck. Updated tests: added isRunning/isRunningButStuck assertions to existing test, added two regression tests for the PAN-1014 stuck-running case using setAgentRuntimeMirror for reliable runtime state in unit tests.",
+      "agentModel": "claude-opus-4-5"
+    },
+    {
+      "timestamp": "2026-05-07T14:00:00.000Z",
+      "reason": "bead-complete",
+      "note": "Implemented bead workspace-b15a: fixed resume route gate at agents.ts:1253 to check !canResumeSession && !isRunningButStuck for 409 (was only checking !canResumeSession); changed success response from flat lifecycle to {before:lifecycleBefore, after:getWorkAgentLifecycleState(id)} so consumers see both temporal snapshots without confusion; kept 409 response as flat lifecycle for backward compat with CommandDeck/index.tsx consumer; added resume-gate.test.ts with 4 tests for the gate predicate covering all four scenarios.",
       "agentModel": "claude-opus-4-5"
     }
   ]
