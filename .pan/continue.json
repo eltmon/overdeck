@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-980",
   "created": "2026-05-06T12:00:00Z",
-  "updated": "2026-05-06T12:30:00Z",
+  "updated": "2026-05-06T12:45:00Z",
   "gitState": { "branch": "feature/pan-980", "sha": "c78b413", "dirty": false },
   "decisions": [
     { "id": "D1", "summary": "Return 202 immediately for graceful restart and perform stop/relaunch async. 30s blocking HTTP handler would violate no-execsync-server rule and freeze the dashboard.", "recordedAt": "2026-05-06T12:00:00Z" },
@@ -16,9 +16,9 @@
     { "id": "H3", "summary": "switch-model endpoint already exists — restart with model should compose with or subsume it", "mitigation": "Restart endpoint handles model switch + restart atomically" }
   ],
   "resumePoint": {
-    "description": "Bead workspace-hwq complete. Next: workspace-487 — dashboard restart UI with model selector.",
-    "beadId": "workspace-487",
-    "filesToRead": ["src/dashboard/frontend/src/components/CommandDeck/ZoneActionStrip.tsx", "src/dashboard/frontend/src/components/CommandDeck/useZoneAActions.ts"]
+    "description": "Implementation complete. All 4 beads closed. buildAgentLaunchConfig extracted, restartAgent function, REST endpoint, dashboard UI all done.",
+    "beadId": null,
+    "filesToRead": []
   },
   "beadsMapping": {
     "workspace-51t": "Extract buildAgentLaunchConfig shared helper",
