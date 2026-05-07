@@ -1,65 +1,95 @@
 {
   "version": "1",
-  "issueId": "PAN-974",
-  "created": "2026-05-06T19:10:06.291Z",
-  "updated": "2026-05-06T19:12:51.442Z",
-  "gitState": {
-    "branch": "feature/pan-974",
-    "sha": "503cb22b4",
-    "dirty": true
-  },
+  "issueId": "PAN-982",
+  "created": "2026-05-07T01:59:13.002Z",
+  "updated": "2026-05-07T02:35:00.000Z",
+  "gitState": { "branch": "feature/pan-982", "sha": "c78b413", "dirty": false },
   "decisions": [
     {
       "id": "D1",
-      "summary": "Session-tree slot support belongs in the server session discovery layer, not the React tree, because FeatureItem and SessionNode already render multiple per-issue sessions and route selection by sessionId.",
-      "recordedAt": "2026-05-06T19:10:06.291Z"
+      "summary": "Adopt --agent partially: use .claude/agents/pan-*.md for model, permissions, tools, and PreToolUse/PostToolUse/Stop hooks. Keep launcher.sh for env var injection (provider routing, Panopticon identity, terminal env, mkcert CA, TMUX unset, keep-alive, script wrapper, caveman). This is because --agent handles declarative config but has no mechanism for env var setup or shell-level pre/post behaviors.",
+      "rationale": "Claude Code's --agent frontmatter only supports Anthropic models in the model: field. Non-Anthropic models (Kimi, OpenAI CLIProxy, OpenRouter) still need ANTHROPIC_BASE_URL/AUTH_TOKEN env injection. Per-agent hooks only support PreToolUse/PostToolUse/Stop — 6 other hook events (SessionStart, UserPromptSubmit, PreCompact, PostCompact, Notification, PermissionRequest) must stay in global settings.json with env-var gating. The launcher script becomes thinner (env-only) but cannot be eliminated entirely.",
+      "recordedAt": "2026-05-07T02:30:00.000Z"
     },
     {
       "id": "D2",
-      "summary": "Slot session JSONL lookup must derive the workspace path from the slot number so agent-pan-<issue>-<n> resolves against workspaces/feature-<issue>-slot-<n> instead of the base workspace.",
-      "recordedAt": "2026-05-06T19:10:06.291Z"
+      "summary": "Use pan- prefix for pipeline agent definitions (pan-work-agent.md, pan-review-agent.md, etc.) to distinguish from existing Claude Code subagent definitions (codebase-explorer.md, planning-agent.md, etc.). These are separate concerns: pipeline agents drive Panopticon lifecycle; subagent definitions drive the Agent tool.",
+      "rationale": "The existing .claude/agents/ files (codebase-explorer, planning-agent, triage-agent, health-monitor) are Claude Code subagent definitions used by the Agent tool for in-session delegation. Panopticon pipeline agents serve a completely different purpose — they're spawned by tmux, run autonomously, and are part of the work→review→test→merge pipeline. Using the pan- prefix makes them visually distinct in 'claude agents' listing and prevents naming collisions.",
+      "recordedAt": "2026-05-07T02:30:00.000Z"
     },
     {
       "id": "D3",
-      "summary": "Frontend agent output should normalize slot work session ids with the same base-issue pattern as the server so selecting agent-<issue>-<slot> keeps ActivityView bound to the parent issue while Terminal stays bound to the slot session.",
-      "recordedAt": "2026-05-06T19:12:51.442Z"
+      "summary": "Use --model CLI override for non-Anthropic models alongside --agent (verified: --model overrides frontmatter model:). Don't use --agents JSON injection as the primary path — reserve it for edge cases.",
+      "rationale": "Empirically tested: --model flag overrides agent frontmatter model: field. This means we can define pan-work-agent.md with model: sonnet as default, but override to kimi-k2 or gpt-5.4 at spawn time via --model. The --agents JSON injection was also tested and works, but adds shell quoting complexity for nested JSON objects. Filesystem definitions + --model override is simpler and more maintainable.",
+      "recordedAt": "2026-05-07T02:30:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Agent Teams feature is explicitly out of scope. Panopticon's tmux + beads + sendKeysAsync is strictly more capable and battle-tested.",
+      "rationale": "Agent Teams is experimental (disabled by default, requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1), has known limitations (no session resumption with teammates, one team per session, no nested teams, slow shutdown), and uses file-locked shared task lists that reinvent what beads + tmux message delivery already provide reliably. Panopticon's lifecycle management (tmux sessions, ready signal polling, state tracking, hook system) is not replaceable by Agent Teams.",
+      "recordedAt": "2026-05-07T02:30:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Hook migration must be atomic — PreToolUse/PostToolUse/Stop hooks must be removed from global settings.json at the same time they're deployed in per-agent frontmatter, to avoid double-firing.",
+      "rationale": "If both global hooks and per-agent hooks define the same event (e.g., PostToolUse → heartbeat-hook), the hook will fire twice. This would double heartbeat events, double cost recordings, and cause confusing duplicate behavior. The pan sync command should handle this atomically: deploy agent definitions and prune migrated global hooks in the same operation.",
+      "recordedAt": "2026-05-07T02:30:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Named sessions (--name) is a low-priority optional enhancement. Not load-bearing for the migration.",
+      "rationale": "Named sessions add ergonomic value (human-readable session names, easier manual debugging via 'claude --resume agent-pan-982') but don't change the fundamental architecture. Panopticon already tracks sessions via tmux session names (agent-pan-982) and agent state files. This can be added after the core migration without risk.",
+      "recordedAt": "2026-05-07T02:30:00.000Z"
     }
   ],
   "hazards": [
     {
       "id": "H1",
-      "summary": "Final UI verification must use the built dashboard server under Node 22, not Bun, or PTY-backed terminal behavior can fail independently of the PAN-974 code changes.",
-      "mitigation": "Run npm run build before browser verification and validate the dashboard through the Node 22 dist server path."
-    }
-  ],
-  "resumePoint": {
-    "description": "Both PAN-974 beads are implemented. Next: run broader verification for the session-tree slot work, then build the dashboard, verify slot selection in the browser against the Node 22 server, and only then do the final push and pan done flow.",
-    "beadId": "workspace-52u",
-    "filesToRead": [
-      "src/dashboard/server/routes/projects.ts",
-      "src/dashboard/server/ws-rpc.ts",
-      "src/dashboard/frontend/src/components/AgentOutputPanel.tsx",
-      "src/dashboard/frontend/src/components/__tests__/AgentOutputPanel.test.tsx",
-      "src/dashboard/server/__tests__/swarm-slot-session-mapping.test.ts"
-    ]
-  },
-  "beadsMapping": {
-    "workspace-448": "Server-side slot session discovery, issue mapping, and slot workspace JSONL resolution",
-    "workspace-52u": "Frontend slot-aware issue/session handling and tests"
-  },
-  "agentModel": "gpt-5.4",
-  "sessionHistory": [
-    {
-      "timestamp": "2026-05-06T19:10:06.291Z",
-      "reason": "end",
-      "note": "Completed bead workspace-448 implementation by adding slot-aware session discovery in projects.ts, slot-aware tmux issue extraction in ws-rpc.ts, and focused regression tests.",
-      "agentModel": "gpt-5.4"
+      "summary": "Per-agent hooks fire only when --agent is used. If launcher fails to pass --agent flag, agents run without hooks entirely — no heartbeat, no cost recording, no stop-hook.",
+      "mitigation": "Add a smoke test in spawnAgent() that verifies the --agent flag is present in the generated launcher command. Also keep the session-start global hook as a safety net — it can detect when a Panopticon agent starts without --agent by checking for PANOPTICON_AGENT_ID env var presence and missing per-agent hook behavior."
     },
     {
-      "timestamp": "2026-05-06T19:12:51.442Z",
-      "reason": "end",
-      "note": "Completed bead workspace-52u by making AgentOutputPanel derive the parent issue from slot session ids and adding focused derivation/render tests for swarm slot sessions.",
-      "agentModel": "gpt-5.4"
+      "id": "H2",
+      "summary": "User's ad-hoc Claude sessions in a workspace directory will see pan-*.md in 'claude agents' listing and could accidentally use --agent pan-work-agent, getting Panopticon hooks.",
+      "mitigation": "The pan- prefix makes accidental use unlikely (users would have to explicitly type --agent pan-work-agent). Additionally, Panopticon hooks are idempotent — running heartbeat or cost recorder without PANOPTICON_AGENT_ID set results in a graceful no-op (hooks check for agent ID and exit 0 if missing)."
+    },
+    {
+      "id": "H3",
+      "summary": "--agent + --resume behavior may change in future Claude Code versions. Migration depends on resumed sessions adopting the new agent's config.",
+      "mitigation": "Pin minimum Claude Code version in pan doctor checks. Add a CI test that verifies --agent + --resume applies the new agent's model (the empirical test done during planning). If behavior changes, fall back to baking full config into the initial spawn and not relying on --agent on resume."
+    },
+    {
+      "id": "H4",
+      "summary": "Hook deduplication gap during migration — if pan sync deploys agent definitions before removing global hooks, there's a window where hooks fire twice.",
+      "mitigation": "Make the migration atomic in pan sync: read current global hooks, deploy agent definitions, remove migrated hooks from global settings, all in one operation. If any step fails, roll back all changes. Add a test that verifies no hook event type appears in both global settings and any pan-*.md agent definition."
+    },
+    {
+      "id": "H5",
+      "summary": "claudish wrapper path (non-direct providers) cannot use --agent because claudish is a separate binary, not Claude Code CLI.",
+      "mitigation": "The claudish path is explicitly excluded from --agent migration. getAgentRuntimeBaseCommand() already branches on provider.compatibility: direct providers get 'claude --agent', claudish providers keep the existing 'claudish -i --model' path. Document this limitation clearly."
+    },
+    {
+      "id": "H6",
+      "summary": "Agent definitions contain absolute paths to hook scripts (/home/eltmon/.panopticon/bin/). These break on different machines or if the Panopticon install location changes.",
+      "mitigation": "Use relative paths from the workspace root where possible. For hooks that must reference ~/.panopticon/bin/, use $HOME expansion or have pan sync template the paths at deployment time. Long-term: move hook scripts into the project repo so paths are repo-relative."
     }
-  ]
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-6",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-07T01:59:13.002Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-982: Evaluate Claude Code --agent/subagent system for agent lifecycle",
+      "agentModel": "agent:claude-opus-4-6"
+    },
+    {
+      "timestamp": "2026-05-07T02:35:00.000Z",
+      "reason": "planning-complete",
+      "note": "Deep research completed. Empirically tested --agent + --resume (works, new agent config adopted), --agent + --model (override works), --agents JSON inline (works). Wrote comprehensive PRD at docs/prds/planned/PAN-982-claude-code-agent-integration.md. Created 15-bead vBRIEF plan covering 7 agent definitions, 4 launcher/spawn integration beads, hook migration, test updates, sync deployment, and optional named sessions. Key decision: partial adoption — use --agent for model/permissions/tools/hooks, keep launcher.sh for env vars and shell-level behaviors. Agent Teams explicitly deferred.",
+      "agentModel": "agent:claude-opus-4-6"
+    }
+  ],
+  "feedback": []
 }
