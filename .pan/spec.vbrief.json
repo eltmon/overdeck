@@ -4,7 +4,7 @@
     "created": "2026-05-07T04:25:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-985: Replace tmux send-keys with Claude Code Channels for prompt delivery (experimental, opt-in)",
-    "updated": "2026-05-07T04:15:26.851Z"
+    "updated": "2026-05-07T05:07:04.824Z"
   },
   "plan": {
     "id": "pan-985",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "4c4b2095-788a-49d5-845c-4c3b535c7e96",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 16,
     "created": "2026-05-07T04:25:00.000Z",
-    "updated": "2026-05-07T04:15:26.851Z",
+    "updated": "2026-05-07T05:07:04.824Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/985",
@@ -99,7 +99,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-07T05:07:04.824Z"
       },
       {
         "id": "bridge-unix-socket-listener",
@@ -155,7 +156,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-07T05:07:04.821Z"
       },
       {
         "id": "bridge-unit-tests",
@@ -211,7 +213,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-07T05:07:04.820Z"
       },
       {
         "id": "config-experimental-flag",
@@ -259,7 +262,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-07T05:07:04.823Z"
       },
       {
         "id": "deliver-agent-message-primitive",
@@ -323,7 +327,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-07T05:07:04.821Z"
       },
       {
         "id": "launcher-channels-args",
@@ -371,7 +376,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-07T05:07:04.823Z"
       },
       {
         "id": "work-agent-launch-wires-bridge",
@@ -427,7 +433,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-07T05:07:04.820Z"
       },
       {
         "id": "dismiss-dev-channels-dialog",
@@ -483,7 +490,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-07T05:07:04.819Z"
       },
       {
         "id": "switch-work-agent-callers-to-deliver",
@@ -523,7 +531,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-07T05:07:04.819Z"
       },
       {
         "id": "settings-api-experimental-block",
@@ -571,7 +580,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-07T05:07:04.821Z"
       },
       {
         "id": "settings-ui-experimental-section",
@@ -627,7 +637,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-07T05:07:04.819Z"
       },
       {
         "id": "smoke-test-doc",
@@ -659,7 +670,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-07T05:07:04.818Z"
       },
       {
         "id": "claude-md-channels-section",
@@ -699,7 +711,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-07T05:07:04.822Z"
       },
       {
         "id": "followup-issues-filed",
@@ -739,7 +752,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-07T05:07:04.822Z"
       }
     ],
     "edges": [
