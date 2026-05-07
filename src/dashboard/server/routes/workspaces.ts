@@ -39,6 +39,7 @@ import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
  */
 
 import { exec, execFile, spawn } from 'node:child_process';
+import { createConnection } from 'node:net';
 import { existsSync } from 'node:fs';
 import { access, chmod, mkdir, readdir, readFile, stat, symlink, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -111,6 +112,37 @@ import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.j
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
+const MAX_PROBED_PORTS = 5;
+const MAX_PROBED_CONTAINERS = 10;
+const PROBE_CACHE_TTL_MS = 30_000;
+
+function safeToISOString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return d.toISOString();
+}
+
+interface ProbeCacheEntry {
+  result: { healthy: boolean; reason?: string };
+  cachedAt: number;
+}
+
+const probeCache = new Map<string, ProbeCacheEntry>();
+
+function getCachedProbe(key: string): { healthy: boolean; reason?: string } | undefined {
+  const entry = probeCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() - entry.cachedAt > PROBE_CACHE_TTL_MS) {
+    probeCache.delete(key);
+    return undefined;
+  }
+  return entry.result;
+}
+
+function setCachedProbe(key: string, result: { healthy: boolean; reason?: string }): void {
+  probeCache.set(key, { result, cachedAt: Date.now() });
+}
 
 export function getWorkspacePathForIssue(projectPath: string, rawIssueId: string): { parsedIssueId: string; workspacePath: string } {
   const parsed = parseIssueId(rawIssueId);
@@ -649,20 +681,41 @@ async function getContainerStatusAsync(
       .map(([name]) => name);
 
     if (runningNames.length > 0) {
-      const { stdout: inspectStdout } = await execFileAsync(
-        'docker',
-        ['inspect', ...runningNames],
-        { encoding: 'utf-8', timeout: 10000 }
-      );
-      const inspects: Array<{
-        Name?: string;
-        Config?: { Labels?: Record<string, string>; ExposedPorts?: Record<string, unknown> };
-        State?: { Health?: { Status?: string; LastExecution?: { End?: string }; FailingStreak?: number; ExitCode?: number } };
-      }> = JSON.parse(inspectStdout);
-      const inspectByName = new Map(inspects.map((i) => [i.Name?.replace(/^\//, ''), i]));
+      let inspectByName = new Map<string, any>();
+      try {
+        const { stdout: inspectStdout } = await execFileAsync(
+          'docker',
+          ['inspect', ...runningNames],
+          { encoding: 'utf-8', timeout: 10000 }
+        );
+        const inspects: Array<{
+          Name?: string;
+          Config?: { Labels?: Record<string, string>; ExposedPorts?: Record<string, unknown> };
+          NetworkSettings?: { Ports?: Record<string, unknown> };
+          State?: { Health?: { Status?: string; LastExecution?: { End?: string }; FailingStreak?: number; ExitCode?: number } };
+        }> = JSON.parse(inspectStdout);
+        inspectByName = new Map(inspects.map((i) => [i.Name?.replace(/^\//, ''), i]));
+      } catch (err: any) {
+        // Docker inspect may return partial JSON on stderr even when one container is missing.
+        // Try to salvage valid results from stdout so one missing container doesn't drop all health data.
+        const partial = err?.stdout;
+        if (typeof partial === 'string' && partial.trim().startsWith('[')) {
+          try {
+            const inspects = JSON.parse(partial);
+            if (Array.isArray(inspects)) {
+              inspectByName = new Map(inspects.map((i: any) => [i.Name?.replace(/^\//, ''), i]));
+            }
+          } catch {
+            // Partial JSON unreadable — fall through to empty inspectByName
+          }
+        }
+      }
+
+      // Cap total probed containers to prevent unbounded fan-out per request
+      const namesToProbe = runningNames.slice(0, MAX_PROBED_CONTAINERS);
 
       await Promise.all(
-        runningNames.map(async (name) => {
+        namesToProbe.map(async (name) => {
           const info = result[name];
           const inspect = inspectByName.get(name);
           const serviceHealth = extractContainerServiceHealth(inspect);
@@ -670,10 +723,24 @@ async function getContainerStatusAsync(
           let lastFailureReason = serviceHealth.lastFailureReason;
           let lastProbeAt = serviceHealth.lastProbeAt;
 
-          // If docker healthcheck is unknown but we have Traefik/exposed ports, probe them
-          if (health === 'unknown' && serviceHealth.ports.length > 0) {
+          // If docker healthcheck is unknown but we have host-mapped ports, probe them
+          if (health === 'unknown' && serviceHealth.bindings.length > 0) {
+            // Deduplicate and cap probe targets
+            const dedupedBindings = Array.from(
+              new Map(
+                serviceHealth.bindings.map((b) => [`${b.hostIp}:${b.hostPort}`, b])
+              ).values()
+            ).slice(0, MAX_PROBED_PORTS);
+
             const probeResults = await Promise.all(
-              serviceHealth.ports.map((port) => probeContainerPortAsync(name, port))
+              dedupedBindings.map(async (b) => {
+                const cacheKey = `${name}::${b.hostIp}:${b.hostPort}`;
+                const cached = getCachedProbe(cacheKey);
+                if (cached) return cached;
+                const probeResult = await probeContainerPortAsync(b.hostPort, b.hostIp);
+                setCachedProbe(cacheKey, probeResult);
+                return probeResult;
+              })
             );
             const anyHealthy = probeResults.some((r) => r.healthy);
             health = anyHealthy ? 'healthy' : 'unhealthy';
@@ -698,9 +765,16 @@ async function getContainerStatusAsync(
   return result;
 }
 
+interface ContainerPortBinding {
+  containerPort: number;
+  hostIp: string;
+  hostPort: number;
+}
+
 interface ContainerServiceHealth {
   health: 'healthy' | 'unhealthy' | 'starting' | 'unknown';
   ports: number[];
+  bindings: ContainerPortBinding[];
   lastProbeAt?: string;
   lastFailureReason?: string;
 }
@@ -708,13 +782,15 @@ interface ContainerServiceHealth {
 function extractContainerServiceHealth(
   inspect?: {
     Config?: { Labels?: Record<string, string>; ExposedPorts?: Record<string, unknown> };
+    NetworkSettings?: { Ports?: Record<string, unknown> };
     State?: { Health?: { Status?: string; LastExecution?: { End?: string }; FailingStreak?: number; ExitCode?: number } };
   }
 ): ContainerServiceHealth {
-  if (!inspect) return { health: 'unknown', ports: [] };
+  if (!inspect) return { health: 'unknown', ports: [], bindings: [] };
   const labels = inspect?.Config?.Labels ?? {};
   const healthState = inspect?.State?.Health;
   const exposedPorts = inspect?.Config?.ExposedPorts ?? {};
+  const portBindings = inspect?.NetworkSettings?.Ports ?? {};
 
   // Parse exposed ports
   const ports = Object.keys(exposedPorts)
@@ -730,6 +806,26 @@ function extractContainerServiceHealth(
     }
   }
 
+  const allPorts = traefikPorts.length > 0 ? traefikPorts : ports;
+
+  // Extract host-mapped ports from NetworkSettings.Ports
+  const bindings: ContainerPortBinding[] = [];
+  for (const [containerPortProto, hostBindings] of Object.entries(portBindings)) {
+    if (!Array.isArray(hostBindings)) continue;
+    const containerPort = parseInt(containerPortProto.split('/')[0], 10);
+    if (Number.isNaN(containerPort)) continue;
+    for (const hb of hostBindings) {
+      if (!hb || typeof hb !== 'object') continue;
+      const hostPort = parseInt((hb as any).HostPort, 10);
+      if (Number.isNaN(hostPort) || hostPort < 1 || hostPort > 65535) continue;
+      bindings.push({
+        containerPort,
+        hostIp: String((hb as any).HostIp || '127.0.0.1'),
+        hostPort,
+      });
+    }
+  }
+
   // If container has a Docker healthcheck, use its state
   if (healthState?.Status) {
     const status = String(healthState.Status).toLowerCase();
@@ -737,32 +833,47 @@ function extractContainerServiceHealth(
       status === 'healthy' ? 'healthy' :
       status === 'unhealthy' ? 'unhealthy' :
       status === 'starting' ? 'starting' : 'unknown';
+    const lastProbeAt = safeToISOString(healthState?.LastExecution?.End);
+    const exitCode = healthState?.LastExecution?.ExitCode;
+    const failingStreak = healthState?.FailingStreak;
+    const lastFailureReason = failingStreak && failingStreak > 0
+      ? (typeof exitCode === 'number' && exitCode !== 0 ? `exit code ${exitCode}` : 'healthcheck failed')
+      : undefined;
     return {
       health,
-      ports: traefikPorts.length > 0 ? traefikPorts : ports,
-      lastProbeAt: healthState?.LastExecution?.End ? new Date(healthState.LastExecution.End).toISOString() : undefined,
-      lastFailureReason: healthState?.FailingStreak && healthState.FailingStreak > 0
-        ? (healthState?.ExitCode !== undefined ? `exit code ${healthState.ExitCode}` : 'healthcheck failed')
-        : undefined,
+      ports: allPorts,
+      bindings,
+      lastProbeAt,
+      lastFailureReason,
     };
   }
 
   return {
     health: 'unknown',
-    ports: traefikPorts.length > 0 ? traefikPorts : ports,
+    ports: allPorts,
+    bindings,
   };
 }
 
-async function probeContainerPortAsync(containerName: string, port: number): Promise<{ healthy: boolean; reason?: string }> {
-  try {
-    // Prefer wget, fall back to curl, then nc
-    const probeCmd = `wget -qO- http://127.0.0.1:${port}/ 2>/dev/null || curl -sf http://127.0.0.1:${port}/ 2>/dev/null || nc -z 127.0.0.1 ${port}`;
-    await execFileAsync('docker', ['exec', containerName, 'sh', '-c', probeCmd], { encoding: 'utf-8', timeout: 5000 });
-    return { healthy: true };
-  } catch (err: any) {
-    const reason = err?.stderr?.trim() || err?.message || 'probe failed';
-    return { healthy: false, reason: reason.slice(0, 200) };
-  }
+async function probeContainerPortAsync(hostPort: number, hostIp = '127.0.0.1'): Promise<{ healthy: boolean; reason?: string }> {
+  return new Promise((resolve) => {
+    const socket = createConnection(hostPort, hostIp);
+    socket.setTimeout(5000);
+
+    socket.on('connect', () => {
+      socket.end();
+      resolve({ healthy: true });
+    });
+
+    socket.on('error', (err) => {
+      resolve({ healthy: false, reason: err.message.slice(0, 200) });
+    });
+
+    socket.on('timeout', () => {
+      socket.destroy();
+      resolve({ healthy: false, reason: 'connection timeout' });
+    });
+  });
 }
 
 async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<string | null> {
