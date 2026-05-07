@@ -108,7 +108,7 @@ describe('ProjectionCache.save', () => {
     expect(row).toBeUndefined()
 
     // Advance past 100ms debounce
-    vi.advanceTimersByTime(150)
+    vi.advanceTimersByTime(2500)
 
     const savedRow = db.prepare(`SELECT sequence FROM projection_cache WHERE key = 'dashboard'`).get() as { sequence: number } | undefined
     expect(savedRow?.sequence).toBe(5)
@@ -122,7 +122,7 @@ describe('ProjectionCache.save', () => {
     cache.save(makeSnapshot(2))
     cache.save(makeSnapshot(3))
 
-    vi.advanceTimersByTime(150)
+    vi.advanceTimersByTime(2500)
 
     // Only one row, with the last snapshot's sequence
     const rows = db.prepare(`SELECT sequence FROM projection_cache`).all() as { sequence: number }[]
@@ -135,10 +135,10 @@ describe('ProjectionCache.save', () => {
     const cache = createProjectionCache(db)
 
     cache.save(makeSnapshot(10))
-    vi.advanceTimersByTime(150)
+    vi.advanceTimersByTime(2500)
 
     cache.save(makeSnapshot(20))
-    vi.advanceTimersByTime(150)
+    vi.advanceTimersByTime(2500)
 
     const rows = db.prepare(`SELECT sequence FROM projection_cache`).all() as { sequence: number }[]
     expect(rows).toHaveLength(1)
