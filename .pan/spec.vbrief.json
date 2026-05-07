@@ -752,7 +752,7 @@
       {
         "id": "work-start-picker-cli",
         "title": "pan start --harness CLI flag and prompt fallback",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T04:10:00.000Z",
         "metadata": {
@@ -766,7 +766,7 @@
           {
             "id": "work-start-picker-cli.ac1",
             "title": "`pan start <id> --harness pi --model gpt-5.4` spawns a Pi work agent and persists harness on state",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -774,7 +774,7 @@
           {
             "id": "work-start-picker-cli.ac2",
             "title": "`pan start <id> --harness pi --model claude-opus-4-7` while Anthropic auth=subscription exits non-zero with the canUseHarness reason text",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -782,7 +782,7 @@
           {
             "id": "work-start-picker-cli.ac3",
             "title": "Without --harness, behavior matches pre-change (claude-code default; no breaking change for existing scripts)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-636",
   "created": "2026-05-07T03:42:36.488Z",
-  "updated": "2026-05-07T05:28:59.389Z",
+  "updated": "2026-05-07T05:32:00.501Z",
   "gitState": {
     "branch": "feature/pan-636",
     "sha": "9b15d68ef",
@@ -138,12 +138,11 @@
     }
   ],
   "resumePoint": {
-    "description": "specialist-base-command bead complete (resolveSpecialistBaseCommand single producer; replaces 3 hardcoded sites — specialists.ts:1104/2316 baseCommand:claude literals + review-agent.ts:540 getAgentRuntimeBaseCommand call; ToS gate fallback to claude-code with console.warn). Beads remaining (12): UI surfaces fjs9/0c2/3ir/lg47/dbf, CLI r63/63b, system uem, niceties 3119/8qco/w1o0/6oe.",
-    "beadId": "workspace-sdf0",
+    "description": "work-start-picker-cli bead complete (pan start <id> --harness <claude-code|pi> flag added; canUseHarness gate runs before workspace setup; invalid combos exit non-zero with reason on stderr; harness flows to spawnAgent so AgentState is persisted). Beads remaining (11): UI fjs9/0c2/3ir/lg47/dbf, system uem/63b, niceties 3119/8qco/w1o0/6oe.",
+    "beadId": "workspace-r63",
     "filesToRead": [
-      "src/lib/cloister/router.ts",
-      "src/lib/cloister/specialists.ts",
-      "src/lib/cloister/review-agent.ts"
+      "src/cli/commands/start.ts",
+      "src/cli/index.ts"
     ]
   },
   "beadsMapping": {},
@@ -232,6 +231,12 @@
       "timestamp": "2026-05-07T05:28:59.389Z",
       "reason": "continue",
       "note": "Closed bead workspace-sdf0 (specialist-base-command). Added resolveSpecialistBaseCommand(role, model, harness?) in router.ts using dynamic imports of harness-policy + agents (avoids circular import with specialists.ts). Helper resolves harness from getSpecialistHarness when not explicit, evaluates canUseHarness against the model + getProviderAuthMode result, falls back to claude-code with a console.warn on block. Replaced 3 hardcoded sites: specialists.ts:1104 (specialist-dispatch inner script — uses specialistType as role), specialists.ts:2316 (specialist-init launcher — uses name as role), review-agent.ts:540 (spawnSingleReviewer — uses literal role review-agent). Removed now-unused getAgentRuntimeBaseCommand import from review-agent.ts. Verified AC1: grep for baseCommand:claude literals in cloister/ returns nothing. 4 vitest cases cover claude-code branch, pi branch (ToS allows non-Anthropic), pi+Anthropic+subscription fallback with warn, explicit harness override beats config. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:32:00.501Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-r63 (work-start-picker-cli). Added --harness <claude-code|pi> option to pan start command in src/cli/index.ts. Extended IssueOptions with harness?. issueCommand validates the flag up front: unknown value exits non-zero with Invalid --harness on stderr; canUseHarness(harness, model, await getProviderAuthMode(model)) is consulted before any workspace setup, so a Pi+Anthropic+subscription combo exits non-zero with the typed reason text and no half-prepared workspace. requestedHarness defaults to claude-code (no breaking change for existing scripts) and is passed to spawnAgent so AgentState.harness round-trips. Local spawn path passes harness; remote spawn path leaves a comment that Pi is local-only until the Fly worker bundles the pi binary (separate concern). 2 vitest cases cover: pi+Anthropic+subscription rejection with reason on stderr, and unknown --harness rejection. typecheck + lint clean.",
       "agentModel": "claude-opus-4-7"
     }
   ],

@@ -327,6 +327,7 @@ program
   .command('start <id>')
   .description('Create workspace and spawn agent for an issue')
   .option('--model <model>', 'Model to use (sonnet/opus/haiku/kimi-k2.5/etc) - defaults to Cloister config')
+  .option('--harness <harness>', 'Coding-agent harness: claude-code (default) | pi')
   .option('--dry-run', 'Show what would be created')
   .option('--shadow', 'Enable shadow mode')
   .option('--no-shadow', 'Disable shadow mode')
