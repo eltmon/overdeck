@@ -4,7 +4,7 @@
     "created": "2026-05-07T04:10:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-636: Pi Coding Agent support as alternative harness to Claude Code",
-    "updated": "2026-05-07T04:11:24.396Z"
+    "updated": "2026-05-07T05:50:35.631Z"
   },
   "plan": {
     "id": "pan-636",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "7e9f8d2c-3a4b-4c5d-9e1f-2a3b4c5d6e7f",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 6,
     "created": "2026-05-07T04:10:00.000Z",
-    "updated": "2026-05-07T04:11:24.396Z",
+    "updated": "2026-05-07T05:50:35.631Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/636",
@@ -152,7 +152,7 @@
       {
         "id": "pi-doctor-prereq",
         "title": "pan doctor reports Pi binary status and supported version range",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T04:10:00.000Z",
         "metadata": {
@@ -166,28 +166,32 @@
           {
             "id": "pi-doctor-prereq.ac1",
             "title": "pan doctor lists a 'Pi Coding Agent' check and reports OK/missing/too-old with the resolved version when Pi is on PATH",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-07T05:50:35.631Z"
           },
           {
             "id": "pi-doctor-prereq.ac2",
             "title": "pan doctor warns when packages/pi-extension/dist/index.js does not exist and includes the build command in the warning",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-07T05:50:35.631Z"
           },
           {
             "id": "pi-doctor-prereq.ac3",
             "title": "When Pi is missing, pan doctor exits non-zero only if --strict is passed; otherwise it warns and continues so existing Claude Code workflows are not blocked",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-07T05:50:35.631Z"
           }
-        ]
+        ],
+        "completed": "2026-05-07T05:50:35.630Z"
       },
       {
         "id": "pi-extension-package",

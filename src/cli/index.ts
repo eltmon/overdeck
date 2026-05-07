@@ -1023,7 +1023,8 @@ program
 program
   .command('doctor')
   .description('Check system health and dependencies')
-  .action(doctorCommand);
+  .option('--strict', 'Exit non-zero if any optional dependency is missing (e.g. Pi binary)')
+  .action((options) => doctorCommand(options));
 
 // Resources command
 program

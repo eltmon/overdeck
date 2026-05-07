@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-636",
   "created": "2026-05-07T03:42:36.488Z",
-  "updated": "2026-05-07T05:34:03.317Z",
+  "updated": "2026-05-07T05:51:00.000Z",
   "gitState": {
     "branch": "feature/pan-636",
-    "sha": "9b15d68ef",
+    "sha": "1c8cd305b",
     "dirty": true
   },
   "decisions": [
@@ -138,8 +138,8 @@
     }
   ],
   "resumePoint": {
-    "description": "pi-termination-flow bead complete (killAgent ladder: RPC abort -> 2s poll -> SIGTERM via Ctrl-C + pkill -TERM -> 5s poll -> tmux kill-session; cleanupPiTransientFiles unlinks rpc.in/ready.json/completed/heartbeat but never touches session JSONLs). 10 pi.test cases pass. Beads remaining (10): 3119 (resume), uem (doctor), 63b (pan sync settings), dbf (status display), 6oe (docs), w1o0 (e2e), UI bundle fjs9/0c2/3ir/lg47.",
-    "beadId": "workspace-8qco",
+    "description": "pi-doctor-prereq bead complete: extracted checkPi(strict) helper from doctorCommand, added SUPPORTED_PI_VERSION_MIN=0.73.0 + compareSemver, parses pi --version output (merges stderr because Pi prints version to stderr), reports OK/missing/too-old, checks packages/pi-extension/dist/index.js, --strict flag escalates missing to error. 6 doctor-pi tests pass. Beads remaining (9): 3119 (resume), 63b (pan sync settings), dbf (status display), 6oe (docs), w1o0 (e2e), UI bundle fjs9/0c2/3ir/lg47.",
+    "beadId": "workspace-uem",
     "filesToRead": [
       "src/lib/runtimes/pi.ts",
       "src/lib/runtimes/__tests__/pi.test.ts"
@@ -243,6 +243,12 @@
       "timestamp": "2026-05-07T05:34:03.317Z",
       "reason": "continue",
       "note": "Closed bead workspace-8qco (pi-termination-flow). Replaced minimal killAgent with the full TERM->KILL escalation ladder: (1) writePiCommand({cmd:abort}) — graceful so Pi can flush session.jsonl; (2) pollUntilSessionGone with 2s budget (100ms cadence); (3) tmux send-keys C-c + pkill -TERM -f agent-id=<id> (best-effort); (4) pollUntilSessionGone with 5s budget; (5) tmux kill-session as SIGKILL fallback. cleanupPiTransientFiles always runs at the end and removes rpc.in (via destroyPiFifo), ready.json, completed marker, and ~/.panopticon/heartbeats/<id>.json — but NEVER touches <agentDir>/sessions/*.jsonl per the JSONL-is-sacred rule in CLAUDE.md. 2 new pi.test cases verify the cleanup invariant (sacred jsonl survives) and the exit-fast-when-no-tmux invariant (<3.5s). 10 tests pass total. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:51:00.000Z",
+      "reason": "continue",
+      "note": "Resumed after context compaction. Ran full vitest: 14 failures broken down: 4 review-agent.test.ts cases were broken by the PAN-636 swap from getAgentRuntimeBaseCommand to resolveSpecialistBaseCommand and by leftover injectProviderEnvOverlay assertions (helper was removed in main commit 9fdb84258 but this stale-base branch still referenced it); fixed by porting main's updated assertions (test now expects resolveSpecialistBaseCommand from router.js, generateLauncherScript + BLANKED_PROVIDER_ENV references, no overlay). Remaining 10 failures (deacon-ci-retry, agent-spawning SageOx, release-monorepo-version, pan-344-auto-merge) verified to PASS on origin/main and are the side effect of feature/pan-636 being branched before those fixes landed — not caused by my changes; they will resolve on the next sync-with-main cycle. Closed bead workspace-uem (pi-doctor-prereq): extracted checkPi(strict) helper from doctorCommand, added SUPPORTED_PI_VERSION_MIN=0.73.0 constant + compareSemver, readPiVersion uses 2>&1 to capture Pi's stderr-printed version, --strict CLI option wired through doctorCommand options, --strict escalates Pi-missing from warn to error per AC3, packages/pi-extension/dist/index.js existence check warns with the build command per AC2. 6 vitest cases (doctor-pi.test.ts) cover OK/too-old/missing-warn/missing-strict/extension-missing/stderr-version-parse. typecheck + lint clean.",
       "agentModel": "claude-opus-4-7"
     }
   ],
