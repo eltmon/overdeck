@@ -474,7 +474,7 @@
       {
         "id": "update-sync-for-agents",
         "title": "Update pan sync to deploy agent definition files",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T02:30:00.000Z",
         "metadata": {
@@ -488,7 +488,7 @@
           {
             "id": "update-sync-for-agents.ac1",
             "title": "pan sync copies pan-*.md agent definitions to project .claude/agents/ directories",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -496,7 +496,7 @@
           {
             "id": "update-sync-for-agents.ac2",
             "title": "Existing non-pan-* agent definitions in .claude/agents/ are preserved (not deleted)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
