@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Container } from 'lucide-react';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import { InlineSparkline } from '../InlineSparkline';
@@ -16,6 +16,7 @@ export interface ContainerNodeProps {
   status: 'running' | 'stopped' | 'unhealthy' | 'restarting';
   cpuPercent: number;
   memoryUsage: number;
+  id?: string;
   cpuHistory?: number[];
   onViewLogs?: (name: string) => void;
   onRestart?: (name: string) => void;
@@ -56,15 +57,35 @@ export function ContainerNode({
   status,
   cpuPercent,
   memoryUsage,
-  cpuHistory,
+  id,
+  cpuHistory: initialCpuHistory,
   onViewLogs,
   onRestart,
   onStop,
   onStart,
   onInspect,
 }: ContainerNodeProps) {
+  const [cpuHistory, setCpuHistory] = useState<number[]>(initialCpuHistory ?? []);
   const dotStatus = containerStatusToDot(status);
   const iconColor = containerStatusColor(status);
+
+  useEffect(() => {
+    if (!id || (initialCpuHistory && initialCpuHistory.length > 0)) return;
+    let cancelled = false;
+    void fetch(`/api/resources/${encodeURIComponent(id)}/history`)
+      .then(async (res) => {
+        if (!res.ok) return null;
+        return res.json() as Promise<{ cpuPercent: number[] }>;
+      })
+      .then((data) => {
+        if (cancelled || !data) return;
+        setCpuHistory(data.cpuPercent ?? []);
+      })
+      .catch(() => {
+        // ignore
+      });
+    return () => { cancelled = true; };
+  }, [id, initialCpuHistory]);
 
   return (
     <ContextMenuRoot>

@@ -2,8 +2,8 @@
   "version": "1",
   "issueId": "PAN-965",
   "created": "2026-05-07T02:55:00Z",
-  "updated": "2026-05-07T03:10:00Z",
-  "gitState": { "branch": "feature/pan-965", "sha": "b9afe9d", "dirty": false },
+  "updated": "2026-05-07T03:13:00Z",
+  "gitState": { "branch": "feature/pan-965", "sha": "084dc35", "dirty": false },
   "decisions": [
     { "id": "D1", "summary": "No beads existed for PAN-965 — created 8 beads from PRD phases and linked dependencies.", "recordedAt": "2026-05-07T02:55:00Z" },
     { "id": "D2", "summary": "Container status mapping: running→active, unhealthy→waiting, restarting→thinking, stopped→ended. Reuses StatusDot component.", "recordedAt": "2026-05-07T02:55:00Z" }
