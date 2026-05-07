@@ -77,7 +77,8 @@ describe('health-api', () => {
 
       const result = await determineHealthStatusAsync(
         'agent-stopped',
-        join(agentDir, 'state.json')
+        join(agentDir, 'state.json'),
+        activeSessions
       );
 
       expect(result).toBeNull();
@@ -88,7 +89,8 @@ describe('health-api', () => {
 
       const result = await determineHealthStatusAsync(
         'agent-completed',
-        join(agentDir, 'state.json')
+        join(agentDir, 'state.json'),
+        activeSessions
       );
 
       expect(result).toBeNull();
@@ -100,7 +102,8 @@ describe('health-api', () => {
 
       const result = await determineHealthStatusAsync(
         'agent-no-state',
-        join(agentDir, 'state.json')
+        join(agentDir, 'state.json'),
+        activeSessions
       );
 
       expect(result).toBeNull();
@@ -111,7 +114,8 @@ describe('health-api', () => {
 
       const result = await determineHealthStatusAsync(
         'agent-crashed',
-        join(agentDir, 'state.json')
+        join(agentDir, 'state.json'),
+        activeSessions
       );
 
       expect(result).not.toBeNull();
@@ -124,7 +128,8 @@ describe('health-api', () => {
 
       const result = await determineHealthStatusAsync(
         'agent-crashed-2',
-        join(agentDir, 'state.json')
+        join(agentDir, 'state.json'),
+        activeSessions
       );
 
       expect(result).not.toBeNull();
@@ -140,7 +145,8 @@ describe('health-api', () => {
       try {
         const result = await determineHealthStatusAsync(
           agentName,
-          join(agentDir, 'state.json')
+          join(agentDir, 'state.json'),
+          activeSessions
         );
 
         expect(result).not.toBeNull();
@@ -160,7 +166,8 @@ describe('health-api', () => {
       try {
         const result = await determineHealthStatusAsync(
           agentName,
-          join(agentDir, 'state.json')
+          join(agentDir, 'state.json'),
+          activeSessions
         );
 
         expect(result).not.toBeNull();
@@ -180,7 +187,8 @@ describe('health-api', () => {
       try {
         const result = await determineHealthStatusAsync(
           agentName,
-          join(agentDir, 'state.json')
+          join(agentDir, 'state.json'),
+          activeSessions
         );
 
         expect(result).not.toBeNull();
@@ -197,7 +205,8 @@ describe('health-api', () => {
 
       const result = await determineHealthStatusAsync(
         'agent-corrupted-state',
-        join(agentDir, 'state.json')
+        join(agentDir, 'state.json'),
+        activeSessions
       );
 
       // Corrupted state.json treated as missing -> excluded
@@ -209,7 +218,8 @@ describe('health-api', () => {
 
       const result = await determineHealthStatusAsync(
         'agent-unknown-status',
-        join(agentDir, 'state.json')
+        join(agentDir, 'state.json'),
+        activeSessions
       );
 
       // Unknown status + no tmux = treat as crashed
