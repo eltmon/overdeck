@@ -217,6 +217,12 @@ function formatRuntime(startedAt: string): string {
   return `${mins}m`;
 }
 
+function fmtTokens(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(2)}M`;
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
+  return `${tokens}`;
+}
+
 export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabProps) {
   const confirm = useConfirm();
   const queryClient = useQueryClient();
@@ -563,6 +569,18 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   ? null
                   : <LiveCounter value={totalCost} unit="$" precision={2} />}
             </div>
+            {costs.data && (costs.data.inputTokens !== undefined || costs.data.outputTokens !== undefined) && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 11 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--muted-foreground)' }}>Input tokens</span>
+                  <span>{fmtTokens(costs.data.inputTokens ?? 0)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--muted-foreground)' }}>Output tokens</span>
+                  <span>{fmtTokens(costs.data.outputTokens ?? 0)}</span>
+                </div>
+              </div>
+            )}
             {costs.data?.byModel && Object.keys(costs.data.byModel).length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {Object.entries(costs.data.byModel)

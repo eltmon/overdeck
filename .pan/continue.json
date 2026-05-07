@@ -2,8 +2,8 @@
   "version": "1",
   "issueId": "PAN-953",
   "created": "2026-05-07T04:30:00Z",
-  "updated": "2026-05-07T05:15:00Z",
-  "gitState": { "branch": "feature/pan-953", "sha": "961f93d", "dirty": false },
+  "updated": "2026-05-07T05:30:00Z",
+  "gitState": { "branch": "feature/pan-953", "sha": "bb85627", "dirty": false },
   "decisions": [
     { "id": "D1", "summary": "Create 5 beads covering all missing inspector parity items", "recordedAt": "2026-05-07T04:30:00Z" },
     { "id": "D2", "summary": "Reuse existing inspector components (ContainerSection, ReviewPipelineSection) where possible to avoid duplication", "recordedAt": "2026-05-07T04:30:00Z" },
@@ -14,24 +14,24 @@
     { "id": "H1", "summary": "OverviewTab uses inline styles while inspector uses Tailwind classes — mixing may look inconsistent", "mitigation": "ContainerSection and ReviewPipelineSection render with Tailwind inside inline-styled Section — CSS variables are global so it works visually" }
   ],
   "resumePoint": {
-    "description": "Implement bead workspace-nc40 (Add Switch Model action to OverviewTab). Add Switch Model button to the Actions tile in OverviewTab when agent exists and is not a feature. Use existing useSwitchModel hook. May also need SwitchModelModal.",
-    "beadId": "workspace-nc40",
+    "description": "Implement bead workspace-59kw (Add Input/Output token totals to Cost tile). Update the Cost tile in OverviewTab to show inputTokens and outputTotals from useIssueCostsQuery data. Add formatted token rows below the per-model breakdown.",
+    "beadId": "workspace-59kw",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx",
-      "src/dashboard/frontend/src/components/SwitchModelModal.tsx",
-      "src/dashboard/frontend/src/hooks/useSwitchModel.ts"
+      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx"
     ]
   },
   "beadsMapping": {
     "workspace-8k4p": "Fix Agent tile: show runtime, uptime, workspace path",
     "workspace-qm53": "Add Containers section with right-click menu to OverviewTab",
-    "workspace-6sr5": "Add Pipeline stepper to OverviewTab"
+    "workspace-6sr5": "Add Pipeline stepper to OverviewTab",
+    "workspace-nc40": "Add Switch Model action to OverviewTab"
   },
   "agentModel": "kimi-k2.6",
   "sessionHistory": [
     { "timestamp": "2026-05-07T04:30:00Z", "reason": "start", "note": "Started PAN-953 implementation. Created 5 beads. Rebased onto latest main. No existing continue file.", "agentModel": "kimi-k2.6" },
     { "timestamp": "2026-05-07T04:45:00Z", "reason": "bead", "note": "Completed workspace-8k4p: threaded agent/issue props through IssueWorkbench→ZoneCOverview→OverviewTab. Fixed Agent tile to show actual runtime harness (getHarness), uptime (formatRuntime), friendly model name, and workspace path. Added workspace path to Workspace tile.", "agentModel": "kimi-k2.6" },
     { "timestamp": "2026-05-07T05:00:00Z", "reason": "bead", "note": "Completed workspace-qm53: fixed WorkspaceData.containers type (Record not array), removed broken container map from WORKSPACE tile, added ContainerSection with right-click context menu (restart/stop/start) to OverviewTab. Added containerControlMutation and refreshDbMutation hooks.", "agentModel": "kimi-k2.6" },
-    { "timestamp": "2026-05-07T05:15:00Z", "reason": "bead", "note": "Completed workspace-6sr5: imported ReviewPipelineSection from inspector/ and rendered it as a Section in OverviewTab when review status exists. onViewLog switches to prdiff tab.", "agentModel": "kimi-k2.6" }
+    { "timestamp": "2026-05-07T05:15:00Z", "reason": "bead", "note": "Completed workspace-6sr5: imported ReviewPipelineSection from inspector/ and rendered it as a Section in OverviewTab when review status exists. onViewLog switches to prdiff tab.", "agentModel": "kimi-k2.6" },
+    { "timestamp": "2026-05-07T05:30:00Z", "reason": "bead", "note": "Completed workspace-nc40: imported SwitchModelModal and useSwitchModel hook, added Switch Model button to Actions tile when agent exists, rendered modal with agent props.", "agentModel": "kimi-k2.6" }
   ]
 }
