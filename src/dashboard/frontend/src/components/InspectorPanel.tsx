@@ -34,6 +34,8 @@ import { PlanDialog } from './PlanDialog';
 import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
+import { isReviewPipelineStuck } from '../lib/pipeline-state';
+import { RecoverButton } from './RecoverButton';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
 import { PanOpenInPicker } from './PanOpenInPicker';
 import { ContainerSection } from './inspector/ContainerSection';
@@ -752,6 +754,20 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
             {issue.assignee.email && (
               <SensitiveText value={issue.assignee.email} className="text-[10px] truncate text-muted-foreground" />
             )}
+          </div>
+        )}
+
+        {/* Pipeline stuck banner */}
+        {reviewStatusProp && isReviewPipelineStuck(reviewStatusProp) && (
+          <div className="px-3 py-2 border-b border-border bg-warning/10">
+            <div className="flex items-center gap-2 mb-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
+              <span className="text-xs font-medium text-warning">Pipeline Stuck</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-2">
+              Review/test/merge pipeline is stuck and needs recovery.
+            </p>
+            <RecoverButton issueId={issueId} reviewStatus={reviewStatusProp} variant="inspector" />
           </div>
         )}
 
