@@ -15,6 +15,7 @@
  */
 
 import { useMemo, useState } from 'react';
+import { getHarness } from '@panctl/contracts';
 import type { Issue, Agent } from '../../../types';
 import { LiveCounter } from '../LiveCounter';
 import { ActivitySparkline } from '../ActivitySparkline';
@@ -34,8 +35,15 @@ import { refreshDashboardState } from '../../../lib/refresh-dashboard-state';
 import { isReviewPipelineStuck } from '../../../lib/pipeline-state';
 import { useConfirm } from '../../DialogProvider';
 import { useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
+import { ContainerSection } from '../../inspector/ContainerSection';
+import { ReviewPipelineSection } from '../../inspector/ReviewPipelineSection';
+import type { ContainerMenuState } from '../../inspector/types';
+import { SwitchModelModal } from '../../SwitchModelModal';
+import { useSwitchModel } from '../../../hooks/useSwitchModel';
 import { GitPullRequest, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Box, Link2, Terminal, Play, Pause, ExternalLink, Code2, Loader2, RotateCcw } from 'lucide-react';
 import { PlanDAGViewer } from '../../PlanDAG.js';
+import { getFriendlyModelName } from '../../inspector/utils';
 
 interface OverviewTabProps {
   issueId: string;
@@ -209,11 +217,54 @@ function formatRuntime(startedAt: string): string {
   return `${mins}m`;
 }
 
+function fmtTokens(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(2)}M`;
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
+  return `${tokens}`;
+}
+
 export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabProps) {
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [isRecoverPending, setIsRecoverPending] = useState(false);
   const [isSpawnPending, setIsSpawnPending] = useState(false);
+  const [containerMenu, setContainerMenu] = useState<ContainerMenuState | null>(null);
+  const [showSwitchModel, setShowSwitchModel] = useState(false);
+  const { switchMutation, isPending: isSwitchingModel } = useSwitchModel(agent?.id, issueId);
+
+  const containerControlMutation = useMutation({
+    mutationFn: async ({ containerName, action }: { containerName: string; action: 'start' | 'stop' | 'restart' }) => {
+      const res = await fetch(`/api/workspaces/${issueId}/containers/${containerName}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `Failed to ${action} container`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setContainerMenu(null);
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['workspace', issueId] }), 2000);
+    },
+  });
+
+  const refreshDbMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/refresh-db`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to refresh database');
+      }
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workspace', issueId] }),
+  });
+
   const planning = usePlanningSummaryQuery(issueId);
   const activity = useActivityQuery(issueId);
   const costs = useIssueCostsQuery(issueId);
@@ -257,6 +308,11 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
 
   const isRecoverable = isReviewPipelineStuck(reviewStatus.data ?? undefined);
   const recentEvents = useMemo(() => sections.slice(-10).reverse(), [sections]);
+
+  const handleContainerContextMenu = (e: React.MouseEvent, containerName: string, isRunning: boolean) => {
+    e.preventDefault();
+    setContainerMenu({ x: e.clientX, y: e.clientY, containerName, isRunning });
+  };
 
   return (
     <div
@@ -439,9 +495,15 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         <Tile title="Agent" icon={<Box size={14} />} testid="overview-tile-agent">
           {agent ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
-              <span><strong>Model:</strong> {agent.model}</span>
-              <span><strong>Runtime:</strong> {formatRuntime(agent.startedAt)}</span>
+              <span><strong>Model:</strong> {getFriendlyModelName(agent.model)}</span>
+              <span><strong>Runtime:</strong> {getHarness(agent)}</span>
+              <span><strong>Uptime:</strong> {formatRuntime(agent.startedAt)}</span>
               <span><strong>Status:</strong> {agent.status}</span>
+              {agent.workspace && (
+                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted-foreground)' }} title={agent.workspace}>
+                  {agent.workspace}
+                </span>
+              )}
               {workspace.data?.agentSessionId && (
                 <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted-foreground)' }}>
                   {workspace.data.agentSessionId}
@@ -450,7 +512,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
             </div>
           ) : workspace.data?.hasAgent ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
-              <span><strong>Model:</strong> {workspace.data.agentModelFull || workspace.data.agentModel || 'unknown'}</span>
+              <span><strong>Model:</strong> {getFriendlyModelName(workspace.data.agentModelFull || workspace.data.agentModel)}</span>
               {workspace.data.agentSessionId && (
                 <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted-foreground)' }}>
                   {workspace.data.agentSessionId}
@@ -507,6 +569,18 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   ? null
                   : <LiveCounter value={totalCost} unit="$" precision={2} />}
             </div>
+            {costs.data && (costs.data.inputTokens !== undefined || costs.data.outputTokens !== undefined) && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 11 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--muted-foreground)' }}>Input tokens</span>
+                  <span>{fmtTokens(costs.data.inputTokens ?? 0)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--muted-foreground)' }}>Output tokens</span>
+                  <span>{fmtTokens(costs.data.outputTokens ?? 0)}</span>
+                </div>
+              </div>
+            )}
             {costs.data?.byModel && Object.keys(costs.data.byModel).length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {Object.entries(costs.data.byModel)
@@ -746,29 +820,35 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                 Stop
               </button>
             )}
+            {agent && (
+              <button
+                type="button"
+                data-testid="overview-action-switch-model"
+                onClick={() => setShowSwitchModel(true)}
+                disabled={isSwitchingModel}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: 6,
+                  border: '1px solid var(--border)',
+                  background: 'transparent',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  opacity: isSwitchingModel ? 0.5 : 1,
+                }}
+              >
+                Switch Model
+              </button>
+            )}
           </div>
         </Tile>
 
         {/* WORKSPACE tile */}
         <Tile title="Workspace" icon={<Box size={14} />} testid="overview-tile-workspace">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {workspace.data?.containers && workspace.data.containers.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {workspace.data.containers.map((c) => (
-                  <div key={c.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-                    <span
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: '50%',
-                        background: c.status === 'running' ? 'var(--success)' : 'var(--destructive)',
-                      }}
-                    />
-                    <span>{c.name}</span>
-                    <span style={{ color: 'var(--muted-foreground)', marginLeft: 'auto' }}>{c.status}</span>
-                  </div>
-                ))}
-              </div>
+            {workspace.data?.path && (
+              <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted-foreground)' }} title={workspace.data.path}>
+                {workspace.data.path}
+              </span>
             )}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {workspace.data?.hasDocker && (
@@ -877,7 +957,38 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         </Tile>
       </div>
 
-      {/* 3. Reviewer summary */}
+      {/* 3. Containers */}
+      {workspace.data?.containers && Object.keys(workspace.data.containers).length > 0 && (
+        <Section title="Containers" rightSlot={<span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>right-click</span>}>
+          <ContainerSection
+            containers={workspace.data.containers}
+            startPending={false}
+            containersStarting={false}
+            containerControlPending={containerControlMutation.isPending}
+            controllingContainer={containerMenu?.containerName}
+            containerMenu={containerMenu}
+            onContainerContextMenu={handleContainerContextMenu}
+            onSetContainerMenu={setContainerMenu}
+            onContainerControl={(name, action) => containerControlMutation.mutate({ containerName: name, action })}
+            onRefreshDb={() => refreshDbMutation.mutate()}
+            refreshDbPending={refreshDbMutation.isPending}
+            confirm={confirm}
+          />
+        </Section>
+      )}
+
+      {/* 4. Pipeline stepper */}
+      {reviewStatus.data && (
+        <Section title="Pipeline">
+          <ReviewPipelineSection
+            reviewStatus={reviewStatus.data}
+            issueId={issueId}
+            onViewLog={() => onSwitchTab?.('prdiff')}
+          />
+        </Section>
+      )}
+
+      {/* 5. Reviewer summary */}
       {reviewerSections.length > 0 && (
         <Section title="Reviewer summary">
           <div
@@ -1144,6 +1255,23 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         >
           Loading planning context…
         </div>
+      )}
+
+      {showSwitchModel && agent && (
+        <SwitchModelModal
+          currentModel={agent.model}
+          agentId={agent.id}
+          issueId={issueId}
+          agentStatus={agent.status}
+          hasResumableSession={agent.hasSession ?? false}
+          onClose={() => setShowSwitchModel(false)}
+          onSwitch={(model, message) => {
+            switchMutation.mutate({ model, message }, {
+              onSuccess: () => setShowSwitchModel(false),
+            });
+          }}
+          isPending={isSwitchingModel}
+        />
       )}
     </div>
   );

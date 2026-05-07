@@ -330,11 +330,10 @@ export function useDiscussionsQuery(
 
 // ─── Workspace (/api/workspaces/:issueId) ───────────────────────────────────
 
-export interface WorkspaceContainer {
-  name: string;
-  status: string;
-  health?: string;
-  ports?: string;
+export interface WorkspaceContainerStatus {
+  running: boolean;
+  uptime: string | null;
+  status?: string;
 }
 
 export interface WorkspaceData {
@@ -351,7 +350,7 @@ export interface WorkspaceData {
   git?: { ahead: number; behind: number; branch: string; dirty: boolean } | null;
   repoGit?: { ahead: number; behind: number; branch: string; dirty: boolean } | null;
   services?: Array<{ name: string; url?: string }>;
-  containers?: WorkspaceContainer[] | null;
+  containers?: Record<string, WorkspaceContainerStatus> | null;
   hasDocker?: boolean;
   canContainerize?: boolean;
   pendingOperation?: string | null;

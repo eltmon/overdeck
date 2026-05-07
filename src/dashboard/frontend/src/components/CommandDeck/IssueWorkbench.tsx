@@ -151,6 +151,8 @@ export function IssueWorkbench({
             issueId={issueId}
             activeTab={activeTab}
             onTabChange={handleSwitchTab}
+            agent={agent}
+            issue={issue}
           />
           <IssueComposer issueId={issueId} sessions={sessions} />
         </>
