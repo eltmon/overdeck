@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync } from 'fs';
 import { readFile, readdir } from 'fs/promises';
+import { Agent as HttpAgent, request as httpRequest } from 'node:http';
 import { join, resolve, dirname } from 'path';
 import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
@@ -31,6 +32,7 @@ import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 import { generateLauncherScript } from './launcher-generator.js';
 import { logAgentLifecycle } from './persistent-logger.js';
 import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
+import { BRIDGE_TOKEN_HEADER, readBridgeToken, writeBridgeToken } from './bridge-token.js';
 
 const execAsync = promisify(exec);
 
@@ -493,6 +495,29 @@ function panopticonHomeForChannels(): string {
   return process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon');
 }
 
+const bridgeHttpAgents = new Map<string, HttpAgent>();
+
+function getBridgeHttpAgent(socketPath: string): HttpAgent {
+  const existing = bridgeHttpAgents.get(socketPath);
+  if (existing) {
+    return existing;
+  }
+  const agent = new HttpAgent({
+    keepAlive: true,
+    maxSockets: 1,
+    maxFreeSockets: 1,
+  });
+  bridgeHttpAgents.set(socketPath, agent);
+  return agent;
+}
+
+function destroyBridgeHttpAgent(socketPath: string): void {
+  const agent = bridgeHttpAgents.get(socketPath);
+  if (!agent) return;
+  bridgeHttpAgents.delete(socketPath);
+  agent.destroy();
+}
+
 /**
  * Append a delivery-event log line to the per-agent bridge log. Best-effort.
  */
@@ -531,52 +556,50 @@ async function postUnixSocketJson(
   socketPath: string,
   body: unknown,
   timeoutMs: number,
+  bridgeToken: string,
 ): Promise<{ status: number; body: string }> {
-  const { connect } = await import('node:net');
+  const payload = JSON.stringify(body);
+  const agent = getBridgeHttpAgent(socketPath);
+
   return new Promise((resolveCall, reject) => {
-    const payload = Buffer.from(JSON.stringify(body), 'utf-8');
-    const request =
-      `POST / HTTP/1.1\r\n` +
-      `Host: localhost\r\n` +
-      `Content-Type: application/json\r\n` +
-      `Content-Length: ${payload.byteLength}\r\n` +
-      `Connection: close\r\n` +
-      `\r\n`;
+    const req = httpRequest(
+      {
+        socketPath,
+        path: '/',
+        method: 'POST',
+        agent,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+          [BRIDGE_TOKEN_HEADER]: bridgeToken,
+        },
+      },
+      (res) => {
+        let responseBody = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => {
+          responseBody += chunk;
+        });
+        res.on('end', () => {
+          const status = res.statusCode ?? 0;
+          if (status >= 200 && status < 300) {
+            resolveCall({ status, body: responseBody });
+            return;
+          }
+          reject(new Error(`socket POST: status ${status}: ${responseBody.slice(0, 100)}`));
+        });
+      },
+    );
 
-    const socket = connect(socketPath);
-    let responseBuf = Buffer.alloc(0);
-    const timer = setTimeout(() => {
-      socket.destroy(new Error('socket POST timeout'));
-    }, timeoutMs);
-
-    socket.once('connect', () => {
-      socket.write(request);
-      socket.write(payload);
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error('socket POST timeout'));
     });
-    socket.on('data', (chunk: Buffer) => {
-      responseBuf = Buffer.concat([responseBuf, chunk]);
-    });
-    socket.once('error', (err: Error) => {
-      clearTimeout(timer);
+    req.on('error', (err: Error) => {
+      destroyBridgeHttpAgent(socketPath);
       reject(err);
     });
-    socket.once('close', () => {
-      clearTimeout(timer);
-      const text = responseBuf.toString('utf-8');
-      const m = /^HTTP\/1\.[01] (\d{3})/.exec(text);
-      if (!m) {
-        reject(new Error('socket POST: invalid HTTP response'));
-        return;
-      }
-      const status = parseInt(m[1], 10);
-      const split = text.indexOf('\r\n\r\n');
-      const respBody = split >= 0 ? text.slice(split + 4) : '';
-      if (status >= 200 && status < 300) {
-        resolveCall({ status, body: respBody });
-      } else {
-        reject(new Error(`socket POST: status ${status}: ${respBody.slice(0, 100)}`));
-      }
-    });
+    req.write(payload);
+    req.end();
   });
 }
 
@@ -622,11 +645,23 @@ export async function deliverAgentMessage(
     return;
   }
 
+  const bridgeToken = readBridgeToken(normalizedId);
+  if (!bridgeToken) {
+    await appendChannelDeliveryLog(normalizedId, {
+      path: 'tmux',
+      reason: 'bridge-token-missing',
+      caller,
+    });
+    await sendKeysAsync(normalizedId, message);
+    return;
+  }
+
   try {
     await postUnixSocketJson(
       socketPath,
       { content: message, meta: { caller } },
       2000,
+      bridgeToken,
     );
     await appendChannelDeliveryLog(normalizedId, { path: 'channel', caller });
     return;
@@ -665,6 +700,11 @@ export async function deliverAgentPermissionDecision(
     throw new Error(`bridge socket missing for ${normalizedId}`);
   }
 
+  const bridgeToken = readBridgeToken(normalizedId);
+  if (!bridgeToken) {
+    throw new Error(`bridge token missing for ${normalizedId}`);
+  }
+
   await postUnixSocketJson(
     socketPath,
     {
@@ -673,6 +713,7 @@ export async function deliverAgentPermissionDecision(
       behavior,
     },
     2000,
+    bridgeToken,
   );
 
   await appendChannelDeliveryLog(normalizedId, {
@@ -1570,6 +1611,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   let channelsBridgeMcpConfig: string | undefined;
   if (channelsDecision.eligible) {
     channelsBridgeMcpConfig = join(options.workspace, '.pan', 'agent-mcp.json');
+    writeBridgeToken(agentId);
     await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, agentId);
     state.channelsEnabled = true;
     saveAgentState(state);

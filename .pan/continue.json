@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-987",
   "created": "2026-05-07T18:25:44Z",
-  "updated": "2026-05-07T18:47:00Z",
+  "updated": "2026-05-07T20:40:13Z",
   "gitState": {
     "branch": "feature/pan-987",
-    "sha": "46e888443",
+    "sha": "ef583d6ec",
     "dirty": true
   },
   "decisions": [
@@ -38,6 +38,16 @@
       "id": "D6",
       "summary": "During full-suite verification, fixed two unrelated repo-health regressions that would have blocked shipping anyway: the desktop package version had drifted behind the root package version, and the GitHub label-cleanup test still assumed unconditional `--remove-label` calls after the PAN-925 optimization to fetch current labels first.",
       "recordedAt": "2026-05-07T18:47:00Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Resolved the review agent's correctness blocker by making dashboard permission responses persist `agent.permission_resolved` events before attempting bridge delivery, then teaching the read model to cache resolved decisions so retries can safely re-deliver without appending duplicate events.",
+      "recordedAt": "2026-05-07T20:40:13Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Hardened the permission relay boundary itself instead of adding downstream bandaids: the Unix-socket bridge now requires a per-agent token checked with constant-time comparison, the dashboard response route enforces trusted origins, and shared payload normalization keeps bridge plus dashboard validation aligned on null previews, byte limits, and durable-log redaction.",
+      "recordedAt": "2026-05-07T20:40:13Z"
     }
   ],
   "hazards": [
@@ -48,8 +58,8 @@
     },
     {
       "id": "H2",
-      "summary": "The bridge/backend plumbing is done, but dashboard UI work is still separate. Backend snapshots and events now carry pending permission requests, yet operators still need the modal bead to make the flow usable end to end.",
-      "mitigation": "After this bead passes inspection, implement workspace-ksbv by wiring the frontend store and permission modal directly to the new pending-request state and response endpoint."
+      "summary": "Older in-memory or test-constructed read-model states can omit the new per-agent permission index maps because those fields did not exist before this review-fix round.",
+      "mitigation": "Reducer paths that touch pending or resolved permission indexes now default missing maps to empty objects. Keep those compatibility guards unless every legacy snapshot and test fixture is migrated in the same change."
     },
     {
       "id": "H3",
@@ -58,11 +68,12 @@
     }
   ],
   "resumePoint": {
-    "description": "Verification fallout is fixed locally. Next step: commit the desktop version alignment, label-cleanup test update, and continue-state note; re-run `npm run typecheck`, `npm run lint`, and `npm test`; then push and call `pan done` if the tree stays clean.",
+    "description": "Review-blocker fixes are green locally. Next step: commit the permission relay hardening changes and updated continue state, then push the branch and invoke `/rebase-and-submit` so the PR can re-enter review with clean verification evidence.",
     "beadId": "workspace-kmfs",
     "filesToRead": [
-      "apps/desktop/package.json",
-      "tests/unit/lib/lifecycle/label-cleanup.test.ts",
+      "src/dashboard/server/routes/agents.ts",
+      "src/lib/channels/panopticon-bridge.ts",
+      "packages/contracts/src/event-reducers.ts",
       ".pan/continue.json"
     ]
   },
@@ -95,6 +106,12 @@
       "timestamp": "2026-05-07T18:47:00Z",
       "reason": "manual",
       "note": "Full-repo verification exposed two unrelated red tests that would block shipping. I aligned `apps/desktop/package.json` to the root version and updated the GitHub label-cleanup test to mock the post-PAN-925 label-fetch behavior before rerunning the targeted failing suites.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T20:40:13Z",
+      "reason": "manual",
+      "note": "Applied the review-agent hardening pass for PAN-987: shared permission payload validation, trusted-origin enforcement on the response endpoint, event-store persistence before bridge delivery, retry-safe resolved-decision caching in the read model, per-agent cleanup indexes in the reducer, bridge token authentication with constant-time comparison, pooled Unix-socket HTTP delivery, optimistic frontend dismissal for resolved requests, and new regression coverage. After fixing a legacy reducer compatibility gap that full-suite tests exposed, `npm run typecheck`, `npm run lint`, and `npm test` all finished green.",
       "agentModel": "claude-opus-4-7"
     }
   ],

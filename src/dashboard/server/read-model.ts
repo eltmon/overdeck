@@ -120,6 +120,14 @@ export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'r
 export interface ReadModelServiceShape {
   /** Return the current read model state as a DashboardSnapshot. */
   readonly getSnapshot: Effect.Effect<DashboardSnapshot>;
+  /** Return a single pending channel permission request without rebuilding a full snapshot. */
+  readonly getChannelPermissionRequest: (
+    requestId: string,
+  ) => Effect.Effect<import('@panctl/contracts').ChannelPermissionRequestSnapshot | null>;
+  /** Return a recent resolved channel permission decision for safe delivery retries. */
+  readonly getResolvedChannelPermissionDecision: (
+    requestId: string,
+  ) => Effect.Effect<import('@panctl/contracts').ResolvedChannelPermissionDecision | null>;
   /** Apply a domain event to the read model (called by event store on append). */
   readonly applyEvent: (event: DomainEvent) => void;
   /** Bootstrap the read model from existing lib module state. */
@@ -204,6 +212,16 @@ export const ReadModelServiceLive = Layer.effect(
 
       return buildSnapshot();
     });
+
+    const getChannelPermissionRequest = (
+      requestId: string,
+    ): Effect.Effect<import('@panctl/contracts').ChannelPermissionRequestSnapshot | null> =>
+      Effect.succeed(state.channelPermissionRequestsById[requestId] ?? null);
+
+    const getResolvedChannelPermissionDecision = (
+      requestId: string,
+    ): Effect.Effect<import('@panctl/contracts').ResolvedChannelPermissionDecision | null> =>
+      Effect.succeed(state.resolvedChannelPermissionDecisionsById[requestId] ?? null);
 
     // ── Bootstrap inline during layer construction ───────────────────────────
     yield* Effect.gen(function* () {
@@ -589,6 +607,12 @@ export const ReadModelServiceLive = Layer.effect(
       }
     });
 
-    return { getSnapshot, applyEvent, bootstrap: Effect.void };
+    return {
+      getSnapshot,
+      getChannelPermissionRequest,
+      getResolvedChannelPermissionDecision,
+      applyEvent,
+      bootstrap: Effect.void,
+    };
   }),
 );

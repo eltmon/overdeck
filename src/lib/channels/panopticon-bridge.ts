@@ -32,11 +32,17 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { timingSafeEqual } from 'node:crypto';
 import { chmod, mkdir, unlink, appendFile } from 'node:fs/promises';
 import { existsSync, unlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
+import { BRIDGE_TOKEN_HEADER, readBridgeToken } from '../bridge-token.js';
+import {
+  normalizeChannelPermissionRequestFields,
+  type NormalizedChannelPermissionRequestFields,
+} from './permission-payload.js';
 import { getInternalToken, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
 
 /**
@@ -79,7 +85,7 @@ interface ChannelPermissionRequestNotification {
     request_id: string;
     tool_name: string;
     description: string;
-    input_preview: string;
+    input_preview?: string | null;
   };
 }
 
@@ -106,32 +112,44 @@ function parsePermissionRequestNotification(payload: unknown): ChannelPermission
   }
 
   const params = (payload as { params?: unknown }).params;
-  if (
-    params === null ||
-    typeof params !== 'object' ||
-    typeof (params as { request_id?: unknown }).request_id !== 'string' ||
-    !((params as { request_id: string }).request_id.length > 0) ||
-    typeof (params as { tool_name?: unknown }).tool_name !== 'string' ||
-    !((params as { tool_name: string }).tool_name.length > 0) ||
-    typeof (params as { description?: unknown }).description !== 'string' ||
-    !((params as { description: string }).description.length > 0) ||
-    typeof (params as { input_preview?: unknown }).input_preview !== 'string'
-  ) {
+  if (params === null || typeof params !== 'object') {
     throw new Error('invalid permission request notification params');
   }
 
-  return payload as ChannelPermissionRequestNotification;
+  const normalized = normalizeChannelPermissionRequestFields({
+    requestId: (params as { request_id?: unknown }).request_id,
+    toolName: (params as { tool_name?: unknown }).tool_name,
+    description: (params as { description?: unknown }).description,
+    inputPreview: (params as { input_preview?: unknown }).input_preview,
+  });
+  if (!normalized.ok) {
+    throw new Error(`invalid permission request notification params: ${normalized.error}`);
+  }
+
+  return {
+    method: 'notifications/claude/channel/permission_request',
+    params: {
+      request_id: normalized.value.requestId,
+      tool_name: normalized.value.toolName,
+      description: normalized.value.description,
+      input_preview: normalized.value.inputPreview,
+    },
+  };
 }
 
 function normalizePermissionRequest(
   notification: ChannelPermissionRequestNotification,
 ): ChannelPermissionRequest {
-  return {
+  const normalized = normalizeChannelPermissionRequestFields({
     requestId: notification.params.request_id,
     toolName: notification.params.tool_name,
     description: notification.params.description,
     inputPreview: notification.params.input_preview,
-  };
+  });
+  if (!normalized.ok) {
+    throw new Error(`invalid permission request notification params: ${normalized.error}`);
+  }
+  return normalized.value;
 }
 
 export const server: Server = new Server(
@@ -150,6 +168,23 @@ export const server: Server = new Server(
   },
 );
 
+export async function handlePermissionRequestNotification(
+  notification: unknown,
+  agentId: string,
+  forwarder: (agentId: string, request: ChannelPermissionRequest) => Promise<void> =
+    forwardPermissionRequestToDashboard,
+): Promise<void> {
+  try {
+    const parsed = parsePermissionRequestNotification(notification);
+    await forwarder(agentId, normalizePermissionRequest(parsed));
+  } catch (error: unknown) {
+    await appendBridgeLog(agentId, {
+      kind: 'permission_request_forward_failed',
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 function installPermissionRequestHandler(mcp: Server): void {
   const handlers = (mcp as unknown as {
     _notificationHandlers?: Map<string, (notification: unknown) => Promise<void>>;
@@ -163,8 +198,7 @@ function installPermissionRequestHandler(mcp: Server): void {
     if (!agentId) {
       throw new Error('PANOPTICON_AGENT_ID missing while handling permission request');
     }
-    const parsed = parsePermissionRequestNotification(notification);
-    await forwardPermissionRequestToDashboard(agentId, normalizePermissionRequest(parsed));
+    await handlePermissionRequestNotification(notification, agentId);
   });
 }
 
@@ -188,6 +222,25 @@ export function getBridgeLogPath(agentId: string): string {
 
 function getDashboardBaseUrl(): string {
   return process.env.DASHBOARD_URL || 'http://localhost:3011';
+}
+
+function constantTimeHeaderMatch(provided: string | null, expected: string): boolean {
+  if (!provided) return false;
+  const providedBuffer = Buffer.from(provided, 'utf8');
+  const expectedBuffer = Buffer.from(expected, 'utf8');
+  if (providedBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+  return timingSafeEqual(providedBuffer, expectedBuffer);
+}
+
+function validateBridgeToken(req: Request, agentId: string): boolean {
+  const expected = readBridgeToken(agentId);
+  if (!expected) {
+    return false;
+  }
+  const provided = req.headers.get(BRIDGE_TOKEN_HEADER);
+  return constantTimeHeaderMatch(provided, expected);
 }
 
 export interface ChannelPushPayload {
@@ -388,6 +441,12 @@ async function startUnixListener(mcp: Server, agentId: string): Promise<UnixHttp
           headers: { 'content-type': 'application/json' },
         });
       }
+      if (!validateBridgeToken(req, agentId)) {
+        return new Response(JSON.stringify({ error: 'forbidden' }), {
+          status: 403,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
       let parsed: unknown;
       try {
         parsed = await req.json();
@@ -411,6 +470,9 @@ async function startUnixListener(mcp: Server, agentId: string): Promise<UnixHttp
 
 async function main(): Promise<void> {
   const agentId = resolveAgentIdOrExit();
+  if (!readBridgeToken(agentId)) {
+    throw new Error(`panopticon-bridge: bridge token missing for ${agentId}`);
+  }
   const transport = new StdioServerTransport();
   await server.connect(transport);
 

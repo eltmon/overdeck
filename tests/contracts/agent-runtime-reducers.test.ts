@@ -125,6 +125,7 @@ describe('PAN-800 runtime reducer', () => {
       agentId: AGENT,
       toolName: 'Bash',
     })
+    expect(next.channelPermissionRequestIdsByAgentId[AGENT]).toEqual(['perm-1'])
   })
 
   it('agent.permission_resolved removes pending permission requests', () => {
@@ -150,6 +151,12 @@ describe('PAN-800 runtime reducer', () => {
       },
     } as any))
     expect(s.channelPermissionRequestsById['perm-1']).toBeUndefined()
+    expect(s.channelPermissionRequestIdsByAgentId[AGENT]).toBeUndefined()
+    expect(s.resolvedChannelPermissionDecisionsById['perm-1']).toMatchObject({
+      requestId: 'perm-1',
+      agentId: AGENT,
+      behavior: 'allow',
+    })
   })
 
   it('agent.message_received bumps lastMessageAt without changing activity', () => {
@@ -192,25 +199,40 @@ describe('PAN-800 runtime reducer', () => {
     expect(next.agentRuntimeById[AGENT].updatedAtSequence).toBe(1)
   })
 
-  it('agent.stopped marks runtime activity stopped and clears stale channel replies', () => {
+  it('agent.stopped marks runtime activity stopped (pan kill path)', () => {
     let s = applyEvent(INITIAL_READ_MODEL_STATE, at(1, {
-      type: 'agent.channel_reply',
-      payload: {
-        agentId: AGENT,
-        reply: { kind: 'done', summary: 'Implementation complete', artifactRefs: [] },
-      },
+      type: 'agent.activity_changed',
+      payload: { agentId: AGENT, activity: 'working', currentTool: 'Bash' },
     } as any))
     s = applyEvent(s, at(2, {
-      type: 'agent.activity_changed',
-      payload: { agentId: AGENT, activity: 'idle' },
+      type: 'agent.permission_requested',
+      payload: {
+        requestId: 'perm-stop',
+        agentId: AGENT,
+        issueId: 'PAN-800',
+        toolName: 'Bash',
+        description: 'Run npm test',
+        inputPreview: '{"command":"npm test"}',
+        createdAt: TS,
+      },
     } as any))
     s = applyEvent(s, at(3, {
+      type: 'agent.permission_resolved',
+      payload: {
+        requestId: 'perm-stop',
+        agentId: AGENT,
+        issueId: 'PAN-800',
+        behavior: 'allow',
+      },
+    } as any))
+    s = applyEvent(s, at(4, {
       type: 'agent.stopped',
       payload: { agentId: AGENT, issueId: 'PAN-800' },
     } as any))
     expect(s.agentRuntimeById[AGENT].activity).toBe('stopped')
     expect(s.agentRuntimeById[AGENT].currentTool).toBeUndefined()
-    expect(s.agentRuntimeById[AGENT].channelReply).toBeUndefined()
+    expect(s.channelPermissionRequestsById['perm-stop']).toBeUndefined()
+    expect(s.resolvedChannelPermissionDecisionsById['perm-stop']).toBeUndefined()
   })
 
   it('bumps AgentSnapshot.runtimeSnapshotSequence when agent exists', () => {

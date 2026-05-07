@@ -321,6 +321,7 @@ describe('App channel permission requests', () => {
         }),
       )
     })
+    expect(screen.queryByTestId('channel-permission-request')).toBeNull()
     expect(mockRefreshDashboardState).toHaveBeenCalledTimes(1)
     expect(mockToastSuccess).toHaveBeenCalledWith('Allowed agent-987 to continue')
   })

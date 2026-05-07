@@ -1,5 +1,14 @@
 import { jsonResponse } from "../http-helpers.js";
 import { httpHandler } from "./http-handler.js";
+import { validateOrigin } from './origin-validation.js';
+import {
+  buildPermissionActivityDetails,
+  buildPermissionWaitingMessage,
+  normalizePermissionRequestBody,
+  parsePermissionResponseBehavior,
+  permissionResolutionVerb,
+  processPermissionResponse,
+} from './agent-permissions.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
 import { withBdMutex } from '../../../lib/bd-mutex.js';
@@ -30,6 +39,7 @@ import { withBdMutex } from '../../../lib/bd-mutex.js';
  */
 
 import { exec, spawn } from 'node:child_process';
+import { timingSafeEqual } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { appendFile, mkdir, open, readdir, readFile, rename, rm, stat, symlink, lstat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -110,18 +120,14 @@ import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSessi
 
 const execAsync = promisify(exec);
 
-function buildPermissionWaitingMessage(toolName: string, description: string): string {
-  return `Waiting for permission: ${toolName} — ${description}`;
-}
-
-function buildPermissionActivityDetails(description: string, inputPreview: string): string {
-  return inputPreview.trim().length > 0
-    ? `${description}\n\nInput preview:\n${inputPreview}`
-    : description;
-}
-
-function permissionResolutionVerb(behavior: 'allow' | 'deny'): 'allowed' | 'denied' {
-  return behavior === 'allow' ? 'allowed' : 'denied';
+function constantTimeTokenEqual(provided: string | undefined, expected: string): boolean {
+  if (!provided) return false;
+  const providedBuffer = Buffer.from(provided, 'utf8');
+  const expectedBuffer = Buffer.from(expected, 'utf8');
+  if (providedBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+  return timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
 async function appendAgentLifecycleLog(agentId: string, event: string, details: Record<string, unknown> = {}): Promise<void> {
@@ -183,7 +189,7 @@ const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const text = yield* request.text;
   try {
-    return text ? JSON.parse(text) : {};
+    return text ? (JSON.parse(text) ?? {}) : {};
   } catch {
     return {};
   }
@@ -1151,33 +1157,19 @@ const postInternalAgentPermissionRequestRoute = HttpRouter.add(
     const headers = request.headers as Record<string, string | string[] | undefined>;
     const rawHeader = headers[INTERNAL_TOKEN_HEADER];
     const provided = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
-    if (!provided || provided !== expected) {
+    if (!constantTimeTokenEqual(provided, expected)) {
       return jsonResponse({ ok: false, error: 'forbidden' }, { status: 403 });
     }
 
     const body = (yield* readJsonBody) as Record<string, unknown>;
-    const requestId = body['requestId'];
-    const toolName = body['toolName'];
-    const description = body['description'];
-    const inputPreview = body['inputPreview'];
-    if (
-      typeof requestId !== 'string' ||
-      requestId.trim().length === 0 ||
-      typeof toolName !== 'string' ||
-      toolName.trim().length === 0 ||
-      typeof description !== 'string' ||
-      description.trim().length === 0 ||
-      (inputPreview !== undefined && typeof inputPreview !== 'string')
-    ) {
-      return jsonResponse(
-        { ok: false, error: 'requestId, toolName, description, and optional string inputPreview are required' },
-        { status: 400 },
-      );
+    const normalized = normalizePermissionRequestBody(body);
+    if (!normalized.ok) {
+      return jsonResponse({ ok: false, error: normalized.error }, { status: 400 });
     }
+    const { requestId, toolName, description, inputPreview } = normalized.value;
 
     const readModel = yield* ReadModelService;
-    const snapshot = yield* readModel.getSnapshot;
-    const existing = (snapshot.channelPermissionRequests ?? []).find((entry) => entry.requestId === requestId);
+    const existing = yield* readModel.getChannelPermissionRequest(requestId);
     if (existing) {
       if (existing.agentId !== id) {
         return jsonResponse({ ok: false, error: `request ${requestId} already belongs to ${existing.agentId}` }, { status: 409 });
@@ -1203,7 +1195,7 @@ const postInternalAgentPermissionRequestRoute = HttpRouter.add(
         issueId,
         toolName,
         description,
-        inputPreview: typeof inputPreview === 'string' ? inputPreview : '',
+        inputPreview,
         createdAt: timestamp,
       },
     } as never);
@@ -1221,7 +1213,7 @@ const postInternalAgentPermissionRequestRoute = HttpRouter.add(
       source: 'dashboard',
       level: 'warn',
       message: `Permission requested for ${toolName}`,
-      details: buildPermissionActivityDetails(description, typeof inputPreview === 'string' ? inputPreview : ''),
+      details: buildPermissionActivityDetails(description, inputPreview),
       issueId,
     });
 
@@ -1240,61 +1232,71 @@ const postAgentPermissionResponseRoute = HttpRouter.add(
       return jsonResponse({ ok: false, error: 'missing agent id or request id' }, { status: 400 });
     }
 
-    const body = (yield* readJsonBody) as Record<string, unknown>;
-    const behavior = body['behavior'];
-    if (behavior !== 'allow' && behavior !== 'deny') {
-      return jsonResponse({ ok: false, error: 'behavior must be allow or deny' }, { status: 400 });
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ ok: false, error: originCheck.error }, { status: 403 });
     }
+
+    const body = (yield* readJsonBody) as Record<string, unknown>;
+    const behaviorResult = parsePermissionResponseBehavior(body);
+    if (!behaviorResult.ok) {
+      return jsonResponse({ ok: false, error: behaviorResult.error }, { status: 400 });
+    }
+    const behavior = behaviorResult.value;
 
     const readModel = yield* ReadModelService;
-    const snapshot = yield* readModel.getSnapshot;
-    const pendingRequest = (snapshot.channelPermissionRequests ?? []).find(
-      (entry) => entry.requestId === requestId,
-    );
-    if (!pendingRequest) {
-      return jsonResponse({ ok: false, error: `permission request ${requestId} not found` }, { status: 404 });
-    }
-    if (pendingRequest.agentId !== id) {
-      return jsonResponse({ ok: false, error: `permission request ${requestId} belongs to ${pendingRequest.agentId}` }, { status: 409 });
-    }
-
-    try {
-      yield* Effect.promise(() => deliverAgentPermissionDecision(id, requestId, behavior));
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      return jsonResponse({ ok: false, error: `failed to deliver permission decision: ${msg}` }, { status: 502 });
-    }
-
     const eventStore = yield* EventStoreService;
-    const timestamp = new Date().toISOString();
-    yield* eventStore.append({
-      type: 'agent.permission_resolved',
-      timestamp,
-      payload: {
-        requestId,
+    const result = yield* Effect.promise(() => processPermissionResponse(
+      {
+        getPendingRequest: (permissionRequestId) =>
+          Effect.runPromise(readModel.getChannelPermissionRequest(permissionRequestId)),
+        getResolvedDecision: (permissionRequestId) =>
+          Effect.runPromise(readModel.getResolvedChannelPermissionDecision(permissionRequestId)),
+        appendResolutionEvents: async (pendingRequest, decisionBehavior) => {
+          const timestamp = new Date().toISOString();
+          await Effect.runPromise(eventStore.append({
+            type: 'agent.permission_resolved',
+            timestamp,
+            payload: {
+              requestId: pendingRequest.requestId,
+              agentId: pendingRequest.agentId,
+              issueId: pendingRequest.issueId,
+              behavior: decisionBehavior,
+            },
+          } as never));
+          await Effect.runPromise(eventStore.append({
+            type: 'agent.waiting_cleared',
+            timestamp,
+            payload: {
+              agentId: pendingRequest.agentId,
+              clearedBy: 'tool_resumed',
+            },
+          } as never));
+        },
+        deliverDecision: (agentId, permissionRequestId, decisionBehavior) =>
+          deliverAgentPermissionDecision(agentId, permissionRequestId, decisionBehavior),
+        emitResolvedActivity: (pendingRequest, decisionBehavior) => {
+          emitActivityEntry({
+            source: 'dashboard',
+            level: decisionBehavior === 'allow' ? 'success' : 'warn',
+            message: `Permission ${permissionResolutionVerb(decisionBehavior)} for ${pendingRequest.toolName}`,
+            details: buildPermissionActivityDetails(
+              pendingRequest.description,
+              pendingRequest.inputPreview,
+            ),
+            issueId: pendingRequest.issueId,
+          });
+        },
+      },
+      {
         agentId: id,
-        issueId: pendingRequest.issueId,
+        requestId,
         behavior,
       },
-    } as never);
-    yield* eventStore.append({
-      type: 'agent.waiting_cleared',
-      timestamp,
-      payload: {
-        agentId: id,
-        clearedBy: 'tool_resumed',
-      },
-    } as never);
+    ));
 
-    emitActivityEntry({
-      source: 'dashboard',
-      level: behavior === 'allow' ? 'success' : 'warn',
-      message: `Permission ${permissionResolutionVerb(behavior)} for ${pendingRequest.toolName}`,
-      details: buildPermissionActivityDetails(pendingRequest.description, pendingRequest.inputPreview),
-      issueId: pendingRequest.issueId,
-    });
-
-    return jsonResponse({ ok: true });
+    return jsonResponse(result.body, { status: result.status });
   })),
 );
 

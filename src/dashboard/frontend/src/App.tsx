@@ -478,12 +478,33 @@ export default function App() {
   // Cast to Agent[] since AgentSnapshot is a compatible subset for the fields used here
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
   const channelPermissionRequests = useDashboardStore(selectChannelPermissionRequests);
+  const [optimisticallyResolvedChannelPermissionRequestIds, setOptimisticallyResolvedChannelPermissionRequestIds] =
+    useState<Set<string>>(new Set());
 
   // Issues from Zustand store (event-sourced via snapshot — no polling)
   const issues = useDashboardStore(selectIssues) as unknown as Issue[];
-  const currentChannelPermissionRequest = channelPermissionRequests[0] ?? null;
+  const visibleChannelPermissionRequests = channelPermissionRequests.filter(
+    (request) => !optimisticallyResolvedChannelPermissionRequestIds.has(request.requestId)
+  );
+  const currentChannelPermissionRequest = visibleChannelPermissionRequests[0] ?? null;
   const currentChannelPermissionIssueId = currentChannelPermissionRequest?.issueId
     ?? agents.find((agent) => agent.id === currentChannelPermissionRequest?.agentId)?.issueId;
+
+  useEffect(() => {
+    setOptimisticallyResolvedChannelPermissionRequestIds((prev) => {
+      const next = new Set<string>();
+      const visibleRequestIds = new Set(channelPermissionRequests.map((request) => request.requestId));
+      for (const requestId of prev) {
+        if (visibleRequestIds.has(requestId)) {
+          next.add(requestId);
+        }
+      }
+      if (next.size === prev.size && Array.from(next).every((requestId) => prev.has(requestId))) {
+        return prev;
+      }
+      return next;
+    });
+  }, [channelPermissionRequests]);
 
   // Poll for pending confirmations
   const { data: confirmations = [] } = useQuery({
@@ -551,6 +572,13 @@ export default function App() {
       requestId: string;
       behavior: ClaudeChannelPermissionBehavior;
     }) => respondToChannelPermission(agentId, requestId, behavior),
+    onMutate: async (variables) => {
+      setOptimisticallyResolvedChannelPermissionRequestIds((prev) => {
+        const next = new Set(prev);
+        next.add(variables.requestId);
+        return next;
+      });
+    },
     onSuccess: async (_data, variables) => {
       await refreshDashboardState(queryClient);
       toast.success(
@@ -559,7 +587,15 @@ export default function App() {
           : `Denied permission request for ${variables.agentId}`,
       );
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables) => {
+      setOptimisticallyResolvedChannelPermissionRequestIds((prev) => {
+        if (!prev.has(variables.requestId)) {
+          return prev;
+        }
+        const next = new Set(prev);
+        next.delete(variables.requestId);
+        return next;
+      });
       toast.error(`Permission response failed: ${error.message}`);
     },
   });

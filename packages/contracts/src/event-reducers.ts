@@ -23,6 +23,13 @@ import type {
 
 // ─── Read model state shape ──────────────────────────────────────────────────
 
+export interface ResolvedChannelPermissionDecision {
+  requestId: string
+  agentId: string
+  issueId: string
+  behavior: 'allow' | 'deny'
+}
+
 export interface ReadModelState {
   sequence: number
   agentsById: Record<string, AgentSnapshot>
@@ -43,6 +50,9 @@ export interface ReadModelState {
   shadowInferenceByIssueId: Record<string, string>
   turnDiffSummariesByAgentId: Record<string, TurnDiffSummary[]>
   channelPermissionRequestsById: Record<string, ChannelPermissionRequestSnapshot>
+  channelPermissionRequestIdsByAgentId: Record<string, string[]>
+  resolvedChannelPermissionDecisionsById: Record<string, ResolvedChannelPermissionDecision>
+  resolvedChannelPermissionDecisionIdsByAgentId: Record<string, string[]>
   dashboardLifecycle: DashboardLifecycleState
   /** Conversation names currently undergoing Panopticon-native compaction. */
   conversationsCompactingByName: Record<string, boolean>
@@ -76,6 +86,9 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   shadowInferenceByIssueId: {},
   turnDiffSummariesByAgentId: {},
   channelPermissionRequestsById: {},
+  channelPermissionRequestIdsByAgentId: {},
+  resolvedChannelPermissionDecisionsById: {},
+  resolvedChannelPermissionDecisionIdsByAgentId: {},
   conversationsCompactingByName: {},
   conversationsAwaitingPermissionByName: {},
   dashboardLifecycle: {
@@ -143,8 +156,11 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
   }
 
   const channelPermissionRequestsById: Record<string, ChannelPermissionRequestSnapshot> = {}
+  const channelPermissionRequestIdsByAgentId: Record<string, string[]> = {}
   for (const request of snapshot.channelPermissionRequests ?? []) {
     channelPermissionRequestsById[request.requestId] = request
+    const existing = channelPermissionRequestIdsByAgentId[request.agentId] ?? []
+    channelPermissionRequestIdsByAgentId[request.agentId] = [...existing, request.requestId]
   }
 
   return {
@@ -155,6 +171,9 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     reviewStatusByIssueId,
     agentRuntimeById: snapshot.agentRuntimeById ?? state.agentRuntimeById,
     channelPermissionRequestsById,
+    channelPermissionRequestIdsByAgentId,
+    resolvedChannelPermissionDecisionsById: {},
+    resolvedChannelPermissionDecisionIdsByAgentId: {},
     resources: (snapshot.resources as ResourceStats | undefined) ?? null,
     issuesRaw: (snapshot as any).issues ?? state.issuesRaw,
   }
@@ -231,17 +250,33 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
             },
           }
         : runtimeById
-      const nextPermissionRequestsById = Object.fromEntries(
-        Object.entries(state.channelPermissionRequestsById).filter(
-          ([, request]) => request.agentId !== event.payload.agentId,
-        ),
-      )
+      const permissionRequestIdsByAgentId = state.channelPermissionRequestIdsByAgentId ?? {}
+      const pendingIds = permissionRequestIdsByAgentId[event.payload.agentId] ?? []
+      const nextPermissionRequestsById = { ...state.channelPermissionRequestsById }
+      for (const requestId of pendingIds) {
+        delete nextPermissionRequestsById[requestId]
+      }
+      const { [event.payload.agentId]: _removedPendingIds, ...restPendingIds } =
+        permissionRequestIdsByAgentId
+
+      const resolvedDecisionIdsByAgentId = state.resolvedChannelPermissionDecisionIdsByAgentId ?? {}
+      const resolvedIds = resolvedDecisionIdsByAgentId[event.payload.agentId] ?? []
+      const nextResolvedDecisionsById = { ...(state.resolvedChannelPermissionDecisionsById ?? {}) }
+      for (const requestId of resolvedIds) {
+        delete nextResolvedDecisionsById[requestId]
+      }
+      const { [event.payload.agentId]: _removedResolvedIds, ...restResolvedIds } =
+        resolvedDecisionIdsByAgentId
+
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentsById: rest,
         agentRuntimeById: nextRuntimeById,
         channelPermissionRequestsById: nextPermissionRequestsById,
+        channelPermissionRequestIdsByAgentId: restPendingIds,
+        resolvedChannelPermissionDecisionsById: nextResolvedDecisionsById,
+        resolvedChannelPermissionDecisionIdsByAgentId: restResolvedIds,
       }
     }
 
@@ -627,6 +662,23 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
 
     case 'agent.permission_requested': {
       const request = event.payload
+      const permissionRequestIdsByAgentId = state.channelPermissionRequestIdsByAgentId ?? {}
+      const resolvedDecisionsById = state.resolvedChannelPermissionDecisionsById ?? {}
+      const resolvedDecisionIdsByAgentId = state.resolvedChannelPermissionDecisionIdsByAgentId ?? {}
+      const nextPendingIds = permissionRequestIdsByAgentId[request.agentId] ?? []
+      const resolvedDecision = resolvedDecisionsById[request.requestId]
+      const nextResolvedDecisionsById = { ...resolvedDecisionsById }
+      const nextResolvedIdsByAgentId = { ...resolvedDecisionIdsByAgentId }
+      if (resolvedDecision) {
+        delete nextResolvedDecisionsById[request.requestId]
+        const prevResolvedIds = nextResolvedIdsByAgentId[resolvedDecision.agentId] ?? []
+        const filteredResolvedIds = prevResolvedIds.filter((id) => id !== request.requestId)
+        if (filteredResolvedIds.length > 0) {
+          nextResolvedIdsByAgentId[resolvedDecision.agentId] = filteredResolvedIds
+        } else {
+          delete nextResolvedIdsByAgentId[resolvedDecision.agentId]
+        }
+      }
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
@@ -634,15 +686,50 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           ...state.channelPermissionRequestsById,
           [request.requestId]: request,
         },
+        channelPermissionRequestIdsByAgentId: {
+          ...permissionRequestIdsByAgentId,
+          [request.agentId]: nextPendingIds.includes(request.requestId)
+            ? nextPendingIds
+            : [...nextPendingIds, request.requestId],
+        },
+        resolvedChannelPermissionDecisionsById: nextResolvedDecisionsById,
+        resolvedChannelPermissionDecisionIdsByAgentId: nextResolvedIdsByAgentId,
       }
     }
 
     case 'agent.permission_resolved': {
       const { [event.payload.requestId]: _removed, ...rest } = state.channelPermissionRequestsById
+      const nextPendingIdsByAgentId = { ...(state.channelPermissionRequestIdsByAgentId ?? {}) }
+      const prevPendingIds = nextPendingIdsByAgentId[event.payload.agentId] ?? []
+      const filteredPendingIds = prevPendingIds.filter((id) => id !== event.payload.requestId)
+      if (filteredPendingIds.length > 0) {
+        nextPendingIdsByAgentId[event.payload.agentId] = filteredPendingIds
+      } else {
+        delete nextPendingIdsByAgentId[event.payload.agentId]
+      }
+
+      const resolvedDecisionIdsByAgentId = state.resolvedChannelPermissionDecisionIdsByAgentId ?? {}
+      const nextResolvedIds = resolvedDecisionIdsByAgentId[event.payload.agentId] ?? []
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         channelPermissionRequestsById: rest,
+        channelPermissionRequestIdsByAgentId: nextPendingIdsByAgentId,
+        resolvedChannelPermissionDecisionsById: {
+          ...(state.resolvedChannelPermissionDecisionsById ?? {}),
+          [event.payload.requestId]: {
+            requestId: event.payload.requestId,
+            agentId: event.payload.agentId,
+            issueId: event.payload.issueId,
+            behavior: event.payload.behavior,
+          },
+        },
+        resolvedChannelPermissionDecisionIdsByAgentId: {
+          ...resolvedDecisionIdsByAgentId,
+          [event.payload.agentId]: nextResolvedIds.includes(event.payload.requestId)
+            ? nextResolvedIds
+            : [...nextResolvedIds, event.payload.requestId],
+        },
       }
     }
 

@@ -2,32 +2,22 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, statSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { spawn, ChildProcess, execFileSync } from 'node:child_process';
+import { spawn, ChildProcess } from 'node:child_process';
+import { request as httpRequest } from 'node:http';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
+import { BRIDGE_TOKEN_HEADER, writeBridgeToken } from '../../bridge-token.js';
 import {
+  handlePermissionRequestNotification,
   pushChannelNotification,
   pushPermissionDecisionNotification,
   getSocketPath,
   getBridgeLogPath,
   getPanopticonHome,
-  handleChannelReplyCall,
-  isDirectInvocation,
-  listBridgeTools,
-  validateChannelReplyPayload,
 } from '../panopticon-bridge.js';
 
 const REPO_ROOT = process.cwd();
 const BRIDGE_ENTRY = join(REPO_ROOT, 'src/lib/channels/panopticon-bridge.ts');
-const hasBun = (() => {
-  try {
-    execFileSync('bun', ['--version'], { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
-})();
 
 let tmpHome: string;
 
@@ -44,6 +34,41 @@ function createMockServer(): { server: Server; frames: Array<{ method: string; p
     frames.push(frame);
   });
   return { server, frames };
+}
+
+async function postToUnixSocket(
+  socketPath: string,
+  token: string | null,
+  body: unknown,
+): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(body);
+    const req = httpRequest(
+      {
+        socketPath,
+        path: '/',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+          ...(token ? { [BRIDGE_TOKEN_HEADER]: token } : {}),
+        },
+      },
+      (res) => {
+        let responseBody = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => {
+          responseBody += chunk;
+        });
+        res.on('end', () => {
+          resolve({ status: res.statusCode ?? 0, body: responseBody });
+        });
+      },
+    );
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
 }
 
 describe('pushChannelNotification (in-process protocol)', () => {
@@ -84,6 +109,57 @@ describe('pushChannelNotification (in-process protocol)', () => {
     expect(frames[0].method).toBe('notifications/claude/channel/permission');
     const params = frames[0].params as { request_id: string; behavior: string };
     expect(params).toEqual({ request_id: 'perm-1', behavior: 'allow' });
+  });
+
+  it('normalizes null input_preview when forwarding permission requests', async () => {
+    const forwarder = vi.fn(async () => {});
+    await handlePermissionRequestNotification(
+      {
+        method: 'notifications/claude/channel/permission_request',
+        params: {
+          request_id: 'perm-1',
+          tool_name: 'Bash',
+          description: 'Run npm test',
+          input_preview: null,
+        },
+      },
+      'agent-1',
+      forwarder,
+    );
+    expect(forwarder).toHaveBeenCalledWith(
+      'agent-1',
+      expect.objectContaining({
+        requestId: 'perm-1',
+        toolName: 'Bash',
+        description: 'Run npm test',
+        inputPreview: '',
+      }),
+    );
+  });
+
+  it('swallows permission forward failures and logs them', async () => {
+    await handlePermissionRequestNotification(
+      {
+        method: 'notifications/claude/channel/permission_request',
+        params: {
+          request_id: 'perm-2',
+          tool_name: 'Bash',
+          description: 'Run npm test',
+          input_preview: '{"command":"npm test"}',
+        },
+      },
+      'agent-2',
+      async () => {
+        throw new Error('dashboard down');
+      },
+    );
+    const logPath = getBridgeLogPath('agent-2');
+    const lines = readFileSync(logPath, 'utf-8').trim().split('\n');
+    expect(JSON.parse(lines[0])).toMatchObject({
+      agentId: 'agent-2',
+      kind: 'permission_request_forward_failed',
+      error: 'dashboard down',
+    });
   });
 
   it('invalid permission response returns 400 and emits zero frames', async () => {
@@ -136,99 +212,6 @@ describe('pushChannelNotification (in-process protocol)', () => {
     expect(getPanopticonHome()).toBe(tmpHome);
     expect(getSocketPath('xyz')).toBe(join(tmpHome, 'sockets', 'agent-xyz.sock'));
   });
-
-  it('lists channel_reply tool with documented schema', () => {
-    const result = listBridgeTools();
-    expect(result.tools).toHaveLength(1);
-    expect(result.tools[0].name).toBe('channel_reply');
-    expect(result.tools[0].inputSchema.required).toEqual(['kind', 'summary']);
-    expect(result.tools[0].inputSchema.properties?.['artifactRefs']).toBeDefined();
-  });
-
-  it('validates channel_reply payloads and trims summary', () => {
-    expect(
-      validateChannelReplyPayload({
-        kind: 'done',
-        summary: '  implementation complete  ',
-        artifactRefs: [{ uri: 'file:///tmp/report.txt', label: 'report' }],
-      }),
-    ).toEqual({
-      kind: 'done',
-      summary: 'implementation complete',
-      artifactRefs: [{ uri: 'file:///tmp/report.txt', label: 'report' }],
-    });
-  });
-
-  it('rejects invalid channel_reply payloads', () => {
-    expect(() => validateChannelReplyPayload({ kind: 'bogus', summary: 'x' })).toThrow(
-      'channel_reply.kind must be one of: status, done, needs_input',
-    );
-    expect(() => validateChannelReplyPayload({ kind: 'done', summary: '' })).toThrow(
-      'channel_reply.summary must be a non-empty string',
-    );
-    expect(() =>
-      validateChannelReplyPayload({
-        kind: 'status',
-        summary: 'x',
-        artifactRefs: [{ label: 'missing-uri' }],
-      }),
-    ).toThrow('channel_reply.artifactRefs[0].uri must be a non-empty string');
-    expect(() =>
-      validateChannelReplyPayload({
-        kind: 'status',
-        summary: 'x'.repeat(4097),
-      }),
-    ).toThrow('channel_reply.summary must be at most 4096 characters');
-    expect(() =>
-      validateChannelReplyPayload({
-        kind: 'status',
-        summary: 'ok',
-        artifactRefs: Array.from({ length: 21 }, (_, i) => ({ uri: `file:///tmp/${i}` })),
-      }),
-    ).toThrow('channel_reply.artifactRefs must contain at most 20 entries');
-    expect(() =>
-      validateChannelReplyPayload({
-        kind: 'status',
-        summary: 'ok',
-        artifactRefs: [{ uri: 'javascript:alert(1)' }],
-      }),
-    ).toThrow('channel_reply.artifactRefs[0].uri must start with file://, https://, or /');
-  });
-
-  it('detects direct invocation for relative bridge paths', () => {
-    const metaUrl = pathToFileURL(BRIDGE_ENTRY).href;
-    expect(isDirectInvocation(metaUrl, './src/lib/channels/panopticon-bridge.ts')).toBe(true);
-    expect(isDirectInvocation(metaUrl, BRIDGE_ENTRY)).toBe(true);
-    expect(isDirectInvocation(metaUrl, undefined)).toBe(false);
-  });
-
-  it('accepts channel_reply calls, invokes sink, and appends outbound log line', async () => {
-    const sink = vi.fn(async () => undefined);
-    const result = await handleChannelReplyCall(
-      {
-        kind: 'needs_input',
-        summary: 'Need user answer',
-        artifactRefs: [{ uri: 'file:///tmp/question.md', label: 'question' }],
-      },
-      'reply-agent',
-      sink,
-    );
-    expect(sink).toHaveBeenCalledWith({
-      kind: 'needs_input',
-      summary: 'Need user answer',
-      artifactRefs: [{ uri: 'file:///tmp/question.md', label: 'question' }],
-    });
-    expect(result.content[0]).toMatchObject({ type: 'text', text: 'channel_reply accepted (needs_input)' });
-    const lines = readFileSync(getBridgeLogPath('reply-agent'), 'utf-8').trim().split('\n');
-    const entry = JSON.parse(lines[0]);
-    expect(entry).toMatchObject({
-      agentId: 'reply-agent',
-      direction: 'outbound',
-      kind: 'needs_input',
-      summaryLength: 16,
-      artifactCount: 1,
-    });
-  });
 });
 
 /**
@@ -237,7 +220,7 @@ describe('pushChannelNotification (in-process protocol)', () => {
  * node:net HTTP/1.1 client used by deliverAgentMessage. Skipped automatically
  * if `bun` is not available so this test file remains green on minimal CI.
  */
-describe.skipIf(!hasBun)('panopticon-bridge subprocess (Bun.serve unix listener)', () => {
+describe('panopticon-bridge subprocess (Bun.serve unix listener)', () => {
   let proc: ChildProcess | null = null;
 
   beforeEach(() => {
@@ -262,6 +245,7 @@ describe.skipIf(!hasBun)('panopticon-bridge subprocess (Bun.serve unix listener)
     'binds socket at 0o600 and unlinks on SIGTERM',
     async () => {
       const agentId = 'int-1';
+      writeBridgeToken(agentId);
       proc = spawn('bun', ['run', BRIDGE_ENTRY], {
         env: {
           ...process.env,
@@ -291,6 +275,44 @@ describe.skipIf(!hasBun)('panopticon-bridge subprocess (Bun.serve unix listener)
         await new Promise((r) => setTimeout(r, 100));
       }
       expect(existsSync(sockPath)).toBe(false);
+    },
+    15_000,
+  );
+
+  it(
+    'rejects unauthenticated Unix socket posts with 403 and no notification delivery',
+    async () => {
+      const agentId = 'int-2';
+      const token = writeBridgeToken(agentId);
+      proc = spawn('bun', ['run', BRIDGE_ENTRY], {
+        env: {
+          ...process.env,
+          PANOPTICON_HOME: tmpHome,
+          PANOPTICON_AGENT_ID: agentId,
+        },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      proc.stdin?.write(' ');
+      const sockPath = join(tmpHome, 'sockets', `agent-${agentId}.sock`);
+      for (let i = 0; i < 30 && !existsSync(sockPath); i++) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      expect(existsSync(sockPath)).toBe(true);
+
+      const forbidden = await postToUnixSocket(sockPath, null, {
+        type: 'permission_response',
+        requestId: 'perm-403',
+        behavior: 'allow',
+      });
+      expect(forbidden.status).toBe(403);
+      expect(forbidden.body).toContain('forbidden');
+
+      const allowed = await postToUnixSocket(sockPath, token, {
+        type: 'permission_response',
+        requestId: 'perm-403',
+        behavior: 'allow',
+      });
+      expect(allowed.status).toBe(200);
     },
     15_000,
   );

@@ -35,6 +35,7 @@ vi.mock('../paths.js', async (importOriginal) => {
   };
 });
 
+import { BRIDGE_TOKEN_HEADER, writeBridgeToken } from '../bridge-token.js';
 import { deliverAgentMessage, deliverAgentPermissionDecision, type AgentState } from '../agents.js';
 import { sendKeysAsync } from '../tmux.js';
 
@@ -58,7 +59,7 @@ interface FakeBridgeOptions {
   status: number;
   body: string;
   delayMs?: number;
-  capture?: { lastBody?: string };
+  capture?: { lastBody?: string; lastHeaders?: Record<string, string> };
 }
 
 function startFakeBridge(socketPath: string, opts: FakeBridgeOptions): Promise<NetServer> {
@@ -75,7 +76,18 @@ function startFakeBridge(socketPath: string, opts: FakeBridgeOptions): Promise<N
         const len = lengthMatch ? parseInt(lengthMatch[1], 10) : 0;
         if (text.length - (headerEnd + 4) < len) return;
         const body = text.slice(headerEnd + 4, headerEnd + 4 + len);
-        if (opts.capture) opts.capture.lastBody = body;
+        if (opts.capture) {
+          opts.capture.lastBody = body;
+          const rawHeaders = headerBlock.split('\r\n').slice(1);
+          opts.capture.lastHeaders = Object.fromEntries(
+            rawHeaders.map((line) => {
+              const idx = line.indexOf(':');
+              const name = idx >= 0 ? line.slice(0, idx).trim().toLowerCase() : line.trim().toLowerCase();
+              const value = idx >= 0 ? line.slice(idx + 1).trim() : '';
+              return [name, value];
+            }),
+          );
+        }
         const respond = () => {
           const resp =
             `HTTP/1.1 ${opts.status} ${opts.status === 200 ? 'OK' : 'ERR'}\r\n` +
@@ -128,6 +140,7 @@ describe('channel bridge delivery', () => {
   it('flag-on, socket-success: posts to bridge and does NOT call sendKeysAsync', async () => {
     const agentId = 'agent-channels';
     writeAgentState(agentId, { channelsEnabled: true });
+    const token = writeBridgeToken(agentId);
     const socketPath = join(socketDir, `agent-${agentId}.sock`);
     const capture: { lastBody?: string } = {};
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
@@ -137,6 +150,7 @@ describe('channel bridge delivery', () => {
       expect(capture.lastBody).toBeDefined();
       const parsed = JSON.parse(capture.lastBody!);
       expect(parsed).toMatchObject({ content: 'channel hi', meta: { caller: 'caller-x' } });
+      expect(capture.lastHeaders?.[BRIDGE_TOKEN_HEADER]).toBe(token);
     } finally {
       await new Promise<void>((r) => server.close(() => r()));
     }
@@ -154,6 +168,7 @@ describe('channel bridge delivery', () => {
   it('flag-on, socket-timeout: falls back to sendKeysAsync', async () => {
     const agentId = 'agent-timeout';
     writeAgentState(agentId, { channelsEnabled: true });
+    writeBridgeToken(agentId);
     const socketPath = join(socketDir, `agent-${agentId}.sock`);
     // Bridge that delays its response longer than the deliver timeout.
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', delayMs: 3500 });
@@ -165,9 +180,24 @@ describe('channel bridge delivery', () => {
     }
   }, 10_000);
 
+  it('flag-on, missing bridge token: falls back to sendKeysAsync', async () => {
+    const agentId = 'agent-no-token';
+    writeAgentState(agentId, { channelsEnabled: true });
+    const socketPath = join(socketDir, `agent-${agentId}.sock`);
+    const server = await startFakeBridge(socketPath, { status: 200, body: 'ok' });
+    try {
+      await deliverAgentMessage(agentId, 'fallback no token', 'caller-no-token');
+      expect(vi.mocked(sendKeysAsync)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(sendKeysAsync)).toHaveBeenCalledWith(agentId, 'fallback no token');
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
   it('deliverAgentPermissionDecision posts permission_response payload to bridge', async () => {
     const agentId = 'agent-perm-ok';
     writeAgentState(agentId, { channelsEnabled: true });
+    const token = writeBridgeToken(agentId);
     const socketPath = join(socketDir, `agent-${agentId}.sock`);
     const capture: { lastBody?: string } = {};
     const server = await startFakeBridge(socketPath, { status: 200, body: 'ok', capture });
@@ -181,6 +211,7 @@ describe('channel bridge delivery', () => {
         requestId: 'perm-123',
         behavior: 'deny',
       });
+      expect(capture.lastHeaders?.[BRIDGE_TOKEN_HEADER]).toBe(token);
     } finally {
       await new Promise<void>((r) => server.close(() => r()));
     }
@@ -200,5 +231,19 @@ describe('channel bridge delivery', () => {
     await expect(deliverAgentPermissionDecision(agentId, 'perm-123', 'allow')).rejects.toThrow(
       /bridge socket missing/,
     );
+  });
+
+  it('deliverAgentPermissionDecision throws when bridge token is missing', async () => {
+    const agentId = 'agent-perm-no-token';
+    writeAgentState(agentId, { channelsEnabled: true });
+    const socketPath = join(socketDir, `agent-${agentId}.sock`);
+    const server = await startFakeBridge(socketPath, { status: 200, body: 'ok' });
+    try {
+      await expect(deliverAgentPermissionDecision(agentId, 'perm-123', 'allow')).rejects.toThrow(
+        /bridge token missing/,
+      );
+    } finally {
+      await new Promise<void>((r) => server.close(() => r()));
+    }
   });
 });
