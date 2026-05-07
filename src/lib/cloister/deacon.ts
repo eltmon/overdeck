@@ -33,7 +33,6 @@ import { getShadowState } from '../shadow-state.js';
 import type { TrackerConfig } from '../tracker/factory.js';
 
 // Review status file location (same as dashboard server)
-const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
 
 import {
   SpecialistType,
@@ -2025,17 +2024,7 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
   const actions: string[] = [];
 
   try {
-    if (!existsSync(REVIEW_STATUS_FILE)) {
-      return actions;
-    }
-
-    const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
-    const statuses: Record<string, {
-      issueId?: string;
-      readyForMerge?: boolean;
-      mergeStatus?: string;
-      updatedAt?: string;
-    }> = JSON.parse(content);
+    const statuses = loadReviewStatuses();
 
     const now = Date.now();
     const state = loadState();
@@ -2193,19 +2182,7 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
   const actions: string[] = [];
 
   try {
-    if (!existsSync(REVIEW_STATUS_FILE)) return actions;
-
-    const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
-    const statuses: Record<string, {
-      issueId?: string;
-      reviewStatus?: string;
-      testStatus?: string;
-      mergeStatus?: string;
-      mergeNotes?: string;
-      readyForMerge?: boolean;
-      mergeRetryCount?: number;
-      updatedAt?: string;
-    }> = JSON.parse(content);
+    const statuses = loadReviewStatuses();
 
     const now = Date.now();
 
@@ -2427,23 +2404,7 @@ export async function checkDeadEndAgents(): Promise<string[]> {
   const actions: string[] = [];
 
   try {
-    if (!existsSync(REVIEW_STATUS_FILE)) {
-      return actions;
-    }
-
-    const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
-    const statuses: Record<string, {
-      issueId?: string;
-      reviewStatus?: string;
-      testStatus?: string;
-      readyForMerge?: boolean;
-      mergeStatus?: string;
-      mergeNotes?: string;
-      mergeRetryCount?: number;
-      updatedAt?: string;
-      autoRequeueCount?: number;
-      history?: Array<{ type: string; status: string; timestamp?: string }>;
-    }> = JSON.parse(content);
+    const statuses = loadReviewStatuses();
 
     const now = Date.now();
 
@@ -2825,7 +2786,7 @@ const FIRST_COMPLETION_IDLE_MS = 10 * 60 * 1000; // 10 minutes idle before nudgi
 const FIRST_COMPLETION_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes between nudges
 
 /**
- * Detect work agents that finished implementation but never called "pan work done".
+ * Detect work agents that finished implementation but never called `pan done`.
  *
  * This is the Layer 3 safety net. Layer 2 (work-agent-stop-hook) should catch most
  * cases within seconds of the agent going idle. This catches agents where the stop-hook
@@ -2870,25 +2831,23 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
 
       // HARD GATE: Never nudge agents that have been through the review pipeline.
       // Check review-status.json — if ANY entry exists for this issue, the agent
-      // has entered the specialist pipeline and must NOT receive a "pan work done" nudge.
+      // has entered the specialist pipeline and must NOT receive a "pan done" nudge.
       // (Dead-end detection handles agents stuck in review/test cycles.)
       const issueId = agent.issueId || agent.id.replace('agent-', '').toUpperCase();
       const issueKey = issueId.toLowerCase();
-      if (existsSync(REVIEW_STATUS_FILE)) {
-        try {
-          const statuses = JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
-          // Keys are stored in original case (e.g., "MIN-727") — check all case variants
-          const hasStatus = statuses[issueKey] || statuses[issueId] || statuses[issueId.toUpperCase()];
-          if (hasStatus) {
-            console.log(`[deacon] First-completion gate: skipping ${agent.id} — has review status entry (readyForMerge=${hasStatus.readyForMerge ?? false})`);
-            continue;
-          }
-        } catch { /* parse error, proceed with check */ }
-      }
+      try {
+        const statuses = loadReviewStatuses();
+        // Keys are stored in original case (e.g., "MIN-727") — check all case variants
+        const hasStatus = statuses[issueKey] || statuses[issueId] || statuses[issueId.toUpperCase()];
+        if (hasStatus) {
+          console.log(`[deacon] First-completion gate: skipping ${agent.id} — has review status entry (readyForMerge=${hasStatus.readyForMerge ?? false})`);
+          continue;
+        }
+      } catch { /* load error, proceed with check */ }
 
       // HARD GATE: Also check for review feedback files in the workspace.
       // If a feedback directory exists and is non-empty, a review agent has already
-      // processed this workspace — never send a "pan work done" nudge.
+      // processed this workspace — never send a "pan done" nudge.
       const agentStateForGate = getAgentState(agent.id);
       if (agentStateForGate?.workspace) {
         const feedbackDir = join(agentStateForGate.workspace, '.pan', 'feedback');
@@ -2937,14 +2896,14 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
       }
       if (!hasCommits) continue; // No commits — agent may not have started yet
 
-      // All heuristics passed: agent likely forgot pan work done
+      // All heuristics passed: agent likely forgot pan done
       const idleMinutes = Math.round(idleMs / 60000);
       console.log(`[deacon] First-completion gap detected: ${agent.id} (${issueId}) idle for ${idleMinutes}m with commits but no completion marker`);
 
       firstCompletionCooldowns.set(agent.id, now);
 
       try {
-        const nudgeMessage = `You appear to have stopped working without calling "pan work done". If your implementation is complete, run this now:\n\npan work done ${issueId} -c "Implementation complete"\n\nIf you still have remaining tasks, continue working on them.`;
+        const nudgeMessage = `You appear to have stopped working without calling \`pan done\`. If your implementation is complete, run this now:\n\npan done ${issueId} -c "Implementation complete"\n\nIf you still have remaining tasks, continue working on them.`;
         await sendKeysAsync(agent.id, nudgeMessage);
         actions.push(`First-completion nudge: ${agent.id} (idle ${idleMinutes}m)`);
         console.log(`[deacon] Sent first-completion nudge to ${agent.id}`);
@@ -2973,7 +2932,7 @@ const stuckPokeState: Map<string, { lastPoke: number; pokes: number }> = new Map
  * Patrol work agent resolution fields (PAN-309).
  *
  * For each running work agent:
- * - resolution === 'done' && count >= 2: auto-complete via pan work done
+ * - resolution === 'done' && count >= 2: auto-complete via pan done
  * - resolution === 'stuck' && count >= 3: send a poke (rate-limited, capped — PAN-650)
  */
 export async function patrolWorkAgentResolutions(): Promise<string[]> {
@@ -3063,7 +3022,7 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
         console.log(`[deacon] Poking stuck agent ${agent.id} (${issueId}): poke ${pokeState.pokes + 1}/${STUCK_POKE_MAX}`);
 
         try {
-          const pokeMsg = `Deacon health check (${pokeState.pokes + 1}/${STUCK_POKE_MAX}): you appear stuck. Please check your current task status, review any errors, and continue working. If work is complete, run: pan work done ${issueId} -c "Implementation complete"`;
+          const pokeMsg = `Deacon health check (${pokeState.pokes + 1}/${STUCK_POKE_MAX}): you appear stuck. Please check your current task status, review any errors, and continue working. If work is complete, run: pan done ${issueId} -c "Implementation complete"`;
           await sendKeysAsync(agent.id, pokeMsg);
           stuckPokeState.set(agent.id, { lastPoke: now, pokes: pokeState.pokes + 1 });
           actions.push(`Deacon poked stuck agent ${agent.id} (${issueId}) [${pokeState.pokes + 1}/${STUCK_POKE_MAX}]`);
@@ -4063,7 +4022,7 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
  * - Agents with pending review feedback (blocked/failed/verification-failed)
  *   are ALWAYS resumed — the specialist pipeline needs them to fix issues.
  * - Agents without pending feedback are skipped if stoppedByUser=true (the
- *   user deliberately killed them via pan kill / pan work done).
+ *   user deliberately killed them via pan kill / pan done).
  * - Orphaned agents (tmux session missing, no stoppedByUser flag) are resumed.
  *
  * Called by runPatrol() on every patrol cycle AND during deacon startup.

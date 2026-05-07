@@ -308,7 +308,7 @@ void import('../../lib/cloister/deacon.js')
   });
 
 // Cloister/Deacon auto-start. Deacon is the Layer 3 safety net that catches
-// work agents that forgot to call `pan work done`, nudges dead-end agents,
+// work agents that forgot to call `pan done`, nudges dead-end agents,
 // and detects stuck thinking loops. Without it, stalled agents are invisible.
 if (shouldAutoStart()) {
   getCloisterService().start().catch((err) => {
