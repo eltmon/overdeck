@@ -57,17 +57,35 @@ async function cleanupLabelsGitHub(ctx: LifecycleContext): Promise<StepResult> {
       { encoding: 'utf-8' },
     );
 
-    // Remove workflow labels (best-effort — skip if not present)
-    for (const label of LABELS_TO_REMOVE) {
+    // Fetch current labels to avoid 404 spam from removing non-existent labels (PAN-925)
+    let currentLabels: string[] = [];
+    try {
+      const { stdout: labelJson } = await execAsync(
+        `gh issue view ${number} --repo ${owner}/${repo} --json labels --jq '.labels[].name'`,
+        { encoding: 'utf-8' },
+      );
+      currentLabels = labelJson.trim().split('\n').filter(Boolean);
+    } catch {
+      // If we can't fetch labels, fall back to removing all (best-effort)
+      currentLabels = [...LABELS_TO_REMOVE];
+    }
+
+    // Remove only labels that actually exist on the issue
+    const labelsToRemove = LABELS_TO_REMOVE.filter(l => currentLabels.includes(l));
+    for (const label of labelsToRemove) {
       await execAsync(
-        `gh issue edit ${number} --repo ${owner}/${repo} --remove-label "${label}" 2>/dev/null || true`,
+        `gh issue edit ${number} --repo ${owner}/${repo} --remove-label "${label}"`,
         { encoding: 'utf-8' },
       );
     }
 
+    const removedDesc = labelsToRemove.length > 0
+      ? `Removed: ${labelsToRemove.join(', ')}`
+      : 'No workflow labels to remove';
+
     return stepOk(step, [
       `Applied '${MERGED_LABEL}' label on GitHub #${number}`,
-      `Removed: ${LABELS_TO_REMOVE.join(', ')}`,
+      removedDesc,
     ]);
   } catch (err) {
     return stepFailed(step, `Label cleanup failed: ${(err as Error).message}`);
