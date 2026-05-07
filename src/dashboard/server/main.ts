@@ -42,19 +42,6 @@ await mkdir(getPanopticonHome(), { recursive: true });
 // on first start; reused on subsequent starts. Used by /api/internal/pipeline/notify.
 ensureInternalToken();
 
-// Event loop stall detector — logs when the event loop is blocked for >200ms.
-// Helps diagnose intermittent terminal freezes in the dashboard.
-{
-  let lastTick = performance.now();
-  setInterval(() => {
-    const now = performance.now();
-    const delta = now - lastTick;
-    lastTick = now;
-    if (delta > 200) {
-      console.warn(`[event-loop] Stall detected: ${Math.round(delta)}ms (expected ~100ms)`);
-    }
-  }, 100);
-}
 
 // Prepare the managed tmux context exactly once, before any code path can spawn
 // tmux. After this call `buildTmuxArgs`, `buildTmuxCommandString`, and
@@ -296,21 +283,38 @@ try {
 await processPendingLifecycle();
 await processPendingFeedbackDeliveries();
 
-void import('../../lib/cloister/deacon.js')
-  .then(({ logNonCanonicalStashesOnStartup }) => logNonCanonicalStashesOnStartup())
-  .then((findings) => {
-    if (findings.length > 0) {
-      emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Detected ${findings.length} non-canonical stash(es) on startup; audit recommended` });
-    }
-  })
-  .catch((err: any) => {
-    console.warn(`[panopticon] Failed non-canonical stash startup scan: ${err.message}`);
-  });
+// Non-canonical stash scan: walks every workspace at startup. Cheap when there
+// are few workspaces, expensive when there are many (each scan does a git
+// stash list + reflog walk per worktree). Gated behind PANOPTICON_DISABLE_DEACON
+// alongside the cloister auto-start so the same escape hatch lets operators
+// bring the dashboard up cleanly when there are too many workspaces.
+if (process.env.PANOPTICON_DISABLE_DEACON !== '1') {
+  void import('../../lib/cloister/deacon.js')
+    .then(({ logNonCanonicalStashesOnStartup }) => logNonCanonicalStashesOnStartup())
+    .then((findings) => {
+      if (findings.length > 0) {
+        emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Detected ${findings.length} non-canonical stash(es) on startup; audit recommended` });
+      }
+    })
+    .catch((err: any) => {
+      console.warn(`[panopticon] Failed non-canonical stash startup scan: ${err.message}`);
+    });
+}
 
 // Cloister/Deacon auto-start. Deacon is the Layer 3 safety net that catches
 // work agents that forgot to call `pan done`, nudges dead-end agents,
 // and detects stuck thinking loops. Without it, stalled agents are invisible.
-if (shouldAutoStart()) {
+//
+// Emergency escape hatch: PANOPTICON_DISABLE_DEACON=1 skips auto-start even
+// when config.startup.auto_start is true. Use this when deacon's first-cycle
+// scan over many workspaces is starving the event loop and preventing the
+// HTTP server from accepting connections (the "Bad Gateway after pan up"
+// failure mode). The dashboard comes up clean; start cloister manually from
+// the UI once the workspace backlog is cleaned up.
+if (process.env.PANOPTICON_DISABLE_DEACON === '1') {
+  console.log('[panopticon] Cloister auto-start SKIPPED (PANOPTICON_DISABLE_DEACON=1)');
+  emitActivityEntry({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via PANOPTICON_DISABLE_DEACON — deacon is not running' });
+} else if (shouldAutoStart()) {
   getCloisterService().start().catch((err) => {
     console.error('[panopticon] Cloister auto-start failed:', err);
     emitActivityEntry({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });

@@ -454,13 +454,10 @@ export const ReadModelServiceLive = Layer.effect(
         );
       }
 
-      // ── Checkpoint reconciliation (always) ───────────────────────────────────
-      // Scan all agents with workspaces for existing git checkpoints and populate
-      // turnDiffSummariesByAgentId for any that aren't already tracked. This handles:
-      // - Stale projection cache (field was added after cache was saved)
-      // - Server restart (checkpoint refs survive, but summaries were lost)
-      // - Stopped agents with historical checkpoints
-      yield* Effect.promise(async () => {
+      // ── Checkpoint reconciliation (deferred — non-blocking) ──────────────────
+      // Fire-and-forget: scan workspaces for git checkpoints in the background
+      // so the ReadModel layer resolves immediately and the dashboard starts fast.
+      void (async () => {
         try {
           const { listCheckpoints, diffCheckpointFiles, getCheckpointTimestamp } = await import('../../lib/checkpoint/checkpoint-manager.js');
 
@@ -470,7 +467,6 @@ export const ReadModelServiceLive = Layer.effect(
             const workspace = (agent as any).workspace as string | undefined;
             if (!workspace) continue;
 
-            // Skip if already has summaries
             const existingSummaries = state.turnDiffSummariesByAgentId[(agent as any).id];
             if (existingSummaries && existingSummaries.length > 0) continue;
 
@@ -496,9 +492,6 @@ export const ReadModelServiceLive = Layer.effect(
                     files = await diffCheckpointFiles(workspace, prevTurnId, turnId);
                   } catch { /* checkpoint might be stale */ }
                 }
-                // Use the actual git commit timestamp, not current time.
-                // Using current time would make timestamp-based matching against
-                // assistant messages always fail (hours/days delta > 5min window).
                 const completedAt = await getCheckpointTimestamp(workspace, turnId);
                 summaries.push({
                   turnId,
@@ -529,7 +522,7 @@ export const ReadModelServiceLive = Layer.effect(
         } catch (err) {
           console.warn('[ReadModel] Checkpoint reconciliation failed:', err);
         }
-      });
+      })();
 
       // ── Issue listener (always) ──────────────────────────────────────────────
       // Issues come from external trackers (Linear/GitHub) with unpredictable shapes.
