@@ -2,12 +2,12 @@
   "version": "1",
   "issueId": "PAN-986",
   "created": "2026-05-07T14:20:00Z",
-  "updated": "2026-05-07T18:42:27Z",
+  "updated": "2026-05-07T18:46:22Z",
   "gitState": {
     "branch": "feature/pan-986",
-    "sha": "ce72c7f23",
+    "sha": "09a782805",
     "dirty": true
-  }
+  },
   "decisions": [
     {
       "id": "D1",
@@ -26,7 +26,7 @@
     },
     {
       "id": "D4",
-      "summary": "Repo-wide verification was blocked by two stale invariants outside the PAN-986 feature code: the desktop workspace package metadata still reported version `0.8.15` while the root CLI package had advanced to `0.8.16`, and the GitHub label-cleanup unit test still assumed unconditional `--remove-label` calls even though the implementation now prefetches current labels and removes only labels that are actually present. I aligned the desktop version metadata and updated the test to mock the label-prefetch response so the quality gate exercises the current behavior instead of an obsolete assumption.",
+      "summary": "Repo-wide verification was blocked by two stale invariants outside the PAN-986 feature code: the desktop workspace package metadata had drifted behind the root CLI package version, and the GitHub label-cleanup unit test still assumed unconditional `--remove-label` calls even though the implementation now prefetches current labels and removes only labels that are actually present. I aligned the desktop package metadata with the rebased root release version and updated the test to mock the label-prefetch response so the quality gate exercises the current behavior instead of an obsolete assumption.",
       "recordedAt": "2026-05-07T18:42:27Z"
     }
   ],
@@ -35,10 +35,15 @@
       "id": "H1",
       "summary": "This workspace started with a deleted `.pan/continue.json` from PAN-939 and no PAN-986 issue-scoped beads, so the normal resume path was broken before implementation began.",
       "mitigation": "I recreated PAN-986 beads locally, replaced the stale deleted continue file with PAN-986 state, and will keep this file updated after each bead so the remaining work can proceed through the standard claim, commit, close, and inspect loop."
+    },
+    {
+      "id": "H2",
+      "summary": "`pan done` attempted to rebase the branch onto `main`, but `main` had advanced the desktop release version to `0.8.17`, which conflicted with the earlier verification-fix commit that had aligned the desktop package to the older branch-local root version.",
+      "mitigation": "I manually rebased the branch onto `main`, kept the current `0.8.17` desktop version from `main`, preserved the label-cleanup test fix, and now need to update the remote branch with the rebased history before re-running `pan done`."
     }
   ],
   "resumePoint": {
-    "description": "The PAN-986 feature work and repo-wide quality gates are now green. The remaining work is to push `feature/pan-986`, run `pan done pan-986 -c \"Implementation complete\"`, and stay available for any automatic review or UAT follow-up.",
+    "description": "The PAN-986 feature work and repo-wide quality gates are green on the rebased branch. The remaining work is to update the remote `feature/pan-986` branch with the rebased history, rerun `pan done pan-986 -c \"Implementation complete\"`, and stay available for any automatic review or UAT follow-up.",
     "beadId": null,
     "filesToRead": [
       ".pan/continue.json",
@@ -80,7 +85,13 @@
     {
       "timestamp": "2026-05-07T18:42:27Z",
       "reason": "manual",
-      "note": "Finished the blocked verification pass after fixing two repo-wide quality gate regressions that were unrelated to the PAN-986 feature logic. I aligned `apps/desktop/package.json` and `bun.lock` with the root `0.8.16` release version, updated the GitHub label-cleanup unit test so it mocks the implementation's current label-prefetch behavior, reran the targeted blockers, and then reran `npm run typecheck`, `npm run lint`, and the full `npm test` suite successfully.",
+      "note": "Finished the blocked verification pass after fixing two repo-wide quality gate regressions that were unrelated to the PAN-986 feature logic. I aligned the desktop package metadata and lockfile with the root release version that existed on the branch at the time, updated the GitHub label-cleanup unit test so it mocks the implementation's current label-prefetch behavior, reran the targeted blockers, and then reran `npm run typecheck`, `npm run lint`, and the full `npm test` suite successfully.",
+      "agentModel": "claude-code"
+    },
+    {
+      "timestamp": "2026-05-07T18:46:22Z",
+      "reason": "manual",
+      "note": "Attempting `pan done pan-986 -c \"Implementation complete\"` exposed a rebase conflict because `main` had moved the desktop package version forward to `0.8.17` after the earlier verification fix. I rebased the branch manually, resolved the conflict by keeping `main`'s current desktop version while preserving the label-cleanup test fix, and confirmed the branch is now based on the latest `main` history. The remaining blocker is updating the already-pushed remote branch to match this rebased local history before re-running `pan done`.",
       "agentModel": "claude-code"
     }
   ]
