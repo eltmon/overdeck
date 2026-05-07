@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-636",
   "created": "2026-05-07T03:42:36.488Z",
-  "updated": "2026-05-07T04:58:48.768Z",
+  "updated": "2026-05-07T05:03:10.329Z",
   "gitState": {
     "branch": "feature/pan-636",
     "sha": "9b15d68ef",
@@ -138,12 +138,12 @@
     }
   ],
   "resumePoint": {
-    "description": "pi-parser bead complete (parsePiSession walks Pi v3 JSONL active branch via parentId, returns SessionUsage). 6 tests pass covering linear/forked/model-change/compaction/unknown-events/missing-file. Next ready bead: workspace-neg (vendor @panopticon/pi-extension at packages/pi-extension/) — needs lifecycle hooks (session_start, tool_execution_end, turn_end, /pan-done command) writing heartbeats to ~/.panopticon/agents/<id>/ and ~/.panopticon/heartbeats/. Pi extension API ref: ~/Projects/pi-mono/packages/coding-agent/docs/extensions.md.",
-    "beadId": "workspace-y4r",
+    "description": "pi-extension-package bead complete (vendored @panopticon/pi-extension at packages/pi-extension/, builds to dist/index.js, registers session_start/tool_execution_end/turn_end hooks plus /pan-done command writing to ~/.panopticon/agents/<id>/{ready.json,completed} and ~/.panopticon/heartbeats/<id>.json; agentId from PANOPTICON_AGENT_ID, no default; private package, no npm publish; 9 tests pass). Next: workspace-c0q (mkfifo named pipe lifecycle for Pi RPC stdin).",
+    "beadId": "workspace-neg",
     "filesToRead": [
-      "src/lib/cost-parsers/pi-parser.ts",
-      "src/lib/cost-parsers/__tests__/fixtures/pi/",
-      "~/Projects/pi-mono/packages/coding-agent/docs/extensions.md"
+      "packages/pi-extension/src/index.ts",
+      "packages/pi-extension/package.json",
+      "packages/pi-extension/tsdown.config.ts"
     ]
   },
   "beadsMapping": {},
@@ -178,6 +178,12 @@
       "timestamp": "2026-05-07T04:58:48.768Z",
       "reason": "continue",
       "note": "Closed bead workspace-y4r (pi-session-parser). Created src/lib/cost-parsers/pi-parser.ts: parsePiSession(filePath) reads Pi v3 JSONL line-by-line, builds Map<id, entry> + childrenOf index, finds latest leaf by max timestamp among childless entries, walks leaf->root via parentId, sums per-message usage along active branch into existing SessionUsage shape from jsonl-parser.ts. Pi reports per-call usage deltas (not cumulative) so summing along the branch is correct without compaction subtraction. Pi inline cost.total is the canonical figure for cost_v2 (cost.ts pricing tables may diverge for non-Anthropic providers). Unknown event types are deduped + logged via console.debug. Compaction count logged for observability. Added 4 fixtures (linear/forked/model-change/compaction/unknown-event) and 6 tests covering AC1-5 + missing-file. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:03:10.329Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-neg (pi-extension-package). Created packages/pi-extension/ as a private workspace package (added to root package.json workspaces). Source at src/index.ts: default export panopticonPiExtension(pi) registers four hooks. session_start writes ~/.panopticon/agents/<agentId>/ready.json with sessionId/reason/pid/timestamp. tool_execution_end writes ~/.panopticon/heartbeats/<agentId>.json with timestamp/tool/last_action/pid (last_action=tool_error when isError). turn_end refreshes the same heartbeat path with last_action=turn_end. /pan-done command writes ~/.panopticon/agents/<agentId>/completed with trimmed summary. agentId comes EXCLUSIVELY from process.env.PANOPTICON_AGENT_ID — when unset, the extension returns silently and registers nothing (so two parallel pi -e instances launched outside Panopticon cannot collide on heartbeat or ready files). Filesystem failures are swallowed inside try/catch so Pi cannot crash. tsdown builds dist/index.js (4kB ESM) + dist/index.d.ts. 9 vitest cases cover all four hooks, the disjoint-paths invariant for AC3, and the empty-agentId no-op behavior. typecheck + lint clean. private:true so no npm publish.",
       "agentModel": "claude-opus-4-7"
     }
   ],

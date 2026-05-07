@@ -27,6 +27,7 @@
   "workspaces": {
     "packages": [
       "packages/contracts",
+      "packages/pi-extension",
       "src/dashboard/server",
       "src/dashboard/frontend",
       "apps/desktop"

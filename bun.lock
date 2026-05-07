@@ -81,6 +81,15 @@
         "typescript": "catalog:",
       },
     },
+    "packages/pi-extension": {
+      "name": "@panopticon/pi-extension",
+      "version": "0.0.1",
+      "devDependencies": {
+        "tsdown": "^0.21.7",
+        "typescript": "catalog:",
+        "vitest": "^2.1.9",
+      },
+    },
     "src/dashboard/frontend": {
       "name": "panopticon-dashboard",
       "version": "0.1.0",
@@ -507,6 +516,8 @@
     "@panctl/contracts": ["@panctl/contracts@workspace:packages/contracts"],
 
     "@panctl/desktop": ["@panctl/desktop@workspace:apps/desktop"],
+
+    "@panopticon/pi-extension": ["@panopticon/pi-extension@workspace:packages/pi-extension"],
 
     "@pierre/diffs": ["@pierre/diffs@1.1.17", "", { "dependencies": { "@pierre/theme": "0.0.28", "@shikijs/transformers": "^3.0.0", "diff": "8.0.3", "hast-util-to-html": "9.0.5", "lru_map": "0.4.1", "shiki": "^3.0.0" }, "peerDependencies": { "react": "^18.3.1 || ^19.0.0", "react-dom": "^18.3.1 || ^19.0.0" } }, "sha512-NtrexN6lSNx0K1JvbCwa91uE/Kc7BGGc8kRC4jfr6iKLJoxR0SZpyi5ldOmpItfepTuJRAhUkao4V+jtciz9bA=="],
 

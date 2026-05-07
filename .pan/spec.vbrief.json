@@ -192,7 +192,7 @@
       {
         "id": "pi-extension-package",
         "title": "Vendored @panopticon/pi-extension at packages/pi-extension/",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-07T04:10:00.000Z",
         "metadata": {
@@ -206,7 +206,7 @@
           {
             "id": "pi-extension-package.ac1",
             "title": "packages/pi-extension/dist/index.js builds via `bun install && cd packages/pi-extension && npm run build` and exports a default function",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -214,7 +214,7 @@
           {
             "id": "pi-extension-package.ac2",
             "title": "Vitest covers all four hooks: simulating each Pi event writes the expected file under a test-specific tmp HOME, and uses agentId from PANOPTICON_AGENT_ID",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -222,7 +222,7 @@
           {
             "id": "pi-extension-package.ac3",
             "title": "Two extension instances with different PANOPTICON_AGENT_ID values do not collide on heartbeat or ready files (covered by test)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -230,7 +230,7 @@
           {
             "id": "pi-extension-package.ac4",
             "title": "Extension does NOT publish to npm (no `npm publish` in CI; package marked `private: true`)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
