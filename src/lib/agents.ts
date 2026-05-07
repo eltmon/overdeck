@@ -177,13 +177,11 @@ export async function getAgentRuntimeBaseCommand(
     return `claude ${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
 
-  // Claudish wrapper path — claudish forwards unrecognized flags (including --agent and --name)
-  // to Claude Code, so agent definitions (hooks, tools) continue to work for non-Anthropic models.
+  // Claudish wrapper path — claudish ≤7.0.3 flag passthrough is broken (Commander.js
+  // rejects --agent, --name as unknown). Skip Claude Code-specific flags; model +
+  // permissions are set directly, workspace CLAUDE.md + vBRIEF provide agent context.
   const routedModel = await getLaunchModelForModel(model);
-  if (agentType) {
-    return `claudish -i --model ${routedModel}${agentFlag}${nameFlag} ${permissionFlags}`;
-  }
-  return `claudish -i --model ${routedModel} ${permissionFlags}${nameFlag}`;
+  return `claudish -i --model ${routedModel} ${permissionFlags}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
