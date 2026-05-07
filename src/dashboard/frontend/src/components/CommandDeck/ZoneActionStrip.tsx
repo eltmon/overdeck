@@ -32,7 +32,6 @@ interface ZoneActionStripProps {
   agent?: Agent;
   issue?: Issue;
   onOpenBeads?: () => void;
-  onOpenVBrief?: () => void;
   /** Called when an artifact action wants to switch a ZoneCOverview tab. */
   onSwitchTab?: (tab: 'overview' | 'activity' | 'costs' | 'prd' | 'state' | 'inference' | 'vbrief' | 'beads' | 'prdiff' | 'discussions') => void;
 }
@@ -42,7 +41,6 @@ export function ZoneActionStrip({
   agent,
   issue,
   onOpenBeads,
-  onOpenVBrief,
   onSwitchTab,
 }: ZoneActionStripProps) {
   const [showOverflow, setShowOverflow] = useState(false);

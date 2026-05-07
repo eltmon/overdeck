@@ -273,13 +273,14 @@ export function vbriefToFlow(doc: VBriefDocument, criticalPath: string[] = [], s
   });
 
   const EDGE_TYPE_COLORS: Record<string, string> = {
-    blocks:      '#ef4444',
-    informs:     '#3b82f6',
-    suggests:    '#8b5cf6',
-    invalidates: '#f59e0b',
+    blocks:      '#f87171',
+    informs:     '#60a5fa',
+    suggests:    '#a78bfa',
+    invalidates: '#fbbf24',
   };
 
-  const rawEdges: Edge[] = doc.plan.edges.map((edge, i) => {
+  const edgeList = doc.plan.edges ?? [];
+  const rawEdges: Edge[] = edgeList.map((edge, i) => {
     const isDashed = edge.type === 'informs' || edge.type === 'suggests';
     const isDotted = edge.type === 'suggests';
     const isCritical = criticalSet.has(edge.from) && criticalSet.has(edge.to);
@@ -297,7 +298,7 @@ export function vbriefToFlow(doc: VBriefDocument, criticalPath: string[] = [], s
       markerEnd: { type: MarkerType.ArrowClosed, width: 20, height: 20, color: edgeColor },
       style: {
         stroke: edgeColor,
-        strokeWidth: isCritical ? 2 : 1,
+        strokeWidth: isCritical ? 3 : 2,
         strokeDasharray: isDotted ? '3 4' : isDashed ? '6 4' : undefined,
       },
       animated: edge.type === 'blocks' && isCritical,
@@ -414,14 +415,17 @@ export function PlanDAGViewer({ issueId, criticalPath, onNodeClick, className }:
   // Use server-computed critical path (from API response) or caller override
   const effectiveCriticalPath = criticalPath ?? doc.criticalPath ?? [];
 
-  // Show critical path length in header when available
+  // Show critical path length + edge count in header when available
   const cpLength = effectiveCriticalPath.length;
+  const edgeCount = doc.plan.edges?.length ?? 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '4px 8px', fontSize: 10, background: '#1f2937', borderBottom: '1px solid #374151', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ color: '#f97316', fontWeight: 600 }}>
           {cpLength > 1 ? `Critical path: ${cpLength} steps` : ''}
+          {cpLength > 1 && edgeCount > 0 ? ' · ' : ''}
+          {edgeCount > 0 ? `${edgeCount} edge${edgeCount === 1 ? '' : 's'}` : ''}
         </span>
         <button
           onClick={() => setShowAC(prev => !prev)}
