@@ -57,24 +57,24 @@ export function CostWarningBadge({ level, compact = false, costPer1MTokens }: Ba
   const baseStyle: CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: 3,
-    padding: compact ? '1px 4px' : '2px 6px',
+    gap: compact ? 0 : 3,
+    padding: compact ? '0' : '2px 6px',
     fontSize: compact ? 9 : 10,
     fontWeight: 700,
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase',
+    letterSpacing: compact ? undefined : '0.04em',
+    textTransform: compact ? undefined : 'uppercase',
     color,
-    background: bg,
-    border,
-    borderRadius: 3,
+    background: compact ? 'transparent' : bg,
+    border: compact ? 'none' : border,
+    borderRadius: compact ? 0 : 3,
     flexShrink: 0,
     whiteSpace: 'nowrap',
-    lineHeight: 1,
-    animation: isExtreme ? 'pan-cost-warning-pulse 2s ease-in-out infinite' : undefined,
+    lineHeight: compact ? 0 : 1,
+    animation: isExtreme && !compact ? 'pan-cost-warning-pulse 2s ease-in-out infinite' : undefined,
   };
 
   const label = isExtreme ? '$$$' : '$$';
-  const iconSize = compact ? 10 : 11;
+  const iconSize = compact ? 11 : 11;
 
   return (
     <span
