@@ -171,7 +171,7 @@ async function startSidecars(): Promise<void> {
   }
 }
 
-export async function devCommand(options: { skipTraefik?: boolean }) {
+export async function devCommand(options: { skipTraefik?: boolean; deacon?: boolean }) {
   // Force dev mode for Traefik config generation and all downstream code
   process.env['PANOPTICON_DEV'] = '1';
 
@@ -276,6 +276,7 @@ export async function devCommand(options: { skipTraefik?: boolean }) {
       ...process.env,
       API_PORT: String(config.dashboardApiPort),
       PANOPTICON_MODE: 'development',
+      ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
     },
   });
 

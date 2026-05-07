@@ -43,6 +43,7 @@ export interface RestartOptions {
   full?: boolean;
   force?: boolean;
   healthTimeout?: string;
+  deacon?: boolean;
 }
 
 function resolveScope(options: RestartOptions): 'dashboard' | 'cliproxy' | 'traefik' | 'full' {
@@ -75,7 +76,7 @@ function resolveBundledServerPath(): string {
   return join(__dirname, '..', 'dashboard', 'server.js');
 }
 
-function spawnDashboardDetached(config: PlatformConfig): void {
+function spawnDashboardDetached(config: PlatformConfig, opts?: { disableDeacon?: boolean }): void {
   const serverPath = resolveBundledServerPath();
   if (!existsSync(serverPath)) {
     throw new StageError({
@@ -90,6 +91,7 @@ function spawnDashboardDetached(config: PlatformConfig): void {
       ...process.env,
       DASHBOARD_PORT: String(config.dashboardPort),
       PANOPTICON_MODE: 'production',
+      ...(opts?.disableDeacon ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
     },
   });
   child.unref();
@@ -101,6 +103,11 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
   const healthTimeoutMs = options.healthTimeout
     ? parseInt(options.healthTimeout, 10)
     : undefined;
+
+  const disableDeacon = options.deacon === false;
+  if (disableDeacon) {
+    console.log(chalk.yellow('  Deacon auto-start disabled for this restart (--no-deacon)'));
+  }
 
   console.log(chalk.bold(`Restarting Panopticon (${scope})...\n`));
 
@@ -114,7 +121,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
           startSupervisorProcess();
         } catch { /* non-fatal */ }
 
-        await restartDashboard(config, () => spawnDashboardDetached(config), {
+        await restartDashboard(config, () => spawnDashboardDetached(config, { disableDeacon }), {
           healthTimeoutMs,
         });
         console.log(chalk.green('✓ Dashboard restarted and healthy'));
@@ -139,7 +146,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
         break;
       }
       case 'full': {
-        await runFullRestart(config, { healthTimeoutMs });
+        await runFullRestart(config, { healthTimeoutMs, disableDeacon });
         break;
       }
     }
@@ -168,7 +175,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
  */
 async function runFullRestart(
   config: PlatformConfig,
-  opts: { healthTimeoutMs?: number },
+  opts: { healthTimeoutMs?: number; disableDeacon?: boolean },
 ): Promise<void> {
   const projectRoot = process.cwd();
   const venvPath = join(projectRoot, '.venv');
@@ -210,7 +217,7 @@ async function runFullRestart(
   const cliproxy = await import('../../lib/cliproxy.js');
   await restartCliproxy(cliproxy);
 
-  spawnDashboardDetached(config);
+  spawnDashboardDetached(config, { disableDeacon: opts.disableDeacon });
   await waitForDashboardHealth(config.dashboardApiPort, {
     timeoutMs: opts.healthTimeoutMs,
   });

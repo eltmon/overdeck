@@ -389,6 +389,7 @@ program
   .command('dev')
   .description('Start dashboard in development mode with Vite HMR')
   .option('--skip-traefik', 'Skip Traefik startup')
+  .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
   .action(devCommand);
 
 program
@@ -396,6 +397,7 @@ program
   .description('Start dashboard (and Traefik if enabled)')
   .option('--detach', 'Run in background')
   .option('--skip-traefik', 'Skip Traefik startup')
+  .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
   .action(async (options) => {
     const { spawn, execSync } = await import('child_process');
     const { join, dirname } = await import('path');
@@ -789,6 +791,7 @@ program
               ...process.env,
               DASHBOARD_PORT: String(dashboardPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
+              ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
             },
           });
 
@@ -843,6 +846,7 @@ program
               ...process.env,
               DASHBOARD_PORT: String(dashboardPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
+              ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
             },
           });
 
@@ -1005,6 +1009,7 @@ program
   .option('--full', 'Restart the entire stack (equivalent to pan down && pan up)')
   .option('--force', 'For --cliproxy: redownload binary at the pinned version before restarting (use after bumping CLIPROXY_RELEASE_VERSION)')
   .option('--health-timeout <ms>', 'Dashboard /api/health wait budget in ms (default 15000)')
+  .option('--no-deacon', 'Skip Cloister/Deacon auto-start on restart (escape hatch when deacon\'s startup scan is starving the event loop)')
   .action(restartCommand);
 
 // Project management commands
