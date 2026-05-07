@@ -371,6 +371,87 @@ describe('generateLauncherScript', () => {
       "
     `);
   });
+
+  // --- PAN-982: --agent flag surfaces in generated launcher scripts ---
+  // When getAgentRuntimeBaseCommand() emits `claude --agent pan-<type>-agent`,
+  // the generator must pass it through verbatim into the exec line.
+
+  it('work agent with --agent flag (Anthropic model — no --model, no permission flags)', () => {
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      agentType: 'work',
+      setCi: true,
+      baseCommand: 'claude --agent pan-work-agent',
+    });
+    expect(script).toContain('exec claude --agent pan-work-agent');
+    expect(script).not.toMatch(/--model/);
+    expect(script).not.toMatch(/--dangerously-skip-permissions/);
+    expect(script).not.toMatch(/--permission-mode/);
+  });
+
+  it('work agent with --agent flag and --model override (non-Anthropic)', () => {
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      agentType: 'work',
+      setCi: true,
+      providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"',
+      baseCommand: 'claude --agent pan-work-agent --model gpt-5.4',
+    });
+    expect(script).toContain('--agent pan-work-agent');
+    expect(script).toContain('--model gpt-5.4');
+    expect(script).not.toMatch(/--dangerously-skip-permissions/);
+  });
+
+  it('planning agent with --agent flag', () => {
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      agentType: 'planning',
+      setCi: true,
+      promptFile: '/tmp/init-prompt.txt',
+      baseCommand: 'claude --agent pan-planning-agent',
+      keepAlive: true,
+    });
+    expect(script).toContain('claude --agent pan-planning-agent');
+    expect(script).not.toMatch(/--dangerously-skip-permissions/);
+  });
+
+  it('resume agent preserves --agent across --resume', () => {
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      agentType: 'resume',
+      setCi: true,
+      baseCommand: 'claude --agent pan-work-agent',
+      resumeSessionId: 'sess-123',
+    });
+    expect(script).toContain('--agent pan-work-agent');
+    expect(script).toContain("--resume 'sess-123'");
+    expect(script).not.toMatch(/--dangerously-skip-permissions/);
+    expect(script).not.toMatch(/--permission-mode/);
+  });
+
+  it('specialist-dispatch with --agent (review)', () => {
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      agentType: 'specialist-dispatch',
+      promptFile: '/tmp/prompt.md',
+      baseCommand: 'claude --agent pan-review-agent',
+      sessionId: 'sess-abc',
+    });
+    expect(script).toContain('--agent pan-review-agent');
+    expect(script).toContain("--session-id 'sess-abc'");
+    expect(script).not.toMatch(/--dangerously-skip-permissions/);
+  });
+
+  it('--agent with --name produces both flags', () => {
+    const script = generateLauncherScript({
+      ...DEFAULT_CONFIG,
+      agentType: 'work',
+      setCi: true,
+      baseCommand: 'claude --agent pan-work-agent --name agent-pan-982',
+    });
+    expect(script).toContain('--agent pan-work-agent');
+    expect(script).toContain('--name agent-pan-982');
+  });
 });
 
 describe('generateLauncherWrapper', () => {
