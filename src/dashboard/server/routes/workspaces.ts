@@ -111,12 +111,35 @@ import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.j
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const MAX_PROBED_PORTS = 5;
+const MAX_PROBED_CONTAINERS = 10;
+const PROBE_CACHE_TTL_MS = 30_000;
 
 function safeToISOString(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return undefined;
   return d.toISOString();
+}
+
+interface ProbeCacheEntry {
+  result: { healthy: boolean; reason?: string };
+  cachedAt: number;
+}
+
+const probeCache = new Map<string, ProbeCacheEntry>();
+
+function getCachedProbe(key: string): { healthy: boolean; reason?: string } | undefined {
+  const entry = probeCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() - entry.cachedAt > PROBE_CACHE_TTL_MS) {
+    probeCache.delete(key);
+    return undefined;
+  }
+  return entry.result;
+}
+
+function setCachedProbe(key: string, result: { healthy: boolean; reason?: string }): void {
+  probeCache.set(key, { result, cachedAt: Date.now() });
 }
 
 export function getWorkspacePathForIssue(projectPath: string, rawIssueId: string): { parsedIssueId: string; workspacePath: string } {
@@ -656,21 +679,41 @@ async function getContainerStatusAsync(
       .map(([name]) => name);
 
     if (runningNames.length > 0) {
-      const { stdout: inspectStdout } = await execFileAsync(
-        'docker',
-        ['inspect', ...runningNames],
-        { encoding: 'utf-8', timeout: 10000 }
-      );
-      const inspects: Array<{
-        Name?: string;
-        Config?: { Labels?: Record<string, string>; ExposedPorts?: Record<string, unknown> };
-        NetworkSettings?: { Ports?: Record<string, unknown> };
-        State?: { Health?: { Status?: string; LastExecution?: { End?: string }; FailingStreak?: number; ExitCode?: number } };
-      }> = JSON.parse(inspectStdout);
-      const inspectByName = new Map(inspects.map((i) => [i.Name?.replace(/^\//, ''), i]));
+      let inspectByName = new Map<string, any>();
+      try {
+        const { stdout: inspectStdout } = await execFileAsync(
+          'docker',
+          ['inspect', ...runningNames],
+          { encoding: 'utf-8', timeout: 10000 }
+        );
+        const inspects: Array<{
+          Name?: string;
+          Config?: { Labels?: Record<string, string>; ExposedPorts?: Record<string, unknown> };
+          NetworkSettings?: { Ports?: Record<string, unknown> };
+          State?: { Health?: { Status?: string; LastExecution?: { End?: string }; FailingStreak?: number; ExitCode?: number } };
+        }> = JSON.parse(inspectStdout);
+        inspectByName = new Map(inspects.map((i) => [i.Name?.replace(/^\//, ''), i]));
+      } catch (err: any) {
+        // Docker inspect may return partial JSON on stderr even when one container is missing.
+        // Try to salvage valid results from stdout so one missing container doesn't drop all health data.
+        const partial = err?.stdout;
+        if (typeof partial === 'string' && partial.trim().startsWith('[')) {
+          try {
+            const inspects = JSON.parse(partial);
+            if (Array.isArray(inspects)) {
+              inspectByName = new Map(inspects.map((i: any) => [i.Name?.replace(/^\//, ''), i]));
+            }
+          } catch {
+            // Partial JSON unreadable — fall through to empty inspectByName
+          }
+        }
+      }
+
+      // Cap total probed containers to prevent unbounded fan-out per request
+      const namesToProbe = runningNames.slice(0, MAX_PROBED_CONTAINERS);
 
       await Promise.all(
-        runningNames.map(async (name) => {
+        namesToProbe.map(async (name) => {
           const info = result[name];
           const inspect = inspectByName.get(name);
           const serviceHealth = extractContainerServiceHealth(inspect);
@@ -688,7 +731,14 @@ async function getContainerStatusAsync(
             ).slice(0, MAX_PROBED_PORTS);
 
             const probeResults = await Promise.all(
-              dedupedBindings.map((b) => probeContainerPortAsync(b.hostPort, b.hostIp))
+              dedupedBindings.map(async (b) => {
+                const cacheKey = `${name}::${b.hostIp}:${b.hostPort}`;
+                const cached = getCachedProbe(cacheKey);
+                if (cached) return cached;
+                const probeResult = await probeContainerPortAsync(b.hostPort, b.hostIp);
+                setCachedProbe(cacheKey, probeResult);
+                return probeResult;
+              })
             );
             const anyHealthy = probeResults.some((r) => r.healthy);
             health = anyHealthy ? 'healthy' : 'unhealthy';
