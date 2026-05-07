@@ -44,6 +44,25 @@ describe('handleSessionStart', () => {
       pid: 4242,
     })
   })
+
+  it('AC1 (PAN-636 workspace-3119): also writes ~/.panopticon/agents/<id>/session.id with the Pi session id', async () => {
+    await handleSessionStart(
+      { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
+      { reason: 'new', sessionId: 'sess-resume-target' },
+    )
+    const paths = panopticonPathsFor('agent-pan-636', h.home)
+    expect(existsSync(paths.sessionIdPath)).toBe(true)
+    expect(readFileSync(paths.sessionIdPath, 'utf8').trim()).toBe('sess-resume-target')
+  })
+
+  it('does NOT write session.id when Pi reports a null/missing sessionId — null would defeat resume', async () => {
+    await handleSessionStart(
+      { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
+      { reason: 'new' /* sessionId omitted */ },
+    )
+    const paths = panopticonPathsFor('agent-pan-636', h.home)
+    expect(existsSync(paths.sessionIdPath)).toBe(false)
+  })
 })
 
 describe('handleToolExecutionEnd', () => {

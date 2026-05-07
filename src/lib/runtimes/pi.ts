@@ -85,6 +85,28 @@ function readyPathFor(agentId: string): string {
   return piFifoPaths(agentId).readyPath
 }
 
+function sessionIdPathFor(agentId: string): string {
+  return join(agentDirFor(agentId), 'session.id')
+}
+
+/**
+ * Read the persisted Pi session id for resume (PAN-636 workspace-3119).
+ * Returns null when the file is absent (fresh agent or post-deep-wipe) or
+ * unreadable. The pi-extension writes this file on every session_start with
+ * a non-null sessionId; killAgent intentionally preserves it so the next
+ * spawn can resume.
+ */
+function readStoredSessionId(agentId: string): string | null {
+  const path = sessionIdPathFor(agentId)
+  if (!existsSync(path)) return null
+  try {
+    const raw = readFileSync(path, 'utf8').trim()
+    return raw || null
+  } catch {
+    return null
+  }
+}
+
 export class PiRuntime implements AgentRuntime {
   readonly name = 'pi' as const
 
@@ -268,6 +290,11 @@ export class PiRuntime implements AgentRuntime {
     const agentId = config.agentId
     const dir = agentDirFor(agentId)
     const sessionDir = piSessionDirFor(agentId)
+    // Detect a prior spawn BEFORE mkdir creates the dir. We treat "sessions/
+    // contains at least one .jsonl" as the canonical proof of a prior run,
+    // since killAgent preserves session jsonls per the JSONL-is-sacred rule.
+    const hadPriorSpawn = existsSync(sessionDir) &&
+      readdirSync(sessionDir).some((f) => f.endsWith('.jsonl'))
     mkdirSync(dir, { recursive: true, mode: 0o700 })
     mkdirSync(sessionDir, { recursive: true, mode: 0o700 })
 
@@ -275,6 +302,18 @@ export class PiRuntime implements AgentRuntime {
     const fifoPath = await createPiFifo(agentId)
 
     const promptFile = config.prompt ? writeAgentPromptFile(agentId, config.prompt) : undefined
+
+    // Resume into the previously-recorded Pi session if one exists (AC2).
+    // AC3: when session.id is missing AFTER a prior spawn (sessions/*.jsonl
+    // present) we fall back to a fresh session and warn so the dashboard
+    // can surface the divergence. On a first-ever spawn — sessions/ is
+    // empty — we stay silent.
+    const resumeSessionId = readStoredSessionId(agentId) ?? undefined
+    if (!resumeSessionId && hadPriorSpawn) {
+      console.warn(
+        `[pi-runtime] ${agentId}: prior session.jsonl exists but session.id is missing — spawning a fresh Pi session`,
+      )
+    }
 
     const launcherScript = generateLauncherScript({
       agentType: 'work',
@@ -285,6 +324,7 @@ export class PiRuntime implements AgentRuntime {
       piSessionDir: sessionDir,
       model: config.model,
       promptFile,
+      resumeSessionId,
       panopticonEnv: { agentId },
       setTerminalEnv: true,
       trapHup: true,

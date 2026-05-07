@@ -138,8 +138,8 @@
     }
   ],
   "resumePoint": {
-    "description": "docs-harnesses bead complete: wrote docs/HARNESSES.md covering all six required topics (supported harnesses, install Pi, harness picker locations, ToS rules with the truth table, troubleshooting incl. PAN_E2E=1 for the smoke test, tradeoffs vs CLIProxy). Linked from CLAUDE.md via a new `## Harnesses` section between the dashboard-server rules and Project Structure. Beads remaining (6): 3119 (resume), w1o0 (e2e), UI bundle fjs9/0c2/3ir/lg47.",
-    "beadId": "workspace-6oe",
+    "description": "pi-resume-flow bead complete: pi-extension handleSessionStart now writes ~/.panopticon/agents/<id>/session.id (plain text, just the id) on every session_start with a non-null sessionId — null is intentionally skipped because it would defeat resume (AC1). PiRuntime.spawnAgent reads session.id via readStoredSessionId and forwards it as resumeSessionId so the launcher emits `pi --session <id>` (AC2). The hadPriorSpawn detector (sessions/ contains at least one .jsonl) gates the warning so the AC3 path emits a console.warn only when the JSONL invariant says we DID run before but the resume hint is gone — first-ever spawns stay silent. Beads remaining (5): w1o0 (e2e), UI bundle fjs9/0c2/3ir/lg47.",
+    "beadId": "workspace-3119",
     "filesToRead": [
       "src/lib/runtimes/pi.ts",
       "src/lib/runtimes/__tests__/pi.test.ts"
@@ -267,6 +267,12 @@
       "timestamp": "2026-05-07T06:05:00.000Z",
       "reason": "continue",
       "note": "Closed bead workspace-6oe (docs-harnesses). Wrote docs/HARNESSES.md (6 sections matching the bead spec: supported harnesses table, install Pi with pan doctor + pan sync workflow, where the harness is picked at the four user-initiated surfaces, ToS rules with the explicit truth table showing pi+Anthropic+subscription as the single blocked cell and the canUseHarness fallback behavior, troubleshooting incl. PAN_E2E=1 gating for the smoke test, tradeoffs RPC vs paste-buffer and Pi multi-provider vs CLIProxy). The 'See also' footer points at the actual files (pi.ts, pi-fifo.ts, pi-parser.ts, harness-policy.ts, packages/pi-extension/) so future readers land on canonical sources, not stale doc copies. Linked from CLAUDE.md via a new 4-line Harnesses section placed between the no-blocking-calls rule and the Project Structure header (AC2). typecheck + lint pass (no source changes — docs only).",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T06:10:00.000Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-3119 (pi-resume-flow). Extended pi-extension's panopticonPathsFor to include sessionIdPath (~/.panopticon/agents/<id>/session.id) and made handleSessionStart write the plain-text sessionId there on every session_start with a non-null id (AC1). Null/undefined sessionIds are intentionally skipped because writing 'null' to that file would silently defeat resume on the next spawn. PiRuntime gained readStoredSessionId(agentId) that returns the trimmed contents or null on absence/empty/error. PiRuntime.spawnAgent reads session.id BEFORE mkdir creates the agent dir (so the hadPriorSpawn detector can use the existence of sessions/*.jsonl as proof of a prior run, since killAgent preserves session jsonls per the JSONL-is-sacred rule) and forwards the id as resumeSessionId; the launcher-generator pi branch already emits `pi --session <id>` when resumeSessionId is set (AC2). When session.id is absent BUT a prior session jsonl exists, console.warn fires with the agent id and the message 'session.id is missing — spawning a fresh Pi session' so the dashboard can surface the divergence; the spawn itself does not fail (AC3). First-ever spawns stay silent. cleanupPiTransientFiles intentionally does NOT delete session.id so kill+respawn reuses the same session. 3 new pi.test cases drive spawnAgent end-to-end with mocked tmux (createSessionAsync/sessionExistsAsync/killSessionAsync set to no-ops) and a pre-created ready.json that lets waitForReady return immediately, then read the launcher script that was written to disk and assert it contains/omits `--session <id>`. 2 new pi-extension tests assert sessionIdPath gets written on non-null sessionId and stays absent on missing sessionId. typecheck + lint clean.",
       "agentModel": "claude-opus-4-7"
     }
   ],

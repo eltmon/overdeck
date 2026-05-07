@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -155,6 +155,105 @@ describe('PiRuntime.getSessionCost (AC5)', () => {
     // Linear fixture totals: 0.0006 + 0.000525.
     expect(breakdown!.totalCost).toBeCloseTo(0.001125, 9)
     expect(breakdown!.currency).toBe('USD')
+  })
+})
+
+// ── PiRuntime resume behavior (PAN-636 workspace-3119) ──────────────────────
+// The pi-extension persists ~/.panopticon/agents/<id>/session.id on every
+// session_start with a non-null sessionId; PiRuntime.spawnAgent reads that
+// file and forwards it as `pi --session <id>` so the next spawn lands in the
+// same Pi session. We mock tmux out so we can drive spawnAgent end-to-end
+// without a real shell process.
+vi.mock('../../tmux.js', async () => {
+  const actual = await vi.importActual<typeof import('../../tmux.js')>('../../tmux.js')
+  return {
+    ...actual,
+    createSessionAsync: vi.fn(async () => undefined),
+    sessionExistsAsync: vi.fn(async () => false),
+    killSessionAsync: vi.fn(async () => undefined),
+  }
+})
+
+describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', () => {
+  let h: ReturnType<typeof withFakeHome>
+  let warnSpy: ReturnType<typeof vi.spyOn>
+  beforeEach(() => {
+    h = withFakeHome()
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    warnSpy.mockRestore()
+    h.cleanup()
+  })
+
+  function preCreateReady(agentId: string): void {
+    const dir = join(h.home, '.panopticon', 'agents', agentId)
+    mkdirSync(dir, { recursive: true })
+    // waitForReady polls existsSync(ready.json) — pre-create so spawnAgent
+    // returns immediately instead of polling for 30s.
+    writeFileSync(join(dir, 'ready.json'), JSON.stringify({ sessionId: 'irrelevant' }))
+  }
+
+  it('AC2: re-spawning after a kill emits `pi --session <id>` when session.id is present', async () => {
+    const agentId = 'agent-resume-1'
+    const dir = join(h.home, '.panopticon', 'agents', agentId)
+    const sessionsDir = join(dir, 'sessions')
+    mkdirSync(sessionsDir, { recursive: true })
+    // Simulate a prior spawn that already wrote session.id and one .jsonl
+    writeFileSync(join(dir, 'session.id'), 'sess-stored-7777\n')
+    writeFileSync(join(sessionsDir, '01a-session.jsonl'), '{"type":"session"}\n')
+    preCreateReady(agentId)
+
+    const r = new PiRuntime()
+    await r.spawnAgent({
+      agentId,
+      workspace: h.home,
+      model: 'claude-sonnet-4-6',
+      piExtensionPath: '/tmp/fake-extension/dist/index.js',
+    } as any)
+
+    const launcher = require('node:fs').readFileSync(join(dir, 'pi-launcher.sh'), 'utf-8')
+    expect(launcher).toMatch(/--session\s+'?sess-stored-7777'?/)
+  })
+
+  it('AC3: omits --session and warns when sessions/*.jsonl exists but session.id is missing', async () => {
+    const agentId = 'agent-resume-2'
+    const dir = join(h.home, '.panopticon', 'agents', agentId)
+    const sessionsDir = join(dir, 'sessions')
+    mkdirSync(sessionsDir, { recursive: true })
+    writeFileSync(join(sessionsDir, '01a-session.jsonl'), '{"type":"session"}\n')
+    // session.id intentionally absent
+    preCreateReady(agentId)
+
+    const r = new PiRuntime()
+    await r.spawnAgent({
+      agentId,
+      workspace: h.home,
+      model: 'claude-sonnet-4-6',
+      piExtensionPath: '/tmp/fake-extension/dist/index.js',
+    } as any)
+
+    const launcher = require('node:fs').readFileSync(join(dir, 'pi-launcher.sh'), 'utf-8')
+    expect(launcher).not.toMatch(/--session\s+\S/)
+
+    const warned = warnSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(warned).toMatch(/session\.id is missing/)
+  })
+
+  it('first-ever spawn (no prior sessions/*.jsonl, no session.id) does NOT warn — clean path', async () => {
+    const agentId = 'agent-resume-3-first'
+    preCreateReady(agentId)
+
+    const r = new PiRuntime()
+    await r.spawnAgent({
+      agentId,
+      workspace: h.home,
+      model: 'claude-sonnet-4-6',
+      piExtensionPath: '/tmp/fake-extension/dist/index.js',
+    } as any)
+
+    const warned = warnSpy.mock.calls.map((c) => String(c[0])).join('\n')
+    expect(warned).not.toMatch(/session\.id/)
   })
 })
 

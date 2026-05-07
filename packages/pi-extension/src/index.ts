@@ -71,6 +71,12 @@ export interface PanopticonPaths {
   readyPath: string
   completedPath: string
   heartbeatPath: string
+  /**
+   * Plain-text file holding ONLY the Pi session id reported by the most recent
+   * spawn (PAN-636 workspace-3119). Survives killAgent so the next spawn can
+   * resume into the same session via `pi --session <id>`.
+   */
+  sessionIdPath: string
 }
 
 export function panopticonPathsFor(agentId: string, home: string = homedir()): PanopticonPaths {
@@ -82,6 +88,7 @@ export function panopticonPathsFor(agentId: string, home: string = homedir()): P
     readyPath: join(agentDir, 'ready.json'),
     completedPath: join(agentDir, 'completed'),
     heartbeatPath: join(heartbeatsDir, `${agentId}.json`),
+    sessionIdPath: join(agentDir, 'session.id'),
   }
 }
 
@@ -123,6 +130,12 @@ export async function handleSessionStart(env: HookEnv, event: SessionStartEvent)
     timestamp: now(),
     pid: env.pid ?? process.pid,
   })
+  // Persist a plain-text session id so PiRuntime.spawnAgent can resume into
+  // the same Pi session on the next spawn (PAN-636 workspace-3119). We write
+  // this only when Pi gives us a sessionId — `null` would defeat resume.
+  if (event.sessionId) {
+    await writeFile(paths.sessionIdPath, `${event.sessionId}\n`, 'utf8')
+  }
 }
 
 export async function handleToolExecutionEnd(env: HookEnv, event: ToolExecutionEndEvent): Promise<void> {
