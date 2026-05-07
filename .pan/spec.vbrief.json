@@ -434,7 +434,7 @@
       {
         "id": "update-launcher-tests",
         "title": "Update launcher-generator tests for --agent flag",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-07T02:30:00.000Z",
         "metadata": {
@@ -448,7 +448,7 @@
           {
             "id": "update-launcher-tests.ac1",
             "title": "Tests verify --agent flag in generated launcher scripts for work, planning, resume agent types",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -456,7 +456,7 @@
           {
             "id": "update-launcher-tests.ac2",
             "title": "Tests verify --model omission for Anthropic models when --agent is active",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -464,7 +464,7 @@
           {
             "id": "update-launcher-tests.ac3",
             "title": "Tests verify permission flags absent when --agent is active",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

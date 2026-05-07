@@ -2,8 +2,8 @@
   "version": "1",
   "issueId": "PAN-982",
   "created": "2026-05-07T01:59:13.002Z",
-  "updated": "2026-05-07T02:35:00.000Z",
-  "gitState": { "branch": "feature/pan-982", "sha": "c78b413", "dirty": false },
+  "updated": "2026-05-07T03:12:00.000Z",
+  "gitState": { "branch": "feature/pan-982", "sha": "585a53f9d", "dirty": false },
   "decisions": [
     {
       "id": "D1",
@@ -74,7 +74,6 @@
       "mitigation": "Use relative paths from the workspace root where possible. For hooks that must reference ~/.panopticon/bin/, use $HOME expansion or have pan sync template the paths at deployment time. Long-term: move hook scripts into the project repo so paths are repo-relative."
     }
   ],
-  "resumePoint": null,
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-6",
   "sessionHistory": [
@@ -89,7 +88,18 @@
       "reason": "planning-complete",
       "note": "Deep research completed. Empirically tested --agent + --resume (works, new agent config adopted), --agent + --model (override works), --agents JSON inline (works). Wrote comprehensive PRD at docs/prds/planned/PAN-982-claude-code-agent-integration.md. Created 15-bead vBRIEF plan covering 7 agent definitions, 4 launcher/spawn integration beads, hook migration, test updates, sync deployment, and optional named sessions. Key decision: partial adoption — use --agent for model/permissions/tools/hooks, keep launcher.sh for env vars and shell-level behaviors. Agent Teams explicitly deferred.",
       "agentModel": "agent:claude-opus-4-6"
+    },
+    {
+      "timestamp": "2026-05-07T03:12:00.000Z",
+      "reason": "bead-close",
+      "note": "Closed bead workspace-o99 (update-launcher-tests). Added 6 new test cases asserting --agent flag pass-through in launcher scripts: work-agent (Anthropic, no --model/no permission flags), work-agent (non-Anthropic with --model override), planning-agent, resume-agent (--agent + --resume), specialist-dispatch (--agent pan-review-agent), and --agent + --name combined. All 24 tests pass (18 existing inline snapshots untouched + 6 new). Tests treat baseCommand as opaque, so they validate behavior independently of getAgentRuntimeBaseCommand() changes — they will continue to pass after the modify-base-command bead alters that helper.",
+      "agentModel": "agent:claude-opus-4-7"
     }
   ],
+  "resumePoint": {
+    "description": "Bead workspace-o99 closed; awaiting inspection result via pan tell. Next ready bead per bd ready: workspace-hik (specialist dispatch), workspace-l71 (migrate hooks), workspace-c6q (named sessions), workspace-d7n (sync deploy). Plan-logical order says agent definition beads (workspace-59m work, 0mb planning, xev review, gy5 test, s0a inspect, atf uat, 8is merge) must come first because they are the source files referenced by --agent flags. Bd dependency graph is inverted relative to plan edges, so bd ready returns leaf beads instead of root beads — work in plan-logical order regardless of bd ready.",
+    "beadId": "workspace-o99",
+    "filesToRead": [".pan/spec.vbrief.json", "src/lib/agents.ts:102", "src/lib/launcher-generator.ts", "~/.claude/settings.json"]
+  },
   "feedback": []
 }
