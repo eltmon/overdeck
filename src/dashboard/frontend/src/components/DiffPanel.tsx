@@ -27,7 +27,7 @@ import { cn } from '../lib/utils'
 import { useTheme } from '../hooks/useTheme'
 import { parseDiffRouteSearch } from '../lib/diffRouteSearch'
 import { buildPatchCacheKey, resolveDiffThemeName } from '../lib/diffRendering'
-import type { TurnDiffFileChange, TurnDiffSummary } from './chat/chat-types'
+import type { TurnDiffSummary } from './chat/chat-types'
 import { DiffPanelLoadingState, DiffPanelShell, type DiffPanelMode } from './DiffPanelShell'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -227,59 +227,6 @@ function ToggleButton(props: {
   )
 }
 
-// ─── File picker (shown when no file is selected) ───────────────────────────
-
-function DiffFilePickerList({ files, onSelectFile, isLoading }: {
-  files: TurnDiffFileChange[]
-  onSelectFile: (path: string) => void
-  isLoading: boolean
-}) {
-  if (isLoading) return <DiffPanelLoadingState label="Loading file list..." />
-  if (files.length === 0) {
-    return (
-      <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
-        No changed files in this selection.
-      </div>
-    )
-  }
-  const sorted = [...files].sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: 'base' }))
-  return (
-    <div className="flex-1 overflow-auto px-2 py-2">
-      <p className="mb-2 px-1 text-[11px] text-muted-foreground/70">
-        {files.length} changed file{files.length !== 1 ? 's' : ''} — select a file to view its diff
-      </p>
-      <div className="space-y-px">
-        {sorted.map((file) => {
-          const parts = file.path.split('/')
-          const fileName = parts.pop() ?? file.path
-          const dirPath = parts.join('/')
-          return (
-            <button
-              key={file.path}
-              type="button"
-              className="group flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-[11px] transition-colors hover:bg-accent"
-              onClick={() => onSelectFile(file.path)}
-            >
-              <span className="min-w-0 flex-1 truncate">
-                {dirPath && <span className="text-muted-foreground/60">{dirPath}/</span>}
-                <span className="text-foreground/90">{fileName}</span>
-              </span>
-              <span className="shrink-0 tabular-nums">
-                {file.additions != null && file.additions > 0 && (
-                  <span className="text-green-500">+{file.additions}</span>
-                )}
-                {file.deletions != null && file.deletions > 0 && (
-                  <span className="ml-1 text-red-400">-{file.deletions}</span>
-                )}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 // ─── DiffPanel ────────────────────────────────────────────────────────────────
 
 interface DiffPanelProps {
@@ -337,38 +284,25 @@ export function DiffPanel({
         orderedTurnDiffSummaries[0])
 
   // Fetch the diff for the selected turn, vs-main, or full conversation
-  // When no file is selected, skip the expensive full-diff fetch for turn diffs
-  // (the file list is already in the summary). For vs-main/full, fetch file list only.
   const baseUrl = diffUrlPrefix ?? `/api/agents/${encodeURIComponent(agentId)}/diffs`
-  const needsFilePicker = !selectedFilePath
-  const skipTurnDiffFetch = needsFilePicker && !!selectedTurn
-
   const { data: diffResponse, isLoading: isLoadingDiff } = useQuery({
     queryKey: isVsMain
-      ? ['diff-vs-main', agentId, selectedFilePath ?? null]
+      ? ['diff-vs-main', agentId]
       : selectedTurn
-        ? ['diff-turn', agentId, selectedTurn.turnId, selectedFilePath ?? null]
-        : ['diff-full', agentId, selectedFilePath ?? null],
+        ? ['diff-turn', agentId, selectedTurn.turnId]
+        : ['diff-full', agentId],
     queryFn: async () => {
-      let url = isVsMain
+      const url = isVsMain
         ? `${baseUrl}/vs-main`
         : selectedTurn
           ? `${baseUrl}/${encodeURIComponent(selectedTurn.turnId)}`
           : `${baseUrl}/full`
-      if (selectedFilePath) {
-        url += `?file=${encodeURIComponent(selectedFilePath)}`
-      }
       const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to fetch diff')
-      return res.json() as Promise<{ diff?: string; files?: TurnDiffFileChange[] }>
+      return res.json() as Promise<{ diff?: string }>
     },
-    enabled: diffOpen && !skipTurnDiffFetch,
+    enabled: diffOpen,
   })
-
-  // For turn diffs without a file selected, use the summary's file list
-  const filePickerFiles: TurnDiffFileChange[] | undefined = needsFilePicker
-    ? (selectedTurn?.files ?? diffResponse?.files)
-    : undefined
 
   const selectedPatch = diffResponse?.diff
   const hasResolvedPatch = typeof selectedPatch === 'string'
@@ -458,12 +392,6 @@ export function DiffPanel({
 
   const selectTurn = (turnId: string) => {
     writeDiffParamsToUrl({ diff: '1', diffTurnId: turnId })
-    setUrlParams(readDiffParamsFromUrl())
-  }
-
-  const selectFile = (filePath: string) => {
-    const turnId = selectedTurnId ?? undefined
-    writeDiffParamsToUrl({ diff: '1', ...(turnId && { diffTurnId: turnId }), diffFilePath: filePath })
     setUrlParams(readDiffParamsFromUrl())
   }
 
@@ -652,8 +580,6 @@ export function DiffPanel({
         <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
           No completed turns yet.
         </div>
-      ) : needsFilePicker ? (
-        <DiffFilePickerList files={filePickerFiles ?? []} onSelectFile={selectFile} isLoading={isLoadingDiff && !filePickerFiles} />
       ) : (
         <div
           ref={patchViewportRef}
