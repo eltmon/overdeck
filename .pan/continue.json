@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-987",
   "created": "2026-05-07T18:25:44Z",
-  "updated": "2026-05-07T18:39:30Z",
+  "updated": "2026-05-07T18:47:00Z",
   "gitState": {
     "branch": "feature/pan-987",
-    "sha": "61ce3495f",
+    "sha": "46e888443",
     "dirty": true
   },
   "decisions": [
@@ -33,6 +33,11 @@
       "id": "D5",
       "summary": "Finished the feature with focused regression coverage on the real permission flow edges that can drift silently: request ordering in the selector, App-level allow submission, and App-level deny submission.",
       "recordedAt": "2026-05-07T18:39:30Z"
+    },
+    {
+      "id": "D6",
+      "summary": "During full-suite verification, fixed two unrelated repo-health regressions that would have blocked shipping anyway: the desktop package version had drifted behind the root package version, and the GitHub label-cleanup test still assumed unconditional `--remove-label` calls after the PAN-925 optimization to fetch current labels first.",
+      "recordedAt": "2026-05-07T18:47:00Z"
     }
   ],
   "hazards": [
@@ -53,11 +58,11 @@
     }
   ],
   "resumePoint": {
-    "description": "Workspace-kmfs is complete and locally verified. Next step: stage the final focused tests plus continue-state update, create one commit for workspace-kmfs, close the bead, then run the full repository quality gates before pushing and calling `pan done`.",
+    "description": "Verification fallout is fixed locally. Next step: commit the desktop version alignment, label-cleanup test update, and continue-state note; re-run `npm run typecheck`, `npm run lint`, and `npm test`; then push and call `pan done` if the tree stays clean.",
     "beadId": "workspace-kmfs",
     "filesToRead": [
-      "src/dashboard/frontend/src/App.test.tsx",
-      "src/dashboard/frontend/src/__tests__/store.test.ts",
+      "apps/desktop/package.json",
+      "tests/unit/lib/lifecycle/label-cleanup.test.ts",
       ".pan/continue.json"
     ]
   },
@@ -84,6 +89,12 @@
       "timestamp": "2026-05-07T18:39:30Z",
       "reason": "manual",
       "note": "Finished workspace-kmfs by adding final regression coverage for deny submission and selector ordering, then re-ran the combined permission relay test suite across frontend, bridge, delivery, and contract reducers with typecheck green.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T18:47:00Z",
+      "reason": "manual",
+      "note": "Full-repo verification exposed two unrelated red tests that would block shipping. I aligned `apps/desktop/package.json` to the root version and updated the GitHub label-cleanup test to mock the post-PAN-925 label-fetch behavior before rerunning the targeted failing suites.",
       "agentModel": "claude-opus-4-7"
     }
   ],
