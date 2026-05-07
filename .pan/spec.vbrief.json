@@ -4,7 +4,7 @@
     "created": "2026-05-07T02:30:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-982: Evaluate Claude Code --agent/subagent system for agent lifecycle",
-    "updated": "2026-05-07T05:37:30.705Z"
+    "updated": "2026-05-07T05:40:29.992Z"
   },
   "plan": {
     "id": "pan-982",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "bd1e908a-5e24-4fcd-b467-a195bc6b5a5e",
     "author": "agent:claude-opus-4-6",
-    "sequence": 17,
+    "sequence": 32,
     "created": "2026-05-07T02:30:00.000Z",
-    "updated": "2026-05-07T05:37:30.705Z",
+    "updated": "2026-05-07T05:40:29.992Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/982",
@@ -70,7 +70,7 @@
             }
           }
         ],
-        "completed": "2026-05-07T05:37:30.705Z"
+        "completed": "2026-05-07T05:40:29.992Z"
       },
       {
         "id": "define-planning-agent",
@@ -103,7 +103,7 @@
             }
           }
         ],
-        "completed": "2026-05-07T05:37:30.704Z"
+        "completed": "2026-05-07T05:40:29.992Z"
       },
       {
         "id": "define-review-agent",
@@ -136,7 +136,7 @@
             }
           }
         ],
-        "completed": "2026-05-07T05:37:30.704Z"
+        "completed": "2026-05-07T05:40:29.992Z"
       },
       {
         "id": "define-test-agent",
@@ -161,7 +161,7 @@
             }
           }
         ],
-        "completed": "2026-05-07T05:37:30.704Z"
+        "completed": "2026-05-07T05:40:29.992Z"
       },
       {
         "id": "define-inspect-agent",
@@ -186,7 +186,7 @@
             }
           }
         ],
-        "completed": "2026-05-07T05:37:30.704Z"
+        "completed": "2026-05-07T05:40:29.992Z"
       },
       {
         "id": "define-uat-agent",
@@ -211,7 +211,7 @@
             }
           }
         ],
-        "completed": "2026-05-07T05:37:30.704Z"
+        "completed": "2026-05-07T05:40:29.991Z"
       },
       {
         "id": "define-merge-agent",
@@ -236,7 +236,7 @@
             }
           }
         ],
-        "completed": "2026-05-07T05:37:30.703Z"
+        "completed": "2026-05-07T05:40:29.991Z"
       },
       {
         "id": "modify-base-command",
@@ -277,7 +277,7 @@
             }
           }
         ],
-        "completed": "2026-05-07T05:37:30.703Z"
+        "completed": "2026-05-07T05:40:29.990Z"
       },
       {
         "id": "update-launcher-config",
@@ -310,7 +310,7 @@
             }
           }
         ],
-        "completed": "2026-05-07T05:37:30.702Z"
+        "completed": "2026-05-07T05:40:29.988Z"
       },
       {
         "id": "wire-spawn-agent",
@@ -351,7 +351,7 @@
             }
           }
         ],
-        "completed": "2026-05-07T05:37:30.702Z"
+        "completed": "2026-05-07T05:40:29.988Z"
       },
       {
         "id": "wire-specialist-dispatch",
@@ -392,7 +392,7 @@
             }
           }
         ],
-        "completed": "2026-05-07T05:37:30.702Z"
+        "completed": "2026-05-07T05:40:29.989Z"
       },
       {
         "id": "migrate-hooks",
@@ -441,7 +441,7 @@
             }
           }
         ],
-        "completed": "2026-05-07T05:37:30.703Z"
+        "completed": "2026-05-07T05:40:29.989Z"
       },
       {
         "id": "update-launcher-tests",
@@ -482,7 +482,7 @@
             }
           }
         ],
-        "completed": "2026-05-07T05:37:30.701Z"
+        "completed": "2026-05-07T05:40:29.987Z"
       },
       {
         "id": "update-sync-for-agents",
@@ -515,7 +515,7 @@
             }
           }
         ],
-        "completed": "2026-05-07T05:37:30.703Z"
+        "completed": "2026-05-07T05:40:29.991Z"
       },
       {
         "id": "named-sessions",
@@ -548,7 +548,7 @@
             }
           }
         ],
-        "completed": "2026-05-07T05:37:30.703Z"
+        "completed": "2026-05-07T05:40:29.990Z"
       }
     ],
     "edges": [
