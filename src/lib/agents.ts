@@ -123,14 +123,25 @@ export function panopticonAgentName(type: PanopticonAgentType): string {
 export async function getAgentRuntimeBaseCommand(
   model: string,
   agentName?: string,
-  _agentType?: PanopticonAgentType,
+  agentType?: PanopticonAgentType,
 ): Promise<string> {
   const provider = getProviderForModel(model);
   const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
   // `claude --resume`. claudish wrapper does not pass --name through, so it is direct-only.
   const nameFlag = agentName ? ` --name ${agentName}` : '';
+  // PAN-982: When agentType is provided, select the matching .claude/agents/pan-<type>-agent.md
+  // definition. The agent frontmatter declares model, permissionMode, tools, and per-agent hooks,
+  // so we omit --dangerously-skip-permissions/--permission-mode and (for Anthropic models) --model.
+  // Non-Anthropic direct providers still need --model to pin the routed model id, since the
+  // frontmatter `model:` only accepts Anthropic identifiers.
+  const agentFlag = agentType ? ` --agent ${panopticonAgentName(agentType)}` : '';
+
   if (provider.compatibility === 'direct') {
+    if (agentType) {
+      // Anthropic direct: --agent fully replaces --model and permission flags.
+      return `claude${agentFlag}${nameFlag}`;
+    }
     return `claude ${permissionFlags} --model ${model}${nameFlag}`;
   }
 
@@ -141,9 +152,15 @@ export async function getAgentRuntimeBaseCommand(
   if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
     // CLIProxy supports gpt-5.x but not the -pro variant; map aliases to real names.
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
+    if (agentType) {
+      // CLIProxy: --agent + --model override (frontmatter model: only accepts Anthropic ids).
+      return `claude${agentFlag} --model ${resolvedModel}${nameFlag}`;
+    }
     return `claude ${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
 
+  // Claudish wrapper path is unchanged — claudish is a separate binary that does not
+  // recognize --agent. Permissions stay inline; non-Anthropic models route via claudish.
   const routedModel = await getLaunchModelForModel(model);
   return `claudish -i --model ${routedModel} ${permissionFlags}`;
 }

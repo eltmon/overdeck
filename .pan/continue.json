@@ -112,6 +112,12 @@
       "reason": "bead-close",
       "note": "Closed bead workspace-r2l (update-launcher-config). Modified buildNonConversationCommand() to skip permission flag emission when baseCommand already contains '--agent ' (per-agent frontmatter handles permissions via permissionMode). Specialists not yet migrated to --agent (specialist-init at specialists.ts:2310, specialist-dispatch branch) still emit permissionFlags. Removed permissionFlags array from agents.ts resume path because baseCommand now includes '--agent pan-work-agent'. Updated existing 'work agent resume' inline snapshot to reflect the new shape (claude --agent pan-work-agent --resume ... --model ...). 24/24 tests still pass; typecheck clean.",
       "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T03:20:00.000Z",
+      "reason": "bead-close",
+      "note": "Closed bead workspace-7if (modify-base-command). getAgentRuntimeBaseCommand() now consumes the agentType parameter wired by bead workspace-eet. Anthropic direct path emits 'claude --agent pan-<type>-agent --name <id>' (no --model, no permission flags — frontmatter handles them). OpenAI CLIProxy path emits 'claude --agent pan-<type>-agent --model <resolvedId> --name <id>' (CLIProxy needs explicit --model since frontmatter model: only accepts Anthropic ids). Claudish wrapper path is unchanged because claudish does not recognize --agent. Behavior is gated on agentType: if a caller does not pass agentType (legacy callers), the function returns the pre-migration shape with permission flags inline. Typecheck + 24/24 launcher tests pass.",
+      "agentModel": "agent:claude-opus-4-7"
     }
   ],
   "resumePoint": {

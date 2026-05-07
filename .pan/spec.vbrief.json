@@ -234,7 +234,7 @@
       {
         "id": "modify-base-command",
         "title": "Update getAgentRuntimeBaseCommand() to emit --agent flag",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-07T02:30:00.000Z",
         "metadata": {
@@ -248,7 +248,7 @@
           {
             "id": "modify-base-command.ac1",
             "title": "getAgentRuntimeBaseCommand() accepts agentType and returns 'claude --agent pan-<type>' for Anthropic models",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -256,7 +256,7 @@
           {
             "id": "modify-base-command.ac2",
             "title": "For non-Anthropic direct providers, command includes both --agent and --model override",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -264,7 +264,7 @@
           {
             "id": "modify-base-command.ac3",
             "title": "Claudish (non-direct) provider path unchanged — still uses claudish wrapper",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
