@@ -4,7 +4,7 @@
     "created": "2026-05-07T04:10:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-636: Pi Coding Agent support as alternative harness to Claude Code",
-    "updated": "2026-05-07T05:59:53.866Z"
+    "updated": "2026-05-07T06:02:34.196Z"
   },
   "plan": {
     "id": "pan-636",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "7e9f8d2c-3a4b-4c5d-9e1f-2a3b4c5d6e7f",
     "author": "agent:claude-opus-4-7",
-    "sequence": 13,
+    "sequence": 16,
     "created": "2026-05-07T04:10:00.000Z",
-    "updated": "2026-05-07T05:59:53.866Z",
+    "updated": "2026-05-07T06:02:34.196Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/636",
@@ -1075,7 +1075,7 @@
       {
         "id": "docs-harnesses",
         "title": "docs/HARNESSES.md — install Pi, harness selection, ToS rules",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-07T04:10:00.000Z",
         "metadata": {
@@ -1089,20 +1089,23 @@
           {
             "id": "docs-harnesses.ac1",
             "title": "docs/HARNESSES.md exists and covers all six topics listed in the action",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-07T06:02:34.188Z"
           },
           {
             "id": "docs-harnesses.ac2",
             "title": "Top-level CLAUDE.md links to docs/HARNESSES.md from a new short 'Harnesses' section",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-07T06:02:34.196Z"
           }
-        ]
+        ],
+        "completed": "2026-05-07T06:02:34.187Z"
       }
     ],
     "edges": [

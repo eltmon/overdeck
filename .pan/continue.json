@@ -138,8 +138,8 @@
     }
   ],
   "resumePoint": {
-    "description": "pan-status-harness bead complete: pan status prints a Harness: line per agent (AC1), defaulting to claude-code on legacy state.json without the harness field. JSON output already includes harness from AgentState. Dashboard IssueAgentCard wraps getHarness(agent) in a styled span (data-testid=agent-harness-badge) tinted purple for pi vs blue for claude-code so mixed-harness pipelines are readable at a glance (AC2). 5 tests pass (3 status-harness + 2 IssueAgentCard source-grep). Beads remaining (7): 3119 (resume), 6oe (docs), w1o0 (e2e), UI bundle fjs9/0c2/3ir/lg47.",
-    "beadId": "workspace-dbf",
+    "description": "docs-harnesses bead complete: wrote docs/HARNESSES.md covering all six required topics (supported harnesses, install Pi, harness picker locations, ToS rules with the truth table, troubleshooting incl. PAN_E2E=1 for the smoke test, tradeoffs vs CLIProxy). Linked from CLAUDE.md via a new `## Harnesses` section between the dashboard-server rules and Project Structure. Beads remaining (6): 3119 (resume), w1o0 (e2e), UI bundle fjs9/0c2/3ir/lg47.",
+    "beadId": "workspace-6oe",
     "filesToRead": [
       "src/lib/runtimes/pi.ts",
       "src/lib/runtimes/__tests__/pi.test.ts"
@@ -261,6 +261,12 @@
       "timestamp": "2026-05-07T06:00:00.000Z",
       "reason": "continue",
       "note": "Closed bead workspace-dbf (pan-status-harness). pan status human-readable output now prints `Harness:  <claude-code|pi>` between Runtime and Duration for each running agent, defaulting to 'claude-code' when AgentState.harness is undefined so legacy pre-PAN-636 state.json files keep rendering correctly (AC1). The JSON mode (`pan status --json`) already inherits agent.harness from AgentState verbatim. Dashboard IssueAgentCard renders the harness as a colored badge — pi gets purple-500/15 + purple-300, claude-code gets blue-500/15 + blue-300 — wrapped in a span tagged data-testid='agent-harness-badge' and titled with 'Coding-agent harness: <name>'. Source comes from getHarness(agent) (the legacy normalizer in @panctl/contracts), not the raw runtime field, so mixed-harness boards stay legible (AC2). 3 status-harness tests via mocked listRunningAgents + 2 source-grep frontend tests (mounting IssueAgentCard pulls in DialogProvider + react-query + Zustand which is out of scope for this AC; the source-grep regression guard is the existing pattern in this codebase per review-agent.test.ts). typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T06:05:00.000Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-6oe (docs-harnesses). Wrote docs/HARNESSES.md (6 sections matching the bead spec: supported harnesses table, install Pi with pan doctor + pan sync workflow, where the harness is picked at the four user-initiated surfaces, ToS rules with the explicit truth table showing pi+Anthropic+subscription as the single blocked cell and the canUseHarness fallback behavior, troubleshooting incl. PAN_E2E=1 gating for the smoke test, tradeoffs RPC vs paste-buffer and Pi multi-provider vs CLIProxy). The 'See also' footer points at the actual files (pi.ts, pi-fifo.ts, pi-parser.ts, harness-policy.ts, packages/pi-extension/) so future readers land on canonical sources, not stale doc copies. Linked from CLAUDE.md via a new 4-line Harnesses section placed between the no-blocking-calls rule and the Project Structure header (AC2). typecheck + lint pass (no source changes — docs only).",
       "agentModel": "claude-opus-4-7"
     }
   ],
