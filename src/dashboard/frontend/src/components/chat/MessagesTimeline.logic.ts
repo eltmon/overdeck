@@ -203,7 +203,7 @@ export function estimateMessagesTimelineRowHeight(
   }
 
   if (row.kind === 'work') {
-    const onlyToolEntries = row.groupedEntries.every((entry) => entry.tone === 'tool');
+    const onlyToolEntries = row.groupedEntries.every((entry) => entry.tone === 'tool' || entry.tone === 'error');
     if (hideToolCalls && onlyToolEntries) {
       return 32;
     }
