@@ -1,0 +1,25 @@
+{
+  "version": "1",
+  "issueId": "PAN-960",
+  "created": "2026-05-07T02:55:00Z",
+  "updated": "2026-05-07T03:10:00Z",
+  "gitState": { "branch": "feature/pan-960", "sha": "34d305a18", "dirty": false },
+  "decisions": [
+    { "id": "D1", "summary": "Created 3 beads: validate issueId in workspaces.ts, replace execAsync with execFileAsync in vulnerable functions, audit issues.ts and agents.ts", "recordedAt": "2026-05-07T02:55:00Z" },
+    { "id": "D2", "summary": "Used Python script to auto-insert parseIssueId() validation after all 32 params['issueId'] extractions in workspaces.ts. TypeScript typecheck passes.", "recordedAt": "2026-05-07T03:00:00Z" },
+    { "id": "D3", "summary": "Replaced execAsync shell string interpolation with execFileAsync argument arrays in getContainerStatusAsync (docker ps + JS grep), getMrUrlAsync (gh pr view), and ensurePRExists (gh pr view + gh pr create). TypeScript typecheck passes.", "recordedAt": "2026-05-07T03:05:00Z" },
+    { "id": "D4", "summary": "Audited issues.ts and added parseIssueId() validation to 21 unvalidated routes. Audited agents.ts — params['id'] is agent ID (system-generated), and buildTmuxCommandString already shell-quotes arguments, so no injection risk. TypeScript typecheck passes.", "recordedAt": "2026-05-07T03:10:00Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "29 route handlers in workspaces.ts extract issueId without validation — CSRF via GET routes can trigger shell injection", "mitigation": "Add parseIssueId() at every extraction point; return 400 for invalid IDs" },
+    { "id": "H2", "summary": "execFileAsync in getContainerStatusAsync runs docker ps without shell grep pipe — need JS-side filtering to preserve behavior", "mitigation": "Filter lines with line.toLowerCase().includes(search)" }
+  ],
+  "resumePoint": {
+    "description": "All 3 beads complete. Remaining: run full test suite, commit, push, and call pan done.",
+    "beadId": "",
+    "filesToRead": []
+  },
+  "beadsMapping": {},
+  "agentModel": "claude-sonnet-4-6",
+  "sessionHistory": []
+}
