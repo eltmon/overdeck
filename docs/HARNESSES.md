@@ -104,13 +104,7 @@ Check `~/.panopticon/agents/<id>/ready.json` — the vendored extension writes t
 `PiRuntime.getHeartbeat()` walks three sources in priority order: active heartbeat (<60s old) → JSONL session mtime → tmux session created timestamp. If your dashboard shows a stale heartbeat, check `~/.panopticon/heartbeats/<id>.json` — Pi writes there on every `tool_execution_end`.
 
 ### End-to-end smoke test
-A full Pi spawn smoke is gated behind `PAN_E2E=1` so it only runs locally with a real Pi binary. From the workspace root:
-
-```bash
-PAN_E2E=1 npm test -- src/lib/runtimes/__tests__/pi-e2e.test.ts
-```
-
-The smoke spawns Pi, drives one prompt through the fifo, and asserts ready/heartbeat/cost/session-resume signals are wired correctly. Without `PAN_E2E=1` the test is skipped so CI stays green on machines without Pi installed.
+A full Pi spawn smoke (spawn → ready → prompt via fifo → tool execution → completion → cost parsed → resume) is tracked under workspace-w1o0 and requires a real Pi binary on PATH. When implemented, it will live at `src/lib/runtimes/__tests__/pi-e2e.test.ts` gated behind `PAN_E2E=1` so default CI runs stay green on machines without Pi installed. Until then, the unit tests in `src/lib/runtimes/__tests__/pi.test.ts` and `packages/pi-extension/src/__tests__/index.test.ts` cover the individual lifecycle signals; you can also smoke the full path manually with `pan start <ISSUE> --harness pi` once Pi is installed.
 
 ---
 

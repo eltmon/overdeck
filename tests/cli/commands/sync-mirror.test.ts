@@ -37,6 +37,9 @@ vi.mock('../../../src/lib/sync.js', () => ({
   syncHooks: mockSyncHooks,
   syncStatusline: mockSyncStatusline,
   mirrorProjectSkills: mockMirrorProjectSkills,
+  // Pi harness skills mirror — added in PAN-636 workspace-63b. The mock
+  // returns 'skipped' so this suite does not interact with ~/.pi at all.
+  syncPiSettings: vi.fn(() => ({ status: 'skipped', path: '/tmp/none', reason: 'pi not on PATH' })),
 }));
 
 vi.mock('../../../src/lib/config.js', () => ({
