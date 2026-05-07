@@ -99,11 +99,14 @@ export async function getLaunchModelForModel(model: string): Promise<string> {
   return getClaudishPrefix(model, await getProviderAuthMode(model));
 }
 
-export async function getAgentRuntimeBaseCommand(model: string): Promise<string> {
+export async function getAgentRuntimeBaseCommand(model: string, agentName?: string): Promise<string> {
   const provider = getProviderForModel(model);
   const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
+  // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
+  // `claude --resume`. claudish wrapper does not pass --name through, so it is direct-only.
+  const nameFlag = agentName ? ` --name ${agentName}` : '';
   if (provider.compatibility === 'direct') {
-    return `claude ${permissionFlags} --model ${model}`;
+    return `claude ${permissionFlags} --model ${model}${nameFlag}`;
   }
 
   // OpenAI subscription → local CLIProxyAPI sidecar exposes an
@@ -113,7 +116,7 @@ export async function getAgentRuntimeBaseCommand(model: string): Promise<string>
   if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
     // CLIProxy supports gpt-5.x but not the -pro variant; map aliases to real names.
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
-    return `claude ${permissionFlags} --model ${resolvedModel}`;
+    return `claude ${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
 
   const routedModel = await getLaunchModelForModel(model);
@@ -1097,7 +1100,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     setTerminalEnv: true,
     providerExports,
     cavemanExports,
-    baseCommand: await getAgentRuntimeBaseCommand(state.model),
+    baseCommand: await getAgentRuntimeBaseCommand(state.model, agentId),
   });
   writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
   const claudeCmd = `bash ${launcherScript}`;
@@ -1447,7 +1450,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
       changeDir: false,
       setCi: true,
       providerExports,
-      baseCommand: await getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6'),
+      baseCommand: await getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6', normalizedId),
     });
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
     await createSessionAsync(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
@@ -1663,6 +1666,7 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
       permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
       resumeSessionId: sessionId,
       model: providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
+      extraArgs: `--name ${normalizedId}`,
     });
     writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
     const claudeCmd = `bash ${launcherScript}`;
@@ -1805,7 +1809,7 @@ export async function recoverAgent(agentId: string): Promise<AgentState | null> 
   }
 
   // Restart the agent with recovery context (YOLO mode - skip permissions)
-  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model)} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
+  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model, agentId)} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
   createSession(normalizedId, state.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: normalizedId,
