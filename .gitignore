@@ -123,3 +123,4 @@ multica/
 .panopticon/config.yaml
 .cache/
 .tldr/
+.claude/mcp.json
