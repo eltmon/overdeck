@@ -299,6 +299,13 @@ type AggregateBadge =
   | { key: 'reviewers'; label: string; tone: 'running' | 'stopped' }
   | { key: 'review-error'; label: string; tone: 'error' };
 
+function formatRoleList(roles: readonly string[]): string {
+  if (roles.length === 0) return '';
+  if (roles.length === 1) return roles[0]!;
+  if (roles.length === 2) return `${roles[0]} and ${roles[1]}`;
+  return `${roles.slice(0, -1).join(', ')}, and ${roles[roles.length - 1]}`;
+}
+
 function isWorkOrSpecialistSession(session: SessionNodeType): boolean {
   return session.type === 'work'
     || session.type === 'planning'
@@ -436,6 +443,89 @@ function getFeatureStateTone(stateLabel: string): 'done' | 'progress' | 'review'
   if (normalized === 'has context') return 'context';
   if (normalized === 'planning') return 'planning';
   return 'todo';
+}
+
+function getAggregateBadgeTitle(badge: AggregateBadge, sessions: readonly SessionNodeType[]): string {
+  if (badge.key === 'work') {
+    const workSessions = sessions.filter((session) => session.type === 'work');
+    const runningWork = workSessions.filter(isRunningSession);
+    const queuedWork = workSessions.filter(isQueuedSession);
+    const stoppedWork = workSessions.filter((session) => !isRunningSession(session) && !isQueuedSession(session));
+    const longest = runningWork.reduce((max, session) => Math.max(max, session.duration ?? 0), 0);
+    const parts = [
+      `Work agent sessions for this issue: ${workSessions.length} total.`,
+    ];
+    if (runningWork.length > 0) {
+      parts.push(`${runningWork.length} running${longest > 0 ? ` (${formatSessionDuration(longest)} longest)` : ''}.`);
+    }
+    if (queuedWork.length > 0) parts.push(`${queuedWork.length} queued or starting.`);
+    if (stoppedWork.length > 0) parts.push(`${stoppedWork.length} stopped or idle.`);
+    return parts.join(' ');
+  }
+
+  if (badge.key === 'reviewers') {
+    const reviewerSessions = sessions.filter((session) => session.type === 'review' || session.type === 'reviewer');
+    const running = reviewerSessions.filter(isRunningSession);
+    const queued = reviewerSessions.filter(isQueuedSession);
+    const stopped = reviewerSessions.filter((session) => !isRunningSession(session) && !isQueuedSession(session) && !isErrorSession(session));
+    const roles = Array.from(new Set(
+      reviewerSessions
+        .map((session) => session.role?.trim())
+        .filter((role): role is string => Boolean(role)),
+    ));
+    const parts = [
+      `Review pipeline sessions for this issue: ${reviewerSessions.length} total.`,
+      `${running.length} active, ${queued.length} queued or starting, ${stopped.length} stopped.`,
+    ];
+    if (roles.length > 0) {
+      parts.push(`Roles present: ${formatRoleList(roles)}.`);
+    }
+    return parts.join(' ');
+  }
+
+  const failures = sessions.filter((session) => (session.type === 'review' || session.type === 'reviewer') && isErrorSession(session));
+  const failingRoles = Array.from(new Set(
+    failures
+      .map((session) => session.role?.trim())
+      .filter((role): role is string => Boolean(role)),
+  ));
+  const parts = [`Review pipeline has ${failures.length} failing session${failures.length === 1 ? '' : 's'}.`];
+  if (failingRoles.length > 0) {
+    parts.push(`Affected roles: ${formatRoleList(failingRoles)}.`);
+  }
+  return parts.join(' ');
+}
+
+function getFeatureStateTitle(feature: ProjectFeature, aggregateSessions: readonly SessionNodeType[]): string | undefined {
+  const normalized = feature.stateLabel.trim().toLowerCase();
+  const contextParts = [
+    feature.hasPrd ? 'PRD' : null,
+    feature.hasState ? 'continue file' : null,
+    feature.resourceDetails?.hasVbrief ? 'vBRIEF' : null,
+    feature.resourceDetails?.hasBeads ? 'beads' : null,
+  ].filter((part): part is string => part !== null);
+  const contextSuffix = contextParts.length > 0 ? ` Context present: ${contextParts.join(', ')}.` : '';
+
+  if (normalized === 'planning') {
+    return `Planning context is being prepared for this issue.${contextSuffix}`;
+  }
+  if (normalized === 'has context') {
+    return `Planning artifacts exist for this issue, but active implementation or review has not started yet.${contextSuffix}`;
+  }
+  if (normalized === 'in review' || normalized === 'review') {
+    return feature.readyForMerge
+      ? 'Implementation has moved into review/test/merge flow and is ready for human merge approval.'
+      : 'Implementation has moved into the review/test/merge pipeline for verification.';
+  }
+  if (normalized === 'in progress' || normalized === 'active') {
+    return aggregateSessions.length > 0
+      ? `Implementation work is active or resumable for this issue. ${buildActivitySummary(aggregateSessions)}.`
+      : `Implementation work is active for this issue.${contextSuffix}`;
+  }
+  if (normalized === 'done') {
+    return 'Tracker state is done for this issue.';
+  }
+  return `Tracker state: ${feature.stateLabel}.${contextSuffix}`;
 }
 
 const TYPE_PRIORITY: Record<string, number> = {
@@ -890,7 +980,7 @@ function ReviewGroup({
         onToggleExpand={() => setExpanded(e => !e)}
       />
       {expanded && children.length > 0 && (
-        <div style={{ paddingLeft: 12 }}>
+        <div className={styles.sessionChildList}>
           {children.map(session => (
             <SessionNode
               key={session.sessionId}
@@ -1024,6 +1114,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                 <span
                   key={badge.key}
                   className={`${styles.featureBadge} ${styles[`featureBadge_${badge.tone}` as keyof typeof styles]}`}
+                  title={getAggregateBadgeTitle(badge, aggregateSessions)}
                 >
                   {badge.label}
                 </span>
@@ -1031,7 +1122,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             </span>
           )}
           {feature.isRally && feature.childCount != null && feature.childCount > 0 ? (
-            <span className={styles.featureState} title={`${feature.completedCount || 0}/${feature.childCount} stories done${feature.inProgressCount ? `, ${feature.inProgressCount} active` : ''}`}>
+            <span className={styles.featureState} title={`${feature.completedCount || 0}/${feature.childCount} stories done${feature.inProgressCount ? `, ${feature.inProgressCount} active` : ''}${progressPct !== null ? ` (${progressPct}% complete)` : ''}`}>
               {feature.completedCount || 0}/{feature.childCount}
               {progressPct !== null && (
                 <span style={{
@@ -1055,7 +1146,12 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               )}
             </span>
           ) : (
-            <span className={`${styles.featureState} ${styles[`featureState_${featureStateTone}` as keyof typeof styles]}`}>{feature.stateLabel}</span>
+            <span
+              className={`${styles.featureState} ${styles[`featureState_${featureStateTone}` as keyof typeof styles]}`}
+              title={getFeatureStateTitle(feature, aggregateSessions)}
+            >
+              {feature.stateLabel}
+            </span>
           )}
           {cost !== undefined && cost > 0 && (
             <span className={styles.featureCost}>{formatCost(cost)}</span>
