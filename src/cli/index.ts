@@ -77,6 +77,7 @@ import { registerReleaseCommands } from './commands/release.js';
 import { resourcesCommand } from './commands/resources.js';
 import { devCommand } from './commands/dev.js';
 import { registerScopeCommands } from './commands/scope.js';
+import { openCommand } from './commands/open.js';
 import { swarmCommand } from './commands/swarm.js';
 
 const program = new Command();
@@ -186,6 +187,13 @@ program
   .option('--health', 'Health + heartbeat only')
   .option('--json', 'Output as JSON')
   .action(showCommand);
+
+// pan open <id> — open workspace in editor
+program
+  .command('open <id>')
+  .description('Open an issue workspace in your preferred editor')
+  .option('-e, --editor <editor>', 'Editor to use (cursor, windsurf, vscode, zed, etc.)')
+  .action(openCommand);
 
 // pan review — pending, request, reset
 const review = program
