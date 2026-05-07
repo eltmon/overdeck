@@ -615,11 +615,10 @@ async function getContainerStatusAsync(
 ): Promise<Record<string, { running: boolean; uptime: string | null; status?: string }>> {
   const result: Record<string, { running: boolean; uptime: string | null; status?: string }> = {};
   try {
-    const { stdout } = await execAsync(
-      `docker ps -a --format "{{.Names}}\\t{{.Status}}" 2>/dev/null | grep "${issueId.toLowerCase()}" || true`,
-      { encoding: 'utf-8' }
-    );
+    const { stdout } = await execFileAsync('docker', ['ps', '-a', '--format', '{{.Names}}\t{{.Status}}'], { encoding: 'utf-8' });
+    const search = issueId.toLowerCase();
     for (const line of stdout.trim().split('\n').filter(Boolean)) {
+      if (!line.toLowerCase().includes(search)) continue;
       const [name, ...statusParts] = line.split('\t');
       const statusStr = statusParts.join('\t');
       const running = statusStr.toLowerCase().startsWith('up');
@@ -638,10 +637,7 @@ async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<st
   try {
     const issueLower = issueId.toLowerCase();
     const branchName = `feature/${issueLower}`;
-    const { stdout } = await execAsync(
-      `gh pr view ${branchName} --json url --jq .url 2>/dev/null || true`,
-      { cwd: workspacePath, encoding: 'utf-8' }
-    );
+    const { stdout } = await execFileAsync('gh', ['pr', 'view', branchName, '--json', 'url', '--jq', '.url'], { cwd: workspacePath, encoding: 'utf-8' });
     const url = stdout.trim();
     return url || null;
   } catch {
@@ -738,14 +734,14 @@ async function ensurePRExists(
     const issueLower = issueId.toLowerCase();
     const branchName = options?.branchName ?? `feature/${issueLower}`;
     const targetBranch = options?.targetBranch ?? 'main';
-    const execOptions: Parameters<typeof execAsync>[1] = { encoding: 'utf-8' };
+    const execOptions: Parameters<typeof execFileAsync>[2] = { encoding: 'utf-8' };
     if (options?.cwd) execOptions.cwd = options.cwd;
 
     // Check for existing PR
-    const { stdout: existingOut } = await execAsync(
-      `gh pr view ${branchName} --json url --jq .url 2>/dev/null || true`,
-      execOptions
-    );
+    let existingOut = '';
+    try {
+      ({ stdout: existingOut } = await execFileAsync('gh', ['pr', 'view', branchName, '--json', 'url', '--jq', '.url'], execOptions));
+    } catch { /* no existing PR */ }
     const existing = existingOut.trim();
     if (existing) return { created: false, prUrl: existing };
 
@@ -760,10 +756,7 @@ async function ensurePRExists(
     await writeFileAsync(bodyFile, prBody, 'utf-8');
 
     try {
-      const { stdout: createOut } = await execAsync(
-        `gh pr create --head ${branchName} --base ${targetBranch} --title "${issueId}" --body-file "${bodyFile}"`,
-        execOptions
-      );
+      const { stdout: createOut } = await execFileAsync('gh', ['pr', 'create', '--head', branchName, '--base', targetBranch, '--title', issueId, '--body-file', bodyFile], execOptions);
       // gh pr create prints the PR URL as the last line of stdout
       const prUrl = createOut.trim().split('\n').pop()?.trim() || createOut.trim();
       return { created: true, prUrl };
