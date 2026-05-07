@@ -40,7 +40,7 @@ import { MergeButton } from './MergeButton';
 import { RecoverButton } from './RecoverButton';
 import { hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
-import { getIssueWorkAgents, getWorkSessionLabel, isAgentSessionAttachable } from '../lib/swarmSlots';
+import { getIssueWorkAgentMap, getWorkSessionLabel, isAgentSessionAttachable } from '../lib/swarmSlots';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useBulkSelection } from '../hooks/useBulkSelection';
 import { BulkActionBar } from './BulkActionBar';
@@ -865,6 +865,7 @@ export function CompactChildCard({
 // List view row — compact row for list view grouped by labels
 export function ListIssueRow({
   issue,
+  issueWorkAgentsById,
   agents,
   specialists,
   issueCosts,
@@ -876,6 +877,7 @@ export function ListIssueRow({
   onBulkToggle,
 }: {
   issue: Issue;
+  issueWorkAgentsById?: Map<string, Agent[]>;
   agents: Agent[];
   specialists: SpecialistAgent[];
   issueCosts: Record<string, IssueCost>;
@@ -909,8 +911,16 @@ export function ListIssueRow({
 
   // Check for running agents (exclude planning agents — they don't block the plan button)
   const issueIdLower = issue.identifier.toLowerCase();
-  const workAgents = getIssueWorkAgents(agents, issue.identifier);
-  const isRunning = workAgents.some(isAgentSessionAttachable);
+  const workAgents = useMemo(() => {
+    if (issueWorkAgentsById) {
+      return issueWorkAgentsById.get(issueIdLower) ?? [];
+    }
+    return getIssueWorkAgentMap(agents).get(issueIdLower) ?? [];
+  }, [agents, issueWorkAgentsById, issueIdLower]);
+  const standbyAgent = workAgents.find(
+    (workAgent) => workAgent.status === 'stopped' && workAgent.agentPhase === 'review-response',
+  );
+  const isRunning = workAgents.some(isAgentSessionAttachable) || !!standbyAgent;
   const hasMultipleWorkAgents = workAgents.length > 1;
 
   // Check for specialists
@@ -1549,6 +1559,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
   const allExpanded = collapsedFeatures.size === 0;
 
+  const issueWorkAgentsById = useMemo(() => getIssueWorkAgentMap(agents), [agents]);
+
   // Group by labels for list view - MUST be before any conditional returns (Rules of Hooks)
   const groupedByLabels = useMemo(() => groupByLabels(filteredIssues), [filteredIssues]);
   const groupedByProject = useMemo(() => groupByProject(filteredIssues), [filteredIssues]);
@@ -1728,6 +1740,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                   <ListIssueRow
                     key={issue.id}
                     issue={issue}
+                    issueWorkAgentsById={issueWorkAgentsById}
                     agents={agents}
                     specialists={specialists}
                     issueCosts={issueCosts}
@@ -1763,6 +1776,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                   <ListIssueRow
                     key={issue.id}
                     issue={issue}
+                    issueWorkAgentsById={issueWorkAgentsById}
                     agents={agents}
                     specialists={specialists}
                     issueCosts={issueCosts}
@@ -1800,6 +1814,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                   <ListIssueRow
                     key={issue.id}
                     issue={issue}
+                    issueWorkAgentsById={issueWorkAgentsById}
                     agents={agents}
                     specialists={specialists}
                     issueCosts={issueCosts}
@@ -1862,6 +1877,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                   </div>
                   <ColumnContent
                     issues={sortedGrouped[status]}
+                    issueWorkAgentsById={issueWorkAgentsById}
                     agents={agents}
                     specialists={specialists}
                     issueCosts={issueCosts}
@@ -1967,6 +1983,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 // ColumnContent — renders issues with Rally hierarchy grouping
 function ColumnContent({
   issues,
+  issueWorkAgentsById,
   agents,
   specialists,
   issueCosts,
@@ -1983,6 +2000,7 @@ function ColumnContent({
   planningStateById,
 }: {
   issues: Issue[];
+  issueWorkAgentsById: Map<string, Agent[]>;
   agents: Agent[];
   specialists: SpecialistAgent[];
   issueCosts: Record<string, IssueCost>;
@@ -2004,7 +2022,7 @@ function ColumnContent({
 
   const renderIssueCard = (issue: Issue) => {
     const issueIdLower = issue.identifier.toLowerCase();
-    const workAgents = getIssueWorkAgents(agents, issue.identifier);
+    const workAgents = issueWorkAgentsById.get(issueIdLower) ?? [];
     const workAgent = workAgents[0];
     const planningAgent = agents.find(
       (a) => a.issueId?.toLowerCase() === issueIdLower && a.id?.startsWith('planning-')
@@ -2691,8 +2709,11 @@ function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialis
   // Determine which agent is relevant based on issue status
   const issueWorkAgents = workAgents.length > 0 ? workAgents : (workAgent ? [workAgent] : []);
   const activeAgent = issueWorkAgents.find(isAgentSessionAttachable) ?? issueWorkAgents[0];
-  const isStandby = activeAgent?.status === 'stopped' && activeAgent?.agentPhase === 'review-response' && !!activeAgent?.lifecycle?.hasLiveTmuxSession;
-  const isRunning = issueWorkAgents.some(isAgentSessionAttachable) || !!isStandby;
+  const standbyAgent = issueWorkAgents.find(
+    (candidate) => candidate.status === 'stopped' && candidate.agentPhase === 'review-response' && !!candidate.lifecycle?.hasLiveTmuxSession,
+  );
+  const isStandby = !!standbyAgent;
+  const isRunning = issueWorkAgents.some(isAgentSessionAttachable) || isStandby;
   const hasMultipleWorkAgents = issueWorkAgents.length > 1;
   // Show "Watch Planning" when planning agent is starting or has a live session
   const isPlanningActive = planningAgent != null && (planningAgent.status === 'starting' || planningAgent.status === 'running' || planningAgent.status === 'healthy' || planningAgent.status === 'warning' || planningAgent.status === 'stuck');

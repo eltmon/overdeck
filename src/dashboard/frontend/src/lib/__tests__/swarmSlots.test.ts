@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Agent } from '../../types';
 import {
   compareWorkAgents,
+  getIssueWorkAgentMap,
   getIssueWorkAgents,
   getSwarmSlotNumber,
   getWorkSessionLabel,
@@ -62,6 +63,26 @@ describe('swarmSlots helpers', () => {
       'agent-pan-971-1',
       'agent-pan-971-2',
     ]);
+  });
+
+  it('builds one sorted issue-to-work-agent map per agent list', () => {
+    const agents = [
+      makeAgent({ id: 'agent-pan-971-2', issueId: 'PAN-971' }),
+      makeAgent({ id: 'agent-pan-972-1', issueId: 'PAN-972' }),
+      makeAgent({ id: 'planning-pan-971', issueId: 'PAN-971' }),
+      makeAgent({ id: 'agent-pan-971-1', issueId: 'PAN-971' }),
+    ];
+
+    const byIssue = getIssueWorkAgentMap(agents);
+
+    expect(byIssue.get('pan-971')?.map((agent) => agent.id)).toEqual([
+      'agent-pan-971-1',
+      'agent-pan-971-2',
+    ]);
+    expect(byIssue.get('pan-972')?.map((agent) => agent.id)).toEqual([
+      'agent-pan-972-1',
+    ]);
+    expect(byIssue.has('planning-pan-971')).toBe(false);
   });
 
   it('labels slot sessions for grouped swarm rendering', () => {

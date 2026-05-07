@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { derivePipelinePhase, type PipelinePhaseInput } from './usePipelinePhase';
+import { act, renderHook } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { derivePipelinePhase, type PipelinePhaseInput, usePipelinePhase } from './usePipelinePhase';
 import type { Agent } from '../../types';
 import type { ReviewStatus } from './types';
 
@@ -319,6 +320,20 @@ describe('derivePipelinePhase precedence table', () => {
       expect(mergeTab?.sessionName).toBe('agent-abc');
     });
 
+    it('prefers the first active swarm slot over an earlier standby slot during merge', () => {
+      const input = makeInput({
+        agent: makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped', agentPhase: 'review-response' }),
+        workAgents: [
+          makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped', agentPhase: 'review-response' }),
+          makeAgent({ id: 'agent-pan-509-2', issueId: 'PAN-509', status: 'healthy' }),
+        ],
+        reviewStatus: makeReviewStatus({ mergeStatus: 'merging' }),
+      });
+      const { activeSession, availableTerminals } = derivePipelinePhase(input);
+      expect(activeSession).toBe('agent-pan-509-2');
+      expect(availableTerminals.find(t => t.id === 'merging')?.sessionName).toBe('agent-pan-509-2');
+    });
+
     it('uses merge-agent session when work agent is stopped (polyrepo)', () => {
       const input = makeInput({
         agent: makeAgent({ status: 'stopped' }),
@@ -397,8 +412,8 @@ describe('derivePipelinePhase availableTerminals', () => {
     const input = makeInput({
       agent: makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509' }),
       workAgents: [
-        makeAgent({ id: 'agent-pan-509-2', issueId: 'PAN-509' }),
         makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509' }),
+        makeAgent({ id: 'agent-pan-509-2', issueId: 'PAN-509' }),
       ],
     });
 
@@ -497,16 +512,32 @@ describe('derivePipelinePhase availableTerminals', () => {
     expect(workTab?.isActive).toBe(true);
   });
 
-  it('follows the first attachable swarm slot when earlier slots are stopped', () => {
+  it('follows the first active swarm slot when an earlier slot is only standby-attachable', () => {
     const input = makeInput({
-      agent: makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped' }),
+      agent: makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped', agentPhase: 'review-response' }),
       workAgents: [
-        makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped' }),
+        makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped', agentPhase: 'review-response' }),
         makeAgent({ id: 'agent-pan-509-2', issueId: 'PAN-509', status: 'healthy' }),
       ],
     });
 
-    const { activeSession, availableTerminals } = derivePipelinePhase(input);
+    const { phase, activeSession, availableTerminals } = derivePipelinePhase(input);
+    expect(phase).toBe('working');
+    expect(activeSession).toBe('agent-pan-509-2');
+    expect(availableTerminals.find((tab) => tab.sessionName === 'agent-pan-509-2')?.isActive).toBe(true);
+  });
+
+  it('enters standby when a later swarm slot is waiting for review feedback', () => {
+    const input = makeInput({
+      agent: makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped' }),
+      workAgents: [
+        makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped' }),
+        makeAgent({ id: 'agent-pan-509-2', issueId: 'PAN-509', status: 'stopped', agentPhase: 'review-response' }),
+      ],
+    });
+
+    const { phase, activeSession, availableTerminals } = derivePipelinePhase(input);
+    expect(phase).toBe('standby');
     expect(activeSession).toBe('agent-pan-509-2');
     expect(availableTerminals.find((tab) => tab.sessionName === 'agent-pan-509-2')?.isActive).toBe(true);
   });
@@ -541,5 +572,45 @@ describe('derivePipelinePhase availableTerminals', () => {
     expect(correctnessTab?.isRunning).toBe(false);
     expect(performanceTab?.disabled).toBe(false);
     expect(performanceTab?.isRunning).toBe(true);
+  });
+});
+
+describe('usePipelinePhase hook', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it('recomputes when agentPhase changes without a status change', async () => {
+    const initialInput = makeInput({
+      agent: makeAgent({ status: 'stopped', agentPhase: 'implementation' }),
+      workAgents: [makeAgent({ status: 'stopped', agentPhase: 'implementation' })],
+    });
+
+    const { result, rerender } = renderHook(
+      ({ input }) => usePipelinePhase(input),
+      { initialProps: { input: initialInput } },
+    );
+
+    expect(result.current.phase).toBe('planning');
+    expect(result.current.activeSession).toBeNull();
+
+    rerender({
+      input: makeInput({
+        agent: makeAgent({ status: 'stopped', agentPhase: 'review-response' }),
+        workAgents: [makeAgent({ status: 'stopped', agentPhase: 'review-response' })],
+      }),
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    expect(result.current.phase).toBe('standby');
+    expect(result.current.activeSession).toBe('agent-abc');
   });
 });

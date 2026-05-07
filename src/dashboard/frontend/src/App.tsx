@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
 import { KanbanBoard } from './components/KanbanBoard';
@@ -501,9 +501,10 @@ export default function App() {
     }
   }, [agents]);
 
-  const selectedIssueWorkAgents = selectedIssue
-    ? getIssueWorkAgents(agents, selectedIssue)
-    : [];
+  const selectedIssueWorkAgents = useMemo(
+    () => (selectedIssue ? getIssueWorkAgents(agents, selectedIssue) : []),
+    [agents, selectedIssue],
+  );
 
   // Prefer grouped work sessions for the selected issue. Fall back to any issue-bound
   // agent so planning-only issues still render their detail panel.

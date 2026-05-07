@@ -20,15 +20,30 @@ export function compareWorkAgents(a: Agent, b: Agent): number {
   return a.id.localeCompare(b.id);
 }
 
+export function getIssueWorkAgentMap(agents: readonly Agent[]): Map<string, Agent[]> {
+  const issueWorkAgents = new Map<string, Agent[]>();
+
+  for (const agent of agents) {
+    const issueId = agent.issueId?.toLowerCase();
+    if (!issueId || agent.id.startsWith('planning-')) continue;
+
+    const agentsForIssue = issueWorkAgents.get(issueId);
+    if (agentsForIssue) {
+      agentsForIssue.push(agent);
+    } else {
+      issueWorkAgents.set(issueId, [agent]);
+    }
+  }
+
+  for (const agentsForIssue of issueWorkAgents.values()) {
+    agentsForIssue.sort(compareWorkAgents);
+  }
+
+  return issueWorkAgents;
+}
+
 export function getIssueWorkAgents(agents: readonly Agent[], issueId: string): Agent[] {
-  const issueIdLower = issueId.toLowerCase();
-  return agents
-    .filter(
-      (agent) =>
-        agent.issueId?.toLowerCase() === issueIdLower &&
-        !agent.id.startsWith('planning-'),
-    )
-    .sort(compareWorkAgents);
+  return getIssueWorkAgentMap(agents).get(issueId.toLowerCase()) ?? [];
 }
 
 export function getWorkSessionLabel(agent: Agent, index = 0): string {
