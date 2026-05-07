@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-636",
   "created": "2026-05-07T03:42:36.488Z",
-  "updated": "2026-05-07T05:14:55.491Z",
+  "updated": "2026-05-07T05:18:30.116Z",
   "gitState": {
     "branch": "feature/pan-636",
     "sha": "9b15d68ef",
@@ -138,12 +138,12 @@
     }
   ],
   "resumePoint": {
-    "description": "pi-runtime-adapter bead complete (PiRuntime implements AgentRuntime, registered in getGlobalRegistry alongside ClaudeCodeRuntime; spawn flow creates fifo + writes launcher + tmux + waits for ready.json with 30s PiSpawnTimeout; sendMessage writes prompt JSONL via writePiCommand; killAgent best-effort RPC abort + kill tmux + unlink fifo (full TERM/KILL ladder is bead 8qco scope); heartbeat priority active>jsonl>tmux; getSessionCost via parsePiSession). Next: workspace-nap (RuntimeRegistry.getRuntimeForAgent dispatches by agent state harness).",
-    "beadId": "workspace-ui5c",
+    "description": "runtime-registry-dispatch bead complete (RuntimeRegistry.getRuntimeForAgent reads state.harness; pi -> pi runtime, claude-code|missing|legacy -> claude-code; 5 tests pass with vi.mock paths.js to redirect AGENTS_DIR). Next: workspace-sur (persist harness on AgentState; refactor getAgentRuntimeBaseCommand(model) -> (model, harness); update 4 call sites).",
+    "beadId": "workspace-nap",
     "filesToRead": [
-      "src/lib/runtimes/pi.ts",
       "src/lib/runtimes/index.ts",
-      "src/lib/runtimes/types.ts"
+      "src/lib/runtimes/__tests__/registry-dispatch.test.ts",
+      "src/lib/agents.ts"
     ]
   },
   "beadsMapping": {},
@@ -202,6 +202,12 @@
       "timestamp": "2026-05-07T05:14:55.491Z",
       "reason": "continue",
       "note": "Closed bead workspace-ui5c (pi-runtime-adapter). Created src/lib/runtimes/pi.ts implementing AgentRuntime (name=pi). Spawn flow: mkdir agent dir + sessions, createPiFifo, optional prompt file, generateLauncherScript({harness:pi,...}) -> ~/.panopticon/agents/<id>/pi-launcher.sh (chmod 755), createSessionAsync(tmux, bash launcher.sh, env PANOPTICON_AGENT_ID), waitForReady polling ready.json (100ms cadence, 30s timeout -> PiSpawnTimeout typed error). sendMessage: throws PiNotReady when ready.json absent, otherwise writes {cmd:prompt,text} JSONL via writePiCommand. killAgent: best-effort {cmd:abort} via fifo (swallow PiNotReady), then killSessionAsync if tmux session exists, then destroyPiFifo. Heartbeat priority: active heartbeat (<60s old, source=active-heartbeat confidence=high) > jsonl mtime (source=jsonl confidence=medium) > tmux session created timestamp (source=tmux confidence=low). getSessionCost: parsePiSession on latest .jsonl under <agentDir>/sessions/ (recursive walk by mtime), returns CostBreakdown with totalCost from Pi inline cost.total. listSessions walks all agent session dirs. PiRuntime registered in getGlobalRegistry alongside Claude Code. Widened AgentRuntime.killAgent and isRunning return types to allow async (claude-code keeps sync; pi uses async per project rule). 9 tests cover registry registration, sendMessage PiNotReady, spawn precondition, PiSpawnTimeout class shape, three heartbeat sources, getSessionCost via fixture, killAgent unlinks fifo. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:18:30.116Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-nap (runtime-registry-dispatch). Replaced hardcoded return this.get(claude-code) in getRuntimeForAgent with: read state.harness; pi -> this.get(pi); anything else (claude-code, missing, legacy unknown value) -> this.get(claude-code). AC4 audit: only one external getRuntime(claude-code) hit and it lives in the unit test (allowed by AC). 5 vitest cases register two stub runtimes via vi.mock(paths.js) -> /tmp tmp dir, write state.json fixtures, and assert dispatch on pi/claude-code/missing/legacy/no-state branches. typecheck + lint clean.",
       "agentModel": "claude-opus-4-7"
     }
   ],

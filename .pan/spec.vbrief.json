@@ -456,7 +456,7 @@
       {
         "id": "runtime-registry-dispatch",
         "title": "RuntimeRegistry.getRuntimeForAgent dispatches by agent state harness",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-07T04:10:00.000Z",
         "metadata": {
@@ -470,7 +470,7 @@
           {
             "id": "runtime-registry-dispatch.ac1",
             "title": "getRuntimeForAgent(agentId) reads state.harness and returns the matching registered runtime (claude-code or pi)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -478,7 +478,7 @@
           {
             "id": "runtime-registry-dispatch.ac2",
             "title": "When state.harness is missing/legacy, getRuntimeForAgent returns the claude-code runtime (back-compat)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -486,7 +486,7 @@
           {
             "id": "runtime-registry-dispatch.ac3",
             "title": "Vitest registers two runtime stubs and verifies dispatch on both branches",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -494,7 +494,7 @@
           {
             "id": "runtime-registry-dispatch.ac4",
             "title": "No remaining grep hit for `getRuntime('claude-code')` outside of the registry bootstrap and unit tests",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
