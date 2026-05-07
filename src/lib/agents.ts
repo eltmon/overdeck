@@ -99,11 +99,50 @@ export async function getLaunchModelForModel(model: string): Promise<string> {
   return getClaudishPrefix(model, await getProviderAuthMode(model));
 }
 
-export async function getAgentRuntimeBaseCommand(model: string): Promise<string> {
+/**
+ * Panopticon pipeline agent types that map 1:1 to .claude/agents/pan-<type>-agent.md
+ * definitions. Bead workspace-7if (modify-base-command) consumes this to emit
+ * `claude --agent pan-<type>-agent` instead of inline --model/--permission flags.
+ * Bead workspace-eet wires the parameter through; bead workspace-7if turns the
+ * parameter into the --agent flag emission.
+ */
+export type PanopticonAgentType =
+  | 'work'
+  | 'planning'
+  | 'review'
+  | 'test'
+  | 'inspect'
+  | 'uat'
+  | 'merge';
+
+/** Agent definitions live at .claude/agents/pan-<type>-agent.md */
+export function panopticonAgentName(type: PanopticonAgentType): string {
+  return `pan-${type}-agent`;
+}
+
+export async function getAgentRuntimeBaseCommand(
+  model: string,
+  agentName?: string,
+  agentType?: PanopticonAgentType,
+): Promise<string> {
   const provider = getProviderForModel(model);
   const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
+  // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
+  // `claude --resume`. claudish wrapper does not pass --name through, so it is direct-only.
+  const nameFlag = agentName ? ` --name ${agentName}` : '';
+  // PAN-982: When agentType is provided, select the matching .claude/agents/pan-<type>-agent.md
+  // definition. The agent frontmatter declares model, permissionMode, tools, and per-agent hooks,
+  // so we omit --dangerously-skip-permissions/--permission-mode and (for Anthropic models) --model.
+  // Non-Anthropic direct providers still need --model to pin the routed model id, since the
+  // frontmatter `model:` only accepts Anthropic identifiers.
+  const agentFlag = agentType ? ` --agent ${panopticonAgentName(agentType)}` : '';
+
   if (provider.compatibility === 'direct') {
-    return `claude ${permissionFlags} --model ${model}`;
+    if (agentType) {
+      // Anthropic direct: --agent fully replaces --model and permission flags.
+      return `claude${agentFlag}${nameFlag}`;
+    }
+    return `claude ${permissionFlags} --model ${model}${nameFlag}`;
   }
 
   // OpenAI subscription → local CLIProxyAPI sidecar exposes an
@@ -113,9 +152,15 @@ export async function getAgentRuntimeBaseCommand(model: string): Promise<string>
   if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
     // CLIProxy supports gpt-5.x but not the -pro variant; map aliases to real names.
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
-    return `claude ${permissionFlags} --model ${resolvedModel}`;
+    if (agentType) {
+      // CLIProxy: --agent + --model override (frontmatter model: only accepts Anthropic ids).
+      return `claude${agentFlag} --model ${resolvedModel}${nameFlag}`;
+    }
+    return `claude ${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
 
+  // Claudish wrapper path is unchanged — claudish is a separate binary that does not
+  // recognize --agent. Permissions stay inline; non-Anthropic models route via claudish.
   const routedModel = await getLaunchModelForModel(model);
   return `claudish -i --model ${routedModel} ${permissionFlags}`;
 }
@@ -1292,16 +1337,19 @@ export async function buildAgentLaunchConfig(opts: {
   const providerExports = await getProviderExportsForModel(model);
 
   if (opts.agentType === 'resume' && opts.resumeSessionId) {
+    // PAN-982: Resume sessions adopt the work-agent definition via --agent.
+    // Permissions/model/tools/hooks come from agents/pan-work-agent.md frontmatter.
+    // --name <agentId> gives the resumed Claude session a human-readable handle.
     const launcherContent = generateLauncherScript({
       agentType: 'resume',
       workingDir: opts.workspace,
       changeDir: false,
       setCi: true,
       providerExports,
-      baseCommand: 'claude',
-      permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
+      baseCommand: `claude --agent ${panopticonAgentName('work')}`,
       resumeSessionId: opts.resumeSessionId,
       model: providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
+      extraArgs: `--name ${opts.agentId}`,
     });
     return { launcherContent, providerEnv };
   }
@@ -1313,6 +1361,9 @@ export async function buildAgentLaunchConfig(opts: {
     opts.isPlanning ?? false,
   );
 
+  // PAN-982: pass agentType + agentId through getAgentRuntimeBaseCommand so it
+  // emits 'claude --agent pan-<work|planning>-agent --name <agentId>'.
+  const panAgentType: PanopticonAgentType = opts.isPlanning ? 'planning' : 'work';
   const launcherContent = generateLauncherScript({
     agentType: 'work',
     workingDir: opts.workspace,
@@ -1321,7 +1372,7 @@ export async function buildAgentLaunchConfig(opts: {
     setTerminalEnv: true,
     providerExports,
     cavemanExports,
-    baseCommand: await getAgentRuntimeBaseCommand(model),
+    baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, panAgentType),
     ...(opts.channelsBridgeMcpConfig
       ? {
           channelsBridgeMcpConfig: opts.channelsBridgeMcpConfig,
@@ -1838,7 +1889,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
       changeDir: false,
       setCi: true,
       providerExports,
-      baseCommand: await getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6'),
+      baseCommand: await getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6', normalizedId, 'work'),
     });
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
     await createSessionAsync(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
@@ -2277,7 +2328,7 @@ export async function recoverAgent(agentId: string): Promise<AgentState | null> 
   }
 
   // Restart the agent with recovery context (YOLO mode - skip permissions)
-  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model)} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
+  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model, agentId, 'work')} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
   createSession(normalizedId, state.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: normalizedId,

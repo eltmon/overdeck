@@ -537,7 +537,10 @@ export async function spawnSingleReviewer(
   promptFile: string,
   projectPath: string,
 ): Promise<void> {
-  const claudeCmd = await getAgentRuntimeBaseCommand(model);
+  // PAN-982: spawnSingleReviewer is the canonical reviewer path (PAN-830 long-lived
+  // sessions). Pass agentType='review' + sessionName so getAgentRuntimeBaseCommand()
+  // emits 'claude --agent pan-review-agent --name <sessionName>'.
+  const claudeCmd = await getAgentRuntimeBaseCommand(model, sessionName, 'review');
   const providerExports = await getProviderExportsForModel(model);
 
   // Pre-generate the Claude session UUID and persist it to the canonical reviewer

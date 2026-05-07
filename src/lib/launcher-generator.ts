@@ -356,17 +356,23 @@ function buildCommand(config: LauncherConfig): string[] {
 
 /**
  * Shared command builder for planning and exec-based agent types.
- * Appends permission flags (with token-level dedup), session args,
- * extra args, and prompt references.
+ * Appends session args, extra args, and prompt references.
+ *
+ * PAN-982: When `baseCommand` contains `--agent` (i.e. an agent definition
+ * is selecting permissions, model, and tools via `.claude/agents/pan-*.md`
+ * frontmatter), permission flags are skipped — the frontmatter handles them.
+ * Specialists not yet migrated to --agent (e.g. specialist-init for review
+ * canonical sessions) still pass permissionFlags and get them emitted.
  */
 function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): string[] {
   const parts: string[] = [];
   if (!config.baseCommand) return parts;
 
   let cmd = config.baseCommand;
+  const usesAgentFlag = cmd.includes('--agent ');
 
-  // Append permission flags if not already present (token-level check)
-  if (config.permissionFlags && config.permissionFlags.length > 0) {
+  // Append permission flags only when --agent is NOT handling permissions via frontmatter.
+  if (!usesAgentFlag && config.permissionFlags && config.permissionFlags.length > 0) {
     const cmdTokens = cmd.split(/\s+/);
     for (const flag of config.permissionFlags) {
       if (!cmdTokens.includes(flag)) {
