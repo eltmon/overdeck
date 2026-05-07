@@ -1530,7 +1530,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     if (ready) {
       // Small delay after ready to ensure Claude is fully rendered and accepting input
       await new Promise(r => setTimeout(r, 500));
-      await sendKeysAsync(agentId, prompt);
+      await deliverAgentMessage(agentId, prompt, 'spawnAgent:initial-prompt');
     } else {
       console.error(`[${agentId}] Claude did not become ready within 30s`);
     }
@@ -1826,7 +1826,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     const ready = await waitForReadySignal(normalizedId, 30);
     const resumePrompt = `You are resuming work on ${agentState.issueId}. Check .pan/feedback/ for specialist feedback that arrived while you were stopped, then continue working.\n\n${message}`;
     if (ready) {
-      await sendKeysAsync(normalizedId, resumePrompt);
+      await deliverAgentMessage(normalizedId, resumePrompt, 'resumeAgent:resume-prompt');
       console.log(`[agents] Fallback-restarted ${normalizedId} and delivered feedback`);
     } else {
       console.warn(`[agents] Fallback-restarted ${normalizedId} but ready signal not detected — feedback in mail queue`);
@@ -1881,7 +1881,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     console.warn(`[agents] ${normalizedId} not at ready prompt after 5s — sending message anyway`);
   }
 
-  await sendKeysAsync(normalizedId, message);
+  await deliverAgentMessage(normalizedId, message, 'messageAgent:pan-tell');
 
   // Also save to mail queue
   const mailDir = join(getAgentDir(normalizedId), 'mail');
@@ -2045,7 +2045,7 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
 
       if (ready) {
         // Send message
-        await sendKeysAsync(normalizedId, message);
+        await deliverAgentMessage(normalizedId, message, 'recoverAgent:ci-nudge');
         messageDelivered = true;
       } else {
         console.error('Claude SessionStart hook did not fire during resume, message not sent');
