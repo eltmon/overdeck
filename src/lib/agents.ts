@@ -145,12 +145,13 @@ export async function getAgentRuntimeBaseCommand(
   const provider = getProviderForModel(model);
   const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
-  // `claude --resume`. claudish wrapper does not pass --name through, so it is direct-only.
+  // `claude --resume`. Claudish forwards unrecognized flags to Claude Code, so --name works
+  // there too.
   const nameFlag = agentName ? ` --name ${agentName}` : '';
   // PAN-982: When agentType is provided, select the matching .claude/agents/pan-<type>-agent.md
   // definition. The agent frontmatter declares model, permissionMode, tools, and per-agent hooks,
   // so we omit --dangerously-skip-permissions/--permission-mode and (for Anthropic models) --model.
-  // Non-Anthropic direct providers still need --model to pin the routed model id, since the
+  // Non-Anthropic providers still need --model to pin the routed model id, since the
   // frontmatter `model:` only accepts Anthropic identifiers.
   const agentFlag = agentType ? ` --agent ${panopticonAgentName(agentType)}` : '';
 
@@ -176,10 +177,13 @@ export async function getAgentRuntimeBaseCommand(
     return `claude ${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
 
-  // Claudish wrapper path is unchanged — claudish is a separate binary that does not
-  // recognize --agent. Permissions stay inline; non-Anthropic models route via claudish.
+  // Claudish wrapper path — claudish forwards unrecognized flags (including --agent and --name)
+  // to Claude Code, so agent definitions (hooks, tools) continue to work for non-Anthropic models.
   const routedModel = await getLaunchModelForModel(model);
-  return `claudish -i --model ${routedModel} ${permissionFlags}`;
+  if (agentType) {
+    return `claudish -i --model ${routedModel}${agentFlag}${nameFlag} ${permissionFlags}`;
+  }
+  return `claudish -i --model ${routedModel} ${permissionFlags}${nameFlag}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
@@ -340,6 +344,31 @@ export function getClaudishPrefix(model: string, authMode?: string): string {
   // Google CodeAssist OAuth — go@ prefix
   if (model.startsWith('gemini-') && authMode === 'subscription') {
     return `go@${model}`;
+  }
+
+  // Kimi models — explicit kimi@ prefix (claudish auto-detect misses K2.6-code-preview)
+  if (['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(model)) {
+    return `kimi@${model}`;
+  }
+
+  // MiniMax models — explicit mm@ prefix
+  if (['minimax-m2.7', 'minimax-m2.7-highspeed'].includes(model)) {
+    return `mm@${model}`;
+  }
+
+  // Z.AI (GLM) models — explicit zai@ prefix
+  if (['glm-5.1', 'glm-4.7', 'glm-4.7-flash'].includes(model)) {
+    return `zai@${model}`;
+  }
+
+  // OpenRouter model IDs always contain '/'
+  if (model.includes('/')) {
+    return `or@${model}`;
+  }
+
+  // Mimo — claudish doesn't auto-detect, use custom URL syntax
+  if (model.startsWith('mimo-')) {
+    return `https://token-plan-sgp.xiaomimimo.com/anthropic/${model}`;
   }
 
   // Other providers — return bare model (fallback to default routing)

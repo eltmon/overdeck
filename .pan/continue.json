@@ -2,19 +2,21 @@
   "version": "1",
   "issueId": "PAN-964",
   "created": "2026-05-07T03:30:00Z",
-  "updated": "2026-05-07T03:30:00Z",
+  "updated": "2026-05-07T03:35:00Z",
   "gitState": { "branch": "feature/pan-964", "sha": "$(git rev-parse --short HEAD)", "dirty": true },
   "decisions": [
-    { "id": "D1", "summary": "Switch all non-Anthropic providers (kimi, minimax, zai, mimo, openrouter) from direct to claudish routing to fix 502 unknown provider errors in Claude Code v2.1.121", "recordedAt": "2026-05-07T03:30:00Z" }
+    { "id": "D1", "summary": "Switch all non-Anthropic providers (kimi, minimax, zai, mimo, openrouter) from direct to claudish routing to fix 502 unknown provider errors in Claude Code v2.1.121", "recordedAt": "2026-05-07T03:30:00Z" },
+    { "id": "D2", "summary": "Claudish forwards unrecognized flags (--agent, --name) to Claude Code, so agent definitions (hooks, tools) continue to work for non-Anthropic models", "recordedAt": "2026-05-07T03:35:00Z" },
+    { "id": "D3", "summary": "Use explicit provider prefixes (kimi@, mm@, zai@, or@) and custom URL for mimo to ensure reliable claudish routing", "recordedAt": "2026-05-07T03:35:00Z" }
   ],
   "hazards": [
-    { "id": "H1", "summary": "Claudish does not natively auto-detect mimo models", "mitigation": "Use custom URL syntax https://token-plan-sgp.xiaomimimo.com/anthropic/<model> for mimo routing" },
-    { "id": "H2", "summary": "OpenRouter models need explicit or@ prefix in claudish", "mitigation": "getClaudishPrefix must add or@ prefix for models containing '/'" }
+    { "id": "H1", "summary": "Claudish auto-detection misses some model variants (e.g. K2.6-code-preview as native-anthropic)", "mitigation": "Explicit prefixes in getClaudishPrefix for all known models" },
+    { "id": "H2", "summary": "Mimo custom URL syntax in claudish is experimental", "mitigation": "Base URL hardcoded to match providers.ts; probe verified claudish parses it correctly" }
   ],
   "resumePoint": {
-    "description": "Implementing bead workspace-tzoh (switch providers to claudish) — providers.ts updated. Next: update getClaudishPrefix in agents.ts to handle new provider prefixes.",
-    "beadId": "workspace-tzoh",
-    "filesToRead": ["src/lib/agents.ts"]
+    "description": "Implementing bead workspace-0loo (update claudish prefix routing) — agents.ts updated. Next: update frontend provider compatibility badges.",
+    "beadId": "workspace-0loo",
+    "filesToRead": ["src/dashboard/frontend/src/components/Settings/Provider/ProviderPanel.tsx"]
   },
   "beadsMapping": {},
   "agentModel": "kimi-k2.6",
