@@ -162,7 +162,7 @@
       {
         "id": "define-inspect-agent",
         "title": "Create pan-inspect-agent.md definition",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T02:30:00.000Z",
         "metadata": {
@@ -176,7 +176,7 @@
           {
             "id": "define-inspect-agent.ac1",
             "title": "pan-inspect-agent.md exists with plan permission mode and NO caveman hooks",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
