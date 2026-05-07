@@ -1,65 +1,63 @@
 {
   "version": "1",
-  "issueId": "PAN-974",
-  "created": "2026-05-06T19:10:06.291Z",
-  "updated": "2026-05-06T19:12:51.442Z",
-  "gitState": {
-    "branch": "feature/pan-974",
-    "sha": "503cb22b4",
-    "dirty": true
-  },
+  "issueId": "PAN-966",
+  "created": "2026-05-07T12:00:00.000Z",
+  "updated": "2026-05-07T13:05:00.000Z",
+  "gitState": { "branch": "feature/pan-966", "sha": "00e9c3c02", "dirty": false },
   "decisions": [
     {
       "id": "D1",
-      "summary": "Session-tree slot support belongs in the server session discovery layer, not the React tree, because FeatureItem and SessionNode already render multiple per-issue sessions and route selection by sessionId.",
-      "recordedAt": "2026-05-06T19:10:06.291Z"
+      "summary": "Use separate getAvailableEditors RPC instead of extending DashboardSnapshot. Avoids coupling read-model to PanOpen service and keeps schema backward-compatible.",
+      "recordedAt": "2026-05-07T12:00:00.000Z"
     },
     {
       "id": "D2",
-      "summary": "Slot session JSONL lookup must derive the workspace path from the slot number so agent-pan-<issue>-<n> resolves against workspaces/feature-<issue>-slot-<n> instead of the base workspace.",
-      "recordedAt": "2026-05-06T19:10:06.291Z"
+      "summary": "Drop upstream PR to T3Code (external repo, out of scope) and keyboard shortcut (marginal value). CLI command is in scope.",
+      "recordedAt": "2026-05-07T12:00:00.000Z"
     },
     {
       "id": "D3",
-      "summary": "Frontend agent output should normalize slot work session ids with the same base-issue pattern as the server so selecting agent-<issue>-<slot> keeps ActivityView bound to the parent issue while Terminal stays bound to the slot session.",
-      "recordedAt": "2026-05-06T19:12:51.442Z"
+      "summary": "Skipped AgentList right-click context menu — no existing context menu infrastructure on agent list. Primary integration points (InspectorPanel + AgentInfoSection) cover all visible workspace paths.",
+      "recordedAt": "2026-05-07T12:30:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Used Schema.String for OpenInEditorInput.cwd instead of Schema.trimmed/nonEmptyString — those APIs not available in this Effect version and server-side validation is unnecessary since spawn ENOENT handles missing paths.",
+      "recordedAt": "2026-05-07T12:10:00.000Z"
     }
   ],
   "hazards": [
     {
       "id": "H1",
-      "summary": "Final UI verification must use the built dashboard server under Node 22, not Bun, or PTY-backed terminal behavior can fail independently of the PAN-974 code changes.",
-      "mitigation": "Run npm run build before browser verification and validate the dashboard through the Node 22 dist server path."
+      "summary": "No sync FS calls in server-reachable code — PAN-70 compliance.",
+      "mitigation": "Cache resolveAvailableEditors at service construction time. Let spawn ENOENT surface for missing commands."
+    },
+    {
+      "id": "H2",
+      "summary": "UI verification must use Node 22 built dist server, not Bun.",
+      "mitigation": "Run npm run build before browser verification."
     }
   ],
   "resumePoint": {
-    "description": "Both PAN-974 beads are implemented. Next: run broader verification for the session-tree slot work, then build the dashboard, verify slot selection in the browser against the Node 22 server, and only then do the final push and pan done flow.",
-    "beadId": "workspace-52u",
-    "filesToRead": [
-      "src/dashboard/server/routes/projects.ts",
-      "src/dashboard/server/ws-rpc.ts",
-      "src/dashboard/frontend/src/components/AgentOutputPanel.tsx",
-      "src/dashboard/frontend/src/components/__tests__/AgentOutputPanel.test.tsx",
-      "src/dashboard/server/__tests__/swarm-slot-session-mapping.test.ts"
-    ]
+    "description": "Implementation complete. All 6 beads closed. Typecheck, lint pass. 12 PAN-966-specific tests pass. 5 pre-existing test failures unrelated to this issue.",
+    "beadId": null,
+    "filesToRead": []
   },
   "beadsMapping": {
-    "workspace-448": "Server-side slot session discovery, issue mapping, and slot workspace JSONL resolution",
-    "workspace-52u": "Frontend slot-aware issue/session handling and tests"
+    "workspace-i247": "B1: editor contracts — EDITORS, EditorId, OpenInEditorInput, RPC definitions",
+    "workspace-b34f": "B2: PanOpen server service — resolveAvailableEditors, launchDetached, tests",
+    "workspace-r0ub": "B3: wire RPC handlers in ws-rpc.ts + PanOpenLive in server.ts",
+    "workspace-a6mo": "B4: frontend editorPreferences + PanOpenInPicker component",
+    "workspace-q1a4": "B5: integrate picker into InspectorPanel + AgentInfoSection",
+    "workspace-25ap": "B6: pan open CLI command"
   },
-  "agentModel": "gpt-5.4",
+  "agentModel": "claude-opus-4-6",
   "sessionHistory": [
     {
-      "timestamp": "2026-05-06T19:10:06.291Z",
+      "timestamp": "2026-05-07T13:05:00.000Z",
       "reason": "end",
-      "note": "Completed bead workspace-448 implementation by adding slot-aware session discovery in projects.ts, slot-aware tmux issue extraction in ws-rpc.ts, and focused regression tests.",
-      "agentModel": "gpt-5.4"
-    },
-    {
-      "timestamp": "2026-05-06T19:12:51.442Z",
-      "reason": "end",
-      "note": "Completed bead workspace-52u by making AgentOutputPanel derive the parent issue from slot session ids and adding focused derivation/render tests for swarm slot sessions.",
-      "agentModel": "gpt-5.4"
+      "note": "Implemented full Open-in-Editor feature: contracts (EDITORS, EditorId, OpenInEditorInput, 2 RPCs), PanOpen server service with async editor detection and detached launch, ws-rpc + server.ts wiring, frontend editorPreferences + PanOpenInPicker split-button component, InspectorPanel + AgentInfoSection integration, pan open CLI command. 6 commits, 6 beads, all closed.",
+      "agentModel": "claude-opus-4-6"
     }
   ]
 }
