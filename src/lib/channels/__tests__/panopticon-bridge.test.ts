@@ -10,6 +10,9 @@ import {
   getSocketPath,
   getBridgeLogPath,
   getPanopticonHome,
+  handleChannelReplyCall,
+  listBridgeTools,
+  validateChannelReplyPayload,
 } from '../panopticon-bridge.js';
 
 const REPO_ROOT = process.cwd();
@@ -95,6 +98,72 @@ describe('pushChannelNotification (in-process protocol)', () => {
   it('exposes a deterministic socket path under PANOPTICON_HOME', () => {
     expect(getPanopticonHome()).toBe(tmpHome);
     expect(getSocketPath('xyz')).toBe(join(tmpHome, 'sockets', 'agent-xyz.sock'));
+  });
+
+  it('lists channel_reply tool with documented schema', () => {
+    const result = listBridgeTools();
+    expect(result.tools).toHaveLength(1);
+    expect(result.tools[0].name).toBe('channel_reply');
+    expect(result.tools[0].inputSchema.required).toEqual(['kind', 'summary']);
+    expect(result.tools[0].inputSchema.properties?.['artifactRefs']).toBeDefined();
+  });
+
+  it('validates channel_reply payloads and trims summary', () => {
+    expect(
+      validateChannelReplyPayload({
+        kind: 'done',
+        summary: '  implementation complete  ',
+        artifactRefs: [{ uri: 'file:///tmp/report.txt', label: 'report' }],
+      }),
+    ).toEqual({
+      kind: 'done',
+      summary: 'implementation complete',
+      artifactRefs: [{ uri: 'file:///tmp/report.txt', label: 'report' }],
+    });
+  });
+
+  it('rejects invalid channel_reply payloads', () => {
+    expect(() => validateChannelReplyPayload({ kind: 'bogus', summary: 'x' })).toThrow(
+      'channel_reply.kind must be one of: status, done, needs_input',
+    );
+    expect(() => validateChannelReplyPayload({ kind: 'done', summary: '' })).toThrow(
+      'channel_reply.summary must be a non-empty string',
+    );
+    expect(() =>
+      validateChannelReplyPayload({
+        kind: 'status',
+        summary: 'x',
+        artifactRefs: [{ label: 'missing-uri' }],
+      }),
+    ).toThrow('channel_reply.artifactRefs[0].uri must be a non-empty string');
+  });
+
+  it('accepts channel_reply calls, invokes sink, and appends outbound log line', async () => {
+    const sink = vi.fn(async () => undefined);
+    const result = await handleChannelReplyCall(
+      {
+        kind: 'needs_input',
+        summary: 'Need user answer',
+        artifactRefs: [{ uri: 'file:///tmp/question.md', label: 'question' }],
+      },
+      'reply-agent',
+      sink,
+    );
+    expect(sink).toHaveBeenCalledWith({
+      kind: 'needs_input',
+      summary: 'Need user answer',
+      artifactRefs: [{ uri: 'file:///tmp/question.md', label: 'question' }],
+    });
+    expect(result.content[0]).toMatchObject({ type: 'text', text: 'channel_reply accepted (needs_input)' });
+    const lines = readFileSync(getBridgeLogPath('reply-agent'), 'utf-8').trim().split('\n');
+    const entry = JSON.parse(lines[0]);
+    expect(entry).toMatchObject({
+      agentId: 'reply-agent',
+      direction: 'outbound',
+      kind: 'needs_input',
+      summaryLength: 16,
+      artifactCount: 1,
+    });
   });
 });
 

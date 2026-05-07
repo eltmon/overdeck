@@ -39,6 +39,13 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  type CallToolResult,
+  type ListToolsResult,
+  type Tool,
+} from '@modelcontextprotocol/sdk/types.js';
 import { chmod, mkdir, unlink, appendFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -66,16 +73,85 @@ function resolveAgentIdOrExit(): string {
 const INSTRUCTIONS = [
   'Panopticon orchestrator bridge.',
   '',
-  'When you receive a `notifications/channel` message with `params.source` set',
-  'to `panopticon-bridge`, the body is operator-supplied text from the',
-  'Panopticon dashboard or CLI that is being delivered out-of-band of the',
-  'normal user-prompt input stream. Treat the body as if the user had typed',
-  'it into the prompt and continue the conversation accordingly.',
+  'When you receive a `notifications/claude/channel` message with',
+  '`params.source` set to `panopticon-bridge`, the body is operator-supplied',
+  'text from the Panopticon dashboard or CLI that is being delivered',
+  'out-of-band of the normal user-prompt input stream. Treat the body as if',
+  'the user had typed it into the prompt and continue the conversation',
+  'accordingly.',
   '',
-  'No reply tool is exposed in PAN-985; respond by continuing your normal',
-  'turn. Status updates back to the orchestrator are scraped from the',
-  'output pane until a follow-up issue lands the bidirectional reply tool.',
+  'When you reach a meaningful status boundary, call `channel_reply` with a',
+  'structured payload instead of relying on terminal prose alone. Use',
+  '`kind: "done"` when implementation is complete and you are ready for the',
+  'orchestrator to treat the work as finished. Use `kind: "needs_input"` when',
+  'you are blocked on a human answer. Use `kind: "status"` for non-terminal',
+  'progress updates. Include a terse `summary` and optional `artifactRefs`',
+  'entries when you want the dashboard to link to specific files or artefacts.',
 ].join('\n');
+
+export const CHANNEL_REPLY_KINDS = ['status', 'done', 'needs_input'] as const;
+export type ChannelReplyKind = (typeof CHANNEL_REPLY_KINDS)[number];
+
+export interface ChannelReplyArtifactRef {
+  uri: string;
+  label?: string;
+}
+
+export interface ChannelReplyPayload {
+  kind: ChannelReplyKind;
+  summary: string;
+  artifactRefs?: ChannelReplyArtifactRef[];
+}
+
+export interface AcceptedChannelReply {
+  kind: ChannelReplyKind;
+  summary: string;
+  artifactRefs: ChannelReplyArtifactRef[];
+}
+
+export const CHANNEL_REPLY_TOOL: Tool = {
+  name: 'channel_reply',
+  title: 'Send structured status to Panopticon',
+  description:
+    'Send structured agent status back to Panopticon. `kind` is one of `status`, `done`, or `needs_input`; `summary` is terse human-readable status text; `artifactRefs` optionally links files, logs, or PRs by URI.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      kind: {
+        type: 'string',
+        enum: [...CHANNEL_REPLY_KINDS],
+        description: 'Status class: status, done, or needs_input.',
+      },
+      summary: {
+        type: 'string',
+        description: 'Terse human-readable status summary for the orchestrator and dashboard.',
+      },
+      artifactRefs: {
+        type: 'array',
+        description: 'Optional artefact references such as file:// paths, PR URLs, or log URLs.',
+        items: {
+          type: 'object',
+          properties: {
+            uri: { type: 'string', description: 'URI or absolute path for the related artefact.' },
+            label: { type: 'string', description: 'Optional short display label for the artefact.' },
+          },
+          required: ['uri'],
+        },
+      },
+    },
+    required: ['kind', 'summary'],
+  },
+  annotations: {
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: false,
+    readOnlyHint: false,
+  },
+};
+
+export function listBridgeTools(): ListToolsResult {
+  return { tools: [CHANNEL_REPLY_TOOL] };
+}
 
 export const server: Server = new Server(
   {
@@ -87,10 +163,22 @@ export const server: Server = new Server(
       experimental: {
         'claude/channel': {},
       },
+      tools: {},
     },
     instructions: INSTRUCTIONS,
   },
 );
+
+server.setRequestHandler(ListToolsRequestSchema, async () => listBridgeTools());
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  if (request.params.name !== 'channel_reply') {
+    throw new Error(`Unknown tool: ${request.params.name}`);
+  }
+  return handleChannelReplyCall(request.params.arguments ?? {}, resolveAgentIdOrExit(), async () => {
+    // PAN-986 bead 1 only defines the MCP surface and validates payloads.
+    // Bead 2 wires accepted replies into the dashboard runtime event stream.
+  });
+});
 
 /**
  * Resolve PANOPTICON_HOME with the same fallback semantics as the rest of the
@@ -117,6 +205,78 @@ export interface ChannelPushResult {
   ok: boolean;
   status: number;
   body: unknown;
+}
+
+function isChannelReplyKind(value: unknown): value is ChannelReplyKind {
+  return typeof value === 'string' && CHANNEL_REPLY_KINDS.includes(value as ChannelReplyKind);
+}
+
+export function validateChannelReplyPayload(payload: unknown): AcceptedChannelReply {
+  if (payload === null || typeof payload !== 'object') {
+    throw new Error('channel_reply payload must be an object');
+  }
+
+  const source = payload as {
+    kind?: unknown;
+    summary?: unknown;
+    artifactRefs?: unknown;
+  };
+
+  if (!isChannelReplyKind(source.kind)) {
+    throw new Error('channel_reply.kind must be one of: status, done, needs_input');
+  }
+  if (typeof source.summary !== 'string' || source.summary.trim().length === 0) {
+    throw new Error('channel_reply.summary must be a non-empty string');
+  }
+  if (source.artifactRefs !== undefined && !Array.isArray(source.artifactRefs)) {
+    throw new Error('channel_reply.artifactRefs must be an array when provided');
+  }
+
+  const artifactRefs = (source.artifactRefs ?? []).map((item, index) => {
+    if (item === null || typeof item !== 'object') {
+      throw new Error(`channel_reply.artifactRefs[${index}] must be an object`);
+    }
+    const ref = item as { uri?: unknown; label?: unknown };
+    if (typeof ref.uri !== 'string' || ref.uri.trim().length === 0) {
+      throw new Error(`channel_reply.artifactRefs[${index}].uri must be a non-empty string`);
+    }
+    if (ref.label !== undefined && typeof ref.label !== 'string') {
+      throw new Error(`channel_reply.artifactRefs[${index}].label must be a string when provided`);
+    }
+    return {
+      uri: ref.uri,
+      ...(typeof ref.label === 'string' ? { label: ref.label } : {}),
+    };
+  });
+
+  return {
+    kind: source.kind,
+    summary: source.summary.trim(),
+    artifactRefs,
+  };
+}
+
+export async function handleChannelReplyCall(
+  payload: unknown,
+  agentId: string,
+  sink: (reply: AcceptedChannelReply) => Promise<void>,
+): Promise<CallToolResult> {
+  const reply = validateChannelReplyPayload(payload);
+  await sink(reply);
+  await appendBridgeLog(agentId, {
+    direction: 'outbound',
+    kind: reply.kind,
+    summaryLength: reply.summary.length,
+    artifactCount: reply.artifactRefs.length,
+  });
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `channel_reply accepted (${reply.kind})`,
+      },
+    ],
+  };
 }
 
 /**
@@ -153,6 +313,7 @@ export async function pushChannelNotification(
   });
 
   await appendBridgeLog(agentId, {
+    direction: 'inbound',
     contentLength: content.length,
     metaKeys: meta ? Object.keys(meta) : [],
   });
@@ -162,15 +323,16 @@ export async function pushChannelNotification(
 
 async function appendBridgeLog(
   agentId: string,
-  entry: { contentLength: number; metaKeys: string[] },
+  entry:
+    | { direction: 'inbound'; contentLength: number; metaKeys: string[] }
+    | { direction: 'outbound'; kind: ChannelReplyKind; summaryLength: number; artifactCount: number },
 ): Promise<void> {
   const logPath = getBridgeLogPath(agentId);
   await mkdir(dirname(logPath), { recursive: true });
   const line = JSON.stringify({
     ts: new Date().toISOString(),
     agentId,
-    contentLength: entry.contentLength,
-    metaKeys: entry.metaKeys,
+    ...entry,
   });
   await appendFile(logPath, `${line}\n`, 'utf-8');
 }
