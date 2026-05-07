@@ -673,14 +673,15 @@ function AssistantMessageRow({
 function WorkLogGroup({ entries, hideToolCalls }: { entries: WorkLogEntry[]; hideToolCalls?: boolean }) {
   const [expanded, setExpanded] = useState(false);
 
-  const onlyToolEntries = entries.every((entry) => entry.tone === 'tool');
+  const onlyToolEntries = entries.every((entry) => entry.tone === 'tool' || entry.tone === 'error');
   if (hideToolCalls && onlyToolEntries && !expanded) {
+    const n = entries.length;
     return (
       <button
         type="button"
         className={styles.workLogGroup}
         onClick={() => setExpanded(true)}
-        title={`Show ${entries.length} tool ${entries.length === 1 ? 'call' : 'calls'}`}
+        title={`Show ${n} tool ${n === 1 ? 'call' : 'calls'}`}
         style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -694,7 +695,7 @@ function WorkLogGroup({ entries, hideToolCalls }: { entries: WorkLogEntry[]; hid
         onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.5'; }}
       >
         <Wrench size={12} />
-        <span>{entries.length} tool {entries.length === 1 ? 'call' : 'calls'} were made</span>
+        <span>{n} tool {n === 1 ? 'call was' : 'calls were'} made</span>
       </button>
     );
   }
