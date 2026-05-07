@@ -281,6 +281,62 @@ describe('killAllReviewSessions', () => {
   });
 });
 
+// ── pan down integration (PAN-931) ────────────────────────────────────────────
+// Regression: verifies that `pan down` imports and calls killAllReviewSessions
+// so review sessions are cleaned up during dashboard shutdown.
+
+describe('pan down integration (PAN-931)', () => {
+  it('src/cli/index.ts imports killAllReviewSessions from review-agent.js', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const src = readFileSync(
+      resolve(import.meta.dirname, '../../../src/cli/index.ts'),
+      'utf-8',
+    );
+    expect(src).toContain('killAllReviewSessions');
+    expect(src).toContain("import('../lib/cloister/review-agent.js')");
+  });
+
+  it('src/cli/index.ts calls killAllReviewSessions inside the down command handler', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const src = readFileSync(
+      resolve(import.meta.dirname, '../../../src/cli/index.ts'),
+      'utf-8',
+    );
+    // Isolate the down command block: from `.command('down')` to the next `.command(`
+    const downBlockMatch = src.match(/\.command\(['"]down['"]\)[\s\S]*?\.command\(/);
+    expect(downBlockMatch).not.toBeNull();
+    const downBlock = downBlockMatch![0];
+    expect(downBlock).toContain('killAllReviewSessions');
+    expect(downBlock).toContain('killed');
+    expect(downBlock).toContain('failed');
+  });
+
+  it('pan down calls killAllReviewSessions after dashboard stop and before Traefik stop', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const src = readFileSync(
+      resolve(import.meta.dirname, '../../../src/cli/index.ts'),
+      'utf-8',
+    );
+    const downBlockMatch = src.match(/\.command\(['"]down['"]\)[\s\S]*?\.command\(/);
+    expect(downBlockMatch).not.toBeNull();
+    const downBlock = downBlockMatch![0];
+
+    // Dashboard stop comes before review session cleanup
+    const dashboardStopIdx = downBlock.indexOf('stopDashboard');
+    const reviewCleanupIdx = downBlock.indexOf('killAllReviewSessions');
+    const traefikStopIdx = downBlock.indexOf('docker compose down');
+
+    expect(dashboardStopIdx).toBeGreaterThanOrEqual(0);
+    expect(reviewCleanupIdx).toBeGreaterThanOrEqual(0);
+    expect(traefikStopIdx).toBeGreaterThanOrEqual(0);
+    expect(reviewCleanupIdx).toBeGreaterThan(dashboardStopIdx);
+    expect(reviewCleanupIdx).toBeLessThan(traefikStopIdx);
+  });
+});
+
 // ── dispatchParallelReview idempotency guard (PAN-931) ────────────────────────
 
 describe('dispatchParallelReview idempotency guard', () => {
@@ -341,16 +397,23 @@ describe('dispatchParallelReview idempotency guard', () => {
       'review-coordinator-PAN-999-1234567890000',
     ]);
     mockIsPaneDeadAsync.mockResolvedValue(false);
-    // Simulate a real live PID (process.kill(0) would succeed for PID 1)
+    // Simulate a real live PID
     mockListPaneValuesAsync.mockResolvedValue(['1']);
+    // process.kill(1, 0) may throw EPERM in restricted test environments;
+    // mock it to succeed so the alive-path is deterministic.
+    const killSpy = vi.spyOn(process, 'kill').mockReturnValue(undefined as never);
     const coordinatorSpawnFn = vi.fn().mockResolvedValue({ sessionName: 'review-coordinator-PAN-999-new' });
 
-    const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
+    try {
+      const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
 
-    expect(mockKillSessionAsync).not.toHaveBeenCalled();
-    expect(coordinatorSpawnFn).not.toHaveBeenCalled();
-    expect(ret.success).toBe(true);
-    expect(ret.message).toContain('Review already in progress');
+      expect(mockKillSessionAsync).not.toHaveBeenCalled();
+      expect(coordinatorSpawnFn).not.toHaveBeenCalled();
+      expect(ret.success).toBe(true);
+      expect(ret.message).toContain('Review already in progress');
+    } finally {
+      killSpy.mockRestore();
+    }
   });
 });
 
