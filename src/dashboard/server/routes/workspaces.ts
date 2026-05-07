@@ -102,6 +102,7 @@ import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
 import { loadWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
 import { extractPrefix, extractNumber, parseIssueId } from '../../../lib/issue-id.js';
 import { getContainersReferencingWorkspacePath } from '../../../lib/workspace-manager.js';
+import { DEVCONTAINER_DIRNAME } from '../../../lib/workspace/devcontainer-renderer.js';
 import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
 import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
@@ -1743,7 +1744,7 @@ const postWorkspaceCleanRoute = HttpRouter.add(
     if (orphanedContainers.length > 0) {
       return jsonResponse(
         {
-          error: `Cannot remove workspace: ${orphanedContainers.length} Docker container(s) still reference compose paths in this workspace. Stop the containers first.`,
+          error: `Cannot remove workspace: ${orphanedContainers.length} Docker container(s) still reference compose paths in ${DEVCONTAINER_DIRNAME}/. Stop the containers first.`,
         },
         { status: 409 },
       );

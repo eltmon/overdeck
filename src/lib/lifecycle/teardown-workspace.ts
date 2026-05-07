@@ -23,6 +23,7 @@ import { stepOk, stepSkipped, stepFailed } from './types.js';
 import { findWorkspacePath } from './archive-planning.js';
 import { extractPrefix } from '../issue-id.js';
 import { getContainersReferencingWorkspacePath } from '../workspace-manager.js';
+import { DEVCONTAINER_DIRNAME } from '../workspace/devcontainer-renderer.js';
 
 const execAsync = promisify(exec);
 
@@ -298,12 +299,13 @@ async function removeWorktree(
     return stepSkipped(step, ['Workspace directory does not exist']);
   }
 
-  // Guard: never delete workspace while containers still reference its compose path
+  // Guard: never delete workspace (and its `.devcontainer/`) while containers
+  // still reference compose paths inside it.
   const orphanedContainers = await getContainersReferencingWorkspacePath(workspacePath);
   if (orphanedContainers.length > 0) {
     return stepFailed(
       step,
-      `Cannot remove workspace: ${orphanedContainers.length} Docker container(s) still reference compose paths in this workspace. ` +
+      `Cannot remove workspace: ${orphanedContainers.length} Docker container(s) still reference compose paths in ${DEVCONTAINER_DIRNAME}/. ` +
         `Run workspace Docker cleanup first or stop the containers manually.`,
     );
   }

@@ -2,17 +2,18 @@
   "version": "1",
   "issueId": "PAN-956",
   "created": "2026-05-07T08:30:00Z",
-  "updated": "2026-05-07T08:35:00Z",
-  "gitState": { "branch": "feature/pan-956", "sha": "9b17f8a", "dirty": false },
+  "updated": "2026-05-07T08:45:00Z",
+  "gitState": { "branch": "feature/pan-956", "sha": "f1ed0b6", "dirty": false },
   "decisions": [
-    { "id": "D1", "summary": "Beads created for PAN-956: workspace-ez7o (cleanup guard), workspace-gl3h (stable path), workspace-04p9 (re-render), workspace-kj8w (doctor check)", "recordedAt": "2026-05-07T08:35:00Z" }
+    { "id": "D1", "summary": "Beads created for PAN-956: workspace-ez7o (cleanup guard), workspace-gl3h (stable path), workspace-04p9 (re-render), workspace-kj8w (doctor check)", "recordedAt": "2026-05-07T08:35:00Z" },
+    { "id": "D2", "summary": "Implemented workspace-ez7o: Added getContainersReferencingWorkspacePath() helper, modified stopWorkspaceDocker to handle orphaned containers via project-name down or raw docker stop/rm, guarded removeWorktree and removeWorkspace and deep-wipe endpoint from deleting workspaces with active container references.", "recordedAt": "2026-05-07T08:45:00Z" }
   ],
   "hazards": [
     { "id": "H1", "summary": "Docker containers may hold references to deleted compose paths, breaking compose operations", "mitigation": "Add guards before deleting .devcontainer/ and implement doctor check for auto-recovery" }
   ],
   "resumePoint": {
-    "description": "Claim and implement bead workspace-ez7o: Add explicit cleanup guard for rendered compose files. Need to add helper function and integrate into teardown-workspace.ts and workspace-manager.ts cleanup paths.",
-    "beadId": "workspace-ez7o",
+    "description": "Claim and implement bead workspace-gl3h: Ensure rendered compose path is stable and protected during cleanup. Need to ensure .devcontainer/ path is stable and documented, and verify cleanup guards are comprehensive.",
+    "beadId": "workspace-gl3h",
     "filesToRead": ["src/lib/lifecycle/teardown-workspace.ts", "src/lib/workspace-manager.ts", "src/lib/workspace/devcontainer-renderer.ts"]
   },
   "beadsMapping": {
@@ -23,6 +24,7 @@
   },
   "agentModel": "kimi-k2.6",
   "sessionHistory": [
-    { "timestamp": "2026-05-07T08:35:00Z", "reason": "start", "note": "Initialized PAN-956 workspace. Issue is about Docker container labels referencing missing rendered compose paths. Created 4 beads and preparing to implement workspace-ez7o first.", "agentModel": "kimi-k2.6" }
+    { "timestamp": "2026-05-07T08:35:00Z", "reason": "start", "note": "Initialized PAN-956 workspace. Issue is about Docker container labels referencing missing rendered compose paths. Created 4 beads and preparing to implement workspace-ez7o first.", "agentModel": "kimi-k2.6" },
+    { "timestamp": "2026-05-07T08:45:00Z", "reason": "bead-complete", "note": "Completed workspace-ez7o: Added getContainersReferencingWorkspacePath helper, modified stopWorkspaceDocker to handle orphaned containers, guarded removeWorktree/removeWorkspace/deep-wipe from deleting workspaces with active container references. All tests pass.", "agentModel": "kimi-k2.6" }
   ]
 }

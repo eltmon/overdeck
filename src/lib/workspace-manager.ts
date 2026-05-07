@@ -251,6 +251,7 @@ import {
   createWorkspacePlaceholders as createPlaceholders,
   sanitizeComposeFile,
   renderDevcontainer,
+  DEVCONTAINER_DIRNAME,
 } from './workspace/devcontainer-renderer.js';
 // `processTemplates` is still imported for the agent-template flow further
 // below; it lives in the same renderer module.
@@ -1194,7 +1195,7 @@ export async function getContainersReferencingWorkspacePath(
       { encoding: 'utf-8' },
     );
     const containers: string[] = [];
-    const devcontainerPath = join(workspacePath, '.devcontainer');
+    const devcontainerPath = join(workspacePath, DEVCONTAINER_DIRNAME);
     for (const line of stdout.trim().split('\n').filter(Boolean)) {
       const sep = line.indexOf('|');
       if (sep === -1) continue;
@@ -1230,7 +1231,7 @@ export async function stopWorkspaceDocker(
   };
 
   // Find all compose files in devcontainer directory (some projects use multiple)
-  const devcontainerDir = join(workspacePath, '.devcontainer');
+  const devcontainerDir = join(workspacePath, DEVCONTAINER_DIRNAME);
   const composeFiles: string[] = [];
 
   if (existsSync(devcontainerDir)) {
@@ -1261,7 +1262,7 @@ export async function stopWorkspaceDocker(
   // or fall back to "{projectName}-feature-{featureName}" convention.
   let composeProjectName = `${projectName}-feature-${featureName}`;
   const devScriptPaths = [
-    join(workspacePath, '.devcontainer', 'dev'),
+    join(workspacePath, DEVCONTAINER_DIRNAME, 'dev'),
     join(workspacePath, 'dev'),
   ];
   for (const devPath of devScriptPaths) {
@@ -1466,7 +1467,7 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
   const orphanedContainers = await getContainersReferencingWorkspacePath(workspacePath);
   if (orphanedContainers.length > 0) {
     result.errors.push(
-      `Cannot remove workspace directory: ${orphanedContainers.length} Docker container(s) still reference compose paths in this workspace. ` +
+      `Cannot remove workspace directory: ${orphanedContainers.length} Docker container(s) still reference compose paths in ${DEVCONTAINER_DIRNAME}/. ` +
         `Run workspace Docker cleanup first or stop the containers manually.`,
     );
   } else {
