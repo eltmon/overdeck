@@ -115,7 +115,12 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
   beforeEach(async () => {
     vi.resetModules();
     mockSetReviewStatus.mockReset();
-    mockLoadReviewStatuses.mockReset().mockReturnValue({});
+    mockLoadReviewStatuses.mockReset().mockImplementation(() => {
+      if (existsSync(REVIEW_STATUS_FILE)) {
+        return JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
+      }
+      return {};
+    });
     mockSessionExists.mockReset().mockReturnValue(false);
     mockSendKeysAsync.mockReset().mockResolvedValue(undefined);
     mockWriteFeedbackFile.mockReset().mockResolvedValue(undefined);
@@ -282,6 +287,13 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
       );
 
       // On the next patrol: checkFailedMergeRetry should now treat this as a fresh start
+      // Reset mock to read from the file (mockReturnValue above overrode mockImplementation)
+      mockLoadReviewStatuses.mockImplementation(() => {
+        if (existsSync(REVIEW_STATUS_FILE)) {
+          return JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
+        }
+        return {};
+      });
       // Write a CI-failed status so checkFailedMergeRetry has something to act on
       writeStatusFile({ [ISSUE_ID]: CI_FAILED_STATUS });
       const retryActions = await checkFailedMergeRetry();
@@ -312,7 +324,12 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
     deadEndIssueId = `PAN-714-DEAD-END-TEST-${process.pid}-${Date.now()}`;
     issueLower = deadEndIssueId.toLowerCase();
     mockSetReviewStatus.mockReset();
-    mockLoadReviewStatuses.mockReset().mockReturnValue({});
+    mockLoadReviewStatuses.mockReset().mockImplementation(() => {
+      if (existsSync(REVIEW_STATUS_FILE)) {
+        return JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
+      }
+      return {};
+    });
     mockSessionExists.mockReset().mockReturnValue(false);
     mockSendKeysAsync.mockReset().mockResolvedValue(undefined);
     mockWriteFeedbackFile.mockReset().mockResolvedValue(undefined);

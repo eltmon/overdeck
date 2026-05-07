@@ -1138,9 +1138,7 @@ describe('spawnReviewer runtime command routing regression', () => {
     expect(fn).not.toMatch(/`claude\s+--(?:dangerously-skip-permissions|model)/);
   });
 
-  it('review-agent.ts uses both launcher exports and settings overlay helpers for provider env isolation', async () => {
-    // The current design uses launcher-script exports plus settings.local.json
-    // overlay injection so Claude settings-level env cannot override provider routing.
+  it('review-agent.ts uses launcher exports for provider env isolation', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const src = readFileSync(
@@ -1148,8 +1146,8 @@ describe('spawnReviewer runtime command routing regression', () => {
       'utf-8',
     );
     expect(src).toMatch(/getProviderExportsForModel/);
-    expect(src).toMatch(/getProviderEnvForModel/);
-    expect(src).toMatch(/injectProviderEnvOverlay/);
+    expect(src).toMatch(/generateLauncherScript/);
+    expect(src).toMatch(/BLANKED_PROVIDER_ENV/);
   });
 
   it('spawnReviewer uses a bash launcher script, not tmux -e env flags', async () => {
@@ -1169,10 +1167,7 @@ describe('spawnReviewer runtime command routing regression', () => {
     expect(fn).toContain('writeFile(');
     expect(fn).toMatch(/bash\s+.*launcherPath/);
 
-    // Provider env now flows through launcher exports plus settings overlay injection,
-    // but must still avoid the old tmux `-e KEY=value` transport.
-    expect(fn).toContain('getProviderEnvForModel(');
-    expect(fn).toContain('injectProviderEnvOverlay(');
+    // Provider env flows through launcher exports — must avoid old tmux `-e KEY=value` transport.
     expect(fn).not.toMatch(/createSessionAsync\([\s\S]*-e\s/);
     const envMatch = fn.match(/\{\s*env\s*:[\s\S]*?\}/);
     if (envMatch) {
