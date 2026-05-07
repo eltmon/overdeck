@@ -14,6 +14,7 @@
  */
 
 import { useState } from 'react';
+import type { Agent, Issue } from '../../types';
 import { OverviewTab } from './ZoneCOverviewTabs/OverviewTab';
 import { ActivityTab } from './ZoneCOverviewTabs/ActivityTab';
 import { CostsTab } from './ZoneCOverviewTabs/CostsTab';
@@ -59,12 +60,18 @@ interface ZoneCOverviewProps {
   /** Optional controlled active tab; defaults to 'overview'. */
   activeTab?: OverviewTab;
   onTabChange?: (tab: OverviewTab) => void;
+  /** Work agent for this issue — forwarded to OverviewTab. */
+  agent?: Agent;
+  /** Full issue record — forwarded to OverviewTab. */
+  issue?: Issue;
 }
 
 export function ZoneCOverview({
   issueId,
   activeTab,
   onTabChange,
+  agent,
+  issue,
 }: ZoneCOverviewProps) {
   const [internalTab, setInternalTab] = useState<OverviewTab>('overview');
   const tab = activeTab ?? internalTab;
@@ -146,7 +153,7 @@ export function ZoneCOverview({
           overflow: 'auto',
         }}
       >
-        {tab === 'overview' && <OverviewTab issueId={issueId} onSwitchTab={handleTabClick} />}
+        {tab === 'overview' && <OverviewTab issueId={issueId} onSwitchTab={handleTabClick} agent={agent} issue={issue} />}
         {tab === 'activity' && <ActivityTab issueId={issueId} />}
         {tab === 'costs' && <CostsTab issueId={issueId} />}
         {tab === 'prd' && (

@@ -1,48 +1,37 @@
 {
   "version": "1",
-  "issueId": "PAN-954",
-  "created": "2026-05-07T04:40:00Z",
-  "updated": "2026-05-07T05:10:00Z",
-  "gitState": { "branch": "feature/pan-954", "sha": "76ef52ccf", "dirty": false },
+  "issueId": "PAN-953",
+  "created": "2026-05-07T04:30:00Z",
+  "updated": "2026-05-07T05:45:00Z",
+  "gitState": { "branch": "feature/pan-953", "sha": "284776b", "dirty": false },
   "decisions": [
-    { "id": "D1", "summary": "Use existing CommandDeck queries (useActivityQuery, usePrQuery) in InspectorPanel to share cache and avoid duplicate backend work.", "recordedAt": "2026-05-07T04:40:00Z" },
-    { "id": "D2", "summary": "Port reviewer summary, test cycle counter, PR status, last activity, session count, and pipeline stuck banner from OverviewTab to InspectorPanel. Keep inspector compact — use condensed layouts.", "recordedAt": "2026-05-07T04:40:00Z" },
-    { "id": "D3", "summary": "Added useActivityQuery to InspectorPanel for last activity and session count. Placed Activity section between workspace path and Links.", "recordedAt": "2026-05-07T04:45:00Z" },
-    { "id": "D4", "summary": "Reviewer summary uses compact 5-col grid with colored dots and round numbers instead of full RoundCard. Fits narrow inspector slide-out.", "recordedAt": "2026-05-07T04:50:00Z" },
-    { "id": "D5", "summary": "Tests cycle counter already existed in ReviewPipelineSection but was hidden at cycle 0. Changed condition to show whenever verificationMaxCycles is defined, matching CommandDeck behavior.", "recordedAt": "2026-05-07T04:55:00Z" },
-    { "id": "D6", "summary": "Added explicit vscode://file/ links in both agent and no-agent workspace path sections, complementing PanOpenInPicker which may be unavailable when RPC fails.", "recordedAt": "2026-05-07T05:00:00Z" },
-    { "id": "D7", "summary": "Added PR link/status section to InspectorPanel using usePrQuery. Shows PR number, title, state badge, additions/deletions, changed files, and review decision.", "recordedAt": "2026-05-07T05:05:00Z" },
-    { "id": "D8", "summary": "Added pipeline stuck banner to InspectorPanel with warning styling and one-click RecoverButton. Placed prominently after assignee section.", "recordedAt": "2026-05-07T05:10:00Z" }
+    { "id": "D1", "summary": "Create 5 beads covering all missing inspector parity items", "recordedAt": "2026-05-07T04:30:00Z" },
+    { "id": "D2", "summary": "Reuse existing inspector components (ContainerSection, ReviewPipelineSection) where possible to avoid duplication", "recordedAt": "2026-05-07T04:30:00Z" },
+    { "id": "D3", "summary": "Thread agent/issue props through ZoneCOverview to OverviewTab so child tabs can access full agent data", "recordedAt": "2026-05-07T04:45:00Z" },
+    { "id": "D4", "summary": "WorkspaceData.containers type in queries.ts was incorrectly typed as array — actual API returns Record<string, ContainerStatus>", "recordedAt": "2026-05-07T05:00:00Z" }
   ],
   "hazards": [
-    { "id": "H1", "summary": "InspectorPanel is rendered in a narrow slide-out. Adding too much content could make it unwieldy.", "mitigation": "Keep new sections compact. Use horizontal layouts where possible. Only show reviewer summary when data exists." },
-    { "id": "H2", "summary": "Activity query polling could be expensive if many inspectors are open.", "mitigation": "Shared QueryClient cache means only one fetch per issue regardless of how many components query it. Use same query keys as OverviewTab." }
+    { "id": "H1", "summary": "OverviewTab uses inline styles while inspector uses Tailwind classes — mixing may look inconsistent", "mitigation": "ContainerSection and ReviewPipelineSection render with Tailwind inside inline-styled Section — CSS variables are global so it works visually" }
   ],
   "resumePoint": {
-    "description": "All 6 beads implemented. Need to run full test suite (npm test), ensure all changes committed, push branch, and call pan done.",
-    "beadId": "workspace-a55e",
-    "filesToRead": [
-      "src/dashboard/frontend/src/components/InspectorPanel.tsx",
-      "src/dashboard/frontend/src/components/inspector/AgentInfoSection.tsx",
-      "src/dashboard/frontend/src/components/inspector/ReviewPipelineSection.tsx"
-    ]
+    "description": "All 5 beads implemented. Run full test suite, push branch, and call pan done PAN-953.",
+    "beadId": "workspace-59kw",
+    "filesToRead": []
   },
   "beadsMapping": {
-    "workspace-n99r": "completed",
-    "workspace-r490": "completed",
-    "workspace-o1gi": "completed",
-    "workspace-yj23": "completed",
-    "workspace-bnlk": "completed",
-    "workspace-a55e": "completed"
+    "workspace-8k4p": "Fix Agent tile: show runtime, uptime, workspace path",
+    "workspace-qm53": "Add Containers section with right-click menu to OverviewTab",
+    "workspace-6sr5": "Add Pipeline stepper to OverviewTab",
+    "workspace-nc40": "Add Switch Model action to OverviewTab",
+    "workspace-59kw": "Add Input/Output token totals to Cost tile"
   },
   "agentModel": "kimi-k2.6",
   "sessionHistory": [
-    { "timestamp": "2026-05-07T04:40:00Z", "reason": "start", "note": "Started implementation of PAN-954. No prior continue file. Created 6 beads based on issue checklist and initialized planning artifacts.", "agentModel": "kimi-k2.6" },
-    { "timestamp": "2026-05-07T04:45:00Z", "reason": "checkpoint", "note": "Completed bead workspace-n99r — added last activity timestamp and session count to InspectorPanel using useActivityQuery from CommandDeck tabs. Typecheck passed.", "agentModel": "kimi-k2.6" },
-    { "timestamp": "2026-05-07T04:50:00Z", "reason": "checkpoint", "note": "Completed bead workspace-r490 — added compact 5-col reviewer summary snapshot to InspectorPanel using activity reviewer sections. Typecheck passed.", "agentModel": "kimi-k2.6" },
-    { "timestamp": "2026-05-07T04:55:00Z", "reason": "checkpoint", "note": "Completed bead workspace-o1gi — fixed ReviewPipelineSection to show tests cycle counter even at cycle 0, matching CommandDeck behavior. Typecheck passed.", "agentModel": "kimi-k2.6" },
-    { "timestamp": "2026-05-07T05:00:00Z", "reason": "checkpoint", "note": "Completed bead workspace-yj23 — added explicit Open VS Code button via vscode://file/ protocol in both agent and no-agent workspace path sections. Typecheck passed.", "agentModel": "kimi-k2.6" },
-    { "timestamp": "2026-05-07T05:05:00Z", "reason": "checkpoint", "note": "Completed bead workspace-bnlk — added PR link/status section to InspectorPanel using usePrQuery. Shows PR number, title, state, diff stats, review decision. Typecheck passed.", "agentModel": "kimi-k2.6" },
-    { "timestamp": "2026-05-07T05:10:00Z", "reason": "checkpoint", "note": "Completed bead workspace-a55e — added pipeline stuck banner with warning styling and one-click RecoverButton to InspectorPanel. Typecheck passed. All beads complete.", "agentModel": "kimi-k2.6" }
+    { "timestamp": "2026-05-07T04:30:00Z", "reason": "start", "note": "Started PAN-953 implementation. Created 5 beads. Rebased onto latest main. No existing continue file.", "agentModel": "kimi-k2.6" },
+    { "timestamp": "2026-05-07T04:45:00Z", "reason": "bead", "note": "Completed workspace-8k4p: threaded agent/issue props through IssueWorkbench→ZoneCOverview→OverviewTab. Fixed Agent tile to show actual runtime harness (getHarness), uptime (formatRuntime), friendly model name, and workspace path. Added workspace path to Workspace tile.", "agentModel": "kimi-k2.6" },
+    { "timestamp": "2026-05-07T05:00:00Z", "reason": "bead", "note": "Completed workspace-qm53: fixed WorkspaceData.containers type (Record not array), removed broken container map from WORKSPACE tile, added ContainerSection with right-click context menu (restart/stop/start) to OverviewTab. Added containerControlMutation and refreshDbMutation hooks.", "agentModel": "kimi-k2.6" },
+    { "timestamp": "2026-05-07T05:15:00Z", "reason": "bead", "note": "Completed workspace-6sr5: imported ReviewPipelineSection from inspector/ and rendered it as a Section in OverviewTab when review status exists. onViewLog switches to prdiff tab.", "agentModel": "kimi-k2.6" },
+    { "timestamp": "2026-05-07T05:30:00Z", "reason": "bead", "note": "Completed workspace-nc40: imported SwitchModelModal and useSwitchModel hook, added Switch Model button to Actions tile when agent exists, rendered modal with agent props.", "agentModel": "kimi-k2.6" },
+    { "timestamp": "2026-05-07T05:45:00Z", "reason": "bead", "note": "Completed workspace-59kw: added fmtTokens helper and displayed inputTokens/outputTokens in Cost tile above per-model breakdown.", "agentModel": "kimi-k2.6" }
   ]
 }
