@@ -932,6 +932,68 @@ export async function transitionIssueToInReview(issueId: string, workspacePath?:
   return transitionIssueState(issueId, 'in_review', workspacePath);
 }
 
+export interface AgentLaunchConfig {
+  launcherContent: string;
+  providerEnv: Record<string, string>;
+}
+
+export async function buildAgentLaunchConfig(opts: {
+  agentId: string;
+  model: string;
+  workspace: string;
+  agentType: 'work' | 'resume';
+  resumeSessionId?: string;
+  isPlanning?: boolean;
+}): Promise<AgentLaunchConfig> {
+  const model = opts.model;
+
+  const providerEnv = await getProviderEnvForModel(model);
+
+  const provider = getProviderForModel(model as ModelId);
+  if (provider.authType === 'credential-file') {
+    setupCredentialFileAuth(provider, opts.workspace);
+  } else {
+    clearCredentialFileAuth(opts.workspace);
+  }
+
+  const providerExports = await getProviderExportsForModel(model);
+
+  if (opts.agentType === 'resume' && opts.resumeSessionId) {
+    const launcherContent = generateLauncherScript({
+      agentType: 'resume',
+      workingDir: opts.workspace,
+      changeDir: false,
+      setCi: true,
+      providerExports,
+      baseCommand: 'claude',
+      permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
+      resumeSessionId: opts.resumeSessionId,
+      model: providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
+    });
+    return { launcherContent, providerEnv };
+  }
+
+  const yamlConfig = loadYamlConfig();
+  const cavemanExports = await buildCavemanExports(
+    opts.workspace,
+    yamlConfig.config.caveman,
+    opts.isPlanning ?? false,
+  );
+
+  const launcherContent = generateLauncherScript({
+    agentType: 'work',
+    workingDir: opts.workspace,
+    changeDir: false,
+    setCi: true,
+    setTerminalEnv: true,
+    providerExports,
+    cavemanExports,
+    baseCommand: await getAgentRuntimeBaseCommand(model),
+  });
+
+  return { launcherContent, providerEnv };
+}
+
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   const agentId = options.slotId != null
     ? `agent-${options.issueId.toLowerCase()}-${options.slotId}`
@@ -1055,50 +1117,15 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Clear ready signal before spawning (clean slate for PAN-87 fix)
   clearReadySignal(agentId);
 
-  // Get provider-specific environment variables (BASE_URL, AUTH_TOKEN)
-  const providerEnv = await getProviderEnvForModel(selectedModel);
-
-  // Determine auth mode for OpenAI. A live Codex/ChatGPT login always wins.
-  const provider = getProviderForModel(selectedModel as ModelId);
-
-  // For credential-file providers (e.g. Kimi Code Plan), configure apiKeyHelper
-  // so Claude Code can refresh short-lived tokens dynamically.
-  // For all other providers, CLEAR any stale apiKeyHelper from previous runs
-  // (e.g. switching from Kimi to Anthropic plan-based auth).
-  if (provider.authType === 'credential-file') {
-    setupCredentialFileAuth(provider, options.workspace);
-  } else {
-    clearCredentialFileAuth(options.workspace);
-  }
-
-  // Create tmux session and start claude in interactive mode.
-  // Previous approach used a positional prompt argument (print mode) which exits after
-  // one tool-use cycle on recent Claude Code versions. The fix is to start interactive
-  // (no positional prompt), then send the prompt via sendKeysAsync once Claude is ready.
-  const providerExports = await getProviderExportsForModel(state.model);
-
-  // Build caveman env exports for the launcher script.
-  // Planning agents are excluded — their output is user-facing and must remain readable.
-  // Inspect agents are excluded because their INSPECTION PASSED/BLOCKED sentinels are
-  // parsed by Cloister and must not be compressed.
-  const yamlConfig = loadYamlConfig();
-  const cavemanExports = await buildCavemanExports(
-    options.workspace,
-    yamlConfig.config.caveman,
-    options.phase === 'planning'
-  );
+  const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
+    agentId,
+    model: selectedModel,
+    workspace: options.workspace,
+    agentType: 'work',
+    isPlanning: options.phase === 'planning',
+  });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
-  const launcherContent = generateLauncherScript({
-    agentType: 'work',
-    workingDir: options.workspace,
-    changeDir: false,
-    setCi: true,
-    setTerminalEnv: true,
-    providerExports,
-    cavemanExports,
-    baseCommand: await getAgentRuntimeBaseCommand(state.model),
-  });
   writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
   const claudeCmd = `bash ${launcherScript}`;
   console.log(`[claude-invoke] purpose=work-agent | model=${state.model} | source=agents.ts:spawnAgent | session=${agentId} | command="${claudeCmd}"`);
@@ -1627,43 +1654,16 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     // Clear ready signal before resuming (clean slate for PAN-87 fix)
     clearReadySignal(normalizedId);
 
-    // Get provider env for the agent's model (reads latest API key from settings)
-    const providerEnv = agentState.model ? await getProviderEnvForModel(agentState.model) : {};
-
-    // For credential-file providers, ensure apiKeyHelper is configured.
-    // For all other providers, clear stale apiKeyHelper from previous runs.
-    if (agentState.model) {
-      const provider = getProviderForModel(agentState.model as ModelId);
-      if (provider.authType === 'credential-file') {
-        setupCredentialFileAuth(provider, agentState.workspace);
-      } else {
-        clearCredentialFileAuth(agentState.workspace);
-      }
-    }
-
-    // Create new tmux session with resume command.
-    // Write a launcher.sh that unsets any leaked provider env vars (ANTHROPIC_BASE_URL,
-    // ANTHROPIC_AUTH_TOKEN, etc — see PAN-705) and then execs claude --resume. tmux's
-    // `-e KEY=VALUE` flag can only SET env, not UNSET — so env cleanup must happen
-    // inside the shell tmux spawns. This mirrors the spawnAgent pattern at ~line 806.
     const model = agentState.model || 'claude-sonnet-4-6';
-    const providerExports = await getProviderExportsForModel(model);
-    // Non-Anthropic models route through a proxy (ANTHROPIC_BASE_URL). Without an explicit
-    // --model flag, Claude Code defaults to claude-sonnet-4-6 on resume, sending claude
-    // requests through the proxy → "unknown provider" 502. Always include --model when
-    // providerExports sets ANTHROPIC_BASE_URL so the resumed session uses the correct model.
-    const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
-    const launcherContent = generateLauncherScript({
+    const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
+      agentId: normalizedId,
+      model,
+      workspace: agentState.workspace,
       agentType: 'resume',
-      workingDir: agentState.workspace,
-      changeDir: false,
-      setCi: true,
-      providerExports,
-      baseCommand: 'claude',
-      permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
       resumeSessionId: sessionId,
-      model: providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
     });
+
+    const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
     const claudeCmd = `bash ${launcherScript}`;
 
