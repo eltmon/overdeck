@@ -355,9 +355,10 @@ export function getClaudishPrefix(model: string, authMode?: string): string {
     return `go@${model}`;
   }
 
-  // Kimi models — explicit kimi@ prefix (claudish auto-detect misses K2.6-code-preview)
+  // Kimi models — kc@ prefix routes to api.kimi.com/coding/v1 (kimi-coding provider).
+  // sk-kimi-* keys are coding keys, NOT moonshot platform keys (kimi@ → api.moonshot.ai).
   if (['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(model)) {
-    return `kimi@${model}`;
+    return `kc@${model}`;
   }
 
   // MiniMax models — explicit mm@ prefix

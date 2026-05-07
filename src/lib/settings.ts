@@ -129,7 +129,8 @@ export function loadSettings(): SettingsConfig {
   if (process.env.OPENAI_API_KEY) envApiKeys.openai = process.env.OPENAI_API_KEY;
   if (process.env.GOOGLE_API_KEY) envApiKeys.google = process.env.GOOGLE_API_KEY;
   if (process.env.MINIMAX_API_KEY) envApiKeys.minimax = process.env.MINIMAX_API_KEY;
-  if (process.env.KIMI_API_KEY) envApiKeys.kimi = process.env.KIMI_API_KEY;
+  if (process.env.KIMI_CODING_API_KEY) envApiKeys.kimi = process.env.KIMI_CODING_API_KEY;
+  else if (process.env.KIMI_API_KEY) envApiKeys.kimi = process.env.KIMI_API_KEY;
   if (process.env.MIMO_API_KEY) envApiKeys.mimo = process.env.MIMO_API_KEY;
 
   // Merge env vars as fallback (settings.json takes precedence)

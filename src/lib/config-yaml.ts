@@ -1145,8 +1145,9 @@ export function loadConfig(): ConfigLoadResult {
       config.enabledProviders.add('zai');
     }
   }
-  if (process.env.KIMI_API_KEY && !config.apiKeys.kimi) {
-    config.apiKeys.kimi = process.env.KIMI_API_KEY;
+  const kimiKey = process.env.KIMI_CODING_API_KEY || process.env.KIMI_API_KEY;
+  if (kimiKey && !config.apiKeys.kimi) {
+    config.apiKeys.kimi = kimiKey;
     if (!explicitlyDisabled.has('kimi')) {
       config.enabledProviders.add('kimi');
     }
