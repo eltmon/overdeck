@@ -23,7 +23,7 @@ export function PanOpenInPicker({ cwd }: PanOpenInPickerProps) {
     let cancelled = false;
     getTransport()
       .request((client) =>
-        (client as PanRpcProtocolClient)[WS_METHODS.getAvailableEditors]({}),
+        (client as PanRpcProtocolClient)[WS_METHODS.getAvailableEditors](),
       )
       .then((result) => {
         if (cancelled) return;
