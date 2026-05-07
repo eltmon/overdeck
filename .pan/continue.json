@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-964",
   "created": "2026-05-07T03:30:00Z",
-  "updated": "2026-05-07T03:40:00Z",
+  "updated": "2026-05-07T03:45:00Z",
   "gitState": { "branch": "feature/pan-964", "sha": "$(git rev-parse --short HEAD)", "dirty": true },
   "decisions": [
     { "id": "D1", "summary": "Switch all non-Anthropic providers (kimi, minimax, zai, mimo, openrouter) from direct to claudish routing to fix 502 unknown provider errors in Claude Code v2.1.121", "recordedAt": "2026-05-07T03:30:00Z" },
@@ -14,9 +14,9 @@
     { "id": "H2", "summary": "Mimo custom URL syntax in claudish is experimental", "mitigation": "Base URL hardcoded to match providers.ts; probe verified claudish parses it correctly" }
   ],
   "resumePoint": {
-    "description": "Implementing bead workspace-spb2 (frontend badges) — ProviderPanel.tsx updated. Next: update tests.",
-    "beadId": "workspace-spb2",
-    "filesToRead": ["tests/lib/agents-auth-routing.test.ts", "tests/lib/providers.test.ts"]
+    "description": "Implementing bead workspace-oodn (update tests) — agents-auth-routing and providers tests updated and passing. Next: run full test suite and typecheck before calling pan done.",
+    "beadId": "workspace-oodn",
+    "filesToRead": []
   },
   "beadsMapping": {},
   "agentModel": "kimi-k2.6",
