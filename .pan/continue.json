@@ -2,26 +2,35 @@
   "version": "1",
   "issueId": "PAN-979",
   "created": "2026-05-06T20:20:00Z",
-  "updated": "2026-05-06T20:20:00Z",
-  "gitState": { "branch": "feature/pan-979", "sha": "714e0c8", "dirty": true },
+  "updated": "2026-05-06T20:42:00Z",
+  "gitState": { "branch": "feature/pan-979", "sha": "5835488", "dirty": false },
   "decisions": [
-    { "id": "D1", "summary": "Prioritize DAG canvas front-loading per user directive. Fix edges first, then duplicate entries, then node enrichment, then gate nodes.", "recordedAt": "2026-05-06T20:20:00Z" }
+    { "id": "D1", "summary": "Prioritize DAG canvas front-loading per user directive. Fix edges first, then duplicate entries, then node enrichment, then gate nodes.", "recordedAt": "2026-05-06T20:20:00Z" },
+    { "id": "D2", "summary": "Removed vbrief/state/prd ActionKeys from Command Deck surface entirely — they remain as ZoneCOverview tabs only. Updated ALL_ACTION_KEYS, surface registry, legacy action map, and all tests.", "recordedAt": "2026-05-06T20:35:00Z" },
+    { "id": "D3", "summary": "SessionNode phase icons use toolNameToPhase() from workingPhase.ts to map currentTool → Lucide icon. Spinner phases get animate-spin.", "recordedAt": "2026-05-06T20:40:00Z" }
   ],
   "hazards": [
-    { "id": "H1", "summary": "PlanDAG.tsx edge code looks correct but user reports no visible edges — need to verify rendering.", "mitigation": "Test with actual vBRIEF data and inspect ReactFlow output." }
+    { "id": "H1", "summary": "Pre-existing test failures in integration/cli tests unrelated to frontend changes. 12 root-level tests fail but 68 frontend test files pass.", "mitigation": "Only frontend test results matter for dashboard changes." },
+    { "id": "H2", "summary": "User is about to restart on different model — continue file must stay current.", "mitigation": "Updated continue.json with all changes before proceeding." }
   ],
   "resumePoint": {
-    "description": "Implementing PAN-979 Directive Flow. Starting with fixing PlanDAG edges and front-loading DAG into OverviewTab. Need to read OverviewTab fully and integrate PlanDAG.",
-    "beadId": "pan-979-edges",
+    "description": "Redesigning IssueHeader pipeline (StageDot → bold progress tracker with pills, icons, glow). Next: add CheckCircle/Loader2/AlertTriangle icons per stage, make active stage pulse prominently. Then enrich PlanDAG nodes (bead progress, agent info, cost) and add quality gate nodes (VERIFY/REVIEW/TEST/MERGE/DONE).",
+    "beadId": "pan-979-enrich",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx",
-      "src/dashboard/frontend/src/components/PlanDAG.tsx",
-      "src/dashboard/frontend/src/components/vbrief/VBriefViewer.tsx"
+      "src/dashboard/frontend/src/components/CommandDeck/SessionView/IssueHeader.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/PlanDAG.tsx"
     ]
   },
-  "beadsMapping": {},
+  "beadsMapping": {
+    "pan-979-dedup": "3d2ac40db",
+    "pan-979-edges": "aa9782d5c"
+  },
   "agentModel": "kimi-k2.6",
   "sessionHistory": [
-    { "timestamp": "2026-05-06T20:20:00Z", "reason": "start", "note": "Fresh session. Created 4 beads for PAN-979. Prioritizing DAG edges and Overview integration per user directive.", "agentModel": "kimi-k2.6" }
+    { "timestamp": "2026-05-06T20:20:00Z", "reason": "start", "note": "Fresh session. Created 4 beads for PAN-979. Prioritizing DAG edges and Overview integration per user directive.", "agentModel": "kimi-k2.6" },
+    { "timestamp": "2026-05-06T20:35:00Z", "reason": "progress", "note": "Closed pan-979-dedup: removed duplicate vBRIEF/STATE/PRD from ZoneActionStrip and OverviewTab quick links. Updated tests.", "agentModel": "kimi-k2.6" },
+    { "timestamp": "2026-05-06T20:38:00Z", "reason": "progress", "note": "Closed pan-979-edges: front-loaded PlanDAG into OverviewTab with 520px section. Improved edge visibility (thicker strokes, brighter colors, edge count header). Removed vbrief/state/prd ActionKeys and updated all parity tests.", "agentModel": "kimi-k2.6" },
+    { "timestamp": "2026-05-06T20:41:00Z", "reason": "progress", "note": "Added rich PhaseIcon to SessionNode in ProjectTree — maps currentTool via toolNameToPhase() to Lucide icons (Terminal, FileText, Search, Globe, Bot, Wrench, Loader2). Committed.", "agentModel": "kimi-k2.6" }
   ]
 }
