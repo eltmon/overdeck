@@ -33,7 +33,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { chmod, mkdir, unlink, appendFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, unlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -416,25 +416,24 @@ async function main(): Promise<void> {
 
   const httpServer = await startUnixListener(server, agentId);
 
-  const shutdown = async (): Promise<void> => {
+  let shuttingDown = false;
+  const shutdown = (): void => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     try {
-      await httpServer.stop();
+      unlinkSync(getSocketPath(agentId));
     } catch {
       // best-effort
     }
     try {
-      await unlink(getSocketPath(agentId));
+      void httpServer.stop();
     } catch {
       // best-effort
     }
     process.exit(0);
   };
-  process.on('SIGTERM', () => {
-    void shutdown();
-  });
-  process.on('SIGINT', () => {
-    void shutdown();
-  });
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 }
 
 // Entrypoint: only run when invoked directly. Tests import the module to

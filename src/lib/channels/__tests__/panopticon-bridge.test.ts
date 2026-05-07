@@ -281,8 +281,12 @@ describe.skipIf(!hasBun)('panopticon-bridge subprocess (Bun.serve unix listener)
       const mode = statSync(sockPath).mode & 0o777;
       expect(mode).toBe(0o600);
 
-      // SIGTERM should unlink
+      // SIGTERM should unlink and exit cleanly.
+      const exitPromise = new Promise<number | null>((resolve) => {
+        proc?.once('exit', (code) => resolve(code));
+      });
       proc.kill('SIGTERM');
+      expect(await exitPromise).toBe(0);
       for (let i = 0; i < 30 && existsSync(sockPath); i++) {
         await new Promise((r) => setTimeout(r, 100));
       }
