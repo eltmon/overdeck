@@ -15,6 +15,7 @@
  */
 
 import { useMemo, useState } from 'react';
+import { getHarness } from '@panctl/contracts';
 import type { Issue, Agent } from '../../../types';
 import { LiveCounter } from '../LiveCounter';
 import { ActivitySparkline } from '../ActivitySparkline';
@@ -36,6 +37,7 @@ import { useConfirm } from '../../DialogProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { GitPullRequest, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Box, Link2, Terminal, Play, Pause, ExternalLink, Code2, Loader2, RotateCcw } from 'lucide-react';
 import { PlanDAGViewer } from '../../PlanDAG.js';
+import { getFriendlyModelName } from '../../inspector/utils';
 
 interface OverviewTabProps {
   issueId: string;
@@ -439,9 +441,15 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         <Tile title="Agent" icon={<Box size={14} />} testid="overview-tile-agent">
           {agent ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
-              <span><strong>Model:</strong> {agent.model}</span>
-              <span><strong>Runtime:</strong> {formatRuntime(agent.startedAt)}</span>
+              <span><strong>Model:</strong> {getFriendlyModelName(agent.model)}</span>
+              <span><strong>Runtime:</strong> {getHarness(agent)}</span>
+              <span><strong>Uptime:</strong> {formatRuntime(agent.startedAt)}</span>
               <span><strong>Status:</strong> {agent.status}</span>
+              {agent.workspace && (
+                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted-foreground)' }} title={agent.workspace}>
+                  {agent.workspace}
+                </span>
+              )}
               {workspace.data?.agentSessionId && (
                 <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted-foreground)' }}>
                   {workspace.data.agentSessionId}
@@ -450,7 +458,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
             </div>
           ) : workspace.data?.hasAgent ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
-              <span><strong>Model:</strong> {workspace.data.agentModelFull || workspace.data.agentModel || 'unknown'}</span>
+              <span><strong>Model:</strong> {getFriendlyModelName(workspace.data.agentModelFull || workspace.data.agentModel)}</span>
               {workspace.data.agentSessionId && (
                 <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted-foreground)' }}>
                   {workspace.data.agentSessionId}
@@ -752,6 +760,11 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         {/* WORKSPACE tile */}
         <Tile title="Workspace" icon={<Box size={14} />} testid="overview-tile-workspace">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {workspace.data?.path && (
+              <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted-foreground)' }} title={workspace.data.path}>
+                {workspace.data.path}
+              </span>
+            )}
             {workspace.data?.containers && workspace.data.containers.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {workspace.data.containers.map((c) => (

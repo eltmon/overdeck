@@ -1,0 +1,28 @@
+{
+  "version": "1",
+  "issueId": "PAN-953",
+  "created": "2026-05-07T04:30:00Z",
+  "updated": "2026-05-07T04:30:00Z",
+  "gitState": { "branch": "feature/pan-953", "sha": "c2d06040", "dirty": false },
+  "decisions": [
+    { "id": "D1", "summary": "Create 5 beads covering all missing inspector parity items", "recordedAt": "2026-05-07T04:30:00Z" },
+    { "id": "D2", "summary": "Reuse existing inspector components (ContainerSection, ReviewPipelineSection) where possible to avoid duplication", "recordedAt": "2026-05-07T04:30:00Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "OverviewTab uses inline styles while inspector uses Tailwind classes — mixing may look inconsistent", "mitigation": "Style ContainerSection and pipeline to match command deck aesthetic using inline styles, or wrap inspector components" }
+  ],
+  "resumePoint": {
+    "description": "Implement bead workspace-8k4p (Fix Agent tile: show runtime, uptime, workspace path). Thread agent/issue props through ZoneCOverview to OverviewTab, then fix Agent tile to show actual runtime harness, uptime duration, and workspace path.",
+    "beadId": "workspace-8k4p",
+    "filesToRead": [
+      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverview.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/IssueWorkbench.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx"
+    ]
+  },
+  "beadsMapping": {},
+  "agentModel": "kimi-k2.6",
+  "sessionHistory": [
+    { "timestamp": "2026-05-07T04:30:00Z", "reason": "start", "note": "Started PAN-953 implementation. Created 5 beads. Rebased onto latest main. No existing continue file.", "agentModel": "kimi-k2.6" }
+  ]
+}
