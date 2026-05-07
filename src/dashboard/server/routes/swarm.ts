@@ -23,7 +23,8 @@ import { getSystemHealthSnapshot, getResourceConfig, type SystemHealthSnapshot }
 import { evaluateSpawnGuardrails } from './agents.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { findPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
-import { groupItemsByWave, type Wave } from '../../../lib/vbrief/dag.js';
+import { groupItemsByWave, type Wave, type WaveItem } from '../../../lib/vbrief/dag.js';
+import type { VBriefDocument, VBriefItem } from '../../../lib/vbrief/types.js';
 import { spawnAgent, type SpawnOptions } from '../../../lib/agents.js';
 import { listSessionNamesAsync, isPaneDeadAsync, killSessionAsync } from '../../../lib/tmux.js';
 
@@ -323,9 +324,9 @@ const postSwarmRoute = HttpRouter.add(
 
       // Build the slot-specific prompt
       const itemPrompt = buildSlotPrompt(
-        item.id,
-        item.title,
-        doc.plan.id,
+        doc,
+        issueUpper,
+        item,
         waveIndex,
         slotNum,
         worktreeResult.branch,
@@ -395,28 +396,98 @@ const postSwarmRoute = HttpRouter.add(
   })),
 );
 
+interface StructuredSlotTaskInput {
+  schema: 'AgentTaskInput';
+  agent_id: string;
+  issue_id: string;
+  plan_id: string;
+  task_id: string;
+  title: string;
+  wave_index: number;
+  slot: number;
+  branch: string;
+  pr_target: string;
+  workspace_plan_path: string;
+  dependencies: Array<{ item_id: string; title: string }>;
+  acceptance_criteria: string[];
+}
+
+function extractAcceptanceCriteria(item: VBriefItem): string[] {
+  return (item.subItems ?? [])
+    .filter(subItem => subItem.metadata?.kind === 'acceptance_criterion')
+    .map(subItem => subItem.title);
+}
+
+function buildStructuredSlotTaskInput(
+  doc: VBriefDocument,
+  issueId: string,
+  item: WaveItem,
+  waveIndex: number,
+  slotNum: number,
+  slotBranch: string,
+  parentBranch: string,
+): StructuredSlotTaskInput {
+  const fullItem = doc.plan.items.find(planItem => planItem.id === item.id);
+  const itemById = new Map(doc.plan.items.map(planItem => [planItem.id, planItem]));
+  const issueLower = issueId.toLowerCase();
+
+  return {
+    schema: 'AgentTaskInput',
+    agent_id: `agent-${issueLower}-${slotNum}`,
+    issue_id: issueId,
+    plan_id: doc.plan.id,
+    task_id: item.id,
+    title: item.title,
+    wave_index: waveIndex,
+    slot: slotNum,
+    branch: slotBranch,
+    pr_target: parentBranch,
+    workspace_plan_path: '.pan/spec.vbrief.json',
+    dependencies: item.blockedBy.map((dependencyId) => ({
+      item_id: dependencyId,
+      title: itemById.get(dependencyId)?.title ?? dependencyId,
+    })),
+    acceptance_criteria: fullItem ? extractAcceptanceCriteria(fullItem) : [],
+  };
+}
+
 function buildSlotPrompt(
-  itemId: string,
-  itemTitle: string,
-  planId: string,
+  doc: VBriefDocument,
+  issueId: string,
+  item: WaveItem,
   waveIndex: number,
   slotNum: number,
   slotBranch: string,
   parentBranch: string,
 ): string {
+  const taskInput = buildStructuredSlotTaskInput(
+    doc,
+    issueId,
+    item,
+    waveIndex,
+    slotNum,
+    slotBranch,
+    parentBranch,
+  );
+
   return [
-    `You are swarm slot ${slotNum} working on wave ${waveIndex} of plan ${planId}.`,
-    `Your assigned task is: **${itemId}: ${itemTitle}**`,
+    `You are swarm slot ${slotNum} working on wave ${waveIndex} of plan ${doc.plan.id}.`,
+    `Your assigned task is: **${item.id}: ${item.title}**`,
     '',
     'Focus ONLY on this specific task from the vBRIEF plan.',
     'The plan is in .pan/spec.vbrief.json — read it for full context, acceptance criteria, and dependencies.',
+    '',
+    'Structured AgentTaskInput:',
+    '```json',
+    JSON.stringify(taskInput, null, 2),
+    '```',
     '',
     `Your slot branch: **${slotBranch}**`,
     `Parent feature branch (merge target): **${parentBranch}**`,
     '',
     'When your task is complete:',
     `1. Commit your changes to branch \`${slotBranch}\``,
-    `2. Find your bead: \`bd list -l ${planId.toLowerCase()} --status open\` and look for the one matching "${itemTitle}"`,
+    `2. Find your bead: \`bd list -l ${doc.plan.id.toLowerCase()} --status open\` and look for the one matching "${item.title}"`,
     `3. Close it: \`bd close <bead-id>\``,
     `4. Push branch \`${slotBranch}\``,
     `5. Create a PR targeting \`${parentBranch}\` — do NOT target main`,
