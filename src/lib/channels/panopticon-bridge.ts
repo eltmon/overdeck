@@ -39,6 +39,10 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { chmod, mkdir, unlink, appendFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 
 const AGENT_ID = process.env.PANOPTICON_AGENT_ID;
 if (!AGENT_ID) {
@@ -79,19 +83,172 @@ export const server: Server = new Server(
   },
 );
 
+/**
+ * Resolve PANOPTICON_HOME with the same fallback semantics as the rest of the
+ * codebase: env var first, then ~/.panopticon.
+ */
+export function getPanopticonHome(): string {
+  return process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon');
+}
+
+export function getSocketPath(agentId: string): string {
+  return join(getPanopticonHome(), 'sockets', `agent-${agentId}.sock`);
+}
+
+export function getBridgeLogPath(agentId: string): string {
+  return join(getPanopticonHome(), 'logs', `bridge-${agentId}.log`);
+}
+
+export interface ChannelPushPayload {
+  content: string;
+  meta?: Record<string, string>;
+}
+
+export interface ChannelPushResult {
+  ok: boolean;
+  status: number;
+  body: unknown;
+}
+
+/**
+ * Validate and translate a single inbound POST payload into a channel
+ * notification. Exposed so unit tests can drive the same code path the
+ * Unix socket listener uses without binding a real socket.
+ */
+export async function pushChannelNotification(
+  mcp: Server,
+  payload: unknown,
+  agentId: string,
+): Promise<ChannelPushResult> {
+  if (
+    payload === null ||
+    typeof payload !== 'object' ||
+    typeof (payload as { content?: unknown }).content !== 'string' ||
+    !((payload as { content: string }).content.length > 0)
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      body: { error: 'content is required and must be a non-empty string' },
+    };
+  }
+  const { content, meta } = payload as ChannelPushPayload;
+
+  await mcp.notification({
+    method: 'notifications/claude/channel',
+    params: {
+      source: 'panopticon-bridge',
+      content,
+      ...(meta ? { meta } : {}),
+    },
+  });
+
+  await appendBridgeLog(agentId, {
+    contentLength: content.length,
+    metaKeys: meta ? Object.keys(meta) : [],
+  });
+
+  return { ok: true, status: 200, body: 'ok' };
+}
+
+async function appendBridgeLog(
+  agentId: string,
+  entry: { contentLength: number; metaKeys: string[] },
+): Promise<void> {
+  const logPath = getBridgeLogPath(agentId);
+  await mkdir(dirname(logPath), { recursive: true });
+  const line = JSON.stringify({
+    ts: new Date().toISOString(),
+    agentId,
+    contentLength: entry.contentLength,
+    metaKeys: entry.metaKeys,
+  });
+  await appendFile(logPath, `${line}\n`, 'utf-8');
+}
+
+interface UnixHttpServer {
+  stop: () => void | Promise<void>;
+}
+
+interface BunGlobal {
+  serve: (opts: {
+    unix: string;
+    fetch: (req: Request) => Response | Promise<Response>;
+  }) => UnixHttpServer;
+}
+
+async function startUnixListener(mcp: Server, agentId: string): Promise<UnixHttpServer> {
+  const socketPath = getSocketPath(agentId);
+  await mkdir(dirname(socketPath), { recursive: true, mode: 0o700 });
+  if (existsSync(socketPath)) {
+    // Pre-existing socket from a prior crashed bridge — unlink before bind.
+    // This is intentional, see header comment.
+    await unlink(socketPath);
+  }
+
+  const bunGlobal = (globalThis as unknown as { Bun?: BunGlobal }).Bun;
+  if (!bunGlobal || typeof bunGlobal.serve !== 'function') {
+    throw new Error(
+      'panopticon-bridge: Bun.serve is required for the Unix socket listener. ' +
+        'Run this script under Bun (bun run src/lib/channels/panopticon-bridge.ts).',
+    );
+  }
+
+  const httpServer = bunGlobal.serve({
+    unix: socketPath,
+    fetch: async (req: Request) => {
+      if (req.method !== 'POST') {
+        return new Response(JSON.stringify({ error: 'method not allowed' }), {
+          status: 405,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      let parsed: unknown;
+      try {
+        parsed = await req.json();
+      } catch {
+        return new Response(JSON.stringify({ error: 'invalid JSON body' }), {
+          status: 400,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      const result = await pushChannelNotification(mcp, parsed, agentId);
+      const headers = { 'content-type': result.status === 200 ? 'text/plain' : 'application/json' };
+      const body =
+        typeof result.body === 'string' ? result.body : JSON.stringify(result.body);
+      return new Response(body, { status: result.status, headers });
+    },
+  });
+
+  await chmod(socketPath, 0o600);
+  return httpServer;
+}
+
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  // TODO(workspace-bvzr): bind the Unix-socket inbound listener at
-  // ${PANOPTICON_HOME}/sockets/agent-<id>.sock and forward every payload as
-  // a `notifications/channel` notification through `server.notification`.
-  // The unlink-on-startup is documented in the header comment above; do
-  // not move it elsewhere.
+  const httpServer = await startUnixListener(server, AGENT_ID!);
 
-  // Block on stdin so Bun does not exit before claude tears down the
-  // process. Claude closes stdin when the parent session ends, which
-  // cleanly resolves the StdioServerTransport.
+  const shutdown = async (): Promise<void> => {
+    try {
+      await httpServer.stop();
+    } catch {
+      // best-effort
+    }
+    try {
+      await unlink(getSocketPath(AGENT_ID!));
+    } catch {
+      // best-effort
+    }
+    process.exit(0);
+  };
+  process.on('SIGTERM', () => {
+    void shutdown();
+  });
+  process.on('SIGINT', () => {
+    void shutdown();
+  });
 }
 
 // Entrypoint: only run when invoked directly. Tests import the module to
