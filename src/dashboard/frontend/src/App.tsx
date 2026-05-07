@@ -292,13 +292,17 @@ export default function App() {
   const [planDialogIssueId, setPlanDialogIssueId] = useState<string | null>(null);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [detailPanelOpen, setDetailPanelOpen] = useState(false);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [trackerBannerDismissed, setTrackerBannerDismissed] = useState(false);
 
   useEffect(() => {
     if (!selectedIssue) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSelectedIssue(null);
+      if (event.key === 'Escape') {
+        setDetailPanelOpen(false);
+        setSelectedIssue(null);
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
