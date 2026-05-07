@@ -418,6 +418,47 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     console.warn(`[merge-agent] Docker cleanup failed (non-fatal): ${err}`);
   }
 
+  // 7. Teardown workspace directory + delete feature branches (PAN-925)
+  // Uses the consolidated teardownWorkspace module which handles: tmux sessions (idempotent
+  // with step 5), TLDR daemon, Docker (idempotent with step 6), worktree removal, agent
+  // state cleanup, and branch deletion. Steps already performed above are no-ops.
+  try {
+    const { teardownWorkspace } = await import('../lifecycle/teardown-workspace.js');
+    const ctx = { issueId, projectPath };
+    const teardownResults = await teardownWorkspace(ctx, { deleteBranches: true });
+    const completedSteps = teardownResults.filter(r => r.success && !r.skipped);
+    if (completedSteps.length > 0) {
+      const summary = completedSteps.map(r => r.details?.join('; ') || r.step).join(' | ');
+      console.log(`[merge-agent] ✓ Workspace teardown: ${summary}`);
+      logActivity('workspace_teardown', `Workspace teardown for ${issueId}: ${summary}`);
+    } else {
+      console.log(`[merge-agent] Workspace teardown: nothing to clean up for ${issueId}`);
+    }
+  } catch (err) {
+    console.warn(`[merge-agent] Workspace teardown failed (non-fatal): ${err}`);
+  }
+
+  // 8. Apply 'needs-close-out' label to signal the user that close-out ceremony is pending (PAN-925)
+  // The close-out ceremony is human-gated — it verifies PRD preservation, branch merge status,
+  // and applies the final 'closed-out' label. We don't auto-trigger it because the user must
+  // confirm the work is truly complete before final sign-off.
+  try {
+    const ghResolved = resolveGitHubIssue(issueId);
+    if (ghResolved.isGitHub) {
+      const { owner, repo, number } = ghResolved;
+      // Ensure the label exists (--force is idempotent)
+      await execAsync(
+        `gh label create "needs-close-out" --repo ${owner}/${repo} --color "fbca04" --description "Merged — awaiting close-out ceremony" --force 2>/dev/null || true`,
+      );
+      await execAsync(
+        `gh issue edit ${number} --repo ${owner}/${repo} --add-label "needs-close-out"`,
+      );
+      console.log(`[merge-agent] ✓ Applied 'needs-close-out' label on GitHub #${number}`);
+    }
+  } catch (err) {
+    console.warn(`[merge-agent] Could not apply needs-close-out label (non-fatal): ${err}`);
+  }
+
   // Mark completed BEFORE logging — prevents re-entry even if the log line triggers something
   _completedPostMerge.add(issueId);
 
