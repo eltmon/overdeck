@@ -259,6 +259,17 @@ export async function getProviderExportsForModel(model: string): Promise<string>
   const unsetLines = PROVIDER_ENV_KEYS.map(key => `unset ${key}`);
   const exportLines = Object.entries(envVars)
     .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`);
+
+  // claudish bundles an older Claude Code that crashes on some model metadata.
+  // Point CLAUDE_PATH at the system binary so claudish uses the global install.
+  const provider = getProviderForModel(model as ModelId);
+  if (provider.compatibility === 'claudish') {
+    try {
+      const claudePath = execSync('which claude', { encoding: 'utf8' }).trim();
+      if (claudePath) exportLines.push(`export CLAUDE_PATH="${claudePath}"`);
+    } catch { /* system claude not found — claudish will use its bundled copy */ }
+  }
+
   return [...unsetLines, ...exportLines].join('\n') + '\n';
 }
 
