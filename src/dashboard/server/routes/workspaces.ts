@@ -101,6 +101,7 @@ import { runVerificationForIssue } from '../../../lib/cloister/verification-runn
 import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
 import { loadWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
 import { extractPrefix, extractNumber, parseIssueId } from '../../../lib/issue-id.js';
+import { getContainersReferencingWorkspacePath } from '../../../lib/workspace-manager.js';
 import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
 import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
@@ -1734,6 +1735,20 @@ const postWorkspaceCleanRoute = HttpRouter.add(
     }
 
     console.log(`Removing corrupted workspace: ${workspacePath}`);
+
+    // Guard: never delete workspace while containers still reference its compose path
+    const orphanedContainers = yield* Effect.promise(() =>
+      getContainersReferencingWorkspacePath(workspacePath)
+    );
+    if (orphanedContainers.length > 0) {
+      return jsonResponse(
+        {
+          error: `Cannot remove workspace: ${orphanedContainers.length} Docker container(s) still reference compose paths in this workspace. Stop the containers first.`,
+        },
+        { status: 409 },
+      );
+    }
+
     try {
       yield* Effect.promise(() => execAsync(`rm -rf "${workspacePath}"`, {
         encoding: 'utf-8',
