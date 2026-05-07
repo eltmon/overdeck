@@ -6,7 +6,8 @@
  *   GET  /api/swarm/:issueId — get swarm state for an issue
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, relative } from 'node:path';
 import { exec } from 'node:child_process';
@@ -59,21 +60,22 @@ function getSwarmStatePath(issueId: string): string {
   return join(getSwarmDir(), `${issueId.toLowerCase()}.json`);
 }
 
-function loadSwarmState(issueId: string): SwarmState | null {
+async function loadSwarmState(issueId: string): Promise<SwarmState | null> {
   const path = getSwarmStatePath(issueId);
   if (!existsSync(path)) return null;
   try {
-    return JSON.parse(readFileSync(path, 'utf-8'));
+    const data = await readFile(path, 'utf-8');
+    return JSON.parse(data);
   } catch {
     return null;
   }
 }
 
-function saveSwarmState(state: SwarmState): void {
+async function saveSwarmState(state: SwarmState): Promise<void> {
   const dir = getSwarmDir();
-  mkdirSync(dir, { recursive: true });
+  await mkdir(dir, { recursive: true });
   state.updatedAt = new Date().toISOString();
-  writeFileSync(getSwarmStatePath(state.issueId), JSON.stringify(state, null, 2));
+  await writeFile(getSwarmStatePath(state.issueId), JSON.stringify(state, null, 2));
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -140,9 +142,9 @@ async function createSlotWorktree(
       const redirectPath = join(worktreeBeadsDir, 'redirect');
       if (!existsSync(redirectPath)) {
         try {
-          mkdirSync(worktreeBeadsDir, { recursive: true });
+          await mkdir(worktreeBeadsDir, { recursive: true });
           const relPath = relative(workspacePath, sourceBeadsDir);
-          writeFileSync(redirectPath, relPath, 'utf-8');
+          await writeFile(redirectPath, relPath, 'utf-8');
         } catch {}
       }
     }
@@ -306,15 +308,17 @@ const postSwarmRoute = HttpRouter.add(
       // Copy the vBRIEF plan into the slot workspace
       const planPath = findPlan(mainWorkspace);
       if (planPath) {
-        const slotPanDir = join(worktreeResult.workspacePath, '.pan');
-        mkdirSync(slotPanDir, { recursive: true });
-        const slotPlanPath = join(slotPanDir, 'spec.vbrief.json');
-        if (!existsSync(slotPlanPath)) {
-          try {
-            const planContent = readFileSync(planPath, 'utf-8');
-            writeFileSync(slotPlanPath, planContent);
-          } catch {}
-        }
+        yield* Effect.promise(async () => {
+          const slotPanDir = join(worktreeResult.workspacePath, '.pan');
+          await mkdir(slotPanDir, { recursive: true });
+          const slotPlanPath = join(slotPanDir, 'spec.vbrief.json');
+          if (!existsSync(slotPlanPath)) {
+            try {
+              const planContent = await readFile(planPath, 'utf-8');
+              await writeFile(slotPlanPath, planContent);
+            } catch {}
+          }
+        });
       }
 
       // Build the slot-specific prompt
@@ -357,7 +361,7 @@ const postSwarmRoute = HttpRouter.add(
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    saveSwarmState(state);
+    yield* Effect.promise(() => saveSwarmState(state));
 
     return jsonResponse({
       success: true,
@@ -411,7 +415,7 @@ const getSwarmRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
 
-    const state = loadSwarmState(issueId);
+    const state = yield* Effect.promise(() => loadSwarmState(issueId));
     if (!state) {
       return jsonResponse({ error: `No swarm state for ${issueId}` }, { status: 404 });
     }
