@@ -6,6 +6,7 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
+import { getClaudePermissionFlagsString } from './claude-permissions.js';
 import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sendRawKeystrokeAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync, waitForClaudePrompt } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
@@ -143,7 +144,7 @@ export async function getAgentRuntimeBaseCommand(
 
 
   const provider = getProviderForModel(model);
-  const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
+  const permissionFlags = getClaudePermissionFlagsString();
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
   // `claude --resume`. Claudish forwards unrecognized flags to Claude Code, so --name works
   // there too.
@@ -180,8 +181,11 @@ export async function getAgentRuntimeBaseCommand(
   // Claudish wrapper path — claudish ≤7.0.3 flag passthrough is broken (Commander.js
   // rejects --agent, --name as unknown). Skip Claude Code-specific flags; model +
   // permissions are set directly, workspace CLAUDE.md + vBRIEF provide agent context.
+  // Force bypass: `--permission-mode auto` is a Claude Code research-preview feature
+  // and doesn't translate through claudish to MiniMax/Kimi/GLM/OpenRouter/Mimo backends.
   const routedModel = await getLaunchModelForModel(model);
-  return `claudish -i --model ${routedModel} ${permissionFlags}`;
+  const claudishFlags = getClaudePermissionFlagsString('bypass');
+  return `claudish -i --model ${routedModel} ${claudishFlags}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */

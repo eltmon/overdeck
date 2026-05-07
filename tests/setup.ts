@@ -14,6 +14,11 @@ export const TEMP_DIR = join(__dirname, '.temp');
 // conflict tests finish in milliseconds instead of 5s each. See merge-agent.ts.
 process.env.PANOPTICON_TEST_POLL_MS = '10';
 
+// Don't pin PAN_YOLO globally — tests should exercise the production default
+// (auto mode). Test files that assert on the legacy bypass strings opt in
+// locally with `process.env.PAN_YOLO = 'true'` in their beforeEach.
+delete process.env.PAN_YOLO;
+
 // Clean up temp directory before each test
 beforeEach(() => {
   try {

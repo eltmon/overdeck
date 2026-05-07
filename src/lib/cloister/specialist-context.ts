@@ -12,6 +12,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from '
 import { join } from 'path';
 import { exec } from 'child_process';
 import { getPanopticonHome } from '../paths.js';
+import { getClaudePermissionFlagsString } from '../claude-permissions.js';
 import type { RunLogEntry } from './specialist-logs.js';
 import { getProject } from '../projects.js';
 import { getModelId } from '../work-type-router.js';
@@ -174,8 +175,9 @@ export async function generateContextDigest(
     const { getProviderEnvForModel } = await import('../agents.js');
     const providerEnv = await getProviderEnvForModel(model);
     const envPrefix = Object.entries(providerEnv).map(([k, v]) => `${k}="${v}"`).join(' ');
+    const permissionFlags = getClaudePermissionFlagsString();
     const { stdout, stderr } = await execAsync(
-      `${envPrefix ? envPrefix + ' ' : ''}claude --dangerously-skip-permissions --permission-mode bypassPermissions --model ${model} "$(cat '${promptFile}')"`,
+      `${envPrefix ? envPrefix + ' ' : ''}claude ${permissionFlags} --model ${model} "$(cat '${promptFile}')"`,
       {
         encoding: 'utf-8',
         maxBuffer: 10 * 1024 * 1024, // 10MB buffer

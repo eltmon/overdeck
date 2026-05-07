@@ -88,6 +88,27 @@ export interface ShadowConfig {
   };
 }
 
+/**
+ * Permission mode for spawned Claude Code agents.
+ *
+ * - `auto` (default): pass `--permission-mode auto`. Uses Claude Code's built-in
+ *   classifier to approve safe tool calls and block destructive ones (force pushes,
+ *   exfiltration, `rm -rf`, etc.). Requires `skipAutoPermissionPrompt: true` in
+ *   `~/.claude/settings.json` and a supporting Anthropic plan (Max/Team/Enterprise/API).
+ * - `bypass`: pass `--dangerously-skip-permissions --permission-mode bypassPermissions`.
+ *   The historical Panopticon behavior — fully autonomous, no approval prompts and no
+ *   classifier. Use when running providers that reject the `auto` flag (some Bedrock/
+ *   Vertex/Foundry setups) or when you genuinely want zero gating.
+ *
+ * Override precedence (highest first): PAN_YOLO env var → `--yolo` CLI flag → this config → 'auto'.
+ */
+export type ClaudePermissionMode = 'bypass' | 'auto';
+
+export interface ClaudeConfig {
+  /** Permission flag set passed to spawned `claude` processes. Default: `auto`. */
+  permissionMode?: ClaudePermissionMode;
+}
+
 export interface PanopticonConfig {
   panopticon: {
     version: string;
@@ -114,6 +135,7 @@ export interface PanopticonConfig {
   };
   remote?: RemoteConfig;
   shadow: ShadowConfig;
+  claude?: ClaudeConfig;
 }
 
 const DEFAULT_CONFIG: PanopticonConfig = {
@@ -150,6 +172,9 @@ const DEFAULT_CONFIG: PanopticonConfig = {
       gitlab: false,
       rally: false,
     },
+  },
+  claude: {
+    permissionMode: 'auto',
   },
 };
 

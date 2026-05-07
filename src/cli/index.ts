@@ -80,6 +80,37 @@ import { registerScopeCommands } from './commands/scope.js';
 import { openCommand } from './commands/open.js';
 import { swarmCommand } from './commands/swarm.js';
 
+// Pre-parse --yolo from argv so it works regardless of position relative to the
+// subcommand. Commander's enablePositionalOptions() routes post-subcommand options
+// to the subcommand, which would either swallow --yolo or error on unknown flag.
+// Doing this here lets `pan --yolo=false up`, `pan up --yolo=false`, and even
+// `pan up agent-foo --yolo=false` all work identically.
+(() => {
+  const argv = process.argv;
+  for (let i = 2; i < argv.length; i++) {
+    const arg = argv[i];
+    let value: string | undefined;
+    if (arg === '--yolo') {
+      // Bare flag — peek at next arg if it doesn't look like another option
+      const next = argv[i + 1];
+      value = next && !next.startsWith('-') ? next : 'true';
+      argv.splice(i, value === 'true' ? 1 : 2);
+      i--;
+    } else if (arg.startsWith('--yolo=')) {
+      value = arg.slice('--yolo='.length);
+      argv.splice(i, 1);
+      i--;
+    } else if (arg === '--no-yolo') {
+      value = 'false';
+      argv.splice(i, 1);
+      i--;
+    } else {
+      continue;
+    }
+    process.env.PAN_YOLO = value.trim().toLowerCase();
+  }
+})();
+
 const program = new Command();
 program.enablePositionalOptions();
 
@@ -116,7 +147,18 @@ const ensureDashboardBundle = async (
 program
   .name('pan')
   .description('Multi-agent orchestration for AI coding assistants')
-  .version(JSON.parse(readFileSync(join(import.meta.dirname, '../../package.json'), 'utf-8')).version);
+  .version(JSON.parse(readFileSync(join(import.meta.dirname, '../../package.json'), 'utf-8')).version)
+  .option(
+    '--yolo [value]',
+    'Override permission mode for spawned Claude Code agents. ' +
+    'Default is auto (Claude Code\'s classifier blocks destructive ops). ' +
+    '--yolo or --yolo=true switches to --dangerously-skip-permissions; ' +
+    '--yolo=false (--no-yolo) forces auto mode. ' +
+    'Equivalent to setting PAN_YOLO=true|false. Works in any argv position. ' +
+    'Falls back to config.claude.permissionMode.'
+  );
+// Note: --yolo is intercepted by the pre-parse block above before commander runs,
+// so the option declaration is for `--help` rendering only — it never receives a value.
 
 program
   .command('init')

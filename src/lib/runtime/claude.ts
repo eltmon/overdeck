@@ -17,6 +17,7 @@ import type {
 } from './interface.js';
 import { CLAUDE_FEATURES } from './interface.js';
 import { generateLauncherScript } from '../launcher-generator.js';
+import { getClaudePermissionFlags } from '../claude-permissions.js';
 
 const CLAUDE_DIR = join(homedir(), '.claude');
 
@@ -82,8 +83,8 @@ export function createClaudeAdapter(): RuntimeAdapter {
           args.push('--model', options.model);
         }
 
-        // Add permission bypass flags for autonomous agents
-        args.push('--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions');
+        // Add permission flags for autonomous agents (auto by default; bypass via config/--yolo)
+        args.push(...getClaudePermissionFlags());
 
         // Spawn in tmux session using a launcher script (safer for prompts with special chars)
         const sessionName = `agent-${id}`;

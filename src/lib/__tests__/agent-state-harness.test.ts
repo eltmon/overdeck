@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { getAgentRuntimeBaseCommand } from '../agents.js'
 
 // AC3: harness='claude-code' (and the no-harness default) MUST produce
@@ -14,6 +14,14 @@ import { getAgentRuntimeBaseCommand } from '../agents.js'
 // path is exercised — that is the surface PAN-636 must keep bit-for-bit.
 
 describe('getAgentRuntimeBaseCommand harness routing (PAN-636)', () => {
+  // Legacy assertions below predate the auto-mode default; pin bypass locally.
+  const ORIGINAL_YOLO = process.env.PAN_YOLO
+  beforeEach(() => { process.env.PAN_YOLO = 'true' })
+  afterEach(() => {
+    if (ORIGINAL_YOLO === undefined) delete process.env.PAN_YOLO
+    else process.env.PAN_YOLO = ORIGINAL_YOLO
+  })
+
   it('claude-code default and explicit are identical (AC3)', async () => {
     const a = await getAgentRuntimeBaseCommand('claude-sonnet-4-6')
     const b = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', undefined, undefined, 'claude-code')
@@ -35,5 +43,31 @@ describe('getAgentRuntimeBaseCommand harness routing (PAN-636)', () => {
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/--permission-mode/)
     expect(cmd).toMatch(/^pi --mode rpc /)
+  })
+})
+
+// Integration coverage for the new permission-mode plumbing.
+// Production default is `auto`; this block exercises that path explicitly,
+// then flips PAN_YOLO=true to verify the bypass override still works.
+describe('getAgentRuntimeBaseCommand permission-mode integration', () => {
+  const ORIGINAL = process.env.PAN_YOLO
+
+  beforeEach(() => { delete process.env.PAN_YOLO })
+  afterEach(() => {
+    if (ORIGINAL === undefined) delete process.env.PAN_YOLO
+    else process.env.PAN_YOLO = ORIGINAL
+  })
+
+  it('default (no PAN_YOLO) emits --permission-mode auto for an Anthropic model', async () => {
+    const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6')
+    expect(cmd).toBe('claude --permission-mode auto --model claude-sonnet-4-6')
+    expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
+    expect(cmd).not.toMatch(/bypassPermissions/)
+  })
+
+  it('PAN_YOLO=true produces the legacy bypass command', async () => {
+    process.env.PAN_YOLO = 'true'
+    const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6')
+    expect(cmd).toBe('claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6')
   })
 })

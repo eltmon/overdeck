@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { buildSpawnEnvForModel, getProviderEnvForModel } from '../agents.js';
+import { getClaudePermissionFlags } from '../claude-permissions.js';
 
 const SUMMARY_TIMEOUT_MS = 60_000;
 const FORK_SUMMARY_TIMEOUT_MS = 300_000;
@@ -610,8 +611,7 @@ export async function runModelSummary(prompt: string, model?: string, timeoutMs?
   const args = [
     '-p',
     '--model', useModel,
-    '--dangerously-skip-permissions',
-    '--permission-mode', 'bypassPermissions',
+    ...getClaudePermissionFlags(),
   ];
 
   // Sanitize parent provider env (strip ANTHROPIC_BASE_URL etc.) and inject the
