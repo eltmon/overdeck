@@ -74,7 +74,7 @@
       {
         "id": "define-planning-agent",
         "title": "Create pan-planning-agent.md definition",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-07T02:30:00.000Z",
         "metadata": {
@@ -88,7 +88,7 @@
           {
             "id": "define-planning-agent.ac1",
             "title": "pan-planning-agent.md exists with correct frontmatter; does NOT include inspect-on-bead-close hook",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -96,7 +96,7 @@
           {
             "id": "define-planning-agent.ac2",
             "title": "claude --agent pan-planning-agent --print runs on sonnet (verified via --output-format json)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
