@@ -243,7 +243,21 @@ export function refreshCache(): RefreshCacheResult {
     }
   }
 
-  // Copy agent definitions from repo to cache
+  // Copy agent definitions from repo to cache.
+  //
+  // PAN-982: This pass deploys both Claude Code subagent definitions
+  // (codebase-explorer, planning-agent, triage-agent, health-monitor — used by
+  // the in-session Agent tool) and the Panopticon pipeline agents
+  // (pan-work-agent, pan-planning-agent, pan-review-agent, pan-test-agent,
+  // pan-inspect-agent, pan-uat-agent, pan-merge-agent — used by `claude --agent
+  // pan-<type>-agent` when Cloister spawns the work/review/test/inspect/uat/
+  // merge processes).
+  //
+  // Both kinds live side by side in the repo's `agents/` directory and both get
+  // mirrored into ~/.panopticon/agent-definitions/ here, then on to
+  // <devroot>/.claude/agents/ via planSync/executeSync. The downstream sync
+  // never deletes existing files in the target, so non-Panopticon agent
+  // definitions a project may have authored stay intact.
   if (existsSync(SOURCE_AGENTS_DIR)) {
     mkdirSync(CACHE_AGENTS_DIR, { recursive: true });
     const agents = readdirSync(SOURCE_AGENTS_DIR, { withFileTypes: true })
@@ -253,6 +267,29 @@ export function refreshCache(): RefreshCacheResult {
     for (const agent of agents) {
       copyFileSync(join(SOURCE_AGENTS_DIR, agent.name), join(CACHE_AGENTS_DIR, agent.name));
       result.agents.copied++;
+    }
+
+    // PAN-982: Warn if any of the pipeline agent definitions are missing from the
+    // source. Cloister depends on these names existing in <devroot>/.claude/agents/
+    // — otherwise `claude --agent pan-<type>-agent` exits immediately with
+    // "agent not found". Surfacing the gap during sync is far cheaper than
+    // discovering it when a work/review/test/inspect/uat/merge spawn fails.
+    const REQUIRED_PIPELINE_AGENTS = [
+      'pan-work-agent.md',
+      'pan-planning-agent.md',
+      'pan-review-agent.md',
+      'pan-test-agent.md',
+      'pan-inspect-agent.md',
+      'pan-uat-agent.md',
+      'pan-merge-agent.md',
+    ];
+    const presentNames = new Set(agents.map((a) => a.name));
+    const missing = REQUIRED_PIPELINE_AGENTS.filter((name) => !presentNames.has(name));
+    if (missing.length > 0) {
+      console.warn(
+        `[sync] WARN: pipeline agent definition(s) missing from agents/: ${missing.join(', ')}. ` +
+          `Cloister will fail to spawn the corresponding specialists with --agent.`,
+      );
     }
   }
 

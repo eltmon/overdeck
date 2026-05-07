@@ -114,6 +114,55 @@ function isHookConfigured(
 }
 
 /**
+ * PAN-982: Remove a Panopticon hook entry by hookType + script name.
+ *
+ * Filters out the inner hook commands matching the given scriptName from each
+ * matcher group, then drops any matcher group whose hook list became empty,
+ * then drops the top-level hookType key if no matcher groups remain.
+ *
+ * Returns true if anything was removed (used to drive the "migrated" log line
+ * in setupHooksCommand). Idempotent — safe to call when the hook is already
+ * absent.
+ */
+function removeHookIfPresent(
+  settings: ClaudeSettings,
+  hookType: keyof NonNullable<ClaudeSettings['hooks']>,
+  binDir: string,
+  scriptName: string,
+): boolean {
+  const groups = settings?.hooks?.[hookType];
+  if (!groups || groups.length === 0) return false;
+
+  const fullPath = join(binDir, scriptName);
+  const legacyMatch = `panopticon/bin/${scriptName}`;
+
+  let removed = false;
+  const newGroups: HookConfig[] = [];
+  for (const group of groups) {
+    const filteredInner = (group.hooks || []).filter((hook) => {
+      const isMatch =
+        (hook.command?.includes(fullPath) ?? false) ||
+        (hook.command?.includes(legacyMatch) ?? false);
+      if (isMatch) removed = true;
+      return !isMatch;
+    });
+    if (filteredInner.length > 0) {
+      newGroups.push({ ...group, hooks: filteredInner });
+    } else {
+      removed = true;
+    }
+  }
+
+  if (newGroups.length > 0) {
+    settings.hooks![hookType] = newGroups;
+  } else {
+    delete settings.hooks![hookType];
+  }
+
+  return removed;
+}
+
+/**
  * Setup Claude Code hooks for Panopticon heartbeat
  */
 export async function setupHooksCommand(): Promise<void> {
@@ -282,24 +331,60 @@ export async function setupHooksCommand(): Promise<void> {
     added.push(`${hookType}:${scriptName}`);
   };
 
-  // Core runtime hooks.
-  addHookIfMissing('PreToolUse', 'pre-tool-hook');
-  addHookIfMissing('PostToolUse', 'heartbeat-hook');
-  addHookIfMissing('Stop', 'stop-hook');
-  // PAN-800: SessionStart + Notification hooks.
+  // PAN-982: PreToolUse, PostToolUse, and Stop hooks are NO LONGER registered in
+  // global ~/.claude/settings.json. They were migrated into per-agent frontmatter
+  // at agents/pan-<type>-agent.md so each Panopticon pipeline agent declares its
+  // own tool-event hooks. Registering them again here would cause every event to
+  // fire twice (once from frontmatter, once from global settings) — the exact
+  // double-fire window the migration exists to close (PAN-982 hazard H4).
+  //
+  // Ad-hoc Claude sessions launched without --agent will no longer trigger
+  // pre-tool-hook / heartbeat-hook / stop-hook / tldr-* / inspect-on-bead-close.
+  // That is intentional: those hooks were Panopticon-specific (heartbeat tracking,
+  // cost recording, bead-close detection) and have no meaning outside a pipeline
+  // agent.
+  //
+  // The remaining hook events below stay in global settings because Claude Code's
+  // agent frontmatter cannot host them reliably for the bootstrap path: they fire
+  // before --agent is fully bound (SessionStart, UserPromptSubmit) or are session-
+  // wide signals that need uniform routing across agent and ad-hoc sessions
+  // (PreCompact/PostCompact/Notification/PermissionRequest).
   addHookIfMissing('SessionStart', 'session-start-hook');
   addHookIfMissing('Notification', 'notification-hook');
   addHookIfMissing('UserPromptSubmit', 'user-prompt-submit-hook');
   addHookIfMissing('PreCompact', 'pre-compact-hook');
   addHookIfMissing('PostCompact', 'post-compact-hook');
   addHookIfMissing('PermissionRequest', 'permission-event-hook');
-  addHookIfMissing('PostToolUse', 'permission-event-hook');
-  addHookIfMissing('Stop', 'permission-event-hook');
 
-  // TLDR helpers (optional — only when python3 is available).
-  if (python3Available) {
-    addHookIfMissing('PreToolUse', 'tldr-read-enforcer', 'Read');
-    addHookIfMissing('PostToolUse', 'tldr-post-edit', 'Edit|Write');
+  // PAN-982: Atomic migration — strip out any pre-existing PreToolUse / PostToolUse /
+  // Stop / TLDR registrations that older Panopticon installs added to
+  // ~/.claude/settings.json. Without this prune, users upgrading across PAN-982
+  // would have BOTH global and per-agent hooks firing for every tool event,
+  // doubling heartbeat/cost/inspect signals and tripping H4 (the dedup hazard
+  // the bead exists to close). The prune is keyed on Panopticon's own bin/
+  // paths, so user-authored hooks pointing elsewhere are left intact.
+  const removed: string[] = [];
+  const removeIfPresent = (
+    hookType: keyof NonNullable<ClaudeSettings['hooks']>,
+    scriptName: string,
+  ): void => {
+    if (removeHookIfPresent(settings, hookType, binDir, scriptName)) {
+      removed.push(`${hookType}:${scriptName}`);
+    }
+  };
+  removeIfPresent('PreToolUse', 'pre-tool-hook');
+  removeIfPresent('PreToolUse', 'tldr-read-enforcer');
+  removeIfPresent('PostToolUse', 'heartbeat-hook');
+  removeIfPresent('PostToolUse', 'permission-event-hook');
+  removeIfPresent('PostToolUse', 'tldr-post-edit');
+  removeIfPresent('PostToolUse', 'inspect-on-bead-close');
+  removeIfPresent('Stop', 'stop-hook');
+  removeIfPresent('Stop', 'permission-event-hook');
+  removeIfPresent('Stop', 'work-agent-stop-hook');
+  removeIfPresent('Stop', 'specialist-stop-hook');
+  if (removed.length > 0) {
+    console.log(chalk.yellow(`\n✓ Migrated ${removed.length} legacy hook(s) to per-agent frontmatter:`));
+    for (const entry of removed) console.log(chalk.dim(`  • ${entry}`));
   }
 
   if (added.length === 0) {
@@ -333,15 +418,17 @@ export async function setupHooksCommand(): Promise<void> {
   // 10. Success message
   console.log(chalk.green.bold('\n✓ Setup complete!\n'));
   console.log(chalk.dim('Claude Code hooks are now configured:'));
-  console.log(chalk.dim('  • PreToolUse  - Sets agent state to "active"'));
-  console.log(chalk.dim('  • PostToolUse - Logs activity to activity.jsonl'));
-  console.log(chalk.dim('  • Stop        - Sets agent state to "idle"'));
+  console.log(chalk.dim('  • SessionStart      - Bootstraps agent state, emits model_set'));
+  console.log(chalk.dim('  • UserPromptSubmit  - Clears waiting state, restarts spinner'));
+  console.log(chalk.dim('  • PreCompact/Post   - Tracks compaction lifecycle'));
+  console.log(chalk.dim('  • Notification      - Emits agent.waiting_started events'));
+  console.log(chalk.dim('  • PermissionRequest - Surfaces permission prompts to dashboard'));
+  console.log(chalk.dim('  PAN-982: PreToolUse/PostToolUse/Stop now live in per-agent frontmatter'));
+  console.log(chalk.dim('           at agents/pan-<type>-agent.md (work, planning, review, ...).'));
   if (python3Available) {
-    console.log(chalk.dim('  • TLDR Read   - Intercepts large file reads → TLDR summaries'));
-    console.log(chalk.dim('  • TLDR Edit   - Tracks dirty files → auto re-warm'));
-    console.log(chalk.dim('  • TLDR MCP    - Token-efficient code analysis'));
+    console.log(chalk.dim('  • TLDR MCP          - Token-efficient code analysis'));
   }
-  console.log(chalk.dim('  • Caveman     - Compressed output hooks (activate with agents.caveman.enabled: true)'));
+  console.log(chalk.dim('  • Caveman           - Compressed output hooks (activate with agents.caveman.enabled: true)'));
   console.log('');
   console.log(chalk.dim('When you run agents via `pan start`, they will report'));
   console.log(chalk.dim('their status in real-time to the Panopticon dashboard.\n'));

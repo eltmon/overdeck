@@ -50,9 +50,6 @@ export type ActionKey =
   | 'copySettings'
   // Issue artifact / planning surface
   | 'beads'
-  | 'vbrief'
-  | 'state'
-  | 'prd'
   | 'inference'
   | 'discussions'
   | 'transcripts'
@@ -62,6 +59,7 @@ export type ActionKey =
   | 'statusReview'
   // Danger zone
   | 'reopen'
+  | 'restartAgent'
   | 'restartFromPlan'
   | 'resetIssue'
   | 'cancel'
@@ -302,8 +300,6 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
 
   // ── Artifacts / planning (always present, demoted to secondary) ───────────
   if (input.hasBeads || input.hasPlan) secondary.push('beads');
-  if (input.hasPlan) secondary.push('vbrief');
-  secondary.push('state', 'prd');
   if (input.hasInference) secondary.push('inference');
   if (input.hasDiscussions) secondary.push('discussions');
   if (input.hasTranscripts) secondary.push('transcripts');
@@ -312,6 +308,9 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
 
   // ── Danger zone (always overflow — shown via "…" menu) ────────────────────
   if (!merged && state !== 'merged' && state !== 'done' && state !== 'canceled') {
+    if (agent && agent.status !== 'failed' && agent.status !== 'dead') {
+      overflow.push('restartAgent');
+    }
     overflow.push('restartFromPlan');
     if (input.issueCanonicalState !== 'done' && input.issueCanonicalState !== 'canceled') {
       overflow.push('resetIssue');

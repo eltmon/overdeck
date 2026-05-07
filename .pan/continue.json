@@ -1,63 +1,147 @@
 {
   "version": "1",
-  "issueId": "PAN-966",
-  "created": "2026-05-07T12:00:00.000Z",
-  "updated": "2026-05-07T13:05:00.000Z",
-  "gitState": { "branch": "feature/pan-966", "sha": "00e9c3c02", "dirty": false },
+  "issueId": "PAN-982",
+  "created": "2026-05-07T01:59:13.002Z",
+  "updated": "2026-05-07T03:12:00.000Z",
+  "gitState": { "branch": "feature/pan-982", "sha": "585a53f9d", "dirty": false },
   "decisions": [
     {
       "id": "D1",
-      "summary": "Use separate getAvailableEditors RPC instead of extending DashboardSnapshot. Avoids coupling read-model to PanOpen service and keeps schema backward-compatible.",
-      "recordedAt": "2026-05-07T12:00:00.000Z"
+      "summary": "Adopt --agent partially: use .claude/agents/pan-*.md for model, permissions, tools, and PreToolUse/PostToolUse/Stop hooks. Keep launcher.sh for env var injection (provider routing, Panopticon identity, terminal env, mkcert CA, TMUX unset, keep-alive, script wrapper, caveman). This is because --agent handles declarative config but has no mechanism for env var setup or shell-level pre/post behaviors.",
+      "rationale": "Claude Code's --agent frontmatter only supports Anthropic models in the model: field. Non-Anthropic models (Kimi, OpenAI CLIProxy, OpenRouter) still need ANTHROPIC_BASE_URL/AUTH_TOKEN env injection. Per-agent hooks only support PreToolUse/PostToolUse/Stop — 6 other hook events (SessionStart, UserPromptSubmit, PreCompact, PostCompact, Notification, PermissionRequest) must stay in global settings.json with env-var gating. The launcher script becomes thinner (env-only) but cannot be eliminated entirely.",
+      "recordedAt": "2026-05-07T02:30:00.000Z"
     },
     {
       "id": "D2",
-      "summary": "Drop upstream PR to T3Code (external repo, out of scope) and keyboard shortcut (marginal value). CLI command is in scope.",
-      "recordedAt": "2026-05-07T12:00:00.000Z"
+      "summary": "Use pan- prefix for pipeline agent definitions (pan-work-agent.md, pan-review-agent.md, etc.) to distinguish from existing Claude Code subagent definitions (codebase-explorer.md, planning-agent.md, etc.). These are separate concerns: pipeline agents drive Panopticon lifecycle; subagent definitions drive the Agent tool.",
+      "rationale": "The existing .claude/agents/ files (codebase-explorer, planning-agent, triage-agent, health-monitor) are Claude Code subagent definitions used by the Agent tool for in-session delegation. Panopticon pipeline agents serve a completely different purpose — they're spawned by tmux, run autonomously, and are part of the work→review→test→merge pipeline. Using the pan- prefix makes them visually distinct in 'claude agents' listing and prevents naming collisions.",
+      "recordedAt": "2026-05-07T02:30:00.000Z"
     },
     {
       "id": "D3",
-      "summary": "Skipped AgentList right-click context menu — no existing context menu infrastructure on agent list. Primary integration points (InspectorPanel + AgentInfoSection) cover all visible workspace paths.",
-      "recordedAt": "2026-05-07T12:30:00.000Z"
+      "summary": "Use --model CLI override for non-Anthropic models alongside --agent (verified: --model overrides frontmatter model:). Don't use --agents JSON injection as the primary path — reserve it for edge cases.",
+      "rationale": "Empirically tested: --model flag overrides agent frontmatter model: field. This means we can define pan-work-agent.md with model: sonnet as default, but override to kimi-k2 or gpt-5.4 at spawn time via --model. The --agents JSON injection was also tested and works, but adds shell quoting complexity for nested JSON objects. Filesystem definitions + --model override is simpler and more maintainable.",
+      "recordedAt": "2026-05-07T02:30:00.000Z"
     },
     {
       "id": "D4",
-      "summary": "Used Schema.String for OpenInEditorInput.cwd instead of Schema.trimmed/nonEmptyString — those APIs not available in this Effect version and server-side validation is unnecessary since spawn ENOENT handles missing paths.",
-      "recordedAt": "2026-05-07T12:10:00.000Z"
+      "summary": "Agent Teams feature is explicitly out of scope. Panopticon's tmux + beads + sendKeysAsync is strictly more capable and battle-tested.",
+      "rationale": "Agent Teams is experimental (disabled by default, requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1), has known limitations (no session resumption with teammates, one team per session, no nested teams, slow shutdown), and uses file-locked shared task lists that reinvent what beads + tmux message delivery already provide reliably. Panopticon's lifecycle management (tmux sessions, ready signal polling, state tracking, hook system) is not replaceable by Agent Teams.",
+      "recordedAt": "2026-05-07T02:30:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Hook migration must be atomic — PreToolUse/PostToolUse/Stop hooks must be removed from global settings.json at the same time they're deployed in per-agent frontmatter, to avoid double-firing.",
+      "rationale": "If both global hooks and per-agent hooks define the same event (e.g., PostToolUse → heartbeat-hook), the hook will fire twice. This would double heartbeat events, double cost recordings, and cause confusing duplicate behavior. The pan sync command should handle this atomically: deploy agent definitions and prune migrated global hooks in the same operation.",
+      "recordedAt": "2026-05-07T02:30:00.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Named sessions (--name) is a low-priority optional enhancement. Not load-bearing for the migration.",
+      "rationale": "Named sessions add ergonomic value (human-readable session names, easier manual debugging via 'claude --resume agent-pan-982') but don't change the fundamental architecture. Panopticon already tracks sessions via tmux session names (agent-pan-982) and agent state files. This can be added after the core migration without risk.",
+      "recordedAt": "2026-05-07T02:30:00.000Z"
     }
   ],
   "hazards": [
     {
       "id": "H1",
-      "summary": "No sync FS calls in server-reachable code — PAN-70 compliance.",
-      "mitigation": "Cache resolveAvailableEditors at service construction time. Let spawn ENOENT surface for missing commands."
+      "summary": "Per-agent hooks fire only when --agent is used. If launcher fails to pass --agent flag, agents run without hooks entirely — no heartbeat, no cost recording, no stop-hook.",
+      "mitigation": "Add a smoke test in spawnAgent() that verifies the --agent flag is present in the generated launcher command. Also keep the session-start global hook as a safety net — it can detect when a Panopticon agent starts without --agent by checking for PANOPTICON_AGENT_ID env var presence and missing per-agent hook behavior."
     },
     {
       "id": "H2",
-      "summary": "UI verification must use Node 22 built dist server, not Bun.",
-      "mitigation": "Run npm run build before browser verification."
+      "summary": "User's ad-hoc Claude sessions in a workspace directory will see pan-*.md in 'claude agents' listing and could accidentally use --agent pan-work-agent, getting Panopticon hooks.",
+      "mitigation": "The pan- prefix makes accidental use unlikely (users would have to explicitly type --agent pan-work-agent). Additionally, Panopticon hooks are idempotent — running heartbeat or cost recorder without PANOPTICON_AGENT_ID set results in a graceful no-op (hooks check for agent ID and exit 0 if missing)."
+    },
+    {
+      "id": "H3",
+      "summary": "--agent + --resume behavior may change in future Claude Code versions. Migration depends on resumed sessions adopting the new agent's config.",
+      "mitigation": "Pin minimum Claude Code version in pan doctor checks. Add a CI test that verifies --agent + --resume applies the new agent's model (the empirical test done during planning). If behavior changes, fall back to baking full config into the initial spawn and not relying on --agent on resume."
+    },
+    {
+      "id": "H4",
+      "summary": "Hook deduplication gap during migration — if pan sync deploys agent definitions before removing global hooks, there's a window where hooks fire twice.",
+      "mitigation": "Make the migration atomic in pan sync: read current global hooks, deploy agent definitions, remove migrated hooks from global settings, all in one operation. If any step fails, roll back all changes. Add a test that verifies no hook event type appears in both global settings and any pan-*.md agent definition."
+    },
+    {
+      "id": "H5",
+      "summary": "claudish wrapper path (non-direct providers) cannot use --agent because claudish is a separate binary, not Claude Code CLI.",
+      "mitigation": "The claudish path is explicitly excluded from --agent migration. getAgentRuntimeBaseCommand() already branches on provider.compatibility: direct providers get 'claude --agent', claudish providers keep the existing 'claudish -i --model' path. Document this limitation clearly."
+    },
+    {
+      "id": "H6",
+      "summary": "Agent definitions contain absolute paths to hook scripts (/home/eltmon/.panopticon/bin/). These break on different machines or if the Panopticon install location changes.",
+      "mitigation": "Use relative paths from the workspace root where possible. For hooks that must reference ~/.panopticon/bin/, use $HOME expansion or have pan sync template the paths at deployment time. Long-term: move hook scripts into the project repo so paths are repo-relative."
+    }
+  ],
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-6",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-07T01:59:13.002Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-982: Evaluate Claude Code --agent/subagent system for agent lifecycle",
+      "agentModel": "agent:claude-opus-4-6"
+    },
+    {
+      "timestamp": "2026-05-07T02:35:00.000Z",
+      "reason": "planning-complete",
+      "note": "Deep research completed. Empirically tested --agent + --resume (works, new agent config adopted), --agent + --model (override works), --agents JSON inline (works). Wrote comprehensive PRD at docs/prds/planned/PAN-982-claude-code-agent-integration.md. Created 15-bead vBRIEF plan covering 7 agent definitions, 4 launcher/spawn integration beads, hook migration, test updates, sync deployment, and optional named sessions. Key decision: partial adoption — use --agent for model/permissions/tools/hooks, keep launcher.sh for env vars and shell-level behaviors. Agent Teams explicitly deferred.",
+      "agentModel": "agent:claude-opus-4-6"
+    },
+    {
+      "timestamp": "2026-05-07T03:12:00.000Z",
+      "reason": "bead-close",
+      "note": "Closed bead workspace-o99 (update-launcher-tests). Added 6 new test cases asserting --agent flag pass-through in launcher scripts: work-agent (Anthropic, no --model/no permission flags), work-agent (non-Anthropic with --model override), planning-agent, resume-agent (--agent + --resume), specialist-dispatch (--agent pan-review-agent), and --agent + --name combined. All 24 tests pass (18 existing inline snapshots untouched + 6 new). Tests treat baseCommand as opaque, so they validate behavior independently of getAgentRuntimeBaseCommand() changes — they will continue to pass after the modify-base-command bead alters that helper.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T03:14:00.000Z",
+      "reason": "bead-close",
+      "note": "Closed bead workspace-c6q (named-sessions). Added optional agentName parameter to getAgentRuntimeBaseCommand() that emits '--name <agentName>'. Wired all 4 spawn callsites (work agent at line ~1100, fallback restart at ~1450, recovery at ~1811, resume at ~1670) to pass the normalized agentId. claudish wrapper path skipped because --name is not passed through by claudish. The resume path uses extraArgs rather than getAgentRuntimeBaseCommand because it constructs baseCommand inline. Typecheck passes; all 24 launcher-generator tests still pass.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T03:16:00.000Z",
+      "reason": "bead-close",
+      "note": "Closed bead workspace-eet (wire-spawn-agent). Added PanopticonAgentType union ('work'|'planning'|'review'|'test'|'inspect'|'uat'|'merge') and panopticonAgentName() helper. Extended getAgentRuntimeBaseCommand() signature with optional agentType parameter (currently underscore-prefixed and unused — bead workspace-7if turns this into actual --agent flag emission). Wired 3 callsites to pass agentType: spawnAgent work path passes 'work' or 'planning' based on options.phase; fallback restart at ~1450 passes 'work'; recovery at ~1811 passes 'work'. Resume path at ~1670 inline-emits 'claude --agent pan-work-agent' as baseCommand to satisfy AC2 (resume uses --agent pan-work-agent alongside --resume). claudish wrapper path inherits no agentType because non-direct providers cannot consume --agent. Typecheck + all 24 launcher tests pass.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T03:18:00.000Z",
+      "reason": "bead-close",
+      "note": "Closed bead workspace-r2l (update-launcher-config). Modified buildNonConversationCommand() to skip permission flag emission when baseCommand already contains '--agent ' (per-agent frontmatter handles permissions via permissionMode). Specialists not yet migrated to --agent (specialist-init at specialists.ts:2310, specialist-dispatch branch) still emit permissionFlags. Removed permissionFlags array from agents.ts resume path because baseCommand now includes '--agent pan-work-agent'. Updated existing 'work agent resume' inline snapshot to reflect the new shape (claude --agent pan-work-agent --resume ... --model ...). 24/24 tests still pass; typecheck clean.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T03:20:00.000Z",
+      "reason": "bead-close",
+      "note": "Closed bead workspace-7if (modify-base-command). getAgentRuntimeBaseCommand() now consumes the agentType parameter wired by bead workspace-eet. Anthropic direct path emits 'claude --agent pan-<type>-agent --name <id>' (no --model, no permission flags — frontmatter handles them). OpenAI CLIProxy path emits 'claude --agent pan-<type>-agent --model <resolvedId> --name <id>' (CLIProxy needs explicit --model since frontmatter model: only accepts Anthropic ids). Claudish wrapper path is unchanged because claudish does not recognize --agent. Behavior is gated on agentType: if a caller does not pass agentType (legacy callers), the function returns the pre-migration shape with permission flags inline. Typecheck + 24/24 launcher tests pass.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T03:24:00.000Z",
+      "reason": "discovery",
+      "note": "Identified the source-of-truth location for Panopticon pipeline agent definitions: top-level `agents/` directory in the repo (resolved via SOURCE_AGENTS_DIR in src/lib/paths.ts:86). pan sync copies *.md files from `agents/` to `~/.panopticon/agent-definitions/` (cache) and then on to `<devroot>/.claude/agents/` via planSync/executeSync. The user rejected 5 prior Write attempts that targeted `.claude/agents/` — that is the SYNC TARGET, not the source. All pan-*-agent.md definitions must be created in `agents/` so they get picked up by the existing mirrorRepoToCache flow. This means bead workspace-d7n (sync deploy) is largely satisfied by the existing sync code; only verification or minor wiring remains. Created agents/pan-work-agent.md.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T03:25:00.000Z",
+      "reason": "bead-close",
+      "note": "Closed bead workspace-59m (define-work-agent). Created agents/pan-work-agent.md with full YAML frontmatter: name, description, model: sonnet, permissionMode: bypassPermissions, effort: high, and per-agent hooks. Hooks mirror the global ~/.claude/settings.json structure: PreToolUse (.* → pre-tool-hook; Read → tldr-read-enforcer), PostToolUse (.* → heartbeat-hook + permission-event-hook; Bash → inspect-on-bead-close; Edit|Write → tldr-post-edit), Stop (.* → stop-hook + permission-event-hook). Hook command paths use $HOME/.panopticon/bin/ for portability across machines. Markdown body describes the per-bead workflow, completion path via pan done, and boundaries (no history rewriting, no JSONL deletion, no self-review).",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T03:30:00.000Z",
+      "reason": "bead-close",
+      "note": "Closed bead workspace-hik (wire-specialist-dispatch). Updated 4 launcher constructions to emit '--agent pan-<specialistType>': (1) dispatchSpecialist in specialists.ts:1090 — replaces baseCommand 'claude' + permissionFlags array with 'claude --agent pan-<specialistType>', dropping the redundant flags array; (2) initializeSpecialist in specialists.ts:2310 — same pattern for the canonical reviewer init path; (3) spawnSingleReviewer in review-agent.ts:540 — passes agentType='review' + sessionName to getAgentRuntimeBaseCommand() so it emits 'claude --agent pan-review-agent --name <session>'; (4) spawn-planning-session.ts:491 — passes agentType='planning' + sessionName for the planning launcher. Conversation route in dashboard/server/routes/conversations.ts:735 was deliberately left unchanged (legacy ad-hoc Claude sessions, AC2 says they may not use --agent). SpecialistType already ends in '-agent' so the mapping is 'pan-' + name. All 716 tests pass; typecheck clean.",
+      "agentModel": "agent:claude-opus-4-7"
     }
   ],
   "resumePoint": {
-    "description": "Implementation complete. All 6 beads closed. Typecheck, lint pass. 12 PAN-966-specific tests pass. 5 pre-existing test failures unrelated to this issue.",
-    "beadId": null,
-    "filesToRead": []
+    "description": "Bead workspace-c6q closed (named sessions). Following bd ready strict order per user instruction. Remaining ready beads: workspace-hik (specialist dispatch --agent), workspace-l71 (migrate hooks to per-agent frontmatter), workspace-d7n (sync deploy agent definitions). Five additional ready beads will become available after closing one of those — the bead dep graph appears inverted but bd ready is the source of truth. Next: claim workspace-hik or workspace-l71. workspace-l71 requires creating .claude/agents/pan-*.md definitions (work, planning, review, test, inspect, uat, merge) — multiple prior Write attempts to .claude/agents/ were user-rejected, indicating user wants a different ordering or pattern for those files; check feedback before retrying.",
+    "beadId": "workspace-c6q",
+    "filesToRead": [".pan/spec.vbrief.json", "src/lib/agents.ts:102", "src/lib/cloister/specialists.ts:1090", "~/.claude/settings.json"]
   },
-  "beadsMapping": {
-    "workspace-i247": "B1: editor contracts — EDITORS, EditorId, OpenInEditorInput, RPC definitions",
-    "workspace-b34f": "B2: PanOpen server service — resolveAvailableEditors, launchDetached, tests",
-    "workspace-r0ub": "B3: wire RPC handlers in ws-rpc.ts + PanOpenLive in server.ts",
-    "workspace-a6mo": "B4: frontend editorPreferences + PanOpenInPicker component",
-    "workspace-q1a4": "B5: integrate picker into InspectorPanel + AgentInfoSection",
-    "workspace-25ap": "B6: pan open CLI command"
-  },
-  "agentModel": "claude-opus-4-6",
-  "sessionHistory": [
-    {
-      "timestamp": "2026-05-07T13:05:00.000Z",
-      "reason": "end",
-      "note": "Implemented full Open-in-Editor feature: contracts (EDITORS, EditorId, OpenInEditorInput, 2 RPCs), PanOpen server service with async editor detection and detached launch, ws-rpc + server.ts wiring, frontend editorPreferences + PanOpenInPicker split-button component, InspectorPanel + AgentInfoSection integration, pan open CLI command. 6 commits, 6 beads, all closed.",
-      "agentModel": "claude-opus-4-6"
-    }
-  ]
+  "feedback": []
 }

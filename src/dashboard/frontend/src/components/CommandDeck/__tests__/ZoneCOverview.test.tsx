@@ -212,14 +212,12 @@ describe('ZoneCOverview', () => {
 
   it('quick-link buttons in Overview switch tabs', () => {
     render(<ZoneCOverview issueId={ISSUE} />);
-    fireEvent.click(screen.getByTestId('overview-link-vbrief'));
-    expect(screen.getByTestId('vbrief-tab-stub')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('overview-link-beads'));
+    expect(screen.getByTestId('beads-tab-stub')).toBeInTheDocument();
   });
 
-  it('quick-link footer shows links for prd, vbrief, beads, costs, activity', () => {
+  it('quick-link footer shows links for beads, costs, activity', () => {
     render(<ZoneCOverview issueId={ISSUE} />);
-    expect(screen.getByTestId('overview-link-prd')).toBeInTheDocument();
-    expect(screen.getByTestId('overview-link-vbrief')).toBeInTheDocument();
     expect(screen.getByTestId('overview-link-beads')).toBeInTheDocument();
     expect(screen.getByTestId('overview-link-costs')).toBeInTheDocument();
     expect(screen.getByTestId('overview-link-activity')).toBeInTheDocument();

@@ -1,0 +1,630 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-07T02:30:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-982: Evaluate Claude Code --agent/subagent system for agent lifecycle",
+    "updated": "2026-05-07T05:40:29.992Z"
+  },
+  "plan": {
+    "id": "pan-982",
+    "title": "Claude Code --agent integration for agent lifecycle",
+    "status": "proposed",
+    "uid": "bd1e908a-5e24-4fcd-b467-a195bc6b5a5e",
+    "author": "agent:claude-opus-4-6",
+    "sequence": 32,
+    "created": "2026-05-07T02:30:00.000Z",
+    "updated": "2026-05-07T05:40:29.992Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/982",
+        "label": "PAN-982",
+        "type": "issue"
+      },
+      {
+        "uri": "docs/prds/planned/PAN-982-claude-code-agent-integration.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "agent-lifecycle",
+      "claude-code",
+      "launcher",
+      "hooks",
+      "migration"
+    ],
+    "narratives": {
+      "Problem": "Panopticon generates complex bash launcher scripts (launcher-generator.ts) that hardcode model selection, permission flags, and tool access for each agent type. Claude Code v2.1.117+ provides a native agent definition system (.claude/agents/*.md) that handles model, permissions, tools, and per-agent hooks declaratively. The current approach is fragile (shell quoting, env var ordering) and duplicates what Claude Code now handles natively.",
+      "Proposal": "Define 7 Panopticon pipeline agent types as .claude/agents/pan-*.md files. Modify getAgentRuntimeBaseCommand() and generateLauncherScript() to emit --agent pan-<type> instead of inline --model/--permission-mode flags. Migrate PreToolUse/PostToolUse/Stop hooks from global settings.json into per-agent frontmatter. Launcher.sh shrinks to env-only (provider routing, Panopticon identity, terminal setup). Non-Anthropic model routing and non-frontmatter hook events (SessionStart, UserPromptSubmit, etc.) remain in launcher/global hooks."
+    },
+    "items": [
+      {
+        "id": "define-work-agent",
+        "title": "Create pan-work-agent.md definition",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-07T02:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-982"
+        },
+        "narrative": {
+          "Action": "Create .claude/agents/pan-work-agent.md with YAML frontmatter: model sonnet, permissionMode bypassPermissions, all tools, effort high. Include PreToolUse (pre-tool-hook, tldr-read-enforcer), PostToolUse (heartbeat-hook, permission-event-hook, inspect-on-bead-close, tldr-post-edit), and Stop (stop-hook, permission-event-hook) hooks. Markdown body describes autonomous implementation role."
+        },
+        "subItems": [
+          {
+            "id": "define-work-agent.ac1",
+            "title": "pan-work-agent.md exists in .claude/agents/ with correct YAML frontmatter (model, permissionMode, tools, hooks)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "define-work-agent.ac2",
+            "title": "claude --agent pan-work-agent --print runs on sonnet with bypassPermissions (verified via --output-format json)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:40:29.992Z"
+      },
+      {
+        "id": "define-planning-agent",
+        "title": "Create pan-planning-agent.md definition",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-07T02:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-982"
+        },
+        "narrative": {
+          "Action": "Create .claude/agents/pan-planning-agent.md with YAML frontmatter: model sonnet, permissionMode bypassPermissions, all tools, effort high. Hooks: PreToolUse/PostToolUse/Stop as appropriate for planning (no inspect-on-bead-close, no caveman). Markdown body describes planning-only role (no implementation, vBRIEF + continue.json output)."
+        },
+        "subItems": [
+          {
+            "id": "define-planning-agent.ac1",
+            "title": "pan-planning-agent.md exists with correct frontmatter; does NOT include inspect-on-bead-close hook",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "define-planning-agent.ac2",
+            "title": "claude --agent pan-planning-agent --print runs on sonnet (verified via --output-format json)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:40:29.992Z"
+      },
+      {
+        "id": "define-review-agent",
+        "title": "Create pan-review-agent.md definition",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-07T02:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-982"
+        },
+        "narrative": {
+          "Action": "Create .claude/agents/pan-review-agent.md with YAML frontmatter: model opus, permissionMode plan, tools restricted to read-only (Read, Grep, Glob, Bash). Hooks: heartbeat + stop only (no pre-tool-hook, no tldr, no inspect). Markdown body describes strict code review role."
+        },
+        "subItems": [
+          {
+            "id": "define-review-agent.ac1",
+            "title": "pan-review-agent.md exists with tools restricted to Read, Grep, Glob, Bash and permissionMode plan",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "define-review-agent.ac2",
+            "title": "claude --agent pan-review-agent --print runs on opus with plan permissions (verified via --output-format json)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:40:29.992Z"
+      },
+      {
+        "id": "define-test-agent",
+        "title": "Create pan-test-agent.md definition",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T02:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-982"
+        },
+        "narrative": {
+          "Action": "Create .claude/agents/pan-test-agent.md: model sonnet, permissionMode bypassPermissions, all tools. Hooks: heartbeat + stop. Markdown body describes test execution and failure analysis role."
+        },
+        "subItems": [
+          {
+            "id": "define-test-agent.ac1",
+            "title": "pan-test-agent.md exists with correct frontmatter and test-execution role description",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:40:29.992Z"
+      },
+      {
+        "id": "define-inspect-agent",
+        "title": "Create pan-inspect-agent.md definition",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T02:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-982"
+        },
+        "narrative": {
+          "Action": "Create .claude/agents/pan-inspect-agent.md: model sonnet, permissionMode plan, tools restricted to read-only. No caveman hooks (inspect sentinels must not be compressed). Markdown body describes per-bead spec verification role."
+        },
+        "subItems": [
+          {
+            "id": "define-inspect-agent.ac1",
+            "title": "pan-inspect-agent.md exists with plan permission mode and NO caveman hooks",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:40:29.992Z"
+      },
+      {
+        "id": "define-uat-agent",
+        "title": "Create pan-uat-agent.md definition",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T02:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-982"
+        },
+        "narrative": {
+          "Action": "Create .claude/agents/pan-uat-agent.md: model sonnet, permissionMode bypassPermissions, all tools plus Playwright MCP server configured. Markdown body describes browser-based requirement verification role."
+        },
+        "subItems": [
+          {
+            "id": "define-uat-agent.ac1",
+            "title": "pan-uat-agent.md exists with Playwright MCP server configured in frontmatter",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:40:29.991Z"
+      },
+      {
+        "id": "define-merge-agent",
+        "title": "Create pan-merge-agent.md definition",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T02:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-982"
+        },
+        "narrative": {
+          "Action": "Create .claude/agents/pan-merge-agent.md: model sonnet, permissionMode bypassPermissions, all tools. Hooks: heartbeat + stop. Markdown body describes PR merge, conflict resolution, and post-merge cleanup role."
+        },
+        "subItems": [
+          {
+            "id": "define-merge-agent.ac1",
+            "title": "pan-merge-agent.md exists with correct frontmatter and merge-role description",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:40:29.991Z"
+      },
+      {
+        "id": "modify-base-command",
+        "title": "Update getAgentRuntimeBaseCommand() to emit --agent flag",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-07T02:30:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-982"
+        },
+        "narrative": {
+          "Action": "Modify getAgentRuntimeBaseCommand() in src/lib/agents.ts to accept an agentType parameter and emit 'claude --agent pan-<type>' instead of 'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model <model>'. For Anthropic models, omit --model (frontmatter handles it). For non-Anthropic models, add --model override alongside --agent. The claudish path remains unchanged (non-direct providers still need the wrapper)."
+        },
+        "subItems": [
+          {
+            "id": "modify-base-command.ac1",
+            "title": "getAgentRuntimeBaseCommand() accepts agentType and returns 'claude --agent pan-<type>' for Anthropic models",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "modify-base-command.ac2",
+            "title": "For non-Anthropic direct providers, command includes both --agent and --model override",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "modify-base-command.ac3",
+            "title": "Claudish (non-direct) provider path unchanged — still uses claudish wrapper",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:40:29.990Z"
+      },
+      {
+        "id": "update-launcher-config",
+        "title": "Remove permission flags from LauncherConfig and buildCommand",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-07T02:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-982"
+        },
+        "narrative": {
+          "Action": "Update generateLauncherScript() and buildNonConversationCommand() in launcher-generator.ts to stop emitting --dangerously-skip-permissions and --permission-mode flags when --agent is used. Permission mode is now in agent frontmatter. Keep permissionFlags for conversation agents and specialist-dispatch (which may not use --agent). Remove the token-level dedup logic for permission flags from buildNonConversationCommand() where --agent makes it redundant."
+        },
+        "subItems": [
+          {
+            "id": "update-launcher-config.ac1",
+            "title": "Generated launcher scripts for work/planning/resume agents no longer contain --dangerously-skip-permissions or --permission-mode when --agent is present",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-launcher-config.ac2",
+            "title": "Conversation agent and specialist-dispatch launcher paths still work (they may not use --agent)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:40:29.988Z"
+      },
+      {
+        "id": "wire-spawn-agent",
+        "title": "Update spawnAgent() to pass agentType through launcher config",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-07T02:30:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-982"
+        },
+        "narrative": {
+          "Action": "Update spawnAgent() in src/lib/agents.ts to pass the Panopticon agent type (work, planning, review, etc.) to getAgentRuntimeBaseCommand(). Update all 4 callsites of generateLauncherScript() in agents.ts: line 1092 (work agent), line 1444 (fallback/recovery), line 1656 (resume). Ensure the agentType maps correctly to the pan-<type>-agent.md filename."
+        },
+        "subItems": [
+          {
+            "id": "wire-spawn-agent.ac1",
+            "title": "spawnAgent() for work agents passes agentType='work' to getAgentRuntimeBaseCommand()",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-spawn-agent.ac2",
+            "title": "Resume path (line 1656) uses --agent pan-work-agent alongside --resume",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-spawn-agent.ac3",
+            "title": "Fallback/recovery path (line 1444) uses correct agent type",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:40:29.988Z"
+      },
+      {
+        "id": "wire-specialist-dispatch",
+        "title": "Update specialist dispatch to use --agent for specialist types",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T02:30:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-982"
+        },
+        "narrative": {
+          "Action": "Find specialist dispatch code (likely in src/lib/cloister/) that spawns review, test, inspect, uat, and merge agents. Update their launcher configuration to use --agent pan-<type>-agent. Specialist dispatch uses script -qfaec wrapper and specialist-dispatch agentType — verify --agent flag passes through the wrapper correctly."
+        },
+        "subItems": [
+          {
+            "id": "wire-specialist-dispatch.ac1",
+            "title": "Review specialist spawns with --agent pan-review-agent",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-specialist-dispatch.ac2",
+            "title": "Test, inspect, uat, merge specialists each use their corresponding pan-*-agent definition",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-specialist-dispatch.ac3",
+            "title": "script -qfaec wrapper correctly passes --agent flag to inner Claude invocation",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:40:29.989Z"
+      },
+      {
+        "id": "migrate-hooks",
+        "title": "Move PreToolUse/PostToolUse/Stop hooks from global settings to per-agent frontmatter",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T02:30:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-982"
+        },
+        "narrative": {
+          "Action": "Remove PreToolUse, PostToolUse, and Stop hook entries from the global ~/.claude/settings.json that are now defined in per-agent frontmatter. This must happen atomically with agent definition deployment to avoid duplicate firing. The pan sync command should handle this — when it deploys agent definitions, it should also prune the global hooks that are now per-agent. Keep SessionStart, UserPromptSubmit, PreCompact, PostCompact, Notification, PermissionRequest hooks in global settings (they can't move to frontmatter)."
+        },
+        "subItems": [
+          {
+            "id": "migrate-hooks.ac1",
+            "title": "PreToolUse, PostToolUse, and Stop hooks removed from global settings.json",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-hooks.ac2",
+            "title": "Global settings.json retains SessionStart, UserPromptSubmit, PreCompact, PostCompact, Notification, PermissionRequest hooks",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-hooks.ac3",
+            "title": "User's ad-hoc Claude sessions (no --agent) still get global hooks for non-migrated events",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-hooks.ac4",
+            "title": "No hook fires twice (global + per-agent) for any event type",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:40:29.989Z"
+      },
+      {
+        "id": "update-launcher-tests",
+        "title": "Update launcher-generator tests for --agent flag",
+        "status": "completed",
+        "priority": "high",
+        "created": "2026-05-07T02:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-982"
+        },
+        "narrative": {
+          "Action": "Update tests in tests/lib/launcher-generator.test.ts to verify: (1) --agent flag present in generated scripts for work/planning/resume types, (2) --model omitted for Anthropic models when --agent is used, (3) --model present alongside --agent for non-Anthropic models, (4) permission flags absent when --agent handles permissions, (5) conversation and specialist-dispatch paths still work without --agent if needed."
+        },
+        "subItems": [
+          {
+            "id": "update-launcher-tests.ac1",
+            "title": "Tests verify --agent flag in generated launcher scripts for work, planning, resume agent types",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-launcher-tests.ac2",
+            "title": "Tests verify --model omission for Anthropic models when --agent is active",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-launcher-tests.ac3",
+            "title": "Tests verify permission flags absent when --agent is active",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:40:29.987Z"
+      },
+      {
+        "id": "update-sync-for-agents",
+        "title": "Update pan sync to deploy agent definition files",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T02:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-982"
+        },
+        "narrative": {
+          "Action": "Update the pan sync command (src/lib/sync.ts) to ensure pan-*.md agent definitions are deployed to project .claude/agents/ directories. Currently sync handles skills and settings — extend it to handle agent definitions. The definitions live in the panopticon-cli repo and need to be available in each managed project's workspace."
+        },
+        "subItems": [
+          {
+            "id": "update-sync-for-agents.ac1",
+            "title": "pan sync copies pan-*.md agent definitions to project .claude/agents/ directories",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-sync-for-agents.ac2",
+            "title": "Existing non-pan-* agent definitions in .claude/agents/ are preserved (not deleted)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:40:29.991Z"
+      },
+      {
+        "id": "named-sessions",
+        "title": "Add --name flag to agent spawn for human-readable session names",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-05-07T02:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-982"
+        },
+        "narrative": {
+          "Action": "Add --name agent-pan-<issueId> to the launcher command construction in getAgentRuntimeBaseCommand() or spawnAgent(). This creates human-readable Claude session names that are discoverable via claude --resume. Optional enhancement — not load-bearing for the migration."
+        },
+        "subItems": [
+          {
+            "id": "named-sessions.ac1",
+            "title": "Spawned agents have --name <agentId> in their launch command",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "named-sessions.ac2",
+            "title": "claude --resume <agentId> can find and resume the session by name",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:40:29.990Z"
+      }
+    ],
+    "edges": [
+      {
+        "from": "define-work-agent",
+        "to": "modify-base-command",
+        "type": "blocks"
+      },
+      {
+        "from": "define-planning-agent",
+        "to": "modify-base-command",
+        "type": "blocks"
+      },
+      {
+        "from": "define-review-agent",
+        "to": "wire-specialist-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "define-test-agent",
+        "to": "wire-specialist-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "define-inspect-agent",
+        "to": "wire-specialist-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "define-uat-agent",
+        "to": "wire-specialist-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "define-merge-agent",
+        "to": "wire-specialist-dispatch",
+        "type": "blocks"
+      },
+      {
+        "from": "modify-base-command",
+        "to": "wire-spawn-agent",
+        "type": "blocks"
+      },
+      {
+        "from": "modify-base-command",
+        "to": "update-launcher-config",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-spawn-agent",
+        "to": "update-launcher-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "update-launcher-config",
+        "to": "update-launcher-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "define-work-agent",
+        "to": "migrate-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "define-review-agent",
+        "to": "migrate-hooks",
+        "type": "blocks"
+      },
+      {
+        "from": "define-planning-agent",
+        "to": "migrate-hooks",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-07-PAN-982-claude-code-agent-integration-for-agent-lifecycle.vbrief.json"
+    }
+  }
+}
