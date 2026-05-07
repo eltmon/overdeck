@@ -28,6 +28,7 @@ import {
   selectCompletedReviewers,
   resolveTemplatePath,
   runParallelReview,
+  killAllReviewSessions,
   type ReviewResult,
 } from '../../../src/lib/cloister/review-agent.js';
 
@@ -58,7 +59,7 @@ vi.mock('../../../src/lib/cloister/config.js', () => ({
   loadCloisterConfig: mockLoadCloisterConfig,
 }));
 
-const { mockKillSessionAsync, mockResolveProjectFromIssue, mockListStashes, mockCreateNamedStash, mockDropStash, mockIsPaneDeadAsync } = vi.hoisted(() => ({
+const { mockKillSessionAsync, mockResolveProjectFromIssue, mockListStashes, mockCreateNamedStash, mockDropStash, mockIsPaneDeadAsync, mockListPaneValuesAsync } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockResolveProjectFromIssue: vi.fn().mockReturnValue({
     projectKey: 'panopticon-cli',
@@ -70,6 +71,7 @@ const { mockKillSessionAsync, mockResolveProjectFromIssue, mockListStashes, mock
   mockCreateNamedStash: vi.fn().mockResolvedValue(null),
   mockDropStash: vi.fn().mockResolvedValue(undefined),
   mockIsPaneDeadAsync: vi.fn().mockResolvedValue(false),
+  mockListPaneValuesAsync: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../../src/lib/projects.js', () => ({
@@ -85,6 +87,7 @@ vi.mock('../../../src/lib/tmux.js', async () => {
     killSessionAsync: mockKillSessionAsync,
     setOptionAsync: vi.fn().mockResolvedValue(undefined),
     isPaneDeadAsync: mockIsPaneDeadAsync,
+    listPaneValuesAsync: mockListPaneValuesAsync,
   };
 });
 
@@ -193,6 +196,161 @@ describe('dispatchParallelReview', () => {
       c => c[1].reviewStatus === 'passed' || c[1].reviewStatus === 'blocked' || c[1].reviewStatus === 'failed',
     );
     expect(terminalCalls.length).toBe(0);
+  });
+});
+
+// ── killAllReviewSessions ─────────────────────────────────────────────────────
+// PAN-931: pan down must kill review sessions so they don't survive dashboard
+// restart and block new review dispatch.
+
+describe('killAllReviewSessions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('kills coordinator sessions', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'review-coordinator-PAN-999-1234567890000',
+      'review-coordinator-PAN-888-1234567890001',
+      'agent-pan-999',
+    ]);
+
+    const result = await killAllReviewSessions();
+
+    expect(result.killed).toContain('review-coordinator-PAN-999-1234567890000');
+    expect(result.killed).toContain('review-coordinator-PAN-888-1234567890001');
+    expect(result.killed).toHaveLength(2);
+    expect(mockKillSessionAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('kills canonical reviewer sessions (PAN-830 naming)', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'specialist-panopticon-cli-PAN-999-review-correctness',
+      'specialist-panopticon-cli-PAN-999-review-security',
+      'agent-pan-999',
+    ]);
+
+    const result = await killAllReviewSessions();
+
+    expect(result.killed).toContain('specialist-panopticon-cli-PAN-999-review-correctness');
+    expect(result.killed).toContain('specialist-panopticon-cli-PAN-999-review-security');
+    expect(result.killed).toHaveLength(2);
+  });
+
+  it('kills legacy timestamp-based reviewer sessions', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'review-PAN-999-1713456789000-correctness',
+      'review-PAN-999-1713456789000-security',
+    ]);
+
+    const result = await killAllReviewSessions();
+
+    expect(result.killed).toContain('review-PAN-999-1713456789000-correctness');
+    expect(result.killed).toContain('review-PAN-999-1713456789000-security');
+    expect(result.killed).toHaveLength(2);
+  });
+
+  it('returns empty when no review sessions exist', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'agent-pan-999',
+      'panopticon-dashboard',
+    ]);
+
+    const result = await killAllReviewSessions();
+
+    expect(result.killed).toHaveLength(0);
+    expect(result.failed).toHaveLength(0);
+    expect(mockKillSessionAsync).not.toHaveBeenCalled();
+  });
+
+  it('reports failed kills without throwing', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'review-coordinator-PAN-999-1234567890000',
+    ]);
+    mockKillSessionAsync.mockRejectedValueOnce(new Error('session not found'));
+
+    const result = await killAllReviewSessions();
+
+    expect(result.killed).toHaveLength(0);
+    expect(result.failed).toContain('review-coordinator-PAN-999-1234567890000');
+  });
+});
+
+// ── dispatchParallelReview idempotency guard (PAN-931) ────────────────────────
+
+describe('dispatchParallelReview idempotency guard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
+      const callback = (typeof _opts === 'function' ? _opts : cb)!;
+      if (cmd === 'git status --porcelain') return callback(null, { stdout: '', stderr: '' });
+      callback(new Error(`unexpected command: ${cmd}`));
+    });
+    mockListStashes.mockResolvedValue([]);
+    mockCreateNamedStash.mockResolvedValue(null);
+    mockDropStash.mockResolvedValue(undefined);
+  });
+
+  const baseOpts = {
+    issueId: 'PAN-999',
+    workspace: '/workspaces/feature-pan-999',
+    branch: 'feature/pan-999',
+    prUrl: 'https://github.com/org/repo/pull/1',
+  };
+
+  it('kills stale coordinator and proceeds when pane is dead (PAN-912)', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'review-coordinator-PAN-999-1234567890000',
+    ]);
+    mockIsPaneDeadAsync.mockResolvedValue(true);
+    const coordinatorSpawnFn = vi.fn().mockResolvedValue({ sessionName: 'review-coordinator-PAN-999-new' });
+
+    const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
+
+    expect(mockKillSessionAsync).toHaveBeenCalledWith('review-coordinator-PAN-999-1234567890000');
+    expect(coordinatorSpawnFn).toHaveBeenCalledOnce();
+    expect(ret.success).toBe(true);
+  });
+
+  it('kills zombie coordinator when pane_dead=0 but process PID is gone (PAN-931)', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'review-coordinator-PAN-999-1234567890000',
+    ]);
+    mockIsPaneDeadAsync.mockResolvedValue(false);
+    // Simulate a pane PID that no longer exists in the process table
+    mockListPaneValuesAsync.mockResolvedValue(['999999']);
+    const coordinatorSpawnFn = vi.fn().mockResolvedValue({ sessionName: 'review-coordinator-PAN-999-new' });
+
+    const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
+
+    expect(mockKillSessionAsync).toHaveBeenCalledWith('review-coordinator-PAN-999-1234567890000');
+    expect(coordinatorSpawnFn).toHaveBeenCalledOnce();
+    expect(ret.success).toBe(true);
+  });
+
+  it('skips dispatch when coordinator pane and process are both alive', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'review-coordinator-PAN-999-1234567890000',
+    ]);
+    mockIsPaneDeadAsync.mockResolvedValue(false);
+    // Simulate a real live PID (process.kill(0) would succeed for PID 1)
+    mockListPaneValuesAsync.mockResolvedValue(['1']);
+    const coordinatorSpawnFn = vi.fn().mockResolvedValue({ sessionName: 'review-coordinator-PAN-999-new' });
+
+    const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
+
+    expect(mockKillSessionAsync).not.toHaveBeenCalled();
+    expect(coordinatorSpawnFn).not.toHaveBeenCalled();
+    expect(ret.success).toBe(true);
+    expect(ret.message).toContain('Review already in progress');
   });
 });
 

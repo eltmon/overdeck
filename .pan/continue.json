@@ -2,23 +2,25 @@
   "version": "1",
   "issueId": "PAN-931",
   "created": "2026-05-07T06:33:00Z",
-  "updated": "2026-05-07T06:33:00Z",
-  "gitState": { "branch": "feature/pan-931", "sha": "a7ec7b123", "dirty": false },
+  "updated": "2026-05-07T06:35:00Z",
+  "gitState": { "branch": "feature/pan-931", "sha": "95ecd17b0", "dirty": false },
   "decisions": [
     { "id": "D1", "summary": "Added killAllReviewSessions() to kill all review-related tmux sessions (coordinators, canonical reviewers, legacy reviewers) — called from pan down to prevent stale sessions surviving dashboard restart.", "recordedAt": "2026-05-07T06:33:00Z" },
-    { "id": "D2", "summary": "Enhanced dispatchParallelReview idempotency guard with isCoordinatorAliveAsync() that checks #{pane_pid} process existence via kill -0. Catches zombies where pane_dead=0 but underlying bash process has exited.", "recordedAt": "2026-05-07T06:33:00Z" }
+    { "id": "D2", "summary": "Enhanced dispatchParallelReview idempotency guard with isCoordinatorAliveAsync() that checks #{pane_pid} process existence via kill -0. Catches zombies where pane_dead=0 but underlying bash process has exited.", "recordedAt": "2026-05-07T06:33:00Z" },
+    { "id": "D3", "summary": "Wired killAllReviewSessions into pan down command in src/cli/index.ts, positioned after dashboard stop and before Traefik stop.", "recordedAt": "2026-05-07T06:35:00Z" }
   ],
   "hazards": [
     { "id": "H1", "summary": "process.kill(pid, 0) is sync but extremely fast (single syscall). Used only in review-agent code, not dashboard server routes.", "mitigation": "Acceptable per CLAUDE.md: CLI-side sync calls are fine." }
   ],
   "resumePoint": {
-    "description": "Bead workspace-etvu is complete. Next: bead workspace-sfog — wire killAllReviewSessions into the pan down command in src/cli/index.ts.",
-    "beadId": "workspace-etvu",
-    "filesToRead": ["src/cli/index.ts"]
+    "description": "Bead workspace-sfog is complete. Next: bead workspace-yzs6 — add tests for killAllReviewSessions, isCoordinatorAliveAsync, and pan down integration.",
+    "beadId": "workspace-sfog",
+    "filesToRead": ["tests/lib/cloister/review-agent.test.ts"]
   },
   "beadsMapping": {},
   "agentModel": "kc@kimi-k2.6",
   "sessionHistory": [
-    { "timestamp": "2026-05-07T06:33:00Z", "reason": "end", "note": "Completed bead workspace-etvu: added killAllReviewSessions function and enhanced idempotency guard in review-agent.ts. All 81 existing tests pass.", "agentModel": "kc@kimi-k2.6" }
+    { "timestamp": "2026-05-07T06:33:00Z", "reason": "end", "note": "Completed bead workspace-etvu: added killAllReviewSessions function and enhanced idempotency guard in review-agent.ts. All 81 existing tests pass.", "agentModel": "kc@kimi-k2.6" },
+    { "timestamp": "2026-05-07T06:35:00Z", "reason": "end", "note": "Completed bead workspace-sfog: wired killAllReviewSessions into pan down command in src/cli/index.ts.", "agentModel": "kc@kimi-k2.6" }
   ]
 }
