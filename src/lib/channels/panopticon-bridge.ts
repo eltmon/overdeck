@@ -44,14 +44,23 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-const AGENT_ID = process.env.PANOPTICON_AGENT_ID;
-if (!AGENT_ID) {
-  process.stderr.write(
-    'panopticon-bridge: PANOPTICON_AGENT_ID env var is required. ' +
-      'It is normally supplied by the per-agent MCP config; if you are running this script ' +
-      'manually for development, set it explicitly.\n',
-  );
-  process.exit(2);
+/**
+ * Resolve the per-agent ID from env. Tests import this module to call the
+ * exported helpers (pushChannelNotification, getSocketPath, …) and must NOT
+ * trigger process.exit at import time. The fail-fast check below moved into
+ * main() so it only fires on direct CLI invocation.
+ */
+function resolveAgentIdOrExit(): string {
+  const id = process.env.PANOPTICON_AGENT_ID;
+  if (!id) {
+    process.stderr.write(
+      'panopticon-bridge: PANOPTICON_AGENT_ID env var is required. ' +
+        'It is normally supplied by the per-agent MCP config; if you are running this script ' +
+        'manually for development, set it explicitly.\n',
+    );
+    process.exit(2);
+  }
+  return id;
 }
 
 const INSTRUCTIONS = [
@@ -225,10 +234,11 @@ async function startUnixListener(mcp: Server, agentId: string): Promise<UnixHttp
 }
 
 async function main(): Promise<void> {
+  const agentId = resolveAgentIdOrExit();
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  const httpServer = await startUnixListener(server, AGENT_ID!);
+  const httpServer = await startUnixListener(server, agentId);
 
   const shutdown = async (): Promise<void> => {
     try {
@@ -237,7 +247,7 @@ async function main(): Promise<void> {
       // best-effort
     }
     try {
-      await unlink(getSocketPath(AGENT_ID!));
+      await unlink(getSocketPath(agentId));
     } catch {
       // best-effort
     }
