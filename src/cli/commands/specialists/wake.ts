@@ -17,6 +17,7 @@ import {
   type SpecialistType,
 } from '../../../lib/cloister/specialists.js';
 import { PANOPTICON_HOME } from '../../../lib/paths.js';
+import { getClaudePermissionFlagsString } from '../../../lib/claude-permissions.js';
 import { createSessionAsync, sendKeys } from '../../../lib/tmux.js';
 
 const TASKS_DIR = join(PANOPTICON_HOME, 'specialists', 'tasks');
@@ -94,7 +95,7 @@ export async function wakeCommand(name: string, options: WakeOptions): Promise<v
 
   try {
     // Build Claude command
-    let claudeCmd = 'claude --dangerously-skip-permissions --permission-mode bypassPermissions';
+    let claudeCmd = `claude ${getClaudePermissionFlagsString()}`;
 
     if (sessionId) {
       claudeCmd += ` --resume ${sessionId}`;

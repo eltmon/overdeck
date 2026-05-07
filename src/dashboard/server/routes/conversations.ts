@@ -1,5 +1,6 @@
 import { jsonResponse } from "../http-helpers.js";
 import { buildChildEnv, buildChildEnvWithoutTmux, BLANKED_PROVIDER_ENV } from '../../../lib/child-env.js';
+import { getClaudePermissionFlagsString, resolvePermissionMode } from '../../../lib/claude-permissions.js';
 /**
  * Conversations route module — Effect HttpRouter.Layer (PAN-416)
  *
@@ -724,7 +725,7 @@ async function spawnConversationSession(
 
   const launcherScript = join(stateDir, 'launcher.sh');
 
-  const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
+  const permissionFlags = getClaudePermissionFlagsString();
   let runtimeCommand = `claude ${permissionFlags}`;
   let providerExportsStr = '';
   let providerEnv: Record<string, string> = {};
@@ -733,11 +734,20 @@ async function spawnConversationSession(
       throw new Error('Invalid model name');
     }
     runtimeCommand = await getAgentRuntimeBaseCommand(model);
-    if (!runtimeCommand.includes('--dangerously-skip-permissions')) {
-      runtimeCommand = `${runtimeCommand} --dangerously-skip-permissions`;
-    }
-    if (!runtimeCommand.includes('--permission-mode')) {
-      runtimeCommand = `${runtimeCommand} --permission-mode bypassPermissions`;
+    // Defensive: agent-frontmatter branches in getAgentRuntimeBaseCommand intentionally
+    // omit permission flags; ensure the resolved mode's flags are present here.
+    const mode = resolvePermissionMode();
+    if (mode === 'auto') {
+      if (!runtimeCommand.includes('--permission-mode')) {
+        runtimeCommand = `${runtimeCommand} --permission-mode auto`;
+      }
+    } else {
+      if (!runtimeCommand.includes('--dangerously-skip-permissions')) {
+        runtimeCommand = `${runtimeCommand} --dangerously-skip-permissions`;
+      }
+      if (!runtimeCommand.includes('--permission-mode')) {
+        runtimeCommand = `${runtimeCommand} --permission-mode bypassPermissions`;
+      }
     }
     providerExportsStr = (await getProviderExportsForModel(model)).trim();
     providerEnv = await getProviderEnvForModel(model);

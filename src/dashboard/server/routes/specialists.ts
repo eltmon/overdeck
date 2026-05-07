@@ -1,6 +1,7 @@
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { getClaudePermissionFlagsString } from '../../../lib/claude-permissions.js';
 /**
  * Specialists route module — Effect HttpRouter.Layer (PAN-428 B9)
  *
@@ -708,10 +709,11 @@ const postSpecialistWakeRoute = HttpRouter.add(
       specModel = getModelId(workTypeId);
     } catch { /* fall back to default */ }
     const specCmd = getAgentCommand(specModel);
+    const specPermissionFlags = getClaudePermissionFlagsString();
     const specCmdWithArgs =
       specCmd.args.length > 0
-        ? `${specCmd.command} ${specCmd.args.join(' ')} --dangerously-skip-permissions --permission-mode bypassPermissions`
-        : `${specCmd.command} --dangerously-skip-permissions --permission-mode bypassPermissions`;
+        ? `${specCmd.command} ${specCmd.args.join(' ')} ${specPermissionFlags}`
+        : `${specCmd.command} ${specPermissionFlags}`;
 
     const cwd = homedir();
     yield* Effect.promise(() => createSessionAsync(

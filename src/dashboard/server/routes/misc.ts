@@ -52,6 +52,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { createSessionAsync, killSessionAsync, listSessionNamesAsync, resizeWindowAsync, sendKeysAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 import { generateLauncherScript } from '../../../lib/launcher-generator.js';
+import { getClaudePermissionFlagsString } from '../../../lib/claude-permissions.js';
 import { listProjects, resolveProjectFromIssue, findProjectByTeam, extractTeamPrefix, getIssuePrefix } from '../../../lib/projects.js';
 import { getLinearApiKey, getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import {
@@ -1182,10 +1183,11 @@ Continue the PLANNING session. Do NOT implement anything.
           msgPlanningModel = getModelId('planning-agent');
         } catch { /* fall back to default */ }
         const msgAgentCmd = getAgentCommand(msgPlanningModel);
+        const msgPermissionFlags = getClaudePermissionFlagsString();
         const msgCmdWithArgs =
           msgAgentCmd.args.length > 0
-            ? `${msgAgentCmd.command} ${msgAgentCmd.args.join(' ')} --dangerously-skip-permissions --permission-mode bypassPermissions`
-            : `${msgAgentCmd.command} --dangerously-skip-permissions --permission-mode bypassPermissions`;
+            ? `${msgAgentCmd.command} ${msgAgentCmd.args.join(' ')} ${msgPermissionFlags}`
+            : `${msgAgentCmd.command} ${msgPermissionFlags}`;
 
         const launcherScript = join(agentStateDir, 'continuation-launcher.sh');
         await mkdir(agentStateDir, { recursive: true });

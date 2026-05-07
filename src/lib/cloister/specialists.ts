@@ -13,6 +13,7 @@ import { promisify } from 'util';
 import { randomUUID, createHash } from 'crypto';
 import { PANOPTICON_HOME } from '../paths.js';
 import { getDevrootPath } from '../config.js';
+import { getClaudePermissionFlagsString } from '../claude-permissions.js';
 import { getProject } from '../projects.js';
 import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
 import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
@@ -1029,8 +1030,8 @@ ${basePrompt}`;
       clearCredentialFileAuth(cwd);
     }
 
-    // All autonomous specialists need full permission bypass to avoid interactive prompts
-    const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
+    // Permission flags resolved from config / --yolo / PAN_YOLO (default: auto)
+    const permissionFlags = getClaudePermissionFlagsString();
 
     // Write task prompt to file to avoid shell escaping issues
     const agentDir = join(homedir(), '.panopticon', 'agents', tmuxSession);
@@ -2556,8 +2557,8 @@ export async function wakeSpecialist(
         clearCredentialFileAuth(cwd);
       }
 
-      // All autonomous specialists need full permission bypass to avoid interactive prompts
-      const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
+      // Permission flags resolved from config / --yolo / PAN_YOLO (default: auto)
+      const permissionFlags = getClaudePermissionFlagsString();
 
       // Start with --resume if we have a session, otherwise generate a new session ID
       // Always start fresh — no --resume. Context compaction corrupts thinking block
