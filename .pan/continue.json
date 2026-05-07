@@ -2,12 +2,12 @@
   "version": "1",
   "issueId": "PAN-986",
   "created": "2026-05-07T14:20:00Z",
-  "updated": "2026-05-07T14:45:00Z",
+  "updated": "2026-05-07T18:42:27Z",
   "gitState": {
     "branch": "feature/pan-986",
-    "sha": "59065c36f",
+    "sha": "ce72c7f23",
     "dirty": true
-  },
+  }
   "decisions": [
     {
       "id": "D1",
@@ -23,6 +23,11 @@
       "id": "D3",
       "summary": "The work-agent stop hook now treats the latest structured `channel_reply` runtime signal as authoritative for `done` and `needs_input` before it falls back to tmux capture and LLM inference. This replaces one of the brittle pane-scrape paths the issue targeted while preserving the old heuristic as a safety net for sessions that never emit structured replies.",
       "recordedAt": "2026-05-07T14:45:00Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Repo-wide verification was blocked by two stale invariants outside the PAN-986 feature code: the desktop workspace package metadata still reported version `0.8.15` while the root CLI package had advanced to `0.8.16`, and the GitHub label-cleanup unit test still assumed unconditional `--remove-label` calls even though the implementation now prefetches current labels and removes only labels that are actually present. I aligned the desktop version metadata and updated the test to mock the label-prefetch response so the quality gate exercises the current behavior instead of an obsolete assumption.",
+      "recordedAt": "2026-05-07T18:42:27Z"
     }
   ],
   "hazards": [
@@ -33,14 +38,12 @@
     }
   ],
   "resumePoint": {
-    "description": "Commit and close bead workspace-jyh4, then run the full PAN-986 quality gates (`npm run typecheck`, `npm run lint`, and `npm test`) before pushing the branch and calling `pan done pan-986`.",
-    "beadId": "workspace-jyh4",
+    "description": "The PAN-986 feature work and repo-wide quality gates are now green. The remaining work is to push `feature/pan-986`, run `pan done pan-986 -c \"Implementation complete\"`, and stay available for any automatic review or UAT follow-up.",
+    "beadId": null,
     "filesToRead": [
-      "scripts/work-agent-stop-hook",
-      "tests/scripts/work-agent-stop-hook.test.ts",
-      "src/lib/channels/panopticon-bridge.ts",
-      "src/lib/agent-runtime.ts",
-      "packages/contracts/src/types.ts"
+      ".pan/continue.json",
+      "apps/desktop/package.json",
+      "tests/unit/lib/lifecycle/label-cleanup.test.ts"
     ]
   },
   "beadsMapping": {
@@ -72,6 +75,12 @@
       "timestamp": "2026-05-07T14:45:00Z",
       "reason": "manual",
       "note": "Claimed workspace-jyh4 and updated `scripts/work-agent-stop-hook` so it checks the structured `channelReply` runtime snapshot before tmux pane capture and Claude fallback. Added end-to-end script tests with mocked curl, tmux, and claude commands to prove that `done` and `needs_input` replies emit the expected runtime resolution without invoking pane scraping.",
+      "agentModel": "claude-code"
+    },
+    {
+      "timestamp": "2026-05-07T18:42:27Z",
+      "reason": "manual",
+      "note": "Finished the blocked verification pass after fixing two repo-wide quality gate regressions that were unrelated to the PAN-986 feature logic. I aligned `apps/desktop/package.json` and `bun.lock` with the root `0.8.16` release version, updated the GitHub label-cleanup unit test so it mocks the implementation's current label-prefetch behavior, reran the targeted blockers, and then reran `npm run typecheck`, `npm run lint`, and the full `npm test` suite successfully.",
       "agentModel": "claude-code"
     }
   ]
