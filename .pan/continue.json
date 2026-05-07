@@ -2,34 +2,37 @@
   "version": "1",
   "issueId": "PAN-954",
   "created": "2026-05-07T04:40:00Z",
-  "updated": "2026-05-07T04:50:00Z",
-  "gitState": { "branch": "feature/pan-954", "sha": "30634d421", "dirty": false },
+  "updated": "2026-05-07T04:55:00Z",
+  "gitState": { "branch": "feature/pan-954", "sha": "5285c98a9", "dirty": false },
   "decisions": [
     { "id": "D1", "summary": "Use existing CommandDeck queries (useActivityQuery, usePrQuery) in InspectorPanel to share cache and avoid duplicate backend work.", "recordedAt": "2026-05-07T04:40:00Z" },
     { "id": "D2", "summary": "Port reviewer summary, test cycle counter, PR status, last activity, session count, and pipeline stuck banner from OverviewTab to InspectorPanel. Keep inspector compact — use condensed layouts.", "recordedAt": "2026-05-07T04:40:00Z" },
     { "id": "D3", "summary": "Added useActivityQuery to InspectorPanel for last activity and session count. Placed Activity section between workspace path and Links.", "recordedAt": "2026-05-07T04:45:00Z" },
-    { "id": "D4", "summary": "Reviewer summary uses compact 5-col grid with colored dots and round numbers instead of full RoundCard. Fits narrow inspector slide-out.", "recordedAt": "2026-05-07T04:50:00Z" }
+    { "id": "D4", "summary": "Reviewer summary uses compact 5-col grid with colored dots and round numbers instead of full RoundCard. Fits narrow inspector slide-out.", "recordedAt": "2026-05-07T04:50:00Z" },
+    { "id": "D5", "summary": "Tests cycle counter already existed in ReviewPipelineSection but was hidden at cycle 0. Changed condition to show whenever verificationMaxCycles is defined, matching CommandDeck behavior.", "recordedAt": "2026-05-07T04:55:00Z" }
   ],
   "hazards": [
     { "id": "H1", "summary": "InspectorPanel is rendered in a narrow slide-out. Adding too much content could make it unwieldy.", "mitigation": "Keep new sections compact. Use horizontal layouts where possible. Only show reviewer summary when data exists." },
     { "id": "H2", "summary": "Activity query polling could be expensive if many inspectors are open.", "mitigation": "Shared QueryClient cache means only one fetch per issue regardless of how many components query it. Use same query keys as OverviewTab." }
   ],
   "resumePoint": {
-    "description": "Implementing bead workspace-o1gi — add tests cycle counter to InspectorPanel. ReviewStatus already has verificationCycleCount and verificationMaxCycles. Need to display this in ReviewPipelineSection or a new compact Tests subsection.",
-    "beadId": "workspace-o1gi",
+    "description": "Implementing bead workspace-yj23 — add Open VS Code button to InspectorPanel. CommandDeck OverviewTab already has this. Need to add vscode://file/ link in inspector workspace path section.",
+    "beadId": "workspace-yj23",
     "filesToRead": [
-      "src/dashboard/frontend/src/components/inspector/ReviewPipelineSection.tsx",
-      "src/dashboard/frontend/src/components/InspectorPanel.tsx"
+      "src/dashboard/frontend/src/components/InspectorPanel.tsx",
+      "src/dashboard/frontend/src/components/inspector/AgentInfoSection.tsx"
     ]
   },
   "beadsMapping": {
     "workspace-n99r": "completed",
-    "workspace-r490": "completed"
+    "workspace-r490": "completed",
+    "workspace-o1gi": "completed"
   },
   "agentModel": "kimi-k2.6",
   "sessionHistory": [
     { "timestamp": "2026-05-07T04:40:00Z", "reason": "start", "note": "Started implementation of PAN-954. No prior continue file. Created 6 beads based on issue checklist and initialized planning artifacts.", "agentModel": "kimi-k2.6" },
     { "timestamp": "2026-05-07T04:45:00Z", "reason": "checkpoint", "note": "Completed bead workspace-n99r — added last activity timestamp and session count to InspectorPanel using useActivityQuery from CommandDeck tabs. Typecheck passed.", "agentModel": "kimi-k2.6" },
-    { "timestamp": "2026-05-07T04:50:00Z", "reason": "checkpoint", "note": "Completed bead workspace-r490 — added compact 5-col reviewer summary snapshot to InspectorPanel using activity reviewer sections. Typecheck passed.", "agentModel": "kimi-k2.6" }
+    { "timestamp": "2026-05-07T04:50:00Z", "reason": "checkpoint", "note": "Completed bead workspace-r490 — added compact 5-col reviewer summary snapshot to InspectorPanel using activity reviewer sections. Typecheck passed.", "agentModel": "kimi-k2.6" },
+    { "timestamp": "2026-05-07T04:55:00Z", "reason": "checkpoint", "note": "Completed bead workspace-o1gi — fixed ReviewPipelineSection to show tests cycle counter even at cycle 0, matching CommandDeck behavior. Typecheck passed.", "agentModel": "kimi-k2.6" }
   ]
 }
