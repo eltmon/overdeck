@@ -138,8 +138,8 @@
     }
   ],
   "resumePoint": {
-    "description": "pan-sync-pi-skills bead complete: added syncPiSettings() in src/lib/sync.ts that no-ops when Pi is missing (AC3), creates/merges ~/.pi/agent/settings.json with skills entry pointing at ~/.claude/skills (AC1/AC2), preserves unrelated keys, returns 'unchanged' on idempotent re-runs, and refuses to clobber a malformed user file. Wired into syncCommand after the optional commands block. 5 vitest cases pass. Beads remaining (8): 3119 (resume), dbf (status display), 6oe (docs), w1o0 (e2e), UI bundle fjs9/0c2/3ir/lg47.",
-    "beadId": "workspace-63b",
+    "description": "pan-status-harness bead complete: pan status prints a Harness: line per agent (AC1), defaulting to claude-code on legacy state.json without the harness field. JSON output already includes harness from AgentState. Dashboard IssueAgentCard wraps getHarness(agent) in a styled span (data-testid=agent-harness-badge) tinted purple for pi vs blue for claude-code so mixed-harness pipelines are readable at a glance (AC2). 5 tests pass (3 status-harness + 2 IssueAgentCard source-grep). Beads remaining (7): 3119 (resume), 6oe (docs), w1o0 (e2e), UI bundle fjs9/0c2/3ir/lg47.",
+    "beadId": "workspace-dbf",
     "filesToRead": [
       "src/lib/runtimes/pi.ts",
       "src/lib/runtimes/__tests__/pi.test.ts"
@@ -255,6 +255,12 @@
       "timestamp": "2026-05-07T05:55:00.000Z",
       "reason": "continue",
       "note": "Closed bead workspace-63b (pan-sync-pi-skills). Added syncPiSettings() to src/lib/sync.ts. The helper checks `which pi` first and returns status='skipped' immediately when Pi is not on PATH so we never overwrite user config for a tool the user has not installed (AC3). When Pi IS on PATH, it reads ~/.pi/agent/settings.json (or starts from {} when absent), merges in a skills array containing ~/.claude/skills while preserving every other key in the existing file (AC2), and writes the merged JSON with a trailing newline. A second invocation with the entry already present returns status='unchanged' (idempotent). Malformed JSON in the existing file is left untouched and surfaces as status='skipped' with reason='not valid JSON'. Wired into syncCommand in src/cli/commands/sync.ts after the existing checks; created/updated/malformed cases each get a colored console line. 5 vitest cases cover the three ACs plus the idempotent and malformed branches. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T06:00:00.000Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-dbf (pan-status-harness). pan status human-readable output now prints `Harness:  <claude-code|pi>` between Runtime and Duration for each running agent, defaulting to 'claude-code' when AgentState.harness is undefined so legacy pre-PAN-636 state.json files keep rendering correctly (AC1). The JSON mode (`pan status --json`) already inherits agent.harness from AgentState verbatim. Dashboard IssueAgentCard renders the harness as a colored badge — pi gets purple-500/15 + purple-300, claude-code gets blue-500/15 + blue-300 — wrapped in a span tagged data-testid='agent-harness-badge' and titled with 'Coding-agent harness: <name>'. Source comes from getHarness(agent) (the legacy normalizer in @panctl/contracts), not the raw runtime field, so mixed-harness boards stay legible (AC2). 3 status-harness tests via mocked listRunningAgents + 2 source-grep frontend tests (mounting IssueAgentCard pulls in DialogProvider + react-query + Zustand which is out of scope for this AC; the source-grep regression guard is the existing pattern in this codebase per review-agent.test.ts). typecheck + lint clean.",
       "agentModel": "claude-opus-4-7"
     }
   ],

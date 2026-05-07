@@ -248,7 +248,18 @@ export function IssueAgentCard({
               )}
             </div>
             <div className="text-sm text-muted-foreground flex items-center gap-2">
-              {getHarness(agent)} / {agent.model}
+              <span
+                className={`px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide ${
+                  getHarness(agent) === 'pi'
+                    ? 'bg-purple-500/15 text-purple-300'
+                    : 'bg-blue-500/15 text-blue-300'
+                }`}
+                title={`Coding-agent harness: ${getHarness(agent)}`}
+                data-testid="agent-harness-badge"
+              >
+                {getHarness(agent)}
+              </span>
+              <span>/ {agent.model}</span>
               {costData && costData.cost > 0 && (
                 <span
                   className="flex items-center gap-1 text-xs text-success"
