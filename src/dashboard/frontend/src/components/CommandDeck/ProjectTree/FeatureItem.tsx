@@ -1257,7 +1257,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       {expanded && hasResources && detailIdentifiers && (
         <ResourcesGroup
           issueId={feature.issueId}
-          defaultExpanded={aggregateSessions.length > 0 && activityState !== 'ended'}
+          defaultExpanded={aggregateSessions.length > 0 && activityState !== 'stopped'}
           containers={(detailIdentifiers.dockerContainerNames ?? []).map((name) => {
             const stats = containerStats?.[name];
             return {

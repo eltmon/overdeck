@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Container } from 'lucide-react';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import { InlineSparkline } from '../InlineSparkline';
