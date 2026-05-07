@@ -1110,17 +1110,17 @@ describe('dispatch failure reviewStatus regression', () => {
 // providers (OpenAI, Google) get routed correctly instead of using the old
 // hardcoded `claude --model` which only works for direct Anthropic-compatible providers.
 describe('spawnReviewer runtime command routing regression', () => {
-  it('review-agent.ts imports getAgentRuntimeBaseCommand from agents.js', async () => {
+  it('review-agent.ts imports resolveSpecialistBaseCommand from router.js (PAN-636: harness-aware routing)', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const src = readFileSync(
       resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
       'utf-8',
     );
-    expect(src).toMatch(/import\s*\{[^}]*getAgentRuntimeBaseCommand[^}]*\}\s*from\s*['"]\.\.\/agents\.js['"]/);
+    expect(src).toMatch(/import\s*\{[^}]*resolveSpecialistBaseCommand[^}]*\}\s*from\s*['"]\.\/router\.js['"]/);
   });
 
-  it('spawnReviewer body uses getAgentRuntimeBaseCommand, not a hardcoded claude --model string', async () => {
+  it('spawnReviewer body uses resolveSpecialistBaseCommand, not a hardcoded claude --model string', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const src = readFileSync(
@@ -1133,14 +1133,13 @@ describe('spawnReviewer runtime command routing regression', () => {
     expect(spawnReviewerMatch).not.toBeNull();
     const fn = spawnReviewerMatch![0];
 
-    // Must use the routing helper — not a bare `claude --model` string
-    expect(fn).toContain('getAgentRuntimeBaseCommand(');
+    // Must use the harness-aware routing helper — not a bare `claude --model` string.
+    // resolveSpecialistBaseCommand wraps getAgentRuntimeBaseCommand and adds harness/ToS routing.
+    expect(fn).toContain('resolveSpecialistBaseCommand(');
     expect(fn).not.toMatch(/`claude\s+--(?:dangerously-skip-permissions|model)/);
   });
 
-  it('review-agent.ts uses both launcher exports and settings overlay helpers for provider env isolation', async () => {
-    // The current design uses launcher-script exports plus settings.local.json
-    // overlay injection so Claude settings-level env cannot override provider routing.
+  it('review-agent.ts uses launcher exports for provider env isolation', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const src = readFileSync(
@@ -1148,8 +1147,8 @@ describe('spawnReviewer runtime command routing regression', () => {
       'utf-8',
     );
     expect(src).toMatch(/getProviderExportsForModel/);
-    expect(src).toMatch(/getProviderEnvForModel/);
-    expect(src).toMatch(/injectProviderEnvOverlay/);
+    expect(src).toMatch(/generateLauncherScript/);
+    expect(src).toMatch(/BLANKED_PROVIDER_ENV/);
   });
 
   it('spawnReviewer uses a bash launcher script, not tmux -e env flags', async () => {
@@ -1166,13 +1165,11 @@ describe('spawnReviewer runtime command routing regression', () => {
 
     // Must write a launcher script file and run it via bash
     expect(fn).toContain('getProviderExportsForModel(');
+    expect(fn).toContain('generateLauncherScript(');
     expect(fn).toContain('writeFile(');
     expect(fn).toMatch(/bash\s+.*launcherPath/);
 
-    // Provider env now flows through launcher exports plus settings overlay injection,
-    // but must still avoid the old tmux `-e KEY=value` transport.
-    expect(fn).toContain('getProviderEnvForModel(');
-    expect(fn).toContain('injectProviderEnvOverlay(');
+    // Provider env flows through launcher exports — must avoid old tmux `-e KEY=value` transport.
     expect(fn).not.toMatch(/createSessionAsync\([\s\S]*-e\s/);
     const envMatch = fn.match(/\{\s*env\s*:[\s\S]*?\}/);
     if (envMatch) {
