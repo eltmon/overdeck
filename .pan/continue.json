@@ -138,8 +138,8 @@
     }
   ],
   "resumePoint": {
-    "description": "pi-doctor-prereq bead complete: extracted checkPi(strict) helper from doctorCommand, added SUPPORTED_PI_VERSION_MIN=0.73.0 + compareSemver, parses pi --version output (merges stderr because Pi prints version to stderr), reports OK/missing/too-old, checks packages/pi-extension/dist/index.js, --strict flag escalates missing to error. 6 doctor-pi tests pass. Beads remaining (9): 3119 (resume), 63b (pan sync settings), dbf (status display), 6oe (docs), w1o0 (e2e), UI bundle fjs9/0c2/3ir/lg47.",
-    "beadId": "workspace-uem",
+    "description": "pan-sync-pi-skills bead complete: added syncPiSettings() in src/lib/sync.ts that no-ops when Pi is missing (AC3), creates/merges ~/.pi/agent/settings.json with skills entry pointing at ~/.claude/skills (AC1/AC2), preserves unrelated keys, returns 'unchanged' on idempotent re-runs, and refuses to clobber a malformed user file. Wired into syncCommand after the optional commands block. 5 vitest cases pass. Beads remaining (8): 3119 (resume), dbf (status display), 6oe (docs), w1o0 (e2e), UI bundle fjs9/0c2/3ir/lg47.",
+    "beadId": "workspace-63b",
     "filesToRead": [
       "src/lib/runtimes/pi.ts",
       "src/lib/runtimes/__tests__/pi.test.ts"
@@ -249,6 +249,12 @@
       "timestamp": "2026-05-07T05:51:00.000Z",
       "reason": "continue",
       "note": "Resumed after context compaction. Ran full vitest: 14 failures broken down: 4 review-agent.test.ts cases were broken by the PAN-636 swap from getAgentRuntimeBaseCommand to resolveSpecialistBaseCommand and by leftover injectProviderEnvOverlay assertions (helper was removed in main commit 9fdb84258 but this stale-base branch still referenced it); fixed by porting main's updated assertions (test now expects resolveSpecialistBaseCommand from router.js, generateLauncherScript + BLANKED_PROVIDER_ENV references, no overlay). Remaining 10 failures (deacon-ci-retry, agent-spawning SageOx, release-monorepo-version, pan-344-auto-merge) verified to PASS on origin/main and are the side effect of feature/pan-636 being branched before those fixes landed — not caused by my changes; they will resolve on the next sync-with-main cycle. Closed bead workspace-uem (pi-doctor-prereq): extracted checkPi(strict) helper from doctorCommand, added SUPPORTED_PI_VERSION_MIN=0.73.0 constant + compareSemver, readPiVersion uses 2>&1 to capture Pi's stderr-printed version, --strict CLI option wired through doctorCommand options, --strict escalates Pi-missing from warn to error per AC3, packages/pi-extension/dist/index.js existence check warns with the build command per AC2. 6 vitest cases (doctor-pi.test.ts) cover OK/too-old/missing-warn/missing-strict/extension-missing/stderr-version-parse. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:55:00.000Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-63b (pan-sync-pi-skills). Added syncPiSettings() to src/lib/sync.ts. The helper checks `which pi` first and returns status='skipped' immediately when Pi is not on PATH so we never overwrite user config for a tool the user has not installed (AC3). When Pi IS on PATH, it reads ~/.pi/agent/settings.json (or starts from {} when absent), merges in a skills array containing ~/.claude/skills while preserving every other key in the existing file (AC2), and writes the merged JSON with a trailing newline. A second invocation with the entry already present returns status='unchanged' (idempotent). Malformed JSON in the existing file is left untouched and surfaces as status='skipped' with reason='not valid JSON'. Wired into syncCommand in src/cli/commands/sync.ts after the existing checks; created/updated/malformed cases each get a colored console line. 5 vitest cases cover the three ACs plus the idempotent and malformed branches. typecheck + lint clean.",
       "agentModel": "claude-opus-4-7"
     }
   ],

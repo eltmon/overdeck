@@ -4,7 +4,7 @@
     "created": "2026-05-07T04:10:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-636: Pi Coding Agent support as alternative harness to Claude Code",
-    "updated": "2026-05-07T05:50:35.631Z"
+    "updated": "2026-05-07T05:54:38.901Z"
   },
   "plan": {
     "id": "pan-636",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "7e9f8d2c-3a4b-4c5d-9e1f-2a3b4c5d6e7f",
     "author": "agent:claude-opus-4-7",
-    "sequence": 6,
+    "sequence": 10,
     "created": "2026-05-07T04:10:00.000Z",
-    "updated": "2026-05-07T05:50:35.631Z",
+    "updated": "2026-05-07T05:54:38.901Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/636",
@@ -900,7 +900,7 @@
       {
         "id": "pan-sync-pi-skills",
         "title": "pan sync writes ~/.pi/agent/settings.json so Pi reads skills from ~/.claude/skills",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T04:10:00.000Z",
         "metadata": {
@@ -914,28 +914,32 @@
           {
             "id": "pan-sync-pi-skills.ac1",
             "title": "Running `pan sync` on a clean machine creates ~/.pi/agent/settings.json with skills containing ~/.claude/skills",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-07T05:54:38.900Z"
           },
           {
             "id": "pan-sync-pi-skills.ac2",
             "title": "Running `pan sync` when ~/.pi/agent/settings.json already has unrelated keys preserves them and only adds/updates the skills entry",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-07T05:54:38.900Z"
           },
           {
             "id": "pan-sync-pi-skills.ac3",
             "title": "Running `pan sync` when Pi is not on PATH does NOT touch ~/.pi/agent/settings.json",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-07T05:54:38.901Z"
           }
-        ]
+        ],
+        "completed": "2026-05-07T05:54:38.899Z"
       },
       {
         "id": "pi-resume-flow",
