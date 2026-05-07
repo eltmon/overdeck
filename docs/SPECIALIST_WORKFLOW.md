@@ -112,31 +112,29 @@ When a user clicks **Start Agent** in the dashboard (`POST /api/agents`), the sy
 
 ```
 1. Planning agent writes:
-   .planning/
-   ├── STATE.md              # Decisions, approach, remaining work
-   ├── PLANNING_PROMPT.md    # Planning agent's instructions (DO NOT READ during implementation)
-   ├── discussions/           # Discovery conversation transcripts
-   ├── notes/                 # Research notes
-   └── transcripts/           # Session transcripts
+   .pan/
+   ├── spec.vbrief.json      # Machine-readable work plan (scope vBRIEF)
+   ├── continue.json         # Session state (decisions, approach, resume point)
+   ├── prd.md                # Discovered/copied PRD
+   └── context.md            # Workspace context for agents
 
 2. User clicks "Start Agent" → POST /api/agents
 
 3. Dashboard server:
    a. Stops planning agent (marks state as 'stopped', stoppedReason: 'work-agent-started')
-   b. Commits .planning/ artifacts to git
-   c. Archives PLANNING_PROMPT.md → PLANNING_PROMPT.md.archived (PAN-250)
-   d. Determines phase: .planning/ exists → 'implementation', otherwise → 'exploration'
-   e. Evaluates work-agent lifecycle truth: real resumable stopped agent ⇒ resume path, orphaned placeholder/stale record ⇒ fresh start path
-   f. Shells out via detached `pan start <ID> --local --phase implementation` and records exact lifecycle + spawn output in `~/.panopticon/agents/agent-<id>/lifecycle.log` and `spawn.log`
+   b. Commits .pan/ artifacts to git
+   c. Determines phase: .pan/spec.vbrief.json exists → 'implementation', otherwise → 'exploration'
+   d. Evaluates work-agent lifecycle truth: real resumable stopped agent ⇒ resume path, orphaned placeholder/stale record ⇒ fresh start path
+   e. Shells out via detached `pan start <ID> --local --phase implementation` and records exact lifecycle + spawn output in `~/.panopticon/agents/agent-<id>/lifecycle.log` and `spawn.log`
 
 4. Dashboard UI shows `Starting...` / `Resuming...` immediately, then switches to the normal running controls once the work agent is actually live
 
-5. Work agent reads .planning/STATE.md and implements remaining work
+5. Work agent reads .pan/continue.json and .pan/spec.vbrief.json and implements remaining work
 ```
 
 ### Beads Prerequisite
 
-Beads are a hard prerequisite for starting work agents. The `POST /api/agents` endpoint returns **422** if `.beads/issues.jsonl` does not exist in the workspace. Cloister automatically creates beads from the vBRIEF plan via `createBeadsFromVBrief()` when the planning agent touches the `.planning-complete` marker. Manual `bd create` is no longer needed.
+Beads are a hard prerequisite for starting work agents. The `POST /api/agents` endpoint returns **422** if `.beads/issues.jsonl` does not exist in the workspace. Cloister automatically creates beads from the vBRIEF plan via `createBeadsFromVBrief()` when planning completes. Manual `bd create` is no longer needed.
 
 ### DAG-Aware Task Scheduling
 
@@ -158,7 +156,7 @@ Each vBRIEF item can have `subItems` with `metadata.kind: "acceptance_criterion"
 
 A PRD may already exist in `docs/prds/active/` or `docs/prds/drafts/` before the planning agent runs — e.g., written manually or by a previous session. The planning agent handles three cases:
 
-1. **PRD with `<task>` XML tags** (execution-ready): Skip discovery. Use existing tasks directly to create `.planning/STATE.md`, beads, and `config.json`.
+1. **PRD with `<task>` XML tags** (execution-ready): Skip discovery. Use existing tasks directly to create `.pan/spec.vbrief.json`, beads, and continue state.
 
 2. **Prose PRD** (architecture decisions, requirements, no `<task>` tags): Use as foundation — do NOT redo decisions already made. Run abbreviated discovery to fill gaps, then convert prose into executable `<task>` XML structure. The PRD provides the "what and why"; planning creates the "how and in what order."
 
@@ -544,8 +542,8 @@ Agent runs `pan done` (Bash command)
         → APPROVED → queues test-agent
           → test-agent runs tests
             → PASS → marks ready for merge (human clicks MERGE or merge-agent handles)
-            → FAIL → feedback to .planning/feedback/ → agent fixes → re-requests review
-        → CHANGES REQUESTED → feedback to .planning/feedback/ → agent fixes → re-requests review
+            → FAIL → feedback to .pan/review/ → agent fixes → re-requests review
+        → CHANGES REQUESTED → feedback to .pan/review/ → agent fixes → re-requests review
           → This cycle repeats up to 3 times before circuit breaker trips
 ```
 

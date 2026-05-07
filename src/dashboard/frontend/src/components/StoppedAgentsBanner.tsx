@@ -174,44 +174,42 @@ export function StoppedAgentsBanner() {
   const failed = results?.filter((r) => !r.success).length ?? 0;
 
   return (
-    <div className="bg-warning/10 border-b-2 border-warning/40 px-4 py-3 flex items-start gap-3 shrink-0" data-testid="stopped-agents-banner">
-      <AlertTriangle className="w-5 h-5 text-warning-foreground shrink-0 mt-0.5" />
-      <div className="flex-1 min-w-0">
-        <p className="text-warning-foreground text-sm font-semibold">
-          {stoppedAgents.length} agent{stoppedAgents.length > 1 ? 's' : ''} stopped
-          {stoppedAgents.some((a) => a.lastActivity) && (
-            <span className="font-normal text-warning-foreground/70 ml-1">
-              (last active {Math.max(...stoppedAgents.map((a) =>
-                a.lastActivity ? Date.now() - new Date(a.lastActivity).getTime() : 0
-              )) / 60000 | 0}m ago)
+    <div className="bg-warning/10 border-b border-warning/30 px-3 py-1 flex items-center gap-2 shrink-0" data-testid="stopped-agents-banner">
+      <AlertTriangle className="w-3.5 h-3.5 text-warning-foreground shrink-0" />
+      <span className="text-warning-foreground text-xs font-semibold">
+        {stoppedAgents.length} stopped
+      </span>
+      <span className="text-warning-foreground/70 text-xs truncate">
+        {stoppedAgents.map((a) => a.issueId || a.id).join(', ')}
+        {stoppedAgents.some((a) => a.lastActivity) && (
+          <span className="ml-1">
+            ({Math.max(...stoppedAgents.map((a) =>
+              a.lastActivity ? Date.now() - new Date(a.lastActivity).getTime() : 0
+            )) / 60000 | 0}m ago)
+          </span>
+        )}
+      </span>
+
+      {results && (
+        <span className="text-xs ml-1">
+          {succeeded > 0 && (
+            <span className="text-success inline-flex items-center gap-0.5">
+              <CheckCircle className="w-3 h-3" /> {succeeded}
             </span>
           )}
-        </p>
-        <p className="text-warning-foreground/80 text-xs mt-0.5">
-          {stoppedAgents.map((a) => a.issueId || a.id).join(', ')}
-        </p>
+          {failed > 0 && (
+            <span className="text-destructive inline-flex items-center gap-0.5 ml-1">
+              <X className="w-3 h-3" /> {failed}
+            </span>
+          )}
+        </span>
+      )}
 
-        {results && (
-          <div className="mt-2 text-xs">
-            {succeeded > 0 && (
-              <span className="text-success flex items-center gap-1">
-                <CheckCircle className="w-3 h-3" /> {succeeded} restarted
-              </span>
-            )}
-            {failed > 0 && (
-              <span className="text-destructive flex items-center gap-1 mt-0.5">
-                <X className="w-3 h-3" /> {failed} failed
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-1.5 shrink-0 ml-auto">
         <button
           onClick={handleRestartAll}
           disabled={restarting}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
           data-testid="banner-restart-all"
         >
           {restarting ? (
@@ -228,7 +226,7 @@ export function StoppedAgentsBanner() {
           title="Dismiss"
           data-testid="banner-dismiss"
         >
-          <X className="w-4 h-4" />
+          <X className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>
