@@ -1,0 +1,37 @@
+{
+  "version": "1",
+  "issueId": "PAN-956",
+  "created": "2026-05-07T09:27:29.235Z",
+  "updated": "2026-05-07T09:28:38.837Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-05-07T09:27:29Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-956 (attempt 1/10):\n\nFailed check: test\n\nVerification FAILED at test (36440ms):\n\nalthStatusAsync src/dashboard/lib/health-filtering.ts:86:30\n     84| \n     85|   // 3. Check tmux liveness against the prefetched set — no per-agent …\n     86|   const alive = liveSessions.has(agentId);\n       |                              ^\n     87| \n     88|   if (!alive) {\n ❯ tests/dashboard/health-api.test.ts:210:22\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯\n\n FAIL |root|  tests/dashboard/projection-cache.test.ts > ProjectionCache.save > persists snapshot after debounce delay\nAssertionError: expected undefined to be 5 // Object.is equality\n\n- Expected: \n5\n\n+ Received: \nundefined\n\n ❯ tests/dashboard/projection-cache.test.ts:114:32\n    112| \n    113|     const savedRow = db.prepare(`SELECT sequence FROM projection_cache…\n    114|     expect(savedRow?.sequence).toBe(5)\n       |                                ^\n    115|   })\n    116| \n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯\n\n FAIL |root|  tests/dashboard/projection-cache.test.ts > ProjectionCache.save > coalesces multiple rapid saves into one write\nAssertionError: expected [] to have a length of 1 but got +0\n\n- Expected\n+ Received\n\n- 1\n+ 0\n\n ❯ tests/dashboard/projection-cache.test.ts:129:18\n    127|     // Only one row, with the last snapshot's sequence\n    128|     const rows = db.prepare(`SELECT sequence FROM projection_cache`).a…\n    129|     expect(rows).toHaveLength(1)\n       |                  ^\n    130|     expect(rows[0]!.sequence).toBe(3)\n    131|   })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯\n\n FAIL |root|  tests/dashboard/projection-cache.test.ts > ProjectionCache.save > overwrites previous snapshot on subsequent save (upsert idempotency)\nAssertionError: expected [] to have a length of 1 but got +0\n\n- Expected\n+ Received\n\n- 1\n+ 0\n\n ❯ tests/dashboard/projection-cache.test.ts:144:18\n    142| \n    143|     const rows = db.prepare(`SELECT sequence FROM projection_cache`).a…\n    144|     expect(rows).toHaveLength(1)\n       |                  ^\n    145|     expect(rows[0]!.sequence).toBe(20)\n    146|   })\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/9]⎯\n\n\n\n## REQUIRED: Fix the failing check, then invoke the /rebase-and-submit skill\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-956 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-956 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until `pan review request` has completed successfully."
+    }
+  ],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T09:27Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-07T09:27:29.235Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-07T09:27:29.268Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-07T09:28:38.837Z"
+    }
+  ]
+}

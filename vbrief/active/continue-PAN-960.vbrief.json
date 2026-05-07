@@ -1,0 +1,32 @@
+{
+  "version": "1",
+  "issueId": "PAN-960",
+  "created": "2026-05-07T07:47:56.852Z",
+  "updated": "2026-05-07T07:47:56.871Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-05-07T07:47:56Z",
+      "markdownBody": "# Verdict: CHANGES_REQUESTED\n\n## Summary\nSecurity-hardening PR for PAN-960. Adds `parseIssueId()` validation to 52 route handlers across `issues.ts` and `workspaces.ts`, and replaces shell-interpolated `execAsync` with `execFileAsync` in 3 helpers. All requirements are met. One warm-path performance regression was introduced by the `docker ps` filter removal; the other two correctness findings are minor cleanliness issues with no runtime impact. Fix the performance regression before merge.\n\n## Blockers (MUST fix before merge)\n\n### 1. `getContainerStatusAsync` transfers all containers to Node.js — `src/dashboard/server/routes/workspaces.ts:618` — `~`\n**Raised by**: performance\n**Why it blocks**: Warm-path endpoint `GET /api/workspaces/:issueId` now runs `docker ps -a` without server-side filtering on every dashboard poll, transferring O(all containers) data instead of O(matching). Large fleets can approach the 1 MB `maxBuffer`.\n\nAdd Docker's native `--filter name=` so the daemon returns only matching containers:\n```typescript\nconst { stdout } = await execFileAsync('docker', [\n  'ps', '-a',\n  '--filter', `name=${issueId.toLowerCase()}`,\n  '--format', '{{.Names}}\\t{{.Status}}',\n], { encoding: 'utf-8' });\n```\nThis restores the prior O(1) data transfer for typical usage.\n\n## High Priority (SHOULD fix; synthesis may still approve if justified)\n\n### 1. Redundant dual validation on merge/approve routes — `src/dashboard/server/routes/workspaces.ts:4671`, `4703`, `4805` — `~`\n**Raised by**: correctness\n**Why it matters**: `postWorkspaceMergeRoute`, `postForgeApproveRoute`, and `postForgeMergeRoute` run both `parseIssueId(issueId)` and `/^[A-Z]+-\\d+$/i.test(issueId)`. The regex is stricter, so `parseIssueId` is a no-op for standard IDs; for non-standard IDs (Rally/GitHub), `parseIssueId` returns 400 first, preventing the regex's more descriptive error message from ever surfacing.\n\nPick a single gate. Either drop `parseIssueId` in these three routes and let the regex be the sole validator, or unify the error message.\n\n### 2. Dead-code `!issueId` check after `parseIssueId` — `src/dashboard/server/routes/workspaces.ts:3578`, `3791` — `~`\n**Raised by**: correctness\n**Why it matters**: `postWorkspaceAbortReviewRoute` and `postWorkspaceDeaconIgnoreRoute` check `if (!issueId)` immediately after `if (!parseIssueId(issueId))`. Since `parseIssueId('')` returns `null`, the first `if` always catches empty strings, making the second check unreachable.\n\nRemove the second `if (!issueId)` block in both routes.\n\n## Nits (advisory — safe to defer)\n\n- `src/dashboard/server/routes/issues.ts` + `workspaces.ts` — `?` — Inconsistent error message format. New validations return `\"Invalid issue ID\"`; existing ones return `\"Invalid issue id: \" + rawId`. Standardize on one shape, preferably including the rejected value. (correctness)\n- `src/dashboard/server/routes/workspaces.ts` — `?` — Redundant `parseIssueId` calls. Many routes validate with `if (!parseIssueId(issueId))` then immediately call `parseIssueId(issueId)` again. Cache the result in a single call. (performance)\n- `src/dashboard/server/routes/issues.ts:2216` — `?` — `isValidIssueId` duplicates `parseIssueId` logic. Replace with `parseIssueId` directly to avoid drift. (performance)\n- `src/dashboard/server/routes/workspaces.ts:1292` — Body-based `issueId` in `POST /api/workspaces` was out of scope for this sweep but remains unvalidated. Consider a follow-up. (correctness)\n\n## Cross-cutting groups\n\n**Validation cleanup in workspaces.ts** (fix together):\n- [high-1] Redundant dual validation on merge/approve routes\n- [high-2] Dead-code `!issueId` check after `parseIssueId`\n- [nit-1] Inconsistent error message format\n- [nit-2] Redundant `parseIssueId` calls\n\n## What's good\n- Security-positive: removes shell interpolation and adds comprehensive input validation across 52 handlers\n- Requirements fully met: all 4 stated requirements implemented and verified\n\n## Review stats\n- Blockers: 1   High: 2   Medium: 0   Nits: 4\n- By reviewer: correctness=2, security=0, performance=1, requirements=0\n- Files touched: 6   Files with findings: 2\n\n## Appendix: individual reviews\n\nSee individual reviewer output files listed in `## Reviewer Output Files` in the Synthesis Context above. Those files contain full per-reviewer detail; this synthesis is the policy layer.\n\n## REQUIRED: Fix ALL issues above, then invoke the /rebase-and-submit skill\n\n1. Read each blocking issue carefully\n2. Fix the code for EVERY issue listed\n3. Run tests locally to verify your fixes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-960 — this is an atomic task that runs pan done (which handles rebase + push + re-submit internally)\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until pan done has completed successfully.\n"
+    }
+  ],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T07:47Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-07T07:47:56.852Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-07T07:47:56.871Z"
+    }
+  ]
+}

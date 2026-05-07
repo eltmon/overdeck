@@ -1,0 +1,69 @@
+{
+  "version": "1",
+  "issueId": "PAN-968",
+  "created": "2026-05-07T07:58:05.614Z",
+  "updated": "2026-05-07T10:33:13.158Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T07:58Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-07T07:58:05.614Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-07T07:58:05.627Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T08:15Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-07T08:15:50.523Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T08:28Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-07T08:28:13.015Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T08:51Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-07T08:51:50.219Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T09:02Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-05-07T09:02:08.206Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T09:13Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-05-07T09:13:09.147Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T09:32Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-05-07T09:32:28.624Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T09:37Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-05-07T09:37:12.612Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T09:39Z] verification-gate → FAILED — seq 4",
+      "timestamp": "2026-05-07T09:39:33.762Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-07T10:33:13.158Z"
+    }
+  ]
+}
