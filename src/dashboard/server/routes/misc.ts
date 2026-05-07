@@ -50,7 +50,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
-import { createSessionAsync, killSessionAsync, resizeWindowAsync, sendKeysAsync, sessionExistsAsync } from '../../../lib/tmux.js';
+import { createSessionAsync, killSessionAsync, listSessionNamesAsync, resizeWindowAsync, sendKeysAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 import { generateLauncherScript } from '../../../lib/launcher-generator.js';
 import { listProjects, resolveProjectFromIssue, findProjectByTeam, extractTeamPrefix, getIssuePrefix } from '../../../lib/projects.js';
 import { getLinearApiKey, getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
@@ -438,20 +438,26 @@ const getHealthAgentsRoute = HttpRouter.add(
           name.startsWith('specialist-'),
       );
 
+      // Fetch the live tmux session set ONCE for the whole request — without
+      // this, determineHealthStatusAsync would spawn a tmux subprocess per
+      // agent dir (~150 forks per /api/health poll, every 5s).
+      const liveSessions = new Set(await listSessionNamesAsync());
+
       const agents = await Promise.all(
         agentNames.map(async name => {
           const stateFile = join(agentsDir, name, 'state.json');
           const healthFile = join(agentsDir, name, 'health.json');
 
+          const healthStatus = await determineHealthStatusAsync(name, stateFile, liveSessions);
+          if (!healthStatus) return null;
+
+          // Only read health.json for agents that survive the status filter —
+          // most agent dirs are stopped/completed and bail out above.
           let storedHealth = { consecutiveFailures: 0, killCount: 0 };
           try {
             const healthContent = await readFile(healthFile, 'utf-8');
             storedHealth = { ...storedHealth, ...JSON.parse(healthContent) };
           } catch {}
-
-          const healthStatus = await determineHealthStatusAsync(name, stateFile);
-
-          if (!healthStatus) return null;
 
           let contextPercent: number | null = null;
           try {
