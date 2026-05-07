@@ -306,7 +306,7 @@
       {
         "id": "wire-spawn-agent",
         "title": "Update spawnAgent() to pass agentType through launcher config",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-07T02:30:00.000Z",
         "metadata": {
@@ -320,7 +320,7 @@
           {
             "id": "wire-spawn-agent.ac1",
             "title": "spawnAgent() for work agents passes agentType='work' to getAgentRuntimeBaseCommand()",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -328,7 +328,7 @@
           {
             "id": "wire-spawn-agent.ac2",
             "title": "Resume path (line 1656) uses --agent pan-work-agent alongside --resume",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -336,7 +336,7 @@
           {
             "id": "wire-spawn-agent.ac3",
             "title": "Fallback/recovery path (line 1444) uses correct agent type",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
