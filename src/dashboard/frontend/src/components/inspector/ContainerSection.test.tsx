@@ -94,4 +94,50 @@ describe('ContainerSection', () => {
     render(<ContainerSection {...defaultProps} containers={containers} />);
     expect(screen.getByText('exited(1)')).toBeInTheDocument();
   });
+
+  it('shows checkmark for healthy running containers', () => {
+    const containers = makeContainers({ api: { running: true, uptime: '1h', health: 'healthy' } });
+    render(<ContainerSection {...defaultProps} containers={containers} />);
+    expect(screen.getByText('api')).toBeInTheDocument();
+  });
+
+  it('shows x-mark for unhealthy running containers', () => {
+    const containers = makeContainers({ api: { running: true, uptime: '1h', health: 'unhealthy' } });
+    render(<ContainerSection {...defaultProps} containers={containers} />);
+    expect(screen.getByText('api')).toBeInTheDocument();
+  });
+
+  it('shows spinner for starting containers', () => {
+    const containers = makeContainers({ api: { running: true, uptime: '30s', health: 'starting' } });
+    render(<ContainerSection {...defaultProps} containers={containers} />);
+    expect(screen.getByText('api')).toBeInTheDocument();
+  });
+
+  it('expands detail panel on click showing ports and probe info', () => {
+    const containers = makeContainers({
+      api: {
+        running: true,
+        uptime: '1h',
+        health: 'unhealthy',
+        ports: [7000, 7001],
+        lastProbeAt: '2026-05-07T10:00:00Z',
+        lastFailureReason: 'connection refused',
+      },
+    });
+    render(<ContainerSection {...defaultProps} containers={containers} />);
+    fireEvent.click(screen.getByText('api'));
+    expect(screen.getByText(/Ports: 7000, 7001/)).toBeInTheDocument();
+    expect(screen.getByText(/Last failure: connection refused/)).toBeInTheDocument();
+  });
+
+  it('collapses detail panel when clicked again', () => {
+    const containers = makeContainers({
+      api: { running: true, uptime: '1h', health: 'healthy', ports: [4173] },
+    });
+    render(<ContainerSection {...defaultProps} containers={containers} />);
+    fireEvent.click(screen.getByText('api'));
+    expect(screen.getByText(/Ports: 4173/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('api'));
+    expect(screen.queryByText(/Ports: 4173/)).not.toBeInTheDocument();
+  });
 });
