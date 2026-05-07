@@ -41,6 +41,7 @@ import { PHASE_CHIP_COLORS, PHASE_LABELS, type PipelinePhase } from './inspector
 import { SwitchModelModal } from './SwitchModelModal';
 import { useSwitchModel } from '../hooks/useSwitchModel';
 import { SensitiveText } from './SensitiveText';
+import { useActivityQuery } from './CommandDeck/ZoneCOverviewTabs/queries';
 
 function formatCost(cost: number): string {
   if (cost >= 100) return `$${cost.toFixed(0)}`;
@@ -214,6 +215,26 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     },
     staleTime: 60000,
   });
+
+  // Activity query — shared cache with CommandDeck overview
+  const { data: activityData } = useActivityQuery(issueId);
+  const sections = activityData?.sections ?? [];
+  const sessionCount = sections.length;
+  const lastActivity = (() => {
+    let latest = 0;
+    for (const s of sections) {
+      const t = Date.parse(s.startedAt);
+      if (!Number.isNaN(t) && t > latest) latest = t;
+    }
+    if (!latest) return null;
+    const ageMs = Date.now() - latest;
+    if (ageMs < 60_000) return `last activity ${Math.round(ageMs / 1000)}s ago`;
+    if (ageMs < 3_600_000) return `last activity ${Math.round(ageMs / 60_000)}m ago`;
+    return `last activity ${Math.round(ageMs / 3_600_000)}h ago`;
+  })();
+
+  // Reviewer summary data
+  const reviewerSections = sections.filter((s) => s.type === 'reviewer');
 
   const startAgentMutation = useMutation({
     mutationFn: async (message?: string) => {
@@ -778,7 +799,59 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
               <span className="font-mono truncate text-[10px] flex-1" title={workspace.path}>
                 {workspace.path}
               </span>
+              <a
+                href={`vscode://file/${workspace.path}`}
+                className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded bg-card text-primary hover:text-primary/80 border border-border"
+                title="Open in VS Code"
+              >
+                <ExternalLink className="w-2.5 h-2.5" />
+                VS Code
+              </a>
               <PanOpenInPicker cwd={workspace.path} />
+            </div>
+          </div>
+        )}
+
+        {/* Activity summary */}
+        {(sessionCount > 0 || lastActivity) && (
+          <div className="px-3 py-2 border-b border-border text-xs">
+            <div className="uppercase tracking-wider text-[10px] mb-1.5 font-semibold text-muted-foreground">Activity</div>
+            <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+              {sessionCount > 0 && (
+                <span>{sessionCount} session{sessionCount === 1 ? '' : 's'}</span>
+              )}
+              {lastActivity && <span>{lastActivity}</span>}
+            </div>
+          </div>
+        )}
+
+        {/* Reviewer summary */}
+        {reviewerSections.length > 0 && (
+          <div className="px-3 py-2 border-b border-border text-xs">
+            <div className="uppercase tracking-wider text-[10px] mb-1.5 font-semibold text-muted-foreground">Reviewer Summary</div>
+            <div className="grid grid-cols-5 gap-1">
+              {(['correctness', 'security', 'performance', 'requirements', 'synthesis'] as const).map((role) => {
+                const sec = reviewerSections.find((s) => s.role === role);
+                const meta = sec?.roundMetadata;
+                const latest = meta?.history?.find((r) => r.round === meta.latestRound);
+                const isRunning = sec?.status === 'running' || sec?.status === 'active';
+                let color = 'bg-muted-foreground';
+                let label = '—';
+                if (isRunning) { color = 'bg-primary'; label = `R${(meta?.latestRound ?? 0) + 1}`; }
+                else if (latest) {
+                  const status = latest.status?.toLowerCase();
+                  if (status === 'passed' || status === 'approved') { color = 'bg-success'; label = `R${latest.round}`; }
+                  else if (status === 'failed' || status === 'blocked') { color = 'bg-destructive'; label = `R${latest.round}`; }
+                  else { color = 'bg-warning'; label = `R${latest.round}`; }
+                }
+                return (
+                  <div key={role} className="flex flex-col items-center gap-0.5">
+                    <span className="text-[9px] text-muted-foreground capitalize truncate w-full text-center">{role.slice(0, 3)}</span>
+                    <span className={`inline-block w-2 h-2 rounded-full ${color}`} title={`${role}: ${label}`} />
+                    <span className="text-[9px] text-muted-foreground">{label}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
