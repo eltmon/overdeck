@@ -40,6 +40,11 @@ export interface ProviderConfig {
   credentialHelper?: string; // Script that reads credential file and prints token
   models: (ModelId | string)[];
   haikuModel?: string; // Model to use as haiku substitute (for non-Anthropic providers)
+  tierModels?: {
+    opus?: string;
+    sonnet?: string;
+    haiku?: string;
+  };
   tested: boolean; // Whether compatibility has been verified
   description: string;
 }
@@ -62,6 +67,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'Kimi (Moonshot AI)',
     compatibility: 'claudish',
     models: ['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'],
+    tierModels: { opus: 'kimi-k2.6', sonnet: 'kimi-k2.5', haiku: 'kimi-k2' },
     tested: true,
     description: 'Route via claudish: kimi@model or bare model (auto-detected)',
   },
@@ -71,6 +77,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'OpenAI',
     compatibility: 'claudish',
     models: ['gpt-5.5', 'gpt-5.5-mini', 'gpt-5.5-nano', 'gpt-5.5-pro', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.4-pro', 'o3', 'o4-mini'],
+    tierModels: { opus: 'gpt-5.5-pro', sonnet: 'gpt-5.5', haiku: 'gpt-5.5-mini' },
     tested: true,
     description: 'Route via claudish: oai@model (API key) or cx@model (ChatGPT OAuth subscription)',
   },
@@ -80,6 +87,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     displayName: 'Google (Gemini)',
     compatibility: 'claudish',
     models: ['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview'],
+    tierModels: { opus: 'gemini-3.1-pro-preview', sonnet: 'gemini-3-flash', haiku: 'gemini-3.1-flash-lite-preview' },
     tested: true,
     description: 'Route via claudish: go@model (Google CodeAssist OAuth) or API key',
   },
@@ -90,6 +98,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     compatibility: 'claudish',
     models: ['minimax-m2.7', 'minimax-m2.7-highspeed'],
     haikuModel: 'minimax-m2.7-highspeed',
+    tierModels: { opus: 'minimax-m2.7', sonnet: 'minimax-m2.7', haiku: 'minimax-m2.7-highspeed' },
     tested: true,
     description: 'Route via claudish: mm@model or bare model (auto-detected)',
   },
@@ -100,6 +109,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     compatibility: 'claudish',
     models: ['glm-5.1', 'glm-4.7', 'glm-4.7-flash'],
     haikuModel: 'glm-4.7-flash',
+    tierModels: { opus: 'glm-5.1', sonnet: 'glm-4.7', haiku: 'glm-4.7-flash' },
     tested: true,
     description: 'Route via claudish: zai@model or bare model (auto-detected)',
   },
@@ -112,6 +122,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     authType: 'static',
     models: ['mimo-v2.5-pro', 'mimo-v2.5'],
     haikuModel: 'mimo-v2.5',
+    tierModels: { opus: 'mimo-v2.5-pro', sonnet: 'mimo-v2.5-pro', haiku: 'mimo-v2.5' },
     tested: true,
     description: 'Route via claudish custom URL: https://token-plan-sgp.xiaomimimo.com/anthropic/<model>',
   },
@@ -241,6 +252,22 @@ export function getProviderEnv(
     // for Explore agents and other haiku-dependent features.
     if (provider.haikuModel) {
       env.ANTHROPIC_DEFAULT_HAIKU_MODEL = provider.haikuModel;
+    }
+
+    // Inject subagent model env vars so Claude Code spawns subagents
+    // (Explorer, Plan, general-purpose) with model IDs the provider knows.
+    if (provider.tierModels) {
+      if (provider.tierModels.opus) {
+        env.ANTHROPIC_DEFAULT_OPUS_MODEL = provider.tierModels.opus;
+      }
+      if (provider.tierModels.sonnet) {
+        env.ANTHROPIC_DEFAULT_SONNET_MODEL = provider.tierModels.sonnet;
+      }
+      if (provider.tierModels.haiku) {
+        env.ANTHROPIC_DEFAULT_HAIKU_MODEL = provider.tierModels.haiku;
+        env.ANTHROPIC_SMALL_FAST_MODEL = provider.tierModels.haiku;
+        env.CLAUDE_CODE_SUBAGENT_MODEL = provider.tierModels.haiku;
+      }
     }
 
     return env;
