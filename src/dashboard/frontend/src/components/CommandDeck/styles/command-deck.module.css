@@ -191,8 +191,8 @@
 .projectHeader {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
+  gap: 6px;
+  padding: 6px 8px;
   cursor: pointer;
   transition: background 0.1s;
   font-size: 12px;
@@ -256,7 +256,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px 4px 4px;
+  padding: 4px 6px 4px 3px;
   cursor: pointer;
   transition: background 0.1s;
   font-size: 12px;
@@ -477,14 +477,14 @@
 .featureItemRow {
   display: flex;
   align-items: center;
-  padding-left: 12px;
+  padding-left: 8px;
 }
 
 .featureItemCaret {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
+  width: 16px;
   flex-shrink: 0;
   padding: 4px 0;
   cursor: pointer;
@@ -500,7 +500,7 @@
 
 .featureItemCaretPlaceholder {
   display: block;
-  width: 20px;
+  width: 16px;
   flex-shrink: 0;
 }
 
@@ -864,7 +864,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px 4px calc(12px + 32px);
+  padding: 4px 8px 4px calc(8px + 24px);
   cursor: pointer;
   transition: background 0.1s;
   font-size: 12px;
@@ -969,10 +969,14 @@
 }
 
 .emptyProject {
-  padding: 8px 32px;
+  padding: 8px 24px;
   font-size: 12px;
   color: var(--muted-foreground);
   font-style: italic;
+}
+
+.sessionChildList {
+  padding-left: 8px;
 }
 
 /* Draggable section divider */
@@ -995,7 +999,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 26px 3px 32px;
+  padding: 3px 22px 3px 28px;
   position: relative;
   cursor: pointer;
   transition: background 0.1s;

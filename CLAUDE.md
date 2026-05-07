@@ -252,13 +252,13 @@ The deep-wipe endpoint (`POST /api/agents/:id/deep-wipe`) with `deleteWorkspace:
 1. **tmux sessions** — all agent sessions killed
 2. **Agent state directories** — `~/.panopticon/agents/<id>/` removed
 3. **Entire workspace directory** — this includes:
-   - `.planning/plan.vbrief.json` — the **workspace-specific draft vBRIEF plan** (before promotion to `vbrief/proposed/`)
-   - `.planning/beads/` — all task tracking beads
+   - `.pan/spec.vbrief.json` — the **workspace-specific vBRIEF plan**
+   - `.beads/` — all task tracking beads
    - Any implementation work in progress
 4. **Git branches** — both local AND remote `feature/<issue-id>` branches deleted
 5. **Linear/GitHub status** — issue status reset to Todo/Open
 
-**The scope vBRIEF** in `vbrief/` lifecycle directories on main survives deep-wipe — it's committed to the project repo independently of the workspace. The docs-level PRD (e.g., `myn/docs/prds/planned/MIN-XXX-*.md`) also survives. The workspace `.planning/` directory (draft plan, beads) is destroyed.
+**The scope vBRIEF** in `.pan/specs/` on main survives deep-wipe — it's committed to the project repo independently of the workspace. The docs-level PRD (e.g., `myn/docs/prds/planned/MIN-XXX-*.md`) also survives. The workspace `.pan/` directory (spec, continue state) and `.beads/` are destroyed.
 
 **Rules:**
 - **NEVER call deep-wipe programmatically** without the user explicitly requesting it
@@ -329,8 +329,8 @@ Filenames are issue-keyed: `YYYY-MM-DD-<ISSUE-ID>-<slug>.vbrief.json`
 - `complete-planning` promotes vBRIEF to `vbrief/proposed/` on main with an issue-keyed filename
 - `start-agent` transitions vBRIEF from `proposed/` to `active/` and sets `plan.status` to `approved`/`running`
 - `postMergeLifecycle` transitions vBRIEF from `active/` to `completed/` on main
-- `start-planning` discovers PRDs from `docs/prds/planned/` and `docs/prds/active/` matching the issue ID and copies to `.planning/prd.md`
-- `findPlan()` resolves vBRIEFs from lifecycle dirs first, falling back to workspace `.planning/plan.vbrief.json`
+- `start-planning` discovers PRDs from `docs/prds/planned/` and `docs/prds/active/` matching the issue ID and copies to `.pan/prd.md`
+- `findPlan()` resolves vBRIEFs from `.pan/specs/` on main first, falling back to workspace `.pan/spec.vbrief.json`
 
 ### Dashboard Viewer
 

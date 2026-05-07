@@ -1164,6 +1164,7 @@ describe('spawnReviewer runtime command routing regression', () => {
 
     // Must write a launcher script file and run it via bash
     expect(fn).toContain('getProviderExportsForModel(');
+    expect(fn).toContain('generateLauncherScript(');
     expect(fn).toContain('writeFile(');
     expect(fn).toMatch(/bash\s+.*launcherPath/);
 

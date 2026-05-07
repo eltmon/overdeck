@@ -93,15 +93,12 @@ describe('Command Deck action parity', () => {
     'Reset issue': 'resetIssue',
 
     // BadgeBar artifact buttons
-    'PRD': 'prd',
-    'State': 'state',
     'Beads': 'beads',
     'Transcripts': 'transcripts',
     'Discussions': 'discussions',
     'Upload': 'upload',
 
     // Zone A secondary actions
-    'vBRIEF': 'vbrief',
     'Inference': 'inference',
     'Sync discussions': 'syncDiscussions',
     'Sync main': 'syncMain',

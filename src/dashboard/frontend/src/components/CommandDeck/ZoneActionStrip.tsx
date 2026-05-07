@@ -13,7 +13,7 @@
 import { useState, useMemo } from 'react';
 import {
   Play, RefreshCw, RotateCcw, FolderPlus, Check, Loader2,
-  MoreHorizontal, FileText, ListTodo, ScrollText, Brain, MessageSquare,
+  MoreHorizontal, FileText, ListTodo, Brain, MessageSquare,
   Upload, Send, XCircle, GitMerge, ChevronDown,
 } from 'lucide-react';
 import type { Agent, Issue } from '../../types';
@@ -33,7 +33,6 @@ interface ZoneActionStripProps {
   agent?: Agent;
   issue?: Issue;
   onOpenBeads?: () => void;
-  onOpenVBrief?: () => void;
   /** Called when an artifact action wants to switch a ZoneCOverview tab. */
   onSwitchTab?: (tab: 'overview' | 'activity' | 'costs' | 'prd' | 'state' | 'inference' | 'vbrief' | 'beads' | 'prdiff' | 'discussions') => void;
 }
@@ -43,7 +42,6 @@ export function ZoneActionStrip({
   agent,
   issue,
   onOpenBeads,
-  onOpenVBrief,
   onSwitchTab,
 }: ZoneActionStripProps) {
   const [showOverflow, setShowOverflow] = useState(false);
@@ -314,42 +312,6 @@ export function ZoneActionStrip({
           >
             <ListTodo className="w-3 h-3" />
             Tasks
-          </button>
-        );
-
-      case 'vbrief':
-        return (
-          <button
-            key={key}
-            onClick={onOpenVBrief}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-signal-review rounded hover:bg-signal-review/10"
-          >
-            <ScrollText className="w-3 h-3" />
-            vBRIEF
-          </button>
-        );
-
-      case 'state':
-        return (
-          <button
-            key={key}
-            onClick={() => onSwitchTab?.('state')}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent"
-          >
-            <FileText className="w-3 h-3" />
-            STATE
-          </button>
-        );
-
-      case 'prd':
-        return (
-          <button
-            key={key}
-            onClick={() => onSwitchTab?.('prd')}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent"
-          >
-            <FileText className="w-3 h-3" />
-            PRD
           </button>
         );
 

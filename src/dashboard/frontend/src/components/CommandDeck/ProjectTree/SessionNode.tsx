@@ -15,6 +15,13 @@ import {
   ClipboardList,
   Layers,
   Archive,
+  Loader2,
+  Terminal,
+  FileText,
+  Search,
+  Globe,
+  Bot,
+  Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
@@ -24,6 +31,7 @@ import { useAvailableModels, type ModelGroup } from '../../shared/ModelPicker/Mo
 import { useResolvedModels, resolveWorkTypeKey } from '../../../lib/useResolvedModels';
 import { useDashboardStore } from '../../../lib/store';
 import { useSharedTick } from '../../../lib/useSharedTick';
+import { toolNameToPhase, isSpinnerPhase, type WorkingPhase } from '../../../lib/workingPhase';
 import { formatRelativeTime } from '../../../lib/formatRelativeTime';
 import styles from '../styles/command-deck.module.css';
 import {
@@ -99,7 +107,48 @@ function deriveDotStatus(runtime: AgentRuntimeSnapshot | undefined, presence: Se
   return presenceToStatus(presence);
 }
 
-function ReviewerVerdict({ session, dotStatus }: { session: SessionNodeType; dotStatus: StatusDotStatus }) {
+const PHASE_ICON: Record<WorkingPhase, LucideIcon> = {
+  init: Loader2,
+  thinking: Loader2,
+  bash: Terminal,
+  file: FileText,
+  search: Search,
+  web: Globe,
+  agent: Bot,
+  tool: Wrench,
+  processing: Loader2,
+};
+
+const PHASE_COLOR: Record<WorkingPhase, string> = {
+  init: 'var(--muted-foreground)',
+  thinking: 'var(--primary)',
+  bash: 'var(--warning)',
+  file: 'var(--success)',
+  search: 'var(--info, #3b82f6)',
+  web: 'var(--info, #3b82f6)',
+  agent: 'var(--signal-review, #8b5cf6)',
+  tool: 'var(--muted-foreground)',
+  processing: 'var(--primary)',
+};
+
+function PhaseIcon({ runtime, dotStatus }: { runtime: AgentRuntimeSnapshot | undefined; dotStatus: StatusDotStatus }) {
+  const phase = runtime?.currentTool ? toolNameToPhase(runtime.currentTool) : undefined;
+  if (!phase) {
+    return <StatusDot status={dotStatus} size="sm" />;
+  }
+  const Icon = PHASE_ICON[phase];
+  const color = PHASE_COLOR[phase];
+  const isSpin = isSpinnerPhase(phase);
+  return (
+    <Icon
+      size={12}
+      className={isSpin ? 'animate-spin' : undefined}
+      style={{ color, flexShrink: 0 }}
+    />
+  );
+}
+
+function ReviewerVerdict({ session, dotStatus, runtime }: { session: SessionNodeType; dotStatus: StatusDotStatus; runtime: AgentRuntimeSnapshot | undefined }) {
   const { latestStatus, latestReviewResult } = session.roundMetadata ?? {};
   if (latestReviewResult === 'APPROVED') {
     return <CircleCheck size={10} style={{ color: 'var(--success)', flexShrink: 0 }} />;
@@ -107,7 +156,7 @@ function ReviewerVerdict({ session, dotStatus }: { session: SessionNodeType; dot
   if (latestReviewResult === 'CHANGES_REQUESTED' || latestStatus === 'failed') {
     return <CircleX size={10} style={{ color: 'var(--destructive)', flexShrink: 0 }} />;
   }
-  return <StatusDot status={dotStatus} size="sm" />;
+  return <PhaseIcon runtime={runtime} dotStatus={dotStatus} />;
 }
 
 interface SessionNodeProps {
@@ -171,11 +220,15 @@ function shortModel(model: string): string {
     .replace(/-latest$/, '');
 }
 
-function deriveSessionLabel(session: SessionNodeType, resolvedModel?: string | null): string {
+function deriveSessionModel(session: SessionNodeType, resolvedModel?: string | null): string {
   const sessionModel = session.model && session.model !== 'unknown' && session.model !== 'specialist'
     ? shortModel(session.model)
     : '';
-  const model = sessionModel || (resolvedModel ? shortModel(resolvedModel) : '');
+  return sessionModel || (resolvedModel ? shortModel(resolvedModel) : '');
+}
+
+function deriveSessionLabel(session: SessionNodeType, resolvedModel?: string | null): string {
+  const model = deriveSessionModel(session, resolvedModel);
   switch (session.type) {
     case 'merge': return model ? `Merge (${model})` : 'Merge agent';
     case 'test': return model ? `Tests (${model})` : 'Tests';
@@ -189,6 +242,161 @@ function deriveSessionLabel(session: SessionNodeType, resolvedModel?: string | n
     case 'legacy': return 'Planning state';
     default: return session.type;
   }
+}
+
+function describeSessionPurpose(session: SessionNodeType): string {
+  switch (session.type) {
+    case 'work':
+      return 'Implementation agent for this issue.';
+    case 'planning':
+      return 'Planning and context-building session for this issue.';
+    case 'review':
+      return 'Review coordinator for this issue.';
+    case 'reviewer':
+      return session.role
+        ? `${capitalize(session.role)} specialist reviewer in the review pipeline.`
+        : 'Specialist reviewer in the review pipeline.';
+    case 'test':
+      return 'Verification and test session for this issue.';
+    case 'merge':
+      return 'Merge and close-out session for this issue.';
+    case 'legacy':
+      return 'Saved planning state for this issue.';
+    default:
+      return 'Session for this issue.';
+  }
+}
+
+function describePresence(presence: SessionNodeType['presence']): string {
+  switch (presence) {
+    case 'active':
+      return 'tmux session is live.';
+    case 'idle':
+      return 'tmux session is still live.';
+    case 'suspended':
+      return 'Session is suspended and can be resumed.';
+    case 'ended':
+      return 'Session has ended.';
+    default:
+      return 'Session presence is unknown.';
+  }
+}
+
+function describeWaitingReason(runtime: AgentRuntimeSnapshot | undefined): string {
+  switch (runtime?.waiting?.reason) {
+    case 'tool_permission':
+      return 'Waiting for tool permission approval.';
+    case 'user_question':
+      return 'Waiting for your reply before continuing.';
+    case 'disambiguation':
+      return 'Waiting for clarification before continuing.';
+    case 'other':
+      return 'Waiting for external input before continuing.';
+    default:
+      return 'Waiting for input before continuing.';
+  }
+}
+
+function getSessionLabelTitle(
+  session: SessionNodeType,
+  resolvedModel: string | null,
+  lastHeardLabel?: string,
+): string {
+  const details = [describeSessionPurpose(session)];
+  const model = deriveSessionModel(session, resolvedModel);
+  if (model) details.push(`Model: ${model}.`);
+  details.push(`Session: ${session.sessionId}.`);
+  if (lastHeardLabel) details.push(`Last heard: ${lastHeardLabel}.`);
+  return details.join(' ');
+}
+
+function getSessionStatusTitle({
+  runtime,
+  presence,
+  displayStatus,
+  lastHeardLabel,
+}: {
+  runtime: AgentRuntimeSnapshot | undefined;
+  presence: SessionNodeType['presence'];
+  displayStatus: string;
+  lastHeardLabel?: string;
+}): string {
+  const details: string[] = [];
+
+  switch (displayStatus) {
+    case 'working':
+      details.push('Actively using tools or just finished a tool run.');
+      break;
+    case 'thinking':
+      details.push('Waiting on model output with no tool currently in flight.');
+      break;
+    case 'waiting':
+      details.push(describeWaitingReason(runtime));
+      break;
+    case 'idle':
+      details.push('Session is live but idle, waiting for the next turn.');
+      if (runtime?.activity === 'stopped' && presence !== 'ended') {
+        details.push('The agent has stopped working, but the tmux session is still alive.');
+      }
+      break;
+    case 'starting':
+      details.push(
+        presence === 'ended'
+          ? 'Session was starting, but it appears to have ended before reporting live activity.'
+          : 'Session is starting and has not reported live activity yet.',
+      );
+      break;
+    case 'running':
+      details.push(
+        presence === 'ended'
+          ? 'Session still reports a running state, but its tmux session has ended.'
+          : 'Session is running but has not reported a more specific live activity yet.',
+      );
+      break;
+    case 'error':
+      details.push(
+        presence === 'ended'
+          ? 'Session hit an error and has ended.'
+          : 'Session hit an error and needs attention before work can continue.',
+      );
+      break;
+    case 'stopped':
+      details.push(
+        presence === 'ended'
+          ? 'Session ended cleanly and is no longer live.'
+          : 'Agent work is stopped, but the tmux session is still live.',
+      );
+      break;
+    case 'stopping':
+      details.push('Stop has been requested and the session is shutting down.');
+      break;
+    default:
+      details.push(`Session status: ${displayStatus}.`);
+      break;
+  }
+
+  const includePresenceDetail = !(
+    presence === 'ended'
+    && (displayStatus === 'starting' || displayStatus === 'running' || displayStatus === 'error' || displayStatus === 'stopped')
+  );
+
+  if (includePresenceDetail) {
+    details.push(describePresence(presence));
+  }
+
+  if (displayStatus === 'working' && runtime?.currentTool) {
+    details.push(`Current tool: ${runtime.currentTool}.`);
+  }
+
+  if (displayStatus === 'waiting' && runtime?.waiting?.message) {
+    details.push(`Waiting on: ${runtime.waiting.message}.`);
+  }
+
+  if (lastHeardLabel) {
+    details.push(`Last heard: ${lastHeardLabel}.`);
+  }
+
+  return details.join(' ');
 }
 
 function RestartModelSubmenu({
@@ -296,6 +504,15 @@ export function SessionNode({
 
   const workTypeKey = resolveWorkTypeKey(session);
   const defaultModel = workTypeKey ? (resolvedModels[workTypeKey] ?? null) : null;
+  const lastHeardLabel = lastActivity ? formatRelativeTime(lastActivity, new Date()) : undefined;
+  const sessionLabel = deriveSessionLabel(session, defaultModel);
+  const sessionLabelTitle = getSessionLabelTitle(session, defaultModel, lastHeardLabel);
+  const sessionStatusTitle = getSessionStatusTitle({
+    runtime,
+    presence: session.presence,
+    displayStatus,
+    lastHeardLabel,
+  });
   // Use "Start" label when session has ended (agent stopped); "Restart" when live
   const restartLabel = session.type === 'review' ? 'Restart all' : !isLive ? 'Start' : undefined;
 
@@ -324,21 +541,18 @@ export function SessionNode({
                 : <ChevronRight size={12} style={{ color: 'var(--muted-foreground)' }} />}
             </span>
           )}
-          <ReviewerVerdict session={session} dotStatus={dotStatus} />
-          <TypeIcon type={session.type} role={session.role} />
-          <span
-            className={styles.sessionLabel}
-            title={(() => {
-              if (!lastActivity) return session.sessionId;
-              const ms = Date.now() - new Date(lastActivity).getTime();
-              if (ms < 1000) return session.sessionId;
-              return `${session.sessionId} · Last heard: ${formatRelativeTime(lastActivity, new Date())}`;
-            })()}
-          >
-            {deriveSessionLabel(session, defaultModel)}
+          <ReviewerVerdict session={session} dotStatus={dotStatus} runtime={runtime} />
+          <span title={sessionLabelTitle} style={{ display: 'inline-flex', flexShrink: 0 }}>
+            <TypeIcon type={session.type} role={session.role} />
+          </span>
+          <span className={styles.sessionLabel} title={sessionLabelTitle}>
+            {sessionLabel}
           </span>
           <LiveLastHeard lastActivity={lastActivity} />
-          <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${statusCssKey}`] ?? ''}`}>
+          <span
+            className={`${styles.sessionStatus} ${styles[`sessionStatus_${statusCssKey}`] ?? ''}`}
+            title={sessionStatusTitle}
+          >
             {displayStatus}
           </span>
           <span className={styles.sessionDuration}>{formatDuration(session.duration)}</span>

@@ -287,30 +287,30 @@ describe('FeatureItem', () => {
       <FeatureItem
         feature={makeFeature({
           sessions: [
-            makeSession({ sessionId: 'work-1', type: 'work', status: 'running', presence: 'active' }),
-            makeSession({ sessionId: 'review-1', type: 'reviewer', status: 'running', presence: 'active' }),
-            makeSession({ sessionId: 'review-2', type: 'reviewer', status: 'stopped', presence: 'ended' }),
+            makeSession({ sessionId: 'work-1', type: 'work', duration: 0, status: 'running', presence: 'active' }),
+            makeSession({ sessionId: 'review-1', type: 'reviewer', role: 'correctness', status: 'running', presence: 'active' }),
+            makeSession({ sessionId: 'review-2', type: 'reviewer', role: 'security', status: 'stopped', presence: 'ended' }),
           ],
         })}
         isSelected={false}
         onSelect={() => {}}
       />,
     );
-    expect(screen.getByText('▸ work')).toBeInTheDocument();
-    expect(screen.getByText('●●● 2')).toBeInTheDocument();
+    expect(screen.getByText('▸ work')).toHaveAttribute('title', 'Work agent sessions for this issue: 1 total. 1 running.');
+    expect(screen.getByText('●●● 2')).toHaveAttribute('title', 'Review pipeline sessions for this issue: 2 total. 1 active, 0 queued or starting, 1 stopped. Roles present: correctness and security.');
   });
 
   it('shows a review error badge when a review session failed', () => {
     render(
       <FeatureItem
         feature={makeFeature({
-          sessions: [makeSession({ sessionId: 'review-1', type: 'reviewer', status: 'error', presence: 'ended' })],
+          sessions: [makeSession({ sessionId: 'review-1', type: 'reviewer', role: 'security', status: 'error', presence: 'ended' })],
         })}
         isSelected={false}
         onSelect={() => {}}
       />,
     );
-    expect(screen.getByText('✕ review')).toBeInTheDocument();
+    expect(screen.getByText('✕ review')).toHaveAttribute('title', 'Review pipeline has 1 failing session. Affected roles: security.');
   });
 
   it('applies the colored kanban state pill class', () => {
@@ -322,6 +322,33 @@ describe('FeatureItem', () => {
       />,
     );
     expect(screen.getByText('Planning')).toHaveClass('featureState_planning');
+  });
+
+  it('adds contextual tooltip text to the feature state pill', () => {
+    render(
+      <FeatureItem
+        feature={makeFeature({ stateLabel: 'In Review', readyForMerge: true })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByText('In Review')).toHaveAttribute('title', 'Implementation has moved into review/test/merge flow and is ready for human merge approval.');
+  });
+
+  it('adds richer progress tooltip text for rally progress pills', () => {
+    render(
+      <FeatureItem
+        feature={makeFeature({
+          isRally: true,
+          childCount: 6,
+          completedCount: 4,
+          inProgressCount: 1,
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+    expect(screen.getByText('4/6')).toHaveAttribute('title', '4/6 stories done, 1 active (67% complete)');
   });
 
   it('toggles expansion when caret is clicked', () => {
