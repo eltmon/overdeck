@@ -386,7 +386,7 @@
       {
         "id": "migrate-hooks",
         "title": "Move PreToolUse/PostToolUse/Stop hooks from global settings to per-agent frontmatter",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T02:30:00.000Z",
         "metadata": {
@@ -400,7 +400,7 @@
           {
             "id": "migrate-hooks.ac1",
             "title": "PreToolUse, PostToolUse, and Stop hooks removed from global settings.json",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -408,7 +408,7 @@
           {
             "id": "migrate-hooks.ac2",
             "title": "Global settings.json retains SessionStart, UserPromptSubmit, PreCompact, PostCompact, Notification, PermissionRequest hooks",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -416,7 +416,7 @@
           {
             "id": "migrate-hooks.ac3",
             "title": "User's ad-hoc Claude sessions (no --agent) still get global hooks for non-migrated events",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -424,7 +424,7 @@
           {
             "id": "migrate-hooks.ac4",
             "title": "No hook fires twice (global + per-agent) for any event type",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

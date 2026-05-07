@@ -282,25 +282,30 @@ export async function setupHooksCommand(): Promise<void> {
     added.push(`${hookType}:${scriptName}`);
   };
 
-  // Core runtime hooks.
-  addHookIfMissing('PreToolUse', 'pre-tool-hook');
-  addHookIfMissing('PostToolUse', 'heartbeat-hook');
-  addHookIfMissing('Stop', 'stop-hook');
-  // PAN-800: SessionStart + Notification hooks.
+  // PAN-982: PreToolUse, PostToolUse, and Stop hooks are NO LONGER registered in
+  // global ~/.claude/settings.json. They were migrated into per-agent frontmatter
+  // at agents/pan-<type>-agent.md so each Panopticon pipeline agent declares its
+  // own tool-event hooks. Registering them again here would cause every event to
+  // fire twice (once from frontmatter, once from global settings) — the exact
+  // double-fire window the migration exists to close (PAN-982 hazard H4).
+  //
+  // Ad-hoc Claude sessions launched without --agent will no longer trigger
+  // pre-tool-hook / heartbeat-hook / stop-hook / tldr-* / inspect-on-bead-close.
+  // That is intentional: those hooks were Panopticon-specific (heartbeat tracking,
+  // cost recording, bead-close detection) and have no meaning outside a pipeline
+  // agent.
+  //
+  // The remaining hook events below stay in global settings because Claude Code's
+  // agent frontmatter cannot host them reliably for the bootstrap path: they fire
+  // before --agent is fully bound (SessionStart, UserPromptSubmit) or are session-
+  // wide signals that need uniform routing across agent and ad-hoc sessions
+  // (PreCompact/PostCompact/Notification/PermissionRequest).
   addHookIfMissing('SessionStart', 'session-start-hook');
   addHookIfMissing('Notification', 'notification-hook');
   addHookIfMissing('UserPromptSubmit', 'user-prompt-submit-hook');
   addHookIfMissing('PreCompact', 'pre-compact-hook');
   addHookIfMissing('PostCompact', 'post-compact-hook');
   addHookIfMissing('PermissionRequest', 'permission-event-hook');
-  addHookIfMissing('PostToolUse', 'permission-event-hook');
-  addHookIfMissing('Stop', 'permission-event-hook');
-
-  // TLDR helpers (optional — only when python3 is available).
-  if (python3Available) {
-    addHookIfMissing('PreToolUse', 'tldr-read-enforcer', 'Read');
-    addHookIfMissing('PostToolUse', 'tldr-post-edit', 'Edit|Write');
-  }
 
   if (added.length === 0) {
     console.log(chalk.cyan('\n✓ All Panopticon hooks already registered'));
@@ -333,15 +338,17 @@ export async function setupHooksCommand(): Promise<void> {
   // 10. Success message
   console.log(chalk.green.bold('\n✓ Setup complete!\n'));
   console.log(chalk.dim('Claude Code hooks are now configured:'));
-  console.log(chalk.dim('  • PreToolUse  - Sets agent state to "active"'));
-  console.log(chalk.dim('  • PostToolUse - Logs activity to activity.jsonl'));
-  console.log(chalk.dim('  • Stop        - Sets agent state to "idle"'));
+  console.log(chalk.dim('  • SessionStart      - Bootstraps agent state, emits model_set'));
+  console.log(chalk.dim('  • UserPromptSubmit  - Clears waiting state, restarts spinner'));
+  console.log(chalk.dim('  • PreCompact/Post   - Tracks compaction lifecycle'));
+  console.log(chalk.dim('  • Notification      - Emits agent.waiting_started events'));
+  console.log(chalk.dim('  • PermissionRequest - Surfaces permission prompts to dashboard'));
+  console.log(chalk.dim('  PAN-982: PreToolUse/PostToolUse/Stop now live in per-agent frontmatter'));
+  console.log(chalk.dim('           at agents/pan-<type>-agent.md (work, planning, review, ...).'));
   if (python3Available) {
-    console.log(chalk.dim('  • TLDR Read   - Intercepts large file reads → TLDR summaries'));
-    console.log(chalk.dim('  • TLDR Edit   - Tracks dirty files → auto re-warm'));
-    console.log(chalk.dim('  • TLDR MCP    - Token-efficient code analysis'));
+    console.log(chalk.dim('  • TLDR MCP          - Token-efficient code analysis'));
   }
-  console.log(chalk.dim('  • Caveman     - Compressed output hooks (activate with agents.caveman.enabled: true)'));
+  console.log(chalk.dim('  • Caveman           - Compressed output hooks (activate with agents.caveman.enabled: true)'));
   console.log('');
   console.log(chalk.dim('When you run agents via `pan start`, they will report'));
   console.log(chalk.dim('their status in real-time to the Panopticon dashboard.\n'));
