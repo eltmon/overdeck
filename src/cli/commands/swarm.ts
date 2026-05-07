@@ -1,5 +1,5 @@
 /**
- * pan swarm <id> [--dry-run] [--wave N] [--model <model>] [--max-slots N]
+ * pan swarm <id> [--dry-run] [--wave N] [--model <model>] [--max-slots N] [--auto-advance]
  *
  * Swarm execution: spawn parallel agents across vBRIEF plan items using
  * dependency-wave scheduling.
@@ -8,6 +8,7 @@
  * --wave N:  only dispatch wave N (default: next unfinished wave)
  * --model:   override model for work slots (default: kimi-k2.6)
  * --max-slots: max concurrent agents (default: respects guardrails)
+ * --auto-advance: dispatch next wave automatically when the current wave completes
  */
 
 import chalk from 'chalk';
@@ -54,7 +55,7 @@ function printWavePlan(waves: Wave[], issueId: string): void {
 
 export async function swarmCommand(
   id: string,
-  options: { dryRun?: boolean; wave?: string; model?: string; maxSlots?: string },
+  options: { dryRun?: boolean; wave?: string; model?: string; maxSlots?: string; autoAdvance?: boolean },
 ): Promise<void> {
   const issueId = id.toUpperCase();
 
@@ -69,6 +70,7 @@ export async function swarmCommand(
     if (options.wave !== undefined) body.wave = parseInt(options.wave, 10);
     if (options.model) body.model = options.model;
     if (options.maxSlots) body.maxSlots = parseInt(options.maxSlots, 10);
+    if (options.autoAdvance) body.autoAdvance = true;
 
     const response = await fetch(`${DASHBOARD_URL}/api/swarm`, {
       method: 'POST',
@@ -82,6 +84,7 @@ export async function swarmCommand(
       hint?: string;
       wavePlan?: Wave[];
       dispatched?: number;
+      autoAdvance?: boolean;
       slots?: Array<{ slot: number; itemId: string; sessionName: string }>;
     };
 
@@ -91,7 +94,7 @@ export async function swarmCommand(
       process.exit(1);
     }
 
-    spinner.succeed(chalk.green(`Swarm dispatched for ${issueId}`));
+    spinner.succeed(chalk.green(`Swarm dispatched for ${issueId}${result.autoAdvance ? ' (auto-advance on)' : ''}`));
 
     if (result.wavePlan) {
       printWavePlan(result.wavePlan, issueId);

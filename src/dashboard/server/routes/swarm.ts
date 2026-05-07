@@ -7,7 +7,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, relative } from 'node:path';
 import { exec } from 'node:child_process';
@@ -18,8 +18,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
-import { ReadModelService } from '../read-model.js';
-import { getSystemHealthSnapshot, getResourceConfig, type SystemHealthSnapshot } from '../services/system-health-service.js';
+import { getSystemHealthSnapshot, getResourceConfig } from '../services/system-health-service.js';
 import { evaluateSpawnGuardrails } from './agents.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { findPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
@@ -48,10 +47,41 @@ interface SwarmState {
   currentWave: number;
   totalWaves: number;
   model: string;
+  autoAdvance?: boolean;
   slots: SlotAssignment[];
   createdAt: string;
   updatedAt: string;
 }
+
+interface SwarmDispatchRequest {
+  issueId: string;
+  wave?: number;
+  model?: string;
+  maxSlots?: number;
+  autoAdvance?: boolean;
+}
+
+interface SwarmDispatchResponseBody {
+  success?: boolean;
+  issueId?: string;
+  wave?: number;
+  totalWaves?: number;
+  model?: string;
+  autoAdvance?: boolean;
+  dispatched?: number;
+  capacity?: { current: number; limit: number; available: number };
+  slots?: Array<{ slot: number; itemId: string; itemTitle: string; sessionName: string; status: SlotAssignment['status'] }>;
+  deferred?: Array<{ itemId: string; itemTitle: string }>;
+  errors?: string[];
+  wavePlan?: Wave[];
+  error?: string;
+  hint?: string;
+  guardrails?: ReturnType<typeof evaluateSpawnGuardrails>;
+}
+
+const SWARM_AUTO_ADVANCE_POLL_MS = 5000;
+const autoAdvanceInFlight = new Set<string>();
+let autoAdvanceLoopStarted = false;
 
 function getSwarmDir(): string {
   return join(homedir(), '.panopticon', 'swarms');
@@ -77,6 +107,314 @@ async function saveSwarmState(state: SwarmState): Promise<void> {
   await mkdir(dir, { recursive: true });
   state.updatedAt = new Date().toISOString();
   await writeFile(getSwarmStatePath(state.issueId), JSON.stringify(state, null, 2));
+}
+
+async function refreshSwarmSlotStatuses(
+  state: SwarmState,
+  sessions?: string[],
+): Promise<{ state: SwarmState; changed: boolean }> {
+  const liveSessions = sessions ?? await listSessionNamesAsync();
+  let changed = false;
+
+  const slots = state.slots.map((slot) => {
+    const alive = liveSessions.includes(slot.sessionName);
+    if (!alive && slot.status === 'running') {
+      changed = true;
+      return {
+        ...slot,
+        status: 'completed' as const,
+        completedAt: slot.completedAt ?? new Date().toISOString(),
+      };
+    }
+    return slot;
+  });
+
+  if (!changed) return { state, changed: false };
+  return {
+    state: {
+      ...state,
+      slots,
+      updatedAt: new Date().toISOString(),
+    },
+    changed: true,
+  };
+}
+
+async function dispatchSwarmWave(
+  request: SwarmDispatchRequest,
+): Promise<{ status: number; body: SwarmDispatchResponseBody }> {
+  const { issueId, wave: requestedWave, model: requestedModel, maxSlots, autoAdvance } = request;
+  const issueLower = issueId.toLowerCase();
+  const issueUpper = issueId.toUpperCase();
+
+  const project = resolveProjectFromIssue(issueId);
+  if (!project) {
+    return {
+      status: 404,
+      body: { error: `Could not resolve project for ${issueUpper}` },
+    };
+  }
+
+  const mainWorkspace = join(project.projectPath, 'workspaces', `feature-${issueLower}`);
+  if (!existsSync(mainWorkspace)) {
+    return {
+      status: 404,
+      body: {
+        error: `No workspace found for ${issueUpper}`,
+        hint: 'Create a workspace first: pan start ' + issueUpper,
+      },
+    };
+  }
+
+  const doc = readWorkspacePlan(mainWorkspace);
+  if (!doc) {
+    return {
+      status: 422,
+      body: {
+        error: `No vBRIEF plan found for ${issueUpper}`,
+        hint: 'Run planning first to produce a vBRIEF plan.',
+      },
+    };
+  }
+
+  const waves = groupItemsByWave(doc);
+  if (waves.length === 0) {
+    return {
+      status: 422,
+      body: {
+        error: `No actionable items in the plan for ${issueUpper}`,
+        hint: 'All items may already be completed or cancelled.',
+      },
+    };
+  }
+
+  const waveIndex = requestedWave ?? 0;
+  const targetWave = waves.find(w => w.index === waveIndex);
+  if (!targetWave) {
+    return {
+      status: 422,
+      body: {
+        error: `Wave ${waveIndex} not found. Available: ${waves.map(w => w.index).join(', ')}`,
+      },
+    };
+  }
+
+  const health = await getSystemHealthSnapshot();
+  const guardrails = evaluateSpawnGuardrails(health);
+  if (guardrails.blocked) {
+    return {
+      status: guardrails.status,
+      body: {
+        error: guardrails.error,
+        hint: guardrails.hint,
+        guardrails,
+      },
+    };
+  }
+
+  const swarmModel = requestedModel || DEFAULT_SWARM_MODEL;
+  const resourceConfig = getResourceConfig();
+  const hardLimit = Number(process.env['PAN_AGENT_BLOCK_COUNT']) || resourceConfig.agentBlockCount;
+  const currentAgents = health.summary.workAgentCount;
+  const systemAvailable = Math.max(0, hardLimit - currentAgents);
+
+  if (systemAvailable === 0) {
+    return {
+      status: 429,
+      body: {
+        error: `No agent capacity available (${currentAgents}/${hardLimit} agents running).`,
+        hint: 'Wait for running agents to finish or stop some before dispatching a swarm.',
+      },
+    };
+  }
+
+  const userMax = maxSlots ?? 4;
+  const maxConcurrent = Math.min(targetWave.items.length, userMax, systemAvailable);
+  const itemsToDispatch = targetWave.items.slice(0, maxConcurrent);
+  const deferredItems = targetWave.items.slice(maxConcurrent);
+
+  const existingSessions = await listSessionNamesAsync();
+  const existingSwarmSessions = existingSessions.filter(
+    s => s.startsWith(`agent-${issueLower}-`) && /agent-[a-z0-9-]+-\d+$/.test(s),
+  );
+
+  const aliveSlots = new Set<string>();
+  for (const sessionName of existingSwarmSessions) {
+    const isDead = await isPaneDeadAsync(sessionName);
+    if (isDead) {
+      await killSessionAsync(sessionName).catch(() => {});
+    } else {
+      aliveSlots.add(sessionName);
+    }
+  }
+
+  const dispatched: SlotAssignment[] = [];
+  const errors: string[] = [];
+
+  for (let i = 0; i < itemsToDispatch.length; i++) {
+    const item = itemsToDispatch[i]!;
+    const slotNum = i + 1;
+    const sessionName = `agent-${issueLower}-${slotNum}`;
+
+    if (aliveSlots.has(sessionName)) {
+      dispatched.push({
+        slot: slotNum,
+        itemId: item.id,
+        itemTitle: item.title,
+        sessionName,
+        workspace: '',
+        status: 'running',
+      });
+      continue;
+    }
+
+    const worktreeResult = await createSlotWorktree(project.projectPath, issueId, slotNum);
+    if (!worktreeResult.success) {
+      errors.push(`Slot ${slotNum}: failed to create worktree — ${worktreeResult.error}`);
+      continue;
+    }
+
+    const planPath = findPlan(mainWorkspace);
+    if (planPath) {
+      const slotPanDir = join(worktreeResult.workspacePath, '.pan');
+      await mkdir(slotPanDir, { recursive: true });
+      const slotPlanPath = join(slotPanDir, 'spec.vbrief.json');
+      if (!existsSync(slotPlanPath)) {
+        try {
+          const planContent = await readFile(planPath, 'utf-8');
+          await writeFile(slotPlanPath, planContent);
+        } catch {}
+      }
+    }
+
+    const itemPrompt = buildSlotPrompt(
+      doc,
+      issueUpper,
+      item,
+      waveIndex,
+      slotNum,
+      worktreeResult.branch,
+      worktreeResult.parentBranch,
+    );
+
+    try {
+      const spawnOptions: SpawnOptions = {
+        issueId,
+        workspace: worktreeResult.workspacePath,
+        model: swarmModel,
+        slotId: slotNum,
+        swarmItemId: item.id,
+        prompt: itemPrompt,
+        phase: 'implementation',
+      };
+
+      await spawnAgent(spawnOptions);
+
+      dispatched.push({
+        slot: slotNum,
+        itemId: item.id,
+        itemTitle: item.title,
+        sessionName,
+        workspace: worktreeResult.workspacePath,
+        status: 'running',
+        startedAt: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      errors.push(`Slot ${slotNum} (${item.id}): ${err.message}`);
+    }
+  }
+
+  const existingState = await loadSwarmState(issueUpper);
+  const state: SwarmState = {
+    issueId: issueUpper,
+    currentWave: waveIndex,
+    totalWaves: waves.length,
+    model: swarmModel,
+    autoAdvance: autoAdvance ?? existingState?.autoAdvance ?? false,
+    slots: dispatched,
+    createdAt: existingState?.createdAt ?? new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  await saveSwarmState(state);
+
+  if (state.autoAdvance) {
+    ensureSwarmAutoAdvanceLoop();
+  }
+
+  return {
+    status: 200,
+    body: {
+      success: true,
+      issueId: issueUpper,
+      wave: waveIndex,
+      totalWaves: waves.length,
+      model: swarmModel,
+      autoAdvance: state.autoAdvance,
+      dispatched: dispatched.length,
+      capacity: { current: currentAgents, limit: hardLimit, available: systemAvailable },
+      slots: dispatched.map(s => ({
+        slot: s.slot,
+        itemId: s.itemId,
+        itemTitle: s.itemTitle,
+        sessionName: s.sessionName,
+        status: s.status,
+      })),
+      deferred: deferredItems.length > 0
+        ? deferredItems.map(item => ({ itemId: item.id, itemTitle: item.title }))
+        : undefined,
+      errors: errors.length > 0 ? errors : undefined,
+      wavePlan: waves,
+    },
+  };
+}
+
+async function pollSwarmAutoAdvance(): Promise<void> {
+  const entries = await readdir(getSwarmDir()).catch(() => [] as string[]);
+  for (const entry of entries) {
+    if (!entry.endsWith('.json')) continue;
+
+    const issueId = entry.replace(/\.json$/, '').toUpperCase();
+    const loadedState = await loadSwarmState(issueId);
+    if (!loadedState?.autoAdvance) continue;
+    if (loadedState.currentWave >= loadedState.totalWaves - 1) continue;
+    if (autoAdvanceInFlight.has(loadedState.issueId)) continue;
+
+    const { state, changed } = await refreshSwarmSlotStatuses(loadedState);
+    if (changed) {
+      await saveSwarmState(state);
+    }
+
+    const allSlotsCompleted = state.slots.length > 0 && state.slots.every(
+      slot => slot.status === 'completed' || slot.status === 'failed',
+    );
+    if (!allSlotsCompleted) continue;
+
+    autoAdvanceInFlight.add(state.issueId);
+    try {
+      const result = await dispatchSwarmWave({
+        issueId: state.issueId,
+        wave: state.currentWave + 1,
+        model: state.model,
+        autoAdvance: true,
+      });
+      if (result.status >= 400) {
+        console.warn(`[swarm] Auto-advance for ${state.issueId} stalled: ${result.body.error ?? 'unknown error'}`);
+      }
+    } finally {
+      autoAdvanceInFlight.delete(state.issueId);
+    }
+  }
+}
+
+function ensureSwarmAutoAdvanceLoop(): void {
+  if (autoAdvanceLoopStarted) return;
+  autoAdvanceLoopStarted = true;
+  const handle = setInterval(() => {
+    void pollSwarmAutoAdvance().catch((err) => {
+      console.error('[swarm] Auto-advance loop failed:', err);
+    });
+  }, SWARM_AUTO_ADVANCE_POLL_MS);
+  handle.unref?.();
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -168,231 +506,21 @@ const postSwarmRoute = HttpRouter.add(
   '/api/swarm',
   httpHandler(Effect.gen(function* () {
     const body = yield* readJsonBody;
-    const readModel = yield* ReadModelService;
-
-    const { issueId, wave: requestedWave, model: requestedModel, maxSlots } = body as {
-      issueId?: string;
-      wave?: number;
-      model?: string;
-      maxSlots?: number;
-    };
+    const { issueId, wave, model, maxSlots, autoAdvance } = body as SwarmDispatchRequest;
 
     if (!issueId) {
       return jsonResponse({ error: 'issueId required' }, { status: 400 });
     }
 
-    const issueLower = issueId.toLowerCase();
-    const issueUpper = issueId.toUpperCase();
+    const result = yield* Effect.promise(() => dispatchSwarmWave({
+      issueId,
+      wave,
+      model,
+      maxSlots,
+      autoAdvance,
+    }));
 
-    // Resolve project
-    const project = resolveProjectFromIssue(issueId);
-    if (!project) {
-      return jsonResponse({ error: `Could not resolve project for ${issueUpper}` }, { status: 404 });
-    }
-
-    // Find the main workspace to read the vBRIEF
-    const mainWorkspace = join(project.projectPath, 'workspaces', `feature-${issueLower}`);
-    if (!existsSync(mainWorkspace)) {
-      return jsonResponse({
-        error: `No workspace found for ${issueUpper}`,
-        hint: 'Create a workspace first: pan start ' + issueUpper,
-      }, { status: 404 });
-    }
-
-    // Read vBRIEF and compute waves
-    const doc = readWorkspacePlan(mainWorkspace);
-    if (!doc) {
-      return jsonResponse({
-        error: `No vBRIEF plan found for ${issueUpper}`,
-        hint: 'Run planning first to produce a vBRIEF plan.',
-      }, { status: 422 });
-    }
-
-    const waves = groupItemsByWave(doc);
-    if (waves.length === 0) {
-      return jsonResponse({
-        error: `No actionable items in the plan for ${issueUpper}`,
-        hint: 'All items may already be completed or cancelled.',
-      }, { status: 422 });
-    }
-
-    // Determine which wave to dispatch
-    const waveIndex = requestedWave ?? 0;
-    const targetWave = waves.find(w => w.index === waveIndex);
-    if (!targetWave) {
-      return jsonResponse({
-        error: `Wave ${waveIndex} not found. Available: ${waves.map(w => w.index).join(', ')}`,
-      }, { status: 422 });
-    }
-
-    // Check spawn guardrails
-    const health: SystemHealthSnapshot = yield* readModel.getSnapshot.pipe(
-      Effect.flatMap((snapshot) => Effect.promise(() => getSystemHealthSnapshot(snapshot))),
-    );
-    const guardrails = evaluateSpawnGuardrails(health);
-    if (guardrails.blocked) {
-      return jsonResponse({
-        error: guardrails.error,
-        hint: guardrails.hint,
-        guardrails,
-      }, { status: guardrails.status });
-    }
-
-    const swarmModel = requestedModel || DEFAULT_SWARM_MODEL;
-
-    // Compute how many slots the system can actually handle right now
-    const resourceConfig = getResourceConfig();
-    const hardLimit = Number(process.env['PAN_AGENT_BLOCK_COUNT']) || resourceConfig.agentBlockCount;
-    const currentAgents = health.summary.workAgentCount;
-    const systemAvailable = Math.max(0, hardLimit - currentAgents);
-
-    if (systemAvailable === 0) {
-      return jsonResponse({
-        error: `No agent capacity available (${currentAgents}/${hardLimit} agents running).`,
-        hint: 'Wait for running agents to finish or stop some before dispatching a swarm.',
-      }, { status: 429 });
-    }
-
-    const userMax = maxSlots ?? 4;
-    const maxConcurrent = Math.min(targetWave.items.length, userMax, systemAvailable);
-    const itemsToDispatch = targetWave.items.slice(0, maxConcurrent);
-    const deferredItems = targetWave.items.slice(maxConcurrent);
-
-    // Idempotency: check for existing swarm sessions
-    const existingSessions = yield* Effect.promise(() => listSessionNamesAsync());
-    const existingSwarmSessions = existingSessions.filter(
-      s => s.startsWith(`agent-${issueLower}-`) && /agent-[a-z0-9-]+-\d+$/.test(s),
-    );
-
-    // Kill dead panes, skip alive ones
-    const aliveSlots = new Set<string>();
-    for (const sessionName of existingSwarmSessions) {
-      const isDead = yield* Effect.promise(() => isPaneDeadAsync(sessionName));
-      if (isDead) {
-        yield* Effect.promise(() => killSessionAsync(sessionName).catch(() => {}));
-      } else {
-        aliveSlots.add(sessionName);
-      }
-    }
-
-    // Spawn slots
-    const dispatched: SlotAssignment[] = [];
-    const errors: string[] = [];
-
-    for (let i = 0; i < itemsToDispatch.length; i++) {
-      const item = itemsToDispatch[i]!;
-      const slotNum = i + 1;
-      const sessionName = `agent-${issueLower}-${slotNum}`;
-
-      if (aliveSlots.has(sessionName)) {
-        dispatched.push({
-          slot: slotNum,
-          itemId: item.id,
-          itemTitle: item.title,
-          sessionName,
-          workspace: '',
-          status: 'running',
-        });
-        continue;
-      }
-
-      // Create slot worktree
-      const worktreeResult = yield* Effect.promise(() =>
-        createSlotWorktree(project.projectPath, issueId, slotNum),
-      );
-
-      if (!worktreeResult.success) {
-        errors.push(`Slot ${slotNum}: failed to create worktree — ${worktreeResult.error}`);
-        continue;
-      }
-
-      // Copy the vBRIEF plan into the slot workspace
-      const planPath = findPlan(mainWorkspace);
-      if (planPath) {
-        yield* Effect.promise(async () => {
-          const slotPanDir = join(worktreeResult.workspacePath, '.pan');
-          await mkdir(slotPanDir, { recursive: true });
-          const slotPlanPath = join(slotPanDir, 'spec.vbrief.json');
-          if (!existsSync(slotPlanPath)) {
-            try {
-              const planContent = await readFile(planPath, 'utf-8');
-              await writeFile(slotPlanPath, planContent);
-            } catch {}
-          }
-        });
-      }
-
-      // Build the slot-specific prompt
-      const itemPrompt = buildSlotPrompt(
-        doc,
-        issueUpper,
-        item,
-        waveIndex,
-        slotNum,
-        worktreeResult.branch,
-        worktreeResult.parentBranch,
-      );
-
-      try {
-        const spawnOptions: SpawnOptions = {
-          issueId,
-          workspace: worktreeResult.workspacePath,
-          model: swarmModel,
-          slotId: slotNum,
-          swarmItemId: item.id,
-          prompt: itemPrompt,
-          phase: 'implementation',
-        };
-
-        yield* Effect.promise(() => spawnAgent(spawnOptions));
-
-        dispatched.push({
-          slot: slotNum,
-          itemId: item.id,
-          itemTitle: item.title,
-          sessionName,
-          workspace: worktreeResult.workspacePath,
-          status: 'running',
-          startedAt: new Date().toISOString(),
-        });
-      } catch (err: any) {
-        errors.push(`Slot ${slotNum} (${item.id}): ${err.message}`);
-      }
-    }
-
-    // Save swarm state
-    const state: SwarmState = {
-      issueId: issueUpper,
-      currentWave: waveIndex,
-      totalWaves: waves.length,
-      model: swarmModel,
-      slots: dispatched,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    yield* Effect.promise(() => saveSwarmState(state));
-
-    return jsonResponse({
-      success: true,
-      issueId: issueUpper,
-      wave: waveIndex,
-      totalWaves: waves.length,
-      model: swarmModel,
-      dispatched: dispatched.length,
-      capacity: { current: currentAgents, limit: hardLimit, available: systemAvailable },
-      slots: dispatched.map(s => ({
-        slot: s.slot,
-        itemId: s.itemId,
-        itemTitle: s.itemTitle,
-        sessionName: s.sessionName,
-        status: s.status,
-      })),
-      deferred: deferredItems.length > 0
-        ? deferredItems.map(item => ({ itemId: item.id, itemTitle: item.title }))
-        : undefined,
-      errors: errors.length > 0 ? errors : undefined,
-      wavePlan: waves,
-    });
+    return jsonResponse(result.body, { status: result.status });
   })),
 );
 
@@ -511,20 +639,19 @@ const getSwarmRoute = HttpRouter.add(
       return jsonResponse({ error: `No swarm state for ${issueId}` }, { status: 404 });
     }
 
-    // Enrich with live session status
     const sessions = yield* Effect.promise(() => listSessionNamesAsync());
-    for (const slot of state.slots) {
-      const alive = sessions.includes(slot.sessionName);
-      if (!alive && slot.status === 'running') {
-        slot.status = 'completed';
-      }
+    const refreshed = yield* Effect.promise(() => refreshSwarmSlotStatuses(state, sessions));
+    if (refreshed.changed) {
+      yield* Effect.promise(() => saveSwarmState(refreshed.state));
     }
 
-    return jsonResponse(state);
+    return jsonResponse(refreshed.state);
   })),
 );
 
 // ─── Export ─────────────────────────────────────────────────────────────────
+
+ensureSwarmAutoAdvanceLoop();
 
 export const swarmRouteLayer = Layer.mergeAll(
   postSwarmRoute,
