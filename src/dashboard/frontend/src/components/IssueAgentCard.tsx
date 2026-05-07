@@ -6,6 +6,7 @@ import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { useAgentCost } from '../hooks/useHandoffData';
 import { HandoffPanel } from './HandoffPanel';
 import { useConfirm, useAlert } from './DialogProvider';
+import { getHarness } from '@panctl/contracts';
 
 export interface IssueAgent {
   id: string;
@@ -247,7 +248,7 @@ export function IssueAgentCard({
               )}
             </div>
             <div className="text-sm text-muted-foreground flex items-center gap-2">
-              {agent.runtime} / {agent.model}
+              {getHarness(agent)} / {agent.model}
               {costData && costData.cost > 0 && (
                 <span
                   className="flex items-center gap-1 text-xs text-success"

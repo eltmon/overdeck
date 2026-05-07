@@ -6,6 +6,7 @@
 import { ContainerStats, ContainerHistory, Agent } from '../types';
 import { ResourceBar } from './ResourceBar';
 import { Sparkline } from './Sparkline';
+import { getHarness } from '@panctl/contracts';
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)}GiB`;
@@ -109,7 +110,7 @@ export function AgentCard({ agent, onNavigate }: AgentCardProps) {
         </div>
         <div className="flex justify-between">
           <span>Runtime</span>
-          <span className="text-foreground">{agent.runtime}</span>
+          <span className="text-foreground">{getHarness(agent)}</span>
         </div>
         {agent.consecutiveFailures > 0 && (
           <div className="flex justify-between text-warning">

@@ -428,7 +428,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
               issueId,
               status: 'running',
               startedAt: event.timestamp,
-              runtime: 'claude',
+              runtime: 'claude-code',
               agentPhase: 'planning' as const,
             },
           },

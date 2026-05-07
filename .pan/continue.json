@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-636",
   "created": "2026-05-07T03:42:36.488Z",
-  "updated": "2026-05-07T04:10:00.000Z",
+  "updated": "2026-05-07T04:40:10.210Z",
   "gitState": {
     "branch": "feature/pan-636",
     "sha": "9b15d68ef",
@@ -137,7 +137,15 @@
       "mitigation": "Pi spawn uses an isolated browser profile per agentId (Playwright user-data-dir under ~/.panopticon/agents/<id>/playwright-profile). Acceptance criterion: two concurrent UAT-on-Pi agents do not share login state, cookies, or service workers."
     }
   ],
-  "resumePoint": null,
+  "resumePoint": {
+    "description": "harness-types bead complete (RuntimeName widened, getHarness helper added, frontend reads migrated, event-reducers writes claude-code, KanbanBoard fixtures updated, unit test passes). Next ready bead: workspace-ef4 (canUseHarness ToS gate helper) — pure-function, no deps. After that: workspace-y4r (pi-parser).",
+    "beadId": "workspace-h5c",
+    "filesToRead": [
+      "packages/contracts/src/types.ts",
+      "src/lib/runtimes/types.ts",
+      "src/lib/__tests__/harness.test.ts"
+    ]
+  },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
   "approach": "Pi Agent ships as a second AgentRuntime adapter parallel to ClaudeCodeRuntime. The adapter spawns Pi inside tmux with its stdin redirected from a per-agent named pipe (mkfifo at ~/.panopticon/agents/<id>/rpc.in) so the dashboard can deliver structured RPC commands without touching tmux paste-buffers. A vendored extension at packages/pi-extension/ provides Panopticon's lifecycle signals (session_start ready, tool_execution_end heartbeat, /pan-done completion). A new src/lib/cost-parsers/pi-parser.ts walks Pi's tree-structured JSONL along the active branch and emits the existing SessionUsage interface, leaving cost-monitor and dashboard cost views untouched. Harness+model selection is exposed at three user-initiated spawn points (plan kickoff, work start, conversation panel) and recorded on agent state; specialists read per-role harness+model from Settings. A single canUseHarness(harness, model, authMode) gate is invoked from every spawn entry point and from picker UIs to disable invalid combos before submit; the only blocked combination is Pi + Anthropic-model + auth=subscription. pan doctor adds a Pi-binary version check; pan sync writes ~/.pi/agent/settings.json so Pi reads skills from ~/.claude/skills. End-to-end smoke test spawns a Pi agent, drives it through one prompt, and asserts ready/heartbeat/cost/session-resume all wired correctly.",
@@ -153,6 +161,12 @@
       "reason": "planning",
       "note": "Discovery complete. User confirmed: ship full integration in PAN-636 (no phasing); harness+model picker exposed at plan kickoff, work agent start, and conversation panel only (specialists configured in Settings); per-spawn picking with no per-issue lock; ToS gate blocks Pi+Anthropic only when Anthropic auth=subscription; Anthropic auth is exclusively subscription OR API key, never both; Pi extension vendored at packages/pi-extension/; RPC IPC via mkfifo named pipe; Pi binary install is a documented prereq with pan doctor check; Settings extends existing per-role model section with a harness column. Claudish removal is NOT in scope. continue.json + spec.vbrief.json being written.",
       "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T04:40:10.210Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-h5c (harness-types). Widened RuntimeName to claude-code|pi in src/lib/runtimes/types.ts. Added Harness type and getHarness() normalizer in packages/contracts/src/types.ts (legacy claude → claude-code, unknowns → claude-code). Migrated three frontend reads (IssueAgentCard, AgentInfoSection, ResourceCard) to call getHarness(agent). Fixed event-reducers.ts:431 default-fill claude → claude-code. Updated KanbanBoard.test.tsx fixtures. Added 6-case unit test src/lib/__tests__/harness.test.ts; all pass. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
     }
   ],
   "feedback": []

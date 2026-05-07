@@ -42,6 +42,29 @@ export type MergeStatusValue = typeof MergeStatusValue.Type
 export const VerificationStatusValue = Schema.Literals(["pending", "running", "passed", "failed", "skipped"])
 export type VerificationStatusValue = typeof VerificationStatusValue.Type
 
+// ─── Harness (PAN-636) ────────────────────────────────────────────────────────
+// Identifies which coding-agent harness an agent is running under.
+// AgentSnapshot.runtime is left as Schema.optional(Schema.String) for forward
+// compatibility (events from older readers may carry unknown values), but every
+// consumer that branches on harness MUST go through getHarness() so unknown or
+// legacy values normalize to 'claude-code'.
+
+export type Harness = 'claude-code' | 'pi'
+
+const KNOWN_HARNESSES: ReadonlySet<string> = new Set<Harness>(['claude-code', 'pi'])
+
+/**
+ * Normalize a snapshot's runtime field to a known Harness value.
+ * Unknown or missing values fall back to 'claude-code' (the default harness).
+ */
+export function getHarness(snapshot: { runtime?: string | undefined } | null | undefined): Harness {
+  const raw = snapshot?.runtime
+  if (raw && KNOWN_HARNESSES.has(raw)) {
+    return raw as Harness
+  }
+  return 'claude-code'
+}
+
 // ─── Agent Runtime (PAN-800) ─────────────────────────────────────────────────
 // High-frequency per-tool-call surface. Kept separate from AgentSnapshot because
 // AgentSnapshot is the low-frequency lifecycle projection (config, status, cost)

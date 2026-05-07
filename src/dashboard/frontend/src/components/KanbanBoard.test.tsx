@@ -299,7 +299,7 @@ describe('ListIssueRow', () => {
   const createMockAgent = (overrides: Partial<Agent> = {}): Agent => ({
     id: 'agent-1',
     issueId: 'TEST-123',
-    runtime: 'claude',
+    runtime: 'claude-code',
     model: 'test-model',
     status: 'healthy',
     startedAt: new Date().toISOString(),
@@ -1054,7 +1054,7 @@ describe('CompactChildCard', () => {
     const agents: Agent[] = [{
       id: 'agent-1',
       issueId: 'US100',
-      runtime: 'claude',
+      runtime: 'claude-code',
       model: 'test',
       status: 'healthy',
       startedAt: new Date().toISOString(),

@@ -48,7 +48,7 @@
       {
         "id": "harness-types",
         "title": "Widen RuntimeName to 'claude-code' | 'pi' across types and contracts",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-07T04:10:00.000Z",
         "metadata": {
@@ -62,7 +62,7 @@
           {
             "id": "harness-types.ac1",
             "title": "RuntimeName type union is exactly 'claude-code' | 'pi' and the union is exported from src/lib/runtimes/types.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -70,7 +70,7 @@
           {
             "id": "harness-types.ac2",
             "title": "A getHarness(snapshot: AgentSnapshot): 'claude-code' | 'pi' helper exists, is unit-tested, and is the only place AgentSnapshot.runtime is read across src/dashboard/frontend/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -78,7 +78,7 @@
           {
             "id": "harness-types.ac3",
             "title": "packages/contracts/src/event-reducers.ts no longer writes the bare literal 'claude'; it writes 'claude-code' (or leaves the field unset when no harness is known)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -86,7 +86,7 @@
           {
             "id": "harness-types.ac4",
             "title": "npm run typecheck passes and no consumer of AgentSnapshot.runtime compares against the literal 'claude' anywhere in src/ or packages/",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
