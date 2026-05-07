@@ -9,7 +9,14 @@
  * directly (zero-roundtrip) — this module is for everything else.
  */
 
-import type { AgentRuntimeSnapshot, Activity, AgentResolution, WaitingReason } from '@panctl/contracts'
+import type {
+  AgentRuntimeSnapshot,
+  Activity,
+  AgentResolution,
+  ChannelReplyArtifactRef,
+  ChannelReplyKind,
+  WaitingReason,
+} from '@panctl/contracts'
 
 // Use 127.0.0.1 explicitly: when /etc/hosts resolves `localhost` to ::1
 // (IPv6 first), Node's undici-based fetch() connects to [::1]:3011 and
@@ -46,6 +53,7 @@ type HeartbeatBody =
   | { kind: 'waiting_start'; reason: WaitingReason; message?: string }
   | { kind: 'waiting_clear'; clearedBy: 'user_response' | 'timeout' | 'stopped' | 'tool_resumed' }
   | { kind: 'message_received'; direction: 'to_agent' | 'from_agent'; source: 'user' | 'cloister' | 'specialist' | 'automated' }
+  | { kind: 'channel_reply'; reply: { kind: ChannelReplyKind; summary: string; artifactRefs?: ChannelReplyArtifactRef[] } }
   | { kind: 'model_set'; model: string; claudeSessionId?: string }
   | { kind: 'resolution_set'; resolution: AgentResolution; resolutionCount: number }
   | { kind: 'current_issue_set'; currentIssue?: string }
@@ -102,6 +110,11 @@ export const emitMessageReceived = (
   direction: 'to_agent' | 'from_agent',
   source: 'user' | 'cloister' | 'specialist' | 'automated',
 ): Promise<boolean> => emitAgentEvent(agentId, { kind: 'message_received', direction, source })
+
+export const emitChannelReply = (
+  agentId: string,
+  reply: { kind: ChannelReplyKind; summary: string; artifactRefs?: ChannelReplyArtifactRef[] },
+): Promise<boolean> => emitAgentEvent(agentId, { kind: 'channel_reply', reply })
 
 export const emitResolution = (
   agentId: string,

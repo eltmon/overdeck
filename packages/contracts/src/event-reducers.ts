@@ -512,6 +512,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         // Clear thinking/waiting on transitions away from those activities.
         thinking: activity === 'thinking' ? prev.thinking : undefined,
         waiting: activity === 'waiting' ? prev.waiting : undefined,
+        channelReply: activity === 'working' ? undefined : prev.channelReply,
         lastActivity: event.timestamp,
         updatedAtSequence: event.sequence,
       }
@@ -533,6 +534,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         currentTool: undefined,
         thinking: { since: event.timestamp, lastToolAt },
         waiting: undefined,
+        channelReply: undefined,
         lastActivity: event.timestamp,
         updatedAtSequence: event.sequence,
       }
@@ -608,12 +610,44 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     }
 
     case 'agent.message_received': {
-      const { agentId } = event.payload
+      const { agentId, direction } = event.payload
       const prev = state.agentRuntimeById[agentId]
         ?? defaultRuntimeSnapshot(agentId, event.timestamp, event.sequence)
       const next: AgentRuntimeSnapshot = {
         ...prev,
         lastMessageAt: event.timestamp,
+        channelReply: direction === 'to_agent' ? undefined : prev.channelReply,
+        lastActivity: event.timestamp,
+        updatedAtSequence: event.sequence,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
+        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
+      }
+    }
+
+    case 'agent.channel_reply': {
+      const { agentId, reply } = event.payload
+      const prev = state.agentRuntimeById[agentId]
+        ?? defaultRuntimeSnapshot(agentId, event.timestamp, event.sequence)
+      const next: AgentRuntimeSnapshot = {
+        ...prev,
+        channelReply: {
+          ...reply,
+          reportedAt: event.timestamp,
+        },
+        resolution:
+          reply.kind === 'done'
+            ? 'done'
+            : reply.kind === 'needs_input'
+              ? 'needs_input'
+              : prev.resolution,
+        resolutionUpdatedAt:
+          reply.kind === 'done' || reply.kind === 'needs_input'
+            ? event.timestamp
+            : prev.resolutionUpdatedAt,
         lastActivity: event.timestamp,
         updatedAtSequence: event.sequence,
       }

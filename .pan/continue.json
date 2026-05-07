@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-986",
   "created": "2026-05-07T14:20:00Z",
-  "updated": "2026-05-07T14:20:00Z",
+  "updated": "2026-05-07T14:35:00Z",
   "gitState": {
     "branch": "feature/pan-986",
-    "sha": "4127d8786",
+    "sha": "e261a2e16",
     "dirty": true
   },
   "decisions": [
@@ -13,6 +13,11 @@
       "id": "D1",
       "summary": "The outbound Claude Code Channels work is being split across three beads so the bridge surface, the dashboard event plumbing, and the hook replacement each land in reviewable commits. The first bead defines the `channel_reply` MCP tool, validates its payload, and documents when Claude should emit structured status instead of relying on terminal prose alone.",
       "recordedAt": "2026-05-07T14:20:00Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Accepted `channel_reply` payloads now enter the same typed runtime-event pipeline as hook heartbeats instead of being stored only in bridge-local logs. The dashboard reducer records the latest structured reply on `AgentRuntimeSnapshot.channelReply`, and the reducer also projects `done` and `needs_input` replies onto the existing runtime resolution fields so current consumers can benefit without waiting for a separate UI migration.",
+      "recordedAt": "2026-05-07T14:35:00Z"
     }
   ],
   "hazards": [
@@ -23,15 +28,17 @@
     }
   ],
   "resumePoint": {
-    "description": "Finish bead workspace-78h8 by finalizing the `channel_reply` bridge surface, verifying the focused bridge tests, committing the bead, and then claiming workspace-teyh for runtime event ingestion.",
-    "beadId": "workspace-78h8",
+    "description": "Finish bead workspace-teyh by committing the runtime event plumbing for `channel_reply`, closing the bead, and then claim workspace-jyh4 to replace the work-agent stop-hook pane scrape with the new structured runtime signal.",
+    "beadId": "workspace-teyh",
     "filesToRead": [
       "src/lib/channels/panopticon-bridge.ts",
-      "src/lib/channels/__tests__/panopticon-bridge.test.ts",
+      "src/lib/agent-runtime.ts",
       "src/dashboard/server/routes/agents.ts",
+      "packages/contracts/src/types.ts",
       "packages/contracts/src/events.ts",
       "packages/contracts/src/event-reducers.ts",
-      "packages/contracts/src/types.ts"
+      "tests/contracts/heartbeat-ingestion.test.ts",
+      "src/dashboard/frontend/src/__tests__/store.test.ts"
     ]
   },
   "beadsMapping": {
@@ -51,6 +58,12 @@
       "timestamp": "2026-05-07T14:20:00Z",
       "reason": "resume",
       "note": "Recovered the PAN-986 workspace after finding a stale deleted PAN-939 continue file and no PAN-986 beads. I recreated issue-scoped beads, claimed workspace-78h8, and started implementing the outbound `channel_reply` MCP tool surface with validation and bridge tests.",
+      "agentModel": "claude-code"
+    },
+    {
+      "timestamp": "2026-05-07T14:35:00Z",
+      "reason": "manual",
+      "note": "Closed workspace-78h8 after landing the bridge tool surface. Claimed workspace-teyh and wired accepted `channel_reply` payloads into the typed runtime heartbeat path, extended the shared contracts and reducer, rebuilt `@panctl/contracts`, and verified the focused contract, bridge, and frontend reducer tests all pass.",
       "agentModel": "claude-code"
     }
   ]

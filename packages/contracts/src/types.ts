@@ -101,6 +101,23 @@ export const WaitingState = Schema.Struct({
 })
 export type WaitingState = typeof WaitingState.Type
 
+export const ChannelReplyKind = Schema.Literals(["status", "done", "needs_input"])
+export type ChannelReplyKind = typeof ChannelReplyKind.Type
+
+export const ChannelReplyArtifactRef = Schema.Struct({
+  uri: Schema.String,
+  label: Schema.optional(Schema.String),
+})
+export type ChannelReplyArtifactRef = typeof ChannelReplyArtifactRef.Type
+
+export const AgentChannelReply = Schema.Struct({
+  kind: ChannelReplyKind,
+  summary: Schema.String,
+  artifactRefs: Schema.Array(ChannelReplyArtifactRef),
+  reportedAt: Schema.String,
+})
+export type AgentChannelReply = typeof AgentChannelReply.Type
+
 export const AgentRuntimeSnapshot = Schema.Struct({
   id: AgentId,
   activity: Activity,
@@ -111,6 +128,8 @@ export const AgentRuntimeSnapshot = Schema.Struct({
   claudeSessionId: Schema.optional(Schema.String),
   model: Schema.optional(Schema.String),
   lastMessageAt: Schema.optional(Schema.String),  // last user→agent message delivered
+  // Last structured Claude Code Channels reply emitted by the work agent.
+  channelReply: Schema.optional(AgentChannelReply),
   // Lifecycle resolution signal emitted by work-agent-stop-hook. Values mirror
   // AgentResolution so the enrichment poller can consume this as input.
   resolution: Schema.optional(AgentResolution),

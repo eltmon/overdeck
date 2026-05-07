@@ -1016,6 +1016,24 @@ export const bodyToEvent = (
           source: source['source'] ?? 'user',
         },
       };
+    case 'channel_reply': {
+      const reply =
+        source['reply'] && typeof source['reply'] === 'object'
+          ? (source['reply'] as Record<string, unknown>)
+          : {};
+      return {
+        type: 'agent.channel_reply',
+        timestamp,
+        payload: {
+          agentId,
+          reply: {
+            kind: reply['kind'],
+            summary: reply['summary'],
+            artifactRefs: Array.isArray(reply['artifactRefs']) ? reply['artifactRefs'] : [],
+          },
+        },
+      };
+    }
     case 'model_set':
       return {
         type: 'agent.model_set',

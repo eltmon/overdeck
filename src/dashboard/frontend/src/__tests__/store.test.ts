@@ -144,6 +144,47 @@ describe('applyEventReducer — agent events', () => {
   })
 })
 
+// ─── Runtime reducers ─────────────────────────────────────────────────────────
+
+describe('applyEventReducer — runtime events', () => {
+  it('agent.channel_reply stores structured reply in runtime snapshot', () => {
+    const event = makeEvent('agent.channel_reply', 8, {
+      agentId: 'agent-1',
+      reply: {
+        kind: 'done',
+        summary: 'Implementation complete',
+        artifactRefs: [{ uri: 'file:///tmp/report.txt', label: 'report' }],
+      },
+    })
+    const next = applyEventReducer(emptyState, event)
+    expect(next.agentRuntimeById['agent-1']?.channelReply).toMatchObject({
+      kind: 'done',
+      summary: 'Implementation complete',
+      artifactRefs: [{ uri: 'file:///tmp/report.txt', label: 'report' }],
+    })
+    expect(next.agentRuntimeById['agent-1']?.resolution).toBe('done')
+  })
+
+  it('agent.message_received clears stale channel reply on new inbound message', () => {
+    const withReply = applyEventReducer(
+      emptyState,
+      makeEvent('agent.channel_reply', 9, {
+        agentId: 'agent-1',
+        reply: { kind: 'needs_input', summary: 'Need answer', artifactRefs: [] },
+      }),
+    )
+    const next = applyEventReducer(
+      withReply,
+      makeEvent('agent.message_received', 10, {
+        agentId: 'agent-1',
+        direction: 'to_agent',
+        source: 'user',
+      }),
+    )
+    expect(next.agentRuntimeById['agent-1']?.channelReply).toBeUndefined()
+  })
+})
+
 // ─── Pipeline / review reducers ───────────────────────────────────────────────
 
 describe('applyEventReducer — review/pipeline events', () => {

@@ -51,6 +51,8 @@ import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
+import { emitChannelReply } from '../agent-runtime.js';
+
 /**
  * Resolve the per-agent ID from env. Tests import this module to call the
  * exported helpers (pushChannelNotification, getSocketPath, …) and must NOT
@@ -174,9 +176,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (request.params.name !== 'channel_reply') {
     throw new Error(`Unknown tool: ${request.params.name}`);
   }
-  return handleChannelReplyCall(request.params.arguments ?? {}, resolveAgentIdOrExit(), async () => {
-    // PAN-986 bead 1 only defines the MCP surface and validates payloads.
-    // Bead 2 wires accepted replies into the dashboard runtime event stream.
+  const agentId = resolveAgentIdOrExit();
+  return handleChannelReplyCall(request.params.arguments ?? {}, agentId, async (reply) => {
+    const ok = await emitChannelReply(agentId, reply);
+    if (!ok) {
+      throw new Error('Failed to emit channel_reply into agent runtime event stream');
+    }
   });
 });
 

@@ -66,6 +66,24 @@ describe('PAN-800 bodyToEvent + DomainEvent decode', () => {
     expect((ev as any).type).toBe('agent.resolution_changed')
   })
 
+  it('channel_reply → agent.channel_reply', () => {
+    const ev = bodyToEvent(
+      AGENT,
+      {
+        kind: 'channel_reply',
+        reply: {
+          kind: 'needs_input',
+          summary: 'Need user answer',
+          artifactRefs: [{ uri: 'file:///tmp/question.md', label: 'question' }],
+        },
+      },
+      TS,
+    )
+    const decoded = decodeCandidate(ev)!
+    expect(decoded._tag).toBe('Success')
+    expect((ev as any).type).toBe('agent.channel_reply')
+  })
+
   it('current_issue_set → agent.current_issue_set', () => {
     const ev = bodyToEvent(AGENT, { kind: 'current_issue_set', currentIssue: 'PAN-800' }, TS)
     const decoded = decodeCandidate(ev)!
