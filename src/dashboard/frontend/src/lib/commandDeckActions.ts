@@ -302,8 +302,6 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
 
   // ── Artifacts / planning (always present, demoted to secondary) ───────────
   if (input.hasBeads || input.hasPlan) secondary.push('beads');
-  if (input.hasPlan) secondary.push('vbrief');
-  secondary.push('state', 'prd');
   if (input.hasInference) secondary.push('inference');
   if (input.hasDiscussions) secondary.push('discussions');
   if (input.hasTranscripts) secondary.push('transcripts');

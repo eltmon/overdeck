@@ -1097,8 +1097,6 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
       >
         {(
           [
-            ['prd', 'View PRD'],
-            ['vbrief', 'View vBRIEF'],
             ['beads', 'View Beads'],
             ['costs', 'View Costs'],
             ['activity', 'View Activity'],
