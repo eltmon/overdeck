@@ -1572,7 +1572,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
  * - Specialists: When queued work arrives
  * - Work agents: When message is sent via /work-tell
  */
-export async function resumeAgent(agentId: string, message?: string): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
+export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
   logAgentLifecycle(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'})`);
 
@@ -1654,7 +1654,11 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     // Clear ready signal before resuming (clean slate for PAN-87 fix)
     clearReadySignal(normalizedId);
 
-    const model = agentState.model || 'claude-sonnet-4-6';
+    const model = opts?.model || agentState.model || 'claude-sonnet-4-6';
+    if (opts?.model && opts.model !== agentState.model) {
+      agentState.model = opts.model;
+      saveAgentState(agentState);
+    }
     const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
       model,
@@ -1715,6 +1719,110 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
       success: false,
       error: `Failed to resume agent: ${msg}`
     };
+  }
+}
+
+export interface RestartAgentOptions {
+  model?: string;
+  graceful?: boolean;
+  message?: string;
+}
+
+export async function restartAgent(
+  agentId: string,
+  opts: RestartAgentOptions = {},
+): Promise<{ success: boolean; error?: string }> {
+  const normalizedId = normalizeAgentId(agentId);
+  const { graceful = true, model: newModel, message } = opts;
+
+  const agentState = getAgentState(normalizedId);
+  if (!agentState) {
+    return { success: false, error: `Agent ${normalizedId} not found` };
+  }
+  if (!agentState.workspace || !existsSync(agentState.workspace)) {
+    return { success: false, error: `Agent workspace missing: ${agentState.workspace}` };
+  }
+
+  logAgentLifecycle(normalizedId, `restartAgent called (graceful=${graceful}, model=${newModel || 'unchanged'})`);
+
+  if (graceful && await sessionExistsAsync(normalizedId)) {
+    const warning = 'Restarting in 30s. Update .pan/continue.json now with all progress, decisions, hazards, and resume point.';
+    try {
+      await sendKeysAsync(normalizedId, warning);
+    } catch { /* non-fatal — session may already be dead */ }
+
+    await new Promise(r => setTimeout(r, 30_000));
+
+    const continueFile = join(agentState.workspace, '.pan', 'continue.json');
+    if (existsSync(continueFile)) {
+      const mtime = statSync(continueFile).mtimeMs;
+      const ageMs = Date.now() - mtime;
+      if (ageMs > 5 * 60 * 1000) {
+        console.warn(`[restartAgent] continue.json is stale (${Math.round(ageMs / 1000)}s old) — proceeding anyway`);
+      }
+    }
+  }
+
+  await stopAgentAsync(normalizedId);
+
+  const effectiveModel = newModel || agentState.model || 'claude-sonnet-4-6';
+  if (newModel && newModel !== agentState.model) {
+    agentState.model = newModel;
+  }
+  agentState.status = 'starting';
+  saveAgentState(agentState);
+
+  try {
+    clearReadySignal(normalizedId);
+
+    const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
+      agentId: normalizedId,
+      model: effectiveModel,
+      workspace: agentState.workspace,
+      agentType: 'work',
+      isPlanning: agentState.phase === 'planning',
+    });
+
+    const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
+    writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
+    const claudeCmd = `bash ${launcherScript}`;
+
+    await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {
+      env: {
+        ...BLANKED_PROVIDER_ENV,
+        TERM: 'xterm-256color',
+        PANOPTICON_AGENT_ID: normalizedId,
+        PANOPTICON_ISSUE_ID: agentState.issueId || '',
+        PANOPTICON_SESSION_TYPE: agentState.phase || 'implementation',
+        CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
+        GIT_SEQUENCE_EDITOR: 'false',
+        ...providerEnv,
+      },
+    });
+
+    const prompt = message || `You are resuming work on ${agentState.issueId}. Read .pan/continue.json for context and pick up where you left off.`;
+    const ready = await waitForReadySignal(normalizedId, 30);
+    if (ready) {
+      await new Promise(r => setTimeout(r, 500));
+      await sendKeysAsync(normalizedId, prompt);
+    } else {
+      console.error(`[restartAgent] Claude did not become ready within 30s for ${normalizedId}`);
+    }
+
+    markAgentRunning(agentState);
+    saveAgentState(agentState);
+
+    await saveAgentRuntimeState(normalizedId, {
+      state: 'active',
+      lastActivity: new Date().toISOString(),
+    });
+
+    logAgentLifecycle(normalizedId, `restartAgent SUCCESS: model=${effectiveModel}`);
+    return { success: true };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logAgentLifecycle(normalizedId, `restartAgent FAILED: ${msg}`);
+    return { success: false, error: `Failed to restart agent: ${msg}` };
   }
 }
 
