@@ -1,0 +1,28 @@
+{
+  "version": "1",
+  "issueId": "PAN-954",
+  "created": "2026-05-07T04:40:00Z",
+  "updated": "2026-05-07T04:40:00Z",
+  "gitState": { "branch": "feature/pan-954", "sha": "9d2700e6f", "dirty": false },
+  "decisions": [
+    { "id": "D1", "summary": "Use existing CommandDeck queries (useActivityQuery, usePrQuery) in InspectorPanel to share cache and avoid duplicate backend work.", "recordedAt": "2026-05-07T04:40:00Z" },
+    { "id": "D2", "summary": "Port reviewer summary, test cycle counter, PR status, last activity, session count, and pipeline stuck banner from OverviewTab to InspectorPanel. Keep inspector compact — use condensed layouts.", "recordedAt": "2026-05-07T04:40:00Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "InspectorPanel is rendered in a narrow slide-out. Adding too much content could make it unwieldy.", "mitigation": "Keep new sections compact. Use horizontal layouts where possible. Only show reviewer summary when data exists." },
+    { "id": "H2", "summary": "Activity query polling could be expensive if many inspectors are open.", "mitigation": "Shared QueryClient cache means only one fetch per issue regardless of how many components query it. Use same query keys as OverviewTab." }
+  ],
+  "resumePoint": {
+    "description": "Implementing bead workspace-n99r — add last activity timestamp and session count to InspectorPanel. Need to import useActivityQuery from CommandDeck tabs and display last activity + session count in the inspector header or agent info section.",
+    "beadId": "workspace-n99r",
+    "filesToRead": [
+      "src/dashboard/frontend/src/components/InspectorPanel.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts"
+    ]
+  },
+  "beadsMapping": {},
+  "agentModel": "kimi-k2.6",
+  "sessionHistory": [
+    { "timestamp": "2026-05-07T04:40:00Z", "reason": "start", "note": "Started implementation of PAN-954. No prior continue file. Created 6 beads based on issue checklist and initialized planning artifacts.", "agentModel": "kimi-k2.6" }
+  ]
+}
