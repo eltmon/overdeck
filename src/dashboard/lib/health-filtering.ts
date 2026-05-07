@@ -3,7 +3,8 @@
  * Determines which agents should be visible in health checks
  */
 
-import { readFileSync, existsSync } from 'fs';
+import { existsSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { loadCloisterConfig } from '../../lib/cloister/config.js';
 import { capturePaneAsync, sessionExistsAsync } from '../../lib/tmux.js';
 
@@ -34,37 +35,44 @@ export async function checkAgentHealthAsync(agentId: string): Promise<{
 /**
  * Determine health status based on activity
  * Returns null if agent should be hidden (completed/stopped/no state.json)
+ *
+ * `liveSessions` is REQUIRED — pass the result of `getAgentSessionsAsync()`
+ * fetched once per request. Iterating ~150 agent dirs and spawning a tmux
+ * subprocess per agent (sessionExistsAsync + capturePaneAsync) was pinning
+ * the dashboard process at 100% CPU on every 5s `/api/health/agents` poll.
+ * State is also read before the tmux check so stopped/completed/missing
+ * agents short-circuit without any extra work.
  */
 export async function determineHealthStatusAsync(
   agentId: string,
-  stateFile: string
+  stateFile: string,
+  liveSessions: Set<string>
 ): Promise<{ status: 'healthy' | 'warning' | 'stuck' | 'dead'; reason?: string } | null> {
-  const health = await checkAgentHealthAsync(agentId);
-
-  // Read state.json for config (status) and runtime.json for heartbeat (lastActivity)
+  // 1. Read state.json first — most agents are stopped/completed and exit here.
   let agentStatus: string | undefined;
   let lastActivity: Date | null = null;
 
-  if (existsSync(stateFile)) {
-    try {
-      const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
-      agentStatus = state.status;
-      // Legacy: lastActivity may still be in state.json
-      lastActivity = state.lastActivity ? new Date(state.lastActivity) : null;
-    } catch {
-      // Silently ignore corrupted state.json - treat as missing/test artifact
-      // Agent will be excluded from health checks
-    }
+  if (!existsSync(stateFile)) return null;
+
+  try {
+    const state = JSON.parse(await readFile(stateFile, 'utf-8'));
+    agentStatus = state.status;
+    lastActivity = state.lastActivity ? new Date(state.lastActivity) : null;
+  } catch {
+    // Corrupted state.json — treat as missing
+    return null;
   }
 
-  // Check runtime.json for more recent lastActivity (hooks write here now)
+  if (!agentStatus) return null;
+  if (agentStatus === 'stopped' || agentStatus === 'completed') return null;
+
+  // 2. Pull more recent lastActivity from runtime.json if present (hooks write here).
   const runtimeFile = stateFile.replace('state.json', 'runtime.json');
   if (existsSync(runtimeFile)) {
     try {
-      const runtime = JSON.parse(readFileSync(runtimeFile, 'utf-8'));
+      const runtime = JSON.parse(await readFile(runtimeFile, 'utf-8'));
       if (runtime.lastActivity) {
         const runtimeDate = new Date(runtime.lastActivity);
-        // Use whichever is more recent
         if (!lastActivity || runtimeDate > lastActivity) {
           lastActivity = runtimeDate;
         }
@@ -74,38 +82,23 @@ export async function determineHealthStatusAsync(
     }
   }
 
-  // No tmux session - check state.json to determine if crash or intentional
-  if (!health.alive) {
-    // No state.json or corrupted - exclude (test artifact or corrupted)
-    if (!agentStatus) {
-      return null;
-    }
+  // 3. Check tmux liveness against the prefetched set — no per-agent subprocess.
+  const alive = liveSessions.has(agentId);
 
-    // Intentionally stopped or completed - exclude
-    if (agentStatus === 'stopped' || agentStatus === 'completed') {
-      return null;
-    }
-
-    // Status is "running" or "in_progress" but no tmux — check staleness
-    // Only report as "dead" if the agent was active recently
-    // Older stale state files are hidden to avoid cluttering the health view
+  if (!alive) {
+    // Status says running but no tmux session — only report 'dead' if recent.
     const cloisterConfig = loadCloisterConfig();
     const stalenessHours = cloisterConfig.retention?.health_staleness_hours ?? 24;
     const STALE_THRESHOLD_MS = stalenessHours * 60 * 60 * 1000;
     if (lastActivity) {
       const ageMs = Date.now() - lastActivity.getTime();
-      if (ageMs > STALE_THRESHOLD_MS) {
-        return null; // Stale — hide from health view
-      }
+      if (ageMs > STALE_THRESHOLD_MS) return null;
     } else {
-      // No lastActivity at all — ancient state file, hide it
       return null;
     }
-
     return { status: 'dead', reason: 'Agent crashed unexpectedly' };
   }
 
-  // Tmux session exists - check activity based on lastActivity
   if (lastActivity) {
     const ageMs = Date.now() - lastActivity.getTime();
     const ageMinutes = ageMs / (1000 * 60);

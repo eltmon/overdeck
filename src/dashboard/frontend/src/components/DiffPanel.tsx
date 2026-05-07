@@ -25,6 +25,7 @@ import {
 } from 'react'
 import { cn } from '../lib/utils'
 import { useTheme } from '../hooks/useTheme'
+import { useDiffPreferences } from '../hooks/useDiffPreferences'
 import { parseDiffRouteSearch } from '../lib/diffRouteSearch'
 import { buildPatchCacheKey, resolveDiffThemeName } from '../lib/diffRendering'
 import type { TurnDiffFileChange, TurnDiffSummary } from './chat/chat-types'
@@ -32,7 +33,6 @@ import { DiffPanelLoadingState, DiffPanelShell, type DiffPanelMode } from './Dif
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type DiffRenderMode = 'stacked' | 'split'
 type DiffThemeType = 'light' | 'dark'
 
 const DIFF_PANEL_UNSAFE_CSS = `
@@ -298,8 +298,9 @@ export function DiffPanel({
   diffUrlPrefix,
 }: DiffPanelProps) {
   const { resolvedTheme } = useTheme()
-  const [diffRenderMode, setDiffRenderMode] = useState<DiffRenderMode>('stacked')
-  const [diffWordWrap, setDiffWordWrap] = useState(false)
+  const { prefs: diffPrefs, update: updateDiffPrefs } = useDiffPreferences()
+  const diffRenderMode = diffPrefs.diffRenderMode
+  const diffWordWrap = diffPrefs.diffWordWrap
   const patchViewportRef = useRef<HTMLDivElement>(null)
   const turnStripRef = useRef<HTMLDivElement>(null)
   const [canScrollTurnStripLeft, setCanScrollTurnStripLeft] = useState(false)
@@ -594,21 +595,21 @@ export function DiffPanel({
       <div className="flex shrink-0 items-center gap-1">
         <ToggleButton
           pressed={diffRenderMode === 'stacked'}
-          onPressedChange={() => setDiffRenderMode('stacked')}
+          onPressedChange={() => updateDiffPrefs({ diffRenderMode: 'stacked' })}
           ariaLabel="Stacked diff view"
         >
           <Rows3 className="size-3" />
         </ToggleButton>
         <ToggleButton
           pressed={diffRenderMode === 'split'}
-          onPressedChange={() => setDiffRenderMode('split')}
+          onPressedChange={() => updateDiffPrefs({ diffRenderMode: 'split' })}
           ariaLabel="Split diff view"
         >
           <Columns2 className="size-3" />
         </ToggleButton>
         <ToggleButton
           pressed={diffWordWrap}
-          onPressedChange={setDiffWordWrap}
+          onPressedChange={(v) => updateDiffPrefs({ diffWordWrap: v })}
           ariaLabel={diffWordWrap ? 'Disable diff line wrapping' : 'Enable diff line wrapping'}
           title={diffWordWrap ? 'Disable line wrapping' : 'Enable line wrapping'}
         >
@@ -692,9 +693,16 @@ export function DiffPanel({
                     <FileDiff
                       fileDiff={fileDiff}
                       options={{
-                        diffStyle: diffRenderMode === 'split' ? 'split' : 'unified',
-                        lineDiffType: 'word-alt',
-                        overflow: diffWordWrap ? 'wrap' : 'scroll',
+                        diffStyle: diffPrefs.diffRenderMode === 'split' ? 'split' : 'unified',
+                        lineDiffType: diffPrefs.lineDiffType,
+                        overflow: diffPrefs.diffWordWrap ? 'wrap' : 'scroll',
+                        diffIndicators: diffPrefs.diffIndicators,
+                        hunkSeparators: diffPrefs.hunkSeparators,
+                        expandUnchanged: diffPrefs.expandUnchanged,
+                        collapsedContextThreshold: diffPrefs.collapsedContextThreshold,
+                        lineHoverHighlight: diffPrefs.lineHoverHighlight,
+                        disableLineNumbers: diffPrefs.disableLineNumbers,
+                        enableLineSelection: diffPrefs.enableLineSelection,
                         theme: resolveDiffThemeName(resolvedTheme),
                         themeType: resolvedTheme as DiffThemeType,
                         unsafeCSS: DIFF_PANEL_UNSAFE_CSS,
