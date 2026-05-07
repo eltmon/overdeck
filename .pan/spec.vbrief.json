@@ -400,7 +400,7 @@
       {
         "id": "pi-runtime-adapter",
         "title": "src/lib/runtimes/pi.ts implements AgentRuntime for Pi",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-07T04:10:00.000Z",
         "metadata": {
@@ -414,7 +414,7 @@
           {
             "id": "pi-runtime-adapter.ac1",
             "title": "PiRuntime is registered in getGlobalRegistry() alongside ClaudeCodeRuntime and getRuntime('pi') returns it",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -422,7 +422,7 @@
           {
             "id": "pi-runtime-adapter.ac2",
             "title": "spawnAgent({harness:'pi',...}) creates the fifo, writes the launcher script, starts a tmux session, and resolves only after ready.json is detected (with a 30s timeout that throws a PiSpawnTimeout error)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -430,7 +430,7 @@
           {
             "id": "pi-runtime-adapter.ac3",
             "title": "sendMessage(agentId, text) writes a single {\"cmd\":\"prompt\",\"text\":...} JSONL line to the fifo and resolves after the write completes; sendMessage before ready.json exists rejects with PiNotReady",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -438,7 +438,7 @@
           {
             "id": "pi-runtime-adapter.ac4",
             "title": "getHeartbeat(agentId) returns a Heartbeat sourced from the heartbeat file when fresh (<60s old), falls back to JSONL mtime when stale, falls back to tmux activity when JSONL is missing",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -446,7 +446,7 @@
           {
             "id": "pi-runtime-adapter.ac5",
             "title": "getSessionCost(agentId) returns a CostBreakdown derived from parsePiSession on the agent's active Pi session file",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

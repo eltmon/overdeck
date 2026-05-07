@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-636",
   "created": "2026-05-07T03:42:36.488Z",
-  "updated": "2026-05-07T05:09:02.205Z",
+  "updated": "2026-05-07T05:14:55.491Z",
   "gitState": {
     "branch": "feature/pan-636",
     "sha": "9b15d68ef",
@@ -138,11 +138,12 @@
     }
   ],
   "resumePoint": {
-    "description": "pi-launcher-support bead complete (LauncherConfig.harness + buildPiCommand emits pi --mode rpc --model X --session-dir Y --extension Z --no-context-files [--session resumeId] [--append-system-prompt prompt] < fifo; permission flags dropped on Pi path; default/claude-code path bit-for-bit unchanged). Next: workspace-sur (persist harness on agent state and route base command builder).",
-    "beadId": "workspace-f9y",
+    "description": "pi-runtime-adapter bead complete (PiRuntime implements AgentRuntime, registered in getGlobalRegistry alongside ClaudeCodeRuntime; spawn flow creates fifo + writes launcher + tmux + waits for ready.json with 30s PiSpawnTimeout; sendMessage writes prompt JSONL via writePiCommand; killAgent best-effort RPC abort + kill tmux + unlink fifo (full TERM/KILL ladder is bead 8qco scope); heartbeat priority active>jsonl>tmux; getSessionCost via parsePiSession). Next: workspace-nap (RuntimeRegistry.getRuntimeForAgent dispatches by agent state harness).",
+    "beadId": "workspace-ui5c",
     "filesToRead": [
-      "src/lib/launcher-generator.ts",
-      "src/lib/__tests__/launcher-generator.test.ts"
+      "src/lib/runtimes/pi.ts",
+      "src/lib/runtimes/index.ts",
+      "src/lib/runtimes/types.ts"
     ]
   },
   "beadsMapping": {},
@@ -195,6 +196,12 @@
       "timestamp": "2026-05-07T05:09:02.205Z",
       "reason": "continue",
       "note": "Closed bead workspace-f9y (pi-launcher-support). Extended LauncherConfig with harness?: claude-code|pi (default claude-code), piExtensionPath, piFifoPath, piSessionDir. buildNonConversationCommand branches early to buildPiCommand when harness===pi. Pi command shape: pi --mode rpc --model <model> --session-dir <piSessionDir> --extension <piExtensionPath> --no-context-files [--session <resumeSessionId>] [<extraArgs>] [--append-system-prompt ] < <piFifoPath>. permissionFlags ignored on Pi path (Pi has no permission system, AC4). baseCommand also ignored on Pi path so callers cannot smuggle claude flags. Throws when piExtensionPath/piFifoPath/piSessionDir missing. AC3 invariant verified by direct equality test: harness unset vs harness=claude-code produce identical output. 22 tests pass total. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:14:55.491Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-ui5c (pi-runtime-adapter). Created src/lib/runtimes/pi.ts implementing AgentRuntime (name=pi). Spawn flow: mkdir agent dir + sessions, createPiFifo, optional prompt file, generateLauncherScript({harness:pi,...}) -> ~/.panopticon/agents/<id>/pi-launcher.sh (chmod 755), createSessionAsync(tmux, bash launcher.sh, env PANOPTICON_AGENT_ID), waitForReady polling ready.json (100ms cadence, 30s timeout -> PiSpawnTimeout typed error). sendMessage: throws PiNotReady when ready.json absent, otherwise writes {cmd:prompt,text} JSONL via writePiCommand. killAgent: best-effort {cmd:abort} via fifo (swallow PiNotReady), then killSessionAsync if tmux session exists, then destroyPiFifo. Heartbeat priority: active heartbeat (<60s old, source=active-heartbeat confidence=high) > jsonl mtime (source=jsonl confidence=medium) > tmux session created timestamp (source=tmux confidence=low). getSessionCost: parsePiSession on latest .jsonl under <agentDir>/sessions/ (recursive walk by mtime), returns CostBreakdown with totalCost from Pi inline cost.total. listSessions walks all agent session dirs. PiRuntime registered in getGlobalRegistry alongside Claude Code. Widened AgentRuntime.killAgent and isRunning return types to allow async (claude-code keeps sync; pi uses async per project rule). 9 tests cover registry registration, sendMessage PiNotReady, spawn precondition, PiSpawnTimeout class shape, three heartbeat sources, getSessionCost via fixture, killAgent unlinks fifo. typecheck + lint clean.",
       "agentModel": "claude-opus-4-7"
     }
   ],

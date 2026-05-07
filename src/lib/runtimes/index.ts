@@ -7,6 +7,7 @@
 
 export * from './types.js';
 export { ClaudeCodeRuntime, createClaudeCodeRuntime } from './claude-code.js';
+export { PiRuntime, createPiRuntime, PiSpawnTimeout } from './pi.js';
 
 import type {
   AgentRuntime,
@@ -15,6 +16,7 @@ import type {
 } from './types.js';
 import { getAgentState } from '../agents.js';
 import { createClaudeCodeRuntime } from './claude-code.js';
+import { createPiRuntime } from './pi.js';
 
 /**
  * Runtime registry implementation
@@ -76,10 +78,9 @@ export function getGlobalRegistry(): RuntimeRegistry {
   if (!globalRegistry) {
     globalRegistry = new RuntimeRegistry();
 
-    // Register Claude Code runtime by default
+    // Register Claude Code (default) and Pi runtimes (PAN-636).
     globalRegistry.register(createClaudeCodeRuntime());
-
-    // Claude Code is the sole supported runtime
+    globalRegistry.register(createPiRuntime());
   }
   return globalRegistry;
 }
