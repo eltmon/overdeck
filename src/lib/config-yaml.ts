@@ -1236,3 +1236,12 @@ export function getProjectConfigPath(): string | null {
   }
   return join(projectRoot, '.pan.yaml');
 }
+
+/**
+ * Returns whether the experimental Claude Code Channels prompt-delivery flag
+ * is enabled. Resolves via loadConfig() so the value reflects merged global,
+ * project, and env-var sources at the moment of the call.
+ */
+export function isClaudeCodeChannelsEnabled(): boolean {
+  return loadConfig().config.experimental.claudeCodeChannels;
+}
