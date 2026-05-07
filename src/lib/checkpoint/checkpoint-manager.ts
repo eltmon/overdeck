@@ -282,10 +282,10 @@ export async function deleteAllCheckpoints(cwd: string): Promise<void> {
  * Uses `git diff main...HEAD` (three-dot) to show changes on the
  * feature branch since it diverged from main.
  */
-export async function diffAgainstMain(cwd: string): Promise<string> {
-  const { stdout } = await execFileAsync('git', [
-    'diff', '--patch', '--minimal', '--no-color', 'main...HEAD',
-  ], { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
+export async function diffAgainstMain(cwd: string, filePath?: string): Promise<string> {
+  const args = ['diff', '--patch', '--minimal', '--no-color', 'main...HEAD']
+  if (filePath) args.push('--', filePath)
+  const { stdout } = await execFileAsync('git', args, { cwd, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
   return stdout
 }
 

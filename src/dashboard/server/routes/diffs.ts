@@ -163,14 +163,16 @@ const getFullDiffRoute = HttpRouter.add(
 
         const firstTurn = checkpoints[0]
         const lastTurn = checkpoints[checkpoints.length - 1]
-        const diff = await diffCheckpoints(workspace, firstTurn, lastTurn)
+        const url = new URL(request.url, 'http://localhost')
+        const filePath = url.searchParams.get('file') ?? undefined
         const files = await diffCheckpointFiles(workspace, firstTurn, lastTurn)
+        const diff = filePath ? await diffCheckpoints(workspace, firstTurn, lastTurn, filePath) : undefined
 
         return jsonResponse({
           agentId,
           fromTurnId: firstTurn,
           toTurnId: lastTurn,
-          diff,
+          ...(diff !== undefined && { diff }),
           files,
           turnCount: checkpoints.length,
         })
@@ -213,10 +215,12 @@ const getVsMainDiffRoute = HttpRouter.add(
           return jsonResponse({ error: 'Agent has no workspace' }, { status: 400 })
         }
 
-        const diff = await diffAgainstMain(workspace)
+        const url = new URL(request.url, 'http://localhost')
+        const filePath = url.searchParams.get('file') ?? undefined
         const files = await diffAgainstMainFiles(workspace)
+        const diff = filePath ? await diffAgainstMain(workspace, filePath) : undefined
 
-        return jsonResponse({ agentId, diff, files })
+        return jsonResponse({ agentId, ...(diff !== undefined && { diff }), files })
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error)
         console.error('[diffs] get vs-main diff failed:', msg)
