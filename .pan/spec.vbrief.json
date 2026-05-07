@@ -210,7 +210,7 @@
       {
         "id": "define-merge-agent",
         "title": "Create pan-merge-agent.md definition",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T02:30:00.000Z",
         "metadata": {
@@ -224,7 +224,7 @@
           {
             "id": "define-merge-agent.ac1",
             "title": "pan-merge-agent.md exists with correct frontmatter and merge-role description",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
