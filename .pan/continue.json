@@ -94,12 +94,18 @@
       "reason": "bead-close",
       "note": "Closed bead workspace-o99 (update-launcher-tests). Added 6 new test cases asserting --agent flag pass-through in launcher scripts: work-agent (Anthropic, no --model/no permission flags), work-agent (non-Anthropic with --model override), planning-agent, resume-agent (--agent + --resume), specialist-dispatch (--agent pan-review-agent), and --agent + --name combined. All 24 tests pass (18 existing inline snapshots untouched + 6 new). Tests treat baseCommand as opaque, so they validate behavior independently of getAgentRuntimeBaseCommand() changes — they will continue to pass after the modify-base-command bead alters that helper.",
       "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T03:14:00.000Z",
+      "reason": "bead-close",
+      "note": "Closed bead workspace-c6q (named-sessions). Added optional agentName parameter to getAgentRuntimeBaseCommand() that emits '--name <agentName>'. Wired all 4 spawn callsites (work agent at line ~1100, fallback restart at ~1450, recovery at ~1811, resume at ~1670) to pass the normalized agentId. claudish wrapper path skipped because --name is not passed through by claudish. The resume path uses extraArgs rather than getAgentRuntimeBaseCommand because it constructs baseCommand inline. Typecheck passes; all 24 launcher-generator tests still pass.",
+      "agentModel": "agent:claude-opus-4-7"
     }
   ],
   "resumePoint": {
-    "description": "Bead workspace-o99 closed; awaiting inspection result via pan tell. Next ready bead per bd ready: workspace-hik (specialist dispatch), workspace-l71 (migrate hooks), workspace-c6q (named sessions), workspace-d7n (sync deploy). Plan-logical order says agent definition beads (workspace-59m work, 0mb planning, xev review, gy5 test, s0a inspect, atf uat, 8is merge) must come first because they are the source files referenced by --agent flags. Bd dependency graph is inverted relative to plan edges, so bd ready returns leaf beads instead of root beads — work in plan-logical order regardless of bd ready.",
-    "beadId": "workspace-o99",
-    "filesToRead": [".pan/spec.vbrief.json", "src/lib/agents.ts:102", "src/lib/launcher-generator.ts", "~/.claude/settings.json"]
+    "description": "Bead workspace-c6q closed (named sessions). Following bd ready strict order per user instruction. Remaining ready beads: workspace-hik (specialist dispatch --agent), workspace-l71 (migrate hooks to per-agent frontmatter), workspace-d7n (sync deploy agent definitions). Five additional ready beads will become available after closing one of those — the bead dep graph appears inverted but bd ready is the source of truth. Next: claim workspace-hik or workspace-l71. workspace-l71 requires creating .claude/agents/pan-*.md definitions (work, planning, review, test, inspect, uat, merge) — multiple prior Write attempts to .claude/agents/ were user-rejected, indicating user wants a different ordering or pattern for those files; check feedback before retrying.",
+    "beadId": "workspace-c6q",
+    "filesToRead": [".pan/spec.vbrief.json", "src/lib/agents.ts:102", "src/lib/cloister/specialists.ts:1090", "~/.claude/settings.json"]
   },
   "feedback": []
 }

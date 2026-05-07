@@ -506,7 +506,7 @@
       {
         "id": "named-sessions",
         "title": "Add --name flag to agent spawn for human-readable session names",
-        "status": "pending",
+        "status": "completed",
         "priority": "low",
         "created": "2026-05-07T02:30:00.000Z",
         "metadata": {
@@ -520,7 +520,7 @@
           {
             "id": "named-sessions.ac1",
             "title": "Spawned agents have --name <agentId> in their launch command",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -528,7 +528,7 @@
           {
             "id": "named-sessions.ac2",
             "title": "claude --resume <agentId> can find and resume the session by name",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
