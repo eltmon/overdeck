@@ -21,7 +21,9 @@ describe('work-agent-stop-hook structured channel replies', () => {
   let heartbeatLog: string
   let tmuxLog: string
   let claudeLog: string
+  let curlLog: string
   let runtimeJson: string
+  let hookScriptPath: string
 
   beforeEach(() => {
     tempRoot = mkdtempSync(join(tmpdir(), 'pan986-stop-hook-'))
@@ -30,17 +32,39 @@ describe('work-agent-stop-hook structured channel replies', () => {
     heartbeatLog = join(tempRoot, 'heartbeat.log')
     tmuxLog = join(tempRoot, 'tmux.log')
     claudeLog = join(tempRoot, 'claude.log')
+    curlLog = join(tempRoot, 'curl.log')
     runtimeJson = join(tempRoot, 'runtime.json')
+    hookScriptPath = join(tempRoot, 'work-agent-stop-hook')
 
     mkdirSync(homeDir, { recursive: true })
     mkdirSync(mockBin, { recursive: true })
     mkdirSync(join(homeDir, '.panopticon', 'agents', AGENT_ID), { recursive: true })
+
+    writeFileSync(hookScriptPath, readFileSync(SCRIPT_PATH, 'utf-8'), 'utf-8')
+    chmodSync(hookScriptPath, 0o755)
+    writeExecutable(
+      join(tempRoot, 'pan-hook-lib.sh'),
+      `#!/bin/bash
+set +e
+PAN_DASHBOARD_URL="\${PANOPTICON_DASHBOARD_URL:-http://127.0.0.1:3000}"
+pan_resolve_agent_id() {
+  AGENT_ID="\${PANOPTICON_AGENT_ID:-}"
+  [ -n "$AGENT_ID" ]
+}
+pan_emit_event() {
+  local agent_id="$1"
+  local body="$2"
+  curl -s -m 0.5 -X POST "$PAN_DASHBOARD_URL/api/agents/$agent_id/heartbeat" --data "$body" >/dev/null 2>&1
+}
+`,
+    )
 
     writeExecutable(
       join(mockBin, 'curl'),
       `#!/bin/bash
 set -euo pipefail
 args="$*"
+printf '%s\n' "$args" >> "$MOCK_CURL_LOG"
 if [[ "$args" == *"/runtime"* ]]; then
   cat "$MOCK_RUNTIME_JSON"
   exit 0
@@ -111,7 +135,7 @@ exit 99
       'utf-8',
     )
 
-    await execFileAsync('bash', [SCRIPT_PATH], {
+    await execFileAsync('bash', [hookScriptPath], {
       env: {
         ...process.env,
         HOME: homeDir,
@@ -122,6 +146,7 @@ exit 99
         MOCK_HEARTBEAT_LOG: heartbeatLog,
         MOCK_TMUX_LOG: tmuxLog,
         MOCK_CLAUDE_LOG: claudeLog,
+        MOCK_CURL_LOG: curlLog,
       },
       timeout: 10_000,
     })
@@ -141,5 +166,22 @@ exit 99
     expect(readFileSync(heartbeatLog, 'utf-8')).toContain('"resolution":"needs_input"')
     expect(existsSync(tmuxLog)).toBe(false)
     expect(existsSync(claudeLog)).toBe(false)
+  })
+
+  it('normalizes structured reply summaries before writing hooks.log', async () => {
+    await runHook('done', 'Line 1\n\t[31mLine 2[0m\rFORGED')
+
+    const hooksLog = readFileSync(join(homeDir, '.panopticon', 'logs', 'hooks.log'), 'utf-8')
+    expect(hooksLog).toContain('summary=Line 1 Line 2 FORGED')
+    expect(hooksLog).not.toContain('\n\t[31m')
+  })
+
+  it('reuses fetched runtime snapshot when emitting structured reply resolution', async () => {
+    await runHook('done', 'Implementation complete')
+
+    const runtimeRequests = readFileSync(curlLog, 'utf-8')
+      .split('\n')
+      .filter(line => line.includes('/runtime'))
+    expect(runtimeRequests).toHaveLength(1)
   })
 })

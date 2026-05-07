@@ -183,6 +183,25 @@ describe('applyEventReducer — runtime events', () => {
     )
     expect(next.agentRuntimeById['agent-1']?.channelReply).toBeUndefined()
   })
+
+  it('agent.stopped clears stale channel reply for restarted agents', () => {
+    const withReply = applyEventReducer(
+      emptyState,
+      makeEvent('agent.channel_reply', 11, {
+        agentId: 'agent-1',
+        reply: { kind: 'done', summary: 'Implementation complete', artifactRefs: [] },
+      }),
+    )
+    const next = applyEventReducer(
+      withReply,
+      makeEvent('agent.stopped', 12, {
+        agentId: 'agent-1',
+        issueId: 'PAN-1',
+      }),
+    )
+    expect(next.agentRuntimeById['agent-1']?.activity).toBe('stopped')
+    expect(next.agentRuntimeById['agent-1']?.channelReply).toBeUndefined()
+  })
 })
 
 // ─── Pipeline / review reducers ───────────────────────────────────────────────

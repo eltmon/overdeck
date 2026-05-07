@@ -98,6 +98,22 @@ fi
 # that can silently fail under load and reset the ratchet to count=1.
 RESOLUTION_CACHE="$AGENT_STATE_DIR/last-resolution.tsv"
 RESOLUTION_LOCK="$AGENT_STATE_DIR/last-resolution.lock"
+MAX_CHANNEL_REPLY_SUMMARY_LENGTH=4096
+
+normalize_log_text() {
+  python3 - "$1" "$MAX_CHANNEL_REPLY_SUMMARY_LENGTH" <<'PY'
+import re
+import sys
+
+text = sys.argv[1]
+limit = int(sys.argv[2])
+text = text.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+text = re.sub(r'\x1B\[[0-?]*[ -/]*[@-~]', '', text)
+text = ''.join(ch for ch in text if ch >= ' ')
+text = re.sub(r'\s+', ' ', text).strip()
+print(text[:limit], end='')
+PY
+}
 
 # Read last-emitted resolution from local cache. Echoes "resolution count"
 # (space-separated) or empty string if cache missing/unreadable.
@@ -130,6 +146,7 @@ write_cached_resolution() {
 # dashboard only if no local cache exists (first emit for this agent).
 emit_resolution() {
   local resolution="$1"
+  local bootstrap_snapshot="${2:-}"
   local prev_resolution="" prev_count=0 prev_source=""
   local cached
   cached=$(read_cached_resolution)
@@ -138,13 +155,18 @@ emit_resolution() {
     prev_count=$(echo "$cached" | awk '{print $2}')
     prev_source="cache"
   else
-    # No local cache — bootstrap from dashboard snapshot if available.
-    local snap
-    snap=$(curl -s -m 0.5 "$PAN_DASHBOARD_URL/api/agents/$AGENT_ID/runtime" 2>/dev/null || echo "")
+    # No local cache — bootstrap from structured reply snapshot when available,
+    # otherwise fall back to the dashboard snapshot.
+    local snap="$bootstrap_snapshot"
+    if [ -z "$snap" ]; then
+      snap=$(curl -s -m 0.5 "$PAN_DASHBOARD_URL/api/agents/$AGENT_ID/runtime" 2>/dev/null || echo "")
+      prev_source="dashboard"
+    else
+      prev_source="structured_snapshot"
+    fi
     if [ -n "$snap" ] && command -v jq >/dev/null 2>&1; then
       prev_resolution=$(echo "$snap" | jq -r '.snapshot.resolution // ""' 2>/dev/null || echo "")
       prev_count=$(echo "$snap" | jq -r '.snapshot.resolutionCount // 0' 2>/dev/null || echo "0")
-      prev_source="dashboard"
     else
       prev_source="none"
     fi
@@ -224,16 +246,17 @@ handle_structured_channel_reply() {
   snap=$(curl -s -m 0.5 "$PAN_DASHBOARD_URL/api/agents/$AGENT_ID/runtime" 2>/dev/null || echo "")
   [ -z "$snap" ] && return 1
 
-  local reply_kind reply_summary
+  local reply_kind reply_summary normalized_reply_summary
   reply_kind=$(echo "$snap" | jq -r '.snapshot.channelReply.kind // ""' 2>/dev/null || echo "")
   [ -z "$reply_kind" ] && return 1
   reply_summary=$(echo "$snap" | jq -r '.snapshot.channelReply.summary // ""' 2>/dev/null || echo "")
+  normalized_reply_summary=$(normalize_log_text "$reply_summary")
 
   case "$reply_kind" in
     done)
-      echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID using structured channel_reply kind=done summary=$reply_summary" \
+      echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID using structured channel_reply kind=done summary=$normalized_reply_summary" \
         >> "$LOG_DIR/hooks.log" 2>/dev/null || true
-      emit_resolution "done"
+      emit_resolution "done" "$snap"
       date +%s > "$NUDGE_FILE" 2>/dev/null || true
       nudge_agent "You reported completion via channel_reply. If your implementation is complete, you MUST run this command now:
 
@@ -243,9 +266,9 @@ If you still have remaining tasks, continue working on them. Do NOT stop until a
       return 0
       ;;
     needs_input)
-      echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID using structured channel_reply kind=needs_input summary=$reply_summary" \
+      echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID using structured channel_reply kind=needs_input summary=$normalized_reply_summary" \
         >> "$LOG_DIR/hooks.log" 2>/dev/null || true
-      emit_resolution "needs_input"
+      emit_resolution "needs_input" "$snap"
       return 0
       ;;
     *)

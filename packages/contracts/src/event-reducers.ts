@@ -216,6 +216,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
               currentTool: undefined,
               thinking: undefined,
               waiting: undefined,
+              channelReply: undefined,
               lastActivity: event.timestamp,
               updatedAtSequence: event.sequence,
             },

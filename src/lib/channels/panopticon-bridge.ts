@@ -49,7 +49,18 @@ import {
 import { chmod, mkdir, unlink, appendFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+import {
+  CHANNEL_REPLY_KIND_VALUES,
+  MAX_CHANNEL_REPLY_ARTIFACT_LABEL_LENGTH,
+  MAX_CHANNEL_REPLY_ARTIFACT_REFS,
+  MAX_CHANNEL_REPLY_ARTIFACT_URI_LENGTH,
+  MAX_CHANNEL_REPLY_SUMMARY_LENGTH,
+  normalizeChannelReplyPayload,
+  type ChannelReplyArtifactRef as ContractChannelReplyArtifactRef,
+} from '@panctl/contracts';
 
 import { emitChannelReply } from '../agent-runtime.js';
 
@@ -91,13 +102,9 @@ const INSTRUCTIONS = [
   'entries when you want the dashboard to link to specific files or artefacts.',
 ].join('\n');
 
-export const CHANNEL_REPLY_KINDS = ['status', 'done', 'needs_input'] as const;
+export const CHANNEL_REPLY_KINDS = CHANNEL_REPLY_KIND_VALUES;
 export type ChannelReplyKind = (typeof CHANNEL_REPLY_KINDS)[number];
-
-export interface ChannelReplyArtifactRef {
-  uri: string;
-  label?: string;
-}
+export type ChannelReplyArtifactRef = ContractChannelReplyArtifactRef;
 
 export interface ChannelReplyPayload {
   kind: ChannelReplyKind;
@@ -126,16 +133,26 @@ export const CHANNEL_REPLY_TOOL: Tool = {
       },
       summary: {
         type: 'string',
+        maxLength: MAX_CHANNEL_REPLY_SUMMARY_LENGTH,
         description: 'Terse human-readable status summary for the orchestrator and dashboard.',
       },
       artifactRefs: {
         type: 'array',
+        maxItems: MAX_CHANNEL_REPLY_ARTIFACT_REFS,
         description: 'Optional artefact references such as file:// paths, PR URLs, or log URLs.',
         items: {
           type: 'object',
           properties: {
-            uri: { type: 'string', description: 'URI or absolute path for the related artefact.' },
-            label: { type: 'string', description: 'Optional short display label for the artefact.' },
+            uri: {
+              type: 'string',
+              maxLength: MAX_CHANNEL_REPLY_ARTIFACT_URI_LENGTH,
+              description: 'URI or absolute path for the related artefact.',
+            },
+            label: {
+              type: 'string',
+              maxLength: MAX_CHANNEL_REPLY_ARTIFACT_LABEL_LENGTH,
+              description: 'Optional short display label for the artefact.',
+            },
           },
           required: ['uri'],
         },
@@ -201,6 +218,17 @@ export function getBridgeLogPath(agentId: string): string {
   return join(getPanopticonHome(), 'logs', `bridge-${agentId}.log`);
 }
 
+const preparedBridgeLogDirs = new Set<string>();
+
+async function ensureBridgeLogDir(agentId: string): Promise<void> {
+  const logDir = dirname(getBridgeLogPath(agentId));
+  if (preparedBridgeLogDirs.has(logDir)) {
+    return;
+  }
+  await mkdir(logDir, { recursive: true });
+  preparedBridgeLogDirs.add(logDir);
+}
+
 export interface ChannelPushPayload {
   content: string;
   meta?: Record<string, string>;
@@ -212,53 +240,8 @@ export interface ChannelPushResult {
   body: unknown;
 }
 
-function isChannelReplyKind(value: unknown): value is ChannelReplyKind {
-  return typeof value === 'string' && CHANNEL_REPLY_KINDS.includes(value as ChannelReplyKind);
-}
-
 export function validateChannelReplyPayload(payload: unknown): AcceptedChannelReply {
-  if (payload === null || typeof payload !== 'object') {
-    throw new Error('channel_reply payload must be an object');
-  }
-
-  const source = payload as {
-    kind?: unknown;
-    summary?: unknown;
-    artifactRefs?: unknown;
-  };
-
-  if (!isChannelReplyKind(source.kind)) {
-    throw new Error('channel_reply.kind must be one of: status, done, needs_input');
-  }
-  if (typeof source.summary !== 'string' || source.summary.trim().length === 0) {
-    throw new Error('channel_reply.summary must be a non-empty string');
-  }
-  if (source.artifactRefs !== undefined && !Array.isArray(source.artifactRefs)) {
-    throw new Error('channel_reply.artifactRefs must be an array when provided');
-  }
-
-  const artifactRefs = (source.artifactRefs ?? []).map((item, index) => {
-    if (item === null || typeof item !== 'object') {
-      throw new Error(`channel_reply.artifactRefs[${index}] must be an object`);
-    }
-    const ref = item as { uri?: unknown; label?: unknown };
-    if (typeof ref.uri !== 'string' || ref.uri.trim().length === 0) {
-      throw new Error(`channel_reply.artifactRefs[${index}].uri must be a non-empty string`);
-    }
-    if (ref.label !== undefined && typeof ref.label !== 'string') {
-      throw new Error(`channel_reply.artifactRefs[${index}].label must be a string when provided`);
-    }
-    return {
-      uri: ref.uri,
-      ...(typeof ref.label === 'string' ? { label: ref.label } : {}),
-    };
-  });
-
-  return {
-    kind: source.kind,
-    summary: source.summary.trim(),
-    artifactRefs,
-  };
+  return normalizeChannelReplyPayload(payload, 'channel_reply');
 }
 
 export async function handleChannelReplyCall(
@@ -268,6 +251,7 @@ export async function handleChannelReplyCall(
 ): Promise<CallToolResult> {
   const reply = validateChannelReplyPayload(payload);
   await sink(reply);
+  await ensureBridgeLogDir(agentId);
   await appendBridgeLog(agentId, {
     direction: 'outbound',
     kind: reply.kind,
@@ -317,6 +301,7 @@ export async function pushChannelNotification(
     },
   });
 
+  await ensureBridgeLogDir(agentId);
   await appendBridgeLog(agentId, {
     direction: 'inbound',
     contentLength: content.length,
@@ -333,7 +318,6 @@ async function appendBridgeLog(
     | { direction: 'outbound'; kind: ChannelReplyKind; summaryLength: number; artifactCount: number },
 ): Promise<void> {
   const logPath = getBridgeLogPath(agentId);
-  await mkdir(dirname(logPath), { recursive: true });
   const line = JSON.stringify({
     ts: new Date().toISOString(),
     agentId,
@@ -402,6 +386,7 @@ async function startUnixListener(mcp: Server, agentId: string): Promise<UnixHttp
 
 async function main(): Promise<void> {
   const agentId = resolveAgentIdOrExit();
+  await ensureBridgeLogDir(agentId);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
@@ -430,12 +415,14 @@ async function main(): Promise<void> {
 
 // Entrypoint: only run when invoked directly. Tests import the module to
 // inspect the server instance without spawning the transport.
-const isDirectInvocation =
-  typeof import.meta.url === 'string' &&
-  Boolean(process.argv[1]) &&
-  import.meta.url === new URL(`file://${process.argv[1]}`).href;
+export function isDirectInvocation(importMetaUrl: string, argvPath: string | undefined): boolean {
+  if (typeof importMetaUrl !== 'string' || !argvPath) {
+    return false;
+  }
+  return importMetaUrl === pathToFileURL(resolve(argvPath)).href;
+}
 
-if (isDirectInvocation) {
+if (isDirectInvocation(import.meta.url, process.argv[1])) {
   main().catch((err) => {
     process.stderr.write(
       `panopticon-bridge: fatal error during MCP server startup: ${err instanceof Error ? err.message : String(err)}\n`,

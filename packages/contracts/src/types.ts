@@ -101,8 +101,19 @@ export const WaitingState = Schema.Struct({
 })
 export type WaitingState = typeof WaitingState.Type
 
-export const ChannelReplyKind = Schema.Literals(["status", "done", "needs_input"])
+export const CHANNEL_REPLY_KIND_VALUES = ["status", "done", "needs_input"] as const
+export const MAX_CHANNEL_REPLY_SUMMARY_LENGTH = 4 * 1024
+export const MAX_CHANNEL_REPLY_ARTIFACT_REFS = 20
+export const MAX_CHANNEL_REPLY_ARTIFACT_URI_LENGTH = 512
+export const MAX_CHANNEL_REPLY_ARTIFACT_LABEL_LENGTH = 512
+const CHANNEL_REPLY_ARTIFACT_URI_PATTERN = /^(?:file:\/\/|https:\/\/|\/)/
+
+export const ChannelReplyKind = Schema.Literals(CHANNEL_REPLY_KIND_VALUES)
 export type ChannelReplyKind = typeof ChannelReplyKind.Type
+
+export function isChannelReplyKind(value: unknown): value is ChannelReplyKind {
+  return typeof value === 'string' && CHANNEL_REPLY_KIND_VALUES.includes(value as ChannelReplyKind)
+}
 
 export const ChannelReplyArtifactRef = Schema.Struct({
   uri: Schema.String,
@@ -117,6 +128,97 @@ export const AgentChannelReply = Schema.Struct({
   reportedAt: Schema.String,
 })
 export type AgentChannelReply = typeof AgentChannelReply.Type
+
+export function normalizeChannelReplyPayload(
+  payload: unknown,
+  fieldPrefix = 'channel_reply',
+): {
+  kind: ChannelReplyKind
+  summary: string
+  artifactRefs: ChannelReplyArtifactRef[]
+} {
+  if (payload === null || typeof payload !== 'object') {
+    throw new Error(`${fieldPrefix} payload must be an object`)
+  }
+
+  const source = payload as {
+    kind?: unknown
+    summary?: unknown
+    artifactRefs?: unknown
+  }
+
+  if (!isChannelReplyKind(source.kind)) {
+    throw new Error(`${fieldPrefix}.kind must be one of: ${CHANNEL_REPLY_KIND_VALUES.join(', ')}`)
+  }
+
+  if (typeof source.summary !== 'string') {
+    throw new Error(`${fieldPrefix}.summary must be a non-empty string`)
+  }
+  const summary = source.summary.trim()
+  if (summary.length === 0) {
+    throw new Error(`${fieldPrefix}.summary must be a non-empty string`)
+  }
+  if (summary.length > MAX_CHANNEL_REPLY_SUMMARY_LENGTH) {
+    throw new Error(
+      `${fieldPrefix}.summary must be at most ${MAX_CHANNEL_REPLY_SUMMARY_LENGTH} characters`,
+    )
+  }
+
+  if (source.artifactRefs !== undefined && !Array.isArray(source.artifactRefs)) {
+    throw new Error(`${fieldPrefix}.artifactRefs must be an array when provided`)
+  }
+  const rawArtifactRefs = source.artifactRefs ?? []
+  if (rawArtifactRefs.length > MAX_CHANNEL_REPLY_ARTIFACT_REFS) {
+    throw new Error(
+      `${fieldPrefix}.artifactRefs must contain at most ${MAX_CHANNEL_REPLY_ARTIFACT_REFS} entries`,
+    )
+  }
+
+  const artifactRefs = rawArtifactRefs.map((item, index) => {
+    if (item === null || typeof item !== 'object') {
+      throw new Error(`${fieldPrefix}.artifactRefs[${index}] must be an object`)
+    }
+    const ref = item as { uri?: unknown; label?: unknown }
+    if (typeof ref.uri !== 'string') {
+      throw new Error(`${fieldPrefix}.artifactRefs[${index}].uri must be a non-empty string`)
+    }
+    const uri = ref.uri.trim()
+    if (uri.length === 0) {
+      throw new Error(`${fieldPrefix}.artifactRefs[${index}].uri must be a non-empty string`)
+    }
+    if (uri.length > MAX_CHANNEL_REPLY_ARTIFACT_URI_LENGTH) {
+      throw new Error(
+        `${fieldPrefix}.artifactRefs[${index}].uri must be at most ${MAX_CHANNEL_REPLY_ARTIFACT_URI_LENGTH} characters`,
+      )
+    }
+    if (!CHANNEL_REPLY_ARTIFACT_URI_PATTERN.test(uri)) {
+      throw new Error(
+        `${fieldPrefix}.artifactRefs[${index}].uri must start with file://, https://, or /`,
+      )
+    }
+
+    if (ref.label !== undefined && typeof ref.label !== 'string') {
+      throw new Error(`${fieldPrefix}.artifactRefs[${index}].label must be a string when provided`)
+    }
+    const label = typeof ref.label === 'string' ? ref.label.trim() : undefined
+    if (label !== undefined && label.length > MAX_CHANNEL_REPLY_ARTIFACT_LABEL_LENGTH) {
+      throw new Error(
+        `${fieldPrefix}.artifactRefs[${index}].label must be at most ${MAX_CHANNEL_REPLY_ARTIFACT_LABEL_LENGTH} characters`,
+      )
+    }
+
+    return {
+      uri,
+      ...(label ? { label } : {}),
+    }
+  })
+
+  return {
+    kind: source.kind,
+    summary,
+    artifactRefs,
+  }
+}
 
 export const AgentRuntimeSnapshot = Schema.Struct({
   id: AgentId,
