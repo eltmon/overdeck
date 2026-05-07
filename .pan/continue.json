@@ -2,8 +2,8 @@
   "version": "1",
   "issueId": "PAN-985",
   "created": "2026-05-07T03:42:01.126Z",
-  "updated": "2026-05-07T05:30:00.000Z",
-  "gitState": { "branch": "feature/pan-985", "sha": "97d4a122d", "dirty": true },
+  "updated": "2026-05-07T05:45:00.000Z",
+  "gitState": { "branch": "feature/pan-985", "sha": "28eb79602", "dirty": true },
   "decisions": [
     {
       "id": "D1",
@@ -99,9 +99,9 @@
     }
   ],
   "resumePoint": {
-    "description": "Bead workspace-ryjv complete (config schema for experimental.claudeCodeChannels added to src/lib/config-yaml.ts: YamlConfig.experimental, NormalizedConfig.experimental, DEFAULT_CONFIG defaults, init copy in load-merge, and merge-from-source block). Next bead: workspace-mnx3 — extend GET/POST /api/settings to read and persist the experimental.claudeCodeChannels flag through the same flow that already persists other settings to ~/.panopticon/config.yaml.",
-    "beadId": "workspace-mnx3",
-    "filesToRead": ["src/dashboard/server/routes/settings.ts", "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx", "src/lib/config-yaml.ts"]
+    "description": "Beads workspace-ryjv and workspace-mnx3 implemented in code. ryjv: experimental.claudeCodeChannels schema + isClaudeCodeChannelsEnabled helper in src/lib/config-yaml.ts. mnx3: ApiSettingsConfig.experimental added in src/lib/settings-api.ts; loadSettingsApi reads it (defensive fallback to false) and saveSettingsApi writes it through to YamlConfig.experimental; validateSettingsApi rejects non-boolean experimental.claudeCodeChannels with a 400-shaped error string consumed by the existing PUT /api/settings handler. settings-api.test.ts unchanged and passing. Next bead: workspace-sohg — add the Experimental section at the bottom of SettingsPage with the Claude Code Channels toggle wired through the same /api/settings PUT flow.",
+    "beadId": "workspace-sohg",
+    "filesToRead": ["src/dashboard/frontend/src/components/Settings/SettingsPage.tsx", "src/dashboard/frontend/src/components/Settings/__tests__/SettingsPage.test.ts"]
   },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
@@ -122,6 +122,12 @@
       "timestamp": "2026-05-07T05:30:00.000Z",
       "reason": "implementation",
       "note": "Resumed after system reboot. Resolved a stuck merge from the prior session (.pan/continue.json conflicted with PAN-979 content from main; took ours; bun.lock took theirs). Closed bead workspace-ryjv: added experimental.claudeCodeChannels boolean to the config schema (YamlConfig.experimental of type ExperimentalConfig and NormalizedConfig.experimental of type NormalizedExperimentalConfig, both new exports) and threaded it through DEFAULT_CONFIG, the init block in loadAndMergeConfigs, and the per-source merge so a config.yaml top-level experimental: { claudeCodeChannels: true } is read and surfaced at result.experimental.claudeCodeChannels. Default is false; flag is fully optional in YamlConfig but always defined and boolean in NormalizedConfig. tsc --noEmit passes with no new errors. Next: workspace-mnx3 to expose this flag through the dashboard /api/settings endpoint.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:45:00.000Z",
+      "reason": "implementation",
+      "note": "Implemented bead workspace-mnx3. Settings API (src/lib/settings-api.ts) now exposes the experimental block to consumers of GET/PUT /api/settings: ApiSettingsConfig has an optional experimental: { claudeCodeChannels?: boolean }; loadSettingsApi populates it with a defensive fallback to false (so partial test mocks of NormalizedConfig that do not set experimental still work); saveSettingsApi persists it into YamlConfig.experimental which the loader already understands; validateSettingsApi rejects non-boolean experimental.claudeCodeChannels with a clear error message that the existing PUT /api/settings handler returns as a 400. updateSettingsApi (the partial-merge path) also threads experimental so subsequent PUTs do not clobber an unrelated field. The route file (src/dashboard/server/routes/settings.ts) needs no changes because it already pipes body → validate → save through the helpers. Existing tests/lib/settings-api.test.ts passes 29/29 with 2 skipped, no test code changed. tsc --noEmit clean. Beads ryjv and mnx3 still cannot bd close because the bead graph dependency direction (ryjv DEPENDS ON clbj, mnx3, ufzv) requires those to close first; will close all beads at the end after the deeper dependents land. Next: workspace-sohg, the Experimental section UI on SettingsPage.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],
