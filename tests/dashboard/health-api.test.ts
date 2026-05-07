@@ -146,7 +146,7 @@ describe('health-api', () => {
         const result = await determineHealthStatusAsync(
           agentName,
           join(agentDir, 'state.json'),
-        activeSessions
+          activeSessions
         );
 
         expect(result).not.toBeNull();
@@ -167,7 +167,7 @@ describe('health-api', () => {
         const result = await determineHealthStatusAsync(
           agentName,
           join(agentDir, 'state.json'),
-        activeSessions
+          activeSessions
         );
 
         expect(result).not.toBeNull();
@@ -188,7 +188,7 @@ describe('health-api', () => {
         const result = await determineHealthStatusAsync(
           agentName,
           join(agentDir, 'state.json'),
-        activeSessions
+          activeSessions
         );
 
         expect(result).not.toBeNull();
