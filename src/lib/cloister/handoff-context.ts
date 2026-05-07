@@ -16,6 +16,7 @@ import { resolveProjectFromIssue } from '../projects.js';
 import { resolveVBriefDir } from '../vbrief/lifecycle.js';
 import { readContinueState, type ContinueState } from '../vbrief/continue-state.js';
 import { readWorkspaceContinue } from '../pan-dir/index.js';
+import { withBdMutex } from '../bd-mutex.js';
 
 const execAsync = promisify(exec);
 

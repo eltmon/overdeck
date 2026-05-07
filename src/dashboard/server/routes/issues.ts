@@ -30,7 +30,7 @@ import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { withBdMutex } from '../utils/bd-mutex.js';
+import { withBdMutex } from '../../../lib/bd-mutex.js';
 
 import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';

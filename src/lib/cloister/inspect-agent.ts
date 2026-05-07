@@ -19,6 +19,7 @@ import {
 } from './inspect-checkpoints.js';
 import { spawnEphemeralSpecialist, type SpecialistType } from './specialists.js';
 import { setReviewStatus } from '../review-status.js';
+import { withBdMutex } from '../bd-mutex.js';
 
 const execAsync = promisify(exec);
 

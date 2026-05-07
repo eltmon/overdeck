@@ -15,6 +15,7 @@ import { promisify } from 'util';
 import type { AgentHealth } from './health.js';
 import type { CloisterConfig } from './config.js';
 import { loadCloisterConfig } from './config.js';
+import { withBdMutex } from '../bd-mutex.js';
 
 const execAsync = promisify(exec);
 
@@ -256,9 +257,9 @@ export async function checkTaskCompletion(
 
   // Check for closed implementation task
   try {
-    const { stdout: output } = await execAsync(`bd list --json -l ${issueId.toLowerCase()} --status closed`, {
+    const { stdout: output } = await withBdMutex(() => execAsync(`bd list --json -l ${issueId.toLowerCase()} --status closed`, {
       encoding: 'utf-8',
-    });
+    }));
     const tasks = JSON.parse(output);
     const implementTask = tasks.find((t: any) =>
       t.title.toLowerCase().includes('implement') ||
