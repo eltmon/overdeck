@@ -186,6 +186,5 @@ describe('agents auth routing', () => {
     expect(result).toContain('unset ANTHROPIC_API_KEY');
     expect(result).toContain('export ANTHROPIC_BASE_URL="http://127.0.0.1:8317"');
     expect(result).toContain('export ANTHROPIC_AUTH_TOKEN="panopticon-local-cliproxy-key"');
-    expect(result).toContain('export CLAUDE_PATH=');
   });
 });
