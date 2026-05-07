@@ -20,6 +20,7 @@ import {
   Box,
   Play,
   GitMerge,
+  GitPullRequest,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
@@ -41,7 +42,7 @@ import { PHASE_CHIP_COLORS, PHASE_LABELS, type PipelinePhase } from './inspector
 import { SwitchModelModal } from './SwitchModelModal';
 import { useSwitchModel } from '../hooks/useSwitchModel';
 import { SensitiveText } from './SensitiveText';
-import { useActivityQuery } from './CommandDeck/ZoneCOverviewTabs/queries';
+import { useActivityQuery, usePrQuery } from './CommandDeck/ZoneCOverviewTabs/queries';
 
 function formatCost(cost: number): string {
   if (cost >= 100) return `$${cost.toFixed(0)}`;
@@ -235,6 +236,10 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
 
   // Reviewer summary data
   const reviewerSections = sections.filter((s) => s.type === 'reviewer');
+
+  // PR query — shared cache with CommandDeck overview
+  const { data: prData } = usePrQuery(issueId);
+  const pr = prData?.pr;
 
   const startAgentMutation = useMutation({
     mutationFn: async (message?: string) => {
@@ -853,6 +858,39 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* PR link / status */}
+        {pr && (
+          <div className="px-3 py-2 border-b border-border text-xs">
+            <div className="uppercase tracking-wider text-[10px] mb-1.5 font-semibold text-muted-foreground">Pull Request</div>
+            <div className="flex items-center gap-1.5">
+              <GitPullRequest className="w-3 h-3 text-primary" />
+              <a href={pr.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 truncate text-[10px] font-medium">
+                #{pr.number} {pr.title}
+              </a>
+              <span className={`text-[10px] px-1 py-0.5 rounded ml-auto ${
+                pr.state === 'OPEN' ? 'bg-success/20 text-success' :
+                pr.state === 'MERGED' ? 'bg-primary/20 text-primary' :
+                'bg-muted-foreground/20 text-muted-foreground'
+              }`}>
+                {pr.state?.toLowerCase()}
+              </span>
+            </div>
+            {(pr.additions !== undefined || pr.deletions !== undefined || pr.changedFiles !== undefined) && (
+              <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+                {pr.additions !== undefined && pr.deletions !== undefined && (
+                  <span>+{pr.additions} -{pr.deletions}</span>
+                )}
+                {pr.changedFiles !== undefined && (
+                  <span>{pr.changedFiles} file{pr.changedFiles === 1 ? '' : 's'}</span>
+                )}
+                {pr.reviewDecision && (
+                  <span className="capitalize">{pr.reviewDecision.replace(/_/g, ' ')}</span>
+                )}
+              </div>
+            )}
           </div>
         )}
 
