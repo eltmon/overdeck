@@ -113,7 +113,9 @@ const getTurnDiffRoute = HttpRouter.add(
         }
 
         const fromTurnId = turnIdx > 0 ? checkpoints[turnIdx - 1] : turnId
-        const diff = await diffCheckpoints(workspace, fromTurnId, turnId)
+        const url = new URL(request.url, 'http://localhost')
+        const filePath = url.searchParams.get('file') ?? undefined
+        const diff = await diffCheckpoints(workspace, fromTurnId, turnId, filePath)
 
         return jsonResponse({ agentId, turnId, fromTurnId, diff })
       } catch (error: unknown) {
