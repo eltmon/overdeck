@@ -110,6 +110,8 @@ export interface SpawnPlanningOptions {
   shadowMode?: boolean;
   /** Optional model override — if omitted, the planning-agent setting is used. */
   model?: string;
+  /** Optional harness override (PAN-636). Defaults to 'claude-code'. */
+  harness?: 'claude-code' | 'pi';
   /** Optional effort level — controls how thorough the planning agent is. */
   effort?: 'low' | 'medium' | 'high';
   /** Optional callback for streaming progress events to the client. */
@@ -488,7 +490,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     await writeFeatureContext(workspacePath, issue);
 
-    const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel);
+    const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel, opts.harness ?? 'claude-code');
 
     const providerExports = await getProviderExportsForModel(planningModel);
 

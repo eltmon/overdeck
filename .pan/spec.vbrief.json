@@ -504,7 +504,7 @@
       {
         "id": "agent-state-harness",
         "title": "Persist harness on agent state and route base command builder",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-07T04:10:00.000Z",
         "metadata": {
@@ -518,7 +518,7 @@
           {
             "id": "agent-state-harness.ac1",
             "title": "AgentState carries a harness field; getAgentState/saveAgentState round-trip it through state.json",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -526,7 +526,7 @@
           {
             "id": "agent-state-harness.ac2",
             "title": "spawnAgent({harness:'pi',...}) records harness='pi' on state and the launcher uses Pi command lines",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -534,7 +534,7 @@
           {
             "id": "agent-state-harness.ac3",
             "title": "getAgentRuntimeBaseCommand has a (model, harness) signature; harness='claude-code' produces output identical to the pre-change implementation (snapshot test)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -542,7 +542,7 @@
           {
             "id": "agent-state-harness.ac4",
             "title": "All four call sites pass an explicit harness; vitest covers harness='pi' producing a `pi --mode rpc ...` command",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

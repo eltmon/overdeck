@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-636",
   "created": "2026-05-07T03:42:36.488Z",
-  "updated": "2026-05-07T05:18:30.116Z",
+  "updated": "2026-05-07T05:22:02.476Z",
   "gitState": {
     "branch": "feature/pan-636",
     "sha": "9b15d68ef",
@@ -138,12 +138,11 @@
     }
   ],
   "resumePoint": {
-    "description": "runtime-registry-dispatch bead complete (RuntimeRegistry.getRuntimeForAgent reads state.harness; pi -> pi runtime, claude-code|missing|legacy -> claude-code; 5 tests pass with vi.mock paths.js to redirect AGENTS_DIR). Next: workspace-sur (persist harness on AgentState; refactor getAgentRuntimeBaseCommand(model) -> (model, harness); update 4 call sites).",
-    "beadId": "workspace-nap",
+    "description": "agent-state-harness bead complete (AgentState carries harness?, SpawnOptions accepts harness with claude-code default, getAgentRuntimeBaseCommand(model, harness) — pi branch returns pi --mode rpc --model X, claude-code preserves pre-PAN-636 output bit-for-bit, all 4 call sites pass explicit harness). Next: workspace-pal (cloister specialist_models config extends with per-role harness) or workspace-anvh (ModelRouter.getSpecialistHarness helper) or workspace-sdf0 (resolveSpecialistBaseCommand) — these three are inter-related specialist routing beads.",
+    "beadId": "workspace-sur",
     "filesToRead": [
-      "src/lib/runtimes/index.ts",
-      "src/lib/runtimes/__tests__/registry-dispatch.test.ts",
-      "src/lib/agents.ts"
+      "src/lib/agents.ts",
+      "src/lib/planning/spawn-planning-session.ts"
     ]
   },
   "beadsMapping": {},
@@ -208,6 +207,12 @@
       "timestamp": "2026-05-07T05:18:30.116Z",
       "reason": "continue",
       "note": "Closed bead workspace-nap (runtime-registry-dispatch). Replaced hardcoded return this.get(claude-code) in getRuntimeForAgent with: read state.harness; pi -> this.get(pi); anything else (claude-code, missing, legacy unknown value) -> this.get(claude-code). AC4 audit: only one external getRuntime(claude-code) hit and it lives in the unit test (allowed by AC). 5 vitest cases register two stub runtimes via vi.mock(paths.js) -> /tmp tmp dir, write state.json fixtures, and assert dispatch on pi/claude-code/missing/legacy/no-state branches. typecheck + lint clean.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T05:22:02.476Z",
+      "reason": "continue",
+      "note": "Closed bead workspace-sur (agent-state-harness). Added harness?: claude-code|pi to AgentState (forward compat — readers default unset/legacy via getHarness). SpawnOptions accepts harness, defaults to claude-code in spawnAgent.state. Refactored getAgentRuntimeBaseCommand(model) -> (model, harness=claude-code default) — pi branch returns pi --mode rpc --model X (no permission flags), claude-code branch preserves the existing claude/claudish output bit-for-bit. Updated 4 call sites: agents.ts:1100/1450/1808 pass state.harness ?? claude-code; planning/spawn-planning-session.ts:491 takes opts.harness (added to SpawnPlanningOptions). Other call sites (review-agent, conversations, conversation-compaction) keep the default — those will be re-routed through resolveSpecialistBaseCommand by bead workspace-sdf0. 4 tests pass: default-vs-explicit equality (AC3), claude-code legacy output exact match, pi --mode rpc --model X (AC4), pi has no permission flags. typecheck + lint clean.",
       "agentModel": "claude-opus-4-7"
     }
   ],

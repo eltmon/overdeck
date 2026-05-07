@@ -99,7 +99,23 @@ export async function getLaunchModelForModel(model: string): Promise<string> {
   return getClaudishPrefix(model, await getProviderAuthMode(model));
 }
 
-export async function getAgentRuntimeBaseCommand(model: string): Promise<string> {
+/**
+ * Build the base command that the launcher will exec for an agent.
+ *
+ * `harness` was added in PAN-636. When omitted (or 'claude-code') the
+ * function preserves its pre-PAN-636 behavior bit-for-bit. When 'pi' it
+ * returns a `pi --mode rpc --model <model>` line; the launcher generator
+ * then layers --session-dir, --extension, --no-context-files, and the
+ * stdin-from-fifo redirect on top via generateLauncherScript.
+ */
+export async function getAgentRuntimeBaseCommand(
+  model: string,
+  harness: 'claude-code' | 'pi' = 'claude-code',
+): Promise<string> {
+  if (harness === 'pi') {
+    return `pi --mode rpc --model ${model}`;
+  }
+
   const provider = getProviderForModel(model);
   const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
   if (provider.compatibility === 'direct') {
@@ -352,6 +368,13 @@ export interface AgentState {
   issueId: string;
   workspace: string;
   runtime: string;
+  /**
+   * Coding-agent harness this agent runs under (PAN-636).
+   * Optional for forward compat with state.json files written before
+   * harness existed; readers must default unset/legacy values to
+   * 'claude-code' (see getHarness in @panctl/contracts).
+   */
+  harness?: 'claude-code' | 'pi';
   model: string;
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: string;
@@ -728,6 +751,8 @@ export interface SpawnOptions {
   issueId: string;
   workspace: string;
   runtime?: string;
+  /** Coding-agent harness (PAN-636). Defaults to 'claude-code' when omitted. */
+  harness?: 'claude-code' | 'pi';
   model?: string;
   prompt?: string;
   difficulty?: ComplexityLevel;
@@ -975,6 +1000,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     issueId: options.issueId,
     workspace: options.workspace,
     runtime: options.runtime || 'claude',
+    harness: options.harness ?? 'claude-code',
     model: selectedModel,
     status: 'starting',
     startedAt: new Date().toISOString(),
@@ -1097,7 +1123,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     setTerminalEnv: true,
     providerExports,
     cavemanExports,
-    baseCommand: await getAgentRuntimeBaseCommand(state.model),
+    baseCommand: await getAgentRuntimeBaseCommand(state.model, state.harness ?? 'claude-code'),
   });
   writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
   const claudeCmd = `bash ${launcherScript}`;
@@ -1447,7 +1473,10 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
       changeDir: false,
       setCi: true,
       providerExports,
-      baseCommand: await getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6'),
+      baseCommand: await getAgentRuntimeBaseCommand(
+        agentState.model || 'claude-sonnet-4-6',
+        agentState.harness ?? 'claude-code',
+      ),
     });
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
     await createSessionAsync(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
@@ -1805,7 +1834,7 @@ export async function recoverAgent(agentId: string): Promise<AgentState | null> 
   }
 
   // Restart the agent with recovery context (YOLO mode - skip permissions)
-  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model)} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
+  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model, state.harness ?? 'claude-code')} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
   createSession(normalizedId, state.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: normalizedId,
