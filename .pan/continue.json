@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-987",
   "created": "2026-05-07T18:25:44Z",
-  "updated": "2026-05-07T18:36:07Z",
+  "updated": "2026-05-07T18:39:30Z",
   "gitState": {
     "branch": "feature/pan-987",
-    "sha": "d0ef610ea",
+    "sha": "61ce3495f",
     "dirty": true
   },
   "decisions": [
@@ -28,6 +28,11 @@
       "id": "D4",
       "summary": "Drove the operator UI directly from event-sourced `channelPermissionRequestsById` state in the shared dashboard store, so the modal opens from the same snapshot and event stream data that the activity log and other panels consume instead of adding another polling channel.",
       "recordedAt": "2026-05-07T18:36:07Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Finished the feature with focused regression coverage on the real permission flow edges that can drift silently: request ordering in the selector, App-level allow submission, and App-level deny submission.",
+      "recordedAt": "2026-05-07T18:39:30Z"
     }
   ],
   "hazards": [
@@ -48,14 +53,12 @@
     }
   ],
   "resumePoint": {
-    "description": "Workspace-ksbv implementation is complete and locally verified. Next step: stage the new dashboard modal, store selector, App wiring, and tests; create one commit for workspace-ksbv; close the bead; then move to workspace-kmfs for any remaining end-to-end verification and cleanup.",
-    "beadId": "workspace-ksbv",
+    "description": "Workspace-kmfs is complete and locally verified. Next step: stage the final focused tests plus continue-state update, create one commit for workspace-kmfs, close the bead, then run the full repository quality gates before pushing and calling `pan done`.",
+    "beadId": "workspace-kmfs",
     "filesToRead": [
-      "src/dashboard/frontend/src/App.tsx",
-      "src/dashboard/frontend/src/lib/store.ts",
-      "src/dashboard/frontend/src/components/ChannelPermissionDialog.tsx",
       "src/dashboard/frontend/src/App.test.tsx",
-      "src/dashboard/frontend/src/components/ChannelPermissionDialog.test.tsx"
+      "src/dashboard/frontend/src/__tests__/store.test.ts",
+      ".pan/continue.json"
     ]
   },
   "beadsMapping": {
@@ -75,6 +78,12 @@
       "timestamp": "2026-05-07T18:36:07Z",
       "reason": "manual",
       "note": "Committed and closed workspace-g86b, then implemented workspace-ksbv by adding a dashboard permission modal, a selector for pending channel permission requests, App-level response handling to `/api/agents/:id/permissions/:requestId/respond`, and focused frontend tests covering rendering plus allow action submission.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T18:39:30Z",
+      "reason": "manual",
+      "note": "Finished workspace-kmfs by adding final regression coverage for deny submission and selector ordering, then re-ran the combined permission relay test suite across frontend, bridge, delivery, and contract reducers with typecheck green.",
       "agentModel": "claude-opus-4-7"
     }
   ],

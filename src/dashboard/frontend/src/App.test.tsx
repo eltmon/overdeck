@@ -324,4 +324,21 @@ describe('App channel permission requests', () => {
     expect(mockRefreshDashboardState).toHaveBeenCalledTimes(1)
     expect(mockToastSuccess).toHaveBeenCalledWith('Allowed agent-987 to continue')
   })
+
+  it('submits deny decisions for pending channel permission requests', async () => {
+    renderApp()
+
+    fireEvent.click(screen.getByText('Deny channel permission'))
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/agents/agent-987/permissions/perm-123/respond',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ behavior: 'deny' }),
+        }),
+      )
+    })
+    expect(mockToastSuccess).toHaveBeenCalledWith('Denied permission request for agent-987')
+  })
 })
