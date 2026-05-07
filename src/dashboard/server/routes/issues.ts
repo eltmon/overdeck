@@ -391,6 +391,9 @@ const getIssueAnalyzeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const linear = yield* LinearClient;
 
     const issue = yield* Effect.promise(() =>
@@ -475,6 +478,9 @@ const postIssueCloseRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
@@ -549,6 +555,9 @@ const postIssueStartPlanningRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
     const linear = yield* LinearClient;
@@ -793,6 +802,9 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const lifecycle = yield* IssueLifecycle;
     const linear = yield* LinearClient;
@@ -919,6 +931,9 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
     const linear = yield* LinearClient;
@@ -1221,6 +1236,9 @@ const postIssueAbortRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const eventStore = yield* EventStoreService;
 
     const result = yield* Effect.promise(() => runDestructiveIssueLifecycle(id, 'reset', { deleteWorkspace: true }));
@@ -1266,6 +1284,9 @@ const postIssueResetRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
@@ -1342,6 +1363,9 @@ const postIssueCancelRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
@@ -1377,6 +1401,9 @@ const postIssueReopenRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const lifecycle = yield* IssueLifecycle;
     const linear = yield* LinearClient;
@@ -1543,6 +1570,9 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const lifecycle = yield* IssueLifecycle;
     const eventStore = yield* EventStoreService;
     const issueLower = id.toLowerCase();
@@ -1769,6 +1799,9 @@ const postIssueMoveStatusRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
     const lifecycle = yield* IssueLifecycle;
@@ -2019,6 +2052,9 @@ const postIssueCopySettingsRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const githubCheck = isGitHubIssue(id);
     let projectPath = '';
@@ -2060,6 +2096,9 @@ const postIssueCloseOutRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const eventStore = yield* EventStoreService;
 
     const { closeOut } = yield* Effect.promise(() => import('../../../lib/lifecycle/index.js'));
@@ -2360,6 +2399,9 @@ const getIssueBeadsRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const issueLower = id.toLowerCase();
     const githubCheck = isGitHubIssue(id);
@@ -2479,6 +2521,9 @@ const getIssuePlanningStateRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const issueLower = id.toLowerCase();
 
     const githubCheck = isGitHubIssue(id);
@@ -2528,6 +2573,9 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const issueLower = id.toLowerCase();
 
     const githubCheck = isGitHubIssue(id);
@@ -2769,6 +2817,9 @@ const getIssuePrRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const result = yield* Effect.promise(() => fetchIssuePullRequest(id));
     return jsonResponse(result);
   })),
@@ -2780,6 +2831,9 @@ const getIssuePrDiffRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const result = yield* Effect.promise(() => fetchIssuePullRequestDiff(id));
     return jsonResponse(result);
   })),
@@ -2791,6 +2845,9 @@ const getIssuePrDetailsRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const result = yield* Effect.promise(() => fetchIssuePullRequestDetails(id));
     return jsonResponse(result);
   })),
@@ -3122,6 +3179,9 @@ const getIssueDiscussionsRoute = HttpRouter.add(
     const linear = yield* LinearClient;
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const linearGetIssueId = async (ref: string): Promise<string | null> => {
       try {
@@ -3159,6 +3219,9 @@ const getIssueCostsRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const issueData = getCostsForIssue(id);
     const agents = yield* Effect.promise(() => getCachedRunningAgents());
