@@ -60,7 +60,19 @@ describe('agents auth routing', () => {
         return { name: 'openai', displayName: 'OpenAI', compatibility: 'claudish', authType: 'env' };
       }
       if (model.startsWith('minimax-')) {
-        return { name: 'minimax', displayName: 'MiniMax', compatibility: 'direct', authType: 'static' };
+        return { name: 'minimax', displayName: 'MiniMax', compatibility: 'claudish', authType: 'static' };
+      }
+      if (model.startsWith('kimi-')) {
+        return { name: 'kimi', displayName: 'Kimi', compatibility: 'claudish', authType: 'static' };
+      }
+      if (model.startsWith('glm-')) {
+        return { name: 'zai', displayName: 'Z.AI', compatibility: 'claudish', authType: 'static' };
+      }
+      if (model.startsWith('mimo-')) {
+        return { name: 'mimo', displayName: 'MiMo', compatibility: 'claudish', authType: 'static' };
+      }
+      if (model.includes('/')) {
+        return { name: 'openrouter', displayName: 'OpenRouter', compatibility: 'claudish', authType: 'static' };
       }
       return { name: 'anthropic', displayName: 'Anthropic', compatibility: 'direct', authType: 'env' };
     });
@@ -113,9 +125,39 @@ describe('agents auth routing', () => {
     expect(getClaudishPrefix('gpt-5.4', 'subscription')).toBe('cx@gpt-5.4');
   });
 
-  it('launches MiniMax models directly through claude instead of claudish', async () => {
+  it('launches MiniMax models through claudish with mm@ prefix', async () => {
     expect(await getAgentRuntimeBaseCommand('minimax-m2.7')).toBe(
-      'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model minimax-m2.7'
+      'claudish -i --model mm@minimax-m2.7 --dangerously-skip-permissions --permission-mode bypassPermissions'
+    );
+  });
+
+  it('launches Kimi models through claudish with kimi@ prefix', async () => {
+    expect(await getAgentRuntimeBaseCommand('kimi-k2.6')).toBe(
+      'claudish -i --model kimi@kimi-k2.6 --dangerously-skip-permissions --permission-mode bypassPermissions'
+    );
+  });
+
+  it('launches Z.AI models through claudish with zai@ prefix', async () => {
+    expect(await getAgentRuntimeBaseCommand('glm-4.7')).toBe(
+      'claudish -i --model zai@glm-4.7 --dangerously-skip-permissions --permission-mode bypassPermissions'
+    );
+  });
+
+  it('launches OpenRouter models through claudish with or@ prefix', async () => {
+    expect(await getAgentRuntimeBaseCommand('qwen/qwen3.6-plus:free')).toBe(
+      'claudish -i --model or@qwen/qwen3.6-plus:free --dangerously-skip-permissions --permission-mode bypassPermissions'
+    );
+  });
+
+  it('launches Mimo models through claudish custom URL', async () => {
+    expect(await getAgentRuntimeBaseCommand('mimo-v2.5')).toBe(
+      'claudish -i --model https://token-plan-sgp.xiaomimimo.com/anthropic/mimo-v2.5 --dangerously-skip-permissions --permission-mode bypassPermissions'
+    );
+  });
+
+  it('passes --agent and --name through claudish for non-Anthropic providers', async () => {
+    expect(await getAgentRuntimeBaseCommand('kimi-k2.6', 'agent-pan-964', 'work')).toBe(
+      'claudish -i --model kimi@kimi-k2.6 --agent pan-work-agent --name agent-pan-964 --dangerously-skip-permissions --permission-mode bypassPermissions'
     );
   });
 
