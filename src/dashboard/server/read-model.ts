@@ -156,12 +156,21 @@ export const ReadModelServiceLive = Layer.effect(
     }
 
     function buildSnapshot(): DashboardSnapshot {
+      // turnDiffSummariesByAgentId is intentionally excluded from the snapshot.
+      //
+      // Per-agent checkpoint history can grow to thousands of turns × hundreds
+      // of files; in production we measured 484 MB across 44 agents, which the
+      // browser's WebSocket client rejects as "Max payload size exceeded" and
+      // closes the socket with code 1006 — leaving the kanban and command deck
+      // perpetually empty. The data is still maintained in `state` and served
+      // on-demand via GET /api/agents/:id/diffs, so chat-timeline components
+      // fetch it only for the agent the user is actually viewing.
       return {
         sequence: state.sequence,
         agents: Object.values(state.agentsById),
         specialists: Object.values(state.specialistsByName),
         reviewStatuses: Object.values(state.reviewStatusByIssueId),
-        turnDiffSummariesByAgentId: sanitizeTurnDiffs(state.turnDiffSummariesByAgentId),
+        turnDiffSummariesByAgentId: {},
         agentRuntimeById: state.agentRuntimeById,
         issues: state.issuesRaw,
         resources: state.resources ?? undefined,

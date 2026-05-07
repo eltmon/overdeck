@@ -12,7 +12,7 @@
  */
 
 import { Octokit } from '@octokit/rest';
-import { existsSync } from 'fs';
+import { existsSync, statSync } from 'fs';
 import { join } from 'path';
 import { mapGitHubStateToCanonical } from '../../../core/state-mapping.js';
 import { CacheService, DEFAULT_TTLS } from './cache-service.js';
@@ -119,8 +119,20 @@ function mapRallyStateToCanonical(issueState: string): string {
 
 /**
  * Compute planning-state for an issue via cheap filesystem checks.
- * No bd process, no dolt lock — just stat calls.
+ *
+ * `isPlanningComplete()` reads and JSON-parses the workspace's plan.vbrief.json
+ * file. Calling it for every issue on every getSnapshot — which happens once
+ * per WS-RPC bootstrap and then every emitted snapshot — would do 870+ sync
+ * disk reads per call and starve the dashboard event loop until WS clients
+ * timeout. Cache by plan-file mtime so the read happens at most once per file
+ * change.
  */
+interface PlanningStateCacheEntry {
+  result: { hasPlan: boolean; hasBeads: boolean; planningComplete: boolean; workspacePath: string };
+  planMtimeMs: number; // -1 when no plan file existed at compute time
+}
+const planningStateCache = new Map<string, PlanningStateCacheEntry>();
+
 function computePlanningState(identifier: string): {
   hasPlan: boolean;
   hasBeads: boolean;
@@ -138,14 +150,31 @@ function computePlanningState(identifier: string): {
     if (!existsSync(workspacePath)) {
       return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath };
     }
-    const hasPlan = findPlan(workspacePath) !== null;
-    // planningComplete now means "plan.status indicates planning has finished" —
-    // any of proposed/approved/pending/running/completed/blocked. Falls back to
-    // the legacy `.planning-complete` marker for vBRIEFs without status fields.
-    // It's the definitive signal for "tasks have been generated." No bd query.
+    const planPath = findPlan(workspacePath);
+
+    // Use the plan file's mtime as the cache key; -1 stands in for "no plan file".
+    let planMtimeMs = -1;
+    if (planPath) {
+      try {
+        planMtimeMs = statSync(planPath).mtimeMs;
+      } catch {
+        planMtimeMs = -1;
+      }
+    }
+
+    const cached = planningStateCache.get(identifier);
+    if (cached && cached.planMtimeMs === planMtimeMs && cached.result.workspacePath === workspacePath) {
+      return cached.result;
+    }
+
+    const hasPlan = planPath !== null;
+    // planningComplete reads the plan file — gated by the cache above so this
+    // only runs when the file actually changes.
     const planningComplete = isPlanningComplete(workspacePath);
     const hasBeads = planningComplete;
-    return { hasPlan, hasBeads, planningComplete, workspacePath };
+    const result = { hasPlan, hasBeads, planningComplete, workspacePath };
+    planningStateCache.set(identifier, { result, planMtimeMs });
+    return result;
   } catch {
     return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '' };
   }

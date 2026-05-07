@@ -262,10 +262,12 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
     return PanRpcGroup.of({
       // ── subscribeDomainEvents ────────────────────────────────────────────────
-      [WS_METHODS.subscribeDomainEvents]: (_input) =>
-        eventStore.streamEvents.pipe(
+      [WS_METHODS.subscribeDomainEvents]: (_input) => {
+        console.log('[ws-rpc] subscribeDomainEvents invoked');
+        return eventStore.streamEvents.pipe(
           Stream.map(storedToDomainEvent),
-        ),
+        );
+      },
 
       // ── subscribeTerminal — live PTY stream (B20) ────────────────────────────
       [WS_METHODS.subscribeTerminal]: (input) =>
@@ -289,7 +291,15 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
       // ── getSnapshot — returns clean read model data (PAN-433) ─────────────────
       [WS_METHODS.getSnapshot]: (_input) =>
-        readModel.getSnapshot.pipe(
+        Effect.gen(function* () {
+          const t0 = Date.now();
+          console.log('[ws-rpc] getSnapshot invoked');
+          const snapshot = yield* readModel.getSnapshot;
+          const issuesLen = Array.isArray(snapshot.issues) ? snapshot.issues.length : 'none';
+          const agentsLen = Array.isArray(snapshot.agents) ? snapshot.agents.length : 'none';
+          console.log(`[ws-rpc] getSnapshot resolved in ${Date.now() - t0}ms — agents=${agentsLen} issues=${issuesLen} seq=${snapshot.sequence}`);
+          return snapshot;
+        }).pipe(
           Effect.mapError(
             (cause) =>
               new PanRpcError({
