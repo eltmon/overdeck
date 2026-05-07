@@ -1,65 +1,33 @@
 {
   "version": "1",
-  "issueId": "PAN-974",
-  "created": "2026-05-06T19:10:06.291Z",
-  "updated": "2026-05-06T19:12:51.442Z",
-  "gitState": {
-    "branch": "feature/pan-974",
-    "sha": "503cb22b4",
-    "dirty": true
-  },
+  "issueId": "PAN-980",
+  "created": "2026-05-06T12:00:00Z",
+  "updated": "2026-05-06T12:00:00Z",
+  "gitState": { "branch": "feature/pan-980", "sha": "c78b413", "dirty": false },
   "decisions": [
-    {
-      "id": "D1",
-      "summary": "Session-tree slot support belongs in the server session discovery layer, not the React tree, because FeatureItem and SessionNode already render multiple per-issue sessions and route selection by sessionId.",
-      "recordedAt": "2026-05-06T19:10:06.291Z"
-    },
-    {
-      "id": "D2",
-      "summary": "Slot session JSONL lookup must derive the workspace path from the slot number so agent-pan-<issue>-<n> resolves against workspaces/feature-<issue>-slot-<n> instead of the base workspace.",
-      "recordedAt": "2026-05-06T19:10:06.291Z"
-    },
-    {
-      "id": "D3",
-      "summary": "Frontend agent output should normalize slot work session ids with the same base-issue pattern as the server so selecting agent-<issue>-<slot> keeps ActivityView bound to the parent issue while Terminal stays bound to the slot session.",
-      "recordedAt": "2026-05-06T19:12:51.442Z"
-    }
+    { "id": "D1", "summary": "Return 202 immediately for graceful restart and perform stop/relaunch async. 30s blocking HTTP handler would violate no-execsync-server rule and freeze the dashboard.", "recordedAt": "2026-05-06T12:00:00Z" },
+    { "id": "D2", "summary": "Restart creates a fresh session (no resumeSessionId), distinct from resume which continues existing session. buildAgentLaunchConfig supports both modes.", "recordedAt": "2026-05-06T12:00:00Z" },
+    { "id": "D3", "summary": "resumeAgent baseCommand: 'claude' is correct even for non-Anthropic models because ANTHROPIC_BASE_URL proxy handles routing. No latent bug to fix.", "recordedAt": "2026-05-06T12:00:00Z" },
+    { "id": "D4", "summary": "restart-all updated to call restartAgent() directly instead of POST /api/agents, preserving agent state rather than recreating.", "recordedAt": "2026-05-06T12:00:00Z" }
   ],
   "hazards": [
-    {
-      "id": "H1",
-      "summary": "Final UI verification must use the built dashboard server under Node 22, not Bun, or PTY-backed terminal behavior can fail independently of the PAN-974 code changes.",
-      "mitigation": "Run npm run build before browser verification and validate the dashboard through the Node 22 dist server path."
-    }
+    { "id": "H1", "summary": "RestartFromPlanButton already exists and does branch reset — new restart UI must not collide names", "mitigation": "Use 'Restart Agent' label, add to ZoneActionStrip as separate action" },
+    { "id": "H2", "summary": "restart-all semantics change from fresh spawn to in-place restart", "mitigation": "Preserves agentState, workspace, beads — more correct behavior" },
+    { "id": "H3", "summary": "switch-model endpoint already exists — restart with model should compose with or subsume it", "mitigation": "Restart endpoint handles model switch + restart atomically" }
   ],
   "resumePoint": {
-    "description": "Both PAN-974 beads are implemented. Next: run broader verification for the session-tree slot work, then build the dashboard, verify slot selection in the browser against the Node 22 server, and only then do the final push and pan done flow.",
-    "beadId": "workspace-52u",
-    "filesToRead": [
-      "src/dashboard/server/routes/projects.ts",
-      "src/dashboard/server/ws-rpc.ts",
-      "src/dashboard/frontend/src/components/AgentOutputPanel.tsx",
-      "src/dashboard/frontend/src/components/__tests__/AgentOutputPanel.test.tsx",
-      "src/dashboard/server/__tests__/swarm-slot-session-mapping.test.ts"
-    ]
+    "description": "Starting bead workspace-51t: Extract buildAgentLaunchConfig() shared helper from spawnAgent() and resumeAgent()",
+    "beadId": "workspace-51t",
+    "filesToRead": ["src/lib/agents.ts", "src/lib/launcher-generator.ts"]
   },
   "beadsMapping": {
-    "workspace-448": "Server-side slot session discovery, issue mapping, and slot workspace JSONL resolution",
-    "workspace-52u": "Frontend slot-aware issue/session handling and tests"
+    "workspace-51t": "Extract buildAgentLaunchConfig shared helper",
+    "workspace-3c9": "Add restartAgent function and model override to resumeAgent",
+    "workspace-hwq": "Add POST /api/agents/:id/restart endpoint and update restart-all",
+    "workspace-487": "Dashboard restart UI with model selector"
   },
-  "agentModel": "gpt-5.4",
+  "agentModel": "claude-opus-4-6",
   "sessionHistory": [
-    {
-      "timestamp": "2026-05-06T19:10:06.291Z",
-      "reason": "end",
-      "note": "Completed bead workspace-448 implementation by adding slot-aware session discovery in projects.ts, slot-aware tmux issue extraction in ws-rpc.ts, and focused regression tests.",
-      "agentModel": "gpt-5.4"
-    },
-    {
-      "timestamp": "2026-05-06T19:12:51.442Z",
-      "reason": "end",
-      "note": "Completed bead workspace-52u by making AgentOutputPanel derive the parent issue from slot session ids and adding focused derivation/render tests for swarm slot sessions.",
-      "agentModel": "gpt-5.4"
-    }
+    { "timestamp": "2026-05-06T12:00:00Z", "reason": "start", "note": "Fresh start. Read PRD, explored spawnAgent/resumeAgent/routes/frontend. Identified duplication and design decisions. Created 4 beads.", "agentModel": "claude-opus-4-6" }
   ]
 }
