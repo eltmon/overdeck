@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
 import { KanbanBoard } from './components/KanbanBoard';
@@ -9,6 +9,7 @@ import { SkillsList } from './components/SkillsList';
 import { ActivityPanel } from './components/ActivityPanel';
 import { AwaitingMergePage } from './components/AwaitingMergePage';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
+import { ChannelPermissionDialog } from './components/ChannelPermissionDialog';
 import { EventRouter } from './components/EventRouter';
 import { MetricsSummaryRow } from './components/MetricsSummaryRow';
 import { MetricsPage } from './components/MetricsPage';
@@ -36,8 +37,9 @@ import { SystemHealthPill } from './components/SystemHealthPill';
 import { CostWarningStyles } from './components/shared/costWarning';
 import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
-import { useDashboardStore, selectAgentList, selectIssues, selectDashboardLifecycle } from './lib/store';
-import { getIssueWorkAgents } from './lib/swarmSlots';
+import { useDashboardStore, selectAgentList, selectChannelPermissionRequests, selectIssues, selectDashboardLifecycle } from './lib/store';
+import { refreshDashboardState } from './lib/refresh-dashboard-state';
+import type { ClaudeChannelPermissionBehavior } from '@panctl/contracts';
 import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
 
 interface TrackerStatusItem {
@@ -194,6 +196,27 @@ async function respondToConfirmation(id: string, confirmed: boolean): Promise<vo
     body: JSON.stringify({ confirmed }),
   });
   if (!res.ok) throw new Error('Failed to respond to confirmation');
+}
+
+async function respondToChannelPermission(
+  agentId: string,
+  requestId: string,
+  behavior: ClaudeChannelPermissionBehavior,
+): Promise<void> {
+  const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/permissions/${encodeURIComponent(requestId)}/respond`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ behavior }),
+  });
+  if (res.ok) return;
+  let message = `Failed to respond to permission request (${res.status})`;
+  try {
+    const body = await res.json() as { error?: string };
+    if (body?.error) message = body.error;
+  } catch {
+    // Ignore invalid JSON bodies and fall back to the generic message.
+  }
+  throw new Error(message);
 }
 
 interface CliproxyStatus {
@@ -454,9 +477,13 @@ export default function App() {
   // Agents from Zustand store (event-sourced — no polling)
   // Cast to Agent[] since AgentSnapshot is a compatible subset for the fields used here
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
+  const channelPermissionRequests = useDashboardStore(selectChannelPermissionRequests);
 
   // Issues from Zustand store (event-sourced via snapshot — no polling)
   const issues = useDashboardStore(selectIssues) as unknown as Issue[];
+  const currentChannelPermissionRequest = channelPermissionRequests[0] ?? null;
+  const currentChannelPermissionIssueId = currentChannelPermissionRequest?.issueId
+    ?? agents.find((agent) => agent.id === currentChannelPermissionRequest?.agentId)?.issueId;
 
   // Poll for pending confirmations
   const { data: confirmations = [] } = useQuery({
@@ -501,15 +528,9 @@ export default function App() {
     }
   }, [agents]);
 
-  const selectedIssueWorkAgents = useMemo(
-    () => (selectedIssue ? getIssueWorkAgents(agents, selectedIssue) : []),
-    [agents, selectedIssue],
-  );
-
-  // Prefer grouped work sessions for the selected issue. Fall back to any issue-bound
-  // agent so planning-only issues still render their detail panel.
+  // Find the work agent for selected issue (agent-<id>, not planning-<id>)
   const selectedIssueAgent = selectedIssue
-    ? selectedIssueWorkAgents[0]
+    ? agents.find((a) => a.issueId?.toLowerCase() === selectedIssue.toLowerCase() && a.id.startsWith('agent-'))
       ?? agents.find((a) => a.issueId?.toLowerCase() === selectedIssue.toLowerCase())
       ?? null
     : null;
@@ -519,6 +540,29 @@ export default function App() {
     ? issues.find((i) => i.identifier.toLowerCase() === selectedIssue.toLowerCase())
     : null;
 
+
+  const channelPermissionResponseMutation = useMutation({
+    mutationFn: ({
+      agentId,
+      requestId,
+      behavior,
+    }: {
+      agentId: string;
+      requestId: string;
+      behavior: ClaudeChannelPermissionBehavior;
+    }) => respondToChannelPermission(agentId, requestId, behavior),
+    onSuccess: async (_data, variables) => {
+      await refreshDashboardState(queryClient);
+      toast.success(
+        variables.behavior === 'allow'
+          ? `Allowed ${variables.agentId} to continue`
+          : `Denied permission request for ${variables.agentId}`,
+      );
+    },
+    onError: (error: Error) => {
+      toast.error(`Permission response failed: ${error.message}`);
+    },
+  });
 
   const handleConfirm = useCallback(async () => {
     if (!currentConfirmation) return;
@@ -539,6 +583,24 @@ export default function App() {
       console.error('Failed to deny:', error);
     }
   }, [currentConfirmation]);
+
+  const handleAllowChannelPermission = useCallback(() => {
+    if (!currentChannelPermissionRequest) return;
+    channelPermissionResponseMutation.mutate({
+      agentId: currentChannelPermissionRequest.agentId,
+      requestId: currentChannelPermissionRequest.requestId,
+      behavior: 'allow',
+    });
+  }, [channelPermissionResponseMutation, currentChannelPermissionRequest]);
+
+  const handleDenyChannelPermission = useCallback(() => {
+    if (!currentChannelPermissionRequest) return;
+    channelPermissionResponseMutation.mutate({
+      agentId: currentChannelPermissionRequest.agentId,
+      requestId: currentChannelPermissionRequest.requestId,
+      behavior: 'deny',
+    });
+  }, [channelPermissionResponseMutation, currentChannelPermissionRequest]);
 
   const handleCloseConfirmation = useCallback(() => {
     setCurrentConfirmation(null);
@@ -774,7 +836,6 @@ export default function App() {
                   >
                     <DetailPanelLayout
                       agent={selectedIssueAgent ?? undefined}
-                      workAgents={selectedIssueWorkAgents}
                       issueId={selectedIssue}
                       issueUrl={selectedIssueData.url}
                       issue={selectedIssueData}
@@ -863,6 +924,15 @@ export default function App() {
         )}
         </main>
       </div>
+
+      <ChannelPermissionDialog
+        request={currentChannelPermissionRequest}
+        issueId={currentChannelPermissionIssueId}
+        isOpen={!!currentChannelPermissionRequest}
+        isSubmitting={channelPermissionResponseMutation.isPending}
+        onAllow={handleAllowChannelPermission}
+        onDeny={handleDenyChannelPermission}
+      />
 
       {/* Confirmation Dialog */}
       <ConfirmationDialog
