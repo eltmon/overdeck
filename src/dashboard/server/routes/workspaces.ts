@@ -2288,6 +2288,30 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
       );
     }
 
+    // Self-heal: if .devcontainer/ is missing for start/restart, re-render
+    // from the project template so docker compose can operate on containers.
+    if (!composeFile && ['start', 'restart'].includes(action)) {
+      const { ensureDevcontainer } = yield* Effect.promise(() =>
+        import('../../../lib/workspace/ensure-devcontainer.js')
+      );
+      const ensure = ensureDevcontainer({ workspacePath, issueId });
+      if (ensure.rendered) {
+        console.log(`[container-control] Re-rendered ${DEVCONTAINER_DIRNAME}/ from project template`);
+      }
+      // Re-scan for compose file after re-render
+      const composePaths = [
+        join(workspacePath, '.devcontainer/docker-compose.devcontainer.yml'),
+        join(workspacePath, 'docker-compose.yml'),
+        join(workspacePath, 'docker-compose.yaml'),
+      ];
+      for (const cp of composePaths) {
+        if (existsSync(cp)) {
+          composeFile = cp;
+          break;
+        }
+      }
+    }
+
     if (!composeFile) {
       return jsonResponse(
         { error: `No docker-compose file found in workspace` },
