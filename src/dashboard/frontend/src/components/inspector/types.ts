@@ -46,6 +46,10 @@ export interface ContainerStatus {
   running: boolean;
   uptime: string | null;
   status?: string;
+  health?: 'healthy' | 'unhealthy' | 'starting' | 'unknown';
+  ports?: number[];
+  lastProbeAt?: string;
+  lastFailureReason?: string;
 }
 
 export interface PendingOperation {

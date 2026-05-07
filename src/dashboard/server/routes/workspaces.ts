@@ -609,15 +609,26 @@ async function getRepoGitStatusAsync(workspacePath: string): Promise<{
   }
 }
 
+export interface WorkspaceContainerStatus {
+  running: boolean;
+  uptime: string | null;
+  status?: string;
+  health?: 'healthy' | 'unhealthy' | 'starting' | 'unknown';
+  ports?: number[];
+  lastProbeAt?: string;
+  lastFailureReason?: string;
+}
+
 async function getContainerStatusAsync(
   issueId: string,
   projectPath?: string
-): Promise<Record<string, { running: boolean; uptime: string | null; status?: string }>> {
-  const result: Record<string, { running: boolean; uptime: string | null; status?: string }> = {};
+): Promise<Record<string, WorkspaceContainerStatus>> {
+  const result: Record<string, WorkspaceContainerStatus> = {};
   try {
     const { stdout } = await execFileAsync('docker', ['ps', '-a', '--format', '{{.Names}}\t{{.Status}}'], { encoding: 'utf-8' });
     const search = issueId.toLowerCase();
-    for (const line of stdout.trim().split('\n').filter(Boolean)) {
+    const lines = stdout.trim().split('\n').filter(Boolean);
+    for (const line of lines) {
       if (!line.toLowerCase().includes(search)) continue;
       const [name, ...statusParts] = line.split('\t');
       const statusStr = statusParts.join('\t');
@@ -629,8 +640,105 @@ async function getContainerStatusAsync(
         status: statusStr,
       };
     }
+
+    // Probe service health for running containers
+    for (const [name, info] of Object.entries(result)) {
+      if (!info.running) continue;
+      const serviceHealth = await getContainerServiceHealthAsync(name);
+      let health: WorkspaceContainerStatus['health'] = serviceHealth.health;
+      let lastFailureReason = serviceHealth.lastFailureReason;
+      let lastProbeAt = serviceHealth.lastProbeAt;
+
+      // If docker healthcheck is unknown but we have Traefik/exposed ports, probe them
+      if (health === 'unknown' && serviceHealth.ports.length > 0) {
+        const probeResults = await Promise.all(
+          serviceHealth.ports.map((port) => probeContainerPortAsync(name, port))
+        );
+        const anyHealthy = probeResults.some((r) => r.healthy);
+        health = anyHealthy ? 'healthy' : 'unhealthy';
+        lastProbeAt = new Date().toISOString();
+        if (!anyHealthy) {
+          const firstFailure = probeResults.find((r) => !r.healthy);
+          lastFailureReason = firstFailure?.reason ?? 'probe failed';
+        }
+      }
+
+      result[name] = {
+        ...info,
+        health,
+        ports: serviceHealth.ports,
+        lastProbeAt,
+        lastFailureReason,
+      };
+    }
   } catch { /* non-fatal */ }
   return result;
+}
+
+interface ContainerServiceHealth {
+  health: 'healthy' | 'unhealthy' | 'starting' | 'unknown';
+  ports: number[];
+  lastProbeAt?: string;
+  lastFailureReason?: string;
+}
+
+async function getContainerServiceHealthAsync(containerName: string): Promise<ContainerServiceHealth> {
+  const defaultResult: ContainerServiceHealth = { health: 'unknown', ports: [] };
+  try {
+    const { stdout } = await execFileAsync('docker', ['inspect', containerName], { encoding: 'utf-8', timeout: 10000 });
+    const inspect = JSON.parse(stdout)[0];
+    const labels: Record<string, string> = inspect?.Config?.Labels ?? {};
+    const healthState = inspect?.State?.Health;
+    const exposedPorts: Record<string, unknown> = inspect?.Config?.ExposedPorts ?? {};
+
+    // Parse exposed ports
+    const ports = Object.keys(exposedPorts).map((p) => parseInt(p.split('/')[0], 10)).filter((n) => !Number.isNaN(n));
+
+    // Parse Traefik loadbalancer port labels
+    const traefikPorts: number[] = [];
+    for (const [key, value] of Object.entries(labels)) {
+      if (key.endsWith('.loadbalancer.server.port') && value) {
+        const port = parseInt(value, 10);
+        if (!Number.isNaN(port)) traefikPorts.push(port);
+      }
+    }
+
+    // If container has a Docker healthcheck, use its state
+    if (healthState?.Status) {
+      const status = String(healthState.Status).toLowerCase();
+      const health: ContainerServiceHealth['health'] =
+        status === 'healthy' ? 'healthy' :
+        status === 'unhealthy' ? 'unhealthy' :
+        status === 'starting' ? 'starting' : 'unknown';
+      return {
+        health,
+        ports: traefikPorts.length > 0 ? traefikPorts : ports,
+        lastProbeAt: healthState?.LastExecution?.End ? new Date(healthState.LastExecution.End).toISOString() : undefined,
+        lastFailureReason: healthState?.FailingStreak && healthState.FailingStreak > 0
+          ? (healthState?.LastExecution?.ExitCode !== undefined ? `exit code ${healthState.LastExecution.ExitCode}` : 'healthcheck failed')
+          : undefined,
+      };
+    }
+
+    return {
+      health: 'unknown',
+      ports: traefikPorts.length > 0 ? traefikPorts : ports,
+    };
+  } catch {
+    return defaultResult;
+  }
+}
+
+async function probeContainerPortAsync(containerName: string, port: number): Promise<{ healthy: boolean; reason?: string }> {
+  try {
+    // Prefer wget, fall back to curl, then nc
+    const probeCmd = `wget -qO- http://127.0.0.1:${port}/ 2>/dev/null || curl -sf http://127.0.0.1:${port}/ 2>/dev/null || nc -z 127.0.0.1 ${port}`;
+    await execAsync(`docker exec "${containerName}" sh -c '${probeCmd}'`, { encoding: 'utf-8', timeout: 5000 });
+    return { healthy: true };
+  } catch (err: any) {
+    const reason = err?.stderr?.trim() || err?.message || 'probe failed';
+    return { healthy: false, reason: reason.slice(0, 200) };
+  }
 }
 
 async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<string | null> {
