@@ -20,7 +20,7 @@ export const EditorIdSchema = Schema.Literal(
 )
 
 export const OpenInEditorInput = Schema.Struct({
-  cwd: Schema.String.pipe(Schema.trimmed(), Schema.nonEmptyString()),
+  cwd: Schema.String,
   editor: EditorIdSchema,
 })
 export type OpenInEditorInput = typeof OpenInEditorInput.Type
