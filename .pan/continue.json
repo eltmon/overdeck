@@ -1,25 +1,76 @@
 {
   "version": "1",
-  "issueId": "PAN-960",
+  "issueId": "PAN-965",
   "created": "2026-05-07T02:55:00Z",
-  "updated": "2026-05-07T03:10:00Z",
-  "gitState": { "branch": "feature/pan-960", "sha": "34d305a18", "dirty": false },
+  "updated": "2026-05-07T07:31:27.227Z",
+  "gitState": {
+    "branch": "feature/pan-965",
+    "sha": "d6afc82",
+    "dirty": false
+  },
   "decisions": [
-    { "id": "D1", "summary": "Created 3 beads: validate issueId in workspaces.ts, replace execAsync with execFileAsync in vulnerable functions, audit issues.ts and agents.ts", "recordedAt": "2026-05-07T02:55:00Z" },
-    { "id": "D2", "summary": "Used Python script to auto-insert parseIssueId() validation after all 32 params['issueId'] extractions in workspaces.ts. TypeScript typecheck passes.", "recordedAt": "2026-05-07T03:00:00Z" },
-    { "id": "D3", "summary": "Replaced execAsync shell string interpolation with execFileAsync argument arrays in getContainerStatusAsync (docker ps + JS grep), getMrUrlAsync (gh pr view), and ensurePRExists (gh pr view + gh pr create). TypeScript typecheck passes.", "recordedAt": "2026-05-07T03:05:00Z" },
-    { "id": "D4", "summary": "Audited issues.ts and added parseIssueId() validation to 21 unvalidated routes. Audited agents.ts — params['id'] is agent ID (system-generated), and buildTmuxCommandString already shell-quotes arguments, so no injection risk. TypeScript typecheck passes.", "recordedAt": "2026-05-07T03:10:00Z" }
+    {
+      "id": "D1",
+      "summary": "No beads existed for PAN-965 — created 8 beads from PRD phases and linked dependencies.",
+      "recordedAt": "2026-05-07T02:55:00Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Container status mapping: running→active, unhealthy→waiting, restarting→thinking, stopped→ended. Reuses StatusDot component.",
+      "recordedAt": "2026-05-07T02:55:00Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Moved containerStats polling effect after projectsWithSessions declaration to fix React initialization order bug.",
+      "recordedAt": "2026-05-07T03:25:00Z"
+    }
   ],
   "hazards": [
-    { "id": "H1", "summary": "29 route handlers in workspaces.ts extract issueId without validation — CSRF via GET routes can trigger shell injection", "mitigation": "Add parseIssueId() at every extraction point; return 400 for invalid IDs" },
-    { "id": "H2", "summary": "execFileAsync in getContainerStatusAsync runs docker ps without shell grep pipe — need JS-side filtering to preserve behavior", "mitigation": "Filter lines with line.toLowerCase().includes(search)" }
+    {
+      "id": "H1",
+      "summary": "Large CSS file (4396 lines) — append new styles at end to avoid conflicts.",
+      "mitigation": "Use Edit with tail context, not offset-based insertion."
+    },
+    {
+      "id": "H2",
+      "summary": "FeatureItem.tsx is 1234 lines — risk of merge conflicts during rebase.",
+      "mitigation": "Keep changes localized to render output section and props."
+    }
   ],
   "resumePoint": {
-    "description": "All 3 beads complete. Remaining: run full test suite, commit, push, and call pan done.",
+    "description": "All beads complete. Tests pass. Branch pushed. Ready for pan done.",
     "beadId": "",
     "filesToRead": []
   },
-  "beadsMapping": {},
-  "agentModel": "claude-sonnet-4-6",
-  "sessionHistory": []
+  "beadsMapping": {
+    "workspace-h3no": "InlineSparkline component",
+    "workspace-z5sm": "ContainerNode component",
+    "workspace-no38": "BranchNode and PrNode components",
+    "workspace-vwmn": "ResourcesGroup component",
+    "workspace-7htl": "FeatureItem integration + CSS",
+    "workspace-xgjy": "Server container action endpoints",
+    "workspace-6hyy": "parseContainerServiceName utility + tests",
+    "workspace-ioyj": "Data enrichment and polling"
+  },
+  "agentModel": "kimi-k2.6",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-07T02:55:00Z",
+      "reason": "start",
+      "note": "Created beads, continue.json, and started implementation of PAN-965.",
+      "agentModel": "kimi-k2.6"
+    },
+    {
+      "timestamp": "2026-05-07T03:30:00Z",
+      "reason": "merge",
+      "note": "Resolved merge conflict with origin/main in .pan/continue.json. All tests pass. Ready for pan done.",
+      "agentModel": "kimi-k2.6"
+    },
+    {
+      "timestamp": "2026-05-07T07:31:27.227Z",
+      "reason": "end",
+      "note": "Implement Command Deck hierarchical resource tree (PAN-965): InlineSparkline, ContainerNode, BranchNode, PrNode, ResourcesGroup components with localStorage persistence, FeatureItem integration, container stats polling (5s), server endpoints for restart/start/logs, parseContainerServiceName utility with tests, and CSS styling. All 4417 tests pass."
+    }
+  ],
+  "feedback": []
 }

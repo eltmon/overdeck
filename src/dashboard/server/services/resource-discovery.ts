@@ -13,6 +13,7 @@ import { listProjects, resolveProjectFromIssue, type ResolvedProject } from '../
 import { listSessionNamesAsync } from '../../../lib/tmux.js';
 import { getReviewStatus } from '../review-status.js';
 import { getGitHubConfig } from './tracker-config.js';
+import { parseIssueIdFromText } from '../../../lib/resource-utils.js';
 
 const execFileAsync = promisify(execFile);
 const RESOURCE_DISCOVERY_TTL_MS = 30_000;
@@ -150,11 +151,6 @@ interface ResourceDiscoveryCacheEntry {
 let cachedResourceIssues: ResourceDiscoveryCacheEntry | null = null;
 let cachedDetailedResourceIssues: InternalDiscoveredIssue[] | null = null;
 let resourceIssuesRefreshPromise: Promise<ResourceAllocatedIssue[]> | null = null;
-
-function parseIssueIdFromText(value: string): string | null {
-  const match = value.match(/\b([A-Za-z]+-\d+|F\d+|US\d+|DE\d+|TA\d+|TC\d+)\b/i);
-  return match ? match[1]!.toUpperCase() : null;
-}
 
 function projectPrefixes(project: ProjectRef): string[] {
   const prefixes = new Set<string>();

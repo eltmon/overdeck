@@ -4394,3 +4394,110 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.resourcesGroup {
+  margin-top: 2px;
+  border-top: 1px solid var(--divider);
+  padding-top: 4px;
+}
+
+.resourcesGroupHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 28px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  user-select: none;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.resourcesGroupHeader:hover {
+  background: var(--accent);
+}
+
+.resourcesGroupSummary {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.containerNode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px 2px 40px;
+  font-size: 11px;
+  cursor: default;
+}
+
+.containerNode:hover {
+  background: var(--accent);
+}
+
+.containerName {
+  font-weight: 500;
+  color: var(--foreground);
+  min-width: 64px;
+}
+
+.containerMetric {
+  font-family: var(--font-mono, 'SF Mono', monospace);
+  font-size: 10px;
+  color: var(--muted-foreground);
+  min-width: 36px;
+  text-align: right;
+}
+
+.branchNode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px 2px 40px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.branchBadge {
+  font-size: 9px;
+  color: var(--muted-foreground);
+}
+
+.prNode {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px 2px 40px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.prNode:hover {
+  background: var(--accent);
+  text-decoration: underline;
+}
+
+.prNumber {
+  font-family: var(--font-mono, 'SF Mono', monospace);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.prTitle {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}

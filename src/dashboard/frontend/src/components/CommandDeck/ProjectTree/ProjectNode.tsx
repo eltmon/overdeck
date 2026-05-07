@@ -88,6 +88,7 @@ interface ProjectNodeProps {
   selectedConversation?: string | null;
   onSelectConversation?: (name: string) => void;
   conversationMutations?: ConversationMutations;
+  containerStats?: Record<string, { id: string; name: string; cpuPercent: number; memoryUsage: number; status: 'running' | 'stopped' | 'unhealthy' | 'restarting' }>;
 }
 
 interface ContextMenuState {
@@ -170,7 +171,7 @@ function ProjectNodeMenu({
   );
 }
 
-export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, onNewConversation, conversations = [], selectedConversation, onSelectConversation, conversationMutations }: ProjectNodeProps) {
+export function ProjectNode({ name, features, selectedFeature, onSelectFeature, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, onNewConversation, conversations = [], selectedConversation, onSelectConversation, conversationMutations, containerStats }: ProjectNodeProps) {
   const visibleFeatures = useMemo(() => {
     if (filter === 'all') return features;
     return features.filter((feature) =>
@@ -261,6 +262,7 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
               onViewJsonl={onViewJsonl}
               onCleanupOrphanedResources={onCleanupOrphanedResources}
               onOpenPlanDialog={onOpenPlanDialog}
+              containerStats={containerStats}
             />
           ))
         ) : (

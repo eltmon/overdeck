@@ -12,6 +12,7 @@ import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
 import { SessionNode } from './SessionNode';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
+import { ResourcesGroup } from './ResourcesGroup';
 import { useAvailableModels } from '../../shared/ModelPicker/ModelPicker';
 import {
   ContextMenuRoot,
@@ -26,6 +27,7 @@ import {
   ContextMenuSubContent,
 } from '../../shared/ContextMenu';
 import { refreshDashboardState } from '../../../lib/refresh-dashboard-state';
+import { parseContainerServiceName } from '../../../lib/resource-utils';
 import styles from '../styles/command-deck.module.css';
 
 export type TreeSessionFilter = 'all' | 'alive' | 'failed';
@@ -49,6 +51,7 @@ interface FeatureItemProps {
   onViewJsonl?: (sessionId: string) => void;
   onCleanupOrphanedResources?: (issueId: string) => void;
   onOpenPlanDialog?: (issueId: string) => void;
+  containerStats?: Record<string, { id: string; name: string; cpuPercent: number; memoryUsage: number; status: 'running' | 'stopped' | 'unhealthy' | 'restarting' }>;
 }
 
 // ContextMenuState removed — migrated to Radix UI ContextMenu
@@ -1004,7 +1007,7 @@ function ReviewGroup({
   );
 }
 
-export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog }: FeatureItemProps) {
+export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, containerStats }: FeatureItemProps) {
   const trimmedTitle = title?.trim() ?? '';
   const displayTitle = trimmedTitle || '(untitled)';
   const titleClassName = trimmedTitle
@@ -1015,6 +1018,39 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     const persisted = readExpanded(feature.issueId);
     return persisted ?? defaultExpandedFromState(feature.stateLabel);
   });
+
+  const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
+
+  useEffect(() => {
+    if (!expanded) return;
+    if (!feature.issueId) return;
+    if (detailIdentifiers) return;
+
+    let cancelled = false;
+    void fetch(`/api/issues/${encodeURIComponent(feature.issueId)}/resource-details`)
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return response.json() as Promise<ProjectFeatureResourceIdentifiers>;
+      })
+      .then((payload) => {
+        if (cancelled || !payload) return;
+        setDetailIdentifiers(payload);
+      })
+      .catch(() => {
+        // ignore
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, feature.issueId, detailIdentifiers]);
+
+  const hasResources = feature.resourceDetails && (
+    feature.resourceDetails.dockerContainerCount > 0 ||
+    feature.resourceDetails.prs.length > 0 ||
+    feature.resourceDetails.localBranchCount > 0 ||
+    feature.resourceDetails.remoteBranchCount > 0
+  );
 
   // Derive best session once per data change instead of on every click (PAN-821 review)
   // Respect the tree filter so auto-select picks a visible session.
@@ -1216,6 +1252,34 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             );
           })()}
         </div>
+      )}
+
+      {expanded && hasResources && detailIdentifiers && (
+        <ResourcesGroup
+          issueId={feature.issueId}
+          defaultExpanded={aggregateSessions.length > 0 && activityState !== 'stopped'}
+          containers={(detailIdentifiers.dockerContainerNames ?? []).map((name) => {
+            const stats = containerStats?.[name];
+            return {
+              name,
+              serviceName: parseContainerServiceName(name),
+              status: stats?.status ?? 'running',
+              cpuPercent: stats?.cpuPercent ?? 0,
+              memoryUsage: stats?.memoryUsage ?? 0,
+              id: stats?.id,
+            };
+          })}
+          branches={[
+            ...(detailIdentifiers.localBranchNames ?? []).map((name) => ({ name, isLocal: true as const })),
+            ...(detailIdentifiers.remoteBranchNames ?? []).map((name) => ({ name, isLocal: false as const })),
+          ]}
+          prs={(detailIdentifiers.prs ?? feature.resourceDetails?.prs ?? []).map((pr) => ({
+            number: pr.number,
+            title: pr.title,
+            state: pr.state,
+            isDraft: pr.isDraft,
+          }))}
+        />
       )}
     </div>
     <FeatureContextMenu
