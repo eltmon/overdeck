@@ -114,6 +114,55 @@ function isHookConfigured(
 }
 
 /**
+ * PAN-982: Remove a Panopticon hook entry by hookType + script name.
+ *
+ * Filters out the inner hook commands matching the given scriptName from each
+ * matcher group, then drops any matcher group whose hook list became empty,
+ * then drops the top-level hookType key if no matcher groups remain.
+ *
+ * Returns true if anything was removed (used to drive the "migrated" log line
+ * in setupHooksCommand). Idempotent — safe to call when the hook is already
+ * absent.
+ */
+function removeHookIfPresent(
+  settings: ClaudeSettings,
+  hookType: keyof NonNullable<ClaudeSettings['hooks']>,
+  binDir: string,
+  scriptName: string,
+): boolean {
+  const groups = settings?.hooks?.[hookType];
+  if (!groups || groups.length === 0) return false;
+
+  const fullPath = join(binDir, scriptName);
+  const legacyMatch = `panopticon/bin/${scriptName}`;
+
+  let removed = false;
+  const newGroups: HookConfig[] = [];
+  for (const group of groups) {
+    const filteredInner = (group.hooks || []).filter((hook) => {
+      const isMatch =
+        (hook.command?.includes(fullPath) ?? false) ||
+        (hook.command?.includes(legacyMatch) ?? false);
+      if (isMatch) removed = true;
+      return !isMatch;
+    });
+    if (filteredInner.length > 0) {
+      newGroups.push({ ...group, hooks: filteredInner });
+    } else {
+      removed = true;
+    }
+  }
+
+  if (newGroups.length > 0) {
+    settings.hooks![hookType] = newGroups;
+  } else {
+    delete settings.hooks![hookType];
+  }
+
+  return removed;
+}
+
+/**
  * Setup Claude Code hooks for Panopticon heartbeat
  */
 export async function setupHooksCommand(): Promise<void> {
@@ -306,6 +355,37 @@ export async function setupHooksCommand(): Promise<void> {
   addHookIfMissing('PreCompact', 'pre-compact-hook');
   addHookIfMissing('PostCompact', 'post-compact-hook');
   addHookIfMissing('PermissionRequest', 'permission-event-hook');
+
+  // PAN-982: Atomic migration — strip out any pre-existing PreToolUse / PostToolUse /
+  // Stop / TLDR registrations that older Panopticon installs added to
+  // ~/.claude/settings.json. Without this prune, users upgrading across PAN-982
+  // would have BOTH global and per-agent hooks firing for every tool event,
+  // doubling heartbeat/cost/inspect signals and tripping H4 (the dedup hazard
+  // the bead exists to close). The prune is keyed on Panopticon's own bin/
+  // paths, so user-authored hooks pointing elsewhere are left intact.
+  const removed: string[] = [];
+  const removeIfPresent = (
+    hookType: keyof NonNullable<ClaudeSettings['hooks']>,
+    scriptName: string,
+  ): void => {
+    if (removeHookIfPresent(settings, hookType, binDir, scriptName)) {
+      removed.push(`${hookType}:${scriptName}`);
+    }
+  };
+  removeIfPresent('PreToolUse', 'pre-tool-hook');
+  removeIfPresent('PreToolUse', 'tldr-read-enforcer');
+  removeIfPresent('PostToolUse', 'heartbeat-hook');
+  removeIfPresent('PostToolUse', 'permission-event-hook');
+  removeIfPresent('PostToolUse', 'tldr-post-edit');
+  removeIfPresent('PostToolUse', 'inspect-on-bead-close');
+  removeIfPresent('Stop', 'stop-hook');
+  removeIfPresent('Stop', 'permission-event-hook');
+  removeIfPresent('Stop', 'work-agent-stop-hook');
+  removeIfPresent('Stop', 'specialist-stop-hook');
+  if (removed.length > 0) {
+    console.log(chalk.yellow(`\n✓ Migrated ${removed.length} legacy hook(s) to per-agent frontmatter:`));
+    for (const entry of removed) console.log(chalk.dim(`  • ${entry}`));
+  }
 
   if (added.length === 0) {
     console.log(chalk.cyan('\n✓ All Panopticon hooks already registered'));
