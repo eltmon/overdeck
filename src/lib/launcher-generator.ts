@@ -56,6 +56,29 @@ export interface LauncherConfig {
 
   // File permissions for the generated script (default: 0o755)
   fileMode?: number;
+
+  /**
+   * Absolute path to a per-agent .mcp.json that wires the panopticon-bridge
+   * (and any other custom MCP servers) into the claude invocation. When set
+   * together with channelsBridgeServerName, the launcher appends
+   *   --mcp-config <path> --dangerously-load-development-channels server:<name>
+   * to the claude command before --session-id and --model.
+   *
+   * --mcp-config is additive — project-level .mcp.json continues to load —
+   * so we MUST NOT also pass --strict-mcp-config.
+   *
+   * When undefined, the generated script is byte-for-byte identical to the
+   * pre-PAN-985 behaviour (channels off path).
+   */
+  channelsBridgeMcpConfig?: string;
+
+  /**
+   * Server name from the per-agent .mcp.json that should be loaded as a
+   * Claude Code Channel. Defaults to 'panopticon-bridge' when
+   * channelsBridgeMcpConfig is set; ignored when the MCP config path is
+   * not also provided.
+   */
+  channelsBridgeServerName?: string;
 }
 
 /**
@@ -64,6 +87,20 @@ export interface LauncherConfig {
  */
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\''`)}'`;
+}
+
+/**
+ * Build the trailing `--mcp-config <path> --dangerously-load-development-channels server:<name>`
+ * fragment when both channels-bridge fields are set. Returns an empty string when
+ * channelsBridgeMcpConfig is unset so existing call sites stay byte-identical.
+ *
+ * Note: --mcp-config is intentionally additive (no --strict-mcp-config) so the
+ * project's .mcp.json continues to load alongside the bridge.
+ */
+function buildChannelsArgs(config: LauncherConfig): string {
+  if (!config.channelsBridgeMcpConfig) return '';
+  const serverName = config.channelsBridgeServerName ?? 'panopticon-bridge';
+  return ` --mcp-config ${shellQuote(config.channelsBridgeMcpConfig)} --dangerously-load-development-channels server:${serverName}`;
 }
 
 /**
@@ -285,6 +322,7 @@ function buildCommand(config: LauncherConfig): string[] {
     if (config.baseCommand) {
       let cmd = config.baseCommand;
 
+      cmd += buildChannelsArgs(config);
       if (config.sessionId) {
         cmd += ` --session-id ${shellQuote(config.sessionId)}`;
       }
@@ -342,6 +380,9 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
       }
     }
   }
+
+  // Append channels bridge args (no-op when channelsBridgeMcpConfig unset)
+  cmd += buildChannelsArgs(config);
 
   // Append session args
   if (config.resumeSessionId) {

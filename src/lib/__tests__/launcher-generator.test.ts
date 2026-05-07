@@ -496,4 +496,67 @@ describe('generateLauncherWrapper', () => {
       "
     `);
   });
+
+  describe('channels bridge args', () => {
+    const FIXTURE_CONFIG: LauncherConfig = {
+      ...DEFAULT_CONFIG,
+      agentType: 'work',
+      setCi: true,
+      baseCommand:
+        'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6',
+      sessionId: 'sess-abc',
+    };
+
+    it('flag-off: output is byte-identical to pre-PAN-985 behaviour', () => {
+      const script = generateLauncherScript(FIXTURE_CONFIG);
+      expect(script).toBe(
+        [
+          '#!/bin/bash',
+          'unset TMUX TMUX_PANE STY',
+          'export CI=1',
+          'command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"',
+          "cd -- '/workspace/project'",
+          "exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --model claude-sonnet-4-6 --session-id 'sess-abc'",
+          '',
+        ].join('\n'),
+      );
+    });
+
+    it('flag-on: appends --mcp-config and --dangerously-load-development-channels before --session-id', () => {
+      const script = generateLauncherScript({
+        ...FIXTURE_CONFIG,
+        channelsBridgeMcpConfig: '/tmp/agent-x/.mcp.json',
+      });
+      expect(script).toContain(
+        "--mcp-config '/tmp/agent-x/.mcp.json' --dangerously-load-development-channels server:panopticon-bridge --session-id 'sess-abc'",
+      );
+      // Must NOT enable strict-mcp-config (project MCP servers must keep loading)
+      expect(script).not.toContain('--strict-mcp-config');
+    });
+
+    it('flag-on with custom server name: uses the override', () => {
+      const script = generateLauncherScript({
+        ...FIXTURE_CONFIG,
+        channelsBridgeMcpConfig: '/tmp/x/.mcp.json',
+        channelsBridgeServerName: 'custom-bridge',
+      });
+      expect(script).toContain('server:custom-bridge');
+      expect(script).not.toContain('server:panopticon-bridge');
+    });
+
+    it('flag-on for specialist-dispatch: same flags applied before session/model', () => {
+      const script = generateLauncherScript({
+        ...DEFAULT_CONFIG,
+        agentType: 'specialist-dispatch',
+        baseCommand: 'claude',
+        sessionId: 'sess-spec',
+        model: 'claude-sonnet-4-6',
+        channelsBridgeMcpConfig: '/tmp/agent-y/.mcp.json',
+      });
+      expect(script).toContain(
+        "claude --mcp-config '/tmp/agent-y/.mcp.json' --dangerously-load-development-channels server:panopticon-bridge --session-id 'sess-spec' --model claude-sonnet-4-6",
+      );
+      expect(script).not.toContain('--strict-mcp-config');
+    });
+  });
 });

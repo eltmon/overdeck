@@ -96,6 +96,10 @@ export interface SettingsConfig {
     rich_compaction?: boolean;
     title_model?: ModelId;
   };
+  experimental?: {
+    /** Use Claude Code Channels (research-preview) for prompt delivery to eligible work agents. */
+    claudeCodeChannels?: boolean;
+  };
 }
 
 

@@ -15,6 +15,13 @@ import {
   ClipboardList,
   Layers,
   Archive,
+  Loader2,
+  Terminal,
+  FileText,
+  Search,
+  Globe,
+  Bot,
+  Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
@@ -24,6 +31,7 @@ import { useAvailableModels, type ModelGroup } from '../../shared/ModelPicker/Mo
 import { useResolvedModels, resolveWorkTypeKey } from '../../../lib/useResolvedModels';
 import { useDashboardStore } from '../../../lib/store';
 import { useSharedTick } from '../../../lib/useSharedTick';
+import { toolNameToPhase, isSpinnerPhase, type WorkingPhase } from '../../../lib/workingPhase';
 import { formatRelativeTime } from '../../../lib/formatRelativeTime';
 import styles from '../styles/command-deck.module.css';
 import {
@@ -99,7 +107,48 @@ function deriveDotStatus(runtime: AgentRuntimeSnapshot | undefined, presence: Se
   return presenceToStatus(presence);
 }
 
-function ReviewerVerdict({ session, dotStatus }: { session: SessionNodeType; dotStatus: StatusDotStatus }) {
+const PHASE_ICON: Record<WorkingPhase, LucideIcon> = {
+  init: Loader2,
+  thinking: Loader2,
+  bash: Terminal,
+  file: FileText,
+  search: Search,
+  web: Globe,
+  agent: Bot,
+  tool: Wrench,
+  processing: Loader2,
+};
+
+const PHASE_COLOR: Record<WorkingPhase, string> = {
+  init: 'var(--muted-foreground)',
+  thinking: 'var(--primary)',
+  bash: 'var(--warning)',
+  file: 'var(--success)',
+  search: 'var(--info, #3b82f6)',
+  web: 'var(--info, #3b82f6)',
+  agent: 'var(--signal-review, #8b5cf6)',
+  tool: 'var(--muted-foreground)',
+  processing: 'var(--primary)',
+};
+
+function PhaseIcon({ runtime, dotStatus }: { runtime: AgentRuntimeSnapshot | undefined; dotStatus: StatusDotStatus }) {
+  const phase = runtime?.currentTool ? toolNameToPhase(runtime.currentTool) : undefined;
+  if (!phase) {
+    return <StatusDot status={dotStatus} size="sm" />;
+  }
+  const Icon = PHASE_ICON[phase];
+  const color = PHASE_COLOR[phase];
+  const isSpin = isSpinnerPhase(phase);
+  return (
+    <Icon
+      size={12}
+      className={isSpin ? 'animate-spin' : undefined}
+      style={{ color, flexShrink: 0 }}
+    />
+  );
+}
+
+function ReviewerVerdict({ session, dotStatus, runtime }: { session: SessionNodeType; dotStatus: StatusDotStatus; runtime: AgentRuntimeSnapshot | undefined }) {
   const { latestStatus, latestReviewResult } = session.roundMetadata ?? {};
   if (latestReviewResult === 'APPROVED') {
     return <CircleCheck size={10} style={{ color: 'var(--success)', flexShrink: 0 }} />;
@@ -107,7 +156,7 @@ function ReviewerVerdict({ session, dotStatus }: { session: SessionNodeType; dot
   if (latestReviewResult === 'CHANGES_REQUESTED' || latestStatus === 'failed') {
     return <CircleX size={10} style={{ color: 'var(--destructive)', flexShrink: 0 }} />;
   }
-  return <StatusDot status={dotStatus} size="sm" />;
+  return <PhaseIcon runtime={runtime} dotStatus={dotStatus} />;
 }
 
 interface SessionNodeProps {
@@ -492,7 +541,7 @@ export function SessionNode({
                 : <ChevronRight size={12} style={{ color: 'var(--muted-foreground)' }} />}
             </span>
           )}
-          <ReviewerVerdict session={session} dotStatus={dotStatus} />
+          <ReviewerVerdict session={session} dotStatus={dotStatus} runtime={runtime} />
           <span title={sessionLabelTitle} style={{ display: 'inline-flex', flexShrink: 0 }}>
             <TypeIcon type={session.type} role={session.role} />
           </span>

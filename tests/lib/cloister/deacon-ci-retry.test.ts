@@ -115,11 +115,19 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
   beforeEach(async () => {
     vi.resetModules();
     mockSetReviewStatus.mockReset();
-    mockLoadReviewStatuses.mockReset().mockReturnValue({});
     mockSessionExists.mockReset().mockReturnValue(false);
     mockSendKeysAsync.mockReset().mockResolvedValue(undefined);
     mockWriteFeedbackFile.mockReset().mockResolvedValue(undefined);
     mockResolveProjectFromIssue.mockReset().mockReturnValue(null);
+    // Default: read the real review-status.json so tests that write to it work
+    mockLoadReviewStatuses.mockReset().mockImplementation(() => {
+      try {
+        const raw = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
+        return JSON.parse(raw);
+      } catch {
+        return {};
+      }
+    });
 
     // Back up existing file
     if (existsSync(REVIEW_STATUS_FILE)) {
@@ -251,9 +259,9 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
     });
 
     try {
-      // loadReviewStatuses returns an issue that has passed review at an OLD commit
+      // Write an issue that has passed review at an OLD commit
       // (different from the current HEAD → triggers the reset path)
-      mockLoadReviewStatuses.mockReturnValue({
+      writeStatusFile({
         [ISSUE_ID]: {
           reviewStatus: 'passed',
           readyForMerge: true,
@@ -282,6 +290,13 @@ describe('checkFailedMergeRetry — CI transient retry state machine', () => {
       );
 
       // On the next patrol: checkFailedMergeRetry should now treat this as a fresh start
+      // Reset mock to read from the file (mockReturnValue above overrode mockImplementation)
+      mockLoadReviewStatuses.mockImplementation(() => {
+        if (existsSync(REVIEW_STATUS_FILE)) {
+          return JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
+        }
+        return {};
+      });
       // Write a CI-failed status so checkFailedMergeRetry has something to act on
       writeStatusFile({ [ISSUE_ID]: CI_FAILED_STATUS });
       const retryActions = await checkFailedMergeRetry();
@@ -312,7 +327,6 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
     deadEndIssueId = `PAN-714-DEAD-END-TEST-${process.pid}-${Date.now()}`;
     issueLower = deadEndIssueId.toLowerCase();
     mockSetReviewStatus.mockReset();
-    mockLoadReviewStatuses.mockReset().mockReturnValue({});
     mockSessionExists.mockReset().mockReturnValue(false);
     mockSendKeysAsync.mockReset().mockResolvedValue(undefined);
     mockWriteFeedbackFile.mockReset().mockResolvedValue(undefined);
@@ -322,6 +336,15 @@ describe('checkDeadEndAgents — dead-end CI recovery path', () => {
     mockGetAgentRuntimeState.mockReturnValue({
       state: 'idle',
       lastActivity: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+    });
+    // Default: read the real review-status.json so tests that write to it work
+    mockLoadReviewStatuses.mockReset().mockImplementation(() => {
+      try {
+        const raw = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
+        return JSON.parse(raw);
+      } catch {
+        return {};
+      }
     });
 
     if (existsSync(REVIEW_STATUS_FILE)) {

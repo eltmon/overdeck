@@ -96,6 +96,7 @@
     "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
     "@iarna/toml": "^2.2.5",
     "@linear/sdk": "^70.0.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@octokit/rest": "^22.0.1",
     "@types/mustache": "^4.2.6",
     "@types/ws": "^8.18.1",

@@ -13,7 +13,7 @@
 import { useState, useMemo } from 'react';
 import {
   Play, RefreshCw, RotateCcw, FolderPlus, Check, Loader2,
-  MoreHorizontal, FileText, ListTodo, ScrollText, Brain, MessageSquare,
+  MoreHorizontal, FileText, ListTodo, Brain, MessageSquare,
   Upload, Send, XCircle, GitMerge, ChevronDown,
 } from 'lucide-react';
 import type { Agent, Issue } from '../../types';
@@ -26,13 +26,13 @@ import { RestartFromPlanButton } from '../RestartFromPlanButton';
 import { ResetIssueButton } from '../ResetIssueButton';
 import { useAvailableModels } from '../shared/ModelPicker/ModelPicker';
 import { useSwitchModel } from '../../hooks/useSwitchModel';
+import { useRestartAgent } from '../../hooks/useRestartAgent';
 
 interface ZoneActionStripProps {
   issueId: string;
   agent?: Agent;
   issue?: Issue;
   onOpenBeads?: () => void;
-  onOpenVBrief?: () => void;
   /** Called when an artifact action wants to switch a ZoneCOverview tab. */
   onSwitchTab?: (tab: 'overview' | 'activity' | 'costs' | 'prd' | 'state' | 'inference' | 'vbrief' | 'beads' | 'prdiff' | 'discussions') => void;
 }
@@ -42,13 +42,13 @@ export function ZoneActionStrip({
   agent,
   issue,
   onOpenBeads,
-  onOpenVBrief,
   onSwitchTab,
 }: ZoneActionStripProps) {
   const [showOverflow, setShowOverflow] = useState(false);
   const [showResumeInput, setShowResumeInput] = useState(false);
   const [resumeMessage, setResumeMessage] = useState('');
   const [showResumeModelDropdown, setShowResumeModelDropdown] = useState(false);
+  const [showRestartModelDropdown, setShowRestartModelDropdown] = useState(false);
 
   const {
     workspace,
@@ -77,6 +77,7 @@ export function ZoneActionStrip({
 
   const { groups } = useAvailableModels();
   const { switchMutation, isPending: isSwitchingModel } = useSwitchModel(agent?.id, issueId);
+  const { restartMutation, isPending: isRestarting } = useRestartAgent(agent?.id);
 
   const layout = useMemo(() => {
     if (reviewStatusLoading) {
@@ -314,42 +315,6 @@ export function ZoneActionStrip({
           </button>
         );
 
-      case 'vbrief':
-        return (
-          <button
-            key={key}
-            onClick={onOpenVBrief}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-signal-review rounded hover:bg-signal-review/10"
-          >
-            <ScrollText className="w-3 h-3" />
-            vBRIEF
-          </button>
-        );
-
-      case 'state':
-        return (
-          <button
-            key={key}
-            onClick={() => onSwitchTab?.('state')}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent"
-          >
-            <FileText className="w-3 h-3" />
-            STATE
-          </button>
-        );
-
-      case 'prd':
-        return (
-          <button
-            key={key}
-            onClick={() => onSwitchTab?.('prd')}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent"
-          >
-            <FileText className="w-3 h-3" />
-            PRD
-          </button>
-        );
-
       case 'inference':
         return (
           <button
@@ -447,6 +412,79 @@ export function ZoneActionStrip({
             {reopenMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
             {reopenMutation.isPending ? 'Reopening...' : 'Reopen'}
           </button>
+        );
+
+      case 'restartAgent':
+        return (
+          <div key={key} className="flex items-center relative">
+            <button
+              data-testid="zone-a-restart-agent"
+              onClick={() => restartMutation.mutate({ graceful: true })}
+              disabled={isRestarting}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-warning rounded hover:bg-warning hover:text-warning-foreground transition-colors disabled:opacity-50"
+              title="Graceful restart: warns agent 30s before kill, preserves continue file"
+            >
+              {isRestarting ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+              {isRestarting ? 'Restarting...' : 'Restart Agent'}
+            </button>
+            <button
+              data-testid="zone-a-restart-model-dropdown"
+              onClick={() => setShowRestartModelDropdown(v => !v)}
+              disabled={isRestarting}
+              className="flex items-center px-1 py-1 text-xs text-warning rounded hover:bg-warning hover:text-warning-foreground transition-colors disabled:opacity-50 border-l border-warning/30"
+              title="Restart with a different model"
+            >
+              <ChevronDown className="w-3 h-3" />
+            </button>
+            {showRestartModelDropdown && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowRestartModelDropdown(false)}
+                />
+                <div
+                  className="absolute left-0 top-full mt-1 min-w-[220px] bg-popover border border-border rounded-md shadow-lg z-50 max-h-64 overflow-y-auto"
+                >
+                  <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Restart with model…
+                  </div>
+                  <button
+                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent border-b border-border text-destructive"
+                    onClick={() => {
+                      setShowRestartModelDropdown(false);
+                      restartMutation.mutate({ graceful: false });
+                    }}
+                    disabled={isRestarting}
+                  >
+                    Force Restart (no warning)
+                  </button>
+                  {groups.map((group) => (
+                    <div key={group.provider}>
+                      <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground/80 border-t border-border">
+                        {group.label}
+                      </div>
+                      {group.models.map((m) => (
+                        <button
+                          key={m.id}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent flex items-center justify-between"
+                          onClick={() => {
+                            setShowRestartModelDropdown(false);
+                            restartMutation.mutate({ model: m.id, graceful: true });
+                          }}
+                          disabled={isRestarting}
+                        >
+                          <span>{m.label}</span>
+                          {m.costDisplay && (
+                            <span className="text-[10px] opacity-50 ml-2">{m.costDisplay}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         );
 
       case 'restartFromPlan':
