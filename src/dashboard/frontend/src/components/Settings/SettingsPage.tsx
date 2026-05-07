@@ -457,6 +457,18 @@ export function SettingsPage() {
     });
   };
 
+  const handleClaudeCodeChannelsToggle = (enabled: boolean) => {
+    const next: SettingsConfig = {
+      ...formData,
+      experimental: {
+        ...formData.experimental,
+        claudeCodeChannels: enabled,
+      },
+    };
+    setFormData(next);
+    saveMutation.mutate(next);
+  };
+
 
   const handleSetOverride = (workType: WorkTypeId, model: ModelId) => {
     setFormData({
@@ -1732,6 +1744,60 @@ export function SettingsPage() {
 
       {/* Desktop App settings — shown only inside Electron */}
       <DesktopSettingsSection />
+
+      {/* Experimental — research-preview features, must remain the LAST section on the page */}
+      <section
+        data-testid="experimental-section"
+        aria-label="Experimental"
+        className="space-y-3 pb-20 border-t-2 border-amber-500/40 pt-8 mt-4"
+      >
+        <h2 className="text-xl font-black text-amber-400 flex items-center gap-2">
+          <Beaker className="w-5 h-5" />
+          Experimental
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Research-preview features that may break, change, or be removed without notice. Use at your own risk.
+        </p>
+
+        <div className="bg-card border border-amber-500/30 rounded-xl p-5 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <h3 className="font-bold text-foreground">
+                Use Claude Code Channels for prompt delivery (work agents only)
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Routes prompts via a stdio MCP bridge instead of tmux send-keys. Requires Claude Code with claude.ai or Console API auth. Does not apply to Codex, Cursor, Gemini, or Bedrock/Vertex/Foundry runtimes; those continue using tmux. Triggers a confirmation dialog at agent startup that Panopticon dismisses automatically.
+              </p>
+              <a
+                href="https://code.claude.com/docs/en/channels"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-amber-400 hover:text-amber-300 underline mt-2 inline-block"
+              >
+                Channels documentation →
+              </a>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={Boolean(formData.experimental?.claudeCodeChannels)}
+              aria-label="Use Claude Code Channels for prompt delivery (work agents only)"
+              data-testid="experimental-claude-code-channels-toggle"
+              onClick={() => handleClaudeCodeChannelsToggle(!formData.experimental?.claudeCodeChannels)}
+              disabled={saveMutation.isPending}
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-50 ${
+                formData.experimental?.claudeCodeChannels ? 'bg-amber-500' : 'bg-gray-400'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  formData.experimental?.claudeCodeChannels ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

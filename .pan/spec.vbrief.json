@@ -1,0 +1,840 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-07T04:25:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-985: Replace tmux send-keys with Claude Code Channels for prompt delivery (experimental, opt-in)",
+    "updated": "2026-05-07T05:09:41.348Z"
+  },
+  "plan": {
+    "id": "pan-985",
+    "title": "Replace tmux send-keys with Claude Code Channels for prompt delivery",
+    "status": "proposed",
+    "uid": "4c4b2095-788a-49d5-845c-4c3b535c7e96",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 30,
+    "created": "2026-05-07T04:25:00.000Z",
+    "updated": "2026-05-07T05:09:41.348Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/985",
+        "label": "PAN-985",
+        "type": "issue"
+      },
+      {
+        "uri": "https://code.claude.com/docs/en/channels",
+        "label": "Channels overview",
+        "type": "documentation"
+      },
+      {
+        "uri": "https://code.claude.com/docs/en/channels-reference",
+        "label": "Channels reference (build a custom server)",
+        "type": "documentation"
+      }
+    ],
+    "tags": [
+      "experimental",
+      "channels",
+      "mcp",
+      "tmux",
+      "work-agent",
+      "claude-code"
+    ],
+    "narratives": {
+      "Problem": "Prompt delivery to running Claude Code agents currently uses tmux load-buffer + paste-buffer + send-keys C-m. This is unreliable: Enter is sometimes not accepted by the TUI, paste/Enter race conditions cause silent message drops, and there is no delivery confirmation. Claude Code v2.1.80+ introduced Channels — a stdio-MCP mechanism for external processes to push messages into a running session via JSON-RPC notifications, bypassing terminal emulation entirely.",
+      "Proposal": "Add a panopticon-bridge stdio MCP server that declares the claude/channel capability and pushes prompts received over a Unix socket as notifications/claude/channel events. Wire it to work-agent launches behind a single experimental opt-in flag (off by default, hidden at the bottom of the Settings page). When the flag is on AND the agent is eligible (Claude Code runtime, Anthropic auth, native not Docker), the launcher adds --dangerously-load-development-channels server:panopticon-bridge plus an additive --mcp-config pointing at a per-agent .mcp.json (no --strict-mcp-config: project-level MCP servers like TLDR and Playwright keep loading), the launcher orchestration sends one tmux Enter at startup to dismiss the dev-channels confirmation dialog, and a new deliverAgentMessage primitive routes prompts through the bridge socket with automatic tmux-send-keys fallback on socket failure. Within work-agent context, pan tell is routed through deliverAgentMessage so it benefits from the channel path on the same eligibility terms. Specialists (review/test/merge), conversation panel input, and ineligible runtimes (Codex/Cursor/Gemini, Bedrock/Vertex/Foundry, Docker workspaces) continue using sendKeysAsync regardless of flag state. Bidirectional reply tool and permission relay are out of scope for this issue and are filed as follow-ups."
+    },
+    "items": [
+      {
+        "id": "scaffold-bridge-package",
+        "title": "Scaffold panopticon-bridge as a Bun MCP server entrypoint in src/lib/channels/",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T04:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-985"
+        },
+        "narrative": {
+          "Action": "Create src/lib/channels/panopticon-bridge.ts as the Bun-runnable MCP server entrypoint. Add @modelcontextprotocol/sdk to root package.json. The file is a single self-contained Bun script: import Server and StdioServerTransport from the SDK, construct a Server with capabilities.experimental['claude/channel'] = {} (no tools entry), include an instructions string telling Claude how to handle incoming <channel source=\"panopticon-bridge\"> events, and connect over StdioServerTransport. Stub the socket listener as a TODO comment for the next bead. The file's header comment must document the Bun-runtime requirement and reference the Claude Code Channels reference URL. The bridge must read PANOPTICON_AGENT_ID from env at startup (passed in via the MCP config env block); fail-fast with a clear error if missing."
+        },
+        "subItems": [
+          {
+            "id": "scaffold-bridge-package.ac1",
+            "title": "src/lib/channels/panopticon-bridge.ts exists and runs cleanly under Bun (bun run src/lib/channels/panopticon-bridge.ts) without immediate exit when stdin is open",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scaffold-bridge-package.ac2",
+            "title": "@modelcontextprotocol/sdk is added to root package.json dependencies and bun install completes successfully",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scaffold-bridge-package.ac3",
+            "title": "Server constructor declares capabilities.experimental['claude/channel'] = {} and OMITS capabilities.tools and capabilities.experimental['claude/channel/permission'] (one-way, no reply tool, no permission relay)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scaffold-bridge-package.ac4",
+            "title": "Bridge process exits with non-zero code and a clear error message when PANOPTICON_AGENT_ID env var is unset",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scaffold-bridge-package.ac5",
+            "title": "Header comment in panopticon-bridge.ts documents the Bun-runtime requirement, the Channels reference URL, and the fact that the socket-unlink-on-startup is intentional (not defensive)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:09:41.348Z"
+      },
+      {
+        "id": "bridge-unix-socket-listener",
+        "title": "Add Unix-socket inbound listener to panopticon-bridge that pushes channel notifications",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T04:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-985"
+        },
+        "narrative": {
+          "Action": "In src/lib/channels/panopticon-bridge.ts, after the StdioServerTransport connect, start a minimal HTTP-over-Unix-socket server using Bun.serve({ unix: '${PANOPTICON_HOME}/sockets/agent-<id>.sock' }). On every POST whose body is a JSON object { content: string, meta?: Record<string,string> }, call mcp.notification with method 'notifications/claude/channel' and the parsed params, then return 200 'ok'. Validate the body shape; reject with 400 on missing content. On startup, ensure the sockets dir exists with mode 0o700, unlink any pre-existing socket at the target path, then bind. On SIGTERM/SIGINT, unlink the socket and exit 0. Log every push to ${PANOPTICON_HOME}/logs/bridge-<agent-id>.log with timestamp, content length, meta keys, and the Claude-side mcp.notification result."
+        },
+        "subItems": [
+          {
+            "id": "bridge-unix-socket-listener.ac1",
+            "title": "Bridge binds to ${PANOPTICON_HOME}/sockets/agent-<PANOPTICON_AGENT_ID>.sock with file mode 0o600 (owner-only)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bridge-unix-socket-listener.ac2",
+            "title": "POST to the socket with body {\"content\": \"hello\"} returns 200 'ok' and is observable as an mcp.notification call (verified via stdio frame inspection in unit test with a fake transport)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bridge-unix-socket-listener.ac3",
+            "title": "POST with missing content field returns 400 with a JSON error body and does NOT call mcp.notification",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bridge-unix-socket-listener.ac4",
+            "title": "Bridge unlinks any pre-existing socket file before bind (no EADDRINUSE on restart) and unlinks again on SIGTERM",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bridge-unix-socket-listener.ac5",
+            "title": "Every push is logged to ${PANOPTICON_HOME}/logs/bridge-<agent-id>.log with ISO timestamp, content length, meta key list",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:09:41.346Z"
+      },
+      {
+        "id": "bridge-unit-tests",
+        "title": "Unit tests for panopticon-bridge: notification frame shape and socket protocol",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T04:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-985"
+        },
+        "narrative": {
+          "Action": "Add src/lib/channels/__tests__/panopticon-bridge.test.ts. Tests must run under vitest and not require a real claude binary. Mock StdioServerTransport with a stub that records JSON-RPC frames written to it. (a) Boot the bridge in-process with a temp PANOPTICON_HOME and a random agent_id; assert the socket file exists at the expected path with mode 0o600. (b) POST {content: 'hello world', meta: {agent_id: 'a-1'}} to the socket; assert exactly one stdio frame was written, method is 'notifications/claude/channel', params.content is 'hello world', params.meta.agent_id is 'a-1'. (c) POST with malformed JSON returns 400. (d) POST with missing content returns 400 and writes zero stdio frames. (e) Bridge unlinks the socket on shutdown signal. Tests must pass under `npm test` from the workspace root."
+        },
+        "subItems": [
+          {
+            "id": "bridge-unit-tests.ac1",
+            "title": "Test file exists at src/lib/channels/__tests__/panopticon-bridge.test.ts and is picked up by vitest",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bridge-unit-tests.ac2",
+            "title": "Test asserts the JSON-RPC notification frame method is exactly 'notifications/claude/channel' and params.content survives round-trip unchanged",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bridge-unit-tests.ac3",
+            "title": "Test asserts socket file mode is 0o600 (owner-only) after bind",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bridge-unit-tests.ac4",
+            "title": "Test asserts malformed-JSON and missing-content POSTs return 400 and emit zero notification frames",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bridge-unit-tests.ac5",
+            "title": "All tests pass under `npm test` with no real claude binary, no real Anthropic auth, no network access required",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:09:41.345Z"
+      },
+      {
+        "id": "config-experimental-flag",
+        "title": "Add experimental.claudeCodeChannels boolean to config schema and loader",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T04:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-985"
+        },
+        "narrative": {
+          "Action": "Extend the config schema in src/lib/config-yaml.ts to recognise an optional top-level `experimental` object with a single boolean field `claudeCodeChannels` (default false). Update the TypeScript YamlConfig type. loadConfig() must populate experimental.claudeCodeChannels with false when the key is absent — never throw, never warn. Add a single helper isClaudeCodeChannelsEnabled() that returns the boolean. Existing config files without the experimental block must continue to load identically. Do NOT yet write the flag to config in any code path; that is the settings-route bead."
+        },
+        "subItems": [
+          {
+            "id": "config-experimental-flag.ac1",
+            "title": "YamlConfig type in src/lib/config-yaml.ts has an optional `experimental?: { claudeCodeChannels?: boolean }` field",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-experimental-flag.ac2",
+            "title": "loadConfig() returns experimental.claudeCodeChannels === false when the key is absent from config.yaml (no warning, no error)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-experimental-flag.ac3",
+            "title": "isClaudeCodeChannelsEnabled() helper exists in src/lib/config-yaml.ts (or co-located helper module) and returns boolean",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-experimental-flag.ac4",
+            "title": "All existing config-yaml unit tests continue to pass without modification",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:09:41.348Z"
+      },
+      {
+        "id": "deliver-agent-message-primitive",
+        "title": "Add deliverAgentMessage primitive in src/lib/agents.ts with eligibility check and tmux fallback",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T04:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-985"
+        },
+        "narrative": {
+          "Action": "Export a new function deliverAgentMessage(agentId, message, caller?) from src/lib/agents.ts. The function: (a) reads the agent state file at ${PANOPTICON_HOME}/agents/<id>/state.json and looks up channelsEnabled (written at launch by the launch bead); (b) if channelsEnabled and the socket file exists, POSTs the message as JSON {content, meta: {caller}} to the Unix socket using a 2-second connect+write timeout; (c) on 200 response: returns success and logs to the existing send-keys log file with caller='channel:<original-caller>'; (d) on any failure (ENOENT, ECONNREFUSED, EPIPE, non-2xx, timeout): falls back to sendKeysAsync(agentId, message, caller) and logs the fallback reason. Pure-tmux behavior (channelsEnabled=false in agent state, or no state file) is identical to today: call sendKeysAsync directly with no socket attempt. Function must use async fs/promises (no sync IO) per dashboard server constraints."
+        },
+        "subItems": [
+          {
+            "id": "deliver-agent-message-primitive.ac1",
+            "title": "deliverAgentMessage exported from src/lib/agents.ts with signature (agentId: string, message: string, caller?: string) => Promise<void>",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver-agent-message-primitive.ac2",
+            "title": "When agent state.channelsEnabled is false or state file missing, deliverAgentMessage delegates to sendKeysAsync exactly once and never attempts a socket connection",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver-agent-message-primitive.ac3",
+            "title": "When channelsEnabled is true and socket POST returns 200, sendKeysAsync is NOT called and the channel-path log line is written",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver-agent-message-primitive.ac4",
+            "title": "When channelsEnabled is true and socket POST fails (any error mode), deliverAgentMessage falls back to sendKeysAsync and writes a fallback-reason log line; the user-visible behavior is identical to a tmux-only delivery",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver-agent-message-primitive.ac5",
+            "title": "Implementation uses fs/promises and node:net (or fetch with unix-socket dispatcher) — no readFileSync/writeFileSync/execSync in this code path",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deliver-agent-message-primitive.ac6",
+            "title": "Unit tests in src/lib/__tests__/deliver-agent-message.test.ts cover: (a) flag-off pure-tmux path, (b) flag-on socket-success path, (c) flag-on socket-ENOENT fallback, (d) flag-on socket-timeout fallback. Each test mocks both the socket and sendKeysAsync.",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:09:41.346Z"
+      },
+      {
+        "id": "launcher-channels-args",
+        "title": "Extend LauncherConfig and generateLauncherScript to accept channels MCP config and dev-channels flag",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T04:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-985"
+        },
+        "narrative": {
+          "Action": "In src/lib/launcher-generator.ts, add two optional fields to LauncherConfig: `channelsBridgeMcpConfig?: string` (absolute path to the per-agent .mcp.json) and `channelsBridgeServerName?: string` (default 'panopticon-bridge'). When BOTH are set, buildNonConversationCommand and buildCommand for specialist-dispatch must append --mcp-config <path> --dangerously-load-development-channels server:<name> to the claude invocation, before --session-id and --model flags. Do NOT add --strict-mcp-config: --mcp-config is additive by default and we MUST keep project-level MCP servers (TLDR, Playwright) loading alongside the bridge. When either is unset, the generated script must be byte-for-byte identical to today (no new tokens, no whitespace changes). Update src/lib/__tests__/launcher-generator.test.ts: (a) regression test asserting flag-off output is unchanged for representative work-agent and specialist configs, (b) new test asserting flag-on output contains the two new flags in the documented order, (c) test asserting --strict-mcp-config is NOT present in the flag-on output."
+        },
+        "subItems": [
+          {
+            "id": "launcher-channels-args.ac1",
+            "title": "LauncherConfig has optional fields channelsBridgeMcpConfig?: string and channelsBridgeServerName?: string with documented defaults",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-channels-args.ac2",
+            "title": "generateLauncherScript output is byte-for-byte identical to the current behavior when channelsBridgeMcpConfig is undefined (regression test asserts string equality against a known fixture)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-channels-args.ac3",
+            "title": "When channelsBridgeMcpConfig is set, generated command includes --mcp-config <quoted-path> --dangerously-load-development-channels server:panopticon-bridge in that order, before --session-id/--model, and does NOT include --strict-mcp-config",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-channels-args.ac4",
+            "title": "Existing launcher-generator unit tests pass without modification; new tests added for both flag-off-regression and flag-on cases, including an explicit assertion that --strict-mcp-config is absent",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:09:41.347Z"
+      },
+      {
+        "id": "work-agent-launch-wires-bridge",
+        "title": "Wire the experimental flag into work-agent launch in src/lib/agents.ts",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T04:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-985"
+        },
+        "narrative": {
+          "Action": "In src/lib/agents.ts, in the work-agent launch path that calls generateLauncherScript (around the existing const launcherContent = generateLauncherScript({ ... }) at ~line 1092), add an isEligibleForChannels(agentConfig) helper and an enableChannels = isClaudeCodeChannelsEnabled() && isEligibleForChannels(...) gate. When true: (a) write a per-agent .mcp.json at <workspace>/.pan/agent-mcp.json containing { mcpServers: { 'panopticon-bridge': { command: 'bun', args: ['<repo>/src/lib/channels/panopticon-bridge.ts'], env: { PANOPTICON_AGENT_ID: '<id>', PANOPTICON_HOME: '<home>' } } } }; (b) populate channelsBridgeMcpConfig and channelsBridgeServerName on the LauncherConfig; (c) write channelsEnabled: true to the agent state file at ${PANOPTICON_HOME}/agents/<id>/state.json. When false: do nothing new (no .mcp.json, no extra flags, channelsEnabled defaults to false in agent state). Eligibility = work agent + Claude Code runtime + Anthropic-compatible auth + non-Docker workspace. Log eligibility result once per launch with a clear category prefix 'channels:eligible' or 'channels:ineligible:<reason>'. Update existing work-agent launch tests to cover both branches."
+        },
+        "subItems": [
+          {
+            "id": "work-agent-launch-wires-bridge.ac1",
+            "title": "isEligibleForChannels helper returns false for non-Claude-Code runtimes (codex, cursor, gemini), false for Bedrock/Vertex/Foundry auth, false for Docker workspaces, true otherwise",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-agent-launch-wires-bridge.ac2",
+            "title": "When experimental flag is off, launching a work agent produces zero new files (no .mcp.json, no state.channelsEnabled change) — regression test asserts directory contents",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-agent-launch-wires-bridge.ac3",
+            "title": "When experimental flag is on AND eligible, launch writes <workspace>/.pan/agent-mcp.json with the documented schema and writes channelsEnabled: true to ${PANOPTICON_HOME}/agents/<id>/state.json",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-agent-launch-wires-bridge.ac4",
+            "title": "When experimental flag is on AND ineligible, launch logs 'channels:ineligible:<reason>' and behaves identically to flag-off (no .mcp.json, no state mutation)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-agent-launch-wires-bridge.ac5",
+            "title": "Eligibility log lines appear exactly once per launch (not per delivery) and contain the agent id and the reason",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:09:41.345Z"
+      },
+      {
+        "id": "dismiss-dev-channels-dialog",
+        "title": "Dismiss the dev-channels confirmation dialog at agent startup with one Enter keystroke",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T04:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-985"
+        },
+        "narrative": {
+          "Action": "In the work-agent launch path in src/lib/agents.ts, after the tmux session is created and BEFORE the first deliverAgentMessage / sendKeysAsync of an actual prompt, add a dismissDevChannelsDialog(agentId) step that runs only when channelsEnabled is true for the agent. Implementation: poll capturePaneAsync for the literal string 'WARNING: Loading development channels' (case-sensitive) every 200ms with a 20-second timeout (cold-start claude with TLDR + Playwright MCP servers commonly takes 8-15s to render the first frame; a tighter budget will frequently false-negative and silently fall through to tmux). On match, call sendRawKeystrokeAsync(agentId, 'C-m', 'channels:dismiss-dev-dialog') ONCE and wait 500ms. If the string is not found within the timeout, log 'channels:dismiss:dialog-not-detected' and proceed (the dialog is suppressed in some auth states). Must NOT use sendKeysAsync (that would type text and submit). The dismissal step must run before any prompt is delivered, otherwise the channel listener does not register and all early channel pushes silently fail."
+        },
+        "subItems": [
+          {
+            "id": "dismiss-dev-channels-dialog.ac1",
+            "title": "dismissDevChannelsDialog runs only when the agent state has channelsEnabled: true; flag-off launches skip it entirely",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dismiss-dev-channels-dialog.ac2",
+            "title": "When the dialog text is detected within 20s, exactly one sendRawKeystrokeAsync(C-m) is fired (verified by checking the send-keys log)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dismiss-dev-channels-dialog.ac3",
+            "title": "When the dialog text is NOT detected within 20s, the launch continues (does not block forever) and a 'channels:dismiss:dialog-not-detected' log line is written",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dismiss-dev-channels-dialog.ac4",
+            "title": "Implementation uses sendRawKeystrokeAsync, NOT sendKeysAsync (no load-buffer/paste-buffer machinery for a single keystroke)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dismiss-dev-channels-dialog.ac5",
+            "title": "Dismissal completes before any deliverAgentMessage is called for that agent (test asserts ordering with a fake clock or call-order assertion)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:09:41.344Z"
+      },
+      {
+        "id": "switch-work-agent-callers-to-deliver",
+        "title": "Switch work-agent prompt-delivery call sites in agents.ts to deliverAgentMessage",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T04:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-985"
+        },
+        "narrative": {
+          "Action": "In src/lib/agents.ts, replace each work-agent-context call to sendKeysAsync with deliverAgentMessage at: line 1174 (initial prompt delivery in launchAgent), line 1470 (resume-prompt delivery), line 1525 (messageAgent — pan tell entry), line 1689 (CI nudge inside messageAgent retry loop). Do NOT touch sendKeysAsync calls in src/lib/cloister/ (specialists, deacon, review, merge), src/lib/runtimes/claude-code.ts, src/dashboard/server/routes/conversations.ts, src/dashboard/server/routes/misc.ts — those remain on sendKeysAsync per scope decision. The semantics for callers must not change: deliverAgentMessage's flag-off branch is identical to a direct sendKeysAsync call. Each replacement passes the same caller string the original sendKeysAsync had."
+        },
+        "subItems": [
+          {
+            "id": "switch-work-agent-callers-to-deliver.ac1",
+            "title": "All four agents.ts call sites (1174, 1470, 1525, 1689 by current numbering) call deliverAgentMessage instead of sendKeysAsync, preserving original caller strings",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-work-agent-callers-to-deliver.ac2",
+            "title": "Zero call-site changes in src/lib/cloister/, src/lib/runtimes/claude-code.ts, src/dashboard/server/routes/conversations.ts, src/dashboard/server/routes/misc.ts (verified by git diff scope)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "switch-work-agent-callers-to-deliver.ac3",
+            "title": "Existing tests for messageAgent and the launchAgent flow continue to pass without modification (deliverAgentMessage with flag-off is a behavior-preserving substitution)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:09:41.345Z"
+      },
+      {
+        "id": "settings-api-experimental-block",
+        "title": "Extend GET/POST /api/settings to read and persist the experimental.claudeCodeChannels flag",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T04:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-985"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/settings.ts, extend the GET /api/settings response shape with an `experimental: { claudeCodeChannels: boolean }` block populated from loadConfig(). Extend POST /api/settings to accept the same block and write it through to config.yaml using the existing config-write helpers (must use async fs/promises per server constraints). Validate that the value is a boolean; reject non-booleans with 400. Must not break existing settings consumers (additive only)."
+        },
+        "subItems": [
+          {
+            "id": "settings-api-experimental-block.ac1",
+            "title": "GET /api/settings returns experimental.claudeCodeChannels in its response, defaulting to false when the config has no experimental block",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-experimental-block.ac2",
+            "title": "POST /api/settings with { experimental: { claudeCodeChannels: true } } persists the value to config.yaml such that a subsequent GET returns true and a fresh loadConfig() in another process also sees true",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-experimental-block.ac3",
+            "title": "POST with experimental.claudeCodeChannels of a non-boolean type (string, number, object) returns 400 with a clear error and does not write to config.yaml",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-experimental-block.ac4",
+            "title": "Implementation uses fs/promises throughout — no readFileSync/writeFileSync in the new code paths",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:09:41.346Z"
+      },
+      {
+        "id": "settings-ui-experimental-section",
+        "title": "Add Experimental section at the bottom of SettingsPage with the Claude Code Channels toggle",
+        "status": "completed",
+        "priority": "medium",
+        "created": "2026-05-07T04:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-985"
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Settings/SettingsPage.tsx, append a new section at the very end (after every other existing section) titled 'Experimental' with the Beaker icon already imported. Use a visually distinct heading treatment (warning-tone color or border) and a one-paragraph blurb: 'Research-preview features that may break, change, or be removed without notice. Use at your own risk.' Inside the section, render a single labeled toggle 'Use Claude Code Channels for prompt delivery (work agents only)' wired through the existing settings query/mutation hooks to experimental.claudeCodeChannels. Sub-text under the toggle: 'Routes prompts via a stdio MCP bridge instead of tmux send-keys. Requires Claude Code with claude.ai or Console API auth. Does not apply to Codex, Cursor, Gemini, or Bedrock/Vertex/Foundry runtimes; those continue using tmux. Triggers a confirmation dialog at agent startup that Panopticon dismisses automatically.' Include a link to https://code.claude.com/docs/en/channels. Add a Playwright test (or extend an existing one) that asserts the section is the last visible section on the page, the toggle defaults to off, and toggling it issues a POST to /api/settings with the expected body."
+        },
+        "subItems": [
+          {
+            "id": "settings-ui-experimental-section.ac1",
+            "title": "The Experimental section is rendered as the LAST section on SettingsPage (no other section appears below it visually or in DOM order)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui-experimental-section.ac2",
+            "title": "The toggle 'Use Claude Code Channels for prompt delivery (work agents only)' defaults to off and reflects the GET /api/settings value on initial render",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui-experimental-section.ac3",
+            "title": "Sub-text under the toggle includes the runtime-eligibility caveat and a link to https://code.claude.com/docs/en/channels",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui-experimental-section.ac4",
+            "title": "Toggling the switch issues a POST to /api/settings with body { experimental: { claudeCodeChannels: true|false } } (verified by Playwright network assertion)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-ui-experimental-section.ac5",
+            "title": "Section heading includes a visually distinct treatment (warning-tone color or border) and the Beaker icon",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:09:41.344Z"
+      },
+      {
+        "id": "smoke-test-doc",
+        "title": "Add SMOKE_TEST.md documenting the manual end-to-end channel-delivery verification",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-05-07T04:25:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-985"
+        },
+        "narrative": {
+          "Action": "Add src/lib/channels/SMOKE_TEST.md with a five-step manual procedure: (1) toggle the experimental flag on in dashboard Settings; (2) start a work agent against a Claude-Code-eligible Linear/GitHub issue; (3) attach to the agent's tmux pane and observe the dev-channels dialog appears and is auto-dismissed; (4) tail ${PANOPTICON_HOME}/logs/bridge-<agent-id>.log and observe a channel-push log line for the initial prompt; (5) run pan tell <id> 'echo test' and observe a second push log line with caller=pan-tell. Document the expected log signatures, where to look on failure, and how to revert (toggle off, restart agent)."
+        },
+        "subItems": [
+          {
+            "id": "smoke-test-doc.ac1",
+            "title": "src/lib/channels/SMOKE_TEST.md exists and contains the five-step procedure with expected outputs and revert instructions",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smoke-test-doc.ac2",
+            "title": "Doc references the bridge log path, the eligibility log category, and the tmux pane location for visual confirmation of the dev-channels dialog",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:09:41.343Z"
+      },
+      {
+        "id": "claude-md-channels-section",
+        "title": "Document the Channels architecture in CLAUDE.md",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-05-07T04:25:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-985"
+        },
+        "narrative": {
+          "Action": "Add a new section to CLAUDE.md titled 'Claude Code Channels (experimental)' immediately after the existing 'tmux Message Delivery' section. The section must explain: (a) what Channels is and why we use it (reliability of prompt delivery vs tmux send-keys); (b) it is opt-in via the experimental flag in Settings, off by default; (c) it applies only to work agents on Claude Code runtimes with Anthropic auth; (d) the bridge is a Bun stdio MCP server at src/lib/channels/panopticon-bridge.ts spawned per agent; (e) the dev-channels confirmation dialog is dismissed automatically with one tmux Enter at startup; (f) deliverAgentMessage in src/lib/agents.ts is the single primitive that handles eligibility check and tmux fallback; (g) callers in src/lib/cloister, conversation routes, and runtimes other than claude-code stay on sendKeysAsync. Cross-link to the Channels reference URL."
+        },
+        "subItems": [
+          {
+            "id": "claude-md-channels-section.ac1",
+            "title": "CLAUDE.md has a new section titled 'Claude Code Channels (experimental)' positioned immediately after the 'tmux Message Delivery' section",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-md-channels-section.ac2",
+            "title": "The section describes opt-in posture, eligibility criteria (Claude Code runtime + Anthropic auth + non-Docker), and explicitly notes which call sites do NOT migrate (cloister, conversations, non-Claude runtimes)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-md-channels-section.ac3",
+            "title": "The section references src/lib/channels/panopticon-bridge.ts, deliverAgentMessage in src/lib/agents.ts, and the Channels reference URL",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:09:41.347Z"
+      },
+      {
+        "id": "followup-issues-filed",
+        "title": "File two follow-up GitHub issues for reply tool and permission relay",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-05-07T04:25:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-985"
+        },
+        "narrative": {
+          "Action": "Create two follow-up GitHub issues using gh CLI: (1) 'Channels: bidirectional reply tool for orchestrator status events' — add a reply MCP tool to panopticon-bridge so Claude can call it to send structured status events back to the dashboard, replacing pane-scraping; depends on PAN-985. (2) 'Channels: route Claude permission prompts through dashboard via permission relay' — declare claude/channel/permission capability on the bridge, add notification handler for notifications/claude/channel/permission_request, build a dashboard modal to display the prompt and POST a verdict back; depends on PAN-985 and on at least Claude Code v2.1.81. Include in each issue a one-paragraph context section explaining the Channels mechanism and a link to the relevant section of channels-reference. Record the resulting issue numbers in the PR description for PAN-985."
+        },
+        "subItems": [
+          {
+            "id": "followup-issues-filed.ac1",
+            "title": "Two GitHub issues exist with titles starting 'Channels: bidirectional reply tool...' and 'Channels: route Claude permission prompts...' and both reference PAN-985 as a dependency",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "followup-issues-filed.ac2",
+            "title": "Each issue has a context paragraph explaining the Channels mechanism and links to the relevant channels-reference section",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "followup-issues-filed.ac3",
+            "title": "The PR description for PAN-985 lists both follow-up issue numbers under a 'Follow-up work' heading",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ],
+        "completed": "2026-05-07T05:09:41.347Z"
+      }
+    ],
+    "edges": [
+      {
+        "from": "scaffold-bridge-package",
+        "to": "bridge-unix-socket-listener",
+        "type": "blocks"
+      },
+      {
+        "from": "bridge-unix-socket-listener",
+        "to": "bridge-unit-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "config-experimental-flag",
+        "to": "deliver-agent-message-primitive",
+        "type": "blocks"
+      },
+      {
+        "from": "config-experimental-flag",
+        "to": "settings-api-experimental-block",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-api-experimental-block",
+        "to": "settings-ui-experimental-section",
+        "type": "blocks"
+      },
+      {
+        "from": "deliver-agent-message-primitive",
+        "to": "switch-work-agent-callers-to-deliver",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-channels-args",
+        "to": "work-agent-launch-wires-bridge",
+        "type": "blocks"
+      },
+      {
+        "from": "bridge-unix-socket-listener",
+        "to": "work-agent-launch-wires-bridge",
+        "type": "blocks"
+      },
+      {
+        "from": "config-experimental-flag",
+        "to": "work-agent-launch-wires-bridge",
+        "type": "blocks"
+      },
+      {
+        "from": "work-agent-launch-wires-bridge",
+        "to": "dismiss-dev-channels-dialog",
+        "type": "blocks"
+      },
+      {
+        "from": "dismiss-dev-channels-dialog",
+        "to": "switch-work-agent-callers-to-deliver",
+        "type": "informs"
+      },
+      {
+        "from": "switch-work-agent-callers-to-deliver",
+        "to": "smoke-test-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-ui-experimental-section",
+        "to": "smoke-test-doc",
+        "type": "blocks"
+      },
+      {
+        "from": "switch-work-agent-callers-to-deliver",
+        "to": "claude-md-channels-section",
+        "type": "informs"
+      },
+      {
+        "from": "claude-md-channels-section",
+        "to": "followup-issues-filed",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-07-PAN-985-replace-tmux-send-keys-with-claude-code-channels-for-prompt-delivery.vbrief.json"
+    }
+  }
+}
