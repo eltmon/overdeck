@@ -39,6 +39,8 @@ import { useMutation } from '@tanstack/react-query';
 import { ContainerSection } from '../../inspector/ContainerSection';
 import { ReviewPipelineSection } from '../../inspector/ReviewPipelineSection';
 import type { ContainerMenuState } from '../../inspector/types';
+import { SwitchModelModal } from '../../SwitchModelModal';
+import { useSwitchModel } from '../../hooks/useSwitchModel';
 import { GitPullRequest, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Box, Link2, Terminal, Play, Pause, ExternalLink, Code2, Loader2, RotateCcw } from 'lucide-react';
 import { PlanDAGViewer } from '../../PlanDAG.js';
 import { getFriendlyModelName } from '../../inspector/utils';
@@ -221,6 +223,8 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
   const [isRecoverPending, setIsRecoverPending] = useState(false);
   const [isSpawnPending, setIsSpawnPending] = useState(false);
   const [containerMenu, setContainerMenu] = useState<ContainerMenuState | null>(null);
+  const [showSwitchModel, setShowSwitchModel] = useState(false);
+  const { switchMutation, isPending: isSwitchingModel } = useSwitchModel(agent?.id, issueId);
 
   const containerControlMutation = useMutation({
     mutationFn: async ({ containerName, action }: { containerName: string; action: 'start' | 'stop' | 'restart' }) => {
@@ -798,6 +802,25 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                 Stop
               </button>
             )}
+            {agent && (
+              <button
+                type="button"
+                data-testid="overview-action-switch-model"
+                onClick={() => setShowSwitchModel(true)}
+                disabled={isSwitchingModel}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: 6,
+                  border: '1px solid var(--border)',
+                  background: 'transparent',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  opacity: isSwitchingModel ? 0.5 : 1,
+                }}
+              >
+                Switch Model
+              </button>
+            )}
           </div>
         </Tile>
 
@@ -1214,6 +1237,23 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         >
           Loading planning context…
         </div>
+      )}
+
+      {showSwitchModel && agent && (
+        <SwitchModelModal
+          currentModel={agent.model}
+          agentId={agent.id}
+          issueId={issueId}
+          agentStatus={agent.status}
+          hasResumableSession={agent.hasSession ?? false}
+          onClose={() => setShowSwitchModel(false)}
+          onSwitch={(model, message) => {
+            switchMutation.mutate({ model, message }, {
+              onSuccess: () => setShowSwitchModel(false),
+            });
+          }}
+          isPending={isSwitchingModel}
+        />
       )}
     </div>
   );
