@@ -138,7 +138,7 @@
       {
         "id": "define-test-agent",
         "title": "Create pan-test-agent.md definition",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T02:30:00.000Z",
         "metadata": {
@@ -152,7 +152,7 @@
           {
             "id": "define-test-agent.ac1",
             "title": "pan-test-agent.md exists with correct frontmatter and test-execution role description",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
