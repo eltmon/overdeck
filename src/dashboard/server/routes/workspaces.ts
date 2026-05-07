@@ -650,55 +650,64 @@ async function getContainerStatusAsync(
       };
     }
 
-    // Probe service health for running containers in parallel
-    const runningContainers = Object.entries(result).filter(([, info]) => info.running);
-    const healthResults = await Promise.all(
-      runningContainers.map(async ([name, info]) => {
-        const serviceHealth = await getContainerServiceHealthAsync(name);
-        let health: WorkspaceContainerStatus['health'] = serviceHealth.health;
-        let lastFailureReason = serviceHealth.lastFailureReason;
-        let lastProbeAt = serviceHealth.lastProbeAt;
+    // Batch docker inspect for all running containers to avoid serial O(n) latency
+    const runningNames = Object.entries(result)
+      .filter(([, info]) => info.running)
+      .map(([name]) => name);
 
-        // If docker healthcheck is unknown but we have host-mapped ports, probe them
-        if (health === 'unknown' && serviceHealth.bindings.length > 0) {
-          // Deduplicate and cap probe targets
-          const dedupedBindings = Array.from(
-            new Map(
-              serviceHealth.bindings.map((b) => [`${b.hostIp}:${b.hostPort}`, b])
-            ).values()
-          ).slice(0, MAX_PROBED_PORTS);
+    if (runningNames.length > 0) {
+      const { stdout: inspectStdout } = await execFileAsync(
+        'docker',
+        ['inspect', ...runningNames],
+        { encoding: 'utf-8', timeout: 10000 }
+      );
+      const inspects: Array<{
+        Name?: string;
+        Config?: { Labels?: Record<string, string>; ExposedPorts?: Record<string, unknown> };
+        NetworkSettings?: { Ports?: Record<string, unknown> };
+        State?: { Health?: { Status?: string; LastExecution?: { End?: string }; FailingStreak?: number; ExitCode?: number } };
+      }> = JSON.parse(inspectStdout);
+      const inspectByName = new Map(inspects.map((i) => [i.Name?.replace(/^\//, ''), i]));
 
-          const probeResults = await Promise.all(
-            dedupedBindings.map((b) => probeContainerPortAsync(b.hostPort, b.hostIp))
-          );
-          const anyHealthy = probeResults.some((r) => r.healthy);
-          health = anyHealthy ? 'healthy' : 'unhealthy';
-          lastProbeAt = new Date().toISOString();
-          if (!anyHealthy) {
-            const firstFailure = probeResults.find((r) => !r.healthy);
-            lastFailureReason = firstFailure?.reason ?? 'probe failed';
+      await Promise.all(
+        runningNames.map(async (name) => {
+          const info = result[name];
+          const inspect = inspectByName.get(name);
+          const serviceHealth = extractContainerServiceHealth(inspect);
+          let health: WorkspaceContainerStatus['health'] = serviceHealth.health;
+          let lastFailureReason = serviceHealth.lastFailureReason;
+          let lastProbeAt = serviceHealth.lastProbeAt;
+
+          // If docker healthcheck is unknown but we have host-mapped ports, probe them
+          if (health === 'unknown' && serviceHealth.bindings.length > 0) {
+            // Deduplicate and cap probe targets
+            const dedupedBindings = Array.from(
+              new Map(
+                serviceHealth.bindings.map((b) => [`${b.hostIp}:${b.hostPort}`, b])
+              ).values()
+            ).slice(0, MAX_PROBED_PORTS);
+
+            const probeResults = await Promise.all(
+              dedupedBindings.map((b) => probeContainerPortAsync(b.hostPort, b.hostIp))
+            );
+            const anyHealthy = probeResults.some((r) => r.healthy);
+            health = anyHealthy ? 'healthy' : 'unhealthy';
+            lastProbeAt = new Date().toISOString();
+            if (!anyHealthy) {
+              const firstFailure = probeResults.find((r) => !r.healthy);
+              lastFailureReason = firstFailure?.reason ?? 'probe failed';
+            }
           }
-        }
 
-        return {
-          name,
-          info,
-          health,
-          ports: serviceHealth.ports,
-          lastProbeAt,
-          lastFailureReason,
-        };
-      })
-    );
-
-    for (const r of healthResults) {
-      result[r.name] = {
-        ...r.info,
-        health: r.health,
-        ports: r.ports,
-        lastProbeAt: r.lastProbeAt,
-        lastFailureReason: r.lastFailureReason,
-      };
+          result[name] = {
+            ...info,
+            health,
+            ports: serviceHealth.ports,
+            lastProbeAt,
+            lastFailureReason,
+          };
+        })
+      );
     }
   } catch { /* non-fatal */ }
   return result;
@@ -718,78 +727,80 @@ interface ContainerServiceHealth {
   lastFailureReason?: string;
 }
 
-async function getContainerServiceHealthAsync(containerName: string): Promise<ContainerServiceHealth> {
-  const defaultResult: ContainerServiceHealth = { health: 'unknown', ports: [], bindings: [] };
-  try {
-    const { stdout } = await execFileAsync('docker', ['inspect', containerName], { encoding: 'utf-8', timeout: 10000 });
-    const inspect = JSON.parse(stdout)[0];
-    const labels: Record<string, string> = inspect?.Config?.Labels ?? {};
-    const healthState = inspect?.State?.Health;
-    const exposedPorts: Record<string, unknown> = inspect?.Config?.ExposedPorts ?? {};
-    const portBindings: Record<string, unknown> = inspect?.NetworkSettings?.Ports ?? {};
+function extractContainerServiceHealth(
+  inspect?: {
+    Config?: { Labels?: Record<string, string>; ExposedPorts?: Record<string, unknown> };
+    NetworkSettings?: { Ports?: Record<string, unknown> };
+    State?: { Health?: { Status?: string; LastExecution?: { End?: string }; FailingStreak?: number; ExitCode?: number } };
+  }
+): ContainerServiceHealth {
+  if (!inspect) return { health: 'unknown', ports: [], bindings: [] };
+  const labels = inspect?.Config?.Labels ?? {};
+  const healthState = inspect?.State?.Health;
+  const exposedPorts = inspect?.Config?.ExposedPorts ?? {};
+  const portBindings = inspect?.NetworkSettings?.Ports ?? {};
 
-    // Parse exposed ports
-    const ports = Object.keys(exposedPorts).map((p) => parseInt(p.split('/')[0], 10)).filter((n) => !Number.isNaN(n));
+  // Parse exposed ports
+  const ports = Object.keys(exposedPorts)
+    .map((p) => parseInt(p.split('/')[0], 10))
+    .filter((n) => !Number.isNaN(n));
 
-    // Parse Traefik loadbalancer port labels
-    const traefikPorts: number[] = [];
-    for (const [key, value] of Object.entries(labels)) {
-      if (key.endsWith('.loadbalancer.server.port') && value) {
-        const port = parseInt(value, 10);
-        if (!Number.isNaN(port)) traefikPorts.push(port);
-      }
+  // Parse Traefik loadbalancer port labels
+  const traefikPorts: number[] = [];
+  for (const [key, value] of Object.entries(labels)) {
+    if (key.endsWith('.loadbalancer.server.port') && value) {
+      const port = parseInt(value, 10);
+      if (!Number.isNaN(port)) traefikPorts.push(port);
     }
+  }
 
-    const allPorts = traefikPorts.length > 0 ? traefikPorts : ports;
+  const allPorts = traefikPorts.length > 0 ? traefikPorts : ports;
 
-    // Extract host-mapped ports from NetworkSettings.Ports
-    const bindings: ContainerPortBinding[] = [];
-    for (const [containerPortProto, hostBindings] of Object.entries(portBindings)) {
-      if (!Array.isArray(hostBindings)) continue;
-      const containerPort = parseInt(containerPortProto.split('/')[0], 10);
-      if (Number.isNaN(containerPort)) continue;
-      for (const hb of hostBindings) {
-        if (!hb || typeof hb !== 'object') continue;
-        const hostPort = parseInt((hb as any).HostPort, 10);
-        if (Number.isNaN(hostPort) || hostPort < 1 || hostPort > 65535) continue;
-        bindings.push({
-          containerPort,
-          hostIp: String((hb as any).HostIp || '127.0.0.1'),
-          hostPort,
-        });
-      }
+  // Extract host-mapped ports from NetworkSettings.Ports
+  const bindings: ContainerPortBinding[] = [];
+  for (const [containerPortProto, hostBindings] of Object.entries(portBindings)) {
+    if (!Array.isArray(hostBindings)) continue;
+    const containerPort = parseInt(containerPortProto.split('/')[0], 10);
+    if (Number.isNaN(containerPort)) continue;
+    for (const hb of hostBindings) {
+      if (!hb || typeof hb !== 'object') continue;
+      const hostPort = parseInt((hb as any).HostPort, 10);
+      if (Number.isNaN(hostPort) || hostPort < 1 || hostPort > 65535) continue;
+      bindings.push({
+        containerPort,
+        hostIp: String((hb as any).HostIp || '127.0.0.1'),
+        hostPort,
+      });
     }
+  }
 
-    // If container has a Docker healthcheck, use its state
-    if (healthState?.Status) {
-      const status = String(healthState.Status).toLowerCase();
-      const health: ContainerServiceHealth['health'] =
-        status === 'healthy' ? 'healthy' :
-        status === 'unhealthy' ? 'unhealthy' :
-        status === 'starting' ? 'starting' : 'unknown';
-      const lastProbeAt = safeToISOString(healthState?.LastExecution?.End);
-      const exitCode = healthState?.LastExecution?.ExitCode;
-      const failingStreak = healthState?.FailingStreak;
-      const lastFailureReason = failingStreak && failingStreak > 0
-        ? (typeof exitCode === 'number' && exitCode !== 0 ? `exit code ${exitCode}` : 'healthcheck failed')
-        : undefined;
-      return {
-        health,
-        ports: allPorts,
-        bindings,
-        lastProbeAt,
-        lastFailureReason,
-      };
-    }
-
+  // If container has a Docker healthcheck, use its state
+  if (healthState?.Status) {
+    const status = String(healthState.Status).toLowerCase();
+    const health: ContainerServiceHealth['health'] =
+      status === 'healthy' ? 'healthy' :
+      status === 'unhealthy' ? 'unhealthy' :
+      status === 'starting' ? 'starting' : 'unknown';
+    const lastProbeAt = safeToISOString(healthState?.LastExecution?.End);
+    const exitCode = healthState?.LastExecution?.ExitCode;
+    const failingStreak = healthState?.FailingStreak;
+    const lastFailureReason = failingStreak && failingStreak > 0
+      ? (typeof exitCode === 'number' && exitCode !== 0 ? `exit code ${exitCode}` : 'healthcheck failed')
+      : undefined;
     return {
-      health: 'unknown',
+      health,
       ports: allPorts,
       bindings,
+      lastProbeAt,
+      lastFailureReason,
     };
-  } catch {
-    return defaultResult;
   }
+
+  return {
+    health: 'unknown',
+    ports: allPorts,
+    bindings,
+  };
 }
 
 async function probeContainerPortAsync(hostPort: number, hostIp = '127.0.0.1'): Promise<{ healthy: boolean; reason?: string }> {

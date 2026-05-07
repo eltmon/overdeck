@@ -3,7 +3,8 @@
  * Determines which agents should be visible in health checks
  */
 
-import { readFileSync, existsSync } from 'fs';
+import { existsSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { loadCloisterConfig } from '../../lib/cloister/config.js';
 import { capturePaneAsync, sessionExistsAsync } from '../../lib/tmux.js';
 
@@ -47,7 +48,7 @@ export async function determineHealthStatusAsync(
 
   if (existsSync(stateFile)) {
     try {
-      const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+      const state = JSON.parse(await readFile(stateFile, 'utf-8'));
       agentStatus = state.status;
       // Legacy: lastActivity may still be in state.json
       lastActivity = state.lastActivity ? new Date(state.lastActivity) : null;
@@ -61,7 +62,7 @@ export async function determineHealthStatusAsync(
   const runtimeFile = stateFile.replace('state.json', 'runtime.json');
   if (existsSync(runtimeFile)) {
     try {
-      const runtime = JSON.parse(readFileSync(runtimeFile, 'utf-8'));
+      const runtime = JSON.parse(await readFile(runtimeFile, 'utf-8'));
       if (runtime.lastActivity) {
         const runtimeDate = new Date(runtime.lastActivity);
         // Use whichever is more recent
