@@ -101,6 +101,35 @@ const NODE_HEIGHT = 80;
 const NODE_HEIGHT_COMPACT = 42;
 const AC_ROW_HEIGHT = 16;
 
+const GATE_WIDTH = 260;
+const GATE_HEIGHT = 62;
+
+type GateType = 'verify' | 'review' | 'test' | 'merge' | 'done';
+
+const GATE_LABELS: Record<GateType, string> = {
+  verify: 'VERIFY',
+  review: 'REVIEW',
+  test:   'TEST',
+  merge:  'MERGE',
+  done:   'DONE',
+};
+
+const GATE_STATUS_COLORS: Record<string, { border: string; bg: string; text: string }> = {
+  pending:        { border: '#6b7280', bg: '#1f2937', text: '#d1d5db' },
+  running:        { border: '#3b82f6', bg: '#1e3a5f', text: '#93c5fd' },
+  testing:        { border: '#3b82f6', bg: '#1e3a5f', text: '#93c5fd' },
+  reviewing:      { border: '#3b82f6', bg: '#1e3a5f', text: '#93c5fd' },
+  merging:        { border: '#3b82f6', bg: '#1e3a5f', text: '#93c5fd' },
+  verifying:      { border: '#3b82f6', bg: '#1e3a5f', text: '#93c5fd' },
+  passed:         { border: '#22c55e', bg: '#14532d', text: '#86efac' },
+  completed:      { border: '#22c55e', bg: '#14532d', text: '#86efac' },
+  merged:         { border: '#22c55e', bg: '#14532d', text: '#86efac' },
+  failed:         { border: '#ef4444', bg: '#450a0a', text: '#fca5a5' },
+  blocked:        { border: '#ef4444', bg: '#450a0a', text: '#fca5a5' },
+  dispatch_failed:{ border: '#ef4444', bg: '#450a0a', text: '#fca5a5' },
+  skipped:        { border: '#eab308', bg: '#422006', text: '#fde047' },
+};
+
 function nodeHeight(acCount: number, showAC: boolean, isCompact: boolean): number {
   if (isCompact) return NODE_HEIGHT_COMPACT;
   return showAC && acCount > 0 ? NODE_HEIGHT + acCount * AC_ROW_HEIGHT + 6 : NODE_HEIGHT;
@@ -112,8 +141,10 @@ function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
   g.setDefaultEdgeLabel(() => ({}));
 
   for (const node of nodes) {
-    const h = (node.data as PlanItemNodeData).nodeHeight ?? NODE_HEIGHT;
-    g.setNode(node.id, { width: NODE_WIDTH, height: h });
+    const isGate = node.type === 'qualityGate';
+    const w = isGate ? GATE_WIDTH : NODE_WIDTH;
+    const h = (node.data as PlanItemNodeData).nodeHeight ?? (isGate ? GATE_HEIGHT : NODE_HEIGHT);
+    g.setNode(node.id, { width: w, height: h });
   }
   for (const edge of edges) {
     g.setEdge(edge.source, edge.target);
@@ -123,8 +154,10 @@ function applyDagreLayout(nodes: Node[], edges: Edge[]): Node[] {
 
   return nodes.map(node => {
     const { x, y } = g.node(node.id);
-    const h = (node.data as PlanItemNodeData).nodeHeight ?? NODE_HEIGHT;
-    return { ...node, position: { x: x - NODE_WIDTH / 2, y: y - h / 2 } };
+    const isGate = node.type === 'qualityGate';
+    const w = isGate ? GATE_WIDTH : NODE_WIDTH;
+    const h = (node.data as PlanItemNodeData).nodeHeight ?? (isGate ? GATE_HEIGHT : NODE_HEIGHT);
+    return { ...node, position: { x: x - w / 2, y: y - h / 2 } };
   });
 }
 
@@ -295,11 +328,115 @@ function PlanItemNode({ data }: { data: PlanItemNodeData }) {
   );
 }
 
-const NODE_TYPES = { planItem: PlanItemNode };
+// ── Quality gate node ──
+
+interface PipelineReviewStatus {
+  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
+  verificationCycleCount?: number;
+  verificationMaxCycles?: number;
+  reviewStatus?: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
+  reviewNotes?: string;
+  testStatus?: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
+  testNotes?: string;
+  mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
+  mergeNotes?: string;
+  queuePosition?: number | null;
+}
+
+interface QualityGateNodeData {
+  gate: GateType;
+  status: string;
+  detail?: string;
+}
+
+function gateStatusFromReview(gate: GateType, rs?: PipelineReviewStatus): { status: string; detail?: string } {
+  if (!rs) return { status: 'pending' };
+  switch (gate) {
+    case 'verify':
+      return {
+        status: rs.verificationStatus ?? 'pending',
+        detail: rs.verificationCycleCount != null
+          ? `Attempt ${rs.verificationCycleCount}/${rs.verificationMaxCycles ?? 3}`
+          : undefined,
+      };
+    case 'review':
+      return { status: rs.reviewStatus ?? 'pending', detail: rs.reviewNotes };
+    case 'test':
+      return { status: rs.testStatus ?? 'pending', detail: rs.testNotes };
+    case 'merge': {
+      const st = rs.mergeStatus ?? 'pending';
+      let detail: string | undefined;
+      if (rs.queuePosition != null && rs.queuePosition >= 0) {
+        detail = `Queue #${rs.queuePosition + 1}`;
+      } else if (rs.mergeNotes) {
+        detail = rs.mergeNotes;
+      }
+      return { status: st, detail };
+    }
+    case 'done':
+      return {
+        status: rs.mergeStatus === 'merged' ? 'completed' : 'pending',
+        detail: rs.mergeStatus === 'merged' ? 'Merged' : undefined,
+      };
+  }
+}
+
+function QualityGateNode({ data }: { data: QualityGateNodeData }) {
+  const { gate, status, detail } = data;
+  const colors = GATE_STATUS_COLORS[status] ?? GATE_STATUS_COLORS.pending;
+  const isActive = status === 'running' || status === 'testing' || status === 'reviewing' || status === 'merging' || status === 'verifying';
+
+  return (
+    <div
+      className={isActive ? 'plan-glow' : undefined}
+      style={{
+        width: GATE_WIDTH,
+        minHeight: GATE_HEIGHT,
+        background: colors.bg,
+        border: `2px solid ${colors.border}`,
+        borderLeft: `4px solid ${colors.border}`,
+        borderRadius: 6,
+        padding: '6px 10px',
+        fontSize: 11,
+        color: colors.text,
+        cursor: 'default',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 3,
+        transition: 'all 0.3s ease',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span style={{ fontWeight: 700, fontSize: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          {GATE_LABELS[gate]}
+        </span>
+        <span style={{
+          fontSize: 9, background: colors.border, color: colors.bg,
+          borderRadius: 3, padding: '1px 5px', fontWeight: 600,
+          textTransform: 'uppercase', letterSpacing: '0.02em',
+        }}>
+          {status}
+        </span>
+      </div>
+      {detail && (
+        <span style={{ fontSize: 9, color: '#9ca3af', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {detail}
+        </span>
+      )}
+    </div>
+  );
+}
+
+const NODE_TYPES = { planItem: PlanItemNode, qualityGate: QualityGateNode };
 
 // ── Conversion: VBriefDocument → ReactFlow nodes/edges ──
 
-export function vbriefToFlow(doc: VBriefDocument, criticalPath: string[] = [], showAC = false): {
+export function vbriefToFlow(
+  doc: VBriefDocument,
+  criticalPath: string[] = [],
+  showAC = false,
+  reviewStatus?: PipelineReviewStatus,
+): {
   nodes: Node[];
   edges: Edge[];
 } {
@@ -379,6 +516,61 @@ export function vbriefToFlow(doc: VBriefDocument, criticalPath: string[] = [], s
     };
   });
 
+  // ── Quality gate tail nodes ──
+  // Find terminal items (no outgoing blocks edges)
+  const hasOutgoingBlocks = new Set<string>();
+  for (const edge of edgeList) {
+    if (edge.type === 'blocks') {
+      hasOutgoingBlocks.add(edge.from);
+    }
+  }
+  const terminalItems = doc.plan.items.filter(item => !hasOutgoingBlocks.has(item.id));
+
+  const gates: GateType[] = ['verify', 'review', 'test', 'merge', 'done'];
+  let prevGateId: string | undefined;
+  let lastTerminalId: string | undefined;
+
+  if (terminalItems.length > 0) {
+    lastTerminalId = terminalItems[0]!.id;
+  }
+
+  for (const gate of gates) {
+    const gateId = `__gate-${gate}`;
+    const gs = gateStatusFromReview(gate, reviewStatus);
+    rawNodes.push({
+      id: gateId,
+      type: 'qualityGate',
+      position: { x: 0, y: 0 },
+      data: { gate, status: gs.status, detail: gs.detail } satisfies QualityGateNodeData,
+    });
+
+    // Edge from previous gate or from terminal items
+    if (prevGateId) {
+      rawEdges.push({
+        id: `e-gate-${prevGateId}-${gateId}`,
+        source: prevGateId,
+        target: gateId,
+        markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: '#6b7280' },
+        style: { stroke: '#6b7280', strokeWidth: 2 },
+        animated: gs.status === 'running' || gs.status === 'testing' || gs.status === 'reviewing' || gs.status === 'merging' || gs.status === 'verifying',
+      });
+    } else if (lastTerminalId) {
+      // Connect from the first terminal item to the first gate
+      // If multiple terminal items, we connect from all of them
+      for (const term of terminalItems) {
+        rawEdges.push({
+          id: `e-gate-${term.id}-${gateId}`,
+          source: term.id,
+          target: gateId,
+          markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: '#6b7280' },
+          style: { stroke: '#6b7280', strokeWidth: 2 },
+          animated: false,
+        });
+      }
+    }
+    prevGateId = gateId;
+  }
+
   const laidOutNodes = applyDagreLayout(rawNodes, rawEdges);
   return { nodes: laidOutNodes, edges: rawEdges };
 }
@@ -421,12 +613,13 @@ interface PlanDAGProps {
   onNodeClick?: (item: VBriefItem) => void;
   className?: string;
   showAC?: boolean;
+  reviewStatus?: PipelineReviewStatus;
 }
 
-export function PlanDAG({ doc, criticalPath = [], onNodeClick, className, showAC = false }: PlanDAGProps) {
+export function PlanDAG({ doc, criticalPath = [], onNodeClick, className, showAC = false, reviewStatus }: PlanDAGProps) {
   const { nodes: initialNodes, edges: initialEdges } = useMemo(
-    () => vbriefToFlow(doc, criticalPath, showAC),
-    [doc, criticalPath, showAC],
+    () => vbriefToFlow(doc, criticalPath, showAC, reviewStatus),
+    [doc, criticalPath, showAC, reviewStatus],
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
@@ -434,14 +627,17 @@ export function PlanDAG({ doc, criticalPath = [], onNodeClick, className, showAC
 
   // Sync when doc or showAC changes (e.g., real-time status updates or toggle)
   useEffect(() => {
-    const { nodes: updated, edges: updatedEdges } = vbriefToFlow(doc, criticalPath, showAC);
+    const { nodes: updated, edges: updatedEdges } = vbriefToFlow(doc, criticalPath, showAC, reviewStatus);
     setNodes(updated);
     setEdges(updatedEdges);
-  }, [doc, criticalPath, showAC, setNodes, setEdges]);
+  }, [doc, criticalPath, showAC, reviewStatus, setNodes, setEdges]);
 
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     if (onNodeClick) {
-      onNodeClick((node.data as PlanItemNodeData).item);
+      // Only planItem nodes have VBriefItem data
+      if (node.type === 'planItem') {
+        onNodeClick((node.data as PlanItemNodeData).item);
+      }
     }
   }, [onNodeClick]);
 
@@ -476,9 +672,10 @@ interface PlanDAGViewerProps {
   criticalPath?: string[];
   onNodeClick?: (item: VBriefItem) => void;
   className?: string;
+  reviewStatus?: PipelineReviewStatus;
 }
 
-export function PlanDAGViewer({ issueId, criticalPath, onNodeClick, className }: PlanDAGViewerProps) {
+export function PlanDAGViewer({ issueId, criticalPath, onNodeClick, className, reviewStatus }: PlanDAGViewerProps) {
   const queryClient = useQueryClient();
   const [showAC, setShowAC] = useState(false);
 
@@ -552,6 +749,7 @@ export function PlanDAGViewer({ issueId, criticalPath, onNodeClick, className }:
           onNodeClick={onNodeClick}
           className={className}
           showAC={showAC}
+          reviewStatus={reviewStatus}
         />
       </div>
     </div>

@@ -423,7 +423,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
           background: '#111827',
         }}
       >
-        <PlanDAGViewer issueId={issueId} />
+        <PlanDAGViewer issueId={issueId} reviewStatus={reviewStatus.data ?? undefined} />
       </section>
 
       {/* 3. Tile grid */}
