@@ -1,62 +1,65 @@
 {
   "version": "1",
-  "issueId": "PAN-972",
-  "created": "2026-05-06T14:50:00Z",
-  "updated": "2026-05-06T20:14:56.799Z",
+  "issueId": "PAN-974",
+  "created": "2026-05-06T19:10:06.291Z",
+  "updated": "2026-05-06T19:12:51.442Z",
   "gitState": {
-    "branch": "feature/pan-972",
-    "sha": "d2e973d",
+    "branch": "feature/pan-974",
+    "sha": "503cb22b4",
     "dirty": true
   },
   "decisions": [
     {
       "id": "D1",
-      "summary": "Use fs/promises readFile for loadSwarmState and wrap call in Effect.promise() since it is called inside an Effect generator",
-      "recordedAt": "2026-05-06T14:50:00Z"
+      "summary": "Session-tree slot support belongs in the server session discovery layer, not the React tree, because FeatureItem and SessionNode already render multiple per-issue sessions and route selection by sessionId.",
+      "recordedAt": "2026-05-06T19:10:06.291Z"
     },
     {
       "id": "D2",
-      "summary": "Use fs/promises mkdir/writeFile for saveSwarmState and wrap call in Effect.promise()",
-      "recordedAt": "2026-05-06T14:55:00Z"
+      "summary": "Slot session JSONL lookup must derive the workspace path from the slot number so agent-pan-<issue>-<n> resolves against workspaces/feature-<issue>-slot-<n> instead of the base workspace.",
+      "recordedAt": "2026-05-06T19:10:06.291Z"
     },
     {
       "id": "D3",
-      "summary": "For createSlotWorktree and postSwarmRoute plan-copy logic, wrap async fs/promises calls in Effect.promise() to preserve error-swallowing try/catch semantics",
-      "recordedAt": "2026-05-06T15:00:00Z"
+      "summary": "Frontend agent output should normalize slot work session ids with the same base-issue pattern as the server so selecting agent-<issue>-<slot> keeps ActivityView bound to the parent issue while Terminal stays bound to the slot session.",
+      "recordedAt": "2026-05-06T19:12:51.442Z"
     }
   ],
-  "hazards": [],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Final UI verification must use the built dashboard server under Node 22, not Bun, or PTY-backed terminal behavior can fail independently of the PAN-974 code changes.",
+      "mitigation": "Run npm run build before browser verification and validate the dashboard through the Node 22 dist server path."
+    }
+  ],
   "resumePoint": {
-    "description": "Implementing bead workspace-gtm (Convert createSlotWorktree sync calls to async) — done, need to commit and close. All 3 beads implemented. Next: run tests, commit, push, call pan done.",
-    "beadId": "workspace-gtm",
+    "description": "Both PAN-974 beads are implemented. Next: run broader verification for the session-tree slot work, then build the dashboard, verify slot selection in the browser against the Node 22 server, and only then do the final push and pan done flow.",
+    "beadId": "workspace-52u",
     "filesToRead": [
-      "src/dashboard/server/routes/swarm.ts"
+      "src/dashboard/server/routes/projects.ts",
+      "src/dashboard/server/ws-rpc.ts",
+      "src/dashboard/frontend/src/components/AgentOutputPanel.tsx",
+      "src/dashboard/frontend/src/components/__tests__/AgentOutputPanel.test.tsx",
+      "src/dashboard/server/__tests__/swarm-slot-session-mapping.test.ts"
     ]
   },
-  "beadsMapping": {},
-  "agentModel": "kimi-k2.6",
+  "beadsMapping": {
+    "workspace-448": "Server-side slot session discovery, issue mapping, and slot workspace JSONL resolution",
+    "workspace-52u": "Frontend slot-aware issue/session handling and tests"
+  },
+  "agentModel": "gpt-5.4",
   "sessionHistory": [
     {
-      "timestamp": "2026-05-06T14:50:00Z",
-      "reason": "start",
-      "note": "Started PAN-972. Created 3 beads and claimed workspace-p0r. Converted loadSwarmState to async.",
-      "agentModel": "kimi-k2.6"
+      "timestamp": "2026-05-06T19:10:06.291Z",
+      "reason": "end",
+      "note": "Completed bead workspace-448 implementation by adding slot-aware session discovery in projects.ts, slot-aware tmux issue extraction in ws-rpc.ts, and focused regression tests.",
+      "agentModel": "gpt-5.4"
     },
     {
-      "timestamp": "2026-05-06T19:30:40.209Z",
+      "timestamp": "2026-05-06T19:12:51.442Z",
       "reason": "end",
-      "note": "Implementation complete"
-    },
-    {
-      "timestamp": "2026-05-06T19:50:11.629Z",
-      "reason": "end",
-      "note": "Implementation complete"
-    },
-    {
-      "timestamp": "2026-05-06T20:14:56.799Z",
-      "reason": "end",
-      "note": "Implementation complete"
+      "note": "Completed bead workspace-52u by making AgentOutputPanel derive the parent issue from slot session ids and adding focused derivation/render tests for swarm slot sessions.",
+      "agentModel": "gpt-5.4"
     }
-  ],
-  "feedback": []
+  ]
 }
