@@ -2,31 +2,33 @@
   "version": "1",
   "issueId": "PAN-953",
   "created": "2026-05-07T04:30:00Z",
-  "updated": "2026-05-07T04:45:00Z",
-  "gitState": { "branch": "feature/pan-953", "sha": "14f5e6b", "dirty": false },
+  "updated": "2026-05-07T05:00:00Z",
+  "gitState": { "branch": "feature/pan-953", "sha": "e30a259", "dirty": false },
   "decisions": [
     { "id": "D1", "summary": "Create 5 beads covering all missing inspector parity items", "recordedAt": "2026-05-07T04:30:00Z" },
     { "id": "D2", "summary": "Reuse existing inspector components (ContainerSection, ReviewPipelineSection) where possible to avoid duplication", "recordedAt": "2026-05-07T04:30:00Z" },
-    { "id": "D3", "summary": "Thread agent/issue props through ZoneCOverview to OverviewTab so child tabs can access full agent data", "recordedAt": "2026-05-07T04:45:00Z" }
+    { "id": "D3", "summary": "Thread agent/issue props through ZoneCOverview to OverviewTab so child tabs can access full agent data", "recordedAt": "2026-05-07T04:45:00Z" },
+    { "id": "D4", "summary": "WorkspaceData.containers type in queries.ts was incorrectly typed as array — actual API returns Record<string, ContainerStatus>", "recordedAt": "2026-05-07T05:00:00Z" }
   ],
   "hazards": [
-    { "id": "H1", "summary": "OverviewTab uses inline styles while inspector uses Tailwind classes — mixing may look inconsistent", "mitigation": "Style ContainerSection and pipeline to match command deck aesthetic using inline styles, or wrap inspector components" }
+    { "id": "H1", "summary": "OverviewTab uses inline styles while inspector uses Tailwind classes — mixing may look inconsistent", "mitigation": "ContainerSection renders with Tailwind inside inline-styled Section — CSS variables are global so it works visually" }
   ],
   "resumePoint": {
-    "description": "Implement bead workspace-qm53 (Add Containers section with right-click menu to OverviewTab). Add container chips with right-click context menu (restart/stop/start) to OverviewTab tile grid or as a new section. Reuse ContainerSection from inspector/ or create inline equivalent styled for command deck.",
-    "beadId": "workspace-qm53",
+    "description": "Implement bead workspace-6sr5 (Add Pipeline stepper to OverviewTab). Import ReviewPipelineSection from inspector/ and render it in OverviewTab when review status exists. Need to handle reviewStatus data shape and style integration.",
+    "beadId": "workspace-6sr5",
     "filesToRead": [
       "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx",
-      "src/dashboard/frontend/src/components/inspector/ContainerSection.tsx",
-      "src/dashboard/frontend/src/components/inspector/types.ts"
+      "src/dashboard/frontend/src/components/inspector/ReviewPipelineSection.tsx"
     ]
   },
   "beadsMapping": {
-    "workspace-8k4p": "Fix Agent tile: show runtime, uptime, workspace path"
+    "workspace-8k4p": "Fix Agent tile: show runtime, uptime, workspace path",
+    "workspace-qm53": "Add Containers section with right-click menu to OverviewTab"
   },
   "agentModel": "kimi-k2.6",
   "sessionHistory": [
     { "timestamp": "2026-05-07T04:30:00Z", "reason": "start", "note": "Started PAN-953 implementation. Created 5 beads. Rebased onto latest main. No existing continue file.", "agentModel": "kimi-k2.6" },
-    { "timestamp": "2026-05-07T04:45:00Z", "reason": "bead", "note": "Completed workspace-8k4p: threaded agent/issue props through IssueWorkbench→ZoneCOverview→OverviewTab. Fixed Agent tile to show actual runtime harness (getHarness), uptime (formatRuntime), friendly model name, and workspace path. Added workspace path to Workspace tile.", "agentModel": "kimi-k2.6" }
+    { "timestamp": "2026-05-07T04:45:00Z", "reason": "bead", "note": "Completed workspace-8k4p: threaded agent/issue props through IssueWorkbench→ZoneCOverview→OverviewTab. Fixed Agent tile to show actual runtime harness (getHarness), uptime (formatRuntime), friendly model name, and workspace path. Added workspace path to Workspace tile.", "agentModel": "kimi-k2.6" },
+    { "timestamp": "2026-05-07T05:00:00Z", "reason": "bead", "note": "Completed workspace-qm53: fixed WorkspaceData.containers type (Record not array), removed broken container map from WORKSPACE tile, added ContainerSection with right-click context menu (restart/stop/start) to OverviewTab as a new Section. Added containerControlMutation and refreshDbMutation hooks.", "agentModel": "kimi-k2.6" }
   ]
 }

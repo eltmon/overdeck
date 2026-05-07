@@ -37,6 +37,7 @@ import { useConfirm } from '../../DialogProvider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMutation } from '@tanstack/react-query';
 import { ContainerSection } from '../../inspector/ContainerSection';
+import { ReviewPipelineSection } from '../../inspector/ReviewPipelineSection';
 import type { ContainerMenuState } from '../../inspector/types';
 import { GitPullRequest, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Box, Link2, Terminal, Play, Pause, ExternalLink, Code2, Loader2, RotateCcw } from 'lucide-react';
 import { PlanDAGViewer } from '../../PlanDAG.js';
@@ -935,7 +936,18 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         </Section>
       )}
 
-      {/* 4. Reviewer summary */}
+      {/* 4. Pipeline stepper */}
+      {reviewStatus.data && (
+        <Section title="Pipeline">
+          <ReviewPipelineSection
+            reviewStatus={reviewStatus.data}
+            issueId={issueId}
+            onViewLog={() => onSwitchTab?.('prdiff')}
+          />
+        </Section>
+      )}
+
+      {/* 5. Reviewer summary */}
       {reviewerSections.length > 0 && (
         <Section title="Reviewer summary">
           <div
