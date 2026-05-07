@@ -488,7 +488,8 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     await writeFeatureContext(workspacePath, issue);
 
-    const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel);
+    // PAN-982: emit 'claude --agent pan-planning-agent --name <sessionName>'
+    const cmdWithArgs = await getAgentRuntimeBaseCommand(planningModel, sessionName, 'planning');
 
     const providerExports = await getProviderExportsForModel(planningModel);
 

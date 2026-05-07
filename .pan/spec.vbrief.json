@@ -346,7 +346,7 @@
       {
         "id": "wire-specialist-dispatch",
         "title": "Update specialist dispatch to use --agent for specialist types",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T02:30:00.000Z",
         "metadata": {
@@ -360,7 +360,7 @@
           {
             "id": "wire-specialist-dispatch.ac1",
             "title": "Review specialist spawns with --agent pan-review-agent",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -368,7 +368,7 @@
           {
             "id": "wire-specialist-dispatch.ac2",
             "title": "Test, inspect, uat, merge specialists each use their corresponding pan-*-agent definition",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -376,7 +376,7 @@
           {
             "id": "wire-specialist-dispatch.ac3",
             "title": "script -qfaec wrapper correctly passes --agent flag to inner Claude invocation",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

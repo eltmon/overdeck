@@ -1088,6 +1088,11 @@ ${basePrompt}`;
     );
 
     const providerExportLines = buildProviderExportLines(providerEnv);
+    // PAN-982: Each specialist now has a matching .claude/agents/pan-<specialistType>.md
+    // definition (pan-review-agent, pan-test-agent, pan-inspect-agent, pan-uat-agent,
+    // pan-merge-agent) that declares model, permissionMode, tools, and per-agent hooks.
+    // SpecialistType already ends in '-agent' (e.g. 'review-agent') so we just prepend 'pan-'.
+    const specialistAgentName = `pan-${specialistType}`;
     writeFileSync(
       innerScript,
       generateLauncherScript({
@@ -1101,8 +1106,7 @@ ${basePrompt}`;
         panopticonEnv: { agentId: tmuxSession, issueId: task.issueId, sessionType: sessionTypeLabel },
         cavemanExports: specialistCavemanExports,
         promptFile,
-        baseCommand: 'claude',
-        permissionFlags: permissionFlags.split(' '),
+        baseCommand: `claude --agent ${specialistAgentName}`,
         sessionId,
         model,
       }),
@@ -2305,6 +2309,9 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
     writeFileSync(promptFile, identityPrompt);
     const newSessionId = randomUUID();
     const initProviderExportLines = buildProviderExportLines(providerEnv);
+    // PAN-982: --agent pan-<specialistType> selects the matching .claude/agents/pan-*.md
+    // definition. SpecialistType already ends in '-agent' so we just prepend 'pan-'.
+    const specialistAgentName = `pan-${name}`;
     writeFileSync(
       launcherScript,
       generateLauncherScript({
@@ -2313,8 +2320,7 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
         unsetProviderEnv: true,
         providerExports: initProviderExportLines,
         promptFile,
-        baseCommand: 'claude',
-        permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
+        baseCommand: `claude --agent ${specialistAgentName}`,
         sessionId: newSessionId,
         model,
       }),

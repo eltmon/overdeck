@@ -130,6 +130,12 @@
       "reason": "bead-close",
       "note": "Closed bead workspace-59m (define-work-agent). Created agents/pan-work-agent.md with full YAML frontmatter: name, description, model: sonnet, permissionMode: bypassPermissions, effort: high, and per-agent hooks. Hooks mirror the global ~/.claude/settings.json structure: PreToolUse (.* → pre-tool-hook; Read → tldr-read-enforcer), PostToolUse (.* → heartbeat-hook + permission-event-hook; Bash → inspect-on-bead-close; Edit|Write → tldr-post-edit), Stop (.* → stop-hook + permission-event-hook). Hook command paths use $HOME/.panopticon/bin/ for portability across machines. Markdown body describes the per-bead workflow, completion path via pan done, and boundaries (no history rewriting, no JSONL deletion, no self-review).",
       "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T03:30:00.000Z",
+      "reason": "bead-close",
+      "note": "Closed bead workspace-hik (wire-specialist-dispatch). Updated 4 launcher constructions to emit '--agent pan-<specialistType>': (1) dispatchSpecialist in specialists.ts:1090 — replaces baseCommand 'claude' + permissionFlags array with 'claude --agent pan-<specialistType>', dropping the redundant flags array; (2) initializeSpecialist in specialists.ts:2310 — same pattern for the canonical reviewer init path; (3) spawnSingleReviewer in review-agent.ts:540 — passes agentType='review' + sessionName to getAgentRuntimeBaseCommand() so it emits 'claude --agent pan-review-agent --name <session>'; (4) spawn-planning-session.ts:491 — passes agentType='planning' + sessionName for the planning launcher. Conversation route in dashboard/server/routes/conversations.ts:735 was deliberately left unchanged (legacy ad-hoc Claude sessions, AC2 says they may not use --agent). SpecialistType already ends in '-agent' so the mapping is 'pan-' + name. All 716 tests pass; typecheck clean.",
+      "agentModel": "agent:claude-opus-4-7"
     }
   ],
   "resumePoint": {
