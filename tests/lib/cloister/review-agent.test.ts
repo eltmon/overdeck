@@ -1138,9 +1138,9 @@ describe('spawnReviewer runtime command routing regression', () => {
     expect(fn).not.toMatch(/`claude\s+--(?:dangerously-skip-permissions|model)/);
   });
 
-  it('review-agent.ts uses both launcher exports and settings overlay helpers for provider env isolation', async () => {
-    // The current design uses launcher-script exports plus settings.local.json
-    // overlay injection so Claude settings-level env cannot override provider routing.
+  it('review-agent.ts uses launcher exports helper for provider env isolation', async () => {
+    // The current design uses launcher-script exports via generateLauncherScript
+    // so provider env is set in a bash wrapper, not tmux flags or settings overlay.
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const src = readFileSync(
@@ -1148,8 +1148,7 @@ describe('spawnReviewer runtime command routing regression', () => {
       'utf-8',
     );
     expect(src).toMatch(/getProviderExportsForModel/);
-    expect(src).toMatch(/getProviderEnvForModel/);
-    expect(src).toMatch(/injectProviderEnvOverlay/);
+    expect(src).toMatch(/generateLauncherScript/);
   });
 
   it('spawnReviewer uses a bash launcher script, not tmux -e env flags', async () => {
@@ -1166,13 +1165,11 @@ describe('spawnReviewer runtime command routing regression', () => {
 
     // Must write a launcher script file and run it via bash
     expect(fn).toContain('getProviderExportsForModel(');
+    expect(fn).toContain('generateLauncherScript(');
     expect(fn).toContain('writeFile(');
     expect(fn).toMatch(/bash\s+.*launcherPath/);
 
-    // Provider env now flows through launcher exports plus settings overlay injection,
-    // but must still avoid the old tmux `-e KEY=value` transport.
-    expect(fn).toContain('getProviderEnvForModel(');
-    expect(fn).toContain('injectProviderEnvOverlay(');
+    // Provider env flows through launcher script exports; avoid tmux `-e` transport.
     expect(fn).not.toMatch(/createSessionAsync\([\s\S]*-e\s/);
     const envMatch = fn.match(/\{\s*env\s*:[\s\S]*?\}/);
     if (envMatch) {
