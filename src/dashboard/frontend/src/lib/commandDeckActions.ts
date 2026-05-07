@@ -50,9 +50,6 @@ export type ActionKey =
   | 'copySettings'
   // Issue artifact / planning surface
   | 'beads'
-  | 'vbrief'
-  | 'state'
-  | 'prd'
   | 'inference'
   | 'discussions'
   | 'transcripts'
