@@ -217,34 +217,6 @@ export function CommandDeck({
   const sectionContainerRef = useRef<HTMLDivElement>(null);
   const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
-  const [containerStats, setContainerStats] = useState<Record<string, ContainerStats>>({});
-
-  // Poll container stats every 5s when issues have containers
-  useEffect(() => {
-    const hasContainers = projectsWithSessions.some((p) =>
-      p.features.some((f) => (f.resourceDetails?.dockerContainerCount ?? 0) > 0),
-    );
-    if (!hasContainers) return;
-
-    const fetchStats = async () => {
-      try {
-        const res = await fetch('/api/resources');
-        if (!res.ok) return;
-        const data = (await res.json()) as { containers: ContainerStats[] };
-        const byName: Record<string, ContainerStats> = {};
-        for (const c of data.containers) {
-          byName[c.name] = c;
-        }
-        setContainerStats(byName);
-      } catch {
-        // ignore
-      }
-    };
-
-    fetchStats();
-    const interval = setInterval(fetchStats, 5000);
-    return () => clearInterval(interval);
-  }, [projectsWithSessions]);
 
   // Per-issue session selection (PAN-830 pan-11sr) — slice keyed by issueId.
   // The tree highlight uses the value for whichever feature is currently active.
@@ -375,6 +347,35 @@ export function CommandDeck({
       return { ...project, features: nextFeatures };
     });
   }, [projects, sessionTreeMap]);
+
+  const [containerStats, setContainerStats] = useState<Record<string, ContainerStats>>({});
+
+  // Poll container stats every 5s when issues have containers
+  useEffect(() => {
+    const hasContainers = projectsWithSessions.some((p) =>
+      p.features.some((f) => (f.resourceDetails?.dockerContainerCount ?? 0) > 0),
+    );
+    if (!hasContainers) return;
+
+    const fetchStats = async () => {
+      try {
+        const res = await fetch('/api/resources');
+        if (!res.ok) return;
+        const data = (await res.json()) as { containers: ContainerStats[] };
+        const byName: Record<string, ContainerStats> = {};
+        for (const c of data.containers) {
+          byName[c.name] = c;
+        }
+        setContainerStats(byName);
+      } catch {
+        // ignore
+      }
+    };
+
+    fetchStats();
+    const interval = setInterval(fetchStats, 5000);
+    return () => clearInterval(interval);
+  }, [projectsWithSessions]);
 
   // Agents from dashboard store (for terminal panel in detail view)
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
