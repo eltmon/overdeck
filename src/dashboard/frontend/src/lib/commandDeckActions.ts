@@ -62,6 +62,7 @@ export type ActionKey =
   | 'statusReview'
   // Danger zone
   | 'reopen'
+  | 'restartAgent'
   | 'restartFromPlan'
   | 'resetIssue'
   | 'cancel'
@@ -312,6 +313,9 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
 
   // ── Danger zone (always overflow — shown via "…" menu) ────────────────────
   if (!merged && state !== 'merged' && state !== 'done' && state !== 'canceled') {
+    if (agent && agent.status !== 'failed' && agent.status !== 'dead') {
+      overflow.push('restartAgent');
+    }
     overflow.push('restartFromPlan');
     if (input.issueCanonicalState !== 'done' && input.issueCanonicalState !== 'canceled') {
       overflow.push('resetIssue');
