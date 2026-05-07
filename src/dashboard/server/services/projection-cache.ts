@@ -5,11 +5,20 @@
  * data instantly on startup without waiting for API fetches.
  *
  * Uses the same DB connection as the event store (shared DbAdapter).
- * Writes are debounced at 100ms to avoid thrashing during event bursts.
+ *
+ * Writes are debounced AND throttled. Under steady load (many active agents
+ * producing events) a 100ms debounce never coalesced — flush ran at ~10 Hz,
+ * each call doing JSON.stringify on the whole snapshot plus a synchronous
+ * SQLite upsert. CPU profiling showed flush at 30% of process self-time and
+ * was the primary source of dashboard event-loop stalls. The cache is only
+ * read at startup; on crash the event store replays anyway, so freshness
+ * within seconds is irrelevant.
  */
 
 import type { DbAdapter } from '../event-store.js';
 import type { DashboardSnapshot } from '@panctl/contracts';
+
+const FLUSH_DEBOUNCE_MS = 2_000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,6 +55,7 @@ export function createProjectionCache(db: DbAdapter): ProjectionCache {
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let pendingSnapshot: DashboardSnapshot | null = null;
+  let lastFlushedSequence = -1;
 
   function load(): DashboardSnapshot | null {
     try {
@@ -65,10 +75,11 @@ export function createProjectionCache(db: DbAdapter): ProjectionCache {
   }
 
   function flush(): void {
+    debounceTimer = null;
     if (!pendingSnapshot) return;
     const snapshot = pendingSnapshot;
     pendingSnapshot = null;
-    debounceTimer = null;
+    if (snapshot.sequence === lastFlushedSequence) return;
     try {
       upsertStmt.run([
         CACHE_KEY,
@@ -76,6 +87,7 @@ export function createProjectionCache(db: DbAdapter): ProjectionCache {
         snapshot.sequence,
         new Date().toISOString(),
       ]);
+      lastFlushedSequence = snapshot.sequence;
     } catch (err) {
       console.warn('[projection-cache] Failed to save snapshot:', err);
     }
@@ -84,7 +96,7 @@ export function createProjectionCache(db: DbAdapter): ProjectionCache {
   function save(snapshot: DashboardSnapshot): void {
     pendingSnapshot = snapshot;
     if (debounceTimer !== null) return; // Already scheduled
-    debounceTimer = setTimeout(flush, 100);
+    debounceTimer = setTimeout(flush, FLUSH_DEBOUNCE_MS);
   }
 
   return { load, save };

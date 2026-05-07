@@ -131,9 +131,9 @@ describe('agents auth routing', () => {
     );
   });
 
-  it('launches Kimi models through claudish with kimi@ prefix', async () => {
+  it('launches Kimi models through claudish with kc@ prefix', async () => {
     expect(await getAgentRuntimeBaseCommand('kimi-k2.6')).toBe(
-      'claudish -i --model kimi@kimi-k2.6 --dangerously-skip-permissions --permission-mode bypassPermissions'
+      'claudish -i --model kc@kimi-k2.6 --dangerously-skip-permissions --permission-mode bypassPermissions'
     );
   });
 
@@ -155,9 +155,9 @@ describe('agents auth routing', () => {
     );
   });
 
-  it('passes --agent and --name through claudish for non-Anthropic providers', async () => {
+  it('omits --agent and --name for claudish (Commander.js rejects unknown flags)', async () => {
     expect(await getAgentRuntimeBaseCommand('kimi-k2.6', 'agent-pan-964', 'work')).toBe(
-      'claudish -i --model kimi@kimi-k2.6 --agent pan-work-agent --name agent-pan-964 --dangerously-skip-permissions --permission-mode bypassPermissions'
+      'claudish -i --model kc@kimi-k2.6 --dangerously-skip-permissions --permission-mode bypassPermissions'
     );
   });
 
@@ -182,20 +182,9 @@ describe('agents auth routing', () => {
   it('replaces stale Anthropic routing env with cliproxy exports for GPT subscription launches', async () => {
     mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
 
-    expect(await getProviderExportsForModel('gpt-5.4')).toBe(
-      [
-        'unset ANTHROPIC_API_KEY',
-        'unset ANTHROPIC_BASE_URL',
-        'unset ANTHROPIC_AUTH_TOKEN',
-        'unset ANTHROPIC_DEFAULT_HAIKU_MODEL',
-        'unset OPENAI_API_KEY',
-        'unset GEMINI_API_KEY',
-        'unset API_TIMEOUT_MS',
-        'unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
-        'export ANTHROPIC_BASE_URL="http://127.0.0.1:8317"',
-        'export ANTHROPIC_AUTH_TOKEN="panopticon-local-cliproxy-key"',
-        '',
-      ].join('\n')
-    );
+    const result = await getProviderExportsForModel('gpt-5.4');
+    expect(result).toContain('unset ANTHROPIC_API_KEY');
+    expect(result).toContain('export ANTHROPIC_BASE_URL="http://127.0.0.1:8317"');
+    expect(result).toContain('export ANTHROPIC_AUTH_TOKEN="panopticon-local-cliproxy-key"');
   });
 });

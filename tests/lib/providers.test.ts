@@ -18,9 +18,9 @@ describe('providers', () => {
     });
   });
 
-  it('returns KIMI_API_KEY for Kimi key-based claudish routing', () => {
+  it('returns KIMI_CODING_API_KEY for Kimi key-based claudish routing', () => {
     expect(getProviderEnv(PROVIDERS.kimi, 'sk-kimi-test')).toEqual({
-      KIMI_API_KEY: 'sk-kimi-test',
+      KIMI_CODING_API_KEY: 'sk-kimi-test',
     });
   });
 

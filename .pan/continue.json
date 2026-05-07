@@ -1,37 +1,30 @@
 {
   "version": "1",
-  "issueId": "PAN-953",
-  "created": "2026-05-07T04:30:00Z",
-  "updated": "2026-05-07T05:45:00Z",
-  "gitState": { "branch": "feature/pan-953", "sha": "284776b", "dirty": false },
+  "issueId": "PAN-931",
+  "created": "2026-05-07T06:33:00Z",
+  "updated": "2026-05-07T06:59:00Z",
+  "gitState": { "branch": "feature/pan-931", "sha": "95ecd17b0", "dirty": false },
   "decisions": [
-    { "id": "D1", "summary": "Create 5 beads covering all missing inspector parity items", "recordedAt": "2026-05-07T04:30:00Z" },
-    { "id": "D2", "summary": "Reuse existing inspector components (ContainerSection, ReviewPipelineSection) where possible to avoid duplication", "recordedAt": "2026-05-07T04:30:00Z" },
-    { "id": "D3", "summary": "Thread agent/issue props through ZoneCOverview to OverviewTab so child tabs can access full agent data", "recordedAt": "2026-05-07T04:45:00Z" },
-    { "id": "D4", "summary": "WorkspaceData.containers type in queries.ts was incorrectly typed as array — actual API returns Record<string, ContainerStatus>", "recordedAt": "2026-05-07T05:00:00Z" }
+    { "id": "D1", "summary": "Added killAllReviewSessions() to kill all review-related tmux sessions (coordinators, canonical reviewers, legacy reviewers) — called from pan down to prevent stale sessions surviving dashboard restart.", "recordedAt": "2026-05-07T06:33:00Z" },
+    { "id": "D2", "summary": "Enhanced dispatchParallelReview idempotency guard with isCoordinatorAliveAsync() that checks #{pane_pid} process existence via kill -0. Catches zombies where pane_dead=0 but underlying bash process has exited.", "recordedAt": "2026-05-07T06:33:00Z" },
+    { "id": "D3", "summary": "Wired killAllReviewSessions into pan down command in src/cli/index.ts, positioned after dashboard stop and before Traefik stop.", "recordedAt": "2026-05-07T06:35:00Z" },
+    { "id": "D4", "summary": "Fixed dispatchParallelReview idempotency guard test 'skips dispatch when coordinator pane and process are both alive' by mocking process.kill — the test was failing because process.kill(1, 0) throws EPERM in restricted test environments.", "recordedAt": "2026-05-07T06:59:00Z" },
+    { "id": "D5", "summary": "Added source-level regression tests for pan down integration: verifies src/cli/index.ts imports killAllReviewSessions, calls it in the down handler, and positions it after dashboard stop and before Traefik stop.", "recordedAt": "2026-05-07T06:59:00Z" }
   ],
   "hazards": [
-    { "id": "H1", "summary": "OverviewTab uses inline styles while inspector uses Tailwind classes — mixing may look inconsistent", "mitigation": "ContainerSection and ReviewPipelineSection render with Tailwind inside inline-styled Section — CSS variables are global so it works visually" }
+    { "id": "H1", "summary": "process.kill(pid, 0) is sync but extremely fast (single syscall). Used only in review-agent code, not dashboard server routes.", "mitigation": "Acceptable per CLAUDE.md: CLI-side sync calls are fine." },
+    { "id": "H2", "summary": "Tests using process.kill(0) for PID existence checks are environment-dependent — may fail in sandboxed containers.", "mitigation": "Mock process.kill in tests that assert alive/zombie coordinator behavior." }
   ],
   "resumePoint": {
-    "description": "All 5 beads implemented. Run full test suite, push branch, and call pan done PAN-953.",
-    "beadId": "workspace-59kw",
+    "description": "All three beads are complete. Implementation done: killAllReviewSessions added, idempotency guard enhanced, pan down wired, tests added and passing. Next step: run pan done PAN-931 to signal completion.",
+    "beadId": "workspace-yzs6",
     "filesToRead": []
   },
-  "beadsMapping": {
-    "workspace-8k4p": "Fix Agent tile: show runtime, uptime, workspace path",
-    "workspace-qm53": "Add Containers section with right-click menu to OverviewTab",
-    "workspace-6sr5": "Add Pipeline stepper to OverviewTab",
-    "workspace-nc40": "Add Switch Model action to OverviewTab",
-    "workspace-59kw": "Add Input/Output token totals to Cost tile"
-  },
-  "agentModel": "kimi-k2.6",
+  "beadsMapping": {},
+  "agentModel": "kc@kimi-k2.6",
   "sessionHistory": [
-    { "timestamp": "2026-05-07T04:30:00Z", "reason": "start", "note": "Started PAN-953 implementation. Created 5 beads. Rebased onto latest main. No existing continue file.", "agentModel": "kimi-k2.6" },
-    { "timestamp": "2026-05-07T04:45:00Z", "reason": "bead", "note": "Completed workspace-8k4p: threaded agent/issue props through IssueWorkbench→ZoneCOverview→OverviewTab. Fixed Agent tile to show actual runtime harness (getHarness), uptime (formatRuntime), friendly model name, and workspace path. Added workspace path to Workspace tile.", "agentModel": "kimi-k2.6" },
-    { "timestamp": "2026-05-07T05:00:00Z", "reason": "bead", "note": "Completed workspace-qm53: fixed WorkspaceData.containers type (Record not array), removed broken container map from WORKSPACE tile, added ContainerSection with right-click context menu (restart/stop/start) to OverviewTab. Added containerControlMutation and refreshDbMutation hooks.", "agentModel": "kimi-k2.6" },
-    { "timestamp": "2026-05-07T05:15:00Z", "reason": "bead", "note": "Completed workspace-6sr5: imported ReviewPipelineSection from inspector/ and rendered it as a Section in OverviewTab when review status exists. onViewLog switches to prdiff tab.", "agentModel": "kimi-k2.6" },
-    { "timestamp": "2026-05-07T05:30:00Z", "reason": "bead", "note": "Completed workspace-nc40: imported SwitchModelModal and useSwitchModel hook, added Switch Model button to Actions tile when agent exists, rendered modal with agent props.", "agentModel": "kimi-k2.6" },
-    { "timestamp": "2026-05-07T05:45:00Z", "reason": "bead", "note": "Completed workspace-59kw: added fmtTokens helper and displayed inputTokens/outputTokens in Cost tile above per-model breakdown.", "agentModel": "kimi-k2.6" }
+    { "timestamp": "2026-05-07T06:33:00Z", "reason": "end", "note": "Completed bead workspace-etvu: added killAllReviewSessions function and enhanced idempotency guard in review-agent.ts. All 81 existing tests pass.", "agentModel": "kc@kimi-k2.6" },
+    { "timestamp": "2026-05-07T06:35:00Z", "reason": "end", "note": "Completed bead workspace-sfog: wired killAllReviewSessions into pan down command in src/cli/index.ts.", "agentModel": "kc@kimi-k2.6" },
+    { "timestamp": "2026-05-07T06:59:00Z", "reason": "end", "note": "Completed bead workspace-yzs6: fixed failing idempotency guard test (mocked process.kill), added 3 source-level regression tests for pan down integration. All 92 review-agent tests pass. Full suite has 4 pre-existing failures in unrelated files.", "agentModel": "kc@kimi-k2.6" }
   ]
 }

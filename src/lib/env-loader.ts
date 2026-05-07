@@ -92,7 +92,7 @@ export function getApiKeysFromEnv(): {
   return {
     openai: process.env.OPENAI_API_KEY,
     google: process.env.GOOGLE_API_KEY,
-    kimi: process.env.KIMI_API_KEY,
+    kimi: process.env.KIMI_CODING_API_KEY || process.env.KIMI_API_KEY,
     openrouter: process.env.OPENROUTER_API_KEY,
   };
 }

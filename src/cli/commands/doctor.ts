@@ -112,6 +112,42 @@ function checkDirectory(path: string): boolean {
   return existsSync(path);
 }
 
+interface ComposeDriftEntry {
+  container: string;
+  missingPath: string;
+}
+
+/**
+ * Check whether any running Docker containers reference compose file paths
+ * that no longer exist on disk (PAN-956). This happens when .devcontainer/
+ * is deleted after containers were created, leaving orphaned containers with
+ * stale com.docker.compose.project.config_files labels.
+ */
+function checkComposeLabelDrift(): ComposeDriftEntry[] {
+  try {
+    const output = execSync(
+      `docker ps --format '{{.Names}}|{{.Label "com.docker.compose.project.config_files"}}'`,
+      { encoding: 'utf-8', stdio: 'pipe' },
+    );
+    const drift: ComposeDriftEntry[] = [];
+    for (const line of output.trim().split('\n').filter(Boolean)) {
+      const sep = line.indexOf('|');
+      if (sep === -1) continue;
+      const containerName = line.slice(0, sep);
+      const configFiles = line.slice(sep + 1);
+      if (!configFiles) continue;
+      for (const filePath of configFiles.split(',').map((s: string) => s.trim()).filter(Boolean)) {
+        if (!existsSync(filePath)) {
+          drift.push({ container: containerName, missingPath: filePath });
+        }
+      }
+    }
+    return drift;
+  } catch {
+    return [];
+  }
+}
+
 function countItems(path: string): number {
   if (!existsSync(path)) return 0;
   try {
@@ -293,6 +329,26 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
       status: 'warn',
       message: 'Status check failed',
     });
+  }
+
+  // Check Docker compose label drift (PAN-956)
+  if (checkCommand('docker')) {
+    const drift = checkComposeLabelDrift();
+    if (drift.length === 0) {
+      checks.push({
+        name: 'Docker Compose Labels',
+        status: 'ok',
+        message: 'No compose path drift detected',
+      });
+    } else {
+      const details = drift.map((d) => `${d.container}: ${d.missingPath}`).join('; ');
+      checks.push({
+        name: 'Docker Compose Labels',
+        status: 'warn',
+        message: `${drift.length} container(s) reference missing compose path(s)`,
+        fix: `Re-render .devcontainer/ for affected workspaces, then restart containers. Drift: ${details}`,
+      });
+    }
   }
 
   // Check for legacy command invocations in shell rc files (PAN-705)
