@@ -11,7 +11,7 @@
  * PlanDAGViewer: data-fetching wrapper that loads from /api/workspaces/:issueId/plan
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDashboardStore } from '../lib/store';
 import ReactFlow, {
@@ -25,6 +25,8 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import dagre from '@dagrejs/dagre';
+
+const EMPTY_ARRAY: string[] = [];
 
 // ── Types ──
 
@@ -656,7 +658,6 @@ export function PlanDAG({ doc, criticalPath = [], onNodeClick, className, showAC
         minZoom={0.2}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
-        key={showAC ? 'ac-on' : 'ac-off'}
       >
         <Background color="#374151" gap={20} size={1} />
         <Controls style={{ background: '#1f2937', border: '1px solid #374151' }} />
@@ -691,10 +692,16 @@ export function PlanDAGViewer({ issueId, criticalPath, onNodeClick, className, r
 
   // Refetch plan data when domain events arrive (plan.item_status_changed, etc.)
   // EventRouter applies events to the store, advancing the sequence number.
+  // Throttled to once per 5s to avoid sustained background refetches.
   const storeSequence = useDashboardStore((s) => s.sequence);
+  const lastInvalidationRef = useRef(0);
   useEffect(() => {
     if (storeSequence > 0) {
-      queryClient.invalidateQueries({ queryKey: ['plan', issueId] });
+      const now = Date.now();
+      if (now - lastInvalidationRef.current > 5000) {
+        lastInvalidationRef.current = now;
+        queryClient.invalidateQueries({ queryKey: ['plan', issueId] });
+      }
     }
   }, [storeSequence, issueId, queryClient]);
 
@@ -715,7 +722,10 @@ export function PlanDAGViewer({ issueId, criticalPath, onNodeClick, className, r
   }
 
   // Use server-computed critical path (from API response) or caller override
-  const effectiveCriticalPath = criticalPath ?? doc.criticalPath ?? [];
+  const effectiveCriticalPath = useMemo(
+    () => criticalPath ?? doc.criticalPath ?? EMPTY_ARRAY,
+    [criticalPath, doc.criticalPath],
+  );
 
   // Show critical path length + edge count in header when available
   const cpLength = effectiveCriticalPath.length;
