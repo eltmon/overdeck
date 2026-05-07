@@ -1,0 +1,25 @@
+{
+  "version": "1",
+  "issueId": "PAN-930",
+  "created": "2026-05-07T06:20:00Z",
+  "updated": "2026-05-07T06:35:00Z",
+  "gitState": { "branch": "feature/pan-930", "sha": "2071249", "dirty": false },
+  "decisions": [
+    { "id": "D1", "summary": "Validate hook paths in copyPanopticonSettingsToWorkspace — remove broken hooks from merged workspace settings.json instead of letting Claude Code fail silently", "recordedAt": "2026-05-07T06:20:00Z" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "Hook commands may use relative paths or shell interpolation", "mitigation": "Only validate absolute file paths; skip validation for relative paths or commands with shell syntax" }
+  ],
+  "resumePoint": {
+    "description": "Both beads complete. Run full test suite, push branch, then signal completion with pan done.",
+    "beadId": "workspace-q6i7",
+    "filesToRead": []
+  },
+  "beadsMapping": { "workspace-afe1": "closed", "workspace-q6i7": "implemented" },
+  "agentModel": "kc@kimi-k2.6",
+  "sessionHistory": [
+    { "timestamp": "2026-05-07T06:20:00Z", "reason": "start", "note": "Fresh start on PAN-930. No continue file existed. Discovered issue: broken damage-control hooks path in workspace settings.json causes review timeouts.", "agentModel": "kc@kimi-k2.6" },
+    { "timestamp": "2026-05-07T06:25:00Z", "reason": "bead-close", "note": "Implemented hook path validation in copyPanopticonSettingsToWorkspace. Typecheck passes.", "agentModel": "kc@kimi-k2.6" },
+    { "timestamp": "2026-05-07T06:35:00Z", "reason": "bead-close", "note": "Added 7 unit tests for hook path validation. All pass.", "agentModel": "kc@kimi-k2.6" }
+  ]
+}
