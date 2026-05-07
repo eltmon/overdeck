@@ -98,9 +98,11 @@ const STATUS_BADGE_LABELS: Record<VBriefItemStatus, string> = {
 
 const NODE_WIDTH = 220;
 const NODE_HEIGHT = 80;
+const NODE_HEIGHT_COMPACT = 42;
 const AC_ROW_HEIGHT = 16;
 
-function nodeHeight(acCount: number, showAC: boolean): number {
+function nodeHeight(acCount: number, showAC: boolean, isCompact: boolean): number {
+  if (isCompact) return NODE_HEIGHT_COMPACT;
   return showAC && acCount > 0 ? NODE_HEIGHT + acCount * AC_ROW_HEIGHT + 6 : NODE_HEIGHT;
 }
 
@@ -150,80 +152,122 @@ interface PlanItemNodeData {
   isCritical?: boolean;
   showAC?: boolean;
   nodeHeight?: number;
+  /** True when status is pending but all blocking dependencies are completed */
+  isUnblocked?: boolean;
+  /** Titles of items that block this node (for blocked status display) */
+  blockerTitles?: string[];
 }
 
 function PlanItemNode({ data }: { data: PlanItemNodeData }) {
-  const { item, isCritical, showAC } = data;
+  const { item, isCritical, showAC, isUnblocked, blockerTitles } = data;
   const colors = STATUS_COLORS[item.status] ?? STATUS_COLORS.pending;
   const difficulty = item.metadata?.difficulty;
   const priority = item.priority;
   const priorityColor = priority ? PRIORITY_DOT[priority] : undefined;
   const acs = (item.subItems ?? []).filter(s => s.metadata?.kind === 'acceptance_criterion');
 
+  const isCompact = item.status === 'completed' || item.status === 'cancelled';
+  const isRunning = item.status === 'in_progress';
+  const isBlocked = item.status === 'blocked';
+
+  // Animation classes for live status
+  let animClass: string | undefined;
+  if (isRunning) animClass = 'plan-glow';
+  else if (isUnblocked) animClass = 'plan-pulse';
+  else if (isBlocked) animClass = 'plan-blocked-pulse';
+
+  // Dim pending nodes that are still blocked
+  const dimmed = item.status === 'pending' && !isUnblocked;
+
   return (
     <div
+      className={animClass}
       style={{
         width: NODE_WIDTH,
-        minHeight: NODE_HEIGHT,
+        minHeight: isCompact ? NODE_HEIGHT_COMPACT : NODE_HEIGHT,
         background: colors.bg,
         border: `2px solid ${isCritical ? '#f97316' : colors.border}`,
         borderRadius: 6,
-        padding: '6px 8px',
+        padding: isCompact ? '4px 8px' : '6px 8px',
         fontSize: 11,
         color: colors.text,
         boxShadow: isCritical ? `0 0 8px #f97316aa` : undefined,
         cursor: 'default',
         display: 'flex',
         flexDirection: 'column',
-        gap: 4,
+        gap: isCompact ? 2 : 4,
+        opacity: dimmed ? 0.6 : 1,
+        textDecoration: item.status === 'cancelled' ? 'line-through' : undefined,
+        transition: 'all 0.3s ease',
       }}
     >
       {/* Title row */}
-      <span style={{ lineHeight: 1.3, wordBreak: 'break-word' }}>
+      <span style={{ lineHeight: 1.3, wordBreak: 'break-word', display: 'flex', alignItems: 'center', gap: 4 }}>
+        {item.status === 'completed' && (
+          <span style={{ color: '#22c55e', fontSize: 10, fontWeight: 700, flexShrink: 0 }}>✓</span>
+        )}
         {item.title}
       </span>
-      {/* Badge row */}
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        {/* Status badge */}
-        <span style={{
-          fontSize: 9, background: colors.border, color: colors.bg,
-          borderRadius: 3, padding: '1px 4px', fontWeight: 600,
-          textTransform: 'uppercase', letterSpacing: '0.02em',
-        }}>
-          {STATUS_BADGE_LABELS[item.status] ?? item.status}
+
+      {/* Blocker info for blocked nodes */}
+      {isBlocked && blockerTitles && blockerTitles.length > 0 && (
+        <span style={{ fontSize: 9, color: '#fca5a5', lineHeight: 1.2 }}>
+          Blocked by: {blockerTitles.join(', ')}
         </span>
-        {/* Priority badge */}
-        {priorityColor && priority && (
+      )}
+
+      {/* Unblocked hint for ready pending nodes */}
+      {isUnblocked && (
+        <span style={{ fontSize: 9, color: '#60a5fa', fontWeight: 600, lineHeight: 1.2 }}>
+          Ready to start
+        </span>
+      )}
+
+      {/* Badge row — hidden in compact mode */}
+      {!isCompact && (
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {/* Status badge */}
           <span style={{
-            fontSize: 9, background: priorityColor, color: '#111827',
+            fontSize: 9, background: colors.border, color: colors.bg,
             borderRadius: 3, padding: '1px 4px', fontWeight: 600,
             textTransform: 'uppercase', letterSpacing: '0.02em',
           }}>
-            {priority}
+            {STATUS_BADGE_LABELS[item.status] ?? item.status}
           </span>
-        )}
-        {/* Difficulty badge */}
-        {difficulty && (
-          <span style={{
-            fontSize: 9, background: '#374151', color: '#9ca3af',
-            borderRadius: 3, padding: '1px 4px',
-          }}>
-            {DIFFICULTY_LABELS[difficulty] ?? difficulty}
-          </span>
-        )}
-        {/* AC progress badge — always visible when node has ACs */}
-        {acs.length > 0 && (
-          <span style={{
-            fontSize: 9, background: '#1e3a5f', color: '#93c5fd',
-            borderRadius: 3, padding: '1px 4px', fontWeight: 600,
-            border: '1px solid #3b82f6',
-          }}>
-            {acs.filter(s => s.status === 'completed').length}/{acs.length} AC
-          </span>
-        )}
-      </div>
+          {/* Priority badge */}
+          {priorityColor && priority && (
+            <span style={{
+              fontSize: 9, background: priorityColor, color: '#111827',
+              borderRadius: 3, padding: '1px 4px', fontWeight: 600,
+              textTransform: 'uppercase', letterSpacing: '0.02em',
+            }}>
+              {priority}
+            </span>
+          )}
+          {/* Difficulty badge */}
+          {difficulty && (
+            <span style={{
+              fontSize: 9, background: '#374151', color: '#9ca3af',
+              borderRadius: 3, padding: '1px 4px',
+            }}>
+              {DIFFICULTY_LABELS[difficulty] ?? difficulty}
+            </span>
+          )}
+          {/* AC progress badge — always visible when node has ACs */}
+          {acs.length > 0 && (
+            <span style={{
+              fontSize: 9, background: '#1e3a5f', color: '#93c5fd',
+              borderRadius: 3, padding: '1px 4px', fontWeight: 600,
+              border: '1px solid #3b82f6',
+            }}>
+              {acs.filter(s => s.status === 'completed').length}/{acs.length} AC
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Inline AC checklist (shown when showAC toggle is on) */}
-      {showAC && acs.length > 0 && (
+      {showAC && acs.length > 0 && !isCompact && (
         <div style={{
           borderTop: '1px solid rgba(255,255,255,0.1)',
           paddingTop: 4,
@@ -260,15 +304,45 @@ export function vbriefToFlow(doc: VBriefDocument, criticalPath: string[] = [], s
   edges: Edge[];
 } {
   const criticalSet = new Set(criticalPath);
+  const itemById = new Map(doc.plan.items.map(i => [i.id, i]));
+
+  // Compute blocker relationships from edges
+  const blockersOf = new Map<string, string[]>();
+  for (const edge of doc.plan.edges ?? []) {
+    if (edge.type === 'blocks') {
+      const list = blockersOf.get(edge.to) ?? [];
+      list.push(edge.from);
+      blockersOf.set(edge.to, list);
+    }
+  }
 
   const rawNodes: Node[] = doc.plan.items.map(item => {
     const acCount = (item.subItems ?? []).filter(s => s.metadata?.kind === 'acceptance_criterion').length;
-    const h = nodeHeight(acCount, showAC);
+    const isCompact = item.status === 'completed' || item.status === 'cancelled';
+    const h = nodeHeight(acCount, showAC, isCompact);
+
+    const blockerIds = blockersOf.get(item.id) ?? [];
+    const blockerTitles = blockerIds
+      .map(id => itemById.get(id)?.title)
+      .filter((t): t is string => !!t);
+
+    // A pending item is "unblocked" (ready to start) when all blockers are completed
+    const isUnblocked = item.status === 'pending'
+      && blockerIds.length > 0
+      && blockerIds.every(id => itemById.get(id)?.status === 'completed');
+
     return {
       id: item.id,
       type: 'planItem',
       position: { x: 0, y: 0 }, // overwritten by dagre
-      data: { item, isCritical: criticalSet.has(item.id), showAC, nodeHeight: h } satisfies PlanItemNodeData,
+      data: {
+        item,
+        isCritical: criticalSet.has(item.id),
+        showAC,
+        nodeHeight: h,
+        isUnblocked,
+        blockerTitles: blockerTitles.length > 0 ? blockerTitles : undefined,
+      } satisfies PlanItemNodeData,
     };
   });
 
@@ -309,6 +383,36 @@ export function vbriefToFlow(doc: VBriefDocument, criticalPath: string[] = [], s
   return { nodes: laidOutNodes, edges: rawEdges };
 }
 
+// ── Animation styles ──
+
+function PlanDagStyles() {
+  return (
+    <style>{`
+      @keyframes plan-glow {
+        0%, 100% { box-shadow: 0 0 6px #3b82f666; }
+        50% { box-shadow: 0 0 16px #3b82f6cc; }
+      }
+      @keyframes plan-pulse {
+        0%, 100% { border-color: #6b7280; }
+        50% { border-color: #60a5fa; }
+      }
+      @keyframes plan-blocked-pulse {
+        0%, 100% { box-shadow: 0 0 4px #ef444444; }
+        50% { box-shadow: 0 0 12px #ef444488; }
+      }
+      .plan-glow {
+        animation: plan-glow 2s ease-in-out infinite;
+      }
+      .plan-pulse {
+        animation: plan-pulse 2s ease-in-out infinite;
+      }
+      .plan-blocked-pulse {
+        animation: plan-blocked-pulse 2s ease-in-out infinite;
+      }
+    `}</style>
+  );
+}
+
 // ── Main component ──
 
 interface PlanDAGProps {
@@ -343,6 +447,7 @@ export function PlanDAG({ doc, criticalPath = [], onNodeClick, className, showAC
 
   return (
     <div className={className} style={{ width: '100%', height: '100%', background: '#111827' }}>
+      <PlanDagStyles />
       <ReactFlow
         nodes={nodes}
         edges={edges}
