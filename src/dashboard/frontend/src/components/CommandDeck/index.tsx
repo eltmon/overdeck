@@ -612,7 +612,7 @@ export function CommandDeck({
       const resumeRes = await fetch(`/api/agents/${sessionId}/resume`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify(model ? { model } : {}),
       });
       const resumeData = await resumeRes.json().catch(() => ({})) as { success?: boolean; error?: string; lifecycle?: { canResumeSession?: boolean; hasLiveTmuxSession?: boolean; isRunning?: boolean } };
       if (resumeRes.ok) {
@@ -627,7 +627,7 @@ export function CommandDeck({
         const resumeRetryRes = await fetch(`/api/agents/${sessionId}/resume`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
+          body: JSON.stringify(model ? { model } : {}),
         });
         if (!resumeRetryRes.ok) {
           const retryData = await resumeRetryRes.json().catch(() => ({})) as { error?: string };

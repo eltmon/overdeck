@@ -1247,7 +1247,7 @@ const postAgentResumeRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const body = yield* readJsonBody;
 
-    const { message } = body as any;
+    const { message, model } = body as any;
     const eventStore = yield* EventStoreService;
     const lifecycle = getWorkAgentLifecycleState(id);
     if (!lifecycle.canResumeSession) {
@@ -1259,9 +1259,10 @@ const postAgentResumeRoute = HttpRouter.add(
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_requested', {
       hasMessage: !!message,
+      model: model || undefined,
       lifecycle,
     }));
-    const result = yield* Effect.promise(() => resumeAgent(id, message));
+    const result = yield* Effect.promise(() => resumeAgent(id, message, model ? { model } : undefined));
     if (result.success) {
       // Emit agent.started event so the read model transitions agent status
       // from 'stopped' → 'running' and the frontend updates immediately.
