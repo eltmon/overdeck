@@ -6,7 +6,7 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
-import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync, waitForClaudePrompt } from './tmux.js';
+import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sendRawKeystrokeAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync, waitForClaudePrompt } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
@@ -720,6 +720,47 @@ async function writeChannelsBridgeMcpConfig(
     },
   };
   await fsp.writeFile(configPath, JSON.stringify(mcpConfig, null, 2), 'utf-8');
+}
+
+/**
+ * Dismiss the dev-channels confirmation TUI dialog rendered by
+ * `claude --dangerously-load-development-channels`. The dialog text
+ * 'WARNING: Loading development channels' must be on screen before any prompt
+ * is delivered, otherwise the channel listener never registers and every
+ * early channel push silently falls back to tmux.
+ *
+ * Polling budget is 20s because cold-start claude with TLDR + Playwright MCP
+ * servers attached commonly takes 8–15s to render the first frame; a tighter
+ * budget false-negatives. If the dialog is not detected within the timeout,
+ * we proceed — the dialog is suppressed in some auth states (e.g. when the
+ * binary takes a non-interactive code path), and the launch must not block
+ * forever.
+ *
+ * Uses sendRawKeystrokeAsync intentionally: sendKeysAsync's load-buffer +
+ * paste-buffer machinery is for typing message bodies, not for a single
+ * Enter on a TUI prompt where mistimed paste can fire before the dialog
+ * accepts input.
+ */
+export async function dismissDevChannelsDialog(agentId: string): Promise<void> {
+  const TIMEOUT_MS = 20_000;
+  const POLL_INTERVAL_MS = 200;
+  const NEEDLE = 'WARNING: Loading development channels';
+  const start = Date.now();
+  while (Date.now() - start < TIMEOUT_MS) {
+    try {
+      const pane = await capturePaneAsync(agentId, 50);
+      if (pane.includes(NEEDLE)) {
+        await sendRawKeystrokeAsync(agentId, 'C-m', 'channels:dismiss-dev-dialog');
+        await new Promise((r) => setTimeout(r, 500));
+        return;
+      }
+    } catch {
+      // Capture failures are transient (tmux session not yet visible to
+      // the new pane); keep polling within the budget.
+    }
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+  }
+  console.log(`[${agentId}] channels:dismiss:dialog-not-detected`);
 }
 
 function markAgentRunning(state: AgentState): void {
@@ -1452,6 +1493,14 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
     }
   });
+
+  // Channels: dismiss the dev-channels confirmation dialog before any prompt
+  // delivery. Must run while we are still in the launch path so the channel
+  // listener is registered before deliverAgentMessage starts preferring the
+  // socket. Skipped when the agent was not eligible at launch time.
+  if (state.channelsEnabled) {
+    await dismissDevChannelsDialog(agentId);
+  }
 
   // Send the initial prompt after Claude's interactive prompt is ready.
   // Wait for the session to be ready by polling tmux output for Claude's prompt.
