@@ -70,7 +70,7 @@ export async function swarmCommand(
     if (options.wave !== undefined) body.wave = parseInt(options.wave, 10);
     if (options.model) body.model = options.model;
     if (options.maxSlots) body.maxSlots = parseInt(options.maxSlots, 10);
-    if (options.autoAdvance) body.autoAdvance = true;
+    if (options.autoAdvance !== undefined) body.autoAdvance = options.autoAdvance;
 
     const response = await fetch(`${DASHBOARD_URL}/api/swarm`, {
       method: 'POST',

@@ -48,6 +48,9 @@ interface SwarmState {
   totalWaves: number;
   model: string;
   autoAdvance?: boolean;
+  autoAdvanceFailureCount?: number;
+  autoAdvanceRetryAfter?: string;
+  lastAutoAdvanceError?: string;
   slots: SlotAssignment[];
   createdAt: string;
   updatedAt: string;
@@ -80,8 +83,12 @@ interface SwarmDispatchResponseBody {
 }
 
 const SWARM_AUTO_ADVANCE_POLL_MS = 5000;
+const SWARM_AUTO_ADVANCE_BACKOFF_MS = 60_000;
+const SWARM_AUTO_ADVANCE_BACKOFF_THRESHOLD = 3;
 const autoAdvanceInFlight = new Set<string>();
 let autoAdvanceLoopStarted = false;
+let autoAdvancePolling = false;
+let autoAdvanceTimer: ReturnType<typeof setTimeout> | null = null;
 
 function getSwarmDir(): string {
   return join(homedir(), '.panopticon', 'swarms');
@@ -109,21 +116,53 @@ async function saveSwarmState(state: SwarmState): Promise<void> {
   await writeFile(getSwarmStatePath(state.issueId), JSON.stringify(state, null, 2));
 }
 
+function isAutoAdvanceCoolingDown(state: SwarmState, now = Date.now()): boolean {
+  if (!state.autoAdvanceRetryAfter) return false;
+  const retryAt = Date.parse(state.autoAdvanceRetryAfter);
+  return Number.isFinite(retryAt) && retryAt > now;
+}
+
+function recordAutoAdvanceFailure(state: SwarmState, error: string, now = Date.now()): SwarmState {
+  const failureCount = (state.autoAdvanceFailureCount ?? 0) + 1;
+  return {
+    ...state,
+    autoAdvanceFailureCount: failureCount,
+    autoAdvanceRetryAfter:
+      failureCount >= SWARM_AUTO_ADVANCE_BACKOFF_THRESHOLD
+        ? new Date(now + SWARM_AUTO_ADVANCE_BACKOFF_MS).toISOString()
+        : undefined,
+    lastAutoAdvanceError: error,
+    updatedAt: new Date(now).toISOString(),
+  };
+}
+
 async function refreshSwarmSlotStatuses(
   state: SwarmState,
   sessions?: string[],
 ): Promise<{ state: SwarmState; changed: boolean }> {
   const liveSessions = sessions ?? await listSessionNamesAsync();
+  const runningSlots = state.slots.filter((slot) => slot.status === 'running' && liveSessions.includes(slot.sessionName));
+  const deadPaneSessions = new Set(
+    (await Promise.all(runningSlots.map(async (slot) => {
+      try {
+        return (await isPaneDeadAsync(slot.sessionName)) ? slot.sessionName : null;
+      } catch {
+        return null;
+      }
+    }))).filter((sessionName): sessionName is string => sessionName !== null),
+  );
+
   let changed = false;
+  const completedAt = new Date().toISOString();
 
   const slots = state.slots.map((slot) => {
-    const alive = liveSessions.includes(slot.sessionName);
+    const alive = liveSessions.includes(slot.sessionName) && !deadPaneSessions.has(slot.sessionName);
     if (!alive && slot.status === 'running') {
       changed = true;
       return {
         ...slot,
         status: 'completed' as const,
-        completedAt: slot.completedAt ?? new Date().toISOString(),
+        completedAt: slot.completedAt ?? completedAt,
       };
     }
     return slot;
@@ -134,7 +173,7 @@ async function refreshSwarmSlotStatuses(
     state: {
       ...state,
       slots,
-      updatedAt: new Date().toISOString(),
+      updatedAt: completedAt,
     },
     changed: true,
   };
@@ -214,7 +253,9 @@ async function dispatchSwarmWave(
 
   const swarmModel = requestedModel || DEFAULT_SWARM_MODEL;
   const resourceConfig = getResourceConfig();
-  const hardLimit = Number(process.env['PAN_AGENT_BLOCK_COUNT']) || resourceConfig.agentBlockCount;
+  const envLimit = process.env['PAN_AGENT_BLOCK_COUNT'];
+  const parsedEnvLimit = envLimit !== undefined ? Number(envLimit) : undefined;
+  const hardLimit = Number.isFinite(parsedEnvLimit) ? parsedEnvLimit : resourceConfig.agentBlockCount;
   const currentAgents = health.summary.workAgentCount;
   const systemAvailable = Math.max(0, hardLimit - currentAgents);
 
@@ -324,6 +365,18 @@ async function dispatchSwarmWave(
     }
   }
 
+  if (itemsToDispatch.length > 0 && dispatched.length === 0) {
+    return {
+      status: 500,
+      body: {
+        error: `Failed to dispatch any slots for ${issueUpper} wave ${waveIndex}.`,
+        hint: 'Resolve the slot creation or agent spawn errors, then retry the swarm wave.',
+        errors,
+        wavePlan: waves,
+      },
+    };
+  }
+
   const existingState = await loadSwarmState(issueUpper);
   const state: SwarmState = {
     issueId: issueUpper,
@@ -331,6 +384,9 @@ async function dispatchSwarmWave(
     totalWaves: waves.length,
     model: swarmModel,
     autoAdvance: autoAdvance ?? existingState?.autoAdvance ?? false,
+    autoAdvanceFailureCount: 0,
+    autoAdvanceRetryAfter: undefined,
+    lastAutoAdvanceError: undefined,
     slots: dispatched,
     createdAt: existingState?.createdAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -370,6 +426,10 @@ async function dispatchSwarmWave(
 
 async function pollSwarmAutoAdvance(): Promise<void> {
   const entries = await readdir(getSwarmDir()).catch(() => [] as string[]);
+  if (entries.length === 0) return;
+
+  const sessions = await listSessionNamesAsync().catch(() => [] as string[]);
+
   for (const entry of entries) {
     if (!entry.endsWith('.json')) continue;
 
@@ -378,13 +438,14 @@ async function pollSwarmAutoAdvance(): Promise<void> {
     if (!loadedState?.autoAdvance) continue;
     if (loadedState.currentWave >= loadedState.totalWaves - 1) continue;
     if (autoAdvanceInFlight.has(loadedState.issueId)) continue;
+    if (isAutoAdvanceCoolingDown(loadedState)) continue;
 
-    const { state, changed } = await refreshSwarmSlotStatuses(loadedState);
+    const { state, changed } = await refreshSwarmSlotStatuses(loadedState, sessions);
     if (changed) {
       await saveSwarmState(state);
     }
 
-    const allSlotsCompleted = state.slots.length > 0 && state.slots.every(
+    const allSlotsCompleted = state.slots.every(
       slot => slot.status === 'completed' || slot.status === 'failed',
     );
     if (!allSlotsCompleted) continue;
@@ -398,7 +459,9 @@ async function pollSwarmAutoAdvance(): Promise<void> {
         autoAdvance: true,
       });
       if (result.status >= 400) {
-        console.warn(`[swarm] Auto-advance for ${state.issueId} stalled: ${result.body.error ?? 'unknown error'}`);
+        const error = result.body.error ?? 'unknown error';
+        console.warn(`[swarm] Auto-advance for ${state.issueId} stalled: ${error}`);
+        await saveSwarmState(recordAutoAdvanceFailure(state, error));
       }
     } finally {
       autoAdvanceInFlight.delete(state.issueId);
@@ -406,15 +469,34 @@ async function pollSwarmAutoAdvance(): Promise<void> {
   }
 }
 
+function scheduleNextSwarmAutoAdvancePoll(): void {
+  autoAdvanceTimer = setTimeout(() => {
+    void runSwarmAutoAdvancePollLoop();
+  }, SWARM_AUTO_ADVANCE_POLL_MS);
+  autoAdvanceTimer.unref?.();
+}
+
+async function runSwarmAutoAdvancePollLoop(): Promise<void> {
+  if (autoAdvancePolling) {
+    scheduleNextSwarmAutoAdvancePoll();
+    return;
+  }
+
+  autoAdvancePolling = true;
+  try {
+    await pollSwarmAutoAdvance();
+  } catch (err) {
+    console.error('[swarm] Auto-advance loop failed:', err);
+  } finally {
+    autoAdvancePolling = false;
+    scheduleNextSwarmAutoAdvancePoll();
+  }
+}
+
 function ensureSwarmAutoAdvanceLoop(): void {
   if (autoAdvanceLoopStarted) return;
   autoAdvanceLoopStarted = true;
-  const handle = setInterval(() => {
-    void pollSwarmAutoAdvance().catch((err) => {
-      console.error('[swarm] Auto-advance loop failed:', err);
-    });
-  }, SWARM_AUTO_ADVANCE_POLL_MS);
-  handle.unref?.();
+  scheduleNextSwarmAutoAdvancePoll();
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -423,7 +505,8 @@ const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const text = yield* request.text;
   try {
-    return text ? JSON.parse(text) : {};
+    const parsed = text ? JSON.parse(text) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
     return {};
   }
@@ -650,8 +733,6 @@ const getSwarmRoute = HttpRouter.add(
 );
 
 // ─── Export ─────────────────────────────────────────────────────────────────
-
-ensureSwarmAutoAdvanceLoop();
 
 export const __testInternals = {
   refreshSwarmSlotStatuses,

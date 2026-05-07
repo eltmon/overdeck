@@ -394,6 +394,7 @@ program
   .option('--model <model>', 'Override model for work slots (default: kimi-k2.6)')
   .option('--max-slots <n>', 'Max concurrent agents')
   .option('--auto-advance', 'Automatically dispatch the next wave when the current one completes')
+  .option('--no-auto-advance', 'Disable automatic next-wave dispatching for this swarm')
   .action(swarmCommand);
 
 // Register workspace commands (pan workspace create, pan workspace list, etc.)

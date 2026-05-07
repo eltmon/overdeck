@@ -393,6 +393,39 @@ describe('derivePipelinePhase availableTerminals', () => {
     expect(workTab?.sessionName).toBe('agent-abc');
   });
 
+  it('renders one work tab per swarm slot when multiple work agents share an issue', () => {
+    const input = makeInput({
+      agent: makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509' }),
+      workAgents: [
+        makeAgent({ id: 'agent-pan-509-2', issueId: 'PAN-509' }),
+        makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509' }),
+      ],
+    });
+
+    const { phase, activeSession, availableTerminals } = derivePipelinePhase(input);
+    expect(phase).toBe('working');
+    expect(activeSession).toBe('agent-pan-509-1');
+    expect(availableTerminals.filter((tab) => tab.id.startsWith('working')).map((tab) => ({
+      id: tab.id,
+      label: tab.label,
+      sessionName: tab.sessionName,
+      isActive: tab.isActive,
+    }))).toEqual([
+      {
+        id: 'working',
+        label: 'Slot 1',
+        sessionName: 'agent-pan-509-1',
+        isActive: true,
+      },
+      {
+        id: 'working-agent-pan-509-2',
+        label: 'Slot 2',
+        sessionName: 'agent-pan-509-2',
+        isActive: false,
+      },
+    ]);
+  });
+
   it('does NOT include Work tab when no agent', () => {
     const input = makeInput();
     const { availableTerminals } = derivePipelinePhase(input);
@@ -462,6 +495,20 @@ describe('derivePipelinePhase availableTerminals', () => {
     const { availableTerminals } = derivePipelinePhase(input);
     const workTab = availableTerminals.find(t => t.id === 'working');
     expect(workTab?.isActive).toBe(true);
+  });
+
+  it('follows the first attachable swarm slot when earlier slots are stopped', () => {
+    const input = makeInput({
+      agent: makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped' }),
+      workAgents: [
+        makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped' }),
+        makeAgent({ id: 'agent-pan-509-2', issueId: 'PAN-509', status: 'healthy' }),
+      ],
+    });
+
+    const { activeSession, availableTerminals } = derivePipelinePhase(input);
+    expect(activeSession).toBe('agent-pan-509-2');
+    expect(availableTerminals.find((tab) => tab.sessionName === 'agent-pan-509-2')?.isActive).toBe(true);
   });
 
   it('marks dead sessions as disabled', () => {

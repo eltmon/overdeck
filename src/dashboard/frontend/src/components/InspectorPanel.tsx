@@ -45,6 +45,7 @@ import { SwitchModelModal } from './SwitchModelModal';
 import { useSwitchModel } from '../hooks/useSwitchModel';
 import { SensitiveText } from './SensitiveText';
 import { useActivityQuery, usePrQuery } from './CommandDeck/ZoneCOverviewTabs/queries';
+import { getWorkSessionLabel, isAgentSessionAttachable } from '../lib/swarmSlots';
 
 function formatCost(cost: number): string {
   if (cost >= 100) return `$${cost.toFixed(0)}`;
@@ -90,6 +91,7 @@ function copyToClipboard(text: string): boolean {
 
 export interface InspectorPanelProps {
   agent?: Agent;
+  workAgents?: Agent[];
   issueId: string;
   issueUrl?: string;
   issue?: Issue;
@@ -107,7 +109,7 @@ export interface InspectorPanelProps {
   embedded?: boolean;
 }
 
-export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewStatus: reviewStatusProp, reviewStatusLoading: reviewStatusLoadingProp, onClose, onOpenTerminal, onViewMergeLog, embedded }: InspectorPanelProps) {
+export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issue, phase, reviewStatus: reviewStatusProp, reviewStatusLoading: reviewStatusLoadingProp, onClose, onOpenTerminal, onViewMergeLog, embedded }: InspectorPanelProps) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const showAlert = useAlert();
@@ -235,6 +237,8 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     if (ageMs < 3_600_000) return `last activity ${Math.round(ageMs / 60_000)}m ago`;
     return `last activity ${Math.round(ageMs / 3_600_000)}h ago`;
   })();
+
+  const swarmWorkAgents = workAgents.length > 1 ? workAgents : [];
 
   // Reviewer summary data
   const reviewerSections = sections.filter((s) => s.type === 'reviewer');
@@ -842,6 +846,33 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
                 <span>{sessionCount} session{sessionCount === 1 ? '' : 's'}</span>
               )}
               {lastActivity && <span>{lastActivity}</span>}
+            </div>
+          </div>
+        )}
+
+        {swarmWorkAgents.length > 1 && (
+          <div className="px-3 py-2 border-b border-border text-xs">
+            <div className="uppercase tracking-wider text-[10px] mb-1.5 font-semibold text-muted-foreground">Swarm Slots</div>
+            <div className="flex flex-wrap gap-1.5">
+              {swarmWorkAgents.map((workAgent, index) => {
+                const attachable = isAgentSessionAttachable(workAgent);
+                return (
+                  <span
+                    key={workAgent.id}
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] ${
+                      attachable
+                        ? 'badge-bg-primary text-primary-foreground'
+                        : 'border border-border/70 bg-card text-muted-foreground'
+                    }`}
+                    title={workAgent.id}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${attachable ? 'bg-primary-foreground/90' : 'bg-muted-foreground'}`}
+                    />
+                    {getWorkSessionLabel(workAgent, index)}
+                  </span>
+                );
+              })}
             </div>
           </div>
         )}

@@ -37,6 +37,7 @@ import { CostWarningStyles } from './components/shared/costWarning';
 import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
 import { useDashboardStore, selectAgentList, selectIssues, selectDashboardLifecycle } from './lib/store';
+import { getIssueWorkAgents } from './lib/swarmSlots';
 import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
 
 interface TrackerStatusItem {
@@ -500,9 +501,14 @@ export default function App() {
     }
   }, [agents]);
 
-  // Find the work agent for selected issue (agent-<id>, not planning-<id>)
+  const selectedIssueWorkAgents = selectedIssue
+    ? getIssueWorkAgents(agents, selectedIssue)
+    : [];
+
+  // Prefer grouped work sessions for the selected issue. Fall back to any issue-bound
+  // agent so planning-only issues still render their detail panel.
   const selectedIssueAgent = selectedIssue
-    ? agents.find((a) => a.issueId?.toLowerCase() === selectedIssue.toLowerCase() && a.id.startsWith('agent-'))
+    ? selectedIssueWorkAgents[0]
       ?? agents.find((a) => a.issueId?.toLowerCase() === selectedIssue.toLowerCase())
       ?? null
     : null;
@@ -767,6 +773,7 @@ export default function App() {
                   >
                     <DetailPanelLayout
                       agent={selectedIssueAgent ?? undefined}
+                      workAgents={selectedIssueWorkAgents}
                       issueId={selectedIssue}
                       issueUrl={selectedIssueData.url}
                       issue={selectedIssueData}

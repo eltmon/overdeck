@@ -306,4 +306,150 @@ describe('swarm route helpers', () => {
       },
     ]);
   });
+
+  it('treats dead tmux panes as completed even when the session name still exists', async () => {
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue(['agent-pan-971-1']);
+    vi.mocked(tmux.isPaneDeadAsync).mockResolvedValue(true);
+
+    const { __testInternals } = await import('../swarm.js');
+    const refreshed = await __testInternals.refreshSwarmSlotStatuses({
+      issueId: 'PAN-971',
+      currentWave: 0,
+      totalWaves: 2,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      slots: [
+        {
+          slot: 1,
+          itemId: 'wave-0-item',
+          itemTitle: 'Prepare slot input',
+          sessionName: 'agent-pan-971-1',
+          workspace: '/tmp/feature-pan-971-slot-1',
+          status: 'running',
+          startedAt: '2026-05-07T00:00:00Z',
+        },
+      ],
+      createdAt: '2026-05-07T00:00:00Z',
+      updatedAt: '2026-05-07T00:00:00Z',
+    });
+
+    expect(refreshed.changed).toBe(true);
+    expect(refreshed.state.slots[0]?.status).toBe('completed');
+  });
+
+  it('reads tmux sessions once per auto-advance poll before refreshing swarm states', async () => {
+    writeFileSync(join(testHome, '.panopticon', 'swarms', 'pan-971.json'), JSON.stringify({
+      issueId: 'PAN-971',
+      currentWave: 0,
+      totalWaves: 2,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      slots: [{
+        slot: 1,
+        itemId: 'wave-0-item',
+        itemTitle: 'Prepare slot input',
+        sessionName: 'agent-pan-971-1',
+        workspace: '/tmp/feature-pan-971-slot-1',
+        status: 'running',
+      }],
+      createdAt: '2026-05-07T00:00:00Z',
+      updatedAt: '2026-05-07T00:00:00Z',
+    }, null, 2));
+    writeFileSync(join(testHome, '.panopticon', 'swarms', 'pan-972.json'), JSON.stringify({
+      issueId: 'PAN-972',
+      currentWave: 0,
+      totalWaves: 2,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      slots: [{
+        slot: 1,
+        itemId: 'wave-0-item',
+        itemTitle: 'Prepare slot input',
+        sessionName: 'agent-pan-972-1',
+        workspace: '/tmp/feature-pan-972-slot-1',
+        status: 'running',
+      }],
+      createdAt: '2026-05-07T00:00:00Z',
+      updatedAt: '2026-05-07T00:00:00Z',
+    }, null, 2));
+
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue(['agent-pan-971-1', 'agent-pan-972-1']);
+
+    const { __testInternals } = await import('../swarm.js');
+    await __testInternals.pollSwarmAutoAdvance();
+
+    expect(tmux.listSessionNamesAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('backs off auto-advance retries after repeated dispatch failures', async () => {
+    const swarmStatePath = join(testHome, '.panopticon', 'swarms', 'pan-971.json');
+    writeFileSync(swarmStatePath, JSON.stringify({
+      issueId: 'PAN-971',
+      currentWave: 0,
+      totalWaves: 2,
+      model: 'kimi-k2.6',
+      autoAdvance: true,
+      slots: [
+        {
+          slot: 1,
+          itemId: 'wave-0-item',
+          itemTitle: 'Prepare slot input',
+          sessionName: 'agent-pan-971-1',
+          workspace: '/tmp/feature-pan-971-slot-1',
+          status: 'completed',
+        },
+      ],
+      createdAt: '2026-05-07T00:00:00Z',
+      updatedAt: '2026-05-07T00:05:00Z',
+    }, null, 2));
+
+    vi.mocked(vbriefIo.readWorkspacePlan).mockReturnValue(null);
+
+    const { __testInternals } = await import('../swarm.js');
+    await __testInternals.pollSwarmAutoAdvance();
+    await __testInternals.pollSwarmAutoAdvance();
+    await __testInternals.pollSwarmAutoAdvance();
+
+    const failedState = JSON.parse(readFileSync(swarmStatePath, 'utf-8')) as {
+      autoAdvanceFailureCount?: number;
+      autoAdvanceRetryAfter?: string;
+    };
+    expect(failedState.autoAdvanceFailureCount).toBe(3);
+    expect(failedState.autoAdvanceRetryAfter).toBeTruthy();
+
+    vi.mocked(vbriefIo.readWorkspacePlan).mockClear();
+    await __testInternals.pollSwarmAutoAdvance();
+    expect(vbriefIo.readWorkspacePlan).not.toHaveBeenCalled();
+  });
+
+  it('returns an error instead of persisting an empty swarm wave when every slot fails to spawn', async () => {
+    mkdirSync(join(projectPath, 'workspaces', 'feature-pan-971-slot-1'), { recursive: true });
+    vi.mocked(tmux.listSessionNamesAsync).mockResolvedValue([]);
+    vi.mocked(agents.spawnAgent).mockRejectedValue(new Error('spawn failed') as never);
+
+    const { __testInternals } = await import('../swarm.js');
+    const result = await __testInternals.dispatchSwarmWave({
+      issueId: 'PAN-971',
+      wave: 0,
+      autoAdvance: true,
+    });
+
+    expect(result.status).toBe(500);
+    expect(result.body.error).toContain('Failed to dispatch any slots');
+  });
+
+  it('honors PAN_AGENT_BLOCK_COUNT=0 as an explicit hard stop', async () => {
+    process.env.PAN_AGENT_BLOCK_COUNT = '0';
+
+    const { __testInternals } = await import('../swarm.js');
+    const result = await __testInternals.dispatchSwarmWave({
+      issueId: 'PAN-971',
+      wave: 0,
+    });
+
+    expect(result.status).toBe(429);
+    expect(result.body.error).toContain('No agent capacity available');
+
+    delete process.env.PAN_AGENT_BLOCK_COUNT;
+  });
 });
