@@ -88,6 +88,7 @@ describe('Command Deck action parity', () => {
     'Recover': 'recover',
     'Resume session': 'resumeSession',
     'Reset session': 'resetSession',
+    'Restart agent': 'restartAgent',
     'Restart from plan': 'restartFromPlan',
     'Reset issue': 'resetIssue',
 

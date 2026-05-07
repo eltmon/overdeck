@@ -1138,9 +1138,7 @@ describe('spawnReviewer runtime command routing regression', () => {
     expect(fn).not.toMatch(/`claude\s+--(?:dangerously-skip-permissions|model)/);
   });
 
-  it('review-agent.ts uses launcher exports helper for provider env isolation', async () => {
-    // The current design uses launcher-script exports via generateLauncherScript
-    // so provider env is set in a bash wrapper, not tmux flags or settings overlay.
+  it('review-agent.ts uses launcher exports for provider env isolation', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const src = readFileSync(
@@ -1149,6 +1147,7 @@ describe('spawnReviewer runtime command routing regression', () => {
     );
     expect(src).toMatch(/getProviderExportsForModel/);
     expect(src).toMatch(/generateLauncherScript/);
+    expect(src).toMatch(/BLANKED_PROVIDER_ENV/);
   });
 
   it('spawnReviewer uses a bash launcher script, not tmux -e env flags', async () => {
@@ -1169,7 +1168,7 @@ describe('spawnReviewer runtime command routing regression', () => {
     expect(fn).toContain('writeFile(');
     expect(fn).toMatch(/bash\s+.*launcherPath/);
 
-    // Provider env flows through launcher script exports; avoid tmux `-e` transport.
+    // Provider env flows through launcher exports — must avoid old tmux `-e KEY=value` transport.
     expect(fn).not.toMatch(/createSessionAsync\([\s\S]*-e\s/);
     const envMatch = fn.match(/\{\s*env\s*:[\s\S]*?\}/);
     if (envMatch) {
