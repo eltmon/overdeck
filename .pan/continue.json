@@ -106,6 +106,12 @@
       "reason": "bead-close",
       "note": "Closed bead workspace-eet (wire-spawn-agent). Added PanopticonAgentType union ('work'|'planning'|'review'|'test'|'inspect'|'uat'|'merge') and panopticonAgentName() helper. Extended getAgentRuntimeBaseCommand() signature with optional agentType parameter (currently underscore-prefixed and unused — bead workspace-7if turns this into actual --agent flag emission). Wired 3 callsites to pass agentType: spawnAgent work path passes 'work' or 'planning' based on options.phase; fallback restart at ~1450 passes 'work'; recovery at ~1811 passes 'work'. Resume path at ~1670 inline-emits 'claude --agent pan-work-agent' as baseCommand to satisfy AC2 (resume uses --agent pan-work-agent alongside --resume). claudish wrapper path inherits no agentType because non-direct providers cannot consume --agent. Typecheck + all 24 launcher tests pass.",
       "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T03:18:00.000Z",
+      "reason": "bead-close",
+      "note": "Closed bead workspace-r2l (update-launcher-config). Modified buildNonConversationCommand() to skip permission flag emission when baseCommand already contains '--agent ' (per-agent frontmatter handles permissions via permissionMode). Specialists not yet migrated to --agent (specialist-init at specialists.ts:2310, specialist-dispatch branch) still emit permissionFlags. Removed permissionFlags array from agents.ts resume path because baseCommand now includes '--agent pan-work-agent'. Updated existing 'work agent resume' inline snapshot to reflect the new shape (claude --agent pan-work-agent --resume ... --model ...). 24/24 tests still pass; typecheck clean.",
+      "agentModel": "agent:claude-opus-4-7"
     }
   ],
   "resumePoint": {

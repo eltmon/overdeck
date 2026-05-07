@@ -1688,7 +1688,6 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
       setCi: true,
       providerExports,
       baseCommand: `claude --agent ${panopticonAgentName('work')}`,
-      permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
       resumeSessionId: sessionId,
       model: providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
       extraArgs: `--name ${normalizedId}`,

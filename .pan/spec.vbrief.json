@@ -274,7 +274,7 @@
       {
         "id": "update-launcher-config",
         "title": "Remove permission flags from LauncherConfig and buildCommand",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-07T02:30:00.000Z",
         "metadata": {
@@ -288,7 +288,7 @@
           {
             "id": "update-launcher-config.ac1",
             "title": "Generated launcher scripts for work/planning/resume agents no longer contain --dangerously-skip-permissions or --permission-mode when --agent is present",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -296,7 +296,7 @@
           {
             "id": "update-launcher-config.ac2",
             "title": "Conversation agent and specialist-dispatch launcher paths still work (they may not use --agent)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

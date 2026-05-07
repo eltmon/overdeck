@@ -48,14 +48,13 @@ describe('generateLauncherScript', () => {
     `);
   });
 
-  it('work agent resume', () => {
+  it('work agent resume (PAN-982: permissions via --agent frontmatter)', () => {
     const script = generateLauncherScript({
       ...DEFAULT_CONFIG,
       agentType: 'resume',
       setCi: true,
       providerExports: 'export ANTHROPIC_BASE_URL="http://proxy"',
-      baseCommand: 'claude',
-      permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
+      baseCommand: 'claude --agent pan-work-agent',
       resumeSessionId: 'sess-123',
       model: 'gpt-5.4',
     });
@@ -66,7 +65,7 @@ describe('generateLauncherScript', () => {
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
       cd -- '/workspace/project'
       export ANTHROPIC_BASE_URL="http://proxy"
-      exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --resume 'sess-123' --model gpt-5.4
+      exec claude --agent pan-work-agent --resume 'sess-123' --model gpt-5.4
       "
     `);
   });
