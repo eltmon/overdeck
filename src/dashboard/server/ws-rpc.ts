@@ -35,12 +35,13 @@ function storedToDomainEvent(stored: StoredEvent): DomainEvent {
 // ─── Session Tree Subscription Helpers (PAN-821) ──────────────────────────────
 
 /** Extract issue ID from a tmux session name. */
-function extractIssueIdFromSession(sessionName: string): string | null {
-  const agentMatch = sessionName.match(/^(agent|planning)-([a-z0-9-]+)$/);
+export function extractIssueIdFromSession(sessionName: string): string | null {
+  const issuePattern = '((?:[a-z]+-\\d+|(?:f|us|de|ta|tc)\\d+))';
+  const agentMatch = sessionName.match(new RegExp(`^(agent|planning)-${issuePattern}(?:-\\d+)?$`, 'i'));
   if (agentMatch) return agentMatch[2]!.toUpperCase();
 
-  const reviewMatch = sessionName.match(/^review-(?:coordinator-)?([A-Z0-9-]+)-\d+/);
-  if (reviewMatch) return reviewMatch[1]!;
+  const reviewMatch = sessionName.match(new RegExp(`^review-(?:coordinator-)?${issuePattern}-\\d+(?:-[a-z]+)?$`, 'i'));
+  if (reviewMatch) return reviewMatch[1]!.toUpperCase();
 
   return null;
 }
