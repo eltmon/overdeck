@@ -2222,7 +2222,7 @@ const postAgentsRoute = HttpRouter.add(
                     phase,
                     workspacePath,
                   });
-                  await spawnPanCommand(['start', issueId, '--local', '--phase', phase], workspacePath);
+                  await spawnPanCommand(['start', issueId, '--local', '--phase', phase, '--model', spawnModel], workspacePath);
                   await updateIssueStatus();
                 } catch (err: any) {
                   const errorMessage = err instanceof Error ? err.message : String(err);
