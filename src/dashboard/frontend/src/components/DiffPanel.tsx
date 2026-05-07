@@ -693,9 +693,16 @@ export function DiffPanel({
                     <FileDiff
                       fileDiff={fileDiff}
                       options={{
-                        diffStyle: diffRenderMode === 'split' ? 'split' : 'unified',
-                        lineDiffType: 'word-alt',
-                        overflow: diffWordWrap ? 'wrap' : 'scroll',
+                        diffStyle: diffPrefs.diffRenderMode === 'split' ? 'split' : 'unified',
+                        lineDiffType: diffPrefs.lineDiffType,
+                        overflow: diffPrefs.diffWordWrap ? 'wrap' : 'scroll',
+                        diffIndicators: diffPrefs.diffIndicators,
+                        hunkSeparators: diffPrefs.hunkSeparators,
+                        expandUnchanged: diffPrefs.expandUnchanged,
+                        collapsedContextThreshold: diffPrefs.collapsedContextThreshold,
+                        lineHoverHighlight: diffPrefs.lineHoverHighlight,
+                        disableLineNumbers: diffPrefs.disableLineNumbers,
+                        enableLineSelection: diffPrefs.enableLineSelection,
                         theme: resolveDiffThemeName(resolvedTheme),
                         themeType: resolvedTheme as DiffThemeType,
                         unsafeCSS: DIFF_PANEL_UNSAFE_CSS,
