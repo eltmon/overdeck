@@ -1,27 +1,59 @@
 {
   "version": "1",
-  "issueId": "pan-939",
-  "created": "2026-05-07T13:10:00Z",
-  "updated": "2026-05-07T13:20:00Z",
-  "gitState": { "branch": "feature/pan-939", "sha": "bdbaec15f", "dirty": false },
+  "issueId": "pan-1014",
+  "created": "2026-05-07T13:50:00.000Z",
+  "updated": "2026-05-07T14:00:00.000Z",
+  "gitState": {
+    "branch": "feature/pan-1014",
+    "sha": "4127d87",
+    "dirty": true
+  },
   "decisions": [
-    { "id": "D1", "summary": "Move withBdMutex to src/lib/bd-mutex.ts so both dashboard and cloister can use it", "recordedAt": "2026-05-07T13:10:00Z" }
+    {
+      "id": "D1",
+      "summary": "Fix canResumeSession to add &&!isRunning so isRunning and canResumeSession are never simultaneously true. Add isRunningButStuck flag (isRunning && runtime===idle||suspended) to make the stuck case explicit. Fix recommendedAction to check isRunningButStuck BEFORE the generic 'running' branch so stuck agents get 'resume' not 'none'.",
+      "recordedAt": "2026-05-07T13:56:00.000Z"
+    },
+    {
+      "id": "D2",
+      "summary": "assertCanResumeSession also updated to accept isRunningButStuck — otherwise all callers of assertCanResumeSession would incorrectly block stuck-agent resumes. Route will check canResumeSession||isRunningButStuck explicitly.",
+      "recordedAt": "2026-05-07T13:56:00.000Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Tests use setAgentRuntimeMirror() directly to populate runtime state, because saveAgentRuntimeState is async and relies on the dashboard event system which is not running in unit tests. The mirror is the in-process source of truth for getAgentRuntimeState.",
+      "recordedAt": "2026-05-07T13:56:00.000Z"
+    }
   ],
   "hazards": [
-    { "id": "H1", "summary": "Cloister files cannot import from src/dashboard/server/utils/", "mitigation": "Move bd-mutex.ts to src/lib/ which is accessible from both" }
+    {
+      "id": "H1",
+      "summary": "suspended runtime state is a legacy value never emitted by the new event path (PAN-800). Only 'idle' is reachable via the current Activity enum. The isRunningButStuck check includes it for backward-compat, but the suspended test uses 'idle' as the real-world equivalent.",
+      "mitigation": "The test comment documents this clearly. No behavior change needed — the guard is safe to keep."
+    }
   ],
   "resumePoint": {
-    "description": "agents.ts wrapped. Next: wrap cloister bd calls in triggers.ts, handoff-context.ts, and inspect-agent.ts with withBdMutex (bead workspace-0ynp)",
-    "beadId": "workspace-0ynp",
-    "filesToRead": ["src/lib/cloister/triggers.ts", "src/lib/cloister/handoff-context.ts", "src/lib/cloister/inspect-agent.ts"]
+    "description": "Both beads complete. Run full test suite, then pan done.",
+    "beadId": null,
+    "filesToRead": []
   },
   "beadsMapping": {
-    "workspace-qgfg": "Move bd-mutex to shared lib location",
-    "workspace-6wb9": "Wrap dashboard agents.ts bd list with withBdMutex",
-    "workspace-0ynp": "Wrap cloister bd calls with withBdMutex"
+    "workspace-bvqq": "Fix getWorkAgentLifecycleState: add isRunningButStuck, fix canResumeSession, fix recommendedAction precedence",
+    "workspace-b15a": "Fix resume route: gate on canResumeSession||isRunningButStuck, return {before,after} lifecycle in response"
   },
-  "agentModel": "kc@kimi-k2.6",
+  "agentModel": "claude-opus-4-5",
   "sessionHistory": [
-    { "timestamp": "2026-05-07T13:10:00Z", "reason": "start", "note": "Rebased onto main, created beads, starting implementation of PAN-939", "agentModel": "kc@kimi-k2.6" }
+    {
+      "timestamp": "2026-05-07T13:56:00.000Z",
+      "reason": "bead-complete",
+      "note": "Implemented bead workspace-bvqq: added isRunningButStuck to WorkAgentLifecycleState interface and computation; fixed canResumeSession to include &&!isRunning; fixed recommendedAction branch ordering so isRunningButStuck check fires before the generic running+live-tmux='none' branch; updated assertCanResumeSession to accept isRunningButStuck. Updated tests: added isRunning/isRunningButStuck assertions to existing test, added two regression tests for the PAN-1014 stuck-running case using setAgentRuntimeMirror for reliable runtime state in unit tests.",
+      "agentModel": "claude-opus-4-5"
+    },
+    {
+      "timestamp": "2026-05-07T14:00:00.000Z",
+      "reason": "bead-complete",
+      "note": "Implemented bead workspace-b15a: fixed resume route gate at agents.ts:1253 to check !canResumeSession && !isRunningButStuck for 409 (was only checking !canResumeSession); changed success response from flat lifecycle to {before:lifecycleBefore, after:getWorkAgentLifecycleState(id)} so consumers see both temporal snapshots without confusion; kept 409 response as flat lifecycle for backward compat with CommandDeck/index.tsx consumer; added resume-gate.test.ts with 4 tests for the gate predicate covering all four scenarios.",
+      "agentModel": "claude-opus-4-5"
+    }
   ]
 }

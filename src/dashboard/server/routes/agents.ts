@@ -1250,18 +1250,20 @@ const postAgentResumeRoute = HttpRouter.add(
 
     const { message, model } = body as any;
     const eventStore = yield* EventStoreService;
-    const lifecycle = getWorkAgentLifecycleState(id);
-    if (!lifecycle.canResumeSession) {
+    // Snapshot lifecycle state BEFORE taking any action so callers can see the
+    // temporal context (why was this resume allowed) without recomputing state.
+    const lifecycleBefore = getWorkAgentLifecycleState(id);
+    if (!lifecycleBefore.canResumeSession && !lifecycleBefore.isRunningButStuck) {
       return jsonResponse({
-        error: lifecycle.reason || `Cannot resume agent ${lifecycle.agentId}`,
-        lifecycle,
+        error: lifecycleBefore.reason || `Cannot resume agent ${lifecycleBefore.agentId}`,
+        lifecycle: lifecycleBefore,
       }, { status: 409 });
     }
 
     yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_requested', {
       hasMessage: !!message,
       model: model || undefined,
-      lifecycle,
+      lifecycle: lifecycleBefore,
     }));
     const result = yield* Effect.promise(() => resumeAgent(id, message, model ? { model } : undefined));
     if (result.success) {
@@ -1292,13 +1294,23 @@ const postAgentResumeRoute = HttpRouter.add(
         hasMessage: !!message,
       }));
       invalidateAgentsCache();
-      return jsonResponse({ success: true, resumed: true, lifecycle: getWorkAgentLifecycleState(id) });
+      // Return both the pre-action and post-action lifecycle so consumers can
+      // see why the resume was allowed (before) and the new running state (after)
+      // without confusion about "canResumeSession:false" in the same payload.
+      return jsonResponse({
+        success: true,
+        resumed: true,
+        lifecycle: { before: lifecycleBefore, after: getWorkAgentLifecycleState(id) },
+      });
     } else {
       yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_failed', {
         hasMessage: !!message,
         error: result.error,
       }));
-      return jsonResponse({ error: result.error, lifecycle: getWorkAgentLifecycleState(id) }, { status: 400 });
+      return jsonResponse({
+        error: result.error,
+        lifecycle: { before: lifecycleBefore, after: getWorkAgentLifecycleState(id) },
+      }, { status: 400 });
     }
   })),
 );
