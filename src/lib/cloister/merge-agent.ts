@@ -424,7 +424,6 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   // state cleanup, and branch deletion. Steps already performed above are no-ops.
   try {
     const { teardownWorkspace } = await import('../lifecycle/teardown-workspace.js');
-    const issueLower = issueId.toLowerCase();
     const ctx = { issueId, projectPath };
     const teardownResults = await teardownWorkspace(ctx, { deleteBranches: true });
     const completedSteps = teardownResults.filter(r => r.success && !r.skipped);
