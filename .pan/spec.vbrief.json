@@ -186,7 +186,7 @@
       {
         "id": "define-uat-agent",
         "title": "Create pan-uat-agent.md definition",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-07T02:30:00.000Z",
         "metadata": {
@@ -200,7 +200,7 @@
           {
             "id": "define-uat-agent.ac1",
             "title": "pan-uat-agent.md exists with Playwright MCP server configured in frontmatter",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
