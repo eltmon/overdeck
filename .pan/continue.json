@@ -2,30 +2,29 @@
   "version": "1",
   "issueId": "PAN-979",
   "created": "2026-05-06T20:20:00Z",
-  "updated": "2026-05-06T21:14:00Z",
-  "gitState": { "branch": "feature/pan-979", "sha": "3067b0c", "dirty": false },
+  "updated": "2026-05-06T21:20:00Z",
+  "gitState": { "branch": "feature/pan-979", "sha": "bcd7f79", "dirty": false },
   "decisions": [
     { "id": "D1", "summary": "Prioritize DAG canvas front-loading per user directive. Fix edges first, then duplicate entries, then node enrichment, then gate nodes.", "recordedAt": "2026-05-06T20:20:00Z" },
     { "id": "D2", "summary": "Removed vbrief/state/prd ActionKeys from Command Deck surface entirely — they remain as ZoneCOverview tabs only. Updated ALL_ACTION_KEYS, surface registry, legacy action map, and all tests.", "recordedAt": "2026-05-06T20:35:00Z" },
     { "id": "D3", "summary": "SessionNode phase icons use toolNameToPhase() from workingPhase.ts to map currentTool → Lucide icon. Spinner phases get animate-spin.", "recordedAt": "2026-05-06T20:40:00Z" },
     { "id": "D4", "summary": "IssueHeader pipeline redesigned from 8px dots to prominent StagePills with icons, colors, glow effects, and connecting lines.", "recordedAt": "2026-05-06T20:47:00Z" },
-    { "id": "D5", "summary": "PlanDAG work item nodes enriched with status animations (glow for in_progress, pulse for unblocked pending, pulse for blocked), compact mode for completed/cancelled, blocker title display, and dimming for blocked pending items.", "recordedAt": "2026-05-06T21:13:00Z" }
+    { "id": "D5", "summary": "PlanDAG work item nodes enriched with status animations (glow for in_progress, pulse for unblocked pending, pulse for blocked), compact mode for completed/cancelled, blocker title display, and dimming for blocked pending items.", "recordedAt": "2026-05-06T21:13:00Z" },
+    { "id": "D6", "summary": "Quality gate nodes (VERIFY, REVIEW, TEST, MERGE, DONE) appended after terminal work items in PlanDAG. Gate status derived from reviewStatus. Distinct visual styling with left border strip and animated edges.", "recordedAt": "2026-05-06T21:19:00Z" }
   ],
   "hazards": [
     { "id": "H1", "summary": "Pre-existing test failures in integration/cli tests unrelated to frontend changes. 12 root-level tests fail but all frontend tests pass.", "mitigation": "Only frontend test results matter for dashboard changes." }
   ],
   "resumePoint": {
-    "description": "Claim pan-979-gates bead and add quality gate nodes (VERIFY, REVIEW, TEST, MERGE, DONE) to the DAG after terminal work items.",
-    "beadId": "pan-979-gates",
-    "filesToRead": [
-      "src/dashboard/frontend/src/components/PlanDAG.tsx",
-      "docs/prds/planned/PAN-969-directive-flow.md"
-    ]
+    "description": "PAN-979 implementation complete. All 4 beads closed: dedup (remove duplicate vBRIEF/STATE/PRD), edges (front-load DAG, fix edge visibility), enrich (status animations, compact mode, blocker info), gates (VERIFY→REVIEW→TEST→MERGE→DONE tail nodes).",
+    "beadId": null,
+    "filesToRead": []
   },
   "beadsMapping": {
     "pan-979-dedup": "3d2ac40db",
     "pan-979-edges": "aa9782d5c",
-    "pan-979-enrich": "3067b0c71"
+    "pan-979-enrich": "3067b0c71",
+    "pan-979-gates": "bcd7f79cb"
   },
   "agentModel": "kimi-k2.6",
   "sessionHistory": [
@@ -34,6 +33,7 @@
     { "timestamp": "2026-05-06T20:38:00Z", "reason": "progress", "note": "Closed pan-979-edges: front-loaded PlanDAG into OverviewTab with 520px section. Improved edge visibility (thicker strokes, brighter colors, edge count header). Removed vbrief/state/prd ActionKeys and updated all parity tests.", "agentModel": "kimi-k2.6" },
     { "timestamp": "2026-05-06T20:41:00Z", "reason": "progress", "note": "Added rich PhaseIcon to SessionNode in ProjectTree — maps currentTool via toolNameToPhase() to Lucide icons. Committed.", "agentModel": "kimi-k2.6" },
     { "timestamp": "2026-05-06T20:47:00Z", "reason": "progress", "note": "Redesigned IssueHeader pipeline from 8px dots to bold StagePills with icons, glow, and connecting lines. Committed.", "agentModel": "kimi-k2.6" },
-    { "timestamp": "2026-05-06T21:13:00Z", "reason": "progress", "note": "Closed pan-979-enrich: enriched PlanDAG nodes with glow/pulse animations, compact completed/cancelled mode, blocker info, unblocked ready state. Typecheck + 68 frontend tests pass. Committed.", "agentModel": "kimi-k2.6" }
+    { "timestamp": "2026-05-06T21:13:00Z", "reason": "progress", "note": "Closed pan-979-enrich: enriched PlanDAG nodes with glow/pulse animations, compact completed/cancelled mode, blocker info, unblocked ready state. Typecheck + 68 frontend tests pass. Committed.", "agentModel": "kimi-k2.6" },
+    { "timestamp": "2026-05-06T21:19:00Z", "reason": "progress", "note": "Closed pan-979-gates: added quality gate nodes (VERIFY→REVIEW→TEST→MERGE→DONE) to PlanDAG with distinct styling, status from reviewStatus, animated edges. Typecheck + 68 frontend tests pass. Committed.", "agentModel": "kimi-k2.6" }
   ]
 }
