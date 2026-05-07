@@ -254,6 +254,22 @@ export function getProviderEnv(
       env.ANTHROPIC_DEFAULT_HAIKU_MODEL = provider.haikuModel;
     }
 
+    // Inject subagent model env vars so Claude Code spawns subagents
+    // (Explorer, Plan, general-purpose) with model IDs the provider knows.
+    if (provider.tierModels) {
+      if (provider.tierModels.opus) {
+        env.ANTHROPIC_DEFAULT_OPUS_MODEL = provider.tierModels.opus;
+      }
+      if (provider.tierModels.sonnet) {
+        env.ANTHROPIC_DEFAULT_SONNET_MODEL = provider.tierModels.sonnet;
+      }
+      if (provider.tierModels.haiku) {
+        env.ANTHROPIC_DEFAULT_HAIKU_MODEL = provider.tierModels.haiku;
+        env.ANTHROPIC_SMALL_FAST_MODEL = provider.tierModels.haiku;
+        env.CLAUDE_CODE_SUBAGENT_MODEL = provider.tierModels.haiku;
+      }
+    }
+
     return env;
   } else {
     // Claudish-backed providers are launched via the `claudish` wrapper, not
