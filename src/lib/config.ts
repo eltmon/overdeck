@@ -101,13 +101,13 @@ export interface ShadowConfig {
  *   Vertex/Foundry setups) or when you genuinely want zero gating.
  *
  * Override precedence (highest first): PAN_YOLO env var → `--yolo` CLI flag → this config → 'auto'.
+ *
+ * The persisted setting lives in `~/.panopticon/config.yaml` under `claude.permissionMode`
+ * (loaded by `config-yaml.ts` and surfaced through `loadConfig().config.claude`). The
+ * type is exported here so other modules can reference it without pulling the whole
+ * yaml-config layer.
  */
 export type ClaudePermissionMode = 'bypass' | 'auto';
-
-export interface ClaudeConfig {
-  /** Permission flag set passed to spawned `claude` processes. Default: `auto`. */
-  permissionMode?: ClaudePermissionMode;
-}
 
 export interface PanopticonConfig {
   panopticon: {
@@ -135,7 +135,6 @@ export interface PanopticonConfig {
   };
   remote?: RemoteConfig;
   shadow: ShadowConfig;
-  claude?: ClaudeConfig;
 }
 
 const DEFAULT_CONFIG: PanopticonConfig = {
@@ -172,9 +171,6 @@ const DEFAULT_CONFIG: PanopticonConfig = {
       gitlab: false,
       rally: false,
     },
-  },
-  claude: {
-    permissionMode: 'auto',
   },
 };
 

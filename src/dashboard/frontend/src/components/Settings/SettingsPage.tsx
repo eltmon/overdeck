@@ -39,6 +39,7 @@ import {
   Palette,
   Wrench,
   Monitor,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAlert } from '../DialogProvider';
 import { SettingsConfig, Provider, WorkTypeId, ModelId } from './types';
@@ -268,6 +269,7 @@ function getModelDisplay(modelId?: string): string {
 const SETTINGS_NAV_ITEMS: NavItem[] = [
   { id: 'model-routing', label: 'Model Routing', icon: Route },
   { id: 'providers', label: 'Providers', icon: Key },
+  { id: 'permissions', label: 'Permissions', icon: ShieldCheck },
   { id: 'conversations', label: 'Conversations', icon: MessageCircle },
   { id: 'terminal', label: 'Terminal', icon: Terminal },
   { id: 'tracker-keys', label: 'Tracker Keys', icon: GitBranch },
@@ -490,6 +492,18 @@ export function SettingsPage() {
       experimental: {
         ...formData.experimental,
         claudeCodeChannels: enabled,
+      },
+    };
+    setFormData(next);
+    saveMutation.mutate(next);
+  };
+
+  const handlePermissionModeChange = (mode: 'auto' | 'bypass') => {
+    const next: SettingsConfig = {
+      ...formData,
+      claude: {
+        ...formData.claude,
+        permissionMode: mode,
       },
     };
     setFormData(next);
@@ -1060,6 +1074,77 @@ export function SettingsPage() {
               </div>
             )}
           </div>
+        </div>
+      </section>
+
+      {/* Permissions — controls what flags get passed to spawned `claude` processes */}
+      <section id="permissions" className="py-6 scroll-mt-4">
+        <h2 className="text-foreground text-base font-semibold tracking-tight mb-4 flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-muted-foreground" />
+          Permissions
+        </h2>
+        <p className="text-xs text-muted-foreground mb-4">
+          How spawned Claude Code agents are gated. Applies to work agents, specialists,
+          conversations, and remote agents. Override per-invocation with{' '}
+          <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--yolo</code>,{' '}
+          <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">--no-yolo</code>, or{' '}
+          <code className="text-foreground/80 bg-muted px-1 py-0.5 rounded">PAN_YOLO</code>.
+        </p>
+
+        <div className="space-y-2">
+          {([
+            {
+              value: 'auto',
+              title: 'Auto (recommended)',
+              flag: '--permission-mode auto',
+              description:
+                'Claude Code\'s built-in classifier auto-approves safe tool calls and blocks destructive ones (force pushes, exfiltration, rm -rf, writes outside workspace). Requires skipAutoPermissionPrompt: true in ~/.claude/settings.json.',
+            },
+            {
+              value: 'bypass',
+              title: 'Bypass (yolo)',
+              flag: '--dangerously-skip-permissions --permission-mode bypassPermissions',
+              description:
+                'Legacy Panopticon behavior. Every tool call auto-approved with no classifier — fastest, but the agent can do anything its file/network access allows. Use when running providers that reject the auto flag, or when the classifier is interfering with intentionally destructive automation.',
+            },
+          ] as const).map((opt) => {
+            const selected = (formData.claude?.permissionMode ?? 'auto') === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                data-testid={`permission-mode-${opt.value}`}
+                onClick={() => handlePermissionModeChange(opt.value)}
+                disabled={saveMutation.isPending}
+                className={`w-full text-left flex items-start gap-3 px-4 py-3 rounded-lg border transition-colors disabled:opacity-50 ${
+                  selected
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border bg-transparent hover:bg-muted/30'
+                }`}
+              >
+                <span
+                  className={`mt-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                    selected ? 'border-primary' : 'border-muted-foreground/40'
+                  }`}
+                >
+                  {selected && <span className="h-2 w-2 rounded-full bg-primary" />}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-foreground">{opt.title}</span>
+                    <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                      {opt.flag}
+                    </code>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                    {opt.description}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </section>
 

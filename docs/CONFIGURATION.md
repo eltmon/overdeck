@@ -177,7 +177,10 @@ direct API plans. Pro / Bedrock / Vertex / Foundry users may need to explicitly 
 
 ### Setting the mode
 
-**1. Persist the choice in `~/.panopticon/config.yaml`:**
+**1. Dashboard Settings → Permissions** (easiest). Two radio options: Auto / Bypass.
+Saves to `~/.panopticon/config.yaml` automatically.
+
+**2. Persist directly in `~/.panopticon/config.yaml`:**
 
 ```yaml
 claude:

@@ -100,6 +100,15 @@ export interface SettingsConfig {
     /** Use Claude Code Channels (research-preview) for prompt delivery to eligible work agents. */
     claudeCodeChannels?: boolean;
   };
+  /**
+   * Permission mode for spawned Claude Code agents.
+   *
+   * 'auto' (default) — Claude Code's classifier blocks destructive ops while running autonomously
+   * 'bypass'         — pass --dangerously-skip-permissions (legacy behavior)
+   */
+  claude?: {
+    permissionMode?: 'auto' | 'bypass';
+  };
 }
 
 

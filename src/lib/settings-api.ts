@@ -132,6 +132,18 @@ export interface ApiSettingsConfig {
     /** Use Claude Code Channels for prompt delivery to eligible work agents. */
     claudeCodeChannels?: boolean;
   };
+  /**
+   * Permission mode for spawned Claude Code agents.
+   *
+   * 'auto' (default) → --permission-mode auto (classifier blocks destructive ops)
+   * 'bypass'         → --dangerously-skip-permissions --permission-mode bypassPermissions
+   *
+   * Persisted under `claude.permissionMode` in `~/.panopticon/config.yaml`.
+   * Override per-invocation with `--yolo` / `--no-yolo` / `PAN_YOLO`.
+   */
+  claude?: {
+    permissionMode?: 'auto' | 'bypass';
+  };
   deprecation_warnings?: ApiDeprecationWarning[];
 }
 
@@ -225,6 +237,11 @@ export function loadSettingsApi(): ApiSettingsConfig {
     experimental: {
       claudeCodeChannels: config.experimental?.claudeCodeChannels ?? false,
     },
+    claude: {
+      // Defensive — older test mocks of loadConfig may not include `claude`;
+      // production loader always populates it via DEFAULT_CONFIG.
+      permissionMode: config.claude?.permissionMode ?? 'auto',
+    },
     deprecation_warnings: deprecationWarnings.length > 0 ? deprecationWarnings : undefined,
   };
 }
@@ -281,6 +298,9 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
     tracker_keys: settings.tracker_keys,
     experimental: settings.experimental
       ? { claudeCodeChannels: settings.experimental.claudeCodeChannels }
+      : undefined,
+    claude: settings.claude?.permissionMode
+      ? { permissionMode: settings.claude.permissionMode }
       : undefined,
   };
 
@@ -348,6 +368,10 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
     experimental: {
       ...current.experimental,
       ...updates.experimental,
+    },
+    claude: {
+      ...current.claude,
+      ...updates.claude,
     },
   };
 

@@ -18,7 +18,7 @@
  */
 
 import type { ClaudePermissionMode } from './config.js';
-import { loadConfig } from './config.js';
+import { loadConfig as loadYamlConfig } from './config-yaml.js';
 
 const YOLO_TRUE = new Set(['1', 'true', 'yes', 'y', 'on']);
 const YOLO_FALSE = new Set(['0', 'false', 'no', 'n', 'off']);
@@ -44,7 +44,7 @@ export function resolvePermissionMode(explicit?: ClaudePermissionMode): ClaudePe
   if (fromEnv) return fromEnv;
   if (explicit) return explicit;
   try {
-    return loadConfig().claude?.permissionMode ?? 'auto';
+    return loadYamlConfig().config.claude.permissionMode;
   } catch {
     return 'auto';
   }

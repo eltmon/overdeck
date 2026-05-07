@@ -180,6 +180,18 @@ export interface YamlConfig {
 
   /** Experimental, opt-in features. Each flag is research-preview and may be removed. */
   experimental?: ExperimentalConfig;
+
+  /**
+   * Claude Code spawn behavior.
+   *
+   * `permissionMode: 'auto'` (default) emits `--permission-mode auto`; the classifier
+   * blocks destructive ops while still running fully autonomously. `'bypass'` emits
+   * `--dangerously-skip-permissions --permission-mode bypassPermissions` (legacy).
+   * Override per-invocation with `--yolo` / `--no-yolo` / `PAN_YOLO`.
+   */
+  claude?: {
+    permissionMode?: 'auto' | 'bypass';
+  };
 }
 
 /**
@@ -335,6 +347,11 @@ export interface NormalizedConfig {
 
   /** Experimental flag values, normalised (always defined, never undefined). */
   experimental: NormalizedExperimentalConfig;
+
+  /** Permission-mode for spawned Claude Code agents. Always defined; defaults to 'auto'. */
+  claude: {
+    permissionMode: 'auto' | 'bypass';
+  };
 }
 
 /**
@@ -445,6 +462,9 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   },
   experimental: {
     claudeCodeChannels: false,
+  },
+  claude: {
+    permissionMode: 'auto',
   },
 };
 
@@ -651,6 +671,9 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
     },
     experimental: {
       claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
+    },
+    claude: {
+      permissionMode: DEFAULT_CONFIG.claude.permissionMode,
     },
   };
 
@@ -903,6 +926,10 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       if (typeof config.experimental.claudeCodeChannels === 'boolean') {
         result.experimental.claudeCodeChannels = config.experimental.claudeCodeChannels;
       }
+    }
+
+    if (config.claude && (config.claude.permissionMode === 'auto' || config.claude.permissionMode === 'bypass')) {
+      result.claude.permissionMode = config.claude.permissionMode;
     }
   }
 
