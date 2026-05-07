@@ -376,6 +376,15 @@ export interface AgentState {
   preSpawnStashRef?: string;
   preSpawnStashMessage?: string;
   preSpawnBaselineHead?: string;
+
+  /**
+   * Whether this work agent was launched with the experimental Claude Code
+   * Channels prompt-delivery path enabled. Set at launch time after the
+   * eligibility check; never mutated after. Read by deliverAgentMessage to
+   * decide whether to attempt the bridge socket before falling back to
+   * sendKeysAsync. Absent or false means tmux-only delivery (current default).
+   */
+  channelsEnabled?: boolean;
 }
 
 export function getAgentDir(agentId: string): string {
@@ -431,6 +440,162 @@ export function saveAgentState(state: AgentState): void {
 
   if (oldStatus && oldStatus !== state.status) {
     logAgentLifecycle(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentState)`);
+  }
+}
+
+/**
+ * Resolve PANOPTICON_HOME — same fallback semantics as panopticon-bridge.
+ */
+function panopticonHomeForChannels(): string {
+  return process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon');
+}
+
+/**
+ * Append a delivery-event log line to the per-agent bridge log. Best-effort.
+ */
+async function appendChannelDeliveryLog(
+  agentId: string,
+  entry: { path: 'channel' | 'tmux'; reason?: string; caller?: string },
+): Promise<void> {
+  try {
+    const home = panopticonHomeForChannels();
+    const dir = join(home, 'logs');
+    await (await import('fs/promises')).mkdir(dir, { recursive: true });
+    const line = JSON.stringify({
+      ts: new Date().toISOString(),
+      agentId,
+      ...entry,
+    });
+    await (await import('fs/promises')).appendFile(
+      join(dir, `bridge-${agentId}.log`),
+      `${line}\n`,
+      'utf-8',
+    );
+  } catch {
+    // Non-critical
+  }
+}
+
+/**
+ * POST a JSON body to a Unix-domain socket using node:net + a hand-rolled
+ * minimal HTTP/1.1 request. Resolves on a 200-class response, rejects on any
+ * error including socket-not-found, connection refused, write timeout, or
+ * non-2xx status. Kept tiny on purpose: this is a hot path, only one caller,
+ * and the whole point of a fallback to tmux is that we do not need a robust
+ * HTTP client here.
+ */
+async function postUnixSocketJson(
+  socketPath: string,
+  body: unknown,
+  timeoutMs: number,
+): Promise<{ status: number; body: string }> {
+  const { connect } = await import('node:net');
+  return new Promise((resolveCall, reject) => {
+    const payload = Buffer.from(JSON.stringify(body), 'utf-8');
+    const request =
+      `POST / HTTP/1.1\r\n` +
+      `Host: localhost\r\n` +
+      `Content-Type: application/json\r\n` +
+      `Content-Length: ${payload.byteLength}\r\n` +
+      `Connection: close\r\n` +
+      `\r\n`;
+
+    const socket = connect(socketPath);
+    let responseBuf = Buffer.alloc(0);
+    const timer = setTimeout(() => {
+      socket.destroy(new Error('socket POST timeout'));
+    }, timeoutMs);
+
+    socket.once('connect', () => {
+      socket.write(request);
+      socket.write(payload);
+    });
+    socket.on('data', (chunk: Buffer) => {
+      responseBuf = Buffer.concat([responseBuf, chunk]);
+    });
+    socket.once('error', (err: Error) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    socket.once('close', () => {
+      clearTimeout(timer);
+      const text = responseBuf.toString('utf-8');
+      const m = /^HTTP\/1\.[01] (\d{3})/.exec(text);
+      if (!m) {
+        reject(new Error('socket POST: invalid HTTP response'));
+        return;
+      }
+      const status = parseInt(m[1], 10);
+      const split = text.indexOf('\r\n\r\n');
+      const respBody = split >= 0 ? text.slice(split + 4) : '';
+      if (status >= 200 && status < 300) {
+        resolveCall({ status, body: respBody });
+      } else {
+        reject(new Error(`socket POST: status ${status}: ${respBody.slice(0, 100)}`));
+      }
+    });
+  });
+}
+
+/**
+ * Single delivery primitive for orchestrator-to-work-agent messages. When the
+ * target agent has channelsEnabled set in its state.json AND the per-agent
+ * bridge socket exists AND the POST returns 200, the message goes through the
+ * bridge and tmux is not involved. In every other case (flag off, state file
+ * missing, socket missing, socket POST failure for any reason) the call falls
+ * back to sendKeysAsync — the user-visible behaviour is identical to today's
+ * tmux-only delivery. Internal callers that today reach for sendKeysAsync to
+ * talk to a work agent should call this primitive instead so the eligibility
+ * and fallback policy live in one place.
+ */
+export async function deliverAgentMessage(
+  agentId: string,
+  message: string,
+  caller: string = 'unknown',
+): Promise<void> {
+  const normalizedId = normalizeAgentId(agentId);
+
+  let channelsEnabled = false;
+  try {
+    const state = await getAgentStateAsync(normalizedId);
+    channelsEnabled = Boolean(state?.channelsEnabled);
+  } catch {
+    channelsEnabled = false;
+  }
+
+  if (!channelsEnabled) {
+    await sendKeysAsync(normalizedId, message);
+    return;
+  }
+
+  const socketPath = join(panopticonHomeForChannels(), 'sockets', `agent-${normalizedId}.sock`);
+  if (!existsSync(socketPath)) {
+    await appendChannelDeliveryLog(normalizedId, {
+      path: 'tmux',
+      reason: 'socket-missing',
+      caller,
+    });
+    await sendKeysAsync(normalizedId, message);
+    return;
+  }
+
+  try {
+    await postUnixSocketJson(
+      socketPath,
+      { content: message, meta: { caller } },
+      2000,
+    );
+    await appendChannelDeliveryLog(normalizedId, { path: 'channel', caller });
+    return;
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    await appendChannelDeliveryLog(normalizedId, {
+      path: 'tmux',
+      reason: `socket-post-failed: ${reason}`,
+      caller,
+    });
+    await sendKeysAsync(normalizedId, message);
+    return;
   }
 }
 
