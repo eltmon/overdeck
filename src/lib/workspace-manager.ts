@@ -293,6 +293,7 @@ import {
   createWorkspacePlaceholders as createPlaceholders,
   sanitizeComposeFile,
   renderDevcontainer,
+  DEVCONTAINER_DIRNAME,
 } from './workspace/devcontainer-renderer.js';
 // `processTemplates` is still imported for the agent-template flow further
 // below; it lives in the same renderer module.
@@ -1223,6 +1224,35 @@ export interface DockerCleanupResult {
 }
 
 /**
+ * Return container IDs (running or stopped) whose
+ * `com.docker.compose.project.config_files` label references a path inside
+ * the workspace's `.devcontainer/` directory.
+ */
+export async function getContainersReferencingWorkspacePath(
+  workspacePath: string,
+): Promise<string[]> {
+  try {
+    const { stdout } = await execAsync(
+      `docker ps -a --format '{{.ID}}|{{.Label "com.docker.compose.project.config_files"}}'`,
+      { encoding: 'utf-8' },
+    );
+    const containers: string[] = [];
+    const devcontainerPath = join(workspacePath, DEVCONTAINER_DIRNAME);
+    for (const line of stdout.trim().split('\n').filter(Boolean)) {
+      const sep = line.indexOf('|');
+      if (sep === -1) continue;
+      const configFiles = line.slice(sep + 1);
+      if (configFiles.includes(devcontainerPath)) {
+        containers.push(line.slice(0, sep));
+      }
+    }
+    return containers;
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Stop Docker containers and clean up Docker-created files for a workspace.
  *
  * Extracted as a standalone function so it can be used by:
@@ -1243,7 +1273,7 @@ export async function stopWorkspaceDocker(
   };
 
   // Find all compose files in devcontainer directory (some projects use multiple)
-  const devcontainerDir = join(workspacePath, '.devcontainer');
+  const devcontainerDir = join(workspacePath, DEVCONTAINER_DIRNAME);
   const composeFiles: string[] = [];
 
   if (existsSync(devcontainerDir)) {
@@ -1270,38 +1300,38 @@ export async function stopWorkspaceDocker(
     }
   }
 
+  // Derive compose project name from the dev script (same logic as dashboard)
+  // or fall back to "{projectName}-feature-{featureName}" convention.
+  let composeProjectName = `${projectName}-feature-${featureName}`;
+  const devScriptPaths = [
+    join(workspacePath, DEVCONTAINER_DIRNAME, 'dev'),
+    join(workspacePath, 'dev'),
+  ];
+  for (const devPath of devScriptPaths) {
+    try {
+      if (existsSync(devPath)) {
+        const content = readFileSync(devPath, 'utf-8');
+        const match = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
+        if (match) {
+          composeProjectName = `${match[1]}feature-${featureName}`;
+          break;
+        }
+        const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
+        if (literalMatch) {
+          composeProjectName = literalMatch[1];
+          break;
+        }
+      }
+    } catch {
+      // Fall through to default
+    }
+  }
+
   if (composeFiles.length > 0) {
     result.containersFound = true;
     try {
       const fileFlags = composeFiles.map(f => `-f "${f}"`).join(' ');
       const cwd = existsSync(devcontainerDir) ? devcontainerDir : workspacePath;
-
-      // Derive compose project name from the dev script (same logic as dashboard)
-      // or fall back to "{projectName}-feature-{featureName}" convention.
-      let composeProjectName = `${projectName}-feature-${featureName}`;
-      const devScriptPaths = [
-        join(workspacePath, '.devcontainer', 'dev'),
-        join(workspacePath, 'dev'),
-      ];
-      for (const devPath of devScriptPaths) {
-        try {
-          if (existsSync(devPath)) {
-            const content = readFileSync(devPath, 'utf-8');
-            const match = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
-            if (match) {
-              composeProjectName = `${match[1]}feature-${featureName}`;
-              break;
-            }
-            const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
-            if (literalMatch) {
-              composeProjectName = literalMatch[1];
-              break;
-            }
-          }
-        } catch {
-          // Fall through to default
-        }
-      }
 
       await execAsync(`docker compose ${fileFlags} -p "${composeProjectName}" down -v --remove-orphans`, {
         cwd,
@@ -1311,6 +1341,32 @@ export async function stopWorkspaceDocker(
     } catch (error: any) {
       // Log but don't fail — containers might not be running
       result.steps.push(`Docker cleanup attempted (${error.message?.split('\n')[0] || 'containers may not be running'})`);
+    }
+  } else {
+    // No compose files on disk — check if containers still reference the missing path.
+    // This can happen when .devcontainer/ was deleted after containers were created.
+    const orphanedContainers = await getContainersReferencingWorkspacePath(workspacePath);
+    if (orphanedContainers.length > 0) {
+      result.containersFound = true;
+      try {
+        // Try project-name-based down first (Docker Compose can discover containers by label)
+        await execAsync(`docker compose -p "${composeProjectName}" down -v --remove-orphans`, {
+          cwd: workspacePath,
+          timeout: 60000,
+        });
+        result.steps.push(`Stopped orphaned Docker containers by project name (${orphanedContainers.length} containers)`);
+      } catch {
+        // Fall back to raw docker stop / rm for each container
+        for (const containerId of orphanedContainers) {
+          try {
+            await execAsync(`docker stop "${containerId}"`, { timeout: 30000 });
+            await execAsync(`docker rm "${containerId}"`, { timeout: 30000 });
+          } catch {
+            // Best-effort — container may already be gone
+          }
+        }
+        result.steps.push(`Stopped ${orphanedContainers.length} orphaned Docker containers individually`);
+      }
     }
   }
 
@@ -1449,12 +1505,21 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
     }
   }
 
-  // Remove workspace directory
-  try {
-    await execAsync(`rm -rf "${workspacePath}"`, { maxBuffer: 10 * 1024 * 1024 });
-    result.steps.push('Removed workspace directory');
-  } catch (error) {
-    result.errors.push(`Failed to remove workspace directory: ${error}`);
+  // Guard: never delete workspace while containers still reference its compose path
+  const orphanedContainers = await getContainersReferencingWorkspacePath(workspacePath);
+  if (orphanedContainers.length > 0) {
+    result.errors.push(
+      `Cannot remove workspace directory: ${orphanedContainers.length} Docker container(s) still reference compose paths in ${DEVCONTAINER_DIRNAME}/. ` +
+        `Run workspace Docker cleanup first or stop the containers manually.`,
+    );
+  } else {
+    // Remove workspace directory
+    try {
+      await execAsync(`rm -rf "${workspacePath}"`, { maxBuffer: 10 * 1024 * 1024 });
+      result.steps.push('Removed workspace directory');
+    } catch (error) {
+      result.errors.push(`Failed to remove workspace directory: ${error}`);
+    }
   }
 
   result.success = result.errors.length === 0;

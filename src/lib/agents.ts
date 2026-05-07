@@ -177,13 +177,11 @@ export async function getAgentRuntimeBaseCommand(
     return `claude ${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
 
-  // Claudish wrapper path — claudish forwards unrecognized flags (including --agent and --name)
-  // to Claude Code, so agent definitions (hooks, tools) continue to work for non-Anthropic models.
+  // Claudish wrapper path — claudish ≤7.0.3 flag passthrough is broken (Commander.js
+  // rejects --agent, --name as unknown). Skip Claude Code-specific flags; model +
+  // permissions are set directly, workspace CLAUDE.md + vBRIEF provide agent context.
   const routedModel = await getLaunchModelForModel(model);
-  if (agentType) {
-    return `claudish -i --model ${routedModel}${agentFlag}${nameFlag} ${permissionFlags}`;
-  }
-  return `claudish -i --model ${routedModel} ${permissionFlags}${nameFlag}`;
+  return `claudish -i --model ${routedModel} ${permissionFlags}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
@@ -261,6 +259,17 @@ export async function getProviderExportsForModel(model: string): Promise<string>
   const unsetLines = PROVIDER_ENV_KEYS.map(key => `unset ${key}`);
   const exportLines = Object.entries(envVars)
     .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`);
+
+  // claudish bundles an older Claude Code that crashes on some model metadata.
+  // Point CLAUDE_PATH at the system binary so claudish uses the global install.
+  const provider = getProviderForModel(model as ModelId);
+  if (provider.compatibility === 'claudish') {
+    try {
+      const claudePath = execSync('which claude', { encoding: 'utf8' }).trim();
+      if (claudePath) exportLines.push(`export CLAUDE_PATH="${claudePath}"`);
+    } catch { /* system claude not found — claudish will use its bundled copy */ }
+  }
+
   return [...unsetLines, ...exportLines].join('\n') + '\n';
 }
 
@@ -346,9 +355,10 @@ export function getClaudishPrefix(model: string, authMode?: string): string {
     return `go@${model}`;
   }
 
-  // Kimi models — explicit kimi@ prefix (claudish auto-detect misses K2.6-code-preview)
+  // Kimi models — kc@ prefix routes to api.kimi.com/coding/v1 (kimi-coding provider).
+  // sk-kimi-* keys are coding keys, NOT moonshot platform keys (kimi@ → api.moonshot.ai).
   if (['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(model)) {
-    return `kimi@${model}`;
+    return `kc@${model}`;
   }
 
   // MiniMax models — explicit mm@ prefix

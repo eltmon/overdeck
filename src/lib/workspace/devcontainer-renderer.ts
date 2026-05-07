@@ -12,6 +12,12 @@
  * output. That means `ensureDevcontainer()` (the self-heal entry point) can
  * safely be called before every container-start operation without disturbing
  * a healthy workspace.
+ *
+ * Lifetime contract: the rendered compose files live at
+ * `<workspace>/.devcontainer/` (DEVCONTAINER_DIRNAME). This path is stable
+ * for the lifetime of the workspace. Cleanup code must never delete
+ * `.devcontainer/` while Docker containers still reference compose paths
+ * inside it (detected via `com.docker.compose.project.config_files` labels).
  */
 
 import {
@@ -31,6 +37,9 @@ import {
   type ProjectConfig,
   type TemplatePlaceholders,
 } from '../workspace-config.js';
+
+/** Stable directory name for rendered compose files inside a workspace. */
+export const DEVCONTAINER_DIRNAME = '.devcontainer';
 
 // ─── Placeholders ───────────────────────────────────────────────────────────
 
@@ -178,7 +187,7 @@ export function renderDevcontainer(
   opts: DevcontainerRenderOptions,
 ): DevcontainerRenderResult {
   const result: DevcontainerRenderResult = {
-    devcontainerDir: join(opts.workspacePath, '.devcontainer'),
+    devcontainerDir: join(opts.workspacePath, DEVCONTAINER_DIRNAME),
     steps: [],
     warnings: [],
   };

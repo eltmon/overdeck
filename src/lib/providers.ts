@@ -262,7 +262,7 @@ export function getProviderEnv(
     }
 
     if (provider.name === 'kimi') {
-      return { KIMI_API_KEY: apiKey };
+      return { KIMI_CODING_API_KEY: apiKey };
     }
 
     if (provider.name === 'minimax') {
