@@ -53,9 +53,17 @@ describe('providers', () => {
     });
   });
 
-  it('returns ZHIPU_API_KEY for Z.AI key-based claudish routing', () => {
+  it('routes Z.AI through its direct Anthropic-compatible endpoint', () => {
+    expect(PROVIDERS.zai.compatibility).toBe('direct');
     expect(getProviderEnv(PROVIDERS.zai, 'sk-zai-test')).toEqual({
-      ZHIPU_API_KEY: 'sk-zai-test',
+      ANTHROPIC_BASE_URL: 'https://api.z.ai/api/anthropic',
+      ANTHROPIC_AUTH_TOKEN: 'sk-zai-test',
+      API_TIMEOUT_MS: '300000',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'glm-5.1',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'glm-4.7',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'glm-4.7-flash',
+      ANTHROPIC_SMALL_FAST_MODEL: 'glm-4.7-flash',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'glm-4.7-flash',
     });
   });
 

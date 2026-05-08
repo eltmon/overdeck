@@ -73,7 +73,7 @@ describe('agents auth routing', () => {
         return { name: 'kimi', displayName: 'Kimi', compatibility: 'direct', authType: 'static' };
       }
       if (model.startsWith('glm-')) {
-        return { name: 'zai', displayName: 'Z.AI', compatibility: 'claudish', authType: 'static' };
+        return { name: 'zai', displayName: 'Z.AI', compatibility: 'direct', authType: 'static' };
       }
       if (model.startsWith('gemini-')) {
         return { name: 'google', displayName: 'Google (Gemini)', compatibility: 'direct', authType: 'static' };
@@ -169,9 +169,9 @@ describe('agents auth routing', () => {
     );
   });
 
-  it('launches Z.AI models through claudish with zai@ prefix', async () => {
+  it('launches Z.AI models directly with Claude Code', async () => {
     expect(await getAgentRuntimeBaseCommand('glm-4.7')).toBe(
-      'claudish -i --model zai@glm-4.7 --dangerously-skip-permissions --permission-mode bypassPermissions'
+      'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model glm-4.7'
     );
   });
 

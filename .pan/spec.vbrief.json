@@ -4,7 +4,7 @@
     "created": "2026-05-08T18:55:00Z",
     "author": "manual:opus-4.7",
     "description": "Plan for PAN-1015: Remove claudish routing in favor of direct ANTHROPIC_BASE_URL (CLIProxy only where needed). Empirically scoped 2026-05-08 \u2014 see issue body Empirical findings section.",
-    "updated": "2026-05-08T14:15:13Z"
+    "updated": "2026-05-08T14:40:46.682Z"
   },
   "plan": {
     "id": "pan-1015",
@@ -12,9 +12,9 @@
     "status": "active",
     "uid": "d3644941-fec5-4e25-9974-34d6a9e02902",
     "author": "manual:opus-4.7",
-    "sequence": 1,
+    "sequence": 2,
     "created": "2026-05-08T18:55:00Z",
-    "updated": "2026-05-08T14:15:13Z",
+    "updated": "2026-05-08T14:40:46.682Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1015",
@@ -56,7 +56,7 @@
       {
         "id": "zai-direct",
         "title": "Z.AI / GLM: flip to direct ANTHROPIC_BASE_URL",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-08T18:55:00Z",
         "metadata": {
@@ -71,7 +71,7 @@
           {
             "id": "zai-direct.ac1",
             "title": "PROVIDERS.zai.compatibility === 'direct'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -79,7 +79,7 @@
           {
             "id": "zai-direct.ac2",
             "title": "PROVIDERS.zai.baseUrl === 'https://api.z.ai/api/anthropic'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -87,7 +87,7 @@
           {
             "id": "zai-direct.ac3",
             "title": "claude --print --model glm-4.7 'pong' succeeds end-to-end via ZAI_API_KEY",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -95,7 +95,7 @@
           {
             "id": "zai-direct.ac4",
             "title": "tests/lib/providers.test.ts updated",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

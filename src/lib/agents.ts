@@ -414,11 +414,6 @@ export function getClaudishPrefix(model: string, authMode?: string): string {
     return `mm@${model}`;
   }
 
-  // Z.AI (GLM) models — explicit zai@ prefix
-  if (['glm-5.1', 'glm-4.7', 'glm-4.7-flash'].includes(model)) {
-    return `zai@${model}`;
-  }
-
   // OpenRouter model IDs always contain '/'
   if (model.includes('/')) {
     return `or@${model}`;

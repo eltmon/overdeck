@@ -48,7 +48,16 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
-  // ── Claudish path (MiniMax, GLM, OpenRouter, Mimo, …) ─────────────────────
+  it('Z.AI direct + Auto: no DSP, --permission-mode auto', async () => {
+    const cmd = await getAgentRuntimeBaseCommand('glm-4.7')
+    expect(cmd).toMatch(/^claude /)
+    expect(cmd).toMatch(/--model glm-4\.7/)
+    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
+    expect(cmd).not.toMatch(/bypassPermissions/)
+  })
+
+  // ── Claudish path (MiniMax, OpenRouter, Mimo, …) ───────────────────────────
 
   it('Claudish-routed model + Auto: REFUSED (no silent fallback to bypass)', async () => {
     await expect(getAgentRuntimeBaseCommand('minimax-m2.7')).rejects.toThrow(
@@ -66,7 +75,6 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     // Sample one real model from each remaining claudish-routed provider in providers.ts.
     const claudishModels = [
       'minimax-m2.7',
-      'glm-4.7',
       'qwen/qwen3.6-plus:free',
       'mimo-v2.5',
     ]

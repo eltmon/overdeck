@@ -115,12 +115,14 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   zai: {
     name: 'zai',
     displayName: 'Z.AI',
-    compatibility: 'claudish',
+    compatibility: 'direct',
+    baseUrl: 'https://api.z.ai/api/anthropic',
+    authType: 'static',
     models: ['glm-5.1', 'glm-4.7', 'glm-4.7-flash'],
     haikuModel: 'glm-4.7-flash',
     tierModels: { opus: 'glm-5.1', sonnet: 'glm-4.7', haiku: 'glm-4.7-flash' },
     tested: true,
-    description: 'Route via claudish: zai@model or bare model (auto-detected)',
+    description: 'Route directly to Z.AI Anthropic-compatible endpoint using ZHIPU_API_KEY.',
   },
 
   mimo: {
