@@ -1,94 +1,110 @@
 {
   "version": "1",
-  "issueId": "pan-971",
-  "created": "2026-05-07T17:54:59Z",
-  "updated": "2026-05-07T18:27:34Z",
+  "issueId": "PAN-986",
+  "created": "2026-05-07T14:20:00Z",
+  "updated": "2026-05-07T15:28:32-04:00",
   "gitState": {
-    "branch": "feature/pan-971",
-    "sha": "39978f2b5",
+    "branch": "feature/pan-986",
+    "sha": "b3b364126",
     "dirty": true
   },
   "decisions": [
     {
       "id": "D1",
-      "summary": "I treated the GitHub issue body as the effective plan because this workspace started without PAN-971 planning artifacts or beads. I created issue-scoped beads for the remaining unresolved follow-up work so implementation could proceed through the normal inspectable one-bead workflow.",
-      "recordedAt": "2026-05-07T17:54:59Z"
+      "summary": "The outbound Claude Code Channels work is being split across three beads so the bridge surface, the dashboard event plumbing, and the hook replacement each land in reviewable commits. The first bead defines the `channel_reply` MCP tool, validates its payload, and documents when Claude should emit structured status instead of relying on terminal prose alone.",
+      "recordedAt": "2026-05-07T14:20:00Z"
     },
     {
       "id": "D2",
-      "summary": "The async filesystem persistence and explicit slot PR target guidance described in PAN-971 were already present on main, so the first implementation bead focused only on the still-missing structured slot context. The slot prompt now embeds a machine-readable AgentTaskInput JSON block derived from the vBRIEF item, its blockers, and its acceptance criteria.",
-      "recordedAt": "2026-05-07T17:54:59Z"
+      "summary": "Accepted `channel_reply` payloads now enter the same typed runtime-event pipeline as hook heartbeats instead of being stored only in bridge-local logs. The dashboard reducer records the latest structured reply on `AgentRuntimeSnapshot.channelReply`, and the reducer also projects `done` and `needs_input` replies onto the existing runtime resolution fields so current consumers can benefit without waiting for a separate UI migration.",
+      "recordedAt": "2026-05-07T14:35:00Z"
     },
     {
       "id": "D3",
-      "summary": "I implemented auto-advance as a persisted swarm-state option plus a lightweight background poller in the dashboard server. The dispatch path is now shared between manual POST requests and automatic wave progression so both modes use the same guardrails, worktree setup, prompt generation, and slot spawning behavior.",
-      "recordedAt": "2026-05-07T18:02:12Z"
+      "summary": "The work-agent stop hook now treats the latest structured `channel_reply` runtime signal as authoritative for `done` and `needs_input` before it falls back to tmux capture and LLM inference. This replaces one of the brittle pane-scrape paths the issue targeted while preserving the old heuristic as a safety net for sessions that never emit structured replies.",
+      "recordedAt": "2026-05-07T14:45:00Z"
     },
     {
       "id": "D4",
-      "summary": "I covered the remaining PAN-971 gaps with direct route-helper tests instead of a fragile end-to-end harness. The swarm route now exposes narrow test internals so the suite can assert the structured AgentTaskInput payload, verify the prose guardrails stay in the slot prompt, and confirm the auto-advance poller persists next-wave state when a finished wave becomes eligible to continue.",
-      "recordedAt": "2026-05-07T18:13:37Z"
+      "summary": "Repo-wide verification was blocked by two stale invariants outside the PAN-986 feature code: the desktop workspace package metadata had drifted behind the root CLI package version, and the GitHub label-cleanup unit test still assumed unconditional `--remove-label` calls even though the implementation now prefetches current labels and removes only labels that are actually present. I aligned the desktop package metadata with the rebased root release version and updated the test to mock the label-prefetch response so the quality gate exercises the current behavior instead of an obsolete assumption.",
+      "recordedAt": "2026-05-07T18:42:27Z"
     },
     {
       "id": "D5",
-      "summary": "The final verification gate exposed three unrelated branch regressions that would have blocked PAN-971 from shipping: the desktop workspace version lagged behind the root package, the GitHub label-cleanup test no longer modeled the PAN-925 behavior of removing only labels that actually exist, and the close-out merge-verification test was too broad and could time out while exercising the full lifecycle workflow. I fixed the version skew, tightened the label-cleanup fixture to match production behavior, and exposed the merge-verification helper as a narrow test seam so the lifecycle test checks the intended contract without depending on unrelated cleanup work.",
-      "recordedAt": "2026-05-07T18:27:34Z"
+      "summary": "Review feedback required tightening both correctness and security around structured channel replies instead of only preserving the original feature path. I centralized channel-reply normalization and limits in the shared contracts package, reused that validator at the bridge and dashboard heartbeat ingress points, cleared stale `channelReply` state on `agent.stopped`, normalized hook log output before writing agent-supplied summaries, made the bridge direct-invocation check path-safe for relative Bun entrypoints, and hardened the related tests so the review fix covers the end-to-end data path rather than a single file-local patch.",
+      "recordedAt": "2026-05-07T15:28:32-04:00"
     }
   ],
   "hazards": [
     {
       "id": "H1",
-      "summary": "Swarm slot prompts now serve both humans and Deft-compatible agents, so the structured block must remain stable and must not remove the existing plain-language guardrails about bead closing and PR targets.",
-      "mitigation": "Keep the JSON block additive, preserve the prose instructions, and cover the prompt shape with regression tests before finishing the issue."
+      "summary": "This workspace started with a deleted `.pan/continue.json` from PAN-939 and no PAN-986 issue-scoped beads, so the normal resume path was broken before implementation began.",
+      "mitigation": "I recreated PAN-986 beads locally, replaced the stale deleted continue file with PAN-986 state, and will keep this file updated after each bead so the remaining work can proceed through the standard claim, commit, close, and inspect loop."
     },
     {
       "id": "H2",
-      "summary": "The auto-advance poller can repeatedly encounter the same finished wave when capacity is exhausted or a next-wave dispatch fails, which would otherwise cause duplicate launches or noisy retries.",
-      "mitigation": "Keep per-issue in-flight guards around automatic dispatch, persist the current wave in swarm state, and leave failed next-wave attempts on the same state so a later poll can retry cleanly without double-spawning the successful case."
+      "summary": "`pan done` attempted to rebase the branch onto `main`, but `main` had advanced the desktop release version to `0.8.17`, which conflicted with the earlier verification-fix commit that had aligned the desktop package to the older branch-local root version.",
+      "mitigation": "I manually rebased the branch onto `main`, kept the current `0.8.17` desktop version from `main`, preserved the label-cleanup test fix, and now need to update the remote branch with the rebased history before re-running `pan done`."
     }
   ],
   "resumePoint": {
-    "description": "The follow-up verification fixes are implemented and the full PAN-971 gate now passes: npm run typecheck, npm run lint, and npm test all succeeded. Next, stage .pan/continue.json, apps/desktop/package.json, src/lib/lifecycle/workflows.ts, tests/unit/lib/lifecycle/label-cleanup.test.ts, and tests/unit/lib/lifecycle/workflows.test.ts, commit bead workspace-wwdp, close it for inspection, then push feature/pan-971 and call pan done.",
-    "beadId": "workspace-wwdp",
+    "description": "The review remediation pass is complete locally. The bridge, contracts, heartbeat ingestion, reducer, and stop-hook paths now enforce structured channel-reply limits, clear stale reply state on stop, sanitize logged summaries, and cover the regressions with focused tests. Local verification is green (`npm run build:contracts`, targeted Vitest for the touched surfaces, `npm run typecheck`, `npm run lint`, and full `npm test`). The remaining work is to commit these review fixes and submit `pan review request PAN-986 -m \"Fixed review issues\"`.",
+    "beadId": null,
     "filesToRead": [
       ".pan/continue.json",
-      "apps/desktop/package.json",
-      "src/lib/lifecycle/workflows.ts",
-      "tests/unit/lib/lifecycle/label-cleanup.test.ts",
-      "tests/unit/lib/lifecycle/workflows.test.ts"
+      "packages/contracts/src/types.ts",
+      "src/lib/channels/panopticon-bridge.ts",
+      "scripts/work-agent-stop-hook"
     ]
   },
   "beadsMapping": {
-    "workspace-08rh": "Add structured swarm slot context",
-    "workspace-dkfo": "Add optional swarm wave auto-advance",
-    "workspace-vuor": "Add swarm dispatch regression coverage",
-    "workspace-wwdp": "Fix verification gate regressions"
+    "bridge-tool": [
+      "workspace-78h8"
+    ],
+    "event-stream": [
+      "workspace-teyh"
+    ],
+    "hook-replacement": [
+      "workspace-jyh4"
+    ]
   },
-  "agentModel": "Claude Code",
+  "agentModel": "claude-code",
   "sessionHistory": [
     {
-      "timestamp": "2026-05-07T17:54:59Z",
-      "reason": "checkpoint",
-      "note": "I reconstructed missing PAN-971 execution context from the issue body, created three issue-scoped beads, committed the structured slot context change, and recorded the remaining work for auto-advance and regression coverage.",
-      "agentModel": "Claude Code"
+      "timestamp": "2026-05-07T14:20:00Z",
+      "reason": "resume",
+      "note": "Recovered the PAN-986 workspace after finding a stale deleted PAN-939 continue file and no PAN-986 beads. I recreated issue-scoped beads, claimed workspace-78h8, and started implementing the outbound `channel_reply` MCP tool surface with validation and bridge tests.",
+      "agentModel": "claude-code"
     },
     {
-      "timestamp": "2026-05-07T18:02:12Z",
-      "reason": "checkpoint",
-      "note": "I refactored swarm dispatch into a shared async path, added persisted auto-advance state plus a background poller, and wired the CLI flag that enables automatic next-wave launches.",
-      "agentModel": "Claude Code"
+      "timestamp": "2026-05-07T14:35:00Z",
+      "reason": "manual",
+      "note": "Closed workspace-78h8 after landing the bridge tool surface. Claimed workspace-teyh and wired accepted `channel_reply` payloads into the typed runtime heartbeat path, extended the shared contracts and reducer, rebuilt `@panctl/contracts`, and verified the focused contract, bridge, and frontend reducer tests all pass.",
+      "agentModel": "claude-code"
     },
     {
-      "timestamp": "2026-05-07T18:13:37Z",
-      "reason": "checkpoint",
-      "note": "I added a dedicated swarm route regression suite that locks the structured AgentTaskInput payload, the slot prompt guardrails, and the persisted auto-advance transition from one completed wave to the next, then verified the touched files with targeted Vitest, ESLint, and typecheck runs.",
-      "agentModel": "Claude Code"
+      "timestamp": "2026-05-07T14:45:00Z",
+      "reason": "manual",
+      "note": "Claimed workspace-jyh4 and updated `scripts/work-agent-stop-hook` so it checks the structured `channelReply` runtime snapshot before tmux pane capture and Claude fallback. Added end-to-end script tests with mocked curl, tmux, and claude commands to prove that `done` and `needs_input` replies emit the expected runtime resolution without invoking pane scraping.",
+      "agentModel": "claude-code"
     },
     {
-      "timestamp": "2026-05-07T18:27:34Z",
-      "reason": "checkpoint",
-      "note": "I repaired the final verification blockers by syncing the desktop package version with the root release version, updating the label-cleanup test fixture to match the current GitHub label-removal flow, narrowing the close-out merge-verification test to the helper it actually intends to cover, and then reran the full typecheck, lint, and test gates successfully.",
-      "agentModel": "Claude Code"
+      "timestamp": "2026-05-07T18:42:27Z",
+      "reason": "manual",
+      "note": "Finished the blocked verification pass after fixing two repo-wide quality gate regressions that were unrelated to the PAN-986 feature logic. I aligned the desktop package metadata and lockfile with the root release version that existed on the branch at the time, updated the GitHub label-cleanup unit test so it mocks the implementation's current label-prefetch behavior, reran the targeted blockers, and then reran `npm run typecheck`, `npm run lint`, and the full `npm test` suite successfully.",
+      "agentModel": "claude-code"
+    },
+    {
+      "timestamp": "2026-05-07T18:46:22Z",
+      "reason": "manual",
+      "note": "Attempting `pan done pan-986 -c \"Implementation complete\"` exposed a rebase conflict because `main` had moved the desktop package version forward to `0.8.17` after the earlier verification fix. I rebased the branch manually, resolved the conflict by keeping `main`'s current desktop version while preserving the label-cleanup test fix, and confirmed the branch is now based on the latest `main` history. The remaining blocker is updating the already-pushed remote branch to match this rebased local history before re-running `pan done`.",
+      "agentModel": "claude-code"
+    },
+    {
+      "timestamp": "2026-05-07T15:28:32-04:00",
+      "reason": "manual",
+      "note": "Addressed the review findings across the structured channel-reply path. I cleared stale `channelReply` state on `agent.stopped`, centralized channel-reply normalization and size limits in the shared contracts helper, reused that validation in both the bridge tool and heartbeat ingestion route, made the bridge direct-entry detection robust for relative Bun paths, memoized bridge log-directory setup, sanitized stop-hook log summaries, mocked `pan-hook-lib.sh` directly in the hook tests, and added regression coverage for the new limits, skip behavior, direct invocation, stale-state clearing, and single-fetch stop-hook resolution path. I then rebuilt `@panctl/contracts`, reran the focused Vitest suites, ran `npm run typecheck`, ran `npm run lint`, and finished a clean full `npm test` pass.",
+      "agentModel": "claude-code"
     }
   ]
 }

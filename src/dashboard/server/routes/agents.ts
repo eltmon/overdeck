@@ -38,7 +38,10 @@ import { promisify } from 'node:util';
 
 import { Effect, Layer, Option, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
-import { DomainEvent } from '@panctl/contracts';
+import {
+  DomainEvent,
+  normalizeChannelReplyPayload,
+} from '@panctl/contracts';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { loadCloisterConfig } from '../../../lib/cloister/config.js';
@@ -1016,6 +1019,17 @@ export const bodyToEvent = (
           source: source['source'] ?? 'user',
         },
       };
+    case 'channel_reply': {
+      const reply = normalizeChannelReplyPayload(source['reply'], 'reply');
+      return {
+        type: 'agent.channel_reply',
+        timestamp,
+        payload: {
+          agentId,
+          reply,
+        },
+      };
+    }
     case 'model_set':
       return {
         type: 'agent.model_set',
@@ -1068,7 +1082,13 @@ const postAgentHeartbeatRoute = HttpRouter.add(
     const body = (yield* readJsonBody) as Record<string, unknown>;
     const timestamp = (body['timestamp'] as string) ?? new Date().toISOString();
 
-    const raw = bodyToEvent(id, body, timestamp);
+    let raw: Record<string, unknown> | null;
+    try {
+      raw = bodyToEvent(id, body, timestamp);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'invalid heartbeat payload';
+      return jsonResponse({ success: false, error: message }, { status: 400 });
+    }
     if (!raw) {
       // Legacy 'uninitialized' or unknown kind — accept but no-op so hooks
       // don't retry forever.

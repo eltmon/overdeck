@@ -7,6 +7,8 @@ import {
   AgentRuntimeSnapshot,
   AgentSnapshot,
   AgentStatus,
+  ChannelReplyArtifactRef,
+  ChannelReplyKind,
   IssueId,
   ResourceStats,
   ReviewStatusSnapshot,
@@ -155,6 +157,21 @@ export const AgentMessageReceivedEvent = Schema.Struct({
   }),
 })
 export type AgentMessageReceivedEvent = typeof AgentMessageReceivedEvent.Type
+
+export const AgentChannelReplyEvent = Schema.Struct({
+  type: Schema.Literal("agent.channel_reply"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    reply: Schema.Struct({
+      kind: ChannelReplyKind,
+      summary: Schema.String,
+      artifactRefs: Schema.Array(ChannelReplyArtifactRef),
+    }),
+  }),
+})
+export type AgentChannelReplyEvent = typeof AgentChannelReplyEvent.Type
 
 export const AgentModelSetEvent = Schema.Struct({
   type: Schema.Literal("agent.model_set"),
@@ -716,6 +733,7 @@ export const DomainEvent = Schema.Union([
   AgentWaitingStartedEvent,
   AgentWaitingClearedEvent,
   AgentMessageReceivedEvent,
+  AgentChannelReplyEvent,
   AgentModelSetEvent,
   AgentCurrentIssueSetEvent,
   AgentResolutionChangedEvent,
