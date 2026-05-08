@@ -106,6 +106,66 @@ describe('saveSnapshotToCache', () => {
     saveSnapshotToCache(makeSnapshot(2))
     expect(loadSnapshotFromCache()!.sequence).toBe(2)
   })
+
+  it('silently ignores non-quota setItem errors (no fallback attempted)', () => {
+    const originalSetItem = Storage.prototype.setItem
+    let calls = 0
+    Storage.prototype.setItem = function (key: string, value: string) {
+      calls++
+      throw new TypeError('localStorage is disabled')
+    }
+
+    try {
+      saveSnapshotToCache(makeSnapshot(1, 10))
+      expect(calls).toBe(1)
+      expect(loadSnapshotFromCache()).toBeNull()
+    } finally {
+      Storage.prototype.setItem = originalSetItem
+    }
+  })
+
+  it('silently ignores when fallback write also fails', () => {
+    const originalSetItem = Storage.prototype.setItem
+    let calls = 0
+    Storage.prototype.setItem = function (key: string, value: string) {
+      calls++
+      const err = new DOMException('Quota exceeded', 'QuotaExceededError')
+      throw err
+    }
+
+    try {
+      saveSnapshotToCache(makeSnapshot(1, 10))
+      expect(calls).toBe(2)
+      expect(loadSnapshotFromCache()).toBeNull()
+    } finally {
+      Storage.prototype.setItem = originalSetItem
+    }
+  })
+
+  it('preserves all non-issue fields after QuotaExceededError fallback', () => {
+    const originalSetItem = Storage.prototype.setItem
+    let calls = 0
+    Storage.prototype.setItem = function (key: string, value: string) {
+      calls++
+      if (calls === 1) {
+        throw new DOMException('Quota exceeded', 'QuotaExceededError')
+      }
+      return originalSetItem.call(this, key, value)
+    }
+
+    try {
+      const snapshot = makeSnapshot(42, 120_000)
+      saveSnapshotToCache(snapshot)
+
+      const loaded = loadSnapshotFromCache()
+      expect(loaded).not.toBeNull()
+      expect(loaded!.sequence).toBe(42)
+      expect(loaded!.agents).toEqual([])
+      expect(loaded!.issues).toEqual([])
+    } finally {
+      Storage.prototype.setItem = originalSetItem
+    }
+  })
 })
 
 // ─── clear ────────────────────────────────────────────────────────────────────
