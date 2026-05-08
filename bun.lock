@@ -51,7 +51,7 @@
     },
     "apps/desktop": {
       "name": "@panctl/desktop",
-      "version": "0.8.15",
+      "version": "0.8.17",
       "bin": {
         "panctl": "./bin/panctl.mjs",
       },

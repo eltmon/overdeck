@@ -40,6 +40,7 @@ import { MergeButton } from './MergeButton';
 import { RecoverButton } from './RecoverButton';
 import { hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
+import { getIssueWorkAgentMap, getWorkSessionLabel, isAgentSessionAttachable } from '../lib/swarmSlots';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useBulkSelection } from '../hooks/useBulkSelection';
 import { BulkActionBar } from './BulkActionBar';
@@ -864,6 +865,7 @@ export function CompactChildCard({
 // List view row — compact row for list view grouped by labels
 export function ListIssueRow({
   issue,
+  issueWorkAgentsById,
   agents,
   specialists,
   issueCosts,
@@ -875,6 +877,7 @@ export function ListIssueRow({
   onBulkToggle,
 }: {
   issue: Issue;
+  issueWorkAgentsById?: Map<string, Agent[]>;
   agents: Agent[];
   specialists: SpecialistAgent[];
   issueCosts: Record<string, IssueCost>;
@@ -908,10 +911,17 @@ export function ListIssueRow({
 
   // Check for running agents (exclude planning agents — they don't block the plan button)
   const issueIdLower = issue.identifier.toLowerCase();
-  const activeAgent = agents.find(
-    a => a.issueId?.toLowerCase() === issueIdLower && a.status !== 'dead' && !a.id?.startsWith('planning-')
+  const workAgents = useMemo(() => {
+    if (issueWorkAgentsById) {
+      return issueWorkAgentsById.get(issueIdLower) ?? [];
+    }
+    return getIssueWorkAgentMap(agents).get(issueIdLower) ?? [];
+  }, [agents, issueWorkAgentsById, issueIdLower]);
+  const standbyAgent = workAgents.find(
+    (workAgent) => workAgent.status === 'stopped' && workAgent.agentPhase === 'review-response',
   );
-  const isRunning = !!activeAgent;
+  const isRunning = workAgents.some(isAgentSessionAttachable) || !!standbyAgent;
+  const hasMultipleWorkAgents = workAgents.length > 1;
 
   // Check for specialists
   const issueSpecialists = specialists.filter(
@@ -989,6 +999,11 @@ export function ListIssueRow({
       {/* Running agent indicator */}
       {isRunning && (
         <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" title="Agent running" />
+      )}
+      {hasMultipleWorkAgents && (
+        <span className="rounded-full border border-border/70 bg-card px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground shrink-0">
+          {workAgents.length} slots
+        </span>
       )}
 
       {/* Specialist indicators */}
@@ -1544,6 +1559,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 
   const allExpanded = collapsedFeatures.size === 0;
 
+  const issueWorkAgentsById = useMemo(() => getIssueWorkAgentMap(agents), [agents]);
+
   // Group by labels for list view - MUST be before any conditional returns (Rules of Hooks)
   const groupedByLabels = useMemo(() => groupByLabels(filteredIssues), [filteredIssues]);
   const groupedByProject = useMemo(() => groupByProject(filteredIssues), [filteredIssues]);
@@ -1723,6 +1740,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                   <ListIssueRow
                     key={issue.id}
                     issue={issue}
+                    issueWorkAgentsById={issueWorkAgentsById}
                     agents={agents}
                     specialists={specialists}
                     issueCosts={issueCosts}
@@ -1758,6 +1776,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                   <ListIssueRow
                     key={issue.id}
                     issue={issue}
+                    issueWorkAgentsById={issueWorkAgentsById}
                     agents={agents}
                     specialists={specialists}
                     issueCosts={issueCosts}
@@ -1795,6 +1814,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                   <ListIssueRow
                     key={issue.id}
                     issue={issue}
+                    issueWorkAgentsById={issueWorkAgentsById}
                     agents={agents}
                     specialists={specialists}
                     issueCosts={issueCosts}
@@ -1857,6 +1877,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                   </div>
                   <ColumnContent
                     issues={sortedGrouped[status]}
+                    issueWorkAgentsById={issueWorkAgentsById}
                     agents={agents}
                     specialists={specialists}
                     issueCosts={issueCosts}
@@ -1962,6 +1983,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
 // ColumnContent — renders issues with Rally hierarchy grouping
 function ColumnContent({
   issues,
+  issueWorkAgentsById,
   agents,
   specialists,
   issueCosts,
@@ -1978,6 +2000,7 @@ function ColumnContent({
   planningStateById,
 }: {
   issues: Issue[];
+  issueWorkAgentsById: Map<string, Agent[]>;
   agents: Agent[];
   specialists: SpecialistAgent[];
   issueCosts: Record<string, IssueCost>;
@@ -1999,9 +2022,8 @@ function ColumnContent({
 
   const renderIssueCard = (issue: Issue) => {
     const issueIdLower = issue.identifier.toLowerCase();
-    const workAgent = agents.find(
-      (a) => a.issueId?.toLowerCase() === issueIdLower && !a.id?.startsWith('planning-')
-    );
+    const workAgents = issueWorkAgentsById.get(issueIdLower) ?? [];
+    const workAgent = workAgents[0];
     const planningAgent = agents.find(
       (a) => a.issueId?.toLowerCase() === issueIdLower && a.id?.startsWith('planning-')
     );
@@ -2014,6 +2036,7 @@ function ColumnContent({
         key={issue.id}
         issue={issue}
         workAgent={workAgent}
+        workAgents={workAgents}
         planningAgent={planningAgent}
         specialists={issueSpecialists}
         cost={issueCosts[issue.identifier.toLowerCase()]}
@@ -2626,6 +2649,7 @@ interface PlanningState {
 interface IssueCardProps {
   issue: Issue;
   workAgent?: Agent;
+  workAgents?: Agent[];
   planningAgent?: Agent;
   specialists?: SpecialistAgent[];
   cost?: IssueCost;
@@ -2640,7 +2664,7 @@ interface IssueCardProps {
   planningState?: PlanningState;
 }
 
-function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief, isBulkSelected, onBulkToggle, planningState: planningStateProp }: IssueCardProps) {
+function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, costsLoading, isSelected, onSelect, onPlan, onViewBeads, onViewVBrief, isBulkSelected, onBulkToggle, planningState: planningStateProp }: IssueCardProps) {
   const queryClient = useQueryClient();
   const showAlert = useAlert();
   const [showCostModal, setShowCostModal] = useState(false);
@@ -2683,9 +2707,14 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
   }, [reviewStatus?.stuck, reviewStatus?.autoRequeueCount, reviewStatus?.stuckReason, reviewStatus?.reviewRetryCount, issue.identifier]);
 
   // Determine which agent is relevant based on issue status
-  const activeAgent = workAgent;
-  const isStandby = activeAgent?.status === 'stopped' && activeAgent?.agentPhase === 'review-response' && !!activeAgent?.lifecycle?.hasLiveTmuxSession;
-  const isRunning = activeAgent && activeAgent.status !== 'dead' && (activeAgent.status !== 'stopped' || isStandby);
+  const issueWorkAgents = workAgents.length > 0 ? workAgents : (workAgent ? [workAgent] : []);
+  const activeAgent = issueWorkAgents.find(isAgentSessionAttachable) ?? issueWorkAgents[0];
+  const standbyAgent = issueWorkAgents.find(
+    (candidate) => candidate.status === 'stopped' && candidate.agentPhase === 'review-response' && !!candidate.lifecycle?.hasLiveTmuxSession,
+  );
+  const isStandby = !!standbyAgent;
+  const isRunning = issueWorkAgents.some(isAgentSessionAttachable) || isStandby;
+  const hasMultipleWorkAgents = issueWorkAgents.length > 1;
   // Show "Watch Planning" when planning agent is starting or has a live session
   const isPlanningActive = planningAgent != null && (planningAgent.status === 'starting' || planningAgent.status === 'running' || planningAgent.status === 'healthy' || planningAgent.status === 'warning' || planningAgent.status === 'stuck');
 
@@ -3051,24 +3080,49 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
                   {issue.assignee.name.split(' ')[0]}
                 </span>
               )}
-              {(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) && (
+              {(activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) && (
                 <span
                   className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                    (workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote'
+                    (activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote'
                       ? 'badge-bg-signal-cost text-signal-cost-foreground'
                       : 'border border-border/70 bg-card/80 text-muted-foreground'
                   }`}
-                  title={(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Running on remote VM (Fly.io)' : 'Running locally'}
+                  title={(activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Running on remote VM (Fly.io)' : 'Running locally'}
                 >
-                  {(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? (
+                  {(activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? (
                     <Cloud className="w-3 h-3" />
                   ) : (
                     <Monitor className="w-3 h-3" />
                   )}
-                  {(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Fly.io' : 'Local'}
+                  {(activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Fly.io' : 'Local'}
                 </span>
               )}
             </div>
+
+            {hasMultipleWorkAgents && (
+              <div className="mt-3 flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Swarm
+                </span>
+                {issueWorkAgents.map((workSessionAgent, index) => {
+                  const attachable = isAgentSessionAttachable(workSessionAgent);
+                  return (
+                    <span
+                      key={workSessionAgent.id}
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] ${
+                        attachable
+                          ? 'badge-bg-primary text-primary-foreground'
+                          : 'border border-border/70 bg-card text-muted-foreground'
+                      }`}
+                      title={workSessionAgent.id}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${attachable ? 'bg-primary-foreground/90' : 'bg-muted-foreground'}`} />
+                      {getWorkSessionLabel(workSessionAgent, index)}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
 
             <div className="mt-3 flex items-center gap-2 flex-wrap">
             {/* Project color indicator */}
@@ -3149,21 +3203,21 @@ function IssueCard({ issue, workAgent, planningAgent, specialists = [], cost, co
               </span>
             )}
             {/* Workspace location badge - shows for any agent with a workspace */}
-            {(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) && (
+            {(activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) && (
               <span
                 className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                  (workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote'
+                  (activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote'
                     ? 'badge-bg-signal-cost text-signal-cost-foreground'
                     : 'bg-card text-muted-foreground border border-border'
                 }`}
-                title={(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Running on remote VM (Fly.io)' : 'Running locally'}
+                title={(activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Running on remote VM (Fly.io)' : 'Running locally'}
               >
-                {(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? (
+                {(activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? (
                   <Cloud className="w-3 h-3" />
                 ) : (
                   <Monitor className="w-3 h-3" />
                 )}
-                {(workAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Fly.io' : 'Local'}
+                {(activeAgent?.workspaceLocation || planningAgent?.workspaceLocation) === 'remote' ? 'Fly.io' : 'Local'}
               </span>
             )}
             {/* Review Ready badge - prominent indicator that agent completed work */}

@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { derivePipelinePhase, type PipelinePhaseInput } from './usePipelinePhase';
+import { act, renderHook } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { derivePipelinePhase, type PipelinePhaseInput, usePipelinePhase } from './usePipelinePhase';
 import type { Agent } from '../../types';
 import type { ReviewStatus } from './types';
 
@@ -319,6 +320,20 @@ describe('derivePipelinePhase precedence table', () => {
       expect(mergeTab?.sessionName).toBe('agent-abc');
     });
 
+    it('prefers the first active swarm slot over an earlier standby slot during merge', () => {
+      const input = makeInput({
+        agent: makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped', agentPhase: 'review-response' }),
+        workAgents: [
+          makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped', agentPhase: 'review-response' }),
+          makeAgent({ id: 'agent-pan-509-2', issueId: 'PAN-509', status: 'healthy' }),
+        ],
+        reviewStatus: makeReviewStatus({ mergeStatus: 'merging' }),
+      });
+      const { activeSession, availableTerminals } = derivePipelinePhase(input);
+      expect(activeSession).toBe('agent-pan-509-2');
+      expect(availableTerminals.find(t => t.id === 'merging')?.sessionName).toBe('agent-pan-509-2');
+    });
+
     it('uses merge-agent session when work agent is stopped (polyrepo)', () => {
       const input = makeInput({
         agent: makeAgent({ status: 'stopped' }),
@@ -393,6 +408,39 @@ describe('derivePipelinePhase availableTerminals', () => {
     expect(workTab?.sessionName).toBe('agent-abc');
   });
 
+  it('renders one work tab per swarm slot when multiple work agents share an issue', () => {
+    const input = makeInput({
+      agent: makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509' }),
+      workAgents: [
+        makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509' }),
+        makeAgent({ id: 'agent-pan-509-2', issueId: 'PAN-509' }),
+      ],
+    });
+
+    const { phase, activeSession, availableTerminals } = derivePipelinePhase(input);
+    expect(phase).toBe('working');
+    expect(activeSession).toBe('agent-pan-509-1');
+    expect(availableTerminals.filter((tab) => tab.id.startsWith('working')).map((tab) => ({
+      id: tab.id,
+      label: tab.label,
+      sessionName: tab.sessionName,
+      isActive: tab.isActive,
+    }))).toEqual([
+      {
+        id: 'working',
+        label: 'Slot 1',
+        sessionName: 'agent-pan-509-1',
+        isActive: true,
+      },
+      {
+        id: 'working-agent-pan-509-2',
+        label: 'Slot 2',
+        sessionName: 'agent-pan-509-2',
+        isActive: false,
+      },
+    ]);
+  });
+
   it('does NOT include Work tab when no agent', () => {
     const input = makeInput();
     const { availableTerminals } = derivePipelinePhase(input);
@@ -464,6 +512,36 @@ describe('derivePipelinePhase availableTerminals', () => {
     expect(workTab?.isActive).toBe(true);
   });
 
+  it('follows the first active swarm slot when an earlier slot is only standby-attachable', () => {
+    const input = makeInput({
+      agent: makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped', agentPhase: 'review-response' }),
+      workAgents: [
+        makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped', agentPhase: 'review-response' }),
+        makeAgent({ id: 'agent-pan-509-2', issueId: 'PAN-509', status: 'healthy' }),
+      ],
+    });
+
+    const { phase, activeSession, availableTerminals } = derivePipelinePhase(input);
+    expect(phase).toBe('working');
+    expect(activeSession).toBe('agent-pan-509-2');
+    expect(availableTerminals.find((tab) => tab.sessionName === 'agent-pan-509-2')?.isActive).toBe(true);
+  });
+
+  it('enters standby when a later swarm slot is waiting for review feedback', () => {
+    const input = makeInput({
+      agent: makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped' }),
+      workAgents: [
+        makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'stopped' }),
+        makeAgent({ id: 'agent-pan-509-2', issueId: 'PAN-509', status: 'stopped', agentPhase: 'review-response' }),
+      ],
+    });
+
+    const { phase, activeSession, availableTerminals } = derivePipelinePhase(input);
+    expect(phase).toBe('standby');
+    expect(activeSession).toBe('agent-pan-509-2');
+    expect(availableTerminals.find((tab) => tab.sessionName === 'agent-pan-509-2')?.isActive).toBe(true);
+  });
+
   it('marks dead sessions as disabled', () => {
     const input = makeInput({ reviewStatus: makeReviewStatus({ reviewStatus: 'passed' }) });
     const dead = new Set(['specialist-panopticon-pan-509-review-agent']);
@@ -494,5 +572,45 @@ describe('derivePipelinePhase availableTerminals', () => {
     expect(correctnessTab?.isRunning).toBe(false);
     expect(performanceTab?.disabled).toBe(false);
     expect(performanceTab?.isRunning).toBe(true);
+  });
+});
+
+describe('usePipelinePhase hook', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it('recomputes when agentPhase changes without a status change', async () => {
+    const initialInput = makeInput({
+      agent: makeAgent({ status: 'stopped', agentPhase: 'implementation' }),
+      workAgents: [makeAgent({ status: 'stopped', agentPhase: 'implementation' })],
+    });
+
+    const { result, rerender } = renderHook(
+      ({ input }) => usePipelinePhase(input),
+      { initialProps: { input: initialInput } },
+    );
+
+    expect(result.current.phase).toBe('planning');
+    expect(result.current.activeSession).toBeNull();
+
+    rerender({
+      input: makeInput({
+        agent: makeAgent({ status: 'stopped', agentPhase: 'review-response' }),
+        workAgents: [makeAgent({ status: 'stopped', agentPhase: 'review-response' })],
+      }),
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+
+    expect(result.current.phase).toBe('standby');
+    expect(result.current.activeSession).toBe('agent-abc');
   });
 });
