@@ -11,7 +11,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
-import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync, isPaneDeadAsync, listPaneValuesAsync } from '../tmux.js';
+import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync, isPaneDeadAsync, listPaneValuesAsync, detectTerminalApiError, type TerminalApiError } from '../tmux.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { getProviderExportsForModel } from '../agents.js';
 import { resolveSpecialistBaseCommand } from './router.js';
@@ -618,12 +618,35 @@ export async function spawnSingleReviewer(
 }
 
 /**
+ * Failure reasons for a reviewer wait. `terminal_api_error` means the upstream
+ * provider returned a non-recoverable error (quota exhausted, login required,
+ * 401/403) — auto-respawn won't help. The other three are existing legacy modes.
+ */
+export type ReviewerFailureReason =
+  | 'session_exited'
+  | 'pane_dead'
+  | 'timeout'
+  | 'terminal_api_error';
+
+export type ReviewerWaitResult =
+  | { status: 'completed' }
+  | { status: 'failed'; reason: ReviewerFailureReason; apiError?: TerminalApiError };
+
+/**
  * Poll until the output file is written (or the session exits), then kill the session.
  *
  * For synthesis sessions: a `requireMarker` predicate may be passed to defeat a race
  * where the agent writes synthesis.md in two stages (body first, tail markers appended
  * seconds later). Without the predicate, parser fires on the incomplete first write
  * and rejects valid output as "did not report result in expected format".
+ *
+ * On every poll cycle we also scan the pane for terminal upstream-API errors
+ * (quota exhausted, auth failed, login required). Without this check, an API
+ * 403 from the reviewer's model provider sits silently at the prompt for the
+ * full 30-minute timeout — Claude Code doesn't exit on API errors, it just
+ * prints the error and returns to the input prompt, so sessionExists and
+ * pane_dead both keep returning true. Detecting via pane content is the only
+ * reliable signal for this failure mode.
  */
 export async function waitForReviewer(
   sessionName: string,
@@ -642,12 +665,22 @@ export async function waitForReviewer(
     capturePane?: (sessionName: string) => Promise<string>;
     requireMarker?: string;
   } = {},
-): Promise<'completed' | 'failed'> {
+): Promise<ReviewerWaitResult> {
   const outputDir = dirname(outputFile);
   const role = sessionName.split('-').pop() ?? 'unknown';
   const tmuxLogFile = join(outputDir, `${role}-tmux.log`);
+  const errorFile = join(outputDir, `${role}-error.json`);
   const startedAt = Date.now();
   const deadline = startedAt + timeoutMs;
+
+  const writePaneCapture = async (label: string, pane: string): Promise<void> => {
+    try {
+      if (pane) await writeFile(tmuxLogFile, pane, { flag: 'a' });
+      console.error(`[review-agent] ${label} capture written to ${tmuxLogFile}`);
+    } catch (err) {
+      console.error(`[review-agent] Failed to write pane capture for ${sessionName}:`, err);
+    }
+  };
 
   while (Date.now() < deadline) {
     // Output file is the primary completion signal — Claude sessions don't auto-exit.
@@ -658,7 +691,7 @@ export async function waitForReviewer(
           const content = await readFile(outputFile, 'utf-8');
           if (content.includes(requireMarker)) {
             console.log(`[review-agent] Reviewer ${sessionName} completed (marker '${requireMarker}' present) in ${Date.now() - startedAt}ms`);
-            return 'completed';
+            return { status: 'completed' };
           }
           // File exists but marker not yet written — keep polling.
         } catch (err) {
@@ -666,7 +699,7 @@ export async function waitForReviewer(
         }
       } else {
         console.log(`[review-agent] Reviewer ${sessionName} completed in ${Date.now() - startedAt}ms`);
-        return 'completed';
+        return { status: 'completed' };
       }
     }
     if (!await sessionExists(sessionName)) {
@@ -675,12 +708,34 @@ export async function waitForReviewer(
       console.error(`[review-agent] Reviewer ${sessionName} exited without output after ${elapsed}ms — capturing pane`);
       try {
         const pane = await capturePane(sessionName);
-        if (pane) await writeFile(tmuxLogFile, pane, { flag: 'a' });
-        console.error(`[review-agent] Pane capture written to ${tmuxLogFile}`);
+        await writePaneCapture('Pane', pane);
       } catch (err) {
         console.error(`[review-agent] Failed to capture pane for ${sessionName}:`, err);
       }
-      return 'failed';
+      return { status: 'failed', reason: 'session_exited' };
+    }
+
+    // Capture pane once per cycle so we can run BOTH the pane-dead check and
+    // the terminal API error scan from the same capture — half the tmux forks.
+    let pane = '';
+    try { pane = await capturePane(sessionName); } catch { /* non-fatal */ }
+
+    // Terminal upstream-API error (quota exhausted / auth / login required).
+    // Pane stays alive after these because Claude Code returns to its prompt;
+    // without this check we'd burn the full timeout on a failure that's
+    // already permanent.
+    const apiError = detectTerminalApiError(pane);
+    if (apiError) {
+      const elapsed = Date.now() - startedAt;
+      console.error(`[review-agent] Reviewer ${sessionName} hit terminal API error after ${elapsed}ms: ${apiError.summary}`);
+      await writePaneCapture('Terminal-API-error', pane);
+      try {
+        await writeFile(errorFile, JSON.stringify({ sessionName, apiError, detectedAt: new Date().toISOString() }, null, 2));
+      } catch (err) {
+        console.error(`[review-agent] Failed to write error file ${errorFile}:`, err);
+      }
+      try { await killSession(sessionName); } catch { /* non-fatal */ }
+      return { status: 'failed', reason: 'terminal_api_error', apiError };
     }
 
     // PAN-912 follow-up: detect dead panes even when remain-on-exit keeps the session alive.
@@ -689,14 +744,8 @@ export async function waitForReviewer(
     if (await isPaneDeadAsync(sessionName)) {
       const elapsed = Date.now() - startedAt;
       console.error(`[review-agent] Reviewer ${sessionName} pane is dead after ${elapsed}ms — capturing pane`);
-      try {
-        const pane = await capturePane(sessionName);
-        if (pane) await writeFile(tmuxLogFile, pane, { flag: 'a' });
-        console.error(`[review-agent] Dead-pane capture written to ${tmuxLogFile}`);
-      } catch (err) {
-        console.error(`[review-agent] Failed to capture pane for dead ${sessionName}:`, err);
-      }
-      return 'failed';
+      await writePaneCapture('Dead-pane', pane);
+      return { status: 'failed', reason: 'pane_dead' };
     }
 
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -707,15 +756,14 @@ export async function waitForReviewer(
   console.error(`[review-agent] Reviewer ${sessionName} timed out after ${elapsed}ms — capturing pane`);
   try {
     const pane = await capturePane(sessionName);
-    if (pane) await writeFile(tmuxLogFile, pane, { flag: 'a' });
-    console.error(`[review-agent] Pane capture written to ${tmuxLogFile}`);
+    await writePaneCapture('Pane', pane);
   } catch (err) {
     console.error(`[review-agent] Failed to capture pane for ${sessionName}:`, err);
   }
   try { await killSession(sessionName); } catch (err) {
     console.error(`[review-agent] Failed to kill timed-out reviewer session ${sessionName}:`, err);
   }
-  return 'failed';
+  return { status: 'failed', reason: 'timeout' };
 }
 
 /**
@@ -831,7 +879,16 @@ export async function killAllReviewSessions(): Promise<{ killed: string[]; faile
   return { killed, failed };
 }
 
-type ReviewerOutcome = { role: string; status: 'completed' | 'failed'; outputFile: string; sessionName?: string };
+type ReviewerOutcome = {
+  role: string;
+  status: 'completed' | 'failed';
+  outputFile: string;
+  sessionName?: string;
+  /** Why the reviewer failed; only set when status === 'failed'. */
+  failureReason?: ReviewerFailureReason;
+  /** Specific upstream-API failure surfaced from the pane, if any. */
+  apiError?: TerminalApiError;
+};
 
 /**
  * Returns completed reviewer outputs, or null if any reviewer failed.
@@ -871,8 +928,8 @@ export const resolveTemplatePath = resolvePromptTemplatePath;
 
 type RunParallelReviewDeps = {
   spawnFn?: (session: string, model: string, promptFile: string, cwd: string) => Promise<void>;
-  waitFn?: (session: string, outputFile: string, timeoutMs: number) => Promise<'completed' | 'failed'>;
-  waitSynthesisFn?: (session: string, outputFile: string, timeoutMs: number) => Promise<'completed' | 'failed'>;
+  waitFn?: (session: string, outputFile: string, timeoutMs: number) => Promise<ReviewerWaitResult>;
+  waitSynthesisFn?: (session: string, outputFile: string, timeoutMs: number) => Promise<ReviewerWaitResult>;
   parseSynthesisFn?: typeof parseReviewSynthesis;
   postReviewFn?: typeof postGitHubPRReview;
   /** Injectable prompt-template resolver (see resolvePromptTemplatePath). */
@@ -1073,12 +1130,22 @@ export async function runParallelReview(
       // Non-fatal: event emission is best-effort
     }
   };
-  let reviewerResults = await Promise.all(
+  let reviewerResults: ReviewerOutcome[] = await Promise.all(
     reviewerSessions.map(({ sessionName, outputFile, role }) =>
       waitFn(sessionName, outputFile, REVIEW_TIMEOUT_MS)
-        .then(async status => {
-          if (status === 'completed') await emitReviewerCompleted(role);
-          return { role, status, outputFile, sessionName };
+        .then(async (waitResult): Promise<ReviewerOutcome> => {
+          if (waitResult.status === 'completed') {
+            await emitReviewerCompleted(role);
+            return { role, status: 'completed', outputFile, sessionName };
+          }
+          return {
+            role,
+            status: 'failed',
+            outputFile,
+            sessionName,
+            failureReason: waitResult.reason,
+            apiError: waitResult.apiError,
+          };
         }),
     ),
   );
@@ -1086,14 +1153,22 @@ export async function runParallelReview(
   // ── Phase 2b: One auto-respawn for reviewers that failed with a dead pane.
   // Transient failures (e.g. 503 auth_unavailable that kills the pane) recover
   // on respawn ~90% of the time. We retry once to avoid burning a full review
-  // cycle for a blip. We ONLY retry when the pane is dead — if the session is
-  // gone entirely or the pane is still alive, the failure is either legitimate
-  // (timeout, missing output) or the reviewer is still working.
+  // cycle for a blip. We ONLY retry when the pane is dead AND the failure was
+  // not a terminal-API error — if the session is gone entirely, the pane is
+  // still alive, or the upstream provider returned a non-recoverable error
+  // (quota exhausted, login required), respawn won't help.
   const failedReviewerResults = reviewerResults.filter(r => r.status === 'failed');
   if (failedReviewerResults.length > 0) {
     const retryable: typeof failedReviewerResults = [];
     for (const failed of failedReviewerResults) {
-      const paneDead = await isPaneDeadAsync(failed.sessionName);
+      // Skip respawn for terminal API errors — same provider/quota/auth
+      // problem will hit again immediately. Surface the error to the user
+      // instead.
+      if (failed.failureReason === 'terminal_api_error') {
+        console.log(`[review-agent] Skipping respawn for ${failed.sessionName} — terminal API error: ${failed.apiError?.summary ?? 'unknown'}`);
+        continue;
+      }
+      const paneDead = failed.sessionName ? await isPaneDeadAsync(failed.sessionName) : false;
       if (!paneDead) continue;
 
       const agent = agents.find(a => a.name === failed.role);
@@ -1108,32 +1183,44 @@ export async function runParallelReview(
       emitActivityEntry({ source: 'review-specialist', level: 'warn', message: `${context.issueId} — auto-respawning dead reviewer ${failed.role}`, issueId: context.issueId });
 
       // Kill stale session (if any) and respawn fresh
-      try { await killSessionAsync(failed.sessionName); } catch { /* ignore */ }
-      try { await spawnFn(failed.sessionName, model, promptFile, context.projectPath); } catch (err) {
-        console.error(`[review-agent] Respawn of ${failed.sessionName} failed:`, err);
-        continue;
+      if (failed.sessionName) {
+        try { await killSessionAsync(failed.sessionName); } catch { /* ignore */ }
+        try { await spawnFn(failed.sessionName, model, promptFile, context.projectPath); } catch (err) {
+          console.error(`[review-agent] Respawn of ${failed.sessionName} failed:`, err);
+          continue;
+        }
+        try { await setOptionAsync(failed.sessionName, 'remain-on-exit', 'on'); } catch { /* ignore */ }
+        // PAN-915 — respawned reviewer is running again
+        try {
+          const { notifyPipeline } = await import('../pipeline-notifier.js');
+          notifyPipeline({
+            type: 'reviewer_started',
+            issueId: context.issueId,
+            role: failed.role,
+            sessionName: failed.sessionName,
+          });
+        } catch { /* non-fatal */ }
       }
-      try { await setOptionAsync(failed.sessionName, 'remain-on-exit', 'on'); } catch { /* ignore */ }
-      // PAN-915 — respawned reviewer is running again
-      try {
-        const { notifyPipeline } = await import('../pipeline-notifier.js');
-        notifyPipeline({
-          type: 'reviewer_started',
-          issueId: context.issueId,
-          role: failed.role,
-          sessionName: failed.sessionName,
-        });
-      } catch { /* non-fatal */ }
       retryable.push(failed);
     }
 
     if (retryable.length > 0) {
-      const retryResults = await Promise.all(
+      const retryResults: ReviewerOutcome[] = await Promise.all(
         retryable.map(({ sessionName, outputFile, role }) =>
-          waitFn(sessionName, outputFile, REVIEW_TIMEOUT_MS)
-            .then(async status => {
-              if (status === 'completed') await emitReviewerCompleted(role);
-              return { role, status, outputFile, sessionName };
+          waitFn(sessionName!, outputFile, REVIEW_TIMEOUT_MS)
+            .then(async (waitResult): Promise<ReviewerOutcome> => {
+              if (waitResult.status === 'completed') {
+                await emitReviewerCompleted(role);
+                return { role, status: 'completed', outputFile, sessionName };
+              }
+              return {
+                role,
+                status: 'failed',
+                outputFile,
+                sessionName,
+                failureReason: waitResult.reason,
+                apiError: waitResult.apiError,
+              };
             }),
         ),
       );
@@ -1146,14 +1233,30 @@ export async function runParallelReview(
   // ── Phase 3: Synthesis ────────────────────────────────────────────────────
   const completedReviewers = selectCompletedReviewers(reviewerResults);
   if (!completedReviewers) {
-    const failed = reviewerResults.filter(r => r.status === 'failed').map(r => r.role);
-    console.warn(`[review-agent] Aborting synthesis — reviewer(s) failed or timed out: ${failed.join(', ')}`);
-    emitActivityEntry({ source: 'review-specialist', level: 'error', message: `${context.issueId} — review aborted: ${failed.join(', ')} failed`, issueId: context.issueId });
-    emitActivityTts({ utterance: `${context.issueId} review aborted, ${failed.join(', ')} failed`, priority: 0, issueId: context.issueId });
+    const failedOutcomes = reviewerResults.filter(r => r.status === 'failed');
+    const failedRoles = failedOutcomes.map(r => r.role);
+    const apiErrors = failedOutcomes.filter(r => r.failureReason === 'terminal_api_error' && r.apiError);
+    // Build a notes message that distinguishes provider-side terminal errors
+    // (quota, login, auth) from generic timeouts so the dashboard surfaces
+    // something the operator can act on. Without this every failure looked
+    // identical to a transient timeout, and "Resubmit to retry" was misleading
+    // when the real fix is "top up the provider quota / re-login".
+    let notes: string;
+    if (apiErrors.length > 0) {
+      const summaries = Array.from(new Set(apiErrors.map(r => `${r.role}: ${r.apiError!.summary}`)));
+      const otherFailed = failedRoles.filter(r => !apiErrors.some(e => e.role === r));
+      const tail = otherFailed.length > 0 ? ` Additional reviewer failures (timeout/dead): ${otherFailed.join(', ')}.` : '';
+      notes = `Review blocked by upstream provider error — ${summaries.join('; ')}.${tail} Fix the provider issue and resubmit; auto-respawn was skipped because the same error would recur.`;
+    } else {
+      notes = `Review aborted: reviewer(s) failed or timed out (${failedRoles.join(', ')}). Resubmit to retry.`;
+    }
+    console.warn(`[review-agent] Aborting synthesis — reviewer(s) failed: ${failedRoles.join(', ')}${apiErrors.length > 0 ? ` (terminal API errors: ${apiErrors.length})` : ''}`);
+    emitActivityEntry({ source: 'review-specialist', level: 'error', message: `${context.issueId} — review aborted: ${failedRoles.join(', ')} failed${apiErrors.length > 0 ? ` (${apiErrors[0]!.apiError!.summary})` : ''}`, issueId: context.issueId });
+    emitActivityTts({ utterance: apiErrors.length > 0 ? `${context.issueId} review blocked, ${apiErrors[0]!.apiError!.summary}` : `${context.issueId} review aborted, ${failedRoles.join(', ')} failed`, priority: 0, issueId: context.issueId });
     const abortResult: ReviewResult = {
       success: false,
       reviewResult: 'COMMENTED',
-      notes: `Review aborted: reviewer(s) failed or timed out (${failed.join(', ')}). Resubmit to retry.`,
+      notes,
       output: `Review ${reviewId}`,
     };
     // PAN-918: Do NOT send feedback to the work agent on abort — there are no
