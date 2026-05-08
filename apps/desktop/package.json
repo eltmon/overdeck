@@ -1,6 +1,6 @@
 {
   "name": "@panctl/desktop",
-  "version": "0.8.17",
+  "version": "0.8.20",
   "description": "Panopticon Command Deck — AI agent monitoring desktop app",
   "main": "dist-electron/main.js",
   "productName": "Panopticon",
