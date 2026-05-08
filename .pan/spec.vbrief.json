@@ -4,17 +4,17 @@
     "created": "2026-05-08T18:55:00Z",
     "author": "manual:opus-4.7",
     "description": "Plan for PAN-1015: Remove claudish routing in favor of direct ANTHROPIC_BASE_URL (CLIProxy only where needed). Empirically scoped 2026-05-08 \u2014 see issue body Empirical findings section.",
-    "updated": "2026-05-08T11:36:54.337Z"
+    "updated": "2026-05-08T14:15:13Z"
   },
   "plan": {
     "id": "pan-1015",
     "title": "Remove claudish routing in favor of direct ANTHROPIC_BASE_URL (CLIProxy only where needed)",
-    "status": "proposed",
+    "status": "active",
     "uid": "d3644941-fec5-4e25-9974-34d6a9e02902",
     "author": "manual:opus-4.7",
     "sequence": 1,
     "created": "2026-05-08T18:55:00Z",
-    "updated": "2026-05-08T11:36:54.337Z",
+    "updated": "2026-05-08T14:15:13Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1015",
