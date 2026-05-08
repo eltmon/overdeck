@@ -2,8 +2,12 @@
   "version": "1",
   "issueId": "PAN-1025",
   "created": "2026-05-07T21:00:00.000Z",
-  "updated": "2026-05-07T21:08:00.000Z",
-  "gitState": { "branch": "feature/pan-1025", "sha": "1348546", "dirty": false },
+  "updated": "2026-05-08T01:14:58.698Z",
+  "gitState": {
+    "branch": "feature/pan-1025",
+    "sha": "1348546",
+    "dirty": false
+  },
   "decisions": [
     {
       "id": "D1",
@@ -67,6 +71,11 @@
       "reason": "fix",
       "note": "Fixed TypeScript build failure (TS6133): removed unused MAX_BYTES constant after the preemptive size check was removed. Full test suite passes (990 tests), frontend build passes.",
       "agentModel": "claude-opus-4-5"
+    },
+    {
+      "timestamp": "2026-05-08T01:14:58.698Z",
+      "reason": "end",
+      "note": "Relax localStorage 2MB cap in snapshotCache.ts: remove preemptive size check, make issues-stripping a QuotaExceededError fallback, add comprehensive tests. Full test suite passes (990 tests)."
     }
   ],
   "feedback": []

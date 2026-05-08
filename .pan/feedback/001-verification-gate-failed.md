@@ -1,119 +1,36 @@
-VERIFICATION FAILED for PAN-1028 (attempt 1/10):
+VERIFICATION FAILED for PAN-1025 (attempt 1/10):
 
 Failed check: test
 
-Verification FAILED at test (42032ms):
+Verification FAILED at test (34494ms):
 
-ng the canvas npm package
+un/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:634:39
+ ❯ FiberImpl.runLoop node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:651:19
+ ❯ FiberImpl.evaluate node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:594:23
+ ❯ resume node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:1031:15
+ ❯ node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:974:14
 
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
 
- FAIL |root|  tests/fixtures/synced-skills.test.ts > synced skill set fixture > matches the committed fixture line-for-line
-AssertionError: expected 'all-up\nbeads\nbeads-completion-check…' to be 'all-up\nbeads\nbeads-completion-check…' // Object.is equality
+ FAIL |root|  src/dashboard/server/routes/__tests__/http-handler.test.ts > httpHandler > maps unknown errors to 500
+TypeError: Cause.isInterruptedOnly is not a function
+ ❯ Array.next src/dashboard/server/routes/http-handler.ts:93:19
+     91|         // Interrupt-only causes mean the consumer (browser tab, abort…
+     92|         // the request. That isn't a server error — silence it instead…
+     93|         if (Cause.isInterruptedOnly(cause)) {
+       |                   ^
+     94|           return jsonResponse({ error: 'Request cancelled' }, { status…
+     95|         }
+ ❯ Object.~effect/Effect/successCont node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:1277:26
+ ❯ Object.~effect/Effect/evaluate node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:1290:23
+ ❯ FiberImpl.runLoop node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:634:39
+ ❯ FiberImpl.evaluate node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:594:23
+ ❯ runFork node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:5016:9
+ ❯ runPromiseExit node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:5094:19
+ ❯ Module.<anonymous> node_modules/.bun/effect@4.0.0-beta.45/node_modules/effect/src/internal/effect.ts:5113:5
+ ❯ runRoute src/dashboard/server/routes/__tests__/http-handler.test.ts:25:33
 
-- Expected
-+ Received
-
-  all-up
-  beads
-  beads-completion-check
-  beads-panopticon-guide
-  benchmark
-  bug-fix
-  check-merged
-  clear-writing
-  cliproxy
-  code-review
-  code-review-performance
-  code-review-security
-  conv-lookup
-  crash-investigation
-  dependency-update
-  feature-work
-  github-cli
-  incident-response
-  knowledge-capture
-  myn-standards
-  onboard-codebase
-  pan
-  pan-admin-cloister
-  pan-admin-config
-  pan-admin-hooks
-  pan-admin-tldr
-  pan-admin-tracker
-  pan-approve
-  pan-close
-  pan-code-review
-  pan-convoy-synthesis
-  pan-dev
-  pan-diagnose
-  pan-docker
-  pan-docs
-  pan-done
-  pan-down
-  pan-fly
-  pan-health
-  pan-help
-  pan-install
-  pan-issues
-  pan-kill
-  pan-logs
-  pan-network
-  pan-new-project
-  pan-oversee
-  pan-plan
-  pan-projects
-  pan-quickstart
-  pan-release
-  pan-reload
-  pan-reopen
-  pan-resources
-  pan-restart
-  pan-review
-  pan-show
-  pan-skill-creator
-  pan-start
-  pan-status
-  pan-stop-all-agents
-  pan-subagent-creator
-  pan-sync
-  pan-sync-main
-  pan-tell
-  pan-test-config
-  pan-tts
-  pan-up
-  pan-wipe
-  pan-workspace-config
-+ pipeline-status
-  plan
-  react-best-practices
-  refactor
-  refactor-radar
-  release
-  send-feedback-to-agent
-  session-health
-  skill-creator
-  spec-readiness
-  spec-readiness-setup
-  stitch-design-md
-  stitch-react-components
-  stitch-setup
-  unarchive-conversation
-  web-design-guidelines
-  work-complete
-  workspace-status
-  write-spec
-
-
- ❯ tests/fixtures/synced-skills.test.ts:53:20
-     51| 
-     52|     const expected = readFileSync(FIXTURE_PATH, 'utf-8');
-     53|     expect(actual).toBe(expected);
-       |                    ^
-     54|   });
-     55| });
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
 
 
 
@@ -123,6 +40,6 @@ AssertionError: expected 'all-up\nbeads\nbeads-completion-check…' to be 'all-u
 2. Fix the code causing the failure
 3. Run the failing check locally to verify it passes
 4. Commit every change
-5. Invoke the /rebase-and-submit skill for PAN-1028 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-1028 -m "Fixed test"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.
+5. Invoke the /rebase-and-submit skill for PAN-1025 — this is an atomic task. Because verification already ran once (a PR exists), the skill will run `pan review request PAN-1025 -m "Fixed test"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.
 
 Do NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until `pan review request` has completed successfully.
