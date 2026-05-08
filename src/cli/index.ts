@@ -333,6 +333,7 @@ program
   .description('Recover crashed or stopped agent')
   .option('--all', 'Auto-recover all crashed agents')
   .option('--json', 'Output as JSON')
+  .option('--model <model>', 'Override model on recovery (e.g. switch off Kimi when quota is exhausted)')
   .action(recoverCommand);
 
 program

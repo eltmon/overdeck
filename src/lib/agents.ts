@@ -6,7 +6,7 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
-import { getClaudePermissionFlagsString } from './claude-permissions.js';
+import { getClaudePermissionFlagsString, resolvePermissionMode } from './claude-permissions.js';
 import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sendRawKeystrokeAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync, waitForClaudePrompt } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
@@ -151,15 +151,24 @@ export async function getAgentRuntimeBaseCommand(
   const nameFlag = agentName ? ` --name ${agentName}` : '';
   // PAN-982: When agentType is provided, select the matching .claude/agents/pan-<type>-agent.md
   // definition. The agent frontmatter declares model, permissionMode, tools, and per-agent hooks,
-  // so we omit --dangerously-skip-permissions/--permission-mode and (for Anthropic models) --model.
+  // so we usually omit --permission-mode and (for Anthropic models) --model.
   // Non-Anthropic providers still need --model to pin the routed model id, since the
   // frontmatter `model:` only accepts Anthropic identifiers.
   const agentFlag = agentType ? ` --agent ${panopticonAgentName(agentType)}` : '';
+  // When the user has opted into full bypass (PAN_YOLO=true or claude.permissionMode=bypass
+  // in config), --dangerously-skip-permissions is added on top of --agent. The agent
+  // frontmatter's permissionMode: bypassPermissions only bypasses prompts INSIDE cwd —
+  // cross-directory reads (e.g. ~/.panopticon/cliproxy/, ~/pan-tts/) still prompt without
+  // DSP. The flag is passed through ahead of --agent so it applies before frontmatter is
+  // resolved.
+  const bypassWithAgent = agentType && resolvePermissionMode() === 'bypass'
+    ? ' --dangerously-skip-permissions'
+    : '';
 
   if (provider.compatibility === 'direct') {
     if (agentType) {
-      // Anthropic direct: --agent fully replaces --model and permission flags.
-      return `claude${agentFlag}${nameFlag}`;
+      // Anthropic direct: --agent fully replaces --model. Permission flags only when in bypass.
+      return `claude${bypassWithAgent}${agentFlag}${nameFlag}`;
     }
     return `claude ${permissionFlags} --model ${model}${nameFlag}`;
   }
@@ -173,7 +182,7 @@ export async function getAgentRuntimeBaseCommand(
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
     if (agentType) {
       // CLIProxy: --agent + --model override (frontmatter model: only accepts Anthropic ids).
-      return `claude${agentFlag} --model ${resolvedModel}${nameFlag}`;
+      return `claude${bypassWithAgent}${agentFlag} --model ${resolvedModel}${nameFlag}`;
     }
     return `claude ${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
@@ -2358,7 +2367,10 @@ export function detectCrashedAgents(): AgentState[] {
 /**
  * Recover a crashed agent by restarting it with context
  */
-export async function recoverAgent(agentId: string): Promise<AgentState | null> {
+export async function recoverAgent(
+  agentId: string,
+  opts: { modelOverride?: string } = {},
+): Promise<AgentState | null> {
   const normalizedId = normalizeAgentId(agentId);
   logAgentLifecycle(normalizedId, 'recoverAgent called');
   const state = getAgentState(normalizedId);
@@ -2370,6 +2382,10 @@ export async function recoverAgent(agentId: string): Promise<AgentState | null> 
 
   // Runtime state files may lack required fields (PAN-150)
   if (!state.id) state.id = normalizedId;
+  if (opts.modelOverride) {
+    state.model = opts.modelOverride;
+    logAgentLifecycle(normalizedId, `recoverAgent: model overridden → ${opts.modelOverride}`);
+  }
   if (!state.workspace || !state.model) {
     const reason = `[agents] Cannot recover ${normalizedId}: state.json missing workspace or model`;
     console.error(reason);
@@ -2415,8 +2431,10 @@ export async function recoverAgent(agentId: string): Promise<AgentState | null> 
     }
   }
 
-  // Restart the agent with recovery context (YOLO mode - skip permissions)
-  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model, agentId, 'work', state.harness ?? 'claude-code')} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
+  // Restart the agent with recovery context. Agent type is derived from the session id:
+  // planning sessions use the planner definition; everything else uses the work definition.
+  const recoveryAgentType: PanopticonAgentType = normalizedId.startsWith('planning-') ? 'planning' : 'work';
+  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model, agentId, recoveryAgentType, state.harness ?? 'claude-code')} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
   createSession(normalizedId, state.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: normalizedId,
