@@ -8,6 +8,7 @@
 - Kimi models now launch through Claude Code directly, selecting the Kimi coding or Moonshot Anthropic endpoint from the configured key prefix.
 - Z.AI / GLM models now launch through Claude Code directly against Z.AI's Anthropic-compatible endpoint.
 - MiniMax models now launch through Claude Code directly against MiniMax's Anthropic-compatible endpoint.
+- Mimo models now launch through Claude Code directly against Xiaomi MiMo's Anthropic-compatible endpoint.
 
 ## [0.7.0] — Command Taxonomy Reorganization
 

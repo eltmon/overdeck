@@ -4,7 +4,7 @@
     "created": "2026-05-08T18:55:00Z",
     "author": "manual:opus-4.7",
     "description": "Plan for PAN-1015: Remove claudish routing in favor of direct ANTHROPIC_BASE_URL (CLIProxy only where needed). Empirically scoped 2026-05-08 \u2014 see issue body Empirical findings section.",
-    "updated": "2026-05-08T14:51:31.744Z"
+    "updated": "2026-05-08T15:00:45.230Z"
   },
   "plan": {
     "id": "pan-1015",
@@ -12,9 +12,9 @@
     "status": "active",
     "uid": "d3644941-fec5-4e25-9974-34d6a9e02902",
     "author": "manual:opus-4.7",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-05-08T18:55:00Z",
-    "updated": "2026-05-08T14:51:31.744Z",
+    "updated": "2026-05-08T15:00:45.230Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1015",
@@ -105,7 +105,7 @@
       {
         "id": "mimo-direct",
         "title": "Mimo: flip to direct (baseUrl already configured)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-08T18:55:00Z",
         "metadata": {
@@ -120,7 +120,7 @@
           {
             "id": "mimo-direct.ac1",
             "title": "PROVIDERS.mimo.compatibility === 'direct'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -128,7 +128,7 @@
           {
             "id": "mimo-direct.ac2",
             "title": "Live verification attempted (or gap documented)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -136,7 +136,7 @@
           {
             "id": "mimo-direct.ac3",
             "title": "Tests updated",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

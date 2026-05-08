@@ -79,7 +79,7 @@ describe('agents auth routing', () => {
         return { name: 'google', displayName: 'Google (Gemini)', compatibility: 'direct', authType: 'static' };
       }
       if (model.startsWith('mimo-')) {
-        return { name: 'mimo', displayName: 'MiMo', compatibility: 'claudish', authType: 'static' };
+        return { name: 'mimo', displayName: 'MiMo', compatibility: 'direct', authType: 'static' };
       }
       if (model.includes('/')) {
         return { name: 'openrouter', displayName: 'OpenRouter', compatibility: 'claudish', authType: 'static' };
@@ -181,9 +181,9 @@ describe('agents auth routing', () => {
     );
   });
 
-  it('launches Mimo models through claudish custom URL', async () => {
+  it('launches Mimo models directly with Claude Code', async () => {
     expect(await getAgentRuntimeBaseCommand('mimo-v2.5')).toBe(
-      'claudish -i --model https://token-plan-sgp.xiaomimimo.com/anthropic/mimo-v2.5 --dangerously-skip-permissions --permission-mode bypassPermissions'
+      'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model mimo-v2.5'
     );
   });
 

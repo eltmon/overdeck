@@ -66,7 +66,16 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
-  // ── Claudish path (OpenRouter, Mimo, …) ────────────────────────────────────
+  it('Mimo direct + Auto: no DSP, --permission-mode auto', async () => {
+    const cmd = await getAgentRuntimeBaseCommand('mimo-v2.5')
+    expect(cmd).toMatch(/^claude /)
+    expect(cmd).toMatch(/--model mimo-v2\.5/)
+    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
+    expect(cmd).not.toMatch(/bypassPermissions/)
+  })
+
+  // ── Claudish path (OpenRouter) ─────────────────────────────────────────────
 
   it('Claudish-routed model + Auto: REFUSED (no silent fallback to bypass)', async () => {
     await expect(getAgentRuntimeBaseCommand('qwen/qwen3.6-plus:free')).rejects.toThrow(
@@ -84,7 +93,6 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     // Sample one real model from each remaining claudish-routed provider in providers.ts.
     const claudishModels = [
       'qwen/qwen3.6-plus:free',
-      'mimo-v2.5',
     ]
     for (const m of claudishModels) {
       await expect(

@@ -75,9 +75,17 @@ describe('providers', () => {
     });
   });
 
-  it('returns ANTHROPIC_API_KEY for Mimo custom-URL claudish routing', () => {
+  it('routes Mimo through its direct Anthropic-compatible endpoint', () => {
+    expect(PROVIDERS.mimo.compatibility).toBe('direct');
     expect(getProviderEnv(PROVIDERS.mimo, 'sk-mimo-test')).toEqual({
-      ANTHROPIC_API_KEY: 'sk-mimo-test',
+      ANTHROPIC_BASE_URL: 'https://token-plan-sgp.xiaomimimo.com/anthropic',
+      ANTHROPIC_AUTH_TOKEN: 'sk-mimo-test',
+      API_TIMEOUT_MS: '300000',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'mimo-v2.5-pro',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'mimo-v2.5-pro',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'mimo-v2.5',
+      ANTHROPIC_SMALL_FAST_MODEL: 'mimo-v2.5',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'mimo-v2.5',
     });
   });
 

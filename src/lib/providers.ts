@@ -130,14 +130,14 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   mimo: {
     name: 'mimo',
     displayName: 'Xiaomi MiMo',
-    compatibility: 'claudish',
+    compatibility: 'direct',
     baseUrl: 'https://token-plan-sgp.xiaomimimo.com/anthropic',
     authType: 'static',
     models: ['mimo-v2.5-pro', 'mimo-v2.5'],
     haikuModel: 'mimo-v2.5',
     tierModels: { opus: 'mimo-v2.5-pro', sonnet: 'mimo-v2.5-pro', haiku: 'mimo-v2.5' },
     tested: true,
-    description: 'Route via claudish custom URL: https://token-plan-sgp.xiaomimimo.com/anthropic/<model>',
+    description: 'Route directly to Xiaomi MiMo Anthropic-compatible endpoint using MIMO_API_KEY.',
   },
 
   openrouter: {

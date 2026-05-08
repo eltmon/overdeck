@@ -414,11 +414,6 @@ export function getClaudishPrefix(model: string, authMode?: string): string {
     return `or@${model}`;
   }
 
-  // Mimo — claudish doesn't auto-detect, use custom URL syntax
-  if (model.startsWith('mimo-')) {
-    return `https://token-plan-sgp.xiaomimimo.com/anthropic/${model}`;
-  }
-
   // Other providers — return bare model (fallback to default routing)
   return model;
 }
