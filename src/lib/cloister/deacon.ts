@@ -3382,6 +3382,14 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...resumeActions);
   for (const a of resumeActions) addLog('action', a, state.patrolCycle);
 
+  // Nudge work agents that are alive-but-idle with open beads remaining.
+  // Catches the gap autoResume misses: tmux alive, status='running', Stop
+  // hook fired (idle), but no advance to the next bead (gpt-5.5 checkpoint
+  // pattern, prompt mis-interpretation, etc.).
+  const beadNudgeActions = await nudgeIdleWorkAgentsWithOpenBeads();
+  actions.push(...beadNudgeActions);
+  for (const a of beadNudgeActions) addLog('action', a, state.patrolCycle);
+
   // Detect "Invalid signature in thinking block" in active agent output (PAN-612).
   // Context compaction corrupts thinking-block signatures; the session cannot be
   // resumed. Must run before idle-suspend so we recover corrupted agents first.
@@ -4011,6 +4019,109 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
     logDeaconEvent(`cleanupOrphanedReviewSessions completed: killed ${actions.length} orphaned session(s)`);
   } else {
     logDeaconEvent(`cleanupOrphanedReviewSessions completed: no orphaned sessions found`);
+  }
+
+  return actions;
+}
+
+/**
+ * Nudge work agents that are alive-but-idle with open beads remaining.
+ *
+ * Detects the gap that autoResumeStoppedWorkAgents misses: agents whose tmux
+ * session is alive and `state.status === 'running'`, but whose Stop hook has
+ * fired (state='idle' in the runtime mirror) and have NOT advanced. The
+ * existing recovery paths only fire on `status='stopped'` (process killed)
+ * or on a downstream review failure — neither matches this case.
+ *
+ * Triggered when ALL of the following hold:
+ *   - state.status === 'running'                  (process still alive)
+ *   - phase === 'implementation' or 'review-response'
+ *   - tmux session exists                          (not orphaned)
+ *   - isAgentIdleForNudge() returns true           (Stop hook authoritative)
+ *   - bd ready -l <issueLabel> has ≥1 ready bead   (work remaining)
+ *   - last nudge older than NUDGE_COOLDOWN_MS      (don't spam)
+ *
+ * Action: send `pan tell` with a concrete imperative pointing at the next
+ * ready bead. Updates `<agentDir>/.last-bead-nudge` for cooldown.
+ *
+ * Returns a list of action descriptions for runPatrol to log.
+ */
+const BEAD_NUDGE_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+
+export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
+  const actions: string[] = [];
+  if (!existsSync(AGENTS_DIR)) return actions;
+
+  let dirs: string[];
+  try {
+    dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-'));
+  } catch { return actions; }
+
+  for (const agentId of dirs) {
+    const state = getAgentState(agentId);
+    if (!state) continue;
+    if (state.status !== 'running') continue;
+    if (state.phase !== 'implementation' && state.phase !== 'review-response') continue;
+
+    // Tmux must be alive; orphans are handled by recoverOrphanedAgents.
+    if (!await sessionExistsAsync(agentId)) continue;
+
+    // Authoritative idle signal — Stop hook fired and runtime mirror is idle.
+    // Skips agents currently mid-thought (state='active') and ones we already
+    // know are stopped/suspended.
+    if (!isAgentIdleForNudge(agentId)) continue;
+
+    // Cooldown — don't nudge the same agent more than once per BEAD_NUDGE_COOLDOWN_MS.
+    const cooldownFile = join(getAgentDir(agentId), '.last-bead-nudge');
+    if (existsSync(cooldownFile)) {
+      try {
+        const last = parseInt(readFileSync(cooldownFile, 'utf-8').trim(), 10);
+        if (!Number.isNaN(last) && Date.now() - last < BEAD_NUDGE_COOLDOWN_MS) continue;
+      } catch { /* fall through and nudge */ }
+    }
+
+    // Open beads for THIS issue?
+    const issueLabel = state.issueId.toLowerCase();
+    let openBeads: string[] = [];
+    try {
+      const { stdout } = await execAsync(`bd ready -l ${issueLabel}`, {
+        cwd: state.workspace,
+        encoding: 'utf-8',
+        timeout: 10_000,
+      });
+      // bd ready output: lines starting with "○ workspace-XXXX ● ... pan-NNN: title"
+      openBeads = stdout
+        .split('\n')
+        .filter(l => /^[○◐]\s+workspace-/i.test(l.trim()))
+        .map(l => l.trim());
+    } catch (err: any) {
+      logDeaconEvent(`nudgeIdleWorkAgentsWithOpenBeads: ${agentId} bd ready failed: ${err?.message ?? err}`);
+      continue;
+    }
+    if (openBeads.length === 0) continue;
+
+    // Build the nudge: tell the agent what's next, do not just ping.
+    const firstBead = openBeads[0]?.replace(/^[○◐]\s+/, '').slice(0, 200) ?? '';
+    const message = [
+      `Deacon idle-nudge: your tmux is alive but Claude is idle and you have ${openBeads.length} open bead(s) remaining for ${state.issueId}.`,
+      ``,
+      `Next ready bead: ${firstBead}`,
+      ``,
+      `Continue the per-bead workflow without asking — claim it (\`bd update <bead-id> --claim\`), implement, commit, close. ` +
+      `Inspection is conditional on metadata.requiresInspection (default false; check the plan item before deciding to call \`pan inspect\`). ` +
+      `Do NOT end your turn with a multi-paragraph summary; just advance to the next bead.`,
+    ].join('\n');
+
+    try {
+      const { messageAgent } = await import('../agents.js');
+      await messageAgent(agentId, message);
+      writeFileSync(cooldownFile, String(Date.now()), 'utf-8');
+      const action = `Nudged idle ${agentId} (${state.issueId}) — ${openBeads.length} open bead(s)`;
+      actions.push(action);
+      logDeaconEvent(`nudgeIdleWorkAgentsWithOpenBeads: ${action}`);
+    } catch (err: any) {
+      logDeaconEvent(`nudgeIdleWorkAgentsWithOpenBeads: ${agentId} messageAgent failed: ${err?.message ?? err}`);
+    }
   }
 
   return actions;
