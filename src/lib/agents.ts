@@ -190,10 +190,23 @@ export async function getAgentRuntimeBaseCommand(
   // Claudish wrapper path — claudish ≤7.0.3 flag passthrough is broken (Commander.js
   // rejects --agent, --name as unknown). Skip Claude Code-specific flags; model +
   // permissions are set directly, workspace CLAUDE.md + vBRIEF provide agent context.
-  // Force bypass: `--permission-mode auto` is a Claude Code research-preview feature
-  // and doesn't translate through claudish to MiniMax/Kimi/GLM/OpenRouter/Mimo backends.
+  //
+  // Permission mode handling: claudish does NOT support `--permission-mode auto`
+  // (it's a Claude Code research-preview flag that the claudish wrapper cannot
+  // proxy). When the user has set Auto mode, we MUST refuse the spawn rather than
+  // silently fall back to bypass. Enterprise users rely on Auto being honored;
+  // a silent flip to --dangerously-skip-permissions is a P0 trust violation.
+  const routedMode = resolvePermissionMode();
+  if (routedMode === 'auto') {
+    throw new Error(
+      `Provider "${provider.displayName}" routes through claudish, which does not support permissionMode=auto. ` +
+      `Either: (1) switch the dashboard Settings → Permissions setting to "Bypass" (acknowledging that Kimi/MiniMax/GLM/OpenRouter/Mimo require unmoderated execution); ` +
+      `(2) pick a Claude or GPT model instead (those honor Auto mode through the native Claude Code classifier or CLIProxy); ` +
+      `or (3) wait for PAN-1015 to land, which removes claudish in favor of CLIProxy for all providers.`,
+    );
+  }
   const routedModel = await getLaunchModelForModel(model);
-  const claudishFlags = getClaudePermissionFlagsString('bypass');
+  const claudishFlags = getClaudePermissionFlagsString(routedMode);
   return `claudish -i --model ${routedModel} ${claudishFlags}`;
 }
 

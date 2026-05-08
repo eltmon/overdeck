@@ -734,12 +734,26 @@ async function spawnConversationSession(
       throw new Error('Invalid model name');
     }
     runtimeCommand = await getAgentRuntimeBaseCommand(model);
-    // Defensive: agent-frontmatter branches in getAgentRuntimeBaseCommand intentionally
-    // omit permission flags; ensure the resolved mode's flags are present here.
+    // Defensive permission-flag injection.
+    // getAgentRuntimeBaseCommand already emits the correct flags for every code path
+    // (direct/CLIProxy/--agent/claudish), so in a healthy build the appends below are
+    // no-ops. They exist as a belt-and-braces guard for future code paths that might
+    // forget to thread the resolved mode through. The critical safety property:
+    // NEVER add --dangerously-skip-permissions when the resolved mode is 'auto'.
+    // Enterprise users rely on Auto being honored; a silent escalation to bypass is
+    // a P0 trust violation.
     const mode = resolvePermissionMode();
     if (mode === 'auto') {
       if (!runtimeCommand.includes('--permission-mode')) {
         runtimeCommand = `${runtimeCommand} --permission-mode auto`;
+      }
+      // Refuse to run with mixed signals: if the base command already contains DSP
+      // while the user explicitly chose Auto, that is a substrate bug that must
+      // surface, not be silently downgraded.
+      if (runtimeCommand.includes('--dangerously-skip-permissions')) {
+        throw new Error(
+          `Refusing to spawn ${tmuxSession}: resolved mode is 'auto' but base command for model "${model}" contains --dangerously-skip-permissions. This is a substrate bug; do not silently bypass user Settings.`,
+        );
       }
     } else {
       if (!runtimeCommand.includes('--dangerously-skip-permissions')) {
