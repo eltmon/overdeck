@@ -221,7 +221,7 @@ void cleanupOrphanedConversationAttachments();
 console.log('[panopticon] Attachment cleanup started');
 
 // Start TTS summarizer (off by default — only starts if tts.summarizer.enabled=true)
-startTtsSummarizer();
+void startTtsSummarizer().catch(err => console.warn('[tts-summarizer] start failed:', err));
 
 // Start CLIProxy watchdog — auto-restarts the sidecar if it crashes
 startCliproxyWatchdog();

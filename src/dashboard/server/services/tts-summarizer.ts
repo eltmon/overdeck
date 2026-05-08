@@ -10,7 +10,7 @@
  */
 
 import { loadConfig } from '../../../lib/config-yaml.js';
-import { getEventStore, type StoredEvent } from '../event-store.js';
+import { getEventStore, initEventStore, type StoredEvent } from '../event-store.js';
 import { emitActivityTts } from '../../../lib/activity-logger.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -176,7 +176,7 @@ function onEvent(event: StoredEvent): void {
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 
-export function startTtsSummarizer(): void {
+export async function startTtsSummarizer(): Promise<void> {
   if (state.timer !== null) return; // Already running
 
   const { config } = loadConfig();
@@ -185,6 +185,10 @@ export function startTtsSummarizer(): void {
     return;
   }
 
+  // Ensure the shared event store is fully initialized before subscribing —
+  // main.ts calls startTtsSummarizer() synchronously at module top-level,
+  // which fires before any route handler has triggered the lazy init.
+  await initEventStore();
   const store = getEventStore();
   state.unsubscribe = store.subscribe(onEvent);
 
