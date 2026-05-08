@@ -31,7 +31,10 @@ export function saveSnapshotToCache(snapshot: DashboardSnapshot): void {
     localStorage.setItem(CACHE_KEY, serialize(snapshot))
   } catch (err) {
     // Retry with issues stripped if quota was exceeded
-    if (err instanceof DOMException && err.name === 'QuotaExceededError') {
+    const isQuotaError =
+      (err instanceof DOMException || err instanceof Error) &&
+      (err as Error).name === 'QuotaExceededError'
+    if (isQuotaError) {
       try {
         const stripped: DashboardSnapshot = { ...snapshot, issues: [] }
         localStorage.setItem(CACHE_KEY, serialize(stripped))
@@ -53,7 +56,7 @@ export function loadSnapshotFromCache(): DashboardSnapshot | null {
     if (!raw) return null
 
     const entry = JSON.parse(raw) as CacheEntry
-    if (!entry?.data?.sequence) return null
+    if (entry?.data?.sequence == null) return null
 
     return entry.data
   } catch {

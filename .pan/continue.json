@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1025",
   "created": "2026-05-07T21:00:00.000Z",
-  "updated": "2026-05-08T03:34:37.224Z",
+  "updated": "2026-05-08T05:21:30.000Z",
   "gitState": {
     "branch": "feature/pan-1025",
     "sha": "1348546",
@@ -28,6 +28,16 @@
       "id": "D4",
       "summary": "Removed the MAX_BYTES constant after TS6133 build failure — it was unused after removing the preemptive check. The effective cap is now the browser's localStorage quota.",
       "recordedAt": "2026-05-07T21:08:00.000Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Broaden QuotaExceededError detection to accept plain Error objects by name, so stripped-snapshot fallback still runs outside true DOMException environments.",
+      "recordedAt": "2026-05-08T05:21:30.000Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Fix the Unix socket permission race at the source: wait for Bun.serve to materialize the socket before chmod, then verify mode 0o600 instead of relying on a test-side retry loop.",
+      "recordedAt": "2026-05-08T05:21:30.000Z"
     }
   ],
   "hazards": [
@@ -38,7 +48,7 @@
     }
   ],
   "resumePoint": {
-    "description": "Implementation complete. Both beads closed, all tests pass (990), build passes. Ready for pan done.",
+    "description": "Review follow-up fixes are implemented and verified locally (typecheck, lint, full npm test). Next step is commit/review resubmission via /rebase-and-submit.",
     "beadId": null,
     "filesToRead": []
   },
@@ -81,6 +91,12 @@
       "timestamp": "2026-05-08T03:34:37.223Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-05-08T05:21:30.000Z",
+      "reason": "fix",
+      "note": "Addressed review/verification follow-ups: broadened QuotaExceededError detection in snapshotCache, fixed sequence=0 cache loading, updated stale test comment, removed unused config-yaml mock from agent-state-harness tests, and moved the panopticon-bridge socket permission retry into production code by waiting for socket creation before chmod. Verified with targeted Vitest suites plus full typecheck, lint, and npm test.",
+      "agentModel": "claude-opus-4-5"
     }
   ],
   "feedback": []

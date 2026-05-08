@@ -32,9 +32,15 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { timingSafeEqual } from 'node:crypto';
-import { chmod, mkdir, unlink, appendFile } from 'node:fs/promises';
-import { existsSync, unlinkSync } from 'node:fs';
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  type CallToolResult,
+  type ListToolsResult,
+  type Tool,
+} from '@modelcontextprotocol/sdk/types.js';
+import { chmod, mkdir, unlink, appendFile, stat } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -464,7 +470,22 @@ async function startUnixListener(mcp: Server, agentId: string): Promise<UnixHttp
     },
   });
 
+  // Bun.serve creates the Unix socket asynchronously. Poll until it exists,
+  // then chmod and verify the mode landed to avoid races with consumers.
+  for (let i = 0; i < 50; i++) {
+    if (existsSync(socketPath)) break;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  if (!existsSync(socketPath)) {
+    throw new Error(`panopticon-bridge: Unix socket ${socketPath} did not appear after 2.5s`);
+  }
   await chmod(socketPath, 0o600);
+  const socketStat = await stat(socketPath);
+  if ((socketStat.mode & 0o777) !== 0o600) {
+    throw new Error(
+      `panopticon-bridge: Unix socket ${socketPath} mode is ${(socketStat.mode & 0o777).toString(8)} instead of 600 after chmod`
+    );
+  }
   return httpServer;
 }
 

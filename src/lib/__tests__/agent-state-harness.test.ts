@@ -1,12 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-
-vi.mock('../config-yaml.js', () => ({
-  loadConfig: vi.fn(() => ({
-    config: {
-      claude: { permissionMode: 'auto' },
-    },
-  })),
-}));
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import { getAgentRuntimeBaseCommand } from '../agents.js'
 

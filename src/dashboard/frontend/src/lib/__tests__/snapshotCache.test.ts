@@ -92,7 +92,8 @@ describe('saveSnapshotToCache', () => {
   })
 
   it('preserves full snapshot when it fits within localStorage quota', () => {
-    // 120,000 issue entries ≈ 2.5MB serialized — well under the 8MB cap
+    // 120,000 issue entries ≈ 2.5MB serialized — should fit in jsdom's
+    // unbounded localStorage without triggering QuotaExceededError
     const bigSnapshot = makeSnapshot(1, 120_000)
     saveSnapshotToCache(bigSnapshot)
 
