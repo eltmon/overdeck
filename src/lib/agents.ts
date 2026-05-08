@@ -161,17 +161,6 @@ export async function getAgentRuntimeBaseCommand(
     ? ' --dangerously-skip-permissions'
     : '';
 
-  if (provider.compatibility === 'direct') {
-    if (agentType) {
-      // Anthropic direct: --agent fully replaces --model. Non-Anthropic
-      // direct providers still need --model because agent frontmatter model:
-      // only accepts Anthropic identifiers.
-      const modelFlag = provider.name === 'anthropic' ? '' : ` --model ${model}`;
-      return `claude${bypassWithAgent}${agentFlag}${modelFlag}${nameFlag}`;
-    }
-    return `claude ${permissionFlags} --model ${model}${nameFlag}`;
-  }
-
   // OpenAI subscription → local CLIProxyAPI sidecar exposes an
   // Anthropic-compatible /v1/messages endpoint, so Claude Code can drive
   // gpt-* models directly via ANTHROPIC_BASE_URL (no claudish wrapper).
@@ -186,10 +175,14 @@ export async function getAgentRuntimeBaseCommand(
     return `claude ${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
 
-  throw new Error(
-    `Provider "${provider.displayName}" is not configured for direct Claude Code routing. ` +
-    `Use a supported direct provider or CLIProxy-backed subscription model.`,
-  );
+  if (agentType) {
+    // Anthropic direct: --agent fully replaces --model. Non-Anthropic
+    // direct providers still need --model because agent frontmatter model:
+    // only accepts Anthropic identifiers.
+    const modelFlag = provider.name === 'anthropic' ? '' : ` --model ${model}`;
+    return `claude${bypassWithAgent}${agentFlag}${modelFlag}${nameFlag}`;
+  }
+  return `claude ${permissionFlags} --model ${model}${nameFlag}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
@@ -286,16 +279,6 @@ export async function getProviderExportsForModel(model: string): Promise<string>
   const unsetLines = PROVIDER_ENV_KEYS.map(key => `unset ${key}`);
   const exportLines = Object.entries(envVars)
     .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`);
-
-  // claudish bundles an older Claude Code that crashes on some model metadata.
-  // Point CLAUDE_PATH at the system binary so claudish uses the global install.
-  const provider = getProviderForModel(model as ModelId);
-  if (provider.compatibility === 'claudish') {
-    try {
-      const claudePath = execSync('which claude', { encoding: 'utf8' }).trim();
-      if (claudePath) exportLines.push(`export CLAUDE_PATH="${claudePath}"`);
-    } catch { /* system claude not found — claudish will use its bundled copy */ }
-  }
 
   return [...unsetLines, ...exportLines].join('\n') + '\n';
 }

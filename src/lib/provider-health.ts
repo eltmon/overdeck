@@ -181,7 +181,7 @@ export function formatProbeError(provider: ProviderConfig, model: string, result
 /**
  * Pre-flight validation for a model before agent spawn.
  * Throws with a descriptive message if the provider is unhealthy.
- * Skips probing for Anthropic and claudish-routed providers.
+ * Skips probing for Anthropic and providers with separate local sidecar checks.
  *
  * If apiKey is not provided, resolves it from config.yaml.
  */
@@ -191,8 +191,8 @@ export async function validateProviderHealth(
 ): Promise<void> {
   const provider = getProviderForModel(model as ModelId);
 
-  // Skip: Anthropic native, claudish-routed (openai/google have their own checks)
-  if (provider.name === 'anthropic' || provider.compatibility === 'claudish') {
+  // Skip: Anthropic native and OpenAI subscription routing have their own checks.
+  if (provider.name === 'anthropic' || provider.name === 'openai') {
     return;
   }
 

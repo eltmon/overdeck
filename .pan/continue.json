@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1015",
   "created": "2026-05-08T00:56:13.011Z",
-  "updated": "2026-05-08T16:10:09.988Z",
+  "updated": "2026-05-08T16:31:35.494Z",
   "gitState": {
     "branch": "feature/pan-1015",
-    "sha": "d756672c5",
+    "sha": "c1195b5d9",
     "dirty": true,
     "clean": false
   },
@@ -49,6 +49,11 @@
       "id": "D8",
       "summary": "Claudish is removed from setup surfaces: lazy prereqs, pan install, and pan sync no longer check, install, or log claudish. OpenAI auth now reads Codex auth directly and only bridges Codex credentials into CLIProxy.",
       "recordedAt": "2026-05-08T16:10:09.988Z"
+    },
+    {
+      "id": "D9",
+      "summary": "ProviderCompatibility is collapsed to direct-only configuration. OpenAI remains a direct provider because subscription launches are handled through CLIProxy, while API-key launches are rejected before env construction.",
+      "recordedAt": "2026-05-08T16:31:35.494Z"
     }
   ],
   "hazards": [
@@ -64,13 +69,14 @@
     }
   ],
   "resumePoint": {
-    "description": "Implemented workspace-xz9q: claudish is no longer installed by prereq registry, pan install, or pan sync; openai-auth no longer reads/writes ~/.claudish credentials and bridges Codex auth only to CLIProxy. Commit and close the bead; inspection is skipped because metadata.requiresInspection=false.",
-    "beadId": "workspace-xz9q",
+    "description": "Implemented workspace-aei6: ProviderCompatibility export and claudish helper functions are removed, OpenAI is direct/CLIProxy-only, provider env construction no longer has a claudish branch, and the inspector strips legacy prefixes without displaying claudish badges. Commit and close the bead; inspection is skipped because metadata.requiresInspection=false.",
+    "beadId": "workspace-aei6",
     "filesToRead": [
-      "src/lib/prereqs/registry.ts",
-      "src/cli/commands/install.ts",
-      "src/cli/commands/sync.ts",
-      "src/lib/openai-auth.ts",
+      "src/lib/providers.ts",
+      "src/lib/agents.ts",
+      "src/lib/provider-health.ts",
+      "src/dashboard/frontend/src/components/inspector/utils.ts",
+      "tests/lib/providers.test.ts",
       ".pan/spec.vbrief.json",
       ".pan/continue.json",
       "CHANGELOG.md"
@@ -155,9 +161,15 @@
       "reason": "bead-complete",
       "note": "Implemented workspace-xz9q. Removed claudish from lazy prerequisite registration and auto-install support, removed --skip-claudish and claudish checks/install from pan install, removed claudish install/version handling from pan sync, and simplified openai-auth to read Codex auth directly while only bridging to CLIProxy. Verified npm run typecheck, npm run lint, affected auth/provider Vitest files, and rg confirms the affected setup/auth files no longer reference claudish.",
       "agentModel": "agent:claude-opus-4.7"
+    },
+    {
+      "timestamp": "2026-05-08T16:31:35.494Z",
+      "reason": "bead-complete",
+      "note": "Implemented workspace-aei6. Removed the ProviderCompatibility union export, made provider configs direct-only, deleted requiresClaudish/getClaudishProviders/needsClaudish, removed the claudish env branch from getProviderEnv, removed the CLAUDE_PATH-for-claudish export path, updated provider health skip logic, and dropped claudish prefix badges from inspector model names. Verified npm run typecheck, npm run lint, affected provider/auth/permission Vitest files, and rg shows no removed provider compatibility helpers remain in src/packages.",
+      "agentModel": "agent:claude-opus-4.7"
     }
   ],
   "feedback": [],
   "agentModel": "agent:claude-opus-4.7",
-  "sequence": 6
+  "sequence": 7
 }

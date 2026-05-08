@@ -1,9 +1,8 @@
 /**
- * Provider Configuration and Compatibility
+ * Provider Configuration
  *
- * Defines which LLM providers are compatible with Claude Code's API format.
- * - Direct providers: Implement Anthropic-compatible API (no router needed)
- * - Claudish providers: Route through claudish for provider-prefixed model selection
+ * Defines LLM providers that Panopticon launches through Claude Code directly
+ * or through local Anthropic-compatible sidecars such as CLIProxyAPI.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
@@ -11,13 +10,6 @@ import { join } from 'path';
 import type { ModelId, AnthropicModel, OpenAIModel, GoogleModel, KimiModel, MimoModel } from './settings.js';
 
 export type ProviderName = 'anthropic' | 'kimi' | 'openai' | 'google' | 'minimax' | 'zai' | 'mimo' | 'openrouter';
-
-/**
- * Provider compatibility types
- * - direct: Anthropic-compatible API, use ANTHROPIC_BASE_URL directly
- * - claudish: Route via claudish (provider@model syntax, supports OAuth subscriptions)
- */
-export type ProviderCompatibility = 'direct' | 'claudish';
 
 /**
  * Provider configuration
@@ -33,7 +25,7 @@ export type ProviderAuthType = 'static' | 'credential-file';
 export interface ProviderConfig {
   name: ProviderName;
   displayName: string;
-  compatibility: ProviderCompatibility;
+  compatibility: 'direct';
   baseUrl?: string; // For direct providers
   authType?: ProviderAuthType; // Defaults to 'static'
   credentialFile?: string; // Path to credential file (for 'credential-file' auth)
@@ -84,11 +76,11 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   openai: {
     name: 'openai',
     displayName: 'OpenAI',
-    compatibility: 'claudish',
+    compatibility: 'direct',
     models: ['gpt-5.5', 'gpt-5.5-mini', 'gpt-5.5-nano', 'gpt-5.5-pro', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.4-nano', 'gpt-5.4-pro', 'o3', 'o4-mini'],
     tierModels: { opus: 'gpt-5.5-pro', sonnet: 'gpt-5.5', haiku: 'gpt-5.5-mini' },
     tested: true,
-    description: 'Route via claudish: oai@model (API key) or cx@model (ChatGPT OAuth subscription)',
+    description: 'Route through the local CLIProxyAPI Anthropic-compatible sidecar using Codex/ChatGPT subscription auth.',
   },
 
   google: {
@@ -201,31 +193,10 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
 }
 
 /**
- * Check if a provider requires claudish routing
- */
-export function requiresClaudish(provider: ProviderName): boolean {
-  return PROVIDERS[provider].compatibility === 'claudish';
-}
-
-/**
- * Get all providers that require claudish routing
- */
-export function getClaudishProviders(): ProviderConfig[] {
-  return Object.values(PROVIDERS).filter(p => p.compatibility === 'claudish');
-}
-
-/**
  * Get all direct-compatible providers
  */
 export function getDirectProviders(): ProviderConfig[] {
-  return Object.values(PROVIDERS).filter(p => p.compatibility === 'direct');
-}
-
-/**
- * Check if any configured providers need claudish installed.
- */
-export function needsClaudish(apiKeys: { openai?: string; google?: string }): boolean {
-  return !!(apiKeys.openai || apiKeys.google);
+  return Object.values(PROVIDERS);
 }
 
 /**
@@ -235,98 +206,64 @@ export function getProviderEnv(
   provider: ProviderConfig,
   apiKey: string
 ): Record<string, string> {
-  if (provider.compatibility === 'direct') {
-    // Direct providers use ANTHROPIC_BASE_URL
-    const env: Record<string, string> = {};
-
-    if (provider.name === 'kimi') {
-      env.ANTHROPIC_BASE_URL = getKimiAnthropicBaseUrl(apiKey);
-    } else if (provider.baseUrl) {
-      env.ANTHROPIC_BASE_URL = provider.baseUrl;
-    }
-
-    if (provider.name !== 'anthropic') {
-      if (provider.authType === 'credential-file') {
-        // Credential-file providers use apiKeyHelper for dynamic token refresh.
-        // We still need an initial ANTHROPIC_AUTH_TOKEN for the first request,
-        // but apiKeyHelper (configured via setupCredentialFileAuth) will keep it fresh.
-        env.ANTHROPIC_AUTH_TOKEN = apiKey;
-        // Refresh token every 60 seconds (kimi-cli refreshes credential file automatically)
-        env.CLAUDE_CODE_API_KEY_HELPER_TTL_MS = '60000';
-      } else {
-        // Static providers use a long-lived API key
-        env.ANTHROPIC_AUTH_TOKEN = apiKey;
-      }
-    }
-
-    // MiniMax, Z.AI, and MiMo recommend longer timeouts
-    if (provider.name === 'minimax' || provider.name === 'zai' || provider.name === 'mimo') {
-      env.API_TIMEOUT_MS = '300000';
-    }
-
-    // Non-Anthropic providers don't support claude-haiku-4-5-20251001.
-    // Tell Claude Code to use the provider's small/fast model instead
-    // for Explore agents and other haiku-dependent features.
-    if (provider.haikuModel) {
-      env.ANTHROPIC_DEFAULT_HAIKU_MODEL = provider.haikuModel;
-    }
-
-    // Inject subagent model env vars so Claude Code spawns subagents
-    // (Explorer, Plan, general-purpose) with model IDs the provider knows.
-    if (provider.tierModels) {
-      if (provider.tierModels.opus) {
-        env.ANTHROPIC_DEFAULT_OPUS_MODEL = provider.tierModels.opus;
-      }
-      if (provider.tierModels.sonnet) {
-        env.ANTHROPIC_DEFAULT_SONNET_MODEL = provider.tierModels.sonnet;
-      }
-      if (provider.tierModels.haiku) {
-        env.ANTHROPIC_DEFAULT_HAIKU_MODEL = provider.tierModels.haiku;
-        env.ANTHROPIC_SMALL_FAST_MODEL = provider.tierModels.haiku;
-        env.CLAUDE_CODE_SUBAGENT_MODEL = provider.tierModels.haiku;
-      }
-    }
-
-    return env;
-  } else {
-    // Claudish-backed providers are launched via the `claudish` wrapper, not
-    // through a long-lived localhost proxy. For subscription/OAuth-backed
-    // models no extra env is required; for direct API-key mode, pass the
-    // provider-native key env that claudish expects.
-    if (apiKey === 'subscription-oauth') {
-      return {};
-    }
-
-    if (provider.name === 'openai') {
-      return { OPENAI_API_KEY: apiKey };
-    }
-
-    if (provider.name === 'google') {
-      return { GEMINI_API_KEY: apiKey };
-    }
-
-    if (provider.name === 'kimi') {
-      return { KIMI_CODING_API_KEY: apiKey };
-    }
-
-    if (provider.name === 'minimax') {
-      return { MINIMAX_API_KEY: apiKey };
-    }
-
-    if (provider.name === 'zai') {
-      return { ZHIPU_API_KEY: apiKey };
-    }
-
-    if (provider.name === 'mimo') {
-      return { ANTHROPIC_API_KEY: apiKey };
-    }
-
-    if (provider.name === 'openrouter') {
-      return { OPENROUTER_API_KEY: apiKey };
-    }
-
+  if (provider.name === 'openai') {
+    // OpenAI never receives provider-native or Anthropic token env here.
+    // getProviderEnvForModel routes subscription launches through CLIProxy and
+    // rejects API-key launches before env construction.
     return {};
   }
+
+  const env: Record<string, string> = {};
+
+  if (provider.name === 'kimi') {
+    env.ANTHROPIC_BASE_URL = getKimiAnthropicBaseUrl(apiKey);
+  } else if (provider.baseUrl) {
+    env.ANTHROPIC_BASE_URL = provider.baseUrl;
+  }
+
+  if (provider.name !== 'anthropic') {
+    if (provider.authType === 'credential-file') {
+      // Credential-file providers use apiKeyHelper for dynamic token refresh.
+      // We still need an initial ANTHROPIC_AUTH_TOKEN for the first request,
+      // but apiKeyHelper (configured via setupCredentialFileAuth) will keep it fresh.
+      env.ANTHROPIC_AUTH_TOKEN = apiKey;
+      // Refresh token every 60 seconds (kimi-cli refreshes credential file automatically)
+      env.CLAUDE_CODE_API_KEY_HELPER_TTL_MS = '60000';
+    } else {
+      // Static providers use a long-lived API key
+      env.ANTHROPIC_AUTH_TOKEN = apiKey;
+    }
+  }
+
+  // MiniMax, Z.AI, and MiMo recommend longer timeouts
+  if (provider.name === 'minimax' || provider.name === 'zai' || provider.name === 'mimo') {
+    env.API_TIMEOUT_MS = '300000';
+  }
+
+  // Non-Anthropic providers don't support claude-haiku-4-5-20251001.
+  // Tell Claude Code to use the provider's small/fast model instead
+  // for Explore agents and other haiku-dependent features.
+  if (provider.haikuModel) {
+    env.ANTHROPIC_DEFAULT_HAIKU_MODEL = provider.haikuModel;
+  }
+
+  // Inject subagent model env vars so Claude Code spawns subagents
+  // (Explorer, Plan, general-purpose) with model IDs the provider knows.
+  if (provider.tierModels) {
+    if (provider.tierModels.opus) {
+      env.ANTHROPIC_DEFAULT_OPUS_MODEL = provider.tierModels.opus;
+    }
+    if (provider.tierModels.sonnet) {
+      env.ANTHROPIC_DEFAULT_SONNET_MODEL = provider.tierModels.sonnet;
+    }
+    if (provider.tierModels.haiku) {
+      env.ANTHROPIC_DEFAULT_HAIKU_MODEL = provider.tierModels.haiku;
+      env.ANTHROPIC_SMALL_FAST_MODEL = provider.tierModels.haiku;
+      env.CLAUDE_CODE_SUBAGENT_MODEL = provider.tierModels.haiku;
+    }
+  }
+
+  return env;
 }
 
 /**

@@ -4,7 +4,7 @@
     "created": "2026-05-08T18:55:00Z",
     "author": "manual:opus-4.7",
     "description": "Plan for PAN-1015: Remove claudish routing in favor of direct ANTHROPIC_BASE_URL (CLIProxy only where needed). Empirically scoped 2026-05-08 \u2014 see issue body Empirical findings section.",
-    "updated": "2026-05-08T16:10:09.988Z"
+    "updated": "2026-05-08T16:31:35.494Z"
   },
   "plan": {
     "id": "pan-1015",
@@ -12,9 +12,9 @@
     "status": "active",
     "uid": "d3644941-fec5-4e25-9974-34d6a9e02902",
     "author": "manual:opus-4.7",
-    "sequence": 7,
+    "sequence": 8,
     "created": "2026-05-08T18:55:00Z",
-    "updated": "2026-05-08T16:10:09.988Z",
+    "updated": "2026-05-08T16:31:35.494Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1015",
@@ -489,7 +489,7 @@
       {
         "id": "collapse-provider-compatibility",
         "title": "Collapse ProviderCompatibility union",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-08T18:55:00Z",
         "metadata": {
@@ -504,7 +504,7 @@
           {
             "id": "collapse-provider-compatibility.ac1",
             "title": "ProviderCompatibility union simplified or removed per gemini decision",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -512,7 +512,7 @@
           {
             "id": "collapse-provider-compatibility.ac2",
             "title": "Helpers removed or narrowed (no dead code)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -520,7 +520,7 @@
           {
             "id": "collapse-provider-compatibility.ac3",
             "title": "Frontend inspector badge updated",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -528,7 +528,7 @@
           {
             "id": "collapse-provider-compatibility.ac4",
             "title": "No orphaned imports of removed types",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

@@ -2,14 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, getProviderEnv, PROVIDERS } from '../../src/lib/providers.js';
 
 describe('providers', () => {
-  it('returns no proxy env for OpenAI subscription routing through claudish', () => {
+  it('returns no provider-native env for OpenAI subscription routing through CLIProxy', () => {
     expect(getProviderEnv(PROVIDERS.openai, 'subscription-oauth')).toEqual({});
   });
 
-  it('returns OPENAI_API_KEY for direct OpenAI key-based claudish routing', () => {
-    expect(getProviderEnv(PROVIDERS.openai, 'sk-test-123')).toEqual({
-      OPENAI_API_KEY: 'sk-test-123',
-    });
+  it('does not expose OpenAI API keys through provider env construction', () => {
+    expect(getProviderEnv(PROVIDERS.openai, 'sk-test-123')).toEqual({});
   });
 
   it('returns Anthropic-compatible env for Google direct routing', () => {
