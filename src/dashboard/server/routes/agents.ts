@@ -1047,7 +1047,10 @@ export const bodyToEvent = (
         timestamp,
         payload: {
           agentId,
-          reply,
+          reply: {
+            ...reply,
+            reportedAt: timestamp,
+          },
         },
       };
     }

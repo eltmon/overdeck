@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-987",
   "created": "2026-05-07T18:25:44Z",
-  "updated": "2026-05-08T08:03:26Z",
+  "updated": "2026-05-08T08:09:42Z",
   "gitState": {
     "branch": "feature/pan-987",
-    "sha": "93e144768",
+    "sha": "241ab19cd",
     "dirty": true
   },
   "decisions": [
@@ -58,6 +58,11 @@
       "id": "D10",
       "summary": "After rebasing onto `origin/main`, verification exposed a synced-fixture mismatch rather than a runtime bug: the committed skill inventory was missing the intentionally-added `pipeline-status` skill. I fixed the root cause by updating the plain-text fixture to match the actual checked-in skill surface so future skill additions remain explicit in diffs.",
       "recordedAt": "2026-05-08T08:03:26Z"
+    },
+    {
+      "id": "D11",
+      "summary": "The next verification failure exposed a real schema drift in the PAN-800 channel-reply path: `bodyToEvent()` emitted `agent.channel_reply`, but the shared `DomainEvent` union on the contracts side no longer included that event shape, and the reply payload also needed `reportedAt`. I fixed the contracts schema and the server-side event assembly together so decode, reducers, and heartbeat ingestion stay aligned.",
+      "recordedAt": "2026-05-08T08:09:42Z"
     }
   ],
   "hazards": [
@@ -78,11 +83,12 @@
     }
   ],
   "resumePoint": {
-    "description": "Second verification retry is fixed locally. Next step: commit the synced-skills fixture update and continue-state note, then resubmit through `pan review request PAN-987 -m \"Fixed test\"` after the branch is pushed.",
+    "description": "Third verification retry is fixed locally. Next step: commit the channel-reply schema alignment and continue-state note, then push and resubmit through `pan review request PAN-987 -m \"Fixed test\"`.",
     "beadId": "workspace-kmfs",
     "filesToRead": [
-      "tests/fixtures/synced-skills.txt",
-      ".pan/feedback/002-verification-gate-failed.md",
+      "packages/contracts/src/events.ts",
+      "src/dashboard/server/routes/agents.ts",
+      "tests/contracts/heartbeat-ingestion.test.ts",
       ".pan/continue.json"
     ]
   },
@@ -133,6 +139,12 @@
       "timestamp": "2026-05-08T08:03:26Z",
       "reason": "manual",
       "note": "After manually rebasing the branch onto `origin/main` and force-pushing per user instruction, the next verification attempt failed on `tests/fixtures/synced-skills.test.ts`. The failure was a real fixture drift: `skills/pipeline-status/SKILL.md` exists in the repo, but `tests/fixtures/synced-skills.txt` did not include it. I updated the committed fixture, reran the failing fixture test, and confirmed `npm run typecheck` still passes before the next resubmission.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-08T08:09:42Z",
+      "reason": "manual",
+      "note": "The following verification retry failed in `tests/contracts/heartbeat-ingestion.test.ts` because the PAN-800 `channel_reply` path had drifted in two places after rebasing: the server route assembled an `agent.channel_reply` event without `reportedAt`, and the shared `DomainEvent` union no longer declared `AgentChannelReplyEvent` at all. I restored the event to the contracts schema, stamped `reportedAt` from the heartbeat timestamp in `bodyToEvent()`, extended the regression test to assert that field, and reran the failing heartbeat suite with `npm run typecheck` green.",
       "agentModel": "claude-opus-4-7"
     }
   ],

@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import {
   Activity,
+  AgentChannelReply,
   AgentId,
   AgentPhase,
   AgentResolution,
@@ -178,6 +179,17 @@ export const AgentMessageReceivedEvent = Schema.Struct({
   }),
 })
 export type AgentMessageReceivedEvent = typeof AgentMessageReceivedEvent.Type
+
+export const AgentChannelReplyEvent = Schema.Struct({
+  type: Schema.Literal("agent.channel_reply"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    reply: AgentChannelReply,
+  }),
+})
+export type AgentChannelReplyEvent = typeof AgentChannelReplyEvent.Type
 
 export const AgentModelSetEvent = Schema.Struct({
   type: Schema.Literal("agent.model_set"),
@@ -741,6 +753,7 @@ export const DomainEvent = Schema.Union([
   AgentPermissionRequestedEvent,
   AgentPermissionResolvedEvent,
   AgentMessageReceivedEvent,
+  AgentChannelReplyEvent,
   AgentModelSetEvent,
   AgentCurrentIssueSetEvent,
   AgentResolutionChangedEvent,
