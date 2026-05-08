@@ -37,7 +37,7 @@ vi.mock('../../src/lib/openai-auth.js', () => ({
 }));
 
 vi.mock('../../src/lib/cliproxy.js', () => ({
-  bridgeGeminiAuthToCliproxy: mockBridgeGeminiAuth,
+  bridgeGeminiAuthToCliproxyAsync: mockBridgeGeminiAuth,
   getCliproxyClientEnv: () => ({
     ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317',
     ANTHROPIC_AUTH_TOKEN: 'panopticon-local-cliproxy-key',
@@ -87,7 +87,7 @@ describe('agents auth routing', () => {
       return { name: 'anthropic', displayName: 'Anthropic', compatibility: 'direct', authType: 'env' };
     });
 
-    mockBridgeGeminiAuth.mockReturnValue(true);
+    mockBridgeGeminiAuth.mockResolvedValue(true);
     mockGetProviderEnv.mockImplementation((_provider, authToken: string) => ({
       AUTH_TOKEN: authToken,
     }));

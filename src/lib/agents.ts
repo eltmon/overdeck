@@ -23,7 +23,7 @@ import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
 import { loadConfig } from './config.js';
 import { getOpenAIAuthStatus, getOpenAIAuthStatusSync } from './openai-auth.js';
-import { bridgeGeminiAuthToCliproxy, getCliproxyClientEnv } from './cliproxy.js';
+import { bridgeGeminiAuthToCliproxyAsync, getCliproxyClientEnv } from './cliproxy.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix, resolveProjectFromIssue } from './projects.js';
@@ -248,7 +248,7 @@ export async function getProviderEnvForModel(model: string): Promise<Record<stri
       throw new Error(`Google API key not configured. Add GOOGLE_API_KEY in Settings → Google or ~/.panopticon.env before using model "${model}".`);
     }
 
-    if (!bridgeGeminiAuthToCliproxy(apiKey)) {
+    if (!await bridgeGeminiAuthToCliproxyAsync(apiKey)) {
       throw new Error(`Failed to bridge Google API key into CLIProxy before using model "${model}".`);
     }
 

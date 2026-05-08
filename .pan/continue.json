@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1015",
   "created": "2026-05-08T00:56:13.011Z",
-  "updated": "2026-05-08T11:44:15Z",
+  "updated": "2026-05-08T11:58:58Z",
   "gitState": {
     "branch": "feature/pan-1015",
-    "sha": "df48dfb71",
+    "sha": "38971c6c1",
     "dirty": true
   },
   "decisions": [
@@ -28,7 +28,7 @@
     }
   ],
   "resumePoint": {
-    "description": "Gemini option (a) implementation validated: CLIProxy API returned pong for gemini-3-flash-preview and claude --print through ANTHROPIC_BASE_URL/ANTHROPIC_AUTH_TOKEN returned pong. Commit and close workspace-25ue, then proceed to remaining direct-provider beads.",
+    "description": "Inspection blocked workspace-25ue because getProviderEnvForModel used sync Gemini credential/config writes on dashboard-reachable routes. Fixed by switching getProviderEnvForModel to bridgeGeminiAuthToCliproxyAsync and making the async Gemini bridge/config path use fs/promises only. Typecheck, lint, and targeted auth-routing tests passed; commit and re-request inspection.",
     "beadId": "workspace-25ue",
     "filesToRead": [
       "src/lib/cliproxy.ts",
@@ -61,6 +61,12 @@
       "timestamp": "2026-05-08T11:44:15Z",
       "reason": "validation",
       "note": "Validated Gemini CLIProxy route: /v1/messages with model gemini-3-flash-preview returned pong, and claude --print --model gemini-3-flash-preview through the CLIProxy env returned pong.",
+      "agentModel": "agent:claude-opus-4.7"
+    },
+    {
+      "timestamp": "2026-05-08T11:58:58Z",
+      "reason": "inspection-response",
+      "note": "Fixed inspection block by removing sync Gemini bridge/config persistence from getProviderEnvForModel's dashboard-reachable path; async Gemini bridge now uses fs/promises for directory creation, credential reads/writes, and config reads/writes. npm run typecheck, npm run lint, and npm test -- tests/lib/agents-auth-routing.test.ts passed.",
       "agentModel": "agent:claude-opus-4.7"
     }
   ],

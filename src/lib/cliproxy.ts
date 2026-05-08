@@ -22,7 +22,7 @@ import {
   writeFileSync,
   statSync,
 } from 'fs';
-import { readFile, writeFile } from 'fs/promises';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
 import { spawn, execSync, exec } from 'child_process';
@@ -79,6 +79,14 @@ function ensureDirs(): void {
   for (const dir of [PANOPTICON_HOME, BIN_DIR, getCliproxyDir(), getCliproxyAuthDir()]) {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   }
+}
+
+async function ensureDirsAsync(): Promise<void> {
+  await Promise.all(
+    [PANOPTICON_HOME, BIN_DIR, getCliproxyDir(), getCliproxyAuthDir()].map((dir) =>
+      mkdir(dir, { recursive: true }),
+    ),
+  );
 }
 
 interface CodexAuthFile {
@@ -254,15 +262,31 @@ export async function bridgeCodexAuthToCliproxyAsync(): Promise<boolean> {
   return true;
 }
 
+function parseBridgedGeminiApiKey(raw: string): string | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<CliproxyGeminiCredentials>;
+    return typeof parsed.api_key === 'string' && parsed.api_key.trim().length > 0
+      ? parsed.api_key.trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function readBridgedGeminiApiKey(): string | null {
   const target = getCliproxyGeminiCredPath();
   if (!existsSync(target)) return null;
 
   try {
-    const parsed = JSON.parse(readFileSync(target, 'utf8')) as Partial<CliproxyGeminiCredentials>;
-    return typeof parsed.api_key === 'string' && parsed.api_key.trim().length > 0
-      ? parsed.api_key.trim()
-      : null;
+    return parseBridgedGeminiApiKey(readFileSync(target, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+async function readBridgedGeminiApiKeyAsync(): Promise<string | null> {
+  try {
+    return parseBridgedGeminiApiKey(await readFile(getCliproxyGeminiCredPath(), 'utf8'));
   } catch {
     return null;
   }
@@ -278,35 +302,19 @@ function serializeYamlString(value: string): string {
  * CLIProxyAPI v6.10.x accepts Gemini API keys through the `gemini-api-key`
  * config section. We also keep a small credential marker in auth-dir so future
  * config rewrites can preserve the bridged key without re-reading Panopticon
- * settings.
+ * settings. This path is used by getProviderEnvForModel(), which is reachable
+ * from dashboard HTTP routes, so all credential/config persistence is async.
  */
-export function bridgeGeminiAuthToCliproxy(apiKey: string): boolean {
-  const normalized = apiKey.trim();
-  if (!normalized) return false;
-
-  ensureDirs();
-  const creds: CliproxyGeminiCredentials = {
-    api_key: normalized,
-    type: 'gemini',
-    disabled: false,
-  };
-
-  const serialized = JSON.stringify(creds, null, 2) + '\n';
-  const target = getCliproxyGeminiCredPath();
-  if (!existsSync(target) || readFileSync(target, 'utf8') !== serialized) {
-    writeFileSync(target, serialized, { mode: 0o600 });
-  }
-
-  ensureConfigFile(normalized);
-  return true;
-}
-
-/** Async variant of bridgeGeminiAuthToCliproxy — safe for the event loop. */
 export async function bridgeGeminiAuthToCliproxyAsync(apiKey: string): Promise<boolean> {
   const normalized = apiKey.trim();
   if (!normalized) return false;
 
-  ensureDirs();
+  try {
+    await ensureDirsAsync();
+  } catch {
+    return false;
+  }
+
   const creds: CliproxyGeminiCredentials = {
     api_key: normalized,
     type: 'gemini',
@@ -316,20 +324,25 @@ export async function bridgeGeminiAuthToCliproxyAsync(apiKey: string): Promise<b
   const target = getCliproxyGeminiCredPath();
 
   try {
-    if (!existsSync(target) || await readFile(target, 'utf8') !== serialized) {
+    let existing: string | null = null;
+    try {
+      existing = await readFile(target, 'utf8');
+    } catch {
+      existing = null;
+    }
+
+    if (existing !== serialized) {
       await writeFile(target, serialized, { mode: 0o600 });
     }
+    await ensureConfigFileAsync(normalized);
   } catch {
     return false;
   }
 
-  ensureConfigFile(normalized);
   return true;
 }
 
-function ensureConfigFile(geminiApiKey: string | null = readBridgedGeminiApiKey()): void {
-  ensureDirs();
-  const configPath = getCliproxyConfigPath();
+function buildCliproxyConfig(geminiApiKey: string | null): string {
   const authDir = getCliproxyAuthDir();
 
   // Config is rewritten every time so upgrades can evolve the format safely.
@@ -349,7 +362,13 @@ function ensureConfigFile(geminiApiKey: string | null = readBridgedGeminiApiKey(
   }
 
   lines.push(`debug: false`, '');
-  const config = lines.join('\n');
+  return lines.join('\n');
+}
+
+function ensureConfigFile(geminiApiKey: string | null = readBridgedGeminiApiKey()): void {
+  ensureDirs();
+  const configPath = getCliproxyConfigPath();
+  const config = buildCliproxyConfig(geminiApiKey);
 
   if (existsSync(configPath)) {
     try {
@@ -359,6 +378,25 @@ function ensureConfigFile(geminiApiKey: string | null = readBridgedGeminiApiKey(
     }
   }
   writeFileSync(configPath, config);
+}
+
+async function ensureConfigFileAsync(geminiApiKey?: string | null): Promise<void> {
+  await ensureDirsAsync();
+  const configPath = getCliproxyConfigPath();
+  const effectiveGeminiApiKey = geminiApiKey === undefined
+    ? await readBridgedGeminiApiKeyAsync()
+    : geminiApiKey;
+  const config = buildCliproxyConfig(effectiveGeminiApiKey);
+
+  let existing: string | null = null;
+  try {
+    existing = await readFile(configPath, 'utf8');
+  } catch {
+    existing = null;
+  }
+
+  if (existing === config) return;
+  await writeFile(configPath, config);
 }
 
 function detectPlatformAsset(): { archive: string; } | null {
