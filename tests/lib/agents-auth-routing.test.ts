@@ -114,22 +114,19 @@ describe('agents auth routing', () => {
     });
   });
 
-  it('falls back to the OpenAI API key when no Codex subscription login exists', async () => {
+  it('rejects OpenAI API-key routing when no Codex subscription login exists', async () => {
     mockLoadYamlConfig.mockReturnValue({
       config: {
         apiKeys: { openai: 'sk-test-123' },
         providerAuth: {},
       },
     });
-    mockOpenAIAuthStatus.mockReturnValue({ loggedIn: false });
+    mockOpenAIAuthStatus.mockReturnValue({ loggedIn: false, hasOpenAIApiKey: true });
 
-    const env = await getProviderEnvForModel('gpt-5.4');
-
-    expect(mockGetProviderEnv).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'openai' }),
-      'sk-test-123'
+    await expect(getProviderEnvForModel('gpt-5.4')).rejects.toThrow(
+      'OpenAI API-key routing is no longer supported'
     );
-    expect(env).toEqual({ AUTH_TOKEN: 'sk-test-123' });
+    expect(mockGetProviderEnv).not.toHaveBeenCalled();
   });
 
   it('uses cx@ prefix for GPT models routed through subscription auth', () => {

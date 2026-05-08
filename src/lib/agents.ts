@@ -263,15 +263,18 @@ export async function getProviderEnvForModel(model: string): Promise<Record<stri
       // Anthropic-compatible endpoint and never needs an API key.
       return getCliproxyClientEnv();
     }
+
+    const configuredKey = apiKey || authStatus.hasOpenAIApiKey;
+    throw new Error(
+      configuredKey
+        ? `OpenAI API-key routing is no longer supported for model "${model}" because api.openai.com does not expose an Anthropic-compatible /v1/messages endpoint. Sign in with a Codex/ChatGPT subscription via \`pan admin specialists codex login\` or Dashboard Settings → Codex Login.`
+        : `Codex/ChatGPT subscription login required for OpenAI model "${model}". Sign in via \`pan admin specialists codex login\` or Dashboard Settings → Codex Login.`,
+    );
   }
 
   if (apiKey) {
     await validateProviderHealth(model, apiKey);
     return getProviderEnv(provider, apiKey);
-  }
-
-  if (provider.name === 'openai' && (await getOpenAIAuthStatus()).loggedIn) {
-    return getCliproxyClientEnv();
   }
 
   throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);

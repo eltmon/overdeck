@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1015",
   "created": "2026-05-08T00:56:13.011Z",
-  "updated": "2026-05-08T11:58:58Z",
+  "updated": "2026-05-08T12:05:11Z",
   "gitState": {
     "branch": "feature/pan-1015",
-    "sha": "38971c6c1",
+    "sha": "a78457e05",
     "dirty": true
   },
   "decisions": [
@@ -28,13 +28,13 @@
     }
   ],
   "resumePoint": {
-    "description": "Inspection blocked workspace-25ue because getProviderEnvForModel used sync Gemini credential/config writes on dashboard-reachable routes. Fixed by switching getProviderEnvForModel to bridgeGeminiAuthToCliproxyAsync and making the async Gemini bridge/config path use fs/promises only. Typecheck, lint, and targeted auth-routing tests passed; commit and re-request inspection.",
-    "beadId": "workspace-25ue",
+    "description": "Implementing workspace-6m0h: OpenAI API-key fallback removed from getProviderEnvForModel. OpenAI models now require Codex/ChatGPT subscription auth through CLIProxy; configured API keys receive a clear remediation error. Typecheck, lint, and targeted auth-routing tests passed. Commit, close bead, and request inspection.",
+    "beadId": "workspace-6m0h",
     "filesToRead": [
-      "src/lib/cliproxy.ts",
       "src/lib/agents.ts",
-      "src/lib/providers.ts",
-      "tests/lib/agents-auth-routing.test.ts"
+      "src/lib/openai-auth.ts",
+      "tests/lib/agents-auth-routing.test.ts",
+      "CHANGELOG.md"
     ]
   },
   "beadsMapping": {},
@@ -67,6 +67,12 @@
       "timestamp": "2026-05-08T11:58:58Z",
       "reason": "inspection-response",
       "note": "Fixed inspection block by removing sync Gemini bridge/config persistence from getProviderEnvForModel's dashboard-reachable path; async Gemini bridge now uses fs/promises for directory creation, credential reads/writes, and config reads/writes. npm run typecheck, npm run lint, and npm test -- tests/lib/agents-auth-routing.test.ts passed.",
+      "agentModel": "agent:claude-opus-4.7"
+    },
+    {
+      "timestamp": "2026-05-08T12:05:11Z",
+      "reason": "bead-complete",
+      "note": "Implemented workspace-6m0h by removing OpenAI API-key fallback from getProviderEnvForModel, preserving only Codex/ChatGPT subscription routing via CLIProxy, updating openai-auth comments, updating auth-routing tests, and adding a changelog entry. Verified npm run typecheck, npm run lint, and npm test -- tests/lib/agents-auth-routing.test.ts.",
       "agentModel": "agent:claude-opus-4.7"
     }
   ],

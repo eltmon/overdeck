@@ -1,11 +1,11 @@
 /**
  * openai-auth.ts
  *
- * Reads Codex/ChatGPT local auth state and keeps a claudish-compatible Codex
- * OAuth credential file in sync. claudish's cx@ provider only honors
- * ~/.claudish/codex-oauth.json, while the local Codex CLI stores tokens in
- * ~/.codex/auth.json. Panopticon bridges between the two so subscription auth
- * works without falling back to an API key.
+ * Reads Codex/ChatGPT local auth state and keeps local subscription credential
+ * stores in sync. OpenAI models are supported only through Codex/ChatGPT
+ * subscription auth routed via CLIProxyAPI; API-key fallback is intentionally
+ * not used because api.openai.com does not expose Anthropic-compatible
+ * /v1/messages.
  */
 
 import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'fs';
