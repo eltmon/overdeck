@@ -297,6 +297,10 @@ function getCachedFavoritedIds(): Set<string> {
   return ids;
 }
 
+function invalidateFavoritesCache(): void {
+  favoritesCache = null;
+}
+
 // ─── CSRF / Origin validation ────────────────────────────────────────────────
 
 let cachedTrustedOrigins: string[] | undefined;
@@ -1694,6 +1698,7 @@ const postConversationArchiveRoute = HttpRouter.add(
         markConversationEnded(name);
         archiveConversation(name);
         removeFavorite('conversation', name);
+        invalidateFavoritesCache();
         // Unconditionally remove all attachments — archiving is permanent and
         // unsent paste uploads should not leak.
         await cleanupConversationAttachments(name);
@@ -1822,6 +1827,7 @@ const postConversationFavoriteRoute = HttpRouter.add(
         const conv = getConversationByName(name);
         if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         setFavorite('conversation', name);
+        invalidateFavoritesCache();
         return jsonResponse({ favorited: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -1850,6 +1856,7 @@ const deleteConversationFavoriteRoute = HttpRouter.add(
         const conv = getConversationByName(name);
         if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         removeFavorite('conversation', name);
+        invalidateFavoritesCache();
         return jsonResponse({ favorited: false });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
