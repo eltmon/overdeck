@@ -10,7 +10,7 @@
  */
 
 import { loadConfig } from '../../../lib/config-yaml.js';
-import { getEventStore, initEventStore, type StoredEvent } from '../event-store.js';
+import { initEventStore, type StoredEvent } from '../event-store.js';
 import { emitActivityTts } from '../../../lib/activity-logger.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -186,10 +186,8 @@ export async function startTtsSummarizer(): Promise<void> {
   }
 
   // Ensure the shared event store is fully initialized before subscribing —
-  // main.ts calls startTtsSummarizer() synchronously at module top-level,
-  // which fires before any route handler has triggered the lazy init.
-  await initEventStore();
-  const store = getEventStore();
+  // main.ts starts the summarizer before route handlers can trigger lazy init.
+  const store = await initEventStore();
   state.unsubscribe = store.subscribe(onEvent);
 
   const intervalMs = config.ttsSummarizer.batchWindowSeconds * 1000;

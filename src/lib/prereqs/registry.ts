@@ -21,7 +21,7 @@ export const PREREQ_REGISTRY = {
   openInteractiveTerminal: ["ttyd"],
   enableHttps: ["mkcert", "docker", "traefik"],
   enableBeads: ["bd"],
-  useClaudeCodeRoutedAgents: ["claudish"],
+  useClaudeCodeRoutedAgents: [],
   useOxAgents: ["ox"],
 } as const;
 
@@ -34,7 +34,6 @@ export const INSTALLABLE_TOOLS: readonly PrereqTool[] = [
   "ttyd",
   "mkcert",
   "bd",
-  "claudish",
   "ox",
 ];
 
@@ -91,8 +90,6 @@ export async function installTool(tool: PrereqTool): Promise<InstallResult> {
         return await installMkcert();
       case "bd":
         return await installBeads();
-      case "claudish":
-        return await installClaudish();
       case "ox":
         return await installOx();
       default:
@@ -205,37 +202,6 @@ async function installBeads(): Promise<InstallResult> {
     tool: "bd",
     success: true,
     message: "beads installed via install script",
-  };
-}
-
-async function installClaudish(): Promise<InstallResult> {
-  const plat = detectPlatform();
-  if (plat === "darwin") {
-    return {
-      tool: "claudish",
-      success: false,
-      message: "Install manually: brew install eltmon/claudish/claudish",
-    };
-  }
-
-  const arch =
-    process.arch === "x64"
-      ? "x64"
-      : process.arch === "arm64"
-        ? "arm64"
-        : "x64";
-  const binDir = join(homedir(), ".local", "bin");
-  const claudishPath = join(binDir, "claudish");
-  mkdirSync(binDir, { recursive: true });
-
-  await execAsync(
-    `curl -sL "https://github.com/eltmon/claudish/releases/latest/download/claudish-linux-${arch}" -o "${claudishPath}" && chmod +x "${claudishPath}"`,
-    { timeout: 60000 }
-  );
-  return {
-    tool: "claudish",
-    success: true,
-    message: "claudish installed to ~/.local/bin/claudish",
   };
 }
 

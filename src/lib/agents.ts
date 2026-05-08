@@ -23,7 +23,7 @@ import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
 import { loadConfig } from './config.js';
 import { getOpenAIAuthStatus, getOpenAIAuthStatusSync } from './openai-auth.js';
-import { getCliproxyClientEnv } from './cliproxy.js';
+import { bridgeGeminiAuthToCliproxyAsync, getCliproxyClientEnv } from './cliproxy.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix, resolveProjectFromIssue } from './projects.js';
@@ -35,9 +35,9 @@ import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
 const execAsync = promisify(exec);
 
 /**
- * BFS-walk a process subtree rooted at `rootPid` looking for a claude-family
- * runtime (comm == 'claude' or 'claudish'). Returns true if any process in the
- * tree matches, false if the tree exists but no match, false on any error.
+ * BFS-walk a process subtree rooted at `rootPid` looking for the Claude Code
+ * runtime (comm == 'claude'). Returns true if any process in the tree matches,
+ * false if the tree exists but no match, false on any error.
  *
  * Used by sendAgentMessage zombie detection. pane_pid is the tmux pane's root
  * process, which is bash for work-agent launchers (`bash launcher.sh`) but
@@ -54,7 +54,7 @@ async function hasAgentRuntimeInSubtree(rootPid: string): Promise<boolean> {
     try {
       const { stdout: comm } = await execAsync(`ps -p ${pid} -o comm=`);
       const name = comm.trim();
-      if (name === 'claude' || name === 'claudish') return true;
+      if (name === 'claude') return true;
     } catch {
       continue;
     }
@@ -95,10 +95,6 @@ const CLI_PROXY_MODEL_ALIASES: Record<string, string> = {
   'gpt-5.5-pro': 'gpt-5.5',
   'gpt-5.4-pro': 'gpt-5.4',
 };
-
-export async function getLaunchModelForModel(model: string): Promise<string> {
-  return getClaudishPrefix(model, await getProviderAuthMode(model));
-}
 
 /**
  * Panopticon pipeline agent types that map 1:1 to .claude/agents/pan-<type>-agent.md
@@ -146,8 +142,7 @@ export async function getAgentRuntimeBaseCommand(
   const provider = getProviderForModel(model);
   const permissionFlags = getClaudePermissionFlagsString();
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
-  // `claude --resume`. Claudish forwards unrecognized flags to Claude Code, so --name works
-  // there too.
+  // `claude --resume`.
   const nameFlag = agentName ? ` --name ${agentName}` : '';
   // PAN-982: When agentType is provided, select the matching .claude/agents/pan-<type>-agent.md
   // definition. The agent frontmatter declares model, permissionMode, tools, and per-agent hooks,
@@ -165,17 +160,9 @@ export async function getAgentRuntimeBaseCommand(
     ? ' --dangerously-skip-permissions'
     : '';
 
-  if (provider.compatibility === 'direct') {
-    if (agentType) {
-      // Anthropic direct: --agent fully replaces --model. Permission flags only when in bypass.
-      return `claude${bypassWithAgent}${agentFlag}${nameFlag}`;
-    }
-    return `claude ${permissionFlags} --model ${model}${nameFlag}`;
-  }
-
   // OpenAI subscription → local CLIProxyAPI sidecar exposes an
   // Anthropic-compatible /v1/messages endpoint, so Claude Code can drive
-  // gpt-* models directly via ANTHROPIC_BASE_URL (no claudish wrapper).
+  // gpt-* models directly via ANTHROPIC_BASE_URL (no wrapper process).
   // The provider env vars are injected separately by getProviderEnvForModel.
   if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
     // CLIProxy supports gpt-5.x but not the -pro variant; map aliases to real names.
@@ -187,27 +174,14 @@ export async function getAgentRuntimeBaseCommand(
     return `claude ${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
 
-  // Claudish wrapper path — claudish ≤7.0.3 flag passthrough is broken (Commander.js
-  // rejects --agent, --name as unknown). Skip Claude Code-specific flags; model +
-  // permissions are set directly, workspace CLAUDE.md + vBRIEF provide agent context.
-  //
-  // Permission mode handling: claudish does NOT support `--permission-mode auto`
-  // (it's a Claude Code research-preview flag that the claudish wrapper cannot
-  // proxy). When the user has set Auto mode, we MUST refuse the spawn rather than
-  // silently fall back to bypass. Enterprise users rely on Auto being honored;
-  // a silent flip to --dangerously-skip-permissions is a P0 trust violation.
-  const routedMode = resolvePermissionMode();
-  if (routedMode === 'auto') {
-    throw new Error(
-      `Provider "${provider.displayName}" routes through claudish, which does not support permissionMode=auto. ` +
-      `Either: (1) switch the dashboard Settings → Permissions setting to "Bypass" (acknowledging that Kimi/MiniMax/GLM/OpenRouter/Mimo require unmoderated execution); ` +
-      `(2) pick a Claude or GPT model instead (those honor Auto mode through the native Claude Code classifier or CLIProxy); ` +
-      `or (3) wait for PAN-1015 to land, which removes claudish in favor of CLIProxy for all providers.`,
-    );
+  if (agentType) {
+    // Anthropic direct: --agent fully replaces --model. Non-Anthropic
+    // direct providers still need --model because agent frontmatter model:
+    // only accepts Anthropic identifiers.
+    const modelFlag = provider.name === 'anthropic' ? '' : ` --model ${model}`;
+    return `claude${bypassWithAgent}${agentFlag}${modelFlag}${nameFlag}`;
   }
-  const routedModel = await getLaunchModelForModel(model);
-  const claudishFlags = getClaudePermissionFlagsString(routedMode);
-  return `claudish -i --model ${routedModel} ${claudishFlags}`;
+  return `claude ${permissionFlags} --model ${model}${nameFlag}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
@@ -243,6 +217,18 @@ export async function getProviderEnvForModel(model: string): Promise<Record<stri
 
   const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
 
+  if (provider.name === 'google') {
+    if (!apiKey) {
+      throw new Error(`Google API key not configured. Add GOOGLE_API_KEY in Settings → Google or ~/.panopticon.env before using model "${model}".`);
+    }
+
+    if (!await bridgeGeminiAuthToCliproxyAsync(apiKey)) {
+      throw new Error(`Failed to bridge Google API key into CLIProxy before using model "${model}".`);
+    }
+
+    return getCliproxyClientEnv();
+  }
+
   if (provider.name === 'openai') {
     const authStatus = await getOpenAIAuthStatus();
     if (authStatus.loggedIn) {
@@ -251,15 +237,18 @@ export async function getProviderEnvForModel(model: string): Promise<Record<stri
       // Anthropic-compatible endpoint and never needs an API key.
       return getCliproxyClientEnv();
     }
+
+    const configuredKey = apiKey || authStatus.hasOpenAIApiKey;
+    throw new Error(
+      configuredKey
+        ? `OpenAI API-key routing is no longer supported for model "${model}" because api.openai.com does not expose an Anthropic-compatible /v1/messages endpoint. Sign in with a Codex/ChatGPT subscription via \`pan admin specialists codex login\` or Dashboard Settings → Codex Login.`
+        : `Codex/ChatGPT subscription login required for OpenAI model "${model}". Sign in via \`pan admin specialists codex login\` or Dashboard Settings → Codex Login.`,
+    );
   }
 
   if (apiKey) {
     await validateProviderHealth(model, apiKey);
     return getProviderEnv(provider, apiKey);
-  }
-
-  if (provider.name === 'openai' && (await getOpenAIAuthStatus()).loggedIn) {
-    return getCliproxyClientEnv();
   }
 
   throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);
@@ -274,6 +263,10 @@ const PROVIDER_ENV_KEYS = [
   'ANTHROPIC_BASE_URL',
   'ANTHROPIC_AUTH_TOKEN',
   'ANTHROPIC_DEFAULT_HAIKU_MODEL',
+  'ANTHROPIC_DEFAULT_OPUS_MODEL',
+  'ANTHROPIC_DEFAULT_SONNET_MODEL',
+  'ANTHROPIC_SMALL_FAST_MODEL',
+  'CLAUDE_CODE_SUBAGENT_MODEL',
   'OPENAI_API_KEY',
   'GEMINI_API_KEY',
   'API_TIMEOUT_MS',
@@ -286,21 +279,11 @@ export async function getProviderExportsForModel(model: string): Promise<string>
   const exportLines = Object.entries(envVars)
     .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`);
 
-  // claudish bundles an older Claude Code that crashes on some model metadata.
-  // Point CLAUDE_PATH at the system binary so claudish uses the global install.
-  const provider = getProviderForModel(model as ModelId);
-  if (provider.compatibility === 'claudish') {
-    try {
-      const claudePath = execSync('which claude', { encoding: 'utf8' }).trim();
-      if (claudePath) exportLines.push(`export CLAUDE_PATH="${claudePath}"`);
-    } catch { /* system claude not found — claudish will use its bundled copy */ }
-  }
-
   return [...unsetLines, ...exportLines].join('\n') + '\n';
 }
 
 /**
- * Build a sanitized env for programmatically spawning `claude`/`claudish`.
+ * Build a sanitized env for programmatically spawning `claude`.
  *
  * The dashboard parent process may inherit provider env vars (e.g.
  * ANTHROPIC_BASE_URL pointing at the CLIProxy sidecar) that would mis-route
@@ -335,80 +318,6 @@ export async function getProviderTmuxFlags(model: string): Promise<string> {
     flags += ` -e ${key}="${value.replace(/"/g, '\\"')}"`;
   }
   return flags;
-}
-
-/**
- * claudish prefix mapping: auth mode → provider prefix for OpenAI models.
- *
- * claudish routes models using the provider@model syntax:
- *   oai@model  → OpenAI Direct API (API key auth)
- *   cx@model  → ChatGPT OAuth subscription (PLUS/PRO tiers)
- *   go@model  → Google OAuth CodeAssist
- *
- * cx@ is the ChatGPT subscription prefix (confirmed in claudish v6.12+).
- * Note: cx@ is for ChatGPT OAuth, distinct from oai@ which uses OpenAI API keys.
- */
-const CLAUDISH_OPENAI_PREFIX: Record<string, string> = {
-  'api-key': 'oai',
-  subscription: 'cx',
-};
-
-/**
- * Get the claudish prefix for a model based on auth mode.
- *
- * Anthropic models: no prefix (use direct claude CLI).
- * OpenAI models: prefix depends on auth mode (oai@ or cx@).
- * Google models (CodeAssist OAuth): go@ prefix.
- *
- * @param model   Model ID (e.g. 'gpt-5.4', 'claude-sonnet-4-6')
- * @param authMode Auth mode: 'api-key' or 'subscription' (undefined = api-key default)
- * @returns Prefixed model string for claudish, or bare model if not applicable
- */
-export function getClaudishPrefix(model: string, authMode?: string): string {
-  // Anthropic models — use direct claude CLI, no prefix needed
-  if (model.startsWith('claude-')) {
-    return model;
-  }
-
-  // OpenAI models — prefix depends on auth mode
-  if (model.startsWith('gpt-') || model.startsWith('o') && !model.startsWith('ollama')) {
-    const prefix = CLAUDISH_OPENAI_PREFIX[authMode ?? 'api-key'] ?? 'oai';
-    return `${prefix}@${model}`;
-  }
-
-  // Google CodeAssist OAuth — go@ prefix
-  if (model.startsWith('gemini-') && authMode === 'subscription') {
-    return `go@${model}`;
-  }
-
-  // Kimi models — kc@ prefix routes to api.kimi.com/coding/v1 (kimi-coding provider).
-  // sk-kimi-* keys are coding keys, NOT moonshot platform keys (kimi@ → api.moonshot.ai).
-  if (['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(model)) {
-    return `kc@${model}`;
-  }
-
-  // MiniMax models — explicit mm@ prefix
-  if (['minimax-m2.7', 'minimax-m2.7-highspeed'].includes(model)) {
-    return `mm@${model}`;
-  }
-
-  // Z.AI (GLM) models — explicit zai@ prefix
-  if (['glm-5.1', 'glm-4.7', 'glm-4.7-flash'].includes(model)) {
-    return `zai@${model}`;
-  }
-
-  // OpenRouter model IDs always contain '/'
-  if (model.includes('/')) {
-    return `or@${model}`;
-  }
-
-  // Mimo — claudish doesn't auto-detect, use custom URL syntax
-  if (model.startsWith('mimo-')) {
-    return `https://token-plan-sgp.xiaomimimo.com/anthropic/${model}`;
-  }
-
-  // Other providers — return bare model (fallback to default routing)
-  return model;
 }
 
 // ============================================================================
@@ -781,8 +690,8 @@ export function decideChannelsForWorkAgent(
   }
 
   // Runtime gate. The runtime field is 'claude' for Claude Code; specialised
-  // launchers set it to 'codex' / 'cursor' / 'gemini' / 'claudish' and those
-  // are not Channel-capable.
+  // launchers set it to 'codex' / 'cursor' / 'gemini' and those are not
+  // Channel-capable.
   const runtime = state.runtime;
   if (runtime !== 'claude' && runtime !== 'claude-code') {
     log(false, `runtime-${runtime}`);

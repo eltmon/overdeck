@@ -7,13 +7,11 @@ import { getAgentRuntimeBaseCommand } from '../agents.js'
 // without exception; a silent escalation to bypass is a P0 trust violation.
 //
 // This file exists to prevent regression of the bug observed in v0.8.20 where
-// claudish-routed conversations (e.g. kimi-k2.6) launched with
-//   "claudish -i --model kc@kimi-k2.6 --dangerously-skip-permissions --permission-mode bypassPermissions"
-// even when the dashboard Permissions setting was Auto. Root cause: the claudish
-// branch in getAgentRuntimeBaseCommand hardcoded 'bypass' instead of resolving
-// the user's setting. The fix replaces the hardcoded literal with
-// resolvePermissionMode() and throws when claudish is paired with auto (claudish
-// cannot proxy --permission-mode auto, so silent fallback to bypass is unsafe).
+// a provider-specific launch branch emitted
+//   "claude --model qwen/qwen3.6-plus:free --dangerously-skip-permissions --permission-mode bypassPermissions"
+// even when the dashboard Permissions setting was Auto. Root cause: the branch
+// hardcoded 'bypass' instead of resolving the user's setting. The direct-routing
+// command builder must honor resolvePermissionMode() for every provider.
 
 const ORIGINAL_YOLO = process.env.PAN_YOLO
 
@@ -39,43 +37,58 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
-  // ── Claudish path (Kimi, MiniMax, GLM, OpenRouter, Mimo, …) ────────────────
-
-  it('Claudish-routed model + Auto: REFUSED (no silent fallback to bypass)', async () => {
-    await expect(getAgentRuntimeBaseCommand('kimi-k2.6')).rejects.toThrow(
-      /claudish.*does not support permissionMode=auto/i,
-    )
+  it('Kimi direct + Auto: no DSP, --permission-mode auto', async () => {
+    const cmd = await getAgentRuntimeBaseCommand('kimi-k2.6')
+    expect(cmd).toMatch(/^claude /)
+    expect(cmd).toMatch(/--model kimi-k2\.6/)
+    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
+    expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
-  it('Claudish + Auto refusal mentions remediation paths', async () => {
-    await expect(getAgentRuntimeBaseCommand('kimi-k2.6')).rejects.toThrow(/Bypass/)
-    await expect(getAgentRuntimeBaseCommand('kimi-k2.6')).rejects.toThrow(/Claude or GPT/)
-    await expect(getAgentRuntimeBaseCommand('kimi-k2.6')).rejects.toThrow(/PAN-1015/)
+  it('Z.AI direct + Auto: no DSP, --permission-mode auto', async () => {
+    const cmd = await getAgentRuntimeBaseCommand('glm-4.7')
+    expect(cmd).toMatch(/^claude /)
+    expect(cmd).toMatch(/--model glm-4\.7/)
+    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
+    expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
-  it('Claudish refusal applies to ALL claudish-routed providers, not just Kimi', async () => {
-    // Sample one real model from each claudish-routed provider in providers.ts.
-    const claudishModels = [
-      'kimi-k2.6',
-      'minimax-m2.7',
-      'glm-4.7',
-      'gemini-3-flash-preview',
-      'mimo-v2.5',
-    ]
-    for (const m of claudishModels) {
-      await expect(
-        getAgentRuntimeBaseCommand(m),
-        `model ${m} must refuse claudish+auto`,
-      ).rejects.toThrow(/claudish.*does not support permissionMode=auto/i)
-    }
+  it('MiniMax direct + Auto: no DSP, --permission-mode auto', async () => {
+    const cmd = await getAgentRuntimeBaseCommand('minimax-m2.7')
+    expect(cmd).toMatch(/^claude /)
+    expect(cmd).toMatch(/--model minimax-m2\.7/)
+    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
+    expect(cmd).not.toMatch(/bypassPermissions/)
+  })
+
+  it('Mimo direct + Auto: no DSP, --permission-mode auto', async () => {
+    const cmd = await getAgentRuntimeBaseCommand('mimo-v2.5')
+    expect(cmd).toMatch(/^claude /)
+    expect(cmd).toMatch(/--model mimo-v2\.5/)
+    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
+    expect(cmd).not.toMatch(/bypassPermissions/)
+  })
+
+  it('OpenRouter direct + Auto: no DSP, --permission-mode auto', async () => {
+    const cmd = await getAgentRuntimeBaseCommand('qwen/qwen3.6-plus:free')
+    expect(cmd).toMatch(/^claude /)
+    expect(cmd).toMatch(/--model qwen\/qwen3\.6-plus:free/)
+    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
+    expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
   // ── PAN_YOLO escape hatch (explicit opt-in to bypass) ──────────────────────
 
-  it('Claudish + PAN_YOLO=true (bypass): DSP present, no error', async () => {
+  it('Kimi direct + PAN_YOLO=true (bypass): DSP present on direct Claude Code command', async () => {
     process.env.PAN_YOLO = 'true'
     const cmd = await getAgentRuntimeBaseCommand('kimi-k2.6')
-    expect(cmd).toMatch(/^claudish -i /)
+    expect(cmd).toMatch(/^claude /)
+    expect(cmd).toMatch(/--model kimi-k2\.6/)
     expect(cmd).toMatch(/--dangerously-skip-permissions/)
     expect(cmd).toMatch(/bypassPermissions/)
   })

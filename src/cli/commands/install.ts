@@ -32,7 +32,6 @@ export function registerInstallCommand(program: Command): void {
     .option('--skip-mkcert', 'Skip mkcert/HTTPS setup')
     .option('--skip-docker', 'Skip Docker network setup')
     .option('--skip-beads', 'Skip beads CLI installation')
-    .option('--skip-claudish', 'Skip claudish installation')
     .action(installCommand);
 }
 
@@ -42,7 +41,6 @@ interface InstallOptions {
   skipMkcert?: boolean;
   skipDocker?: boolean;
   skipBeads?: boolean;
-  skipClaudish?: boolean;
 }
 
 interface PrereqResult {
@@ -160,15 +158,6 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
     fix: 'curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash',
   });
 
-  // claudish (optional - will be auto-installed)
-  const hasClaudish = checkCommand('claudish');
-  results.push({
-    name: 'claudish',
-    passed: hasClaudish,
-    message: hasClaudish ? 'installed' : 'not found (will auto-install)',
-    fix: 'brew install claudish  # macOS, or download from github.com/eltmon/claudish/releases',
-  });
-
   // jq (JSON processor — used by statusline, beads, merge-agent, review-agent, dashboard)
   const hasJq = checkCommand('jq');
   results.push({
@@ -189,8 +178,8 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
 
   return {
     results,
-    // mkcert, ttyd, beads, and claudish are optional (will be auto-installed or skipped)
-    allPassed: results.filter((r) => r.name !== 'mkcert' && r.name !== 'ttyd' && r.name !== 'Beads CLI (bd)' && r.name !== 'claudish').every((r) => r.passed),
+    // mkcert, ttyd, and beads are optional (will be auto-installed or skipped)
+    allPassed: results.filter((r) => r.name !== 'mkcert' && r.name !== 'ttyd' && r.name !== 'Beads CLI (bd)').every((r) => r.passed),
   };
 }
 
@@ -428,37 +417,6 @@ async function installCommand(options: InstallOptions): Promise<void> {
     } catch {
       spinner.info('beads already installed');
     }
-    }
-  }
-
-  // Step 5c: Install claudish (multi-model router with OAuth support)
-  if (options.skipClaudish) {
-    spinner.info('Skipping claudish installation (--skip-claudish)');
-  } else {
-    const hasClaudishNow = checkCommand('claudish');
-    if (!hasClaudishNow) {
-      const plat = detectPlatform();
-      if (plat === 'darwin') {
-        spinner.info('Install claudish on macOS via Homebrew: brew install eltmon/claudish/claudish');
-      } else {
-        // Linux: download binary from GitHub releases
-        const arch = process.arch === 'x64' ? 'x64' : process.arch === 'arm64' ? 'arm64' : 'x64';
-        const binDir = join(homedir(), '.local', 'bin');
-        const claudishPath = join(binDir, 'claudish');
-        spinner.start('Installing claudish (Linux binary)...');
-        try {
-          mkdirSync(binDir, { recursive: true });
-          execSync(
-            `curl -sL "https://github.com/eltmon/claudish/releases/latest/download/claudish-linux-${arch}" -o "${claudishPath}" && chmod +x "${claudishPath}"`,
-            { stdio: 'pipe', timeout: 60000 }
-          );
-          spinner.succeed('claudish installed to ~/.local/bin/claudish');
-        } catch {
-          spinner.warn('claudish installation failed - download manually from github.com/eltmon/claudish/releases');
-        }
-      }
-    } else {
-      spinner.info('claudish already installed');
     }
   }
 

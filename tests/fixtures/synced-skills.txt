@@ -68,6 +68,7 @@ pan-tts
 pan-up
 pan-wipe
 pan-workspace-config
+pipeline-status
 plan
 react-best-practices
 refactor
