@@ -12,7 +12,6 @@
 import type { DashboardSnapshot } from '@panctl/contracts'
 
 const CACHE_KEY = 'pan-snapshot-cache-v1'
-const MAX_BYTES = 8 * 1024 * 1024 // 8MB
 
 interface CacheEntry {
   data: DashboardSnapshot
