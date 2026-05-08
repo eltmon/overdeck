@@ -4,7 +4,7 @@
     "created": "2026-05-08T18:55:00Z",
     "author": "manual:opus-4.7",
     "description": "Plan for PAN-1015: Remove claudish routing in favor of direct ANTHROPIC_BASE_URL (CLIProxy only where needed). Empirically scoped 2026-05-08 — see issue body Empirical findings section.",
-    "updated": "2026-05-08T17:47:26.510Z"
+    "updated": "2026-05-08T17:52:11.235Z"
   },
   "plan": {
     "id": "pan-1015",
@@ -12,9 +12,9 @@
     "status": "active",
     "uid": "d3644941-fec5-4e25-9974-34d6a9e02902",
     "author": "manual:opus-4.7",
-    "sequence": 22,
+    "sequence": 34,
     "created": "2026-05-08T18:55:00Z",
-    "updated": "2026-05-08T17:47:26.510Z",
+    "updated": "2026-05-08T17:52:11.235Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1015",
@@ -101,7 +101,7 @@
             }
           }
         ],
-        "completed": "2026-05-08T17:47:26.510Z"
+        "completed": "2026-05-08T17:52:11.235Z"
       },
       {
         "id": "mimo-direct",
@@ -143,7 +143,7 @@
             }
           }
         ],
-        "completed": "2026-05-08T17:47:26.510Z"
+        "completed": "2026-05-08T17:52:11.235Z"
       },
       {
         "id": "openrouter-direct",
@@ -193,7 +193,7 @@
             }
           }
         ],
-        "completed": "2026-05-08T17:47:26.509Z"
+        "completed": "2026-05-08T17:52:11.235Z"
       },
       {
         "id": "minimax-direct",
@@ -243,7 +243,7 @@
             }
           }
         ],
-        "completed": "2026-05-08T17:47:26.509Z"
+        "completed": "2026-05-08T17:52:11.234Z"
       },
       {
         "id": "kimi-direct",
@@ -293,7 +293,7 @@
             }
           }
         ],
-        "completed": "2026-05-08T17:47:26.509Z"
+        "completed": "2026-05-08T17:52:11.232Z"
       },
       {
         "id": "openai-key-deprecate",
@@ -343,7 +343,7 @@
             }
           }
         ],
-        "completed": "2026-05-08T17:47:26.509Z"
+        "completed": "2026-05-08T17:52:11.232Z"
       },
       {
         "id": "gemini-cliproxy-or-defer",
@@ -401,7 +401,7 @@
             }
           }
         ],
-        "completed": "2026-05-08T17:47:26.508Z"
+        "completed": "2026-05-08T17:52:11.231Z"
       },
       {
         "id": "delete-claudish-spawn-branch",
@@ -451,7 +451,7 @@
             }
           }
         ],
-        "completed": "2026-05-08T17:47:26.508Z"
+        "completed": "2026-05-08T17:52:11.231Z"
       },
       {
         "id": "delete-claudish-prereq-and-install",
@@ -493,7 +493,7 @@
             }
           }
         ],
-        "completed": "2026-05-08T17:47:26.508Z"
+        "completed": "2026-05-08T17:52:11.230Z"
       },
       {
         "id": "collapse-provider-compatibility",
@@ -543,7 +543,7 @@
             }
           }
         ],
-        "completed": "2026-05-08T17:47:26.507Z"
+        "completed": "2026-05-08T17:52:11.230Z"
       },
       {
         "id": "update-or-delete-claudish-tests",
@@ -593,7 +593,7 @@
             }
           }
         ],
-        "completed": "2026-05-08T17:47:26.507Z"
+        "completed": "2026-05-08T17:52:11.229Z"
       },
       {
         "id": "verification-typecheck-lint-test",
@@ -659,7 +659,7 @@
             }
           }
         ],
-        "completed": "2026-05-08T17:47:26.506Z"
+        "completed": "2026-05-08T17:52:11.228Z"
       }
     ],
     "edges": [
