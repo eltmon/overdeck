@@ -52,6 +52,10 @@ describe('agents auth routing', () => {
       config: {
         apiKeys: {},
         providerAuth: {},
+        // Auth-routing tests pre-date the permission-mode resolver; pin bypass
+        // so they exercise the legacy claudish path they were written against.
+        // Production default is 'auto' (which refuses claudish spawns).
+        claude: { permissionMode: 'bypass' },
       },
     });
 
