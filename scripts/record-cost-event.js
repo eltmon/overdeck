@@ -997,7 +997,27 @@ function getDatabase() {
 	_db.pragma("journal_mode = WAL");
 	_db.pragma("foreign_keys = ON");
 	_db.pragma("synchronous = NORMAL");
+	_db.pragma("journal_size_limit = 67108864");
 	runMigrations(_db);
+	const currentVacuum = _db.pragma("auto_vacuum", { simple: true });
+	if (currentVacuum !== 2) {
+		const sizeBefore = _db.pragma("page_count", { simple: true });
+		const pageSize = _db.pragma("page_size", { simple: true });
+		const mbBefore = (sizeBefore * pageSize / 1024 / 1024).toFixed(1);
+		console.log(`[db] Migrating SQLite to incremental_vacuum (current=${currentVacuum}, size=${mbBefore}MB) — one-time, may take ~30s on a large DB...`);
+		const t0 = Date.now();
+		_db.pragma("auto_vacuum = INCREMENTAL");
+		_db.exec("VACUUM");
+		const mbAfter = (_db.pragma("page_count", { simple: true }) * pageSize / 1024 / 1024).toFixed(1);
+		console.log(`[db] Migration complete in ${Date.now() - t0}ms (${mbBefore}MB → ${mbAfter}MB)`);
+	}
+	setInterval(() => {
+		if (!_db) return;
+		try {
+			const free = _db.pragma("freelist_count", { simple: true });
+			if (free > 256) _db.pragma(`incremental_vacuum(${Math.min(free, 1e4)})`);
+		} catch {}
+	}, 900 * 1e3).unref();
 	return _db;
 }
 //#endregion

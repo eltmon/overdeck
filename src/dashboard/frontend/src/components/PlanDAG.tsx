@@ -705,6 +705,14 @@ export function PlanDAGViewer({ issueId, criticalPath, onNodeClick, className, r
     }
   }, [storeSequence, issueId, queryClient]);
 
+  // Hooks MUST run on every render in the same order (Rules of Hooks).
+  // Compute these unconditionally and let the early-return branches below
+  // skip the JSX that consumes them.
+  const effectiveCriticalPath = useMemo(
+    () => criticalPath ?? doc?.criticalPath ?? EMPTY_ARRAY,
+    [criticalPath, doc?.criticalPath],
+  );
+
   if (isLoading) {
     return (
       <div className={className} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#6b7280', fontSize: 12 }}>
@@ -720,12 +728,6 @@ export function PlanDAGViewer({ issueId, criticalPath, onNodeClick, className, r
       </div>
     );
   }
-
-  // Use server-computed critical path (from API response) or caller override
-  const effectiveCriticalPath = useMemo(
-    () => criticalPath ?? doc.criticalPath ?? EMPTY_ARRAY,
-    [criticalPath, doc.criticalPath],
-  );
 
   // Show critical path length + edge count in header when available
   const cpLength = effectiveCriticalPath.length;

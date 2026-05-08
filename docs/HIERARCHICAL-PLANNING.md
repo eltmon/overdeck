@@ -359,7 +359,7 @@ Acceptance criteria (`subItems` with `metadata.kind: "acceptance_criterion"`) fl
 | Stage | AC Usage |
 |-------|----------|
 | **Work agent** | Sees AC per bead as completion checklist |
-| **Inspect agent** | Verifies per-bead AC against the diff |
+| **Inspect agent** | Verifies per-bead AC against the diff (only on beads flagged `metadata.requiresInspection: true`) |
 | **Review agent** | Full AC list for implementation coverage verification |
 | **Test agent** | Maps test results to AC, flags untested criteria |
 | **Verification gate** | Hard-gates on all AC subItems completed |

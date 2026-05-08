@@ -24,25 +24,33 @@ Source: [`docs/diagrams/panopticon-specialist-pipeline.excalidraw`](./diagrams/p
 
 ## Inspect Specialist (PAN-382)
 
-The inspect specialist runs **during** implementation, after each bead. It catches architectural deviations early — before they cascade through subsequent beads.
+The inspect specialist runs **during** implementation — but only on beads the planning agent flagged with `metadata.requiresInspection: true`. It catches architectural deviations early on the foundational beads where downstream work could cascade off a wrong choice (the MIN-796 failure mode).
 
-**Jidoka principle: never pass a defect downstream.**
+**Jidoka principle (applied selectively): never pass a foundation-class defect downstream.**
+
+> **Per-bead opt-in (2026-05-08 design revision).** The original PAN-382 design made inspection mandatory after every `bd close`. In practice that turned mechanical refactors into per-step interviews and added compounding stall risk on the inspect-dispatch path. Inspection is now a planning-time decision recorded as `metadata.requiresInspection: true|false` on each plan item. See [PAN-382 PRD](prds/planned/PAN-382-inspect-specialist.md) and the planning prompt's "Inspection Requirement" section for the criteria the planning agent uses.
 
 ### Agent Workflow
 
-After completing each bead, agents must request inspection:
+After closing a bead, the work agent reads `metadata.requiresInspection` from `.pan/spec.vbrief.json`:
 
 ```bash
 # After closing a bead
 bd close <beadId> --reason="Implemented X"
 
-# Request inspection before starting next bead
+# Branch on the bead's flag:
+#   requiresInspection: false → continue straight to the next bead (default for most beads)
+#   requiresInspection: true  → run pan inspect and wait
+
+# When required:
 pan inspect <issueId> --bead <beadId>
 
 # Wait for result — delivered via pan tell
 # INSPECTION PASSED → proceed to next bead
 # INSPECTION BLOCKED → fix issues, then re-request
 ```
+
+`pan inspect` is an explicit command the agent runs only for flagged beads. There is no auto-trigger from `bd close`.
 
 ### What Inspect Checks
 

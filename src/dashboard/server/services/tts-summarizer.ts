@@ -185,6 +185,8 @@ export async function startTtsSummarizer(): Promise<void> {
     return;
   }
 
+  // Ensure the shared event store is fully initialized before subscribing —
+  // main.ts starts the summarizer before route handlers can trigger lazy init.
   const store = await initEventStore();
   state.unsubscribe = store.subscribe(onEvent);
 
