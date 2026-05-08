@@ -1,110 +1,79 @@
 {
   "version": "1",
-  "issueId": "PAN-986",
-  "created": "2026-05-07T14:20:00Z",
-  "updated": "2026-05-07T15:28:32-04:00",
+  "issueId": "PAN-1032",
+  "created": "2026-05-08T00:00:00Z",
+  "updated": "2026-05-08T00:00:00Z",
   "gitState": {
-    "branch": "feature/pan-986",
-    "sha": "b3b364126",
-    "dirty": true
+    "branch": "feature/pan-1032",
+    "sha": "a8bffd787",
+    "dirty": false
   },
   "decisions": [
     {
       "id": "D1",
-      "summary": "The outbound Claude Code Channels work is being split across three beads so the bridge surface, the dashboard event plumbing, and the hook replacement each land in reviewable commits. The first bead defines the `channel_reply` MCP tool, validates its payload, and documents when Claude should emit structured status instead of relying on terminal prose alone.",
-      "recordedAt": "2026-05-07T14:20:00Z"
+      "summary": "claudish supports --model-opus, --model-sonnet, --model-haiku, --model-subagent (verified by user via claudish --help at /home/eltmon/.config/nvm/versions/node/v22.22.0/bin/claudish). Use all 4 flags in getAgentRuntimeBaseCommand.",
+      "recordedAt": "2026-05-08T00:00:00Z"
     },
     {
       "id": "D2",
-      "summary": "Accepted `channel_reply` payloads now enter the same typed runtime-event pipeline as hook heartbeats instead of being stored only in bridge-local logs. The dashboard reducer records the latest structured reply on `AgentRuntimeSnapshot.channelReply`, and the reducer also projects `done` and `needs_input` replies onto the existing runtime resolution fields so current consumers can benefit without waiting for a separate UI migration.",
-      "recordedAt": "2026-05-07T14:35:00Z"
+      "summary": "Flag values use claudish-prefixed form (e.g. kc@kimi-k2) matching getLaunchModelForModel output. --model-subagent maps to tierModels.haiku (same as CLAUDE_CODE_SUBAGENT_MODEL). Single source of truth: provider.tierModels in providers.ts.",
+      "recordedAt": "2026-05-08T00:00:00Z"
     },
     {
       "id": "D3",
-      "summary": "The work-agent stop hook now treats the latest structured `channel_reply` runtime signal as authoritative for `done` and `needs_input` before it falls back to tmux capture and LLM inference. This replaces one of the brittle pane-scrape paths the issue targeted while preserving the old heuristic as a safety net for sessions that never emit structured replies.",
-      "recordedAt": "2026-05-07T14:45:00Z"
-    },
-    {
-      "id": "D4",
-      "summary": "Repo-wide verification was blocked by two stale invariants outside the PAN-986 feature code: the desktop workspace package metadata had drifted behind the root CLI package version, and the GitHub label-cleanup unit test still assumed unconditional `--remove-label` calls even though the implementation now prefetches current labels and removes only labels that are actually present. I aligned the desktop package metadata with the rebased root release version and updated the test to mock the label-prefetch response so the quality gate exercises the current behavior instead of an obsolete assumption.",
-      "recordedAt": "2026-05-07T18:42:27Z"
-    },
-    {
-      "id": "D5",
-      "summary": "Review feedback required tightening both correctness and security around structured channel replies instead of only preserving the original feature path. I centralized channel-reply normalization and limits in the shared contracts package, reused that validator at the bridge and dashboard heartbeat ingress points, cleared stale `channelReply` state on `agent.stopped`, normalized hook log output before writing agent-supplied summaries, made the bridge direct-invocation check path-safe for relative Bun entrypoints, and hardened the related tests so the review fix covers the end-to-end data path rather than a single file-local patch.",
-      "recordedAt": "2026-05-07T15:28:32-04:00"
+      "summary": "HARNESSES.md updated, CLAUDE.md is NOT updated. Provider internals are not documented in CLAUDE.md.",
+      "recordedAt": "2026-05-08T00:00:00Z"
     }
   ],
   "hazards": [
     {
       "id": "H1",
-      "summary": "This workspace started with a deleted `.pan/continue.json` from PAN-939 and no PAN-986 issue-scoped beads, so the normal resume path was broken before implementation began.",
-      "mitigation": "I recreated PAN-986 beads locally, replaced the stale deleted continue file with PAN-986 state, and will keep this file updated after each bead so the remaining work can proceed through the standard claim, commit, close, and inspect loop."
+      "summary": "Existing providers.test.ts assertions check EXACT return values from getProviderEnv (e.g. expect(getProviderEnv(PROVIDERS.kimi, 'sk-kimi-test')).toEqual({ KIMI_CODING_API_KEY: 'sk-kimi-test' })). After bead claudish-env, these will fail because tier-model vars are now returned too. Update all 7 claudish provider tests.",
+      "mitigation": "Update tests in bead 'tests' (or update as part of bead 'claudish-env') to use expect.objectContaining or add the new vars to the expected object."
     },
     {
       "id": "H2",
-      "summary": "`pan done` attempted to rebase the branch onto `main`, but `main` had advanced the desktop release version to `0.8.17`, which conflicted with the earlier verification-fix commit that had aligned the desktop package to the older branch-local root version.",
-      "mitigation": "I manually rebased the branch onto `main`, kept the current `0.8.17` desktop version from `main`, preserved the label-cleanup test fix, and now need to update the remote branch with the rebased history before re-running `pan done`."
+      "summary": "The getProviderExportsForModel test in agents-auth-routing.test.ts asserts exactly 8 unset lines. After adding 4 new vars to PROVIDER_ENV_KEYS, this becomes 12 unset lines. The test will fail.",
+      "mitigation": "Update the test in bead 'tests' (or 'env-keys') to expect 12 unset lines."
+    },
+    {
+      "id": "H3",
+      "summary": "OpenRouter has no tierModels defined in PROVIDERS.openrouter. The claudish flag injection must guard against undefined tierModels — provider without tierModels should not append any --model-* flags.",
+      "mitigation": "Guard with if (provider.tierModels) before computing flags. Test with an OpenRouter model to confirm no flags appended."
+    },
+    {
+      "id": "H4",
+      "summary": "The subscription-oauth path in getProviderEnv returns {} (empty object). Tier-model injection must NOT apply to this path since it's the claudish subscription route with no API key.",
+      "mitigation": "The early return on line 279 (apiKey === 'subscription-oauth') already returns before any tierModels logic. This is correct behavior — confirm with a test."
     }
   ],
   "resumePoint": {
-    "description": "The review remediation pass is complete locally. The bridge, contracts, heartbeat ingestion, reducer, and stop-hook paths now enforce structured channel-reply limits, clear stale reply state on stop, sanitize logged summaries, and cover the regressions with focused tests. Local verification is green (`npm run build:contracts`, targeted Vitest for the touched surfaces, `npm run typecheck`, `npm run lint`, and full `npm test`). The remaining work is to commit these review fixes and submit `pan review request PAN-986 -m \"Fixed review issues\"`.",
+    "description": "Planning complete. Implementation agent should start with bead 'env-keys': add ANTHROPIC_DEFAULT_OPUS_MODEL, ANTHROPIC_DEFAULT_SONNET_MODEL, ANTHROPIC_SMALL_FAST_MODEL, CLAUDE_CODE_SUBAGENT_MODEL to PROVIDER_ENV_KEYS array in src/lib/agents.ts (lines 250-259) and to PROVIDER_ENV_KEYS Set in src/lib/child-env.ts (lines 23-32). Then bead 'claudish-env': add tierModels injection to the claudish branch of getProviderEnv in providers.ts (lines 274-312). Then bead 'cliproxy-env': merge tierModels into CLIProxy return in getProviderEnvForModel in agents.ts (lines 171-179). Then bead 'claudish-flags': compute and append --model-opus/sonnet/haiku/subagent to claudish command in getAgentRuntimeBaseCommand (lines 181-188). Then bead 'tests': update existing test assertions and add new ones. Finally bead 'docs': update HARNESSES.md.",
     "beadId": null,
     "filesToRead": [
-      ".pan/continue.json",
-      "packages/contracts/src/types.ts",
-      "src/lib/channels/panopticon-bridge.ts",
-      "scripts/work-agent-stop-hook"
+      "src/lib/agents.ts",
+      "src/lib/providers.ts",
+      "src/lib/child-env.ts",
+      "tests/lib/providers.test.ts",
+      "tests/lib/agents-auth-routing.test.ts",
+      "docs/HARNESSES.md"
     ]
   },
   "beadsMapping": {
-    "bridge-tool": [
-      "workspace-78h8"
-    ],
-    "event-stream": [
-      "workspace-teyh"
-    ],
-    "hook-replacement": [
-      "workspace-jyh4"
-    ]
+    "env-keys": "workspace-ikvy",
+    "claudish-env": "workspace-k9cq",
+    "cliproxy-env": "workspace-4jk2",
+    "claudish-flags": "workspace-jyy0",
+    "tests": "workspace-yu52",
+    "docs": "workspace-k0b3"
   },
-  "agentModel": "claude-code",
+  "agentModel": "claude-opus-4-6",
   "sessionHistory": [
     {
-      "timestamp": "2026-05-07T14:20:00Z",
-      "reason": "resume",
-      "note": "Recovered the PAN-986 workspace after finding a stale deleted PAN-939 continue file and no PAN-986 beads. I recreated issue-scoped beads, claimed workspace-78h8, and started implementing the outbound `channel_reply` MCP tool surface with validation and bridge tests.",
-      "agentModel": "claude-code"
-    },
-    {
-      "timestamp": "2026-05-07T14:35:00Z",
-      "reason": "manual",
-      "note": "Closed workspace-78h8 after landing the bridge tool surface. Claimed workspace-teyh and wired accepted `channel_reply` payloads into the typed runtime heartbeat path, extended the shared contracts and reducer, rebuilt `@panctl/contracts`, and verified the focused contract, bridge, and frontend reducer tests all pass.",
-      "agentModel": "claude-code"
-    },
-    {
-      "timestamp": "2026-05-07T14:45:00Z",
-      "reason": "manual",
-      "note": "Claimed workspace-jyh4 and updated `scripts/work-agent-stop-hook` so it checks the structured `channelReply` runtime snapshot before tmux pane capture and Claude fallback. Added end-to-end script tests with mocked curl, tmux, and claude commands to prove that `done` and `needs_input` replies emit the expected runtime resolution without invoking pane scraping.",
-      "agentModel": "claude-code"
-    },
-    {
-      "timestamp": "2026-05-07T18:42:27Z",
-      "reason": "manual",
-      "note": "Finished the blocked verification pass after fixing two repo-wide quality gate regressions that were unrelated to the PAN-986 feature logic. I aligned the desktop package metadata and lockfile with the root release version that existed on the branch at the time, updated the GitHub label-cleanup unit test so it mocks the implementation's current label-prefetch behavior, reran the targeted blockers, and then reran `npm run typecheck`, `npm run lint`, and the full `npm test` suite successfully.",
-      "agentModel": "claude-code"
-    },
-    {
-      "timestamp": "2026-05-07T18:46:22Z",
-      "reason": "manual",
-      "note": "Attempting `pan done pan-986 -c \"Implementation complete\"` exposed a rebase conflict because `main` had moved the desktop package version forward to `0.8.17` after the earlier verification fix. I rebased the branch manually, resolved the conflict by keeping `main`'s current desktop version while preserving the label-cleanup test fix, and confirmed the branch is now based on the latest `main` history. The remaining blocker is updating the already-pushed remote branch to match this rebased local history before re-running `pan done`.",
-      "agentModel": "claude-code"
-    },
-    {
-      "timestamp": "2026-05-07T15:28:32-04:00",
-      "reason": "manual",
-      "note": "Addressed the review findings across the structured channel-reply path. I cleared stale `channelReply` state on `agent.stopped`, centralized channel-reply normalization and size limits in the shared contracts helper, reused that validation in both the bridge tool and heartbeat ingestion route, made the bridge direct-entry detection robust for relative Bun paths, memoized bridge log-directory setup, sanitized stop-hook log summaries, mocked `pan-hook-lib.sh` directly in the hook tests, and added regression coverage for the new limits, skip behavior, direct invocation, stale-state clearing, and single-fetch stop-hook resolution path. I then rebuilt `@panctl/contracts`, reran the focused Vitest suites, ran `npm run typecheck`, ran `npm run lint`, and finished a clean full `npm test` pass.",
-      "agentModel": "claude-code"
+      "timestamp": "2026-05-08T00:00:00Z",
+      "reason": "end",
+      "note": "Planning complete for PAN-1032. Researched: claudish flag support confirmed (--model-opus/sonnet/haiku/subagent), gaps identified in providers.ts claudish branch (no tier-model env injection), agents.ts CLIProxy path (no tier-model injection), and PROVIDER_ENV_KEYS tracking (missing 4 vars). 6-bead plan written: env-keys, claudish-env, cliproxy-env, claudish-flags, tests, docs.",
+      "agentModel": "claude-opus-4-6"
     }
   ]
 }
