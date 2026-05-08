@@ -10,6 +10,7 @@
 - MiniMax models now launch through Claude Code directly against MiniMax's Anthropic-compatible endpoint.
 - Mimo models now launch through Claude Code directly against Xiaomi MiMo's Anthropic-compatible endpoint.
 - OpenRouter models now launch through Claude Code directly against OpenRouter's Anthropic-compatible endpoint while preserving slash-containing model IDs.
+- `pan install`, `pan sync`, and lazy prerequisite checks no longer install or require `claudish`.
 
 ## [0.7.0] — Command Taxonomy Reorganization
 

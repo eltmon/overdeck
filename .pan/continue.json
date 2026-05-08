@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1015",
   "created": "2026-05-08T00:56:13.011Z",
-  "updated": "2026-05-08T15:49:24.440Z",
+  "updated": "2026-05-08T16:10:09.988Z",
   "gitState": {
     "branch": "feature/pan-1015",
-    "sha": "14e6f1be5",
+    "sha": "d756672c5",
     "dirty": true,
     "clean": false
   },
@@ -44,6 +44,11 @@
       "id": "D7",
       "summary": "The claudish spawn branch is deleted from getAgentRuntimeBaseCommand. Claude Code launches now either use native direct providers or CLIProxy-backed subscription routing; legacy non-direct provider configs fail closed instead of spawning claudish.",
       "recordedAt": "2026-05-08T15:49:24.440Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Claudish is removed from setup surfaces: lazy prereqs, pan install, and pan sync no longer check, install, or log claudish. OpenAI auth now reads Codex auth directly and only bridges Codex credentials into CLIProxy.",
+      "recordedAt": "2026-05-08T16:10:09.988Z"
     }
   ],
   "hazards": [
@@ -59,13 +64,16 @@
     }
   ],
   "resumePoint": {
-    "description": "Implemented workspace-b175: getAgentRuntimeBaseCommand no longer has a claudish spawn branch or auto-mode claudish refusal path; the unused getLaunchModelForModel helper was deleted and migrated provider prefixes no longer route through getClaudishPrefix. Commit and close the bead; inspection is skipped because metadata.requiresInspection=false.",
-    "beadId": "workspace-b175",
+    "description": "Implemented workspace-xz9q: claudish is no longer installed by prereq registry, pan install, or pan sync; openai-auth no longer reads/writes ~/.claudish credentials and bridges Codex auth only to CLIProxy. Commit and close the bead; inspection is skipped because metadata.requiresInspection=false.",
+    "beadId": "workspace-xz9q",
     "filesToRead": [
-      "src/lib/agents.ts",
-      "src/lib/__tests__/permission-mode-leak.test.ts",
+      "src/lib/prereqs/registry.ts",
+      "src/cli/commands/install.ts",
+      "src/cli/commands/sync.ts",
+      "src/lib/openai-auth.ts",
       ".pan/spec.vbrief.json",
-      ".pan/continue.json"
+      ".pan/continue.json",
+      "CHANGELOG.md"
     ]
   },
   "beadsMapping": {},
@@ -141,9 +149,15 @@
       "reason": "bead-complete",
       "note": "Implemented workspace-b175. Deleted the claudish spawn branch and auto-mode claudish refusal path from getAgentRuntimeBaseCommand; unsupported non-direct provider configs now fail closed without launching claudish. Removed unused getLaunchModelForModel and removed the remaining Kimi kc@ mapping from getClaudishPrefix while leaving the exported helper for existing tests until the dedicated test-cleanup bead. Verified npm run typecheck and npm test -- src/lib/__tests__/permission-mode-leak.test.ts.",
       "agentModel": "agent:claude-opus-4.7"
+    },
+    {
+      "timestamp": "2026-05-08T16:10:09.988Z",
+      "reason": "bead-complete",
+      "note": "Implemented workspace-xz9q. Removed claudish from lazy prerequisite registration and auto-install support, removed --skip-claudish and claudish checks/install from pan install, removed claudish install/version handling from pan sync, and simplified openai-auth to read Codex auth directly while only bridging to CLIProxy. Verified npm run typecheck, npm run lint, affected auth/provider Vitest files, and rg confirms the affected setup/auth files no longer reference claudish.",
+      "agentModel": "agent:claude-opus-4.7"
     }
   ],
   "feedback": [],
   "agentModel": "agent:claude-opus-4.7",
-  "sequence": 5
+  "sequence": 6
 }
