@@ -155,10 +155,14 @@ will be rejected.
 3. Implement ONLY that bead's work
 4. `git add` and `git commit` — one bead = one commit
 5. **Update `.pan/continue.json`** — append a decision or hazard if you learned something new, update `resumePoint` with what the next agent should do (see continue format below)
-6. `bd close <bead-id> --reason="what you did"` — this auto-triggers inspection
-7. **WAIT** for the inspection result (delivered to your session via `pan tell`)
-8. `INSPECTION PASSED` → proceed to step 1
-9. `INSPECTION BLOCKED` → fix, commit, `bd close` again
+6. `bd close <bead-id> --reason="what you did"`
+7. **Check `metadata.requiresInspection` on this bead's plan item** in `.pan/spec.vbrief.json`:
+   - If `true` (or missing — treat as `true` only on legacy plans without the field): run `pan inspect {{ISSUE_ID}} --bead <bead-id>` and **WAIT** for the verdict (delivered via `pan tell`).
+     - `INSPECTION PASSED` → proceed to step 1
+     - `INSPECTION BLOCKED` → fix, commit, `bd close` again, then `pan inspect` again
+   - If `false`: skip inspection entirely. Proceed straight to step 1.
+
+The planning agent decides per-bead whether inspection is required. Most mechanical beads (flag flips, file renames, isolated bug fixes) carry `requiresInspection: false`; foundational beads that downstream beads build on top of carry `true`. Trust the plan — do not request inspection on beads marked `false`, do not skip inspection on beads marked `true`.
 
 **IMPORTANT:** Always use `-l {{ISSUE_ID_LOWER}}` with `bd ready` and `bd list` to scope
 to this issue's beads. The shared database contains beads from ALL issues — without the
@@ -174,8 +178,10 @@ and `.pan/spec.vbrief.json`, you MUST still run `bd close <bead-id> --reason="..
 The bead is NOT done until `bd close` succeeds.
 
 **Do NOT implement multiple beads before committing and closing.** Each bead must be
-a separate commit with a separate `bd close`. The inspection fires automatically on
-`bd close` — you do not need to call `pan inspect` manually.
+a separate commit with a separate `bd close`. Whether inspection follows depends on
+that bead's `metadata.requiresInspection` flag — see step 7 above. The inspector
+specialist is NOT auto-spawned by `bd close`; when inspection is required you must
+invoke `pan inspect` yourself.
 
 **CRITICAL: Update vBRIEF AC statuses as you complete each bead.** The verification gate
 checks `.pan/spec.vbrief.json` subItem statuses. If you close a bead but leave its
@@ -267,10 +273,11 @@ and your work will be rejected.
 3. Implement ONLY that bead's work
 4. `git add` and `git commit` — one bead = one commit
 5. **Update `.pan/continue.json`** — this is MANDATORY before closing the bead (see continue format below)
-6. `bd close <bead-id> --reason="what you did"` — this auto-triggers inspection
-7. **WAIT** for the inspection result (delivered to your session via `pan tell`)
-8. `INSPECTION PASSED` → proceed to step 1
-9. `INSPECTION BLOCKED` → fix, commit, `bd close` again
+6. `bd close <bead-id> --reason="what you did"`
+7. `pan inspect {{ISSUE_ID}} --bead <bead-id>` — YOU must run this yourself. There is no auto-trigger; closing a bead does NOT spawn the inspector.
+8. **WAIT** for the inspection result (delivered to your session via `pan tell`)
+9. `INSPECTION PASSED` → proceed to step 1
+10. `INSPECTION BLOCKED` → fix, commit, `bd close` again, then `pan inspect …` again
 
 **IMPORTANT:** Always use `-l {{ISSUE_ID_LOWER}}` with `bd ready` and `bd list` to scope
 to this issue's beads. The shared database contains beads from ALL issues — without the
@@ -286,8 +293,10 @@ and `.pan/spec.vbrief.json`, you MUST still run `bd close <bead-id> --reason="..
 The bead is NOT done until `bd close` succeeds.
 
 **Do NOT implement multiple beads before committing and closing.** Each bead must be
-a separate commit with a separate `bd close`. The inspection fires automatically on
-`bd close` — you do not need to call `pan inspect` manually.
+a separate commit with a separate `bd close`. Whether inspection follows depends on
+that bead's `metadata.requiresInspection` flag — see step 7 above. The inspector
+specialist is NOT auto-spawned by `bd close`; when inspection is required you must
+invoke `pan inspect` yourself.
 
 ## CRITICAL: Keep `.pan/continue.json` Updated — Crash Recovery Insurance
 
