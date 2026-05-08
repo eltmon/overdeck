@@ -1,0 +1,704 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-08T18:55:00Z",
+    "author": "manual:opus-4.7",
+    "description": "Plan for PAN-1015: Remove claudish routing in favor of direct ANTHROPIC_BASE_URL (CLIProxy only where needed). Empirically scoped 2026-05-08 — see issue body Empirical findings section.",
+    "updated": "2026-05-08T10:53:39.135Z"
+  },
+  "plan": {
+    "id": "pan-1015",
+    "title": "Remove claudish routing in favor of direct ANTHROPIC_BASE_URL (CLIProxy only where needed)",
+    "status": "proposed",
+    "uid": "d3644941-fec5-4e25-9974-34d6a9e02902",
+    "author": "manual:opus-4.7",
+    "sequence": 1,
+    "created": "2026-05-08T18:55:00Z",
+    "updated": "2026-05-08T10:53:39.135Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1015",
+        "label": "PAN-1015",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/964",
+        "label": "PAN-964 (closing PR cargo-culted to claudish without isolating root cause)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/690",
+        "label": "PAN-690 (CLIProxy + OpenAI subscription, already shipped)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/752",
+        "label": "PAN-752 (Gemini OAuth — gates the claudish-cleanup for Gemini)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/465",
+        "label": "PAN-465 (OpenRouter as a model provider)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "providers",
+      "routing",
+      "cleanup",
+      "claudish-removal"
+    ],
+    "narratives": {
+      "Problem": "claudish v7.0.3 wraps every non-Anthropic provider with prefix@model syntax. The wrapper exists because of an assumed Claude Code v2.1.121 model-name validator (PAN-964) — but empirical retest 2026-05-08 shows that validator does not exist; PR #996 cargo-culted everything to claudish without isolating the actual cause of the original 502. Five providers (Z.AI, Mimo, OpenRouter, MiniMax, Kimi) expose native Anthropic-compatible endpoints that work end-to-end with Claude Code via direct ANTHROPIC_BASE_URL. The claudish layer is also the reason --permission-mode auto had to be pinned to bypass (commit 0ad7af02f) — claudish cannot proxy auto upstream. Removing claudish for those five providers unlocks auto-mode for them.",
+      "Proposal": "Flip Z.AI, Mimo, OpenRouter, MiniMax, Kimi to compatibility:'direct' with their native Anthropic baseUrls. Deprecate the OpenAI API-key fallback (Codex subscription via CLIProxy is the supported OpenAI path). Defer Gemini to #752 (Gemini OAuth) and either keep claudish gated to Gemini-only OR add a CLIProxy Gemini adapter. Then delete the claudish spawn branch, prereqs, install/sync flows, ProviderCompatibility union, and the bypass-mode pin. Recommended split: ship Wave 1 (5 direct-flips) + OpenAI-deprecate + Gemini-deferral as v0.8.21 alongside the DSP-leak fix. Cleanup waves follow in v0.8.22."
+    },
+    "items": [
+      {
+        "id": "zai-direct",
+        "title": "Z.AI / GLM: flip to direct ANTHROPIC_BASE_URL",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-08T18:55:00Z",
+        "metadata": {
+          "difficulty": "moderate",
+          "issueLabel": "pan-1015"
+        },
+        "narrative": {
+          "Action": "In src/lib/providers.ts, change PROVIDERS.zai: set compatibility: 'direct', add baseUrl: 'https://api.z.ai/api/anthropic'. Verified end-to-end with Claude Code v2.1.121 — claude --print --model glm-4.7 'pong' returns successfully through ANTHROPIC_BASE_URL routing. Remove zai entry from any prefix-routing branches in src/lib/agents.ts."
+        },
+        "subItems": [
+          {
+            "id": "zai-direct.ac1",
+            "title": "PROVIDERS.zai.compatibility === 'direct'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "zai-direct.ac2",
+            "title": "PROVIDERS.zai.baseUrl === 'https://api.z.ai/api/anthropic'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "zai-direct.ac3",
+            "title": "claude --print --model glm-4.7 'pong' succeeds end-to-end via ZAI_API_KEY",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "zai-direct.ac4",
+            "title": "tests/lib/providers.test.ts updated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "mimo-direct",
+        "title": "Mimo: flip to direct (baseUrl already configured)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-08T18:55:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1015"
+        },
+        "narrative": {
+          "Action": "PROVIDERS.mimo already has baseUrl: 'https://token-plan-sgp.xiaomimimo.com/anthropic'. Just change compatibility from 'claudish' to 'direct'. Probe confirmed endpoint returns proper Anthropic-shape 401 'Invalid API Key'. If user has MIMO_API_KEY available, run live verification; otherwise note the gap in followup-issues.txt."
+        },
+        "subItems": [
+          {
+            "id": "mimo-direct.ac1",
+            "title": "PROVIDERS.mimo.compatibility === 'direct'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mimo-direct.ac2",
+            "title": "Live verification attempted (or gap documented)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "mimo-direct.ac3",
+            "title": "Tests updated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "openrouter-direct",
+        "title": "OpenRouter: flip to direct ANTHROPIC_BASE_URL",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-08T18:55:00Z",
+        "metadata": {
+          "difficulty": "moderate",
+          "issueLabel": "pan-1015"
+        },
+        "narrative": {
+          "Action": "PROVIDERS.openrouter: set compatibility: 'direct', baseUrl: 'https://openrouter.ai/api/v1', authType: 'static'. Probe confirmed endpoint returns proper 401 'Missing Authentication header'. OpenRouter model IDs contain '/' (e.g. 'qwen/qwen3.6-plus:free') — verify Claude Code passes them through. Remove 'or@' prefix routing in src/lib/agents.ts."
+        },
+        "subItems": [
+          {
+            "id": "openrouter-direct.ac1",
+            "title": "PROVIDERS.openrouter.compatibility === 'direct'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openrouter-direct.ac2",
+            "title": "PROVIDERS.openrouter.baseUrl === 'https://openrouter.ai/api/v1'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openrouter-direct.ac3",
+            "title": "Slash-containing model IDs route correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openrouter-direct.ac4",
+            "title": "Tests updated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "minimax-direct",
+        "title": "MiniMax: flip to direct ANTHROPIC_BASE_URL",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-08T18:55:00Z",
+        "metadata": {
+          "difficulty": "moderate",
+          "issueLabel": "pan-1015"
+        },
+        "narrative": {
+          "Action": "PROVIDERS.minimax: set compatibility: 'direct', baseUrl: 'https://api.minimaxi.com/anthropic'. Probe confirmed proper Anthropic-shape authentication_error with request_id when key missing. MiniMax requires Authorization: Bearer (Claude Code converts ANTHROPIC_AUTH_TOKEN appropriately). Live verification deferred if no MINIMAX_API_KEY available."
+        },
+        "subItems": [
+          {
+            "id": "minimax-direct.ac1",
+            "title": "PROVIDERS.minimax.compatibility === 'direct'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "minimax-direct.ac2",
+            "title": "PROVIDERS.minimax.baseUrl === 'https://api.minimaxi.com/anthropic'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "minimax-direct.ac3",
+            "title": "Auth header convention verified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "minimax-direct.ac4",
+            "title": "Tests updated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "kimi-direct",
+        "title": "Kimi: flip to direct with key-aware endpoint selection",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-08T18:55:00Z",
+        "metadata": {
+          "difficulty": "moderate",
+          "issueLabel": "pan-1015"
+        },
+        "narrative": {
+          "Action": "PROVIDERS.kimi: set compatibility: 'direct'. Two endpoints depending on key prefix: sk-kimi-* coding key -> https://api.kimi.com/coding/anthropic; moonshot platform key -> https://api.moonshot.ai/anthropic. Probe confirmed api.moonshot.ai/anthropic/v1/messages reachable. Implement key-prefix detection in getProviderEnv(). User has KIMI_CODING_API_KEY but is currently out of tokens — capture the quota-exceeded response as proof of authenticated reach."
+        },
+        "subItems": [
+          {
+            "id": "kimi-direct.ac1",
+            "title": "PROVIDERS.kimi.compatibility === 'direct'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kimi-direct.ac2",
+            "title": "Endpoint selection respects key prefix (coding vs platform)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kimi-direct.ac3",
+            "title": "claude --print --model kimi-k2.6 produces an authenticated response (or quota-exceeded, not auth failure)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "kimi-direct.ac4",
+            "title": "Tests updated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "openai-key-deprecate",
+        "title": "OpenAI API-key path: deprecate (keep only Codex subscription via CLIProxy)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-08T18:55:00Z",
+        "metadata": {
+          "difficulty": "moderate",
+          "issueLabel": "pan-1015"
+        },
+        "narrative": {
+          "Action": "Probe confirmed api.openai.com does NOT expose Anthropic-compatible /v1/messages. Recommendation: deprecate the oai@ API-key fallback. Codex subscription via CLIProxy is the supported OpenAI path. In src/lib/agents.ts getProviderEnvForModel(), when provider.name==='openai' and no Codex login, throw a clear remediation error pointing to (1) pan admin specialists codex login or (2) dashboard Settings Codex login. Update src/lib/openai-auth.ts to remove the API-key fallback. Update tests."
+        },
+        "subItems": [
+          {
+            "id": "openai-key-deprecate.ac1",
+            "title": "OpenAI API-key fallback path removed from src/lib/agents.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openai-key-deprecate.ac2",
+            "title": "Clear remediation error when user has OpenAI key but no Codex subscription",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openai-key-deprecate.ac3",
+            "title": "Tests in tests/lib/agents-auth-routing.test.ts updated to single-path Codex routing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "openai-key-deprecate.ac4",
+            "title": "CHANGELOG entry written",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gemini-cliproxy-or-defer",
+        "title": "Gemini: scope decision — CLIProxy adapter vs defer to #752",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-08T18:55:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1015"
+        },
+        "narrative": {
+          "Action": "Probe confirmed Gemini does NOT expose Anthropic endpoint at generativelanguage.googleapis.com. Two paths: (a) Add Gemini adapter to CLIProxy now (substantial — multi-week translator). (b) Mark Gemini as the ONE remaining claudish route, defer cleanup to #752 which is already open and tracking Gemini OAuth support. Recommendation: (b). Unblocks 90% of cleanup without coupling to a multi-week project. Add code comment in src/lib/agents.ts marking the claudish branch as Gemini-only, link to #752."
+        },
+        "subItems": [
+          {
+            "id": "gemini-cliproxy-or-defer.ac1",
+            "title": "Decision recorded (a or b) in code comment + linked to issue body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gemini-cliproxy-or-defer.ac2",
+            "title": "If (b): claudish branch in agents.ts narrowed to Gemini-only with deprecation comment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gemini-cliproxy-or-defer.ac3",
+            "title": "If (a): CLIProxy gemini adapter scoped as separate sub-issue or sub-bead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-claudish-spawn-branch",
+        "title": "Remove claudish spawn branch from getAgentRuntimeBaseCommand",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-05-08T18:55:00Z",
+        "metadata": {
+          "difficulty": "moderate",
+          "issueLabel": "pan-1015"
+        },
+        "narrative": {
+          "Action": "After items above land, the claudish branch in getAgentRuntimeBaseCommand() in src/lib/agents.ts becomes mostly dead. If gemini-cliproxy-or-defer chose (b), narrow to fire only when provider.name==='google'. Also delete: getClaudishPrefix() entries for migrated providers, the auto-refusal throw added in commit 0ad7af02f for non-Gemini providers, and the bypass-mode pin once the branch shrinks. Verify the DSP-leak regression tests in src/lib/__tests__/permission-mode-leak.test.ts still pass — those invariants must hold under direct routing."
+        },
+        "subItems": [
+          {
+            "id": "delete-claudish-spawn-branch.ac1",
+            "title": "Claudish branch deleted (option a) or narrowed to Gemini-only (option b)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-claudish-spawn-branch.ac2",
+            "title": "getClaudishPrefix() returns null/throws for migrated providers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-claudish-spawn-branch.ac3",
+            "title": "Bypass-mode pin removed for direct-routed providers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-claudish-spawn-branch.ac4",
+            "title": "All 8 permission-mode-leak.test.ts tests still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-claudish-prereq-and-install",
+        "title": "Remove claudish from prereqs / install / sync flows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-08T18:55:00Z",
+        "metadata": {
+          "difficulty": "moderate",
+          "issueLabel": "pan-1015"
+        },
+        "narrative": {
+          "Action": "If (a) chosen: remove claudish from src/lib/prereqs/registry.ts, src/cli/commands/install.ts, src/cli/commands/sync.ts. If (b): gate claudish prereq behind 'has Gemini' rather than always-required. Delete src/lib/openai-auth.ts claudish-backed paths now that OpenAI API-key path is deprecated. Verify pan install / pan sync runs cleanly on a fresh setup without claudish for non-Gemini users."
+        },
+        "subItems": [
+          {
+            "id": "delete-claudish-prereq-and-install.ac1",
+            "title": "claudish either fully removed from prereqs, or gated to Gemini users only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-claudish-prereq-and-install.ac2",
+            "title": "openai-auth.ts cleaned of claudish-backed dead code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-claudish-prereq-and-install.ac3",
+            "title": "pan install / pan sync runs cleanly without claudish for non-Gemini users",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "collapse-provider-compatibility",
+        "title": "Collapse ProviderCompatibility union",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-08T18:55:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1015"
+        },
+        "narrative": {
+          "Action": "ProviderCompatibility = 'direct' | 'claudish' becomes either a single literal 'direct' (deletable) if all providers route direct, or stays as the union with only Gemini using 'claudish' under option (b). Delete ProviderCompatibility export, requiresClaudish(), getClaudishProviders(), and helpers if unused. Update inspector frontend src/dashboard/frontend/src/components/inspector/utils.ts to drop the claudish badge."
+        },
+        "subItems": [
+          {
+            "id": "collapse-provider-compatibility.ac1",
+            "title": "ProviderCompatibility union simplified or removed per gemini decision",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collapse-provider-compatibility.ac2",
+            "title": "Helpers removed or narrowed (no dead code)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collapse-provider-compatibility.ac3",
+            "title": "Frontend inspector badge updated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "collapse-provider-compatibility.ac4",
+            "title": "No orphaned imports of removed types",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "update-or-delete-claudish-tests",
+        "title": "Update or delete claudish-only tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-08T18:55:00Z",
+        "metadata": {
+          "difficulty": "moderate",
+          "issueLabel": "pan-1015"
+        },
+        "narrative": {
+          "Action": "Files to revisit: tests/lib/agents-auth-routing.test.ts (just patched in commit aa3f64afc to pin permissionMode=bypass — most assertions about claudish spawn shapes become obsolete; rewrite to assert direct ANTHROPIC_BASE_URL spawn shapes). tests/lib/providers.test.ts (compatibility assertions). tests/lib/cloister/review-agent.test.ts (any claudish env assumptions). permission-mode-leak.test.ts must still pass — its invariants apply to direct routing too."
+        },
+        "subItems": [
+          {
+            "id": "update-or-delete-claudish-tests.ac1",
+            "title": "agents-auth-routing.test.ts rewritten for direct routing assertions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-or-delete-claudish-tests.ac2",
+            "title": "providers.test.ts updated to reflect new compatibility values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-or-delete-claudish-tests.ac3",
+            "title": "permission-mode-leak.test.ts: all 8 tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "update-or-delete-claudish-tests.ac4",
+            "title": "No skipped/disabled tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verification-typecheck-lint-test",
+        "title": "Quality gates: typecheck, lint, full test suite, build, smoke test",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-05-08T18:55:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1015"
+        },
+        "narrative": {
+          "Action": "Run npm run typecheck, npm run lint, npm test (root + frontend), npm run build. Fix any type errors. Validate dashboard launches via pan up. Spot-check Settings → Providers page renders, then smoke-test claude --print --model glm-4.7 'pong' end-to-end through the new direct path. NEVER bypass hooks; if anything fails, fix the underlying issue."
+        },
+        "subItems": [
+          {
+            "id": "verification-typecheck-lint-test.ac1",
+            "title": "npm run typecheck passes with zero errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-typecheck-lint-test.ac2",
+            "title": "npm run lint passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-typecheck-lint-test.ac3",
+            "title": "npm test passes (root + frontend)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-typecheck-lint-test.ac4",
+            "title": "npm run build succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-typecheck-lint-test.ac5",
+            "title": "pan up launches dashboard cleanly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verification-typecheck-lint-test.ac6",
+            "title": "Smoke test: claude --print --model glm-4.7 'pong' succeeds via direct path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "zai-direct",
+        "to": "delete-claudish-spawn-branch",
+        "type": "blocks"
+      },
+      {
+        "from": "mimo-direct",
+        "to": "delete-claudish-spawn-branch",
+        "type": "blocks"
+      },
+      {
+        "from": "openrouter-direct",
+        "to": "delete-claudish-spawn-branch",
+        "type": "blocks"
+      },
+      {
+        "from": "minimax-direct",
+        "to": "delete-claudish-spawn-branch",
+        "type": "blocks"
+      },
+      {
+        "from": "kimi-direct",
+        "to": "delete-claudish-spawn-branch",
+        "type": "blocks"
+      },
+      {
+        "from": "openai-key-deprecate",
+        "to": "delete-claudish-spawn-branch",
+        "type": "blocks"
+      },
+      {
+        "from": "gemini-cliproxy-or-defer",
+        "to": "delete-claudish-spawn-branch",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-claudish-spawn-branch",
+        "to": "delete-claudish-prereq-and-install",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-claudish-spawn-branch",
+        "to": "collapse-provider-compatibility",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-claudish-spawn-branch",
+        "to": "update-or-delete-claudish-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "collapse-provider-compatibility",
+        "to": "update-or-delete-claudish-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "update-or-delete-claudish-tests",
+        "to": "verification-typecheck-lint-test",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-claudish-prereq-and-install",
+        "to": "verification-typecheck-lint-test",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "implementationModel": "gpt-5.5",
+      "plannedBy": "manual (Opus 4.7) — based on empirical provider probe 2026-05-08",
+      "decisionsRequired": [
+        "gemini-cliproxy-or-defer: pick option (a) implement adapter now, or (b) defer to #752 — recommendation: (b)",
+        "openai-key-deprecate: confirm deprecation is acceptable (vs. adding adapter)"
+      ],
+      "rollbackPlan": "Each direct-flip item is independently revertable: re-set compatibility:'claudish' on the affected provider in providers.ts. The spawn-branch deletion is the riskier change; keep the previous claudish code path in git history for at least one release as a hot-rollback option.",
+      "validationEvidence": "PAN-1015 issue body 'Empirical findings (2026-05-08)' section contains raw probe results.",
+      "canonicalFilename": "2026-05-08-PAN-1015-remove-claudish-routing-in-favor-of-direct-anthropic-base-url-cliproxy-only-where-needed.vbrief.json"
+    }
+  }
+}
