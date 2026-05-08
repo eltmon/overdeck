@@ -8,11 +8,31 @@
 
 set +e
 
+# Log first-thing so we have empirical evidence the hook fired, regardless of
+# whether anything downstream succeeded. Silent failures in pan_resolve_agent_id
+# used to leave zero trace, making "did the Stop hook even fire?" impossible to
+# answer post-hoc.
+LOG_DIR="$HOME/.panopticon/logs"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+echo "[$(date -Iseconds)] stop-hook: invoked CLAUDE_SESSION_ID=${CLAUDE_SESSION_ID:-unset} PANOPTICON_AGENT_ID=${PANOPTICON_AGENT_ID:-unset} cwd=$(pwd)" \
+  >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=pan-hook-lib.sh
-. "$SCRIPT_DIR/pan-hook-lib.sh" 2>/dev/null || exit 0
+. "$SCRIPT_DIR/pan-hook-lib.sh" 2>/dev/null || {
+  echo "[$(date -Iseconds)] stop-hook: pan-hook-lib.sh source failed — exiting" \
+    >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+  exit 0
+}
 
-pan_resolve_agent_id || exit 0
+if ! pan_resolve_agent_id; then
+  echo "[$(date -Iseconds)] stop-hook: pan_resolve_agent_id failed (CLAUDE_SESSION_ID=${CLAUDE_SESSION_ID:-unset} cwd=$(pwd)) — exiting" \
+    >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+  exit 0
+fi
+
+echo "[$(date -Iseconds)] stop-hook: resolved AGENT_ID=$AGENT_ID — proceeding" \
+  >> "$LOG_DIR/hooks.log" 2>/dev/null || true
 
 TS=$(date -Iseconds)
 BODY="{\"kind\":\"activity\",\"activity\":\"idle\",\"timestamp\":\"$TS\"}"
