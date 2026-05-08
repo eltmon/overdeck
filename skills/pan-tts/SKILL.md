@@ -25,7 +25,7 @@ allowed-tools:
 
 The TTS pipeline is split into two independent components:
 
-1. **Qwen3-TTS HTTP daemon** (`~/Projects/eltmon-stream/tts_daemon.py`) — keeps the 1.7B model resident in VRAM, synthesizes speech on demand via `POST /speak`, and plays audio through the default PipeWire sink. This is the component that actually drives the speaker.
+1. **Qwen3-TTS HTTP daemon** (`skills/pan-tts/scripts/tts_daemon.py`) — keeps the 1.7B model resident in VRAM, synthesizes speech on demand via `POST /speak`, and plays audio through the default PipeWire sink. This is the component that actually drives the speaker.
 2. **SSE subscriber** (`~/Projects/pan-tts/`) — connects to Panopticon's `/events/stream`, formats condensed utterances, and forwards them to the daemon. This is the component that decides *what* to speak.
 
 ## Architecture
@@ -46,7 +46,7 @@ pan dashboard            pan-tts subscriber          qwen-tts daemon            
 
 ## Qwen3-TTS HTTP Daemon
 
-**Source:** `~/Projects/eltmon-stream/tts_daemon.py`
+**Source:** `skills/pan-tts/scripts/tts_daemon.py`
 
 The daemon loads `Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice` on `cuda:0` at startup and exposes three endpoints:
 
@@ -57,8 +57,8 @@ The daemon loads `Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice` on `cuda:0` at startup a
 ### Running the daemon
 
 ```bash
-cd ~/Projects/eltmon-stream
-. .venv/bin/activate   # or use the qwen-tts venv
+cd skills/pan-tts/scripts
+# assumes the qwen-tts venv is active (see eltmon-stream setup)
 python tts_daemon.py
 ```
 
@@ -100,7 +100,7 @@ tts:
   rate: 1.1
 
 queue:
-  max_depth: 8
+  max_depth: 8            # subscriber-side queue; drops low-priority info events when full
   drop_info_when_full: true
 ```
 
@@ -128,7 +128,7 @@ The skill bundles `scripts/say.sh` for one-off utterances — agents can use thi
 ./scripts/say.sh "Pan 672 merged to main."
 ```
 
-The script POSTs to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (override via `QWEN_TTS_ENDPOINT`). It returns immediately after queuing — audio plays asynchronously through the daemon's worker thread. Keep utterances short (under ~200 characters); the daemon's queue caps at 6.
+The script POSTs to the local Qwen3-TTS daemon at `http://127.0.0.1:8787/speak` (override via `QWEN_TTS_ENDPOINT`). It waits for the daemon to acknowledge the request (up to 5 s); audio then plays asynchronously in the daemon's worker thread. Keep utterances short (under ~200 characters); the daemon's queue caps at 6.
 
 Use this sparingly — the SSE-subscribed sidecar already speaks every activity entry. Ad-hoc speak is for:
 - Announcements that don't warrant a dashboard activity entry (local test runs, meta-commentary)
@@ -138,7 +138,7 @@ Use this sparingly — the SSE-subscribed sidecar already speaks every activity 
 ## Verifying It
 
 1. `pan up` — start the dashboard.
-2. Start the Qwen3-TTS daemon: `cd ~/Projects/eltmon-stream && python tts_daemon.py`
+2. Start the Qwen3-TTS daemon: `cd skills/pan-tts/scripts && python tts_daemon.py`
 3. Start the sidecar: `systemctl --user start pan-tts`
 4. `journalctl --user -u pan-tts -f` — watch logs.
 5. In another terminal: `pan start PAN-XXX` and listen. You should hear the merge agent, review specialist, etc. as they post activity entries.
@@ -159,4 +159,4 @@ If nothing speaks:
 
 - `docs/EXTERNAL-EVENT-STREAM.md` — the public contract this skill depends on
 - `packages/contracts/src/events.ts` — canonical event schemas
-- `~/Projects/eltmon-stream/tts_daemon.py` — Qwen3-TTS HTTP daemon source
+- `skills/pan-tts/scripts/tts_daemon.py` — Qwen3-TTS HTTP daemon source
