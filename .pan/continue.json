@@ -2,8 +2,8 @@
   "version": "1",
   "issueId": "PAN-1025",
   "created": "2026-05-07T21:00:00.000Z",
-  "updated": "2026-05-07T21:02:00.000Z",
-  "gitState": { "branch": "feature/pan-1025", "sha": "0d2c779", "dirty": false },
+  "updated": "2026-05-07T21:05:00.000Z",
+  "gitState": { "branch": "feature/pan-1025", "sha": "fc077a9", "dirty": false },
   "decisions": [
     {
       "id": "D1",
@@ -29,9 +29,9 @@
     }
   ],
   "resumePoint": {
-    "description": "Bead workspace-az36 is complete. Next: implement bead workspace-rad9 — add comprehensive tests for QuotaExceededError fallback (e.g., verify first call throws, second call succeeds; verify non-quota errors are silently ignored; verify load still works after fallback).",
+    "description": "Bead workspace-rad9 is complete. Both beads implemented. Next: run full test suite (npm test), commit any remaining changes, push, then pan done.",
     "beadId": "workspace-rad9",
-    "filesToRead": ["src/dashboard/frontend/src/lib/__tests__/snapshotCache.test.ts"]
+    "filesToRead": []
   },
   "beadsMapping": {
     "workspace-az36": "Bump MAX_BYTES to 8 MB and make issues-stripping a fallback on QuotaExceededError",
@@ -49,6 +49,12 @@
       "timestamp": "2026-05-07T21:02:00.000Z",
       "reason": "bead-complete",
       "note": "Implemented bead workspace-az36: modified snapshotCache.ts — bumped MAX_BYTES from 2MB to 8MB, restructured saveSnapshotToCache to try full write first and catch QuotaExceededError DOMException, retrying with issues stripped. Updated existing test to mock QuotaExceededError and verify fallback stripping. Added test verifying ~2.5MB snapshot is preserved under new 8MB cap. All 10 tests pass.",
+      "agentModel": "claude-opus-4-5"
+    },
+    {
+      "timestamp": "2026-05-07T21:05:00.000Z",
+      "reason": "bead-complete",
+      "note": "Implemented bead workspace-rad9: added 3 new tests for QuotaExceededError fallback — non-quota errors silently ignored, both writes failing gracefully, non-issue fields preserved after fallback. All 13 tests pass.",
       "agentModel": "claude-opus-4-5"
     }
   ],
