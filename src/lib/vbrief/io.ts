@@ -18,6 +18,12 @@
 
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import {
+  PROJECT_DOCS_SUBDIR,
+  PROJECT_PRDS_ACTIVE_SUBDIR,
+  PROJECT_PRDS_PLANNED_SUBDIR,
+  PROJECT_PRDS_SUBDIR,
+} from '../paths.js';
 import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';
 import type { VBriefDocument, VBriefItemStatus } from './types.js';
 
@@ -29,6 +35,44 @@ import type { VBriefDocument, VBriefItemStatus } from './types.js';
 export function findPlan(workspacePath: string): string | null {
   const panPlanPath = join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME);
   return existsSync(panPlanPath) ? panPlanPath : null;
+}
+
+const PRD_VBRIEF_STATUS_DIRS = [PROJECT_PRDS_ACTIVE_SUBDIR, PROJECT_PRDS_PLANNED_SUBDIR] as const;
+const PRD_VBRIEF_ROOTS = [
+  [PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR],
+  ['api', PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR],
+] as const;
+
+/**
+ * Returns a PRD-scoped vBRIEF path for an issue when the workspace-local
+ * `.pan/spec.vbrief.json` has not been materialized yet.
+ *
+ * Supports both legacy flat files (`docs/prds/active/PAN-123-plan.vbrief.json`)
+ * and canonical subdirectory files (`docs/prds/active/pan-123/plan.vbrief.json`),
+ * including the historical uppercase-directory variant and the `api/docs/prds/*`
+ * mirror used by some projects.
+ */
+export function findVBriefInPrdDirs(projectRoot: string, issueId: string): string | null {
+  const issueIdLower = issueId.toLowerCase();
+  const issueIdUpper = issueId.toUpperCase();
+
+  for (const prdRoot of PRD_VBRIEF_ROOTS) {
+    for (const statusDir of PRD_VBRIEF_STATUS_DIRS) {
+      const root = join(projectRoot, ...prdRoot, statusDir);
+      const candidates = [
+        join(root, `${issueIdUpper}-plan.vbrief.json`),
+        join(root, `${issueIdLower}-plan.vbrief.json`),
+        join(root, issueIdLower, 'plan.vbrief.json'),
+        join(root, issueIdUpper, 'plan.vbrief.json'),
+      ];
+
+      for (const candidate of candidates) {
+        if (existsSync(candidate)) return candidate;
+      }
+    }
+  }
+
+  return null;
 }
 
 /**

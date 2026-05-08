@@ -2,22 +2,46 @@
   "version": "1",
   "issueId": "PAN-945",
   "created": "2026-05-07T09:30:00Z",
-  "updated": "2026-05-07T09:30:00Z",
-  "gitState": { "branch": "feature/pan-945", "sha": "33b2387f6", "dirty": false },
+  "updated": "2026-05-08T09:24:39Z",
+  "gitState": { "branch": "feature/pan-945", "sha": "12c339f08", "dirty": false },
   "decisions": [
-    { "id": "D1", "summary": "Create findVBriefInPrdDirs helper in vbrief/io.ts to search docs/prds/planned/, docs/prds/active/, api/docs/prds/planned/, api/docs/prds/active/ for .vbrief.json files matching an issue ID.", "recordedAt": "2026-05-07T09:30:00Z" }
+    {
+      "id": "D1",
+      "summary": "Added `findVBriefInPrdDirs` to `src/lib/vbrief/io.ts` so start flows can recover a missing workspace plan from PRD-published vBRIEF copies before the workspace `.pan/spec.vbrief.json` exists.",
+      "recordedAt": "2026-05-08T09:24:39Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Kept discovery path checks `existsSync`-only and enumerated known layouts explicitly: flat `PAN-123-plan.vbrief.json`, lowercase flat variants, lowercase per-issue subdirectories, uppercase per-issue subdirectories, and the `api/docs/prds/*` mirror. This keeps later dashboard callers compatible with the no-blocking-server rule.",
+      "recordedAt": "2026-05-08T09:24:39Z"
+    }
   ],
   "hazards": [
-    { "id": "H1", "summary": "PRD dir paths may not exist in all project structures", "mitigation": "Use existsSync checks and graceful fallbacks" }
+    {
+      "id": "H1",
+      "summary": "PRD-published vBRIEFs exist in multiple historical layouts and casing variants, so a narrow filename assumption would miss real plans during recovery.",
+      "mitigation": "The helper now checks both active and planned PRD roots, both flat and subdirectory formats, both lowercase and uppercase issue IDs, and the mirrored `api/docs/prds` tree before returning null."
+    }
   ],
   "resumePoint": {
-    "description": "Implement bead workspace-d5qf: add findVBriefInPrdDirs helper to src/lib/vbrief/io.ts. Then integrate into CLI start.ts and dashboard agents.ts.",
-    "beadId": "workspace-d5qf",
-    "filesToRead": ["src/lib/vbrief/io.ts", "src/cli/commands/start.ts", "src/dashboard/server/routes/agents.ts"]
+    "description": "Implement bead workspace-qmrt by wiring `findVBriefInPrdDirs` into the dashboard start-agent flow so the route can import a PRD-scoped vBRIEF into the workspace before plan validation runs.",
+    "beadId": "workspace-qmrt",
+    "filesToRead": ["src/lib/vbrief/io.ts", "src/dashboard/server/routes/agents.ts"]
   },
   "beadsMapping": {},
   "agentModel": "kc@kimi-k2.6",
   "sessionHistory": [
-    { "timestamp": "2026-05-07T09:30:00Z", "reason": "start", "note": "Started PAN-945 implementation. Rebased onto main, removed stale continue.json, created beads.", "agentModel": "kc@kimi-k2.6" }
+    {
+      "timestamp": "2026-05-07T09:30:00Z",
+      "reason": "start",
+      "note": "Started PAN-945 implementation. Rebased onto main, removed stale continue.json, and created the bead set for the issue.",
+      "agentModel": "kc@kimi-k2.6"
+    },
+    {
+      "timestamp": "2026-05-08T09:24:39Z",
+      "reason": "progress",
+      "note": "Completed bead workspace-d5qf by adding PRD-directory vBRIEF discovery in `src/lib/vbrief/io.ts` and verified the existing vbrief I/O test suite still passes after the change.",
+      "agentModel": "kc@kimi-k2.6"
+    }
   ]
 }
