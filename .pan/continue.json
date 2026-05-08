@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1028",
   "created": "2026-05-07T22:45:00Z",
-  "updated": "2026-05-08T03:32:36.585Z",
+  "updated": "2026-05-08T09:24:33Z",
   "gitState": {
     "branch": "feature/pan-1028",
-    "sha": "234a1348a",
-    "dirty": false
+    "sha": "d5b8ed9e5",
+    "dirty": true
   },
   "decisions": [
     {
@@ -18,6 +18,11 @@
       "id": "D2",
       "summary": "Since eltmon-stream has no GitHub remote and the issue is tracked in panopticon-cli, the fix was committed locally in eltmon-stream and a documentation update was committed in panopticon-cli (skills/pan-tts/SKILL.md) to reflect the correct split architecture and document the PipeWire suspend mitigation.",
       "recordedAt": "2026-05-07T22:45:00Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Review follow-up hardened the bundled tts_daemon.py: lazy model initialization now uses a shared double-checked lock, warm pw-play reuse skips redundant pactl probes, request bodies must be JSON objects, null fields collapse to defaults/empty strings, negative Content-Length clamps to zero, and empty voice-clone prompts return 422 instead of indexing past an empty list.",
+      "recordedAt": "2026-05-08T09:24:33Z"
     }
   ],
   "hazards": [
@@ -28,11 +33,11 @@
     }
   ],
   "resumePoint": {
-    "description": "Fix committed in eltmon-stream and documentation updated in panopticon-cli. Remaining step: run pan done PAN-1028 to signal completion and trigger the review pipeline.",
+    "description": "Review feedback fixes are staged in the workspace. Next step: commit the tts_daemon.py hardening changes, then invoke /rebase-and-submit for PAN-1028 to push and rerun review.",
     "beadId": null,
     "filesToRead": [
-      ".pan/continue.json",
-      "skills/pan-tts/SKILL.md"
+      "skills/pan-tts/scripts/tts_daemon.py",
+      ".pan/review/review-PAN-1028-1778224511722/correctness.md"
     ]
   },
   "beadsMapping": {},
@@ -48,6 +53,12 @@
       "timestamp": "2026-05-08T03:32:36.585Z",
       "reason": "end",
       "note": "Fix TTS audio clipping: persistent pw-play stream + adaptive silence prepend for PipeWire suspend"
+    },
+    {
+      "timestamp": "2026-05-08T09:24:33Z",
+      "reason": "resume",
+      "note": "Recovered from crash, verified the branch state, fixed remaining tts_daemon review findings (env parsing, JSON body validation, null handling, empty prompt guard, warm-player sink probing), and reran local verification before resubmission.",
+      "agentModel": "claude-code"
     }
   ],
   "feedback": []

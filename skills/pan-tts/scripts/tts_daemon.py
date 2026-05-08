@@ -33,7 +33,8 @@ import torch
 from qwen_tts import Qwen3TTSModel
 
 HOST = os.environ.get("QWEN_TTS_HOST", "127.0.0.1")
-PORT = int(os.environ.get("QWEN_TTS_PORT", "8787"))
+DEFAULT_PORT = 8787
+PORT_ENV = os.environ.get("QWEN_TTS_PORT", str(DEFAULT_PORT))
 MODEL_ID = os.environ.get("QWEN_TTS_MODEL", "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice")
 DEFAULT_VOICE = os.environ.get("QWEN_TTS_VOICE", "Vivian")
 DEFAULT_INSTRUCT = os.environ.get(
@@ -45,29 +46,50 @@ DEFAULT_INSTRUCT = os.environ.get(
         "inflection."
     ),
 )
-MAX_QUEUE = int(os.environ.get("QWEN_TTS_MAX_QUEUE", "6"))
+DEFAULT_MAX_QUEUE = 6
+MAX_QUEUE_ENV = os.environ.get("QWEN_TTS_MAX_QUEUE", str(DEFAULT_MAX_QUEUE))
 SAMPLE_RATE = 24000
 PLAYER_IDLE_TIMEOUT = 10.0  # seconds to keep pw-play open after last utterance
 
+PORT = DEFAULT_PORT
+MAX_QUEUE = DEFAULT_MAX_QUEUE
 MODEL: Qwen3TTSModel | None = None
 WORK_QUEUE: "queue.Queue[dict[str, Any]]" = queue.Queue(maxsize=MAX_QUEUE)
 MODEL_LOCK = threading.Lock()
+_MODEL_INIT_LOCK = threading.Lock()
 
 
 def log(msg: str) -> None:
     print(f"[qwen-tts] {msg}", flush=True)
 
 
+def parse_int_env(name: str, raw: str, *, minimum: int = 0, maximum: int | None = None) -> int:
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer, got {raw!r}") from exc
+    if value < minimum:
+        raise ValueError(f"{name} must be >= {minimum}, got {value}")
+    if maximum is not None and value > maximum:
+        raise ValueError(f"{name} must be <= {maximum}, got {value}")
+    return value
+
+
 def load_model() -> None:
     global MODEL
-    log(f"loading {MODEL_ID} on cuda:0 (bfloat16)…")
-    t0 = time.time()
-    MODEL = Qwen3TTSModel.from_pretrained(
-        MODEL_ID,
-        device_map="cuda:0",
-        dtype=torch.bfloat16,
-    )
-    log(f"model loaded in {time.time() - t0:.1f}s")
+    if MODEL is not None:
+        return
+    with _MODEL_INIT_LOCK:
+        if MODEL is not None:
+            return
+        log(f"loading {MODEL_ID} on cuda:0 (bfloat16)…")
+        t0 = time.time()
+        MODEL = Qwen3TTSModel.from_pretrained(
+            MODEL_ID,
+            device_map="cuda:0",
+            dtype=torch.bfloat16,
+        )
+        log(f"model loaded in {time.time() - t0:.1f}s")
 
 
 MODEL_DESIGN: Qwen3TTSModel | None = None
@@ -77,14 +99,17 @@ def load_design_model() -> None:
     global MODEL_DESIGN
     if MODEL_DESIGN is not None:
         return
-    log("loading VoiceDesign model on cuda:0 (bfloat16)…")
-    t0 = time.time()
-    MODEL_DESIGN = Qwen3TTSModel.from_pretrained(
-        "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
-        device_map="cuda:0",
-        dtype=torch.bfloat16,
-    )
-    log(f"VoiceDesign model loaded in {time.time() - t0:.1f}s")
+    with _MODEL_INIT_LOCK:
+        if MODEL_DESIGN is not None:
+            return
+        log("loading VoiceDesign model on cuda:0 (bfloat16)…")
+        t0 = time.time()
+        MODEL_DESIGN = Qwen3TTSModel.from_pretrained(
+            "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+            device_map="cuda:0",
+            dtype=torch.bfloat16,
+        )
+        log(f"VoiceDesign model loaded in {time.time() - t0:.1f}s")
 
 
 MODEL_BASE: Qwen3TTSModel | None = None
@@ -94,14 +119,17 @@ def load_base_model() -> None:
     global MODEL_BASE
     if MODEL_BASE is not None:
         return
-    log("loading Base model on cuda:0 (bfloat16)…")
-    t0 = time.time()
-    MODEL_BASE = Qwen3TTSModel.from_pretrained(
-        "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-        device_map="cuda:0",
-        dtype=torch.bfloat16,
-    )
-    log(f"Base model loaded in {time.time() - t0:.1f}s")
+    with _MODEL_INIT_LOCK:
+        if MODEL_BASE is not None:
+            return
+        log("loading Base model on cuda:0 (bfloat16)…")
+        t0 = time.time()
+        MODEL_BASE = Qwen3TTSModel.from_pretrained(
+            "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+            device_map="cuda:0",
+            dtype=torch.bfloat16,
+        )
+        log(f"Base model loaded in {time.time() - t0:.1f}s")
 
 
 def _extract_audio(result: Any) -> np.ndarray:
@@ -209,9 +237,10 @@ def _get_default_sink_state() -> str:
     return "SUSPENDED"
 
 
-def _ensure_player() -> subprocess.Popen:
+def _ensure_player() -> tuple[subprocess.Popen, bool]:
     """Start or return the existing pw-play subprocess."""
     global _PLAYER_PROC
+    created = False
     if _PLAYER_PROC is None or _PLAYER_PROC.poll() is not None:
         _PLAYER_PROC = subprocess.Popen(
             ["pw-play", "-"],
@@ -219,7 +248,8 @@ def _ensure_player() -> subprocess.Popen:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-    return _PLAYER_PROC
+        created = True
+    return _PLAYER_PROC, created
 
 
 def _close_player() -> None:
@@ -242,19 +272,19 @@ def play_audio(audio: np.ndarray, volume: float = 1.0) -> None:
     if volume != 1.0:
         audio = audio * max(0.0, min(volume, 1.0))
 
-    # Adapt silence prepend based on sink state.  When the sink is suspended
-    # (cold start) we need enough headroom for PipeWire + USB DAC resume.
-    # When the sink is already running the persistent pw-play stream keeps it
-    # warm and only a tiny safety buffer is needed.
-    sink_state = _get_default_sink_state()
-    prepend_secs = 0.60 if sink_state == "SUSPENDED" else 0.05
-    silence = np.zeros(int(SAMPLE_RATE * prepend_secs), dtype=audio.dtype)
-    audio = np.concatenate([silence, audio])
-
     for attempt in range(2):
-        player = _ensure_player()
+        player, created = _ensure_player()
+
+        # Only probe PipeWire sink state when we spawn a fresh player. Reused
+        # players already keep the sink warm, so the fast path can skip the
+        # extra pactl subprocess overhead.
+        sink_state = _get_default_sink_state() if created else "RUNNING"
+        prepend_secs = 0.60 if sink_state == "SUSPENDED" else 0.05
+        silence = np.zeros(int(SAMPLE_RATE * prepend_secs), dtype=audio.dtype)
+        audio_to_play = np.concatenate([silence, audio])
+
         buf = io.BytesIO()
-        sf.write(buf, audio, SAMPLE_RATE, format="WAV")
+        sf.write(buf, audio_to_play, SAMPLE_RATE, format="WAV")
         try:
             player.stdin.write(buf.getvalue())
             player.stdin.flush()
@@ -321,10 +351,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         self._json(404, {"error": "not_found"})
 
-    def _read_body(self) -> dict[str, Any]:
+    def _read_body(self) -> Any:
         raw_len = self.headers.get("Content-Length", "0") or "0"
         try:
-            length = int(raw_len)
+            length = max(0, int(raw_len))
         except ValueError:
             length = 0
         raw = self.rfile.read(length) if length > 0 else b""
@@ -335,9 +365,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         body = self._read_body()
+        if not isinstance(body, dict):
+            self._json(400, {"error": "expected_object"})
+            return
 
         if self.path == "/speak":
-            text = str(body.get("text", "")).strip()
+            text = str(body.get("text") or "").strip()
             if not text:
                 self._json(400, {"error": "empty_text"})
                 return
@@ -354,7 +387,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         "voice": str(body.get("voice") or DEFAULT_VOICE),
                         "instruct": str(body.get("instruct") or DEFAULT_INSTRUCT),
                         "volume": volume,
-                        "mode": str(body.get("mode", "custom")),
+                        "mode": str(body.get("mode") or "custom"),
                         "embedding": body.get("embedding"),
                     }
                 )
@@ -365,8 +398,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
 
         if self.path == "/extract-embedding":
-            design = str(body.get("design", "")).strip()
-            text = str(body.get("text", "")).strip()
+            design = str(body.get("design") or "").strip()
+            text = str(body.get("text") or "").strip()
             if not design or not text:
                 self._json(400, {"error": "missing_design_or_text"})
                 return
@@ -398,6 +431,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                         ref_text=text,
                         x_vector_only_mode=True,
                     )
+                if not prompt_items:
+                    self._json(422, {"error": "voice_clone_prompt_empty"})
+                    return
                 spk_emb = prompt_items[0].ref_spk_embedding
                 embedding_list = spk_emb.detach().cpu().tolist()
                 self._json(200, {"embedding": embedding_list})
@@ -419,6 +455,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 
 def main() -> int:
+    global PORT, MAX_QUEUE, WORK_QUEUE
+
+    try:
+        PORT = parse_int_env("QWEN_TTS_PORT", PORT_ENV, minimum=1, maximum=65535)
+        MAX_QUEUE = parse_int_env("QWEN_TTS_MAX_QUEUE", MAX_QUEUE_ENV, minimum=1)
+    except ValueError as exc:
+        log(f"invalid env var: {exc}")
+        return 1
+
+    WORK_QUEUE = queue.Queue(maxsize=MAX_QUEUE)
     load_model()
     threading.Thread(target=worker, daemon=True).start()
     server = http.server.ThreadingHTTPServer((HOST, PORT), Handler)
