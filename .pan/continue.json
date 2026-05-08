@@ -1,0 +1,48 @@
+{
+  "version": "1",
+  "issueId": "PAN-1028",
+  "created": "2026-05-07T22:45:00Z",
+  "updated": "2026-05-07T22:45:00Z",
+  "gitState": {
+    "branch": "feature/pan-1028",
+    "sha": "234a1348a",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "The actual bug fix must be applied to eltmon-stream/tts_daemon.py (external to this workspace). The daemon's play_audio() was using per-utterance aplay with a fixed 400ms silence prepend, which is insufficient for PipeWire + USB DAC resume (~500ms). The fix replaces aplay with a persistent pw-play stdin stream, keeps it open for 10s after the last utterance, and adapts silence prepend based on sink state (600ms for SUSPENDED, 50ms for RUNNING).",
+      "recordedAt": "2026-05-07T22:45:00Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Since eltmon-stream has no GitHub remote and the issue is tracked in panopticon-cli, the fix was committed locally in eltmon-stream and a documentation update was committed in panopticon-cli (skills/pan-tts/SKILL.md) to reflect the correct split architecture and document the PipeWire suspend mitigation.",
+      "recordedAt": "2026-05-07T22:45:00Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "The workspace was created on panopticon-cli but the actual code to fix is in eltmon-stream (a separate local git repo with no remote). The normal pan done / PR flow targets panopticon-cli.",
+      "mitigation": "Committed the daemon fix in eltmon-stream locally, committed a documentation update in panopticon-cli to reflect the architecture, and pushed the panopticon-cli branch for PR creation."
+    }
+  ],
+  "resumePoint": {
+    "description": "Fix committed in eltmon-stream and documentation updated in panopticon-cli. Remaining step: run pan done PAN-1028 to signal completion and trigger the review pipeline.",
+    "beadId": null,
+    "filesToRead": [
+      ".pan/continue.json",
+      "skills/pan-tts/SKILL.md"
+    ]
+  },
+  "beadsMapping": {},
+  "agentModel": "claude-code",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-07T22:45:00Z",
+      "reason": "resume",
+      "note": "Found workspace with no PAN-1028 beads and a deleted stale PAN-986 continue.json. Identified the issue as TTS audio clipping in eltmon-stream/tts_daemon.py. Implemented persistent pw-play stream with adaptive silence prepend (600ms cold start, 50ms warm). Committed fix in eltmon-stream and updated panopticon-cli skill docs.",
+      "agentModel": "claude-code"
+    }
+  ]
+}
