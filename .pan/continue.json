@@ -2,8 +2,8 @@
   "version": "1",
   "issueId": "PAN-1025",
   "created": "2026-05-07T21:00:00.000Z",
-  "updated": "2026-05-07T21:05:00.000Z",
-  "gitState": { "branch": "feature/pan-1025", "sha": "fc077a9", "dirty": false },
+  "updated": "2026-05-07T21:08:00.000Z",
+  "gitState": { "branch": "feature/pan-1025", "sha": "1348546", "dirty": false },
   "decisions": [
     {
       "id": "D1",
@@ -19,6 +19,11 @@
       "id": "D3",
       "summary": "Removed the preemptive serialized.length > MAX_BYTES check entirely. The only size gate is now the actual localStorage.setItem call. This is simpler and avoids the UTF-16-code-unit-vs-bytes mismatch that made the old check approximate anyway.",
       "recordedAt": "2026-05-07T21:02:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Removed the MAX_BYTES constant after TS6133 build failure — it was unused after removing the preemptive check. The effective cap is now the browser's localStorage quota.",
+      "recordedAt": "2026-05-07T21:08:00.000Z"
     }
   ],
   "hazards": [
@@ -29,8 +34,8 @@
     }
   ],
   "resumePoint": {
-    "description": "Bead workspace-rad9 is complete. Both beads implemented. Next: run full test suite (npm test), commit any remaining changes, push, then pan done.",
-    "beadId": "workspace-rad9",
+    "description": "Implementation complete. Both beads closed, all tests pass (990), build passes. Ready for pan done.",
+    "beadId": null,
     "filesToRead": []
   },
   "beadsMapping": {
@@ -55,6 +60,12 @@
       "timestamp": "2026-05-07T21:05:00.000Z",
       "reason": "bead-complete",
       "note": "Implemented bead workspace-rad9: added 3 new tests for QuotaExceededError fallback — non-quota errors silently ignored, both writes failing gracefully, non-issue fields preserved after fallback. All 13 tests pass.",
+      "agentModel": "claude-opus-4-5"
+    },
+    {
+      "timestamp": "2026-05-07T21:08:00.000Z",
+      "reason": "fix",
+      "note": "Fixed TypeScript build failure (TS6133): removed unused MAX_BYTES constant after the preemptive size check was removed. Full test suite passes (990 tests), frontend build passes.",
       "agentModel": "claude-opus-4-5"
     }
   ],
