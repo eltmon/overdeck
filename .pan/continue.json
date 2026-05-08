@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1028",
   "created": "2026-05-07T22:45:00Z",
-  "updated": "2026-05-07T22:45:00Z",
+  "updated": "2026-05-08T03:32:36.585Z",
   "gitState": {
     "branch": "feature/pan-1028",
     "sha": "234a1348a",
@@ -43,6 +43,12 @@
       "reason": "resume",
       "note": "Found workspace with no PAN-1028 beads and a deleted stale PAN-986 continue.json. Identified the issue as TTS audio clipping in eltmon-stream/tts_daemon.py. Implemented persistent pw-play stream with adaptive silence prepend (600ms cold start, 50ms warm). Committed fix in eltmon-stream and updated panopticon-cli skill docs.",
       "agentModel": "claude-code"
+    },
+    {
+      "timestamp": "2026-05-08T03:32:36.585Z",
+      "reason": "end",
+      "note": "Fix TTS audio clipping: persistent pw-play stream + adaptive silence prepend for PipeWire suspend"
     }
-  ]
+  ],
+  "feedback": []
 }
