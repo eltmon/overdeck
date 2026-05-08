@@ -65,15 +65,40 @@ describe('saveSnapshotToCache', () => {
     expect(loaded!.agents).toEqual([])
   })
 
-  it('strips issues when serialized size exceeds 2MB', () => {
-    // 120,000 issue entries ≈ 2.5MB serialized — triggers the size limit strip
+  it('strips issues when localStorage throws QuotaExceededError', () => {
+    const originalSetItem = Storage.prototype.setItem
+    let calls = 0
+    Storage.prototype.setItem = function (key: string, value: string) {
+      calls++
+      if (calls === 1) {
+        const err = new DOMException('Quota exceeded', 'QuotaExceededError')
+        throw err
+      }
+      return originalSetItem.call(this, key, value)
+    }
+
+    try {
+      const bigSnapshot = makeSnapshot(1, 120_000)
+      saveSnapshotToCache(bigSnapshot)
+
+      const loaded = loadSnapshotFromCache()
+      expect(loaded).not.toBeNull()
+      // Issues should be stripped to empty array after QuotaExceededError fallback
+      expect(loaded!.issues).toEqual([])
+      expect(calls).toBe(2)
+    } finally {
+      Storage.prototype.setItem = originalSetItem
+    }
+  })
+
+  it('preserves full snapshot when it fits within localStorage quota', () => {
+    // 120,000 issue entries ≈ 2.5MB serialized — well under the 8MB cap
     const bigSnapshot = makeSnapshot(1, 120_000)
     saveSnapshotToCache(bigSnapshot)
 
     const loaded = loadSnapshotFromCache()
     expect(loaded).not.toBeNull()
-    // Issues should be stripped to empty array to fit within size limit
-    expect(loaded!.issues).toEqual([])
+    expect(loaded!.issues.length).toBe(120_000)
   })
 
   it('overwrites a previous entry on re-save', () => {

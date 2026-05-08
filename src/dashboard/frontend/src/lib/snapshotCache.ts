@@ -6,36 +6,41 @@
  * returns a fresh snapshot.
  *
  * Cache key is versioned so old incompatible snapshots are silently ignored.
- * If the snapshot is too large (> 2MB), output buffers are stripped first.
+ * If localStorage quota is exceeded, the issues array is stripped and retried.
  */
 
 import type { DashboardSnapshot } from '@panctl/contracts'
 
 const CACHE_KEY = 'pan-snapshot-cache-v1'
-const MAX_BYTES = 2 * 1024 * 1024 // 2MB
+const MAX_BYTES = 8 * 1024 * 1024 // 8MB
 
 interface CacheEntry {
   data: DashboardSnapshot
   timestamp: string
 }
 
+function serialize(snapshot: DashboardSnapshot): string {
+  return JSON.stringify({ data: snapshot, timestamp: new Date().toISOString() } satisfies CacheEntry)
+}
+
 /**
  * Save a DashboardSnapshot to localStorage.
- * Strips large fields if the serialized size exceeds MAX_BYTES.
+ * On QuotaExceededError, retries with the issues array stripped.
  */
 export function saveSnapshotToCache(snapshot: DashboardSnapshot): void {
   try {
-    let serialized = JSON.stringify({ data: snapshot, timestamp: new Date().toISOString() } satisfies CacheEntry)
-
-    if (serialized.length > MAX_BYTES) {
-      // Strip issues array (largest field) to bring size down
-      const stripped: DashboardSnapshot = { ...snapshot, issues: [] }
-      serialized = JSON.stringify({ data: stripped, timestamp: new Date().toISOString() } satisfies CacheEntry)
+    localStorage.setItem(CACHE_KEY, serialize(snapshot))
+  } catch (err) {
+    // Retry with issues stripped if quota was exceeded
+    if (err instanceof DOMException && err.name === 'QuotaExceededError') {
+      try {
+        const stripped: DashboardSnapshot = { ...snapshot, issues: [] }
+        localStorage.setItem(CACHE_KEY, serialize(stripped))
+      } catch {
+        // localStorage genuinely full or unavailable — ignore
+      }
     }
-
-    localStorage.setItem(CACHE_KEY, serialized)
-  } catch {
-    // localStorage may be unavailable (private browsing) or full — ignore
+    // localStorage may be unavailable (private browsing) — ignore
   }
 }
 
