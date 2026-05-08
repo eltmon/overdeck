@@ -4,7 +4,7 @@
     "created": "2026-05-08T18:55:00Z",
     "author": "manual:opus-4.7",
     "description": "Plan for PAN-1015: Remove claudish routing in favor of direct ANTHROPIC_BASE_URL (CLIProxy only where needed). Empirically scoped 2026-05-08 \u2014 see issue body Empirical findings section.",
-    "updated": "2026-05-08T15:00:45.230Z"
+    "updated": "2026-05-08T15:14:28.222Z"
   },
   "plan": {
     "id": "pan-1015",
@@ -12,9 +12,9 @@
     "status": "active",
     "uid": "d3644941-fec5-4e25-9974-34d6a9e02902",
     "author": "manual:opus-4.7",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-05-08T18:55:00Z",
-    "updated": "2026-05-08T15:00:45.230Z",
+    "updated": "2026-05-08T15:14:28.222Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1015",
@@ -146,7 +146,7 @@
       {
         "id": "openrouter-direct",
         "title": "OpenRouter: flip to direct ANTHROPIC_BASE_URL",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-08T18:55:00Z",
         "metadata": {
@@ -161,7 +161,7 @@
           {
             "id": "openrouter-direct.ac1",
             "title": "PROVIDERS.openrouter.compatibility === 'direct'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -169,7 +169,7 @@
           {
             "id": "openrouter-direct.ac2",
             "title": "PROVIDERS.openrouter.baseUrl === 'https://openrouter.ai/api/v1'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -177,7 +177,7 @@
           {
             "id": "openrouter-direct.ac3",
             "title": "Slash-containing model IDs route correctly",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -185,7 +185,7 @@
           {
             "id": "openrouter-direct.ac4",
             "title": "Tests updated",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

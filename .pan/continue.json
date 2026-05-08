@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1015",
   "created": "2026-05-08T00:56:13.011Z",
-  "updated": "2026-05-08T15:00:45.230Z",
+  "updated": "2026-05-08T15:14:28.222Z",
   "gitState": {
     "branch": "feature/pan-1015",
-    "sha": "7ef7a90ea",
+    "sha": "16330caaf",
     "dirty": true,
     "clean": false
   },
@@ -34,6 +34,11 @@
       "id": "D5",
       "summary": "Mimo now routes directly through Claude Code using its existing ANTHROPIC_BASE_URL=https://token-plan-sgp.xiaomimimo.com/anthropic and static ANTHROPIC_AUTH_TOKEN auth; the claudish custom-URL prefix branch is removed.",
       "recordedAt": "2026-05-08T15:00:45.230Z"
+    },
+    {
+      "id": "D6",
+      "summary": "OpenRouter now routes directly through Claude Code using ANTHROPIC_BASE_URL=https://openrouter.ai/api/v1 and static ANTHROPIC_AUTH_TOKEN auth; slash-containing model IDs are passed through unchanged, and provider health probes avoid double-appending /v1 for versioned base URLs.",
+      "recordedAt": "2026-05-08T15:14:28.222Z"
     }
   ],
   "hazards": [
@@ -49,13 +54,15 @@
     }
   ],
   "resumePoint": {
-    "description": "Implemented workspace-zx2g: Mimo is direct using https://token-plan-sgp.xiaomimimo.com/anthropic, no longer uses the claudish custom URL branch, and endpoint auth/quota shape was verified. Commit and close the bead; inspection is skipped because metadata.requiresInspection=false.",
-    "beadId": "workspace-zx2g",
+    "description": "Implemented workspace-21co: OpenRouter is direct using https://openrouter.ai/api/v1, preserves slash-containing model IDs without or@, and provider health probes target /api/v1/messages instead of double /v1. Commit and close the bead; inspection is skipped because metadata.requiresInspection=false.",
+    "beadId": "workspace-21co",
     "filesToRead": [
       "src/lib/providers.ts",
       "src/lib/agents.ts",
+      "src/lib/provider-health.ts",
       "tests/lib/providers.test.ts",
       "tests/lib/agents-auth-routing.test.ts",
+      "tests/lib/provider-health.test.ts",
       "src/lib/__tests__/permission-mode-leak.test.ts",
       ".pan/spec.vbrief.json",
       "CHANGELOG.md"
@@ -122,9 +129,15 @@
       "reason": "bead-complete",
       "note": "Implemented workspace-zx2g. PROVIDERS.mimo is direct using baseUrl https://token-plan-sgp.xiaomimimo.com/anthropic and authType static; removed the claudish custom URL prefix; updated provider/auth/permission tests; verified npm run typecheck, npm run lint, affected Vitest files. Direct endpoint probe reached Mimo and returned quota exhausted, proving authenticated direct routing rather than claudish. Status update: 3 direct-flip beads completed since kickoff (Z.AI, MiniMax, Mimo); OpenRouter remains before cleanup beads.",
       "agentModel": "agent:claude-opus-4.7"
+    },
+    {
+      "timestamp": "2026-05-08T15:14:28.222Z",
+      "reason": "bead-complete",
+      "note": "Implemented workspace-21co. PROVIDERS.openrouter is direct with baseUrl https://openrouter.ai/api/v1 and authType static; removed the or@ claudish prefix; slash-containing model IDs are passed directly to claude --model; provider health URL construction now recognizes versioned /v1 base URLs and probes /messages to avoid /v1/v1. Verified npm run typecheck, npm run lint, and affected Vitest files including the new provider-health URL test.",
+      "agentModel": "agent:claude-opus-4.7"
     }
   ],
   "feedback": [],
   "agentModel": "agent:claude-opus-4.7",
-  "sequence": 3
+  "sequence": 4
 }

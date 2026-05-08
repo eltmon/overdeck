@@ -61,6 +61,13 @@ function parseErrorMessage(body: string): string {
   }
 }
 
+export function buildAnthropicMessagesUrl(baseUrl: string): string {
+  const normalized = baseUrl.replace(/\/+$/, '');
+  return normalized.endsWith('/v1')
+    ? `${normalized}/messages`
+    : `${normalized}/v1/messages`;
+}
+
 /**
  * Probe a direct provider's API to verify it can serve requests.
  * Returns cached results within the TTL window.
@@ -104,7 +111,7 @@ async function doProbe(
   const baseUrl = providerEnv.ANTHROPIC_BASE_URL ?? provider.baseUrl;
   if (!baseUrl) return { ok: true };
 
-  const url = `${baseUrl}/v1/messages`;
+  const url = buildAnthropicMessagesUrl(baseUrl);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
 

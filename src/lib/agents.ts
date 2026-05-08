@@ -409,11 +409,6 @@ export function getClaudishPrefix(model: string, authMode?: string): string {
     return `kc@${model}`;
   }
 
-  // OpenRouter model IDs always contain '/'
-  if (model.includes('/')) {
-    return `or@${model}`;
-  }
-
   // Other providers — return bare model (fallback to default routing)
   return model;
 }

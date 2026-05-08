@@ -89,9 +89,11 @@ describe('providers', () => {
     });
   });
 
-  it('returns OPENROUTER_API_KEY for OpenRouter key-based claudish routing', () => {
+  it('routes OpenRouter through its direct Anthropic-compatible endpoint', () => {
+    expect(PROVIDERS.openrouter.compatibility).toBe('direct');
     expect(getProviderEnv(PROVIDERS.openrouter, 'sk-or-test')).toEqual({
-      OPENROUTER_API_KEY: 'sk-or-test',
+      ANTHROPIC_BASE_URL: 'https://openrouter.ai/api/v1',
+      ANTHROPIC_AUTH_TOKEN: 'sk-or-test',
     });
   });
 });

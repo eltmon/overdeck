@@ -143,10 +143,12 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   openrouter: {
     name: 'openrouter',
     displayName: 'OpenRouter',
-    compatibility: 'claudish',
+    compatibility: 'direct',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    authType: 'static',
     models: [], // Dynamic models fetched from OpenRouter API; IDs contain '/'
     tested: true,
-    description: 'Route via claudish: or@model (e.g. or@qwen/qwen3.6-plus:free)',
+    description: 'Route directly to OpenRouter Anthropic-compatible endpoint; slash-containing model IDs pass through unchanged.',
   },
 };
 

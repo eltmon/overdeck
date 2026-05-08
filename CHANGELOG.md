@@ -9,6 +9,7 @@
 - Z.AI / GLM models now launch through Claude Code directly against Z.AI's Anthropic-compatible endpoint.
 - MiniMax models now launch through Claude Code directly against MiniMax's Anthropic-compatible endpoint.
 - Mimo models now launch through Claude Code directly against Xiaomi MiMo's Anthropic-compatible endpoint.
+- OpenRouter models now launch through Claude Code directly against OpenRouter's Anthropic-compatible endpoint while preserving slash-containing model IDs.
 
 ## [0.7.0] — Command Taxonomy Reorganization
 

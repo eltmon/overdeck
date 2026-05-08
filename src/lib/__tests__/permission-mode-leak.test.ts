@@ -75,31 +75,13 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
-  // ── Claudish path (OpenRouter) ─────────────────────────────────────────────
-
-  it('Claudish-routed model + Auto: REFUSED (no silent fallback to bypass)', async () => {
-    await expect(getAgentRuntimeBaseCommand('qwen/qwen3.6-plus:free')).rejects.toThrow(
-      /claudish.*does not support permissionMode=auto/i,
-    )
-  })
-
-  it('Claudish + Auto refusal mentions remediation paths', async () => {
-    await expect(getAgentRuntimeBaseCommand('qwen/qwen3.6-plus:free')).rejects.toThrow(/Bypass/)
-    await expect(getAgentRuntimeBaseCommand('qwen/qwen3.6-plus:free')).rejects.toThrow(/Claude or GPT/)
-    await expect(getAgentRuntimeBaseCommand('qwen/qwen3.6-plus:free')).rejects.toThrow(/PAN-1015/)
-  })
-
-  it('Claudish refusal applies to remaining claudish-routed providers', async () => {
-    // Sample one real model from each remaining claudish-routed provider in providers.ts.
-    const claudishModels = [
-      'qwen/qwen3.6-plus:free',
-    ]
-    for (const m of claudishModels) {
-      await expect(
-        getAgentRuntimeBaseCommand(m),
-        `model ${m} must refuse claudish+auto`,
-      ).rejects.toThrow(/claudish.*does not support permissionMode=auto/i)
-    }
+  it('OpenRouter direct + Auto: no DSP, --permission-mode auto', async () => {
+    const cmd = await getAgentRuntimeBaseCommand('qwen/qwen3.6-plus:free')
+    expect(cmd).toMatch(/^claude /)
+    expect(cmd).toMatch(/--model qwen\/qwen3\.6-plus:free/)
+    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
+    expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
   // ── PAN_YOLO escape hatch (explicit opt-in to bypass) ──────────────────────

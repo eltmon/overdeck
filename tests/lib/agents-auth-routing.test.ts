@@ -82,7 +82,7 @@ describe('agents auth routing', () => {
         return { name: 'mimo', displayName: 'MiMo', compatibility: 'direct', authType: 'static' };
       }
       if (model.includes('/')) {
-        return { name: 'openrouter', displayName: 'OpenRouter', compatibility: 'claudish', authType: 'static' };
+        return { name: 'openrouter', displayName: 'OpenRouter', compatibility: 'direct', authType: 'static' };
       }
       return { name: 'anthropic', displayName: 'Anthropic', compatibility: 'direct', authType: 'env' };
     });
@@ -175,9 +175,9 @@ describe('agents auth routing', () => {
     );
   });
 
-  it('launches OpenRouter models through claudish with or@ prefix', async () => {
+  it('launches OpenRouter models directly with Claude Code and preserves slash model IDs', async () => {
     expect(await getAgentRuntimeBaseCommand('qwen/qwen3.6-plus:free')).toBe(
-      'claudish -i --model or@qwen/qwen3.6-plus:free --dangerously-skip-permissions --permission-mode bypassPermissions'
+      'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model qwen/qwen3.6-plus:free'
     );
   });
 
