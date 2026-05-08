@@ -1,4 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('../config-yaml.js', () => ({
+  loadConfig: vi.fn(() => ({
+    config: {
+      claude: { permissionMode: 'auto' },
+    },
+  })),
+}));
+
 import { getAgentRuntimeBaseCommand } from '../agents.js'
 
 // AC3: harness='claude-code' (and the no-harness default) MUST produce
