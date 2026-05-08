@@ -50,7 +50,7 @@ SAMPLE_RATE = 24000
 PLAYER_IDLE_TIMEOUT = 10.0  # seconds to keep pw-play open after last utterance
 
 MODEL: Qwen3TTSModel | None = None
-WORK_QUEUE: "queue.Queue[dict[str, Any]]" = queue.Queue()
+WORK_QUEUE: "queue.Queue[dict[str, Any]]" = queue.Queue(maxsize=MAX_QUEUE)
 MODEL_LOCK = threading.Lock()
 
 
@@ -110,7 +110,12 @@ def _extract_audio(result: Any) -> np.ndarray:
         audio = audio.cpu()
     if hasattr(audio, "numpy"):
         audio = audio.numpy()
-    return np.squeeze(audio)
+    audio = np.squeeze(audio)
+    if audio.ndim == 2 and audio.shape[0] <= 2:
+        audio = audio.T  # channels-last for soundfile
+    if audio.ndim != 1:
+        raise ValueError(f"Unexpected audio shape: {audio.shape}")
+    return audio
 
 
 def build_voice_clone_prompt(embedding_data: list) -> dict[str, Any]:
@@ -317,7 +322,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self._json(404, {"error": "not_found"})
 
     def _read_body(self) -> dict[str, Any]:
-        length = int(self.headers.get("Content-Length", "0") or "0")
+        raw_len = self.headers.get("Content-Length", "0") or "0"
+        try:
+            length = int(raw_len)
+        except ValueError:
+            length = 0
         raw = self.rfile.read(length) if length > 0 else b""
         try:
             return json.loads(raw or b"{}")
@@ -332,19 +341,26 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if not text:
                 self._json(400, {"error": "empty_text"})
                 return
-            if WORK_QUEUE.qsize() >= MAX_QUEUE:
+            raw_volume = body.get("volume", 1.0)
+            try:
+                volume = float(raw_volume)
+            except (ValueError, TypeError):
+                self._json(400, {"error": "invalid_volume"})
+                return
+            try:
+                WORK_QUEUE.put_nowait(
+                    {
+                        "text": text,
+                        "voice": str(body.get("voice") or DEFAULT_VOICE),
+                        "instruct": str(body.get("instruct") or DEFAULT_INSTRUCT),
+                        "volume": volume,
+                        "mode": str(body.get("mode", "custom")),
+                        "embedding": body.get("embedding"),
+                    }
+                )
+            except queue.Full:
                 self._json(429, {"error": "queue_full", "depth": WORK_QUEUE.qsize()})
                 return
-            WORK_QUEUE.put(
-                {
-                    "text": text,
-                    "voice": str(body.get("voice") or DEFAULT_VOICE),
-                    "instruct": str(body.get("instruct") or DEFAULT_INSTRUCT),
-                    "volume": float(body.get("volume", 1.0)),
-                    "mode": str(body.get("mode", "custom")),
-                    "embedding": body.get("embedding"),
-                }
-            )
             self._json(202, {"queued": True, "depth": WORK_QUEUE.qsize()})
             return
 
@@ -355,6 +371,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._json(400, {"error": "missing_design_or_text"})
                 return
 
+            tmp_path = None
             try:
                 # 1. Generate audio with VoiceDesign
                 load_design_model()
@@ -369,8 +386,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
                 # 2. Save to temp file
                 with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-                    sf.write(f.name, audio, samplerate=SAMPLE_RATE)
                     tmp_path = f.name
+                sf.write(tmp_path, audio, samplerate=SAMPLE_RATE)
 
                 # 3. Extract speaker embedding with Base model
                 load_base_model()
@@ -388,7 +405,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 log(f"extract-embedding failed: {exc}")
                 self._json(500, {"error": str(exc)})
             finally:
-                if "tmp_path" in dir() or "tmp_path" in vars():
+                if tmp_path is not None:
                     try:
                         os.unlink(tmp_path)
                     except OSError:
