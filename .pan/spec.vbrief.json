@@ -38,7 +38,8 @@
           "getProviderEnv for zai returns ZHIPU_API_KEY plus tier-model env vars",
           "getProviderEnv for mimo returns ANTHROPIC_API_KEY plus tier-model env vars",
           "getProviderEnv for openrouter returns OPENROUTER_API_KEY only (no tierModels)",
-          "subscription-oauth path returns empty env (unchanged)"
+          "subscription-oauth path (Google CodeAssist OAuth) returns tier-model env vars without an API key var",
+          "providers.test.ts exact-match assertions updated to include tier-model vars alongside each API key var"
         ]
       },
       {
@@ -47,7 +48,8 @@
         "status": "pending",
         "acceptanceCriteria": [
           "When OpenAI subscription login is active, getProviderEnvForModel returns cliproxy env PLUS tier-model env vars from PROVIDERS.openai.tierModels",
-          "Tier-model vars: ANTHROPIC_DEFAULT_OPUS_MODEL=gpt-5.5-pro, ANTHROPIC_DEFAULT_SONNET_MODEL=gpt-5.5, ANTHROPIC_DEFAULT_HAIKU_MODEL=gpt-5.5-mini, ANTHROPIC_SMALL_FAST_MODEL=gpt-5.5-mini, CLAUDE_CODE_SUBAGENT_MODEL=gpt-5.5-mini"
+          "Tier-model vars: ANTHROPIC_DEFAULT_OPUS_MODEL=gpt-5.5-pro, ANTHROPIC_DEFAULT_SONNET_MODEL=gpt-5.5, ANTHROPIC_DEFAULT_HAIKU_MODEL=gpt-5.5-mini, ANTHROPIC_SMALL_FAST_MODEL=gpt-5.5-mini, CLAUDE_CODE_SUBAGENT_MODEL=gpt-5.5-mini",
+          "agents-auth-routing.test.ts GPT subscription test asserts tier-model env vars in result"
         ]
       },
       {
@@ -59,19 +61,18 @@
           "getAgentRuntimeBaseCommand for minimax-m2.7 includes --model-opus mm@minimax-m2.7 --model-sonnet mm@minimax-m2.7 --model-haiku mm@minimax-m2.7-highspeed --model-subagent mm@minimax-m2.7-highspeed",
           "Provider without tierModels (openrouter bare) does not append --model-* flags",
           "Flags use claudish-prefixed form from getLaunchModelForModel (e.g. kc@kimi-k2 not bare kimi-k2)",
-          "--model-subagent maps to tierModels.haiku"
+          "--model-subagent maps to tierModels.haiku",
+          "agents-auth-routing.test.ts claudish command string tests updated to assert --model-* flags"
         ]
       },
       {
         "id": "tests",
-        "title": "Write Vitest tests covering all three routing paths",
+        "title": "Add new Vitest assertions for behaviors not covered by per-bead test updates",
         "status": "pending",
         "acceptanceCriteria": [
-          "providers.test.ts: each claudish provider test asserts tier-model env vars alongside the API key",
-          "agents-auth-routing.test.ts: claudish command strings assert --model-* flags",
-          "agents-auth-routing.test.ts: GPT subscription path asserts tier-model env vars in result",
-          "agents-auth-routing.test.ts: Anthropic direct path unchanged (no tier-model vars)",
-          "agents-auth-routing.test.ts: getProviderExportsForModel for Anthropic unsets 12 vars",
+          "New test: subscription-oauth path (google provider) returns tier-model vars (no API key var)",
+          "New test: openrouter (no tierModels) does not append --model-* flags to claudish command",
+          "New test: Anthropic direct path unchanged — no tier-model vars in env, no flags in command",
           "npm test passes"
         ]
       },

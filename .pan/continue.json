@@ -23,6 +23,11 @@
       "id": "D3",
       "summary": "HARNESSES.md updated, CLAUDE.md is NOT updated. Provider internals are not documented in CLAUDE.md.",
       "recordedAt": "2026-05-08T00:00:00Z"
+    },
+    {
+      "id": "D4",
+      "summary": "--model-subagent uses tierModels.haiku to mirror CLAUDE_CODE_SUBAGENT_MODEL. This is correct because claudish's subagent role maps to the fast/cheap tier. Revisit only if claudish defines a distinct subagent-specific model tier in a future release.",
+      "recordedAt": "2026-05-08T00:00:00Z"
     }
   ],
   "hazards": [
@@ -43,12 +48,12 @@
     },
     {
       "id": "H4",
-      "summary": "The subscription-oauth path in getProviderEnv returns {} (empty object). Tier-model injection must NOT apply to this path since it's the claudish subscription route with no API key.",
-      "mitigation": "The early return on line 279 (apiKey === 'subscription-oauth') already returns before any tierModels logic. This is correct behavior — confirm with a test."
+      "summary": "The subscription-oauth path in getProviderEnv (line 279) is used by Google CodeAssist OAuth (go@ prefix). Tier-model injection MUST apply here — these users route through claudish and spawn subagents that need tier-model env vars. Only the API key var is omitted, not the tier-model vars. The current `return {}` early return is WRONG and must be changed to return tierModelEnv derived from provider.tierModels.",
+      "mitigation": "In bead 'claudish-env', replace the `if (apiKey === 'subscription-oauth') { return {}; }` early return with logic that computes tierModelEnv from provider.tierModels and returns that (skipping the API key var). Add a test asserting subscription-oauth returns tier-model vars."
     }
   ],
   "resumePoint": {
-    "description": "Planning complete. Implementation agent should start with bead 'env-keys': add ANTHROPIC_DEFAULT_OPUS_MODEL, ANTHROPIC_DEFAULT_SONNET_MODEL, ANTHROPIC_SMALL_FAST_MODEL, CLAUDE_CODE_SUBAGENT_MODEL to PROVIDER_ENV_KEYS array in src/lib/agents.ts (lines 250-259) and to PROVIDER_ENV_KEYS Set in src/lib/child-env.ts (lines 23-32). Then bead 'claudish-env': add tierModels injection to the claudish branch of getProviderEnv in providers.ts (lines 274-312). Then bead 'cliproxy-env': merge tierModels into CLIProxy return in getProviderEnvForModel in agents.ts (lines 171-179). Then bead 'claudish-flags': compute and append --model-opus/sonnet/haiku/subagent to claudish command in getAgentRuntimeBaseCommand (lines 181-188). Then bead 'tests': update existing test assertions and add new ones. Finally bead 'docs': update HARNESSES.md.",
+    "description": "Planning complete. Implementation agent should start with bead 'env-keys': add ANTHROPIC_DEFAULT_OPUS_MODEL, ANTHROPIC_DEFAULT_SONNET_MODEL, ANTHROPIC_SMALL_FAST_MODEL, CLAUDE_CODE_SUBAGENT_MODEL to PROVIDER_ENV_KEYS array in src/lib/agents.ts (lines 250-259) and to PROVIDER_ENV_KEYS Set in src/lib/child-env.ts (lines 23-32); update getProviderExportsForModel test to expect 12 unset lines. Then bead 'claudish-env': add tierModels injection to the claudish branch of getProviderEnv in providers.ts (lines 274-312); CRITICAL: the subscription-oauth path (line 279) must return tierModelEnv not {} — these are Google CodeAssist OAuth users who need tier-model vars; update providers.test.ts to add tier-model vars to existing exact-match assertions. Then bead 'cliproxy-env': merge tierModels into CLIProxy return in getProviderEnvForModel in agents.ts (lines 171-179); update agents-auth-routing.test.ts GPT subscription assertion. Then bead 'claudish-flags': compute and append --model-opus/sonnet/haiku/subagent to claudish command in getAgentRuntimeBaseCommand (lines 181-188); update agents-auth-routing.test.ts claudish command string assertions. Then bead 'tests': add NEW assertions only for behaviors not yet tested (subscription-oauth tier-model, openrouter no-flags guard). Finally bead 'docs': update HARNESSES.md.",
     "beadId": null,
     "filesToRead": [
       "src/lib/agents.ts",
