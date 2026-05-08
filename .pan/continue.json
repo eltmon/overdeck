@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1015",
   "created": "2026-05-08T00:56:13.011Z",
-  "updated": "2026-05-08T14:40:46.682Z",
+  "updated": "2026-05-08T14:51:31.744Z",
   "gitState": {
     "branch": "feature/pan-1015",
-    "sha": "94f5eb2d1",
+    "sha": "3b13356c6",
     "dirty": true,
     "clean": false
   },
@@ -24,6 +24,11 @@
       "id": "D3",
       "summary": "Z.AI / GLM now routes directly through Claude Code using ANTHROPIC_BASE_URL=https://api.z.ai/api/anthropic and static ANTHROPIC_AUTH_TOKEN auth; the claudish zai@ prefix branch is removed.",
       "recordedAt": "2026-05-08T14:40:46.682Z"
+    },
+    {
+      "id": "D4",
+      "summary": "MiniMax now routes directly through Claude Code using ANTHROPIC_BASE_URL=https://api.minimaxi.com/anthropic and static ANTHROPIC_AUTH_TOKEN auth; the claudish mm@ prefix branch is removed.",
+      "recordedAt": "2026-05-08T14:51:31.744Z"
     }
   ],
   "hazards": [
@@ -39,8 +44,8 @@
     }
   ],
   "resumePoint": {
-    "description": "Implemented workspace-bxsw: Z.AI / GLM is direct, uses https://api.z.ai/api/anthropic, no longer has a zai@ claudish prefix branch, and live claude --print --model glm-4.7 returned pong. Commit and close the bead; inspection is skipped because metadata.requiresInspection=false.",
-    "beadId": "workspace-bxsw",
+    "description": "Implemented workspace-kwjg: MiniMax is direct, uses https://api.minimaxi.com/anthropic, no longer has an mm@ claudish prefix branch, and endpoint auth shape was verified. Commit and close the bead; inspection is skipped because metadata.requiresInspection=false.",
+    "beadId": "workspace-kwjg",
     "filesToRead": [
       "src/lib/providers.ts",
       "src/lib/agents.ts",
@@ -100,9 +105,15 @@
       "reason": "bead-complete",
       "note": "Implemented workspace-bxsw. PROVIDERS.zai is direct with baseUrl https://api.z.ai/api/anthropic and authType static; removed the zai@ claudish prefix; updated provider/auth/permission tests; verified npm run typecheck, affected Vitest files, and live claude --print --model glm-4.7 returned pong.",
       "agentModel": "agent:claude-opus-4.7"
+    },
+    {
+      "timestamp": "2026-05-08T14:51:31.744Z",
+      "reason": "bead-complete",
+      "note": "Implemented workspace-kwjg. PROVIDERS.minimax is direct with baseUrl https://api.minimaxi.com/anthropic and authType static; removed the mm@ claudish prefix; updated provider/auth/permission tests; verified npm run typecheck, npm run lint, affected Vitest files. Configured MiniMax key reached the endpoint but returned authentication_error with request_id, confirming Anthropic-shaped auth handling rather than claudish involvement.",
+      "agentModel": "agent:claude-opus-4.7"
     }
   ],
   "feedback": [],
   "agentModel": "agent:claude-opus-4.7",
-  "sequence": 1
+  "sequence": 2
 }

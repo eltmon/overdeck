@@ -104,12 +104,14 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   minimax: {
     name: 'minimax',
     displayName: 'MiniMax',
-    compatibility: 'claudish',
+    compatibility: 'direct',
+    baseUrl: 'https://api.minimaxi.com/anthropic',
+    authType: 'static',
     models: ['minimax-m2.7', 'minimax-m2.7-highspeed'],
     haikuModel: 'minimax-m2.7-highspeed',
     tierModels: { opus: 'minimax-m2.7', sonnet: 'minimax-m2.7', haiku: 'minimax-m2.7-highspeed' },
     tested: true,
-    description: 'Route via claudish: mm@model or bare model (auto-detected)',
+    description: 'Route directly to MiniMax Anthropic-compatible endpoint using MINIMAX_API_KEY.',
   },
 
   zai: {

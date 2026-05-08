@@ -4,7 +4,7 @@
     "created": "2026-05-08T18:55:00Z",
     "author": "manual:opus-4.7",
     "description": "Plan for PAN-1015: Remove claudish routing in favor of direct ANTHROPIC_BASE_URL (CLIProxy only where needed). Empirically scoped 2026-05-08 \u2014 see issue body Empirical findings section.",
-    "updated": "2026-05-08T14:40:46.682Z"
+    "updated": "2026-05-08T14:51:31.744Z"
   },
   "plan": {
     "id": "pan-1015",
@@ -12,9 +12,9 @@
     "status": "active",
     "uid": "d3644941-fec5-4e25-9974-34d6a9e02902",
     "author": "manual:opus-4.7",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-08T18:55:00Z",
-    "updated": "2026-05-08T14:40:46.682Z",
+    "updated": "2026-05-08T14:51:31.744Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1015",
@@ -195,7 +195,7 @@
       {
         "id": "minimax-direct",
         "title": "MiniMax: flip to direct ANTHROPIC_BASE_URL",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-08T18:55:00Z",
         "metadata": {
@@ -210,7 +210,7 @@
           {
             "id": "minimax-direct.ac1",
             "title": "PROVIDERS.minimax.compatibility === 'direct'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -218,7 +218,7 @@
           {
             "id": "minimax-direct.ac2",
             "title": "PROVIDERS.minimax.baseUrl === 'https://api.minimaxi.com/anthropic'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -226,7 +226,7 @@
           {
             "id": "minimax-direct.ac3",
             "title": "Auth header convention verified",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -234,7 +234,7 @@
           {
             "id": "minimax-direct.ac4",
             "title": "Tests updated",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

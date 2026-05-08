@@ -8,7 +8,7 @@ import { getAgentRuntimeBaseCommand } from '../agents.js'
 //
 // This file exists to prevent regression of the bug observed in v0.8.20 where
 // claudish-routed conversations launched with
-//   "claudish -i --model mm@minimax-m2.7 --dangerously-skip-permissions --permission-mode bypassPermissions"
+//   "claudish -i --model or@qwen/qwen3.6-plus:free --dangerously-skip-permissions --permission-mode bypassPermissions"
 // even when the dashboard Permissions setting was Auto. Root cause: the claudish
 // branch in getAgentRuntimeBaseCommand hardcoded 'bypass' instead of resolving
 // the user's setting. The fix replaces the hardcoded literal with
@@ -57,24 +57,32 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
-  // ── Claudish path (MiniMax, OpenRouter, Mimo, …) ───────────────────────────
+  it('MiniMax direct + Auto: no DSP, --permission-mode auto', async () => {
+    const cmd = await getAgentRuntimeBaseCommand('minimax-m2.7')
+    expect(cmd).toMatch(/^claude /)
+    expect(cmd).toMatch(/--model minimax-m2\.7/)
+    expect(cmd).toMatch(/--permission-mode auto/)
+    expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
+    expect(cmd).not.toMatch(/bypassPermissions/)
+  })
+
+  // ── Claudish path (OpenRouter, Mimo, …) ────────────────────────────────────
 
   it('Claudish-routed model + Auto: REFUSED (no silent fallback to bypass)', async () => {
-    await expect(getAgentRuntimeBaseCommand('minimax-m2.7')).rejects.toThrow(
+    await expect(getAgentRuntimeBaseCommand('qwen/qwen3.6-plus:free')).rejects.toThrow(
       /claudish.*does not support permissionMode=auto/i,
     )
   })
 
   it('Claudish + Auto refusal mentions remediation paths', async () => {
-    await expect(getAgentRuntimeBaseCommand('minimax-m2.7')).rejects.toThrow(/Bypass/)
-    await expect(getAgentRuntimeBaseCommand('minimax-m2.7')).rejects.toThrow(/Claude or GPT/)
-    await expect(getAgentRuntimeBaseCommand('minimax-m2.7')).rejects.toThrow(/PAN-1015/)
+    await expect(getAgentRuntimeBaseCommand('qwen/qwen3.6-plus:free')).rejects.toThrow(/Bypass/)
+    await expect(getAgentRuntimeBaseCommand('qwen/qwen3.6-plus:free')).rejects.toThrow(/Claude or GPT/)
+    await expect(getAgentRuntimeBaseCommand('qwen/qwen3.6-plus:free')).rejects.toThrow(/PAN-1015/)
   })
 
   it('Claudish refusal applies to remaining claudish-routed providers', async () => {
     // Sample one real model from each remaining claudish-routed provider in providers.ts.
     const claudishModels = [
-      'minimax-m2.7',
       'qwen/qwen3.6-plus:free',
       'mimo-v2.5',
     ]

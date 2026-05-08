@@ -409,11 +409,6 @@ export function getClaudishPrefix(model: string, authMode?: string): string {
     return `kc@${model}`;
   }
 
-  // MiniMax models — explicit mm@ prefix
-  if (['minimax-m2.7', 'minimax-m2.7-highspeed'].includes(model)) {
-    return `mm@${model}`;
-  }
-
   // OpenRouter model IDs always contain '/'
   if (model.includes('/')) {
     return `or@${model}`;

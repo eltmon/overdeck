@@ -67,7 +67,7 @@ describe('agents auth routing', () => {
         return { name: 'openai', displayName: 'OpenAI', compatibility: 'claudish', authType: 'env' };
       }
       if (model.startsWith('minimax-')) {
-        return { name: 'minimax', displayName: 'MiniMax', compatibility: 'claudish', authType: 'static' };
+        return { name: 'minimax', displayName: 'MiniMax', compatibility: 'direct', authType: 'static' };
       }
       if (model.startsWith('kimi-')) {
         return { name: 'kimi', displayName: 'Kimi', compatibility: 'direct', authType: 'static' };
@@ -157,9 +157,9 @@ describe('agents auth routing', () => {
     );
   });
 
-  it('launches MiniMax models through claudish with mm@ prefix', async () => {
+  it('launches MiniMax models directly with Claude Code', async () => {
     expect(await getAgentRuntimeBaseCommand('minimax-m2.7')).toBe(
-      'claudish -i --model mm@minimax-m2.7 --dangerously-skip-permissions --permission-mode bypassPermissions'
+      'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model minimax-m2.7'
     );
   });
 

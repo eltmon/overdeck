@@ -47,9 +47,17 @@ describe('providers', () => {
     });
   });
 
-  it('returns MINIMAX_API_KEY for MiniMax key-based claudish routing', () => {
+  it('routes MiniMax through its direct Anthropic-compatible endpoint', () => {
+    expect(PROVIDERS.minimax.compatibility).toBe('direct');
     expect(getProviderEnv(PROVIDERS.minimax, 'sk-minimax-test')).toEqual({
-      MINIMAX_API_KEY: 'sk-minimax-test',
+      ANTHROPIC_BASE_URL: 'https://api.minimaxi.com/anthropic',
+      ANTHROPIC_AUTH_TOKEN: 'sk-minimax-test',
+      API_TIMEOUT_MS: '300000',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'minimax-m2.7',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'minimax-m2.7',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'minimax-m2.7-highspeed',
+      ANTHROPIC_SMALL_FAST_MODEL: 'minimax-m2.7-highspeed',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'minimax-m2.7-highspeed',
     });
   });
 
