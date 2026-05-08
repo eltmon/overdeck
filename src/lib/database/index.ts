@@ -86,9 +86,24 @@ export function getDatabase(): Database.Database {
   _db.pragma('foreign_keys = ON');
   // Write-ahead log synchronization — NORMAL is safe and fast
   _db.pragma('synchronous = NORMAL');
+  // Cap WAL file size at 64 MB. Without this, SQLite's autocheckpoint only
+  // RESETS the WAL (rewinds to offset 0); the file itself never shrinks
+  // and grows to its lifetime high-water mark. Empirically observed at
+  // 489 MB after a few days of agent activity, contributing to system-wide
+  // disk thrashing. The limit only takes effect after a checkpoint, so we
+  // also schedule a periodic TRUNCATE checkpoint below.
+  _db.pragma('journal_size_limit = 67108864');
 
   // Initialize or migrate schema
   runMigrations(_db);
+
+  // Periodic TRUNCATE checkpoint — once per minute. Belt-and-suspenders
+  // alongside journal_size_limit: if a long-lived reader has been holding a
+  // WAL frame, autocheckpoint upgrades won't cap the file. TRUNCATE forces
+  // the WAL back to zero bytes whenever no readers are blocking.
+  setInterval(() => {
+    try { _db?.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* ignore */ }
+  }, 60_000).unref();
 
   return _db;
 }
