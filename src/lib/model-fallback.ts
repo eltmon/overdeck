@@ -46,12 +46,11 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
 
   // Google models (current)
   'gemini-3.1-pro-preview': 'google',
-  'gemini-3-flash': 'google',
+  'gemini-3-flash-preview': 'google',
   'gemini-3.1-flash-lite-preview': 'google',
 
   // Google legacy
   'gemini-3-pro-preview': 'google',
-  'gemini-3-flash-preview': 'google',
   'gemini-2.5-pro': 'google',
   'gemini-2.5-flash': 'google',
 
@@ -108,11 +107,10 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
 
   // Google → Anthropic
   'gemini-3.1-pro-preview': 'claude-sonnet-4-6', // Flagship → Sonnet
-  'gemini-3-flash': 'claude-haiku-4-5', // Fast model → Haiku
+  'gemini-3-flash-preview': 'claude-haiku-4-5', // Fast model → Haiku
   'gemini-3.1-flash-lite-preview': 'claude-haiku-4-5', // Budget model → Haiku
   // Deprecated Google IDs
   'gemini-3-pro-preview': 'claude-sonnet-4-6',
-  'gemini-3-flash-preview': 'claude-haiku-4-5',
   'gemini-2.5-pro': 'claude-sonnet-4-6',
   'gemini-2.5-flash': 'claude-haiku-4-5',
 

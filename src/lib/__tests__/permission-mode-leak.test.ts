@@ -59,7 +59,7 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
       'kimi-k2.6',
       'minimax-m2.7',
       'glm-4.7',
-      'gemini-3-flash',
+      'gemini-3-flash-preview',
       'mimo-v2.5',
     ]
     for (const m of claudishModels) {

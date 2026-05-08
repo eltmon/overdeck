@@ -86,8 +86,8 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'google',
     displayName: 'Google (Gemini)',
     compatibility: 'claudish',
-    models: ['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview'],
-    tierModels: { opus: 'gemini-3.1-pro-preview', sonnet: 'gemini-3-flash', haiku: 'gemini-3.1-flash-lite-preview' },
+    models: ['gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview'],
+    tierModels: { opus: 'gemini-3.1-pro-preview', sonnet: 'gemini-3-flash-preview', haiku: 'gemini-3.1-flash-lite-preview' },
     tested: true,
     description: 'Route via claudish: go@model (Google CodeAssist OAuth) or API key',
   },
@@ -157,7 +157,7 @@ export function getProviderForModel(modelId: ModelId | string): ProviderConfig {
   }
 
   // Check Google models
-  if (['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'].includes(modelId)) {
+  if (['gemini-3.1-pro-preview', 'gemini-3.1-flash-lite-preview', 'gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'].includes(modelId)) {
     return PROVIDERS.google;
   }
 
