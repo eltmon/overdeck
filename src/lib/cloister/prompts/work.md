@@ -357,22 +357,19 @@ Your `.pan/continue.json` MUST be valid JSON with these fields:
 - Declare infrastructure "complete" when tests still fail
 - Poll or `curl` the specialist API in a loop — the pipeline is event-driven, not polling-based
 - Use `sleep` to wait for reviews, tests, or any external process
-{{#REMOTE}}
-- Stop after completing a subset of tasks to ask "what should I do next?" — just continue to the next task
-- If you encounter an error on a task, try to fix it. If you truly cannot proceed, skip it and move to the next task, noting what failed
-{{/REMOTE}}
+- **Stop after completing a subset of tasks to ask "what should I do next?"** Just continue to the next task. The plan IS the input; no human kickoff is coming between beads.
+- **End your turn with a multi-paragraph "what I just did" summary and idle.** Summaries cost tokens and stall the pipeline. Close the bead with `bd close --reason="…"`, then immediately call `bd ready -l {{ISSUE_ID_LOWER}}` and start the next one in the same turn.
+- If you encounter an error on a task, try to fix it. If you truly cannot proceed, skip it and move to the next task, noting what failed in `.pan/continue.json` decisions[] / hazards[].
 
 **ALWAYS do this instead:**
-- Work through beads ONE AT A TIME — claim, implement, commit, close, wait for inspection
-- Complete ALL beads from start to finish — but each one individually
+- Work through beads ONE AT A TIME — claim, implement, commit, close. Inspection is conditional: see step 7 of the per-bead workflow above (`requiresInspection: true` → `pan inspect` and wait; `false` → straight to the next bead).
+- Complete ALL beads from start to finish — but each one individually as a separate commit.
+- **When one bead is done, immediately advance to the next unblocked bead in the same turn.** Don't checkpoint. Don't await acknowledgment. The pipeline assumes continuous bead execution.
 - Fix ALL failing tests, not just "high-impact" ones
 - If something is broken, fix it - don't document it
 - If tests fail, debug and fix them until they pass
 - Work autonomously until the issue is FULLY resolved
-- The only acceptable end state is: all beads closed with passing inspections, all tests pass, all code committed, pushed
-{{#REMOTE}}
-- When one task is done, immediately move to the next unblocked task. Keep going until every task is finished.
-{{/REMOTE}}
+- The only acceptable end state is: all beads closed (with passing inspections on flagged beads), all tests pass, all code committed and pushed, and `pan done {{ISSUE_ID}}` called.
 
 **You have unlimited time and context. Use it. Do not be lazy.**
 
