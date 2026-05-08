@@ -21,38 +21,66 @@ allowed-tools:
 
 ## What It Is
 
-`pan-tts` is an **optional** local daemon that subscribes to Panopticon's public SSE feed, filters for `activity.entry` events, and speaks the message aloud using a local text-to-speech engine. It runs as its own process — nothing inside pan depends on it, and pan users who do not want audio notifications will never know it exists.
+`pan-tts` is an **optional** local sidecar that subscribes to Panopticon's public SSE feed, filters for `activity.entry` events, and speaks the message aloud using a local text-to-speech engine. It runs as its own process — nothing inside pan depends on it, and pan users who do not want audio notifications will never know it exists.
 
-Default voice stack for this machine is Qwen3-TTS VoiceDesign 1.7B via the existing `stream-voices` rig on the RTX 3090 (see `~/Projects/stream-voices`). Any TTS that takes text on stdin and plays audio on stdout will drop in.
+The TTS pipeline is split into two independent components:
 
-## Why It's a Skill, Not a Core Feature
+1. **Qwen3-TTS HTTP daemon** (`~/Projects/eltmon-stream/tts_daemon.py`) — keeps the 1.7B model resident in VRAM, synthesizes speech on demand via `POST /speak`, and plays audio through the default PipeWire sink. This is the component that actually drives the speaker.
+2. **SSE subscriber** (`~/Projects/pan-tts/`) — connects to Panopticon's `/events/stream`, formats condensed utterances, and forwards them to the daemon. This is the component that decides *what* to speak.
 
-- Panopticon should not own audio, GPU runtimes, or voice models.
-- Users with different TTS preferences (Piper, Coqui, ElevenLabs, macOS `say`) can swap the engine without touching pan.
-- The `/events/stream` contract is stable; sidecars built against it keep working across pan upgrades.
-
-See **`docs/EXTERNAL-EVENT-STREAM.md`** for the full event-stream contract.
-
-## How It Works
+## Architecture
 
 ```
-pan dashboard            pan-tts daemon              audio out
-─────────────────        ─────────────────           ─────────
-/events/stream ──SSE──▶  filter activity.entry ──▶  Qwen3-TTS ──▶  speaker
-                         dedupe by sequence
-                         priority queue
+pan dashboard            pan-tts subscriber          qwen-tts daemon            audio out
+─────────────────        ───────────────────         ─────────────────          ─────────
+/events/stream ──SSE──▶  filter activity.entry  ──▶  POST /speak  ──▶         PipeWire
+                         dedupe by sequence          synthesize (GPU)
+                         priority queue              persistent pw-play stream
 ```
 
-1. Connects to `http://127.0.0.1:3000/events/stream?types=activity.entry` with `EventSource` semantics.
-2. On each event, formats a condensed utterance: `"<source>: <message>"` (e.g. `"merge agent: PAN-537 merged"`). Full `details` text is never spoken — keep utterances short.
-3. Enqueues into a priority queue:
-   - `level: error` → interrupt current speech
-   - `level: warn | success` → normal queue
-   - `level: info` → low priority, drop if queue > 5 items
-4. Synthesizes with the configured TTS engine and plays through the default audio device.
-5. Persists the last processed `sequence` to `~/.pan-tts/state.json` so restarts replay missed events via `Last-Event-ID`.
+### Why two components?
 
-## Configuration
+- The GPU daemon is expensive to start (model load ~10s) and must stay resident.
+- The subscriber is cheap to restart and can be swapped for a different consumer (Discord bot, desktop notification, etc.) without touching the GPU runtime.
+- The `/speak` contract is simple HTTP; anything that can POST JSON can use the daemon.
+
+## Qwen3-TTS HTTP Daemon
+
+**Source:** `~/Projects/eltmon-stream/tts_daemon.py`
+
+The daemon loads `Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice` on `cuda:0` at startup and exposes three endpoints:
+
+- `POST /speak` — queue a text utterance for synthesis and playback
+- `POST /extract-embedding` — generate a VoiceDesign audio clip and extract a 2048-dim speaker embedding for voice cloning
+- `GET /health` — queue depth and model status
+
+### Running the daemon
+
+```bash
+cd ~/Projects/eltmon-stream
+. .venv/bin/activate   # or use the qwen-tts venv
+python tts_daemon.py
+```
+
+The daemon auto-detects the default PipeWire sink and uses a **persistent `pw-play` stream** to avoid audio truncation caused by sink suspend/resume (see *PipeWire Suspend* below).
+
+### PipeWire Suspend
+
+PipeWire suspends idle audio sinks by default. When a sink is suspended, the first ~50–500ms of audio can be dropped while the DAC resumes. The daemon handles this in `play_audio()`:
+
+- A persistent `pw-play` subprocess is kept open for up to 10 seconds after the last utterance, keeping the sink **RUNNING** between consecutive announcements.
+- On cold starts (sink is **SUSPENDED**), 600ms of silence is prepended to cover the resume latency.
+- On warm playback (sink already **RUNNING**), only 50ms of safety silence is added.
+
+This ensures short utterances (e.g. "PAN-1024 ready for merge") are never truncated, while the sink returns to **SUSPENDED** within a reasonable timeout once the queue is drained.
+
+## SSE Subscriber
+
+**Source:** `~/Projects/pan-tts/src/pan_tts/`
+
+The subscriber is a small Python project that connects to Panopticon's SSE feed and speaks activity entries.
+
+### Configuration
 
 `~/.pan-tts/config.yaml`:
 
@@ -78,9 +106,7 @@ queue:
 
 Secrets (if any) go in `~/.panopticon.env` alongside the rest of the pan environment — do not duplicate them here.
 
-## Running It
-
-The daemon ships as a small Python project at `~/Projects/pan-tts/` (to be created after the `/events/stream` endpoint lands).
+### Running the subscriber
 
 ```bash
 # one-shot foreground run (smoke test)
@@ -112,9 +138,10 @@ Use this sparingly — the SSE-subscribed sidecar already speaks every activity 
 ## Verifying It
 
 1. `pan up` — start the dashboard.
-2. `systemctl --user start pan-tts` — start the sidecar.
-3. `journalctl --user -u pan-tts -f` — watch logs.
-4. In another terminal: `pan start PAN-XXX` and listen. You should hear the merge agent, review specialist, etc. as they post activity entries.
+2. Start the Qwen3-TTS daemon: `cd ~/Projects/eltmon-stream && python tts_daemon.py`
+3. Start the sidecar: `systemctl --user start pan-tts`
+4. `journalctl --user -u pan-tts -f` — watch logs.
+5. In another terminal: `pan start PAN-XXX` and listen. You should hear the merge agent, review specialist, etc. as they post activity entries.
 
 If nothing speaks:
 
@@ -132,4 +159,4 @@ If nothing speaks:
 
 - `docs/EXTERNAL-EVENT-STREAM.md` — the public contract this skill depends on
 - `packages/contracts/src/events.ts` — canonical event schemas
-- `~/Projects/stream-voices` — the underlying Qwen3-TTS rig
+- `~/Projects/eltmon-stream/tts_daemon.py` — Qwen3-TTS HTTP daemon source
