@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-987",
   "created": "2026-05-07T18:25:44Z",
-  "updated": "2026-05-07T21:29:02Z",
+  "updated": "2026-05-08T08:03:26Z",
   "gitState": {
     "branch": "feature/pan-987",
-    "sha": "6bab1d493",
+    "sha": "93e144768",
     "dirty": true
   },
   "decisions": [
@@ -53,6 +53,11 @@
       "id": "D9",
       "summary": "Stabilized the bridge SIGTERM subprocess regression test by asserting the actual contract we need for verification — the bridge must terminate and unlink its Unix socket — instead of over-specifying Bun's exit-shape as code 0 only, which can intermittently surface as a signal-based exit in CI.",
       "recordedAt": "2026-05-07T21:29:02Z"
+    },
+    {
+      "id": "D10",
+      "summary": "After rebasing onto `origin/main`, verification exposed a synced-fixture mismatch rather than a runtime bug: the committed skill inventory was missing the intentionally-added `pipeline-status` skill. I fixed the root cause by updating the plain-text fixture to match the actual checked-in skill surface so future skill additions remain explicit in diffs.",
+      "recordedAt": "2026-05-08T08:03:26Z"
     }
   ],
   "hazards": [
@@ -73,11 +78,11 @@
     }
   ],
   "resumePoint": {
-    "description": "Verification-gate retry is fixed locally. Next step: commit the bridge subprocess test stabilization and updated continue state, then resubmit through `pan review request PAN-987 -m \"Fixed test\"` so verification can rerun.",
+    "description": "Second verification retry is fixed locally. Next step: commit the synced-skills fixture update and continue-state note, then resubmit through `pan review request PAN-987 -m \"Fixed test\"` after the branch is pushed.",
     "beadId": "workspace-kmfs",
     "filesToRead": [
-      "src/lib/channels/__tests__/panopticon-bridge.test.ts",
-      ".pan/feedback/001-verification-gate-failed.md",
+      "tests/fixtures/synced-skills.txt",
+      ".pan/feedback/002-verification-gate-failed.md",
       ".pan/continue.json"
     ]
   },
@@ -122,6 +127,12 @@
       "timestamp": "2026-05-07T21:29:02Z",
       "reason": "manual",
       "note": "Verification retry failed on the bridge subprocess SIGTERM test because the assertion required an exact exit code of 0, while Bun can sometimes report the shutdown as a signal-based exit even when the handler still unlinks the socket correctly. I narrowed the regression to the actual contract the feature depends on — bridge termination plus socket cleanup — updated the test to accept either exit shape, and re-ran the failing bridge suite with `npm run typecheck` green before resubmitting verification.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-08T08:03:26Z",
+      "reason": "manual",
+      "note": "After manually rebasing the branch onto `origin/main` and force-pushing per user instruction, the next verification attempt failed on `tests/fixtures/synced-skills.test.ts`. The failure was a real fixture drift: `skills/pipeline-status/SKILL.md` exists in the repo, but `tests/fixtures/synced-skills.txt` did not include it. I updated the committed fixture, reran the failing fixture test, and confirmed `npm run typecheck` still passes before the next resubmission.",
       "agentModel": "claude-opus-4-7"
     }
   ],
