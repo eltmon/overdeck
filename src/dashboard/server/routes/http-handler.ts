@@ -12,7 +12,7 @@
  *   })))
  */
 
-import { Cause, Effect } from 'effect';
+import { Cause, Effect, Option } from 'effect';
 import { HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { jsonResponse } from '../http-helpers.js';
@@ -90,18 +90,19 @@ export function httpHandler<R, E>(
       Effect.gen(function* () {
         // Interrupt-only causes mean the consumer (browser tab, abort signal) cancelled
         // the request. That isn't a server error — silence it instead of spamming logs.
-        if (Cause.isInterruptedOnly(cause)) {
+        if (Cause.hasInterruptsOnly(cause)) {
           return jsonResponse({ error: 'Request cancelled' }, { status: 499 });
         }
         const error = Cause.squash(cause);
         const message = error instanceof Error ? error.message : 'Internal server error';
-        let route = 'unknown';
-        try {
-          const req = yield* HttpServerRequest.HttpServerRequest;
-          route = `${req.method} ${req.url}`;
-        } catch {
-          // request service may not be available in all contexts
-        }
+        // Try to capture request method+URL for the log, but don't fail the
+        // handler if the service isn't in context (e.g., unit tests that invoke
+        // httpHandler without a full HTTP layer). `Effect.serviceOption` returns
+        // None instead of throwing when the service is missing.
+        const reqOpt = yield* Effect.serviceOption(HttpServerRequest.HttpServerRequest);
+        const route = Option.isSome(reqOpt)
+          ? `${reqOpt.value.method} ${reqOpt.value.url}`
+          : 'unknown';
         console.error(`[httpHandler] Unhandled error on ${route}:\n${Cause.pretty(cause)}`);
         return jsonResponse({ error: message }, { status: 500 });
       }),
