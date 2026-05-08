@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1015",
   "created": "2026-05-08T00:56:13.011Z",
-  "updated": "2026-05-08T17:44:16.082Z",
+  "updated": "2026-05-08T17:52:21.408Z",
   "gitState": {
     "branch": "feature/pan-1015",
     "sha": "f4b2f78ae",
@@ -187,6 +187,11 @@
       "reason": "bead-complete",
       "note": "Implemented workspace-stvj. Full quality gates pass: npm run typecheck, npm run lint, npm test, npm run build. Fixed final validation failures by removing deprecated gemini-3-flash-preview from the Settings model catalog, refreshing the synced-skills fixture for pipeline-status, and making TTS summarizer startup use initEventStore so pan up health passes when TTS summarization is enabled. Verified dashboard Settings Providers render and direct GLM smoke through provider env with claude --print --model glm-4.7.",
       "agentModel": "agent:claude-opus-4.7"
+    },
+    {
+      "timestamp": "2026-05-08T17:52:21.408Z",
+      "reason": "end",
+      "note": "Removed claudish routing; all providers now launch via Claude Code direct env or CLIProxy, with verification gates passing."
     }
   ],
   "feedback": [],
