@@ -5,6 +5,7 @@
 ### Changed
 
 - OpenAI model routing now requires Codex/ChatGPT subscription auth through CLIProxy; direct OpenAI API-key fallback is deprecated because api.openai.com is not Anthropic-compatible.
+- Kimi models now launch through Claude Code directly, selecting the Kimi coding or Moonshot Anthropic endpoint from the configured key prefix.
 
 ## [0.7.0] — Command Taxonomy Reorganization
 

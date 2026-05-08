@@ -167,8 +167,11 @@ export async function getAgentRuntimeBaseCommand(
 
   if (provider.compatibility === 'direct') {
     if (agentType) {
-      // Anthropic direct: --agent fully replaces --model. Permission flags only when in bypass.
-      return `claude${bypassWithAgent}${agentFlag}${nameFlag}`;
+      // Anthropic direct: --agent fully replaces --model. Non-Anthropic
+      // direct providers still need --model because agent frontmatter model:
+      // only accepts Anthropic identifiers.
+      const modelFlag = provider.name === 'anthropic' ? '' : ` --model ${model}`;
+      return `claude${bypassWithAgent}${agentFlag}${modelFlag}${nameFlag}`;
     }
     return `claude ${permissionFlags} --model ${model}${nameFlag}`;
   }
@@ -289,6 +292,10 @@ const PROVIDER_ENV_KEYS = [
   'ANTHROPIC_BASE_URL',
   'ANTHROPIC_AUTH_TOKEN',
   'ANTHROPIC_DEFAULT_HAIKU_MODEL',
+  'ANTHROPIC_DEFAULT_OPUS_MODEL',
+  'ANTHROPIC_DEFAULT_SONNET_MODEL',
+  'ANTHROPIC_SMALL_FAST_MODEL',
+  'CLAUDE_CODE_SUBAGENT_MODEL',
   'OPENAI_API_KEY',
   'GEMINI_API_KEY',
   'API_TIMEOUT_MS',

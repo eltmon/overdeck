@@ -52,6 +52,15 @@ export interface ProviderConfig {
 /**
  * All provider configurations
  */
+export const KIMI_CODING_BASE_URL = 'https://api.kimi.com/coding';
+export const KIMI_PLATFORM_BASE_URL = 'https://api.moonshot.ai/anthropic';
+
+export function getKimiAnthropicBaseUrl(apiKey: string): string {
+  return apiKey.trim().startsWith('sk-kimi-')
+    ? KIMI_CODING_BASE_URL
+    : KIMI_PLATFORM_BASE_URL;
+}
+
 export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   anthropic: {
     name: 'anthropic',
@@ -65,11 +74,11 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   kimi: {
     name: 'kimi',
     displayName: 'Kimi (Moonshot AI)',
-    compatibility: 'claudish',
+    compatibility: 'direct',
     models: ['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'],
     tierModels: { opus: 'kimi-k2.6', sonnet: 'kimi-k2.5', haiku: 'kimi-k2' },
     tested: true,
-    description: 'Route via claudish: kimi@model or bare model (auto-detected)',
+    description: 'Route directly to Kimi Anthropic-compatible endpoints; sk-kimi-* keys use the coding endpoint, platform keys use Moonshot.',
   },
 
   openai: {
@@ -224,7 +233,9 @@ export function getProviderEnv(
     // Direct providers use ANTHROPIC_BASE_URL
     const env: Record<string, string> = {};
 
-    if (provider.baseUrl) {
+    if (provider.name === 'kimi') {
+      env.ANTHROPIC_BASE_URL = getKimiAnthropicBaseUrl(apiKey);
+    } else if (provider.baseUrl) {
       env.ANTHROPIC_BASE_URL = provider.baseUrl;
     }
 

@@ -70,7 +70,7 @@ describe('agents auth routing', () => {
         return { name: 'minimax', displayName: 'MiniMax', compatibility: 'claudish', authType: 'static' };
       }
       if (model.startsWith('kimi-')) {
-        return { name: 'kimi', displayName: 'Kimi', compatibility: 'claudish', authType: 'static' };
+        return { name: 'kimi', displayName: 'Kimi', compatibility: 'direct', authType: 'static' };
       }
       if (model.startsWith('glm-')) {
         return { name: 'zai', displayName: 'Z.AI', compatibility: 'claudish', authType: 'static' };
@@ -163,9 +163,9 @@ describe('agents auth routing', () => {
     );
   });
 
-  it('launches Kimi models through claudish with kc@ prefix', async () => {
+  it('launches Kimi models directly with Claude Code', async () => {
     expect(await getAgentRuntimeBaseCommand('kimi-k2.6')).toBe(
-      'claudish -i --model kc@kimi-k2.6 --dangerously-skip-permissions --permission-mode bypassPermissions'
+      'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model kimi-k2.6'
     );
   });
 
@@ -187,9 +187,9 @@ describe('agents auth routing', () => {
     );
   });
 
-  it('omits --agent and --name for claudish (Commander.js rejects unknown flags)', async () => {
+  it('keeps --agent and --name for direct Kimi launches', async () => {
     expect(await getAgentRuntimeBaseCommand('kimi-k2.6', 'agent-pan-964', 'work')).toBe(
-      'claudish -i --model kc@kimi-k2.6 --dangerously-skip-permissions --permission-mode bypassPermissions'
+      'claude --dangerously-skip-permissions --agent pan-work-agent --model kimi-k2.6 --name agent-pan-964'
     );
   });
 
@@ -202,6 +202,10 @@ describe('agents auth routing', () => {
         'unset ANTHROPIC_BASE_URL',
         'unset ANTHROPIC_AUTH_TOKEN',
         'unset ANTHROPIC_DEFAULT_HAIKU_MODEL',
+        'unset ANTHROPIC_DEFAULT_OPUS_MODEL',
+        'unset ANTHROPIC_DEFAULT_SONNET_MODEL',
+        'unset ANTHROPIC_SMALL_FAST_MODEL',
+        'unset CLAUDE_CODE_SUBAGENT_MODEL',
         'unset OPENAI_API_KEY',
         'unset GEMINI_API_KEY',
         'unset API_TIMEOUT_MS',

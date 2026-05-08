@@ -6,7 +6,7 @@
  * network issues BEFORE the agent enters Claude Code's opaque retry loop.
  */
 
-import { getProviderForModel, type ProviderConfig } from './providers.js';
+import { getProviderEnv, getProviderForModel, type ProviderConfig } from './providers.js';
 import { loadConfig as loadYamlConfig } from './config-yaml.js';
 import type { ModelId } from './settings.js';
 
@@ -100,7 +100,8 @@ async function doProbe(
   apiKey: string,
   model: string,
 ): Promise<ProbeResult> {
-  const baseUrl = provider.baseUrl;
+  const providerEnv = getProviderEnv(provider, apiKey);
+  const baseUrl = providerEnv.ANTHROPIC_BASE_URL ?? provider.baseUrl;
   if (!baseUrl) return { ok: true };
 
   const url = `${baseUrl}/v1/messages`;

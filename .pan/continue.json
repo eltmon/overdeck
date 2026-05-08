@@ -2,17 +2,23 @@
   "version": "1",
   "issueId": "PAN-1015",
   "created": "2026-05-08T00:56:13.011Z",
-  "updated": "2026-05-08T12:05:11Z",
+  "updated": "2026-05-08T12:18:33.859Z",
   "gitState": {
     "branch": "feature/pan-1015",
-    "sha": "a78457e05",
-    "dirty": true
+    "sha": "da754ee65",
+    "dirty": true,
+    "clean": false
   },
   "decisions": [
     {
       "id": "D1",
       "summary": "Course correction: chose Gemini option (a), not deferral. CLIProxyAPI v6.10.x has a Gemini backend, so Panopticon will bridge GOOGLE_API_KEY into CLIProxy and route Gemini models directly through the local Anthropic-compatible sidecar with no claudish carve-out.",
       "recordedAt": "2026-05-08T11:36:54.337Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Kimi sk-kimi-* coding keys route to https://api.kimi.com/coding. The bead text named /coding/anthropic, but live probes showed /coding/anthropic/v1/messages returns 404 while /coding/v1/messages returns the expected authenticated quota-exceeded response.",
+      "recordedAt": "2026-05-08T12:18:33.859Z"
     }
   ],
   "hazards": [
@@ -28,12 +34,15 @@
     }
   ],
   "resumePoint": {
-    "description": "Implementing workspace-6m0h: OpenAI API-key fallback removed from getProviderEnvForModel. OpenAI models now require Codex/ChatGPT subscription auth through CLIProxy; configured API keys receive a clear remediation error. Typecheck, lint, and targeted auth-routing tests passed. Commit, close bead, and request inspection.",
-    "beadId": "workspace-6m0h",
+    "description": "Implemented workspace-i9tb: Kimi now routes as a direct Claude Code provider with key-prefix endpoint selection, direct agent launches keep --model for non-Anthropic direct providers, and Kimi/remaining-claudish permission-mode tests were updated. Live validation reached the Kimi coding endpoint and returned the expected quota-exceeded response for the configured sk-kimi key, proving authenticated routing rather than invalid auth. Commit, close bead, and request inspection.",
+    "beadId": "workspace-i9tb",
     "filesToRead": [
+      "src/lib/providers.ts",
+      "src/lib/provider-health.ts",
       "src/lib/agents.ts",
-      "src/lib/openai-auth.ts",
+      "tests/lib/providers.test.ts",
       "tests/lib/agents-auth-routing.test.ts",
+      "src/lib/__tests__/permission-mode-leak.test.ts",
       "CHANGELOG.md"
     ]
   },
@@ -73,6 +82,12 @@
       "timestamp": "2026-05-08T12:05:11Z",
       "reason": "bead-complete",
       "note": "Implemented workspace-6m0h by removing OpenAI API-key fallback from getProviderEnvForModel, preserving only Codex/ChatGPT subscription routing via CLIProxy, updating openai-auth comments, updating auth-routing tests, and adding a changelog entry. Verified npm run typecheck, npm run lint, and npm test -- tests/lib/agents-auth-routing.test.ts.",
+      "agentModel": "agent:claude-opus-4.7"
+    },
+    {
+      "timestamp": "2026-05-08T12:18:33.859Z",
+      "reason": "bead-complete",
+      "note": "Implemented workspace-i9tb. PROVIDERS.kimi is direct; getProviderEnv selects https://api.kimi.com/coding for sk-kimi-* keys and https://api.moonshot.ai/anthropic otherwise; provider health probes derive dynamic base URLs from provider env; direct non-Anthropic agent launches include --model with --agent; stale direct-provider subagent model env vars are unset before exports. Verified npm run typecheck, npm run lint, npm test -- tests/lib/providers.test.ts tests/lib/agents-auth-routing.test.ts src/lib/__tests__/permission-mode-leak.test.ts, and claude --print --model kimi-k2.6 reached Kimi with quota-exceeded rather than invalid auth.",
       "agentModel": "agent:claude-opus-4.7"
     }
   ],

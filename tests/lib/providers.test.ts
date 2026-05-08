@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getProviderEnv, PROVIDERS } from '../../src/lib/providers.js';
+import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, getProviderEnv, PROVIDERS } from '../../src/lib/providers.js';
 
 describe('providers', () => {
   it('returns no proxy env for OpenAI subscription routing through claudish', () => {
@@ -12,15 +12,38 @@ describe('providers', () => {
     });
   });
 
-  it('returns GEMINI_API_KEY for direct Google key-based claudish routing', () => {
+  it('returns Anthropic-compatible env for Google direct routing', () => {
     expect(getProviderEnv(PROVIDERS.google, 'AIza-test')).toEqual({
-      GEMINI_API_KEY: 'AIza-test',
+      ANTHROPIC_AUTH_TOKEN: 'AIza-test',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'gemini-3.1-pro-preview',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'gemini-3-flash-preview',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'gemini-3.1-flash-lite-preview',
+      ANTHROPIC_SMALL_FAST_MODEL: 'gemini-3.1-flash-lite-preview',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'gemini-3.1-flash-lite-preview',
     });
   });
 
-  it('returns KIMI_CODING_API_KEY for Kimi key-based claudish routing', () => {
+  it('routes sk-kimi-* coding keys to the Kimi coding Anthropic endpoint', () => {
     expect(getProviderEnv(PROVIDERS.kimi, 'sk-kimi-test')).toEqual({
-      KIMI_CODING_API_KEY: 'sk-kimi-test',
+      ANTHROPIC_BASE_URL: KIMI_CODING_BASE_URL,
+      ANTHROPIC_AUTH_TOKEN: 'sk-kimi-test',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'kimi-k2.6',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'kimi-k2.5',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'kimi-k2',
+      ANTHROPIC_SMALL_FAST_MODEL: 'kimi-k2',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'kimi-k2',
+    });
+  });
+
+  it('routes Moonshot platform keys to the Moonshot Anthropic endpoint', () => {
+    expect(getProviderEnv(PROVIDERS.kimi, 'sk-platform-test')).toEqual({
+      ANTHROPIC_BASE_URL: KIMI_PLATFORM_BASE_URL,
+      ANTHROPIC_AUTH_TOKEN: 'sk-platform-test',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'kimi-k2.6',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'kimi-k2.5',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'kimi-k2',
+      ANTHROPIC_SMALL_FAST_MODEL: 'kimi-k2',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'kimi-k2',
     });
   });
 
