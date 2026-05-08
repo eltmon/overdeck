@@ -92,7 +92,7 @@ export function getReviewButtonState(
 export function getFriendlyModelName(fullModel: string | undefined | null): string {
   if (!fullModel) return 'Unknown';
 
-  // Normalize legacy provider-prefixed models without surfacing a claudish badge.
+  // Normalize legacy provider-prefixed models without surfacing a routing badge.
   const backingModel = fullModel.replace(/^(?:oai|cx|go)@/, '');
 
   // Anthropic models

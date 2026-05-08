@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1015",
   "created": "2026-05-08T00:56:13.011Z",
-  "updated": "2026-05-08T16:31:35.494Z",
+  "updated": "2026-05-08T16:55:36.580Z",
   "gitState": {
     "branch": "feature/pan-1015",
-    "sha": "c1195b5d9",
+    "sha": "04d38c18d",
     "dirty": true,
     "clean": false
   },
@@ -54,6 +54,11 @@
       "id": "D9",
       "summary": "ProviderCompatibility is collapsed to direct-only configuration. OpenAI remains a direct provider because subscription launches are handled through CLIProxy, while API-key launches are rejected before env construction.",
       "recordedAt": "2026-05-08T16:31:35.494Z"
+    },
+    {
+      "id": "D10",
+      "summary": "Claudish-only test coverage has been rewritten for direct Claude Code and CLIProxy routing: GPT subscription commands use bare model IDs, OpenAI -pro aliases map to CLIProxy-supported IDs, and obsolete claudish prefix helper coverage is removed.",
+      "recordedAt": "2026-05-08T16:55:36.580Z"
     }
   ],
   "hazards": [
@@ -69,17 +74,16 @@
     }
   ],
   "resumePoint": {
-    "description": "Implemented workspace-aei6: ProviderCompatibility export and claudish helper functions are removed, OpenAI is direct/CLIProxy-only, provider env construction no longer has a claudish branch, and the inspector strips legacy prefixes without displaying claudish badges. Commit and close the bead; inspection is skipped because metadata.requiresInspection=false.",
-    "beadId": "workspace-aei6",
+    "description": "Implemented workspace-7tmx: claudish-only tests and comments are rewritten for direct Claude Code/CLIProxy routing; getClaudishPrefix was removed; affected typecheck, lint, and Vitest suites pass. Commit and close the bead, then advance to workspace-stvj for final quality gates. Inspection is skipped because metadata.requiresInspection=false.",
+    "beadId": "workspace-7tmx",
     "filesToRead": [
-      "src/lib/providers.ts",
       "src/lib/agents.ts",
-      "src/lib/provider-health.ts",
+      "tests/lib/agents-auth-routing.test.ts",
+      "tests/lib/cloister/review-agent.test.ts",
+      "src/lib/__tests__/permission-mode-leak.test.ts",
       "src/dashboard/frontend/src/components/inspector/utils.ts",
-      "tests/lib/providers.test.ts",
       ".pan/spec.vbrief.json",
-      ".pan/continue.json",
-      "CHANGELOG.md"
+      ".pan/continue.json"
     ]
   },
   "beadsMapping": {},
@@ -167,9 +171,15 @@
       "reason": "bead-complete",
       "note": "Implemented workspace-aei6. Removed the ProviderCompatibility union export, made provider configs direct-only, deleted requiresClaudish/getClaudishProviders/needsClaudish, removed the claudish env branch from getProviderEnv, removed the CLAUDE_PATH-for-claudish export path, updated provider health skip logic, and dropped claudish prefix badges from inspector model names. Verified npm run typecheck, npm run lint, affected provider/auth/permission Vitest files, and rg shows no removed provider compatibility helpers remain in src/packages.",
       "agentModel": "agent:claude-opus-4.7"
+    },
+    {
+      "timestamp": "2026-05-08T16:55:36.580Z",
+      "reason": "bead-complete",
+      "note": "Implemented workspace-7tmx. Rewrote agents-auth-routing tests away from claudish prefix assertions toward direct CLIProxy/OpenAI command shapes, removed the exported getClaudishPrefix helper, refreshed review-agent and permission-mode regression wording, and confirmed no skipped tests. Verified npm run typecheck, npm run lint, and npm test -- tests/lib/agents-auth-routing.test.ts tests/lib/providers.test.ts tests/lib/cloister/review-agent.test.ts src/lib/__tests__/permission-mode-leak.test.ts.",
+      "agentModel": "agent:claude-opus-4.7"
     }
   ],
   "feedback": [],
   "agentModel": "agent:claude-opus-4.7",
-  "sequence": 7
+  "sequence": 8
 }

@@ -4,7 +4,7 @@
     "created": "2026-05-08T18:55:00Z",
     "author": "manual:opus-4.7",
     "description": "Plan for PAN-1015: Remove claudish routing in favor of direct ANTHROPIC_BASE_URL (CLIProxy only where needed). Empirically scoped 2026-05-08 \u2014 see issue body Empirical findings section.",
-    "updated": "2026-05-08T16:31:35.494Z"
+    "updated": "2026-05-08T16:55:36.580Z"
   },
   "plan": {
     "id": "pan-1015",
@@ -12,9 +12,9 @@
     "status": "active",
     "uid": "d3644941-fec5-4e25-9974-34d6a9e02902",
     "author": "manual:opus-4.7",
-    "sequence": 8,
+    "sequence": 9,
     "created": "2026-05-08T18:55:00Z",
-    "updated": "2026-05-08T16:31:35.494Z",
+    "updated": "2026-05-08T16:55:36.580Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1015",
@@ -244,7 +244,7 @@
       {
         "id": "kimi-direct",
         "title": "Kimi: flip to direct with key-aware endpoint selection",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-08T18:55:00Z",
         "metadata": {
@@ -259,7 +259,7 @@
           {
             "id": "kimi-direct.ac1",
             "title": "PROVIDERS.kimi.compatibility === 'direct'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -267,7 +267,7 @@
           {
             "id": "kimi-direct.ac2",
             "title": "Endpoint selection respects key prefix (coding vs platform)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -275,7 +275,7 @@
           {
             "id": "kimi-direct.ac3",
             "title": "claude --print --model kimi-k2.6 produces an authenticated response (or quota-exceeded, not auth failure)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -283,7 +283,7 @@
           {
             "id": "kimi-direct.ac4",
             "title": "Tests updated",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -293,7 +293,7 @@
       {
         "id": "openai-key-deprecate",
         "title": "OpenAI API-key path: deprecate (keep only Codex subscription via CLIProxy)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-08T18:55:00Z",
         "metadata": {
@@ -308,7 +308,7 @@
           {
             "id": "openai-key-deprecate.ac1",
             "title": "OpenAI API-key fallback path removed from src/lib/agents.ts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -316,7 +316,7 @@
           {
             "id": "openai-key-deprecate.ac2",
             "title": "Clear remediation error when user has OpenAI key but no Codex subscription",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -324,7 +324,7 @@
           {
             "id": "openai-key-deprecate.ac3",
             "title": "Tests in tests/lib/agents-auth-routing.test.ts updated to single-path Codex routing",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -332,7 +332,7 @@
           {
             "id": "openai-key-deprecate.ac4",
             "title": "CHANGELOG entry written",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -538,7 +538,7 @@
       {
         "id": "update-or-delete-claudish-tests",
         "title": "Update or delete claudish-only tests",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-08T18:55:00Z",
         "metadata": {
@@ -553,7 +553,7 @@
           {
             "id": "update-or-delete-claudish-tests.ac1",
             "title": "agents-auth-routing.test.ts rewritten for direct routing assertions",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -561,7 +561,7 @@
           {
             "id": "update-or-delete-claudish-tests.ac2",
             "title": "providers.test.ts updated to reflect new compatibility values",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -569,7 +569,7 @@
           {
             "id": "update-or-delete-claudish-tests.ac3",
             "title": "permission-mode-leak.test.ts: all 8 tests pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -577,7 +577,7 @@
           {
             "id": "update-or-delete-claudish-tests.ac4",
             "title": "No skipped/disabled tests",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

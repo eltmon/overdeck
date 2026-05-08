@@ -7,13 +7,11 @@ import { getAgentRuntimeBaseCommand } from '../agents.js'
 // without exception; a silent escalation to bypass is a P0 trust violation.
 //
 // This file exists to prevent regression of the bug observed in v0.8.20 where
-// claudish-routed conversations launched with
-//   "claudish -i --model or@qwen/qwen3.6-plus:free --dangerously-skip-permissions --permission-mode bypassPermissions"
-// even when the dashboard Permissions setting was Auto. Root cause: the claudish
-// branch in getAgentRuntimeBaseCommand hardcoded 'bypass' instead of resolving
-// the user's setting. The fix replaces the hardcoded literal with
-// resolvePermissionMode() and throws when claudish is paired with auto (claudish
-// cannot proxy --permission-mode auto, so silent fallback to bypass is unsafe).
+// a provider-specific launch branch emitted
+//   "claude --model qwen/qwen3.6-plus:free --dangerously-skip-permissions --permission-mode bypassPermissions"
+// even when the dashboard Permissions setting was Auto. Root cause: the branch
+// hardcoded 'bypass' instead of resolving the user's setting. The direct-routing
+// command builder must honor resolvePermissionMode() for every provider.
 
 const ORIGINAL_YOLO = process.env.PAN_YOLO
 
@@ -86,7 +84,7 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
 
   // ── PAN_YOLO escape hatch (explicit opt-in to bypass) ──────────────────────
 
-  it('Kimi direct + PAN_YOLO=true (bypass): DSP present, no claudish wrapper', async () => {
+  it('Kimi direct + PAN_YOLO=true (bypass): DSP present on direct Claude Code command', async () => {
     process.env.PAN_YOLO = 'true'
     const cmd = await getAgentRuntimeBaseCommand('kimi-k2.6')
     expect(cmd).toMatch(/^claude /)

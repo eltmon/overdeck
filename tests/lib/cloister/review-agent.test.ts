@@ -751,7 +751,7 @@ describe('resolveReviewerModel', () => {
   // Template frontmatter uses "haiku"/"sonnet"/"opus" as shorthand. Aliases must
   // be resolved through the work-type router (getModelId) — NOT hard-coded to
   // Anthropic model IDs — so the returned ID is provider-correct when using
-  // claudish, OpenAI, or other providers.
+  // OpenAI, Gemini, or other routed providers.
   it('resolves "haiku" alias via work-type router (not passed through verbatim)', () => {
     const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'haiku');
     expect(model).not.toBe('haiku');
@@ -1326,10 +1326,10 @@ describe('dispatch failure reviewStatus regression', () => {
   });
 });
 
-// ── spawnReviewer claudish routing regression (PAN-540) ───────────────────────
-// Verifies that spawnReviewer uses getAgentRuntimeBaseCommand() so claudish
-// providers (OpenAI, Google) get routed correctly instead of using the old
-// hardcoded `claude --model` which only works for direct Anthropic-compatible providers.
+// ── spawnReviewer provider-routing regression (PAN-540) ───────────────────────
+// Verifies that spawnReviewer uses getAgentRuntimeBaseCommand() so routed
+// providers (OpenAI, Google, direct Anthropic-compatible providers) get the same
+// command construction as work agents instead of using a hardcoded `claude --model`.
 describe('spawnReviewer runtime command routing regression', () => {
   it('review-agent.ts imports resolveSpecialistBaseCommand from router.js (PAN-636: harness-aware routing)', async () => {
     const { readFileSync } = await import('fs');

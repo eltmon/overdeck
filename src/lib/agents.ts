@@ -35,9 +35,9 @@ import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
 const execAsync = promisify(exec);
 
 /**
- * BFS-walk a process subtree rooted at `rootPid` looking for a claude-family
- * runtime (comm == 'claude' or 'claudish'). Returns true if any process in the
- * tree matches, false if the tree exists but no match, false on any error.
+ * BFS-walk a process subtree rooted at `rootPid` looking for the Claude Code
+ * runtime (comm == 'claude'). Returns true if any process in the tree matches,
+ * false if the tree exists but no match, false on any error.
  *
  * Used by sendAgentMessage zombie detection. pane_pid is the tmux pane's root
  * process, which is bash for work-agent launchers (`bash launcher.sh`) but
@@ -54,7 +54,7 @@ async function hasAgentRuntimeInSubtree(rootPid: string): Promise<boolean> {
     try {
       const { stdout: comm } = await execAsync(`ps -p ${pid} -o comm=`);
       const name = comm.trim();
-      if (name === 'claude' || name === 'claudish') return true;
+      if (name === 'claude') return true;
     } catch {
       continue;
     }
@@ -142,8 +142,7 @@ export async function getAgentRuntimeBaseCommand(
   const provider = getProviderForModel(model);
   const permissionFlags = getClaudePermissionFlagsString();
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
-  // `claude --resume`. Claudish forwards unrecognized flags to Claude Code, so --name works
-  // there too.
+  // `claude --resume`.
   const nameFlag = agentName ? ` --name ${agentName}` : '';
   // PAN-982: When agentType is provided, select the matching .claude/agents/pan-<type>-agent.md
   // definition. The agent frontmatter declares model, permissionMode, tools, and per-agent hooks,
@@ -163,7 +162,7 @@ export async function getAgentRuntimeBaseCommand(
 
   // OpenAI subscription → local CLIProxyAPI sidecar exposes an
   // Anthropic-compatible /v1/messages endpoint, so Claude Code can drive
-  // gpt-* models directly via ANTHROPIC_BASE_URL (no claudish wrapper).
+  // gpt-* models directly via ANTHROPIC_BASE_URL (no wrapper process).
   // The provider env vars are injected separately by getProviderEnvForModel.
   if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
     // CLIProxy supports gpt-5.x but not the -pro variant; map aliases to real names.
@@ -284,7 +283,7 @@ export async function getProviderExportsForModel(model: string): Promise<string>
 }
 
 /**
- * Build a sanitized env for programmatically spawning `claude`/`claudish`.
+ * Build a sanitized env for programmatically spawning `claude`.
  *
  * The dashboard parent process may inherit provider env vars (e.g.
  * ANTHROPIC_BASE_URL pointing at the CLIProxy sidecar) that would mis-route
@@ -319,54 +318,6 @@ export async function getProviderTmuxFlags(model: string): Promise<string> {
     flags += ` -e ${key}="${value.replace(/"/g, '\\"')}"`;
   }
   return flags;
-}
-
-/**
- * claudish prefix mapping: auth mode → provider prefix for OpenAI models.
- *
- * claudish routes models using the provider@model syntax:
- *   oai@model  → OpenAI Direct API (API key auth)
- *   cx@model  → ChatGPT OAuth subscription (PLUS/PRO tiers)
- *   go@model  → Google OAuth CodeAssist
- *
- * cx@ is the ChatGPT subscription prefix (confirmed in claudish v6.12+).
- * Note: cx@ is for ChatGPT OAuth, distinct from oai@ which uses OpenAI API keys.
- */
-const CLAUDISH_OPENAI_PREFIX: Record<string, string> = {
-  'api-key': 'oai',
-  subscription: 'cx',
-};
-
-/**
- * Get the claudish prefix for a model based on auth mode.
- *
- * Anthropic models: no prefix (use direct claude CLI).
- * OpenAI models: prefix depends on auth mode (oai@ or cx@).
- * Google models (CodeAssist OAuth): go@ prefix.
- *
- * @param model   Model ID (e.g. 'gpt-5.4', 'claude-sonnet-4-6')
- * @param authMode Auth mode: 'api-key' or 'subscription' (undefined = api-key default)
- * @returns Prefixed model string for claudish, or bare model if not applicable
- */
-export function getClaudishPrefix(model: string, authMode?: string): string {
-  // Anthropic models — use direct claude CLI, no prefix needed
-  if (model.startsWith('claude-')) {
-    return model;
-  }
-
-  // OpenAI models — prefix depends on auth mode
-  if (model.startsWith('gpt-') || model.startsWith('o') && !model.startsWith('ollama')) {
-    const prefix = CLAUDISH_OPENAI_PREFIX[authMode ?? 'api-key'] ?? 'oai';
-    return `${prefix}@${model}`;
-  }
-
-  // Google CodeAssist OAuth — go@ prefix
-  if (model.startsWith('gemini-') && authMode === 'subscription') {
-    return `go@${model}`;
-  }
-
-  // Other providers — return bare model (fallback to default routing)
-  return model;
 }
 
 // ============================================================================
@@ -739,8 +690,8 @@ export function decideChannelsForWorkAgent(
   }
 
   // Runtime gate. The runtime field is 'claude' for Claude Code; specialised
-  // launchers set it to 'codex' / 'cursor' / 'gemini' / 'claudish' and those
-  // are not Channel-capable.
+  // launchers set it to 'codex' / 'cursor' / 'gemini' and those are not
+  // Channel-capable.
   const runtime = state.runtime;
   if (runtime !== 'claude' && runtime !== 'claude-code') {
     log(false, `runtime-${runtime}`);

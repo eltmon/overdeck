@@ -45,7 +45,7 @@ vi.mock('../../src/lib/cliproxy.js', () => ({
   startCliproxy: vi.fn(),
 }));
 
-import { getClaudishPrefix, getProviderEnvForModel, getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../../src/lib/agents.js';
+import { getProviderEnvForModel, getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../../src/lib/agents.js';
 
 describe('agents auth routing', () => {
   beforeEach(() => {
@@ -55,16 +55,15 @@ describe('agents auth routing', () => {
       config: {
         apiKeys: {},
         providerAuth: {},
-        // Auth-routing tests pre-date the permission-mode resolver; pin bypass
-        // so they exercise the legacy claudish path they were written against.
-        // Production default is 'auto' (which refuses claudish spawns).
+        // Pin bypass so command-shape assertions remain explicit; Auto-mode
+        // invariants are covered in permission-mode-leak.test.ts.
         claude: { permissionMode: 'bypass' },
       },
     });
 
     mockGetProviderForModel.mockImplementation((model: string) => {
       if (model.startsWith('gpt-') || model === 'o3' || model === 'o4-mini') {
-        return { name: 'openai', displayName: 'OpenAI', compatibility: 'claudish', authType: 'env' };
+        return { name: 'openai', displayName: 'OpenAI', compatibility: 'direct', authType: 'static' };
       }
       if (model.startsWith('minimax-')) {
         return { name: 'minimax', displayName: 'MiniMax', compatibility: 'direct', authType: 'static' };
@@ -104,9 +103,9 @@ describe('agents auth routing', () => {
 
     const env = await getProviderEnvForModel('gpt-5.4');
 
-    // Subscription path bypasses claudish-backed getProviderEnv entirely and
-    // instead injects ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN pointing at
-    // the local CLIProxyAPI sidecar.
+    // Subscription path bypasses provider-native env construction entirely
+    // and instead injects ANTHROPIC_BASE_URL + ANTHROPIC_AUTH_TOKEN pointing
+    // at the local CLIProxyAPI sidecar.
     expect(mockGetProviderEnv).not.toHaveBeenCalled();
     expect(env).toEqual({
       ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317',
@@ -129,11 +128,23 @@ describe('agents auth routing', () => {
     expect(mockGetProviderEnv).not.toHaveBeenCalled();
   });
 
-  it('uses cx@ prefix for GPT models routed through subscription auth', () => {
-    expect(getClaudishPrefix('gpt-5.4', 'subscription')).toBe('cx@gpt-5.4');
+  it('uses bare GPT model IDs when launching through CLIProxy subscription auth', async () => {
+    mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
+
+    expect(await getAgentRuntimeBaseCommand('gpt-5.4')).toBe(
+      'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.4'
+    );
   });
 
-  it('bridges Gemini API keys into CLIProxy env instead of claudish env', async () => {
+  it('maps OpenAI -pro aliases to CLIProxy-supported model IDs', async () => {
+    mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
+
+    expect(await getAgentRuntimeBaseCommand('gpt-5.4-pro')).toBe(
+      'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.4'
+    );
+  });
+
+  it('bridges Gemini API keys into CLIProxy env instead of provider-native env', async () => {
     mockLoadYamlConfig.mockReturnValue({
       config: {
         apiKeys: { google: 'google-test-key' },
