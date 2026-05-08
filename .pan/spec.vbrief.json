@@ -4,7 +4,7 @@
     "created": "2026-05-08T18:55:00Z",
     "author": "manual:opus-4.7",
     "description": "Plan for PAN-1015: Remove claudish routing in favor of direct ANTHROPIC_BASE_URL (CLIProxy only where needed). Empirically scoped 2026-05-08 \u2014 see issue body Empirical findings section.",
-    "updated": "2026-05-08T16:55:36.580Z"
+    "updated": "2026-05-08T17:44:16.082Z"
   },
   "plan": {
     "id": "pan-1015",
@@ -12,9 +12,9 @@
     "status": "active",
     "uid": "d3644941-fec5-4e25-9974-34d6a9e02902",
     "author": "manual:opus-4.7",
-    "sequence": 9,
+    "sequence": 10,
     "created": "2026-05-08T18:55:00Z",
-    "updated": "2026-05-08T16:55:36.580Z",
+    "updated": "2026-05-08T17:44:16.082Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1015",
@@ -587,7 +587,7 @@
       {
         "id": "verification-typecheck-lint-test",
         "title": "Quality gates: typecheck, lint, full test suite, build, smoke test",
-        "status": "pending",
+        "status": "completed",
         "priority": "critical",
         "created": "2026-05-08T18:55:00Z",
         "metadata": {
@@ -602,7 +602,7 @@
           {
             "id": "verification-typecheck-lint-test.ac1",
             "title": "npm run typecheck passes with zero errors",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -610,7 +610,7 @@
           {
             "id": "verification-typecheck-lint-test.ac2",
             "title": "npm run lint passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -618,7 +618,7 @@
           {
             "id": "verification-typecheck-lint-test.ac3",
             "title": "npm test passes (root + frontend)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -626,7 +626,7 @@
           {
             "id": "verification-typecheck-lint-test.ac4",
             "title": "npm run build succeeds",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -634,7 +634,7 @@
           {
             "id": "verification-typecheck-lint-test.ac5",
             "title": "pan up launches dashboard cleanly",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -642,7 +642,7 @@
           {
             "id": "verification-typecheck-lint-test.ac6",
             "title": "Smoke test: claude --print --model glm-4.7 'pong' succeeds via direct path",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

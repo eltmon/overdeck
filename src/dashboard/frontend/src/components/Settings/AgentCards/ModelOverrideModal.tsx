@@ -80,7 +80,6 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
     name: 'Google',
     models: [
       { id: 'gemini-3.1-pro-preview' as ModelId, name: 'Gemini 3.1 Pro', icon: Layers, tier: 'premium', costPer1MTokens: 7, capabilities: ['reasoning', 'large-context', 'code'], description: 'Google flagship, 1M context, strong agentic coding' },
-      { id: 'gemini-3-flash-preview' as ModelId, name: 'Gemini 3 Flash Preview', icon: Zap, tier: 'fast', costPer1MTokens: 0.4, capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Fast and cheap with 1M context' },
       { id: 'gemini-3.1-flash-lite-preview' as ModelId, name: 'Gemini 3.1 Flash Lite', icon: Zap, tier: 'fast', costPer1MTokens: 0.9, capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Most cost-efficient Google model' },
     ],
   },
