@@ -178,11 +178,19 @@ export async function getAgentRuntimeBaseCommand(
     return `claude ${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
 
-  // Claudish wrapper path — claudish ≤7.0.3 flag passthrough is broken (Commander.js
-  // rejects --agent, --name as unknown). Skip Claude Code-specific flags; model +
-  // permissions are set directly, workspace CLAUDE.md + vBRIEF provide agent context.
-  // Force bypass: `--permission-mode auto` is a Claude Code research-preview feature
-  // and doesn't translate through claudish to MiniMax/Kimi/GLM/OpenRouter/Mimo backends.
+  if (provider.name !== 'google') {
+    throw new Error(
+      `Provider ${provider.displayName} is marked claudish but PAN-1015 only permits claudish for Gemini pending GitHub issue #752. Migrate model "${model}" to direct Anthropic-compatible routing before launching.`,
+    );
+  }
+
+  // Gemini is the one remaining claudish route because Google's Gemini API does
+  // not expose an Anthropic-compatible /v1/messages endpoint. Keep this branch
+  // scoped to Google only and remove it when PAN-752 adds Gemini OAuth support
+  // through a direct adapter.
+  // Claudish ≤7.0.3 flag passthrough is broken (Commander.js rejects --agent,
+  // --name as unknown). Skip Claude Code-specific flags; model + permissions
+  // are set directly, workspace CLAUDE.md + vBRIEF provide agent context.
   const routedModel = await getLaunchModelForModel(model);
   const claudishFlags = getClaudePermissionFlagsString('bypass');
   return `claudish -i --model ${routedModel} ${claudishFlags}`;

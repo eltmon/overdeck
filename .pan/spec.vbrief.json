@@ -4,7 +4,7 @@
     "created": "2026-05-08T18:55:00Z",
     "author": "manual:opus-4.7",
     "description": "Plan for PAN-1015: Remove claudish routing in favor of direct ANTHROPIC_BASE_URL (CLIProxy only where needed). Empirically scoped 2026-05-08 — see issue body Empirical findings section.",
-    "updated": "2026-05-08T10:53:39.135Z"
+    "updated": "2026-05-08T11:24:44.688Z"
   },
   "plan": {
     "id": "pan-1015",
@@ -14,7 +14,7 @@
     "author": "manual:opus-4.7",
     "sequence": 1,
     "created": "2026-05-08T18:55:00Z",
-    "updated": "2026-05-08T10:53:39.135Z",
+    "updated": "2026-05-08T11:24:44.688Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1015",
@@ -336,7 +336,7 @@
       {
         "id": "gemini-cliproxy-or-defer",
         "title": "Gemini: scope decision — CLIProxy adapter vs defer to #752",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-08T18:55:00Z",
         "metadata": {
@@ -350,7 +350,7 @@
           {
             "id": "gemini-cliproxy-or-defer.ac1",
             "title": "Decision recorded (a or b) in code comment + linked to issue body",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -358,7 +358,7 @@
           {
             "id": "gemini-cliproxy-or-defer.ac2",
             "title": "If (b): claudish branch in agents.ts narrowed to Gemini-only with deprecation comment",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -366,7 +366,7 @@
           {
             "id": "gemini-cliproxy-or-defer.ac3",
             "title": "If (a): CLIProxy gemini adapter scoped as separate sub-issue or sub-bead",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
