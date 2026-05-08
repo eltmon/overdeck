@@ -96,10 +96,6 @@ const CLI_PROXY_MODEL_ALIASES: Record<string, string> = {
   'gpt-5.4-pro': 'gpt-5.4',
 };
 
-export async function getLaunchModelForModel(model: string): Promise<string> {
-  return getClaudishPrefix(model, await getProviderAuthMode(model));
-}
-
 /**
  * Panopticon pipeline agent types that map 1:1 to .claude/agents/pan-<type>-agent.md
  * definitions. Bead workspace-7if (modify-base-command) consumes this to emit
@@ -190,27 +186,10 @@ export async function getAgentRuntimeBaseCommand(
     return `claude ${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
 
-  // Claudish wrapper path — claudish ≤7.0.3 flag passthrough is broken (Commander.js
-  // rejects --agent, --name as unknown). Skip Claude Code-specific flags; model +
-  // permissions are set directly, workspace CLAUDE.md + vBRIEF provide agent context.
-  //
-  // Permission mode handling: claudish does NOT support `--permission-mode auto`
-  // (it's a Claude Code research-preview flag that the claudish wrapper cannot
-  // proxy). When the user has set Auto mode, we MUST refuse the spawn rather than
-  // silently fall back to bypass. Enterprise users rely on Auto being honored;
-  // a silent flip to --dangerously-skip-permissions is a P0 trust violation.
-  const routedMode = resolvePermissionMode();
-  if (routedMode === 'auto') {
-    throw new Error(
-      `Provider "${provider.displayName}" routes through claudish, which does not support permissionMode=auto. ` +
-      `Either: (1) switch the dashboard Settings → Permissions setting to "Bypass" (acknowledging that Kimi/MiniMax/GLM/OpenRouter/Mimo require unmoderated execution); ` +
-      `(2) pick a Claude or GPT model instead (those honor Auto mode through the native Claude Code classifier or CLIProxy); ` +
-      `or (3) wait for PAN-1015 to land, which removes claudish in favor of CLIProxy for all providers.`,
-    );
-  }
-  const routedModel = await getLaunchModelForModel(model);
-  const claudishFlags = getClaudePermissionFlagsString(routedMode);
-  return `claudish -i --model ${routedModel} ${claudishFlags}`;
+  throw new Error(
+    `Provider "${provider.displayName}" is not configured for direct Claude Code routing. ` +
+    `Use a supported direct provider or CLIProxy-backed subscription model.`,
+  );
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
@@ -401,12 +380,6 @@ export function getClaudishPrefix(model: string, authMode?: string): string {
   // Google CodeAssist OAuth — go@ prefix
   if (model.startsWith('gemini-') && authMode === 'subscription') {
     return `go@${model}`;
-  }
-
-  // Kimi models — kc@ prefix routes to api.kimi.com/coding/v1 (kimi-coding provider).
-  // sk-kimi-* keys are coding keys, NOT moonshot platform keys (kimi@ → api.moonshot.ai).
-  if (['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(model)) {
-    return `kc@${model}`;
   }
 
   // Other providers — return bare model (fallback to default routing)

@@ -4,7 +4,7 @@
     "created": "2026-05-08T18:55:00Z",
     "author": "manual:opus-4.7",
     "description": "Plan for PAN-1015: Remove claudish routing in favor of direct ANTHROPIC_BASE_URL (CLIProxy only where needed). Empirically scoped 2026-05-08 \u2014 see issue body Empirical findings section.",
-    "updated": "2026-05-08T15:14:28.222Z"
+    "updated": "2026-05-08T15:49:24.440Z"
   },
   "plan": {
     "id": "pan-1015",
@@ -12,9 +12,9 @@
     "status": "active",
     "uid": "d3644941-fec5-4e25-9974-34d6a9e02902",
     "author": "manual:opus-4.7",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-05-08T18:55:00Z",
-    "updated": "2026-05-08T15:14:28.222Z",
+    "updated": "2026-05-08T15:49:24.440Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1015",
@@ -399,7 +399,7 @@
       {
         "id": "delete-claudish-spawn-branch",
         "title": "Remove claudish spawn branch from getAgentRuntimeBaseCommand",
-        "status": "pending",
+        "status": "completed",
         "priority": "critical",
         "created": "2026-05-08T18:55:00Z",
         "metadata": {
@@ -414,7 +414,7 @@
           {
             "id": "delete-claudish-spawn-branch.ac1",
             "title": "Claudish branch deleted (option a) or narrowed to Gemini-only (option b)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -422,7 +422,7 @@
           {
             "id": "delete-claudish-spawn-branch.ac2",
             "title": "getClaudishPrefix() returns null/throws for migrated providers",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -430,7 +430,7 @@
           {
             "id": "delete-claudish-spawn-branch.ac3",
             "title": "Bypass-mode pin removed for direct-routed providers",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -438,7 +438,7 @@
           {
             "id": "delete-claudish-spawn-branch.ac4",
             "title": "All 8 permission-mode-leak.test.ts tests still pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

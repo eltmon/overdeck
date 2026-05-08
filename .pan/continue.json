@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1015",
   "created": "2026-05-08T00:56:13.011Z",
-  "updated": "2026-05-08T15:14:28.222Z",
+  "updated": "2026-05-08T15:49:24.440Z",
   "gitState": {
     "branch": "feature/pan-1015",
-    "sha": "16330caaf",
+    "sha": "14e6f1be5",
     "dirty": true,
     "clean": false
   },
@@ -39,6 +39,11 @@
       "id": "D6",
       "summary": "OpenRouter now routes directly through Claude Code using ANTHROPIC_BASE_URL=https://openrouter.ai/api/v1 and static ANTHROPIC_AUTH_TOKEN auth; slash-containing model IDs are passed through unchanged, and provider health probes avoid double-appending /v1 for versioned base URLs.",
       "recordedAt": "2026-05-08T15:14:28.222Z"
+    },
+    {
+      "id": "D7",
+      "summary": "The claudish spawn branch is deleted from getAgentRuntimeBaseCommand. Claude Code launches now either use native direct providers or CLIProxy-backed subscription routing; legacy non-direct provider configs fail closed instead of spawning claudish.",
+      "recordedAt": "2026-05-08T15:49:24.440Z"
     }
   ],
   "hazards": [
@@ -54,18 +59,13 @@
     }
   ],
   "resumePoint": {
-    "description": "Implemented workspace-21co: OpenRouter is direct using https://openrouter.ai/api/v1, preserves slash-containing model IDs without or@, and provider health probes target /api/v1/messages instead of double /v1. Commit and close the bead; inspection is skipped because metadata.requiresInspection=false.",
-    "beadId": "workspace-21co",
+    "description": "Implemented workspace-b175: getAgentRuntimeBaseCommand no longer has a claudish spawn branch or auto-mode claudish refusal path; the unused getLaunchModelForModel helper was deleted and migrated provider prefixes no longer route through getClaudishPrefix. Commit and close the bead; inspection is skipped because metadata.requiresInspection=false.",
+    "beadId": "workspace-b175",
     "filesToRead": [
-      "src/lib/providers.ts",
       "src/lib/agents.ts",
-      "src/lib/provider-health.ts",
-      "tests/lib/providers.test.ts",
-      "tests/lib/agents-auth-routing.test.ts",
-      "tests/lib/provider-health.test.ts",
       "src/lib/__tests__/permission-mode-leak.test.ts",
       ".pan/spec.vbrief.json",
-      "CHANGELOG.md"
+      ".pan/continue.json"
     ]
   },
   "beadsMapping": {},
@@ -135,9 +135,15 @@
       "reason": "bead-complete",
       "note": "Implemented workspace-21co. PROVIDERS.openrouter is direct with baseUrl https://openrouter.ai/api/v1 and authType static; removed the or@ claudish prefix; slash-containing model IDs are passed directly to claude --model; provider health URL construction now recognizes versioned /v1 base URLs and probes /messages to avoid /v1/v1. Verified npm run typecheck, npm run lint, and affected Vitest files including the new provider-health URL test.",
       "agentModel": "agent:claude-opus-4.7"
+    },
+    {
+      "timestamp": "2026-05-08T15:49:24.440Z",
+      "reason": "bead-complete",
+      "note": "Implemented workspace-b175. Deleted the claudish spawn branch and auto-mode claudish refusal path from getAgentRuntimeBaseCommand; unsupported non-direct provider configs now fail closed without launching claudish. Removed unused getLaunchModelForModel and removed the remaining Kimi kc@ mapping from getClaudishPrefix while leaving the exported helper for existing tests until the dedicated test-cleanup bead. Verified npm run typecheck and npm test -- src/lib/__tests__/permission-mode-leak.test.ts.",
+      "agentModel": "agent:claude-opus-4.7"
     }
   ],
   "feedback": [],
   "agentModel": "agent:claude-opus-4.7",
-  "sequence": 4
+  "sequence": 5
 }
