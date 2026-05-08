@@ -9,6 +9,7 @@ import {
 interface RecoverOptions {
   all?: boolean;
   json?: boolean;
+  model?: string;
 }
 
 export async function recoverCommand(id?: string, options: RecoverOptions = {}): Promise<void> {
@@ -76,11 +77,15 @@ export async function recoverCommand(id?: string, options: RecoverOptions = {}):
       return;
     }
 
-    // Recover specific agent
-    const agentId = id.startsWith('agent-') ? id : `agent-${id.toLowerCase()}`;
-    spinner.text = `Recovering ${agentId}...`;
+    // Recover specific agent. Preserve known prefixes; bare PAN-NNN gets the work prefix.
+    const agentId = (id.startsWith('agent-') || id.startsWith('planning-'))
+      ? id
+      : `agent-${id.toLowerCase()}`;
+    spinner.text = options.model
+      ? `Recovering ${agentId} on ${options.model}...`
+      : `Recovering ${agentId}...`;
 
-    const state = await recoverAgent(agentId);
+    const state = await recoverAgent(agentId, { modelOverride: options.model });
 
     if (!state) {
       spinner.fail(`Agent not found: ${agentId}`);

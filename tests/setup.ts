@@ -8,7 +8,9 @@ import { join } from 'path';
 
 // Test fixtures directory
 export const FIXTURES_DIR = join(__dirname, 'fixtures');
-export const TEMP_DIR = join(__dirname, '.temp');
+const TEMP_ROOT_DIR = join(__dirname, '.temp');
+const TEMP_WORKER_ID = process.env.VITEST_POOL_ID ?? String(process.pid);
+export const TEMP_DIR = join(TEMP_ROOT_DIR, `worker-${TEMP_WORKER_ID}`);
 
 // Collapse merge-agent polling intervals in tests so syncMainIntoWorkspace
 // conflict tests finish in milliseconds instead of 5s each. See merge-agent.ts.

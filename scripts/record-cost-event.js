@@ -234,7 +234,7 @@ const DEFAULT_PRICING = [
 	},
 	{
 		provider: "google",
-		model: "gemini-3-flash",
+		model: "gemini-3-flash-preview",
 		inputPer1k: 15e-5,
 		outputPer1k: 6e-4,
 		currency: "USD"

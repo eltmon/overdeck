@@ -107,7 +107,7 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   { provider: 'openai', model: 'o4-mini', inputPer1k: 0.0011, outputPer1k: 0.0044, currency: 'USD' },
   // Google
   { provider: 'google', model: 'gemini-3.1-pro-preview', inputPer1k: 0.002, outputPer1k: 0.012, currency: 'USD' },
-  { provider: 'google', model: 'gemini-3-flash', inputPer1k: 0.00015, outputPer1k: 0.0006, currency: 'USD' },
+  { provider: 'google', model: 'gemini-3-flash-preview', inputPer1k: 0.00015, outputPer1k: 0.0006, currency: 'USD' },
   { provider: 'google', model: 'gemini-3.1-flash-lite-preview', inputPer1k: 0.00025, outputPer1k: 0.0015, currency: 'USD' },
   // Moonshot AI (Kimi)
   { provider: 'custom', model: 'kimi-for-coding', inputPer1k: 0.0006, outputPer1k: 0.002, cacheReadPer1k: 0.00006, cacheWrite5mPer1k: 0.00075, currency: 'USD' },

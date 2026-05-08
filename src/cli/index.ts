@@ -333,6 +333,7 @@ program
   .description('Recover crashed or stopped agent')
   .option('--all', 'Auto-recover all crashed agents')
   .option('--json', 'Output as JSON')
+  .option('--model <model>', 'Override model on recovery (e.g. switch off Kimi when quota is exhausted)')
   .action(recoverCommand);
 
 program
@@ -393,6 +394,8 @@ program
   .option('--wave <n>', 'Dispatch only wave N')
   .option('--model <model>', 'Override model for work slots (default: kimi-k2.6)')
   .option('--max-slots <n>', 'Max concurrent agents')
+  .option('--auto-advance', 'Automatically dispatch the next wave when the current one completes')
+  .option('--no-auto-advance', 'Disable automatic next-wave dispatching for this swarm')
   .action(swarmCommand);
 
 // Register workspace commands (pan workspace create, pan workspace list, etc.)

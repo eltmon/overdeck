@@ -51,7 +51,7 @@
     },
     "apps/desktop": {
       "name": "@panctl/desktop",
-      "version": "0.8.17",
+      "version": "0.8.20",
       "bin": {
         "panctl": "./bin/panctl.mjs",
       },
@@ -72,7 +72,7 @@
     },
     "packages/contracts": {
       "name": "@panctl/contracts",
-      "version": "0.8.4",
+      "version": "0.8.20",
       "dependencies": {
         "effect": "4.0.0-beta.45",
       },

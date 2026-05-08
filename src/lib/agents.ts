@@ -6,7 +6,7 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
-import { getClaudePermissionFlagsString } from './claude-permissions.js';
+import { getClaudePermissionFlagsString, resolvePermissionMode } from './claude-permissions.js';
 import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sendRawKeystrokeAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync, waitForClaudePrompt } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
@@ -23,7 +23,7 @@ import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
 import { loadConfig } from './config.js';
 import { getOpenAIAuthStatus, getOpenAIAuthStatusSync } from './openai-auth.js';
-import { getCliproxyClientEnv } from './cliproxy.js';
+import { bridgeGeminiAuthToCliproxy, getCliproxyClientEnv } from './cliproxy.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix, resolveProjectFromIssue } from './projects.js';
@@ -151,15 +151,24 @@ export async function getAgentRuntimeBaseCommand(
   const nameFlag = agentName ? ` --name ${agentName}` : '';
   // PAN-982: When agentType is provided, select the matching .claude/agents/pan-<type>-agent.md
   // definition. The agent frontmatter declares model, permissionMode, tools, and per-agent hooks,
-  // so we omit --dangerously-skip-permissions/--permission-mode and (for Anthropic models) --model.
+  // so we usually omit --permission-mode and (for Anthropic models) --model.
   // Non-Anthropic providers still need --model to pin the routed model id, since the
   // frontmatter `model:` only accepts Anthropic identifiers.
   const agentFlag = agentType ? ` --agent ${panopticonAgentName(agentType)}` : '';
+  // When the user has opted into full bypass (PAN_YOLO=true or claude.permissionMode=bypass
+  // in config), --dangerously-skip-permissions is added on top of --agent. The agent
+  // frontmatter's permissionMode: bypassPermissions only bypasses prompts INSIDE cwd —
+  // cross-directory reads (e.g. ~/.panopticon/cliproxy/, ~/pan-tts/) still prompt without
+  // DSP. The flag is passed through ahead of --agent so it applies before frontmatter is
+  // resolved.
+  const bypassWithAgent = agentType && resolvePermissionMode() === 'bypass'
+    ? ' --dangerously-skip-permissions'
+    : '';
 
   if (provider.compatibility === 'direct') {
     if (agentType) {
-      // Anthropic direct: --agent fully replaces --model and permission flags.
-      return `claude${agentFlag}${nameFlag}`;
+      // Anthropic direct: --agent fully replaces --model. Permission flags only when in bypass.
+      return `claude${bypassWithAgent}${agentFlag}${nameFlag}`;
     }
     return `claude ${permissionFlags} --model ${model}${nameFlag}`;
   }
@@ -173,26 +182,31 @@ export async function getAgentRuntimeBaseCommand(
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
     if (agentType) {
       // CLIProxy: --agent + --model override (frontmatter model: only accepts Anthropic ids).
-      return `claude${agentFlag} --model ${resolvedModel}${nameFlag}`;
+      return `claude${bypassWithAgent}${agentFlag} --model ${resolvedModel}${nameFlag}`;
     }
     return `claude ${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
 
-  if (provider.name !== 'google') {
+  // Claudish wrapper path — claudish ≤7.0.3 flag passthrough is broken (Commander.js
+  // rejects --agent, --name as unknown). Skip Claude Code-specific flags; model +
+  // permissions are set directly, workspace CLAUDE.md + vBRIEF provide agent context.
+  //
+  // Permission mode handling: claudish does NOT support `--permission-mode auto`
+  // (it's a Claude Code research-preview flag that the claudish wrapper cannot
+  // proxy). When the user has set Auto mode, we MUST refuse the spawn rather than
+  // silently fall back to bypass. Enterprise users rely on Auto being honored;
+  // a silent flip to --dangerously-skip-permissions is a P0 trust violation.
+  const routedMode = resolvePermissionMode();
+  if (routedMode === 'auto') {
     throw new Error(
-      `Provider ${provider.displayName} is marked claudish but PAN-1015 only permits claudish for Gemini pending GitHub issue #752. Migrate model "${model}" to direct Anthropic-compatible routing before launching.`,
+      `Provider "${provider.displayName}" routes through claudish, which does not support permissionMode=auto. ` +
+      `Either: (1) switch the dashboard Settings → Permissions setting to "Bypass" (acknowledging that Kimi/MiniMax/GLM/OpenRouter/Mimo require unmoderated execution); ` +
+      `(2) pick a Claude or GPT model instead (those honor Auto mode through the native Claude Code classifier or CLIProxy); ` +
+      `or (3) wait for PAN-1015 to land, which removes claudish in favor of CLIProxy for all providers.`,
     );
   }
-
-  // Gemini is the one remaining claudish route because Google's Gemini API does
-  // not expose an Anthropic-compatible /v1/messages endpoint. Keep this branch
-  // scoped to Google only and remove it when PAN-752 adds Gemini OAuth support
-  // through a direct adapter.
-  // Claudish ≤7.0.3 flag passthrough is broken (Commander.js rejects --agent,
-  // --name as unknown). Skip Claude Code-specific flags; model + permissions
-  // are set directly, workspace CLAUDE.md + vBRIEF provide agent context.
   const routedModel = await getLaunchModelForModel(model);
-  const claudishFlags = getClaudePermissionFlagsString('bypass');
+  const claudishFlags = getClaudePermissionFlagsString(routedMode);
   return `claudish -i --model ${routedModel} ${claudishFlags}`;
 }
 
@@ -228,6 +242,18 @@ export async function getProviderEnvForModel(model: string): Promise<Record<stri
   }
 
   const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
+
+  if (provider.name === 'google') {
+    if (!apiKey) {
+      throw new Error(`Google API key not configured. Add GOOGLE_API_KEY in Settings → Google or ~/.panopticon.env before using model "${model}".`);
+    }
+
+    if (!bridgeGeminiAuthToCliproxy(apiKey)) {
+      throw new Error(`Failed to bridge Google API key into CLIProxy before using model "${model}".`);
+    }
+
+    return getCliproxyClientEnv();
+  }
 
   if (provider.name === 'openai') {
     const authStatus = await getOpenAIAuthStatus();
@@ -2366,7 +2392,10 @@ export function detectCrashedAgents(): AgentState[] {
 /**
  * Recover a crashed agent by restarting it with context
  */
-export async function recoverAgent(agentId: string): Promise<AgentState | null> {
+export async function recoverAgent(
+  agentId: string,
+  opts: { modelOverride?: string } = {},
+): Promise<AgentState | null> {
   const normalizedId = normalizeAgentId(agentId);
   logAgentLifecycle(normalizedId, 'recoverAgent called');
   const state = getAgentState(normalizedId);
@@ -2378,6 +2407,10 @@ export async function recoverAgent(agentId: string): Promise<AgentState | null> 
 
   // Runtime state files may lack required fields (PAN-150)
   if (!state.id) state.id = normalizedId;
+  if (opts.modelOverride) {
+    state.model = opts.modelOverride;
+    logAgentLifecycle(normalizedId, `recoverAgent: model overridden → ${opts.modelOverride}`);
+  }
   if (!state.workspace || !state.model) {
     const reason = `[agents] Cannot recover ${normalizedId}: state.json missing workspace or model`;
     console.error(reason);
@@ -2423,8 +2456,10 @@ export async function recoverAgent(agentId: string): Promise<AgentState | null> 
     }
   }
 
-  // Restart the agent with recovery context (YOLO mode - skip permissions)
-  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model, agentId, 'work', state.harness ?? 'claude-code')} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
+  // Restart the agent with recovery context. Agent type is derived from the session id:
+  // planning sessions use the planner definition; everything else uses the work definition.
+  const recoveryAgentType: PanopticonAgentType = normalizedId.startsWith('planning-') ? 'planning' : 'work';
+  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model, agentId, recoveryAgentType, state.harness ?? 'claude-code')} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
   createSession(normalizedId, state.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: normalizedId,

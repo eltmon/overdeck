@@ -147,17 +147,25 @@ describe('PAN-800 runtime reducer', () => {
     expect(next.agentRuntimeById[AGENT].updatedAtSequence).toBe(1)
   })
 
-  it('agent.stopped marks runtime activity stopped (pan kill path)', () => {
+  it('agent.stopped marks runtime activity stopped and clears stale channel replies', () => {
     let s = applyEvent(INITIAL_READ_MODEL_STATE, at(1, {
-      type: 'agent.activity_changed',
-      payload: { agentId: AGENT, activity: 'working', currentTool: 'Bash' },
+      type: 'agent.channel_reply',
+      payload: {
+        agentId: AGENT,
+        reply: { kind: 'done', summary: 'Implementation complete', artifactRefs: [] },
+      },
     } as any))
     s = applyEvent(s, at(2, {
+      type: 'agent.activity_changed',
+      payload: { agentId: AGENT, activity: 'idle' },
+    } as any))
+    s = applyEvent(s, at(3, {
       type: 'agent.stopped',
       payload: { agentId: AGENT, issueId: 'PAN-800' },
     } as any))
     expect(s.agentRuntimeById[AGENT].activity).toBe('stopped')
     expect(s.agentRuntimeById[AGENT].currentTool).toBeUndefined()
+    expect(s.agentRuntimeById[AGENT].channelReply).toBeUndefined()
   })
 
   it('bumps AgentSnapshot.runtimeSnapshotSequence when agent exists', () => {

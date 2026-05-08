@@ -2,17 +2,17 @@
   "version": "1",
   "issueId": "PAN-1015",
   "created": "2026-05-08T00:56:13.011Z",
-  "updated": "2026-05-08T11:24:44.688Z",
+  "updated": "2026-05-08T11:44:15Z",
   "gitState": {
     "branch": "feature/pan-1015",
-    "sha": "a421df3d3",
-    "dirty": false
+    "sha": "df48dfb71",
+    "dirty": true
   },
   "decisions": [
     {
       "id": "D1",
-      "summary": "Chose the vBRIEF recommended Gemini option (b): defer a Gemini adapter to GitHub issue #752 and keep claudish scoped to Google/Gemini only until that work lands.",
-      "recordedAt": "2026-05-08T11:24:44.688Z"
+      "summary": "Course correction: chose Gemini option (a), not deferral. CLIProxyAPI v6.10.x has a Gemini backend, so Panopticon will bridge GOOGLE_API_KEY into CLIProxy and route Gemini models directly through the local Anthropic-compatible sidecar with no claudish carve-out.",
+      "recordedAt": "2026-05-08T11:36:54.337Z"
     }
   ],
   "hazards": [
@@ -20,15 +20,21 @@
       "id": "H1",
       "summary": "The bead dependency graph generated from vBRIEF edges was reversed, making the quality-gate bead ready before implementation beads.",
       "mitigation": "Corrected the local bead dependencies to match vBRIEF source-blocks-target semantics before claiming implementation beads; continue using bd ready -l pan-1015."
+    },
+    {
+      "id": "H2",
+      "summary": "WebFetch/WebSearch for CLIProxy docs failed with provider routing errors during implementation.",
+      "mitigation": "Used gh api against the public router-for-me/CLIProxyAPI repository from inside the workspace; config.example.yaml documents gemini-api-key entries, so the bridge writes both a credential marker and the live config section."
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-25ue (Gemini decision): claudish is now guarded to Google/Gemini only with a #752 deprecation comment. Next claim a remaining provider direct-routing bead from bd ready -l pan-1015.",
+    "description": "Gemini option (a) implementation validated: CLIProxy API returned pong for gemini-3-flash-preview and claude --print through ANTHROPIC_BASE_URL/ANTHROPIC_AUTH_TOKEN returned pong. Commit and close workspace-25ue, then proceed to remaining direct-provider beads.",
     "beadId": "workspace-25ue",
     "filesToRead": [
-      "src/lib/providers.ts",
+      "src/lib/cliproxy.ts",
       "src/lib/agents.ts",
-      ".pan/spec.vbrief.json"
+      "src/lib/providers.ts",
+      "tests/lib/agents-auth-routing.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -43,6 +49,18 @@
       "timestamp": "2026-05-08T11:24:44.688Z",
       "reason": "bead-complete",
       "note": "Implemented workspace-25ue by selecting the Gemini defer-to-#752 path and narrowing the claudish runtime branch to Google/Gemini only.",
+      "agentModel": "agent:claude-opus-4.7"
+    },
+    {
+      "timestamp": "2026-05-08T11:36:54.337Z",
+      "reason": "course-correction",
+      "note": "Updated Gemini bead trail to option (a): CLIProxy v6.10.x Gemini backend with GOOGLE_API_KEY bridge; reverted the prior Google-only claudish carve-out direction.",
+      "agentModel": "agent:claude-opus-4.7"
+    },
+    {
+      "timestamp": "2026-05-08T11:44:15Z",
+      "reason": "validation",
+      "note": "Validated Gemini CLIProxy route: /v1/messages with model gemini-3-flash-preview returned pong, and claude --print --model gemini-3-flash-preview through the CLIProxy env returned pong.",
       "agentModel": "agent:claude-opus-4.7"
     }
   ],

@@ -1,0 +1,95 @@
+{
+  "version": "0.5",
+  "issueId": "PAN-1029",
+  "title": "Harness Picker UI — add dashboard controls for harness selection",
+  "status": "proposed",
+  "created": "2026-05-08T12:00:00Z",
+  "updated": "2026-05-08T12:00:00Z",
+  "plan": {
+    "sequence": 0,
+    "status": "proposed",
+    "items": [
+      {
+        "id": "harness-picker-component",
+        "title": "Create reusable HarnessPicker component with ToS gating",
+        "description": "New file src/dashboard/frontend/src/components/HarnessPicker.tsx. Props: value (Harness), onChange (Harness=>void), model (string), authMode (AuthMode), disabled?, size? ('sm'|'md'). Renders claude-code and pi options. Calls canUseHarness() for each; blocked option disabled with tooltip. Auto-reverts to claude-code when blocked. Exports HarnessPickerInline variant for Settings rows.",
+        "status": "pending",
+        "acceptanceCriteria": [
+          "HarnessPicker renders both claude-code and pi options",
+          "Pi option disabled when canUseHarness(pi, model, authMode) returns false",
+          "Disabled option shows tooltip explaining restriction",
+          "Auto-reverts to claude-code via onChange when current selection becomes blocked",
+          "HarnessPickerInline variant exported for Settings rows"
+        ]
+      },
+      {
+        "id": "api-harness-params",
+        "title": "Extend spawn API endpoints to accept harness parameter",
+        "description": "POST /api/agents: add optional harness: Harness, default claude-code, thread to launcher, persist to agent state, canUseHarness() validation 400 if blocked. POST /api/issues/:id/start-planning: add optional harness: Harness, default claude-code, thread to spawn-planning-session. Backward compatible.",
+        "status": "pending",
+        "acceptanceCriteria": [
+          "POST /api/agents accepts optional harness param and passes to launcher",
+          "POST /api/issues/:id/start-planning accepts optional harness param",
+          "Invalid combination returns HTTP 400 with descriptive error",
+          "Harness persisted to agent state",
+          "Requests without harness default to claude-code"
+        ]
+      },
+      {
+        "id": "plan-dialog-picker",
+        "title": "Add harness picker to PlanDialog (planning kickoff)",
+        "description": "In PlanDialog.tsx add harnessOverride state (default claude-code) alongside modelOverride. Render HarnessPicker below model dropdown. Pass harnessOverride in startPlanningViaSSE() request body.",
+        "status": "pending",
+        "acceptanceCriteria": [
+          "PlanDialog shows HarnessPicker below model dropdown",
+          "Selected harness included in start-planning API request",
+          "Default harness is claude-code",
+          "ToS gating: Pi+subscription shows disabled"
+        ]
+      },
+      {
+        "id": "start-agent-picker",
+        "title": "Add harness picker to start-agent dashboard flow",
+        "description": "In PlanDialog.tsx Start Agent tab add harnessOverride state and render HarnessPicker next to model picker. Pass harness in startAgentMutation.mutate() payload.",
+        "status": "pending",
+        "acceptanceCriteria": [
+          "Start Agent flow shows HarnessPicker",
+          "Selected harness sent to POST /api/agents",
+          "Default is claude-code",
+          "ToS gating enforced"
+        ]
+      },
+      {
+        "id": "conversation-panel-picker",
+        "title": "Add per-conversation harness override to ConversationPanel",
+        "description": "In ConversationPanel.tsx add HarnessPicker to panel header/settings area. Selection is per-conversation local React state.",
+        "status": "pending",
+        "acceptanceCriteria": [
+          "ConversationPanel shows HarnessPicker",
+          "Selection is local to that conversation panel instance",
+          "ToS gating enforced"
+        ]
+      },
+      {
+        "id": "settings-page-defaults",
+        "title": "Add per-role harness defaults to SettingsPage",
+        "description": "In Settings/SettingsPage.tsx add HarnessPickerInline next to each specialist role's model dropdown. Persist to settings.specialists.<role>.harness. Verify cloister/router.ts getSpecialistHarness() reads from this key.",
+        "status": "pending",
+        "acceptanceCriteria": [
+          "Each specialist row in Settings shows HarnessPickerInline",
+          "Values persist across browser sessions",
+          "getSpecialistHarness() reads the stored value",
+          "ToS gating enforced per-role"
+        ]
+      }
+    ],
+    "edges": [
+      {"from": "harness-picker-component", "to": "plan-dialog-picker", "type": "blocks"},
+      {"from": "harness-picker-component", "to": "start-agent-picker", "type": "blocks"},
+      {"from": "harness-picker-component", "to": "conversation-panel-picker", "type": "blocks"},
+      {"from": "harness-picker-component", "to": "settings-page-defaults", "type": "blocks"},
+      {"from": "api-harness-params", "to": "plan-dialog-picker", "type": "blocks"},
+      {"from": "api-harness-params", "to": "start-agent-picker", "type": "blocks"}
+    ]
+  }
+}

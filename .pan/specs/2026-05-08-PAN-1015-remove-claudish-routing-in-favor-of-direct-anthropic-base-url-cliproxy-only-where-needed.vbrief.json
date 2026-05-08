@@ -716,5 +716,6 @@
       "validationEvidence": "PAN-1015 issue body 'Empirical findings (2026-05-08)' section contains raw probe results.",
       "canonicalFilename": "2026-05-08-PAN-1015-remove-claudish-routing-in-favor-of-direct-anthropic-base-url-cliproxy-only-where-needed.vbrief.json"
     }
-  }
+  },
+  "status": "proposed"
 }

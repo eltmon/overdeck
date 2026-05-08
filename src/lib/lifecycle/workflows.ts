@@ -546,6 +546,10 @@ async function clearReviewStatusStep(issueId: string): Promise<StepResult> {
   }
 }
 
+export const __testInternals = {
+  verifyBranchMerged,
+};
+
 async function resetIssueToCanceled(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'cancel:reset-issue';
   try {

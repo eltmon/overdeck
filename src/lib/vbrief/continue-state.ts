@@ -130,9 +130,18 @@ export interface ContinueState {
   feedback?: ContinueFeedbackEntry[];
 }
 
-/** Build the continue filename for a given issue ID. */
+/** Build the continue filename for a given issue ID.
+ *
+ * Issue IDs are case-canonical UPPERCASE (e.g. `PAN-1014`) — matches the GitHub
+ * tracker, the kanban kard ID, the workspace branch prefix, and the review-status
+ * DB key (Run 14 fix `4b660d10` already normalizes those). Some call sites pass
+ * lowercase (`pan-1014`) — usually agent state.json or path-derived strings —
+ * which previously produced a *second* file `continue-pan-1014.vbrief.json`
+ * sitting next to the canonical `continue-PAN-1014.vbrief.json`, defeating
+ * lookups and leaving orphan dirt on `main`. Normalize here so both cases land
+ * on the same file. */
 export function continueFilename(issueId: string): string {
-  return `${CONTINUE_FILENAME_PREFIX}${issueId}${CONTINUE_FILENAME_SUFFIX}`;
+  return `${CONTINUE_FILENAME_PREFIX}${issueId.toUpperCase()}${CONTINUE_FILENAME_SUFFIX}`;
 }
 
 /** Build the absolute path for a continue file inside a lifecycle directory. */
@@ -145,11 +154,12 @@ export function continueFilePath(dir: string, issueId: string): string {
  * using temp-file + rename. Sets `updated` to "now" and `created` if absent.
  */
 export function writeContinueState(dir: string, issueId: string, state: ContinueState): void {
-  const path = continueFilePath(dir, issueId);
+  const canonicalIssueId = issueId.toUpperCase();
+  const path = continueFilePath(dir, canonicalIssueId);
   const now = new Date().toISOString();
   const next: ContinueState = {
     ...state,
-    issueId,
+    issueId: canonicalIssueId,
     version: '1',
     created: state.created || now,
     updated: now,

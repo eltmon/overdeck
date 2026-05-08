@@ -3313,10 +3313,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   if (isDeaconGloballyPaused()) {
     state.lastPatrol = new Date().toISOString();
     saveState(state);
-    // Log once per minute-ish cadence is fine — the patrol interval itself is
-    // already ~60s, so logging every cycle is acceptable.
-    console.log(`[deacon] Patrol cycle ${state.patrolCycle} SKIPPED — globally paused`);
-    addLog('info', `Patrol cycle ${state.patrolCycle} skipped — deacon globally paused`, state.patrolCycle);
+    if (!hasLoggedGlobalPauseSkip) {
+      console.log(`[deacon] Patrol cycle ${state.patrolCycle} SKIPPED — globally paused`);
+      addLog('info', `Patrol cycle ${state.patrolCycle} skipped — deacon globally paused`, state.patrolCycle);
+      hasLoggedGlobalPauseSkip = true;
+    }
     const skipped: PatrolResult = {
       cycle: state.patrolCycle,
       timestamp: state.lastPatrol,
@@ -3328,6 +3329,7 @@ export async function runPatrol(): Promise<PatrolResult> {
     return skipped;
   }
 
+  hasLoggedGlobalPauseSkip = false;
   addLog('info', `Patrol cycle ${state.patrolCycle} — checking per-project specialists`, state.patrolCycle);
   console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking per-project specialists`);
 
@@ -3680,6 +3682,7 @@ export async function runPatrol(): Promise<PatrolResult> {
 
 // Store the most recent patrol result for API access
 let lastPatrolResult: PatrolResult | null = null;
+let hasLoggedGlobalPauseSkip = false;
 
 // ============================================================================
 // Deacon Log Buffer

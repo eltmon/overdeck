@@ -5,11 +5,13 @@ const {
   mockGetProviderForModel,
   mockGetProviderEnv,
   mockOpenAIAuthStatus,
+  mockBridgeGeminiAuth,
 } = vi.hoisted(() => ({
   mockLoadYamlConfig: vi.fn(),
   mockGetProviderForModel: vi.fn(),
   mockGetProviderEnv: vi.fn(),
   mockOpenAIAuthStatus: vi.fn(),
+  mockBridgeGeminiAuth: vi.fn(),
 }));
 
 vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
@@ -35,6 +37,7 @@ vi.mock('../../src/lib/openai-auth.js', () => ({
 }));
 
 vi.mock('../../src/lib/cliproxy.js', () => ({
+  bridgeGeminiAuthToCliproxy: mockBridgeGeminiAuth,
   getCliproxyClientEnv: () => ({
     ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317',
     ANTHROPIC_AUTH_TOKEN: 'panopticon-local-cliproxy-key',
@@ -52,6 +55,10 @@ describe('agents auth routing', () => {
       config: {
         apiKeys: {},
         providerAuth: {},
+        // Auth-routing tests pre-date the permission-mode resolver; pin bypass
+        // so they exercise the legacy claudish path they were written against.
+        // Production default is 'auto' (which refuses claudish spawns).
+        claude: { permissionMode: 'bypass' },
       },
     });
 
@@ -68,6 +75,9 @@ describe('agents auth routing', () => {
       if (model.startsWith('glm-')) {
         return { name: 'zai', displayName: 'Z.AI', compatibility: 'claudish', authType: 'static' };
       }
+      if (model.startsWith('gemini-')) {
+        return { name: 'google', displayName: 'Google (Gemini)', compatibility: 'direct', authType: 'static' };
+      }
       if (model.startsWith('mimo-')) {
         return { name: 'mimo', displayName: 'MiMo', compatibility: 'claudish', authType: 'static' };
       }
@@ -77,6 +87,7 @@ describe('agents auth routing', () => {
       return { name: 'anthropic', displayName: 'Anthropic', compatibility: 'direct', authType: 'env' };
     });
 
+    mockBridgeGeminiAuth.mockReturnValue(true);
     mockGetProviderEnv.mockImplementation((_provider, authToken: string) => ({
       AUTH_TOKEN: authToken,
     }));
@@ -123,6 +134,30 @@ describe('agents auth routing', () => {
 
   it('uses cx@ prefix for GPT models routed through subscription auth', () => {
     expect(getClaudishPrefix('gpt-5.4', 'subscription')).toBe('cx@gpt-5.4');
+  });
+
+  it('bridges Gemini API keys into CLIProxy env instead of claudish env', async () => {
+    mockLoadYamlConfig.mockReturnValue({
+      config: {
+        apiKeys: { google: 'google-test-key' },
+        providerAuth: {},
+      },
+    });
+
+    const env = await getProviderEnvForModel('gemini-3-flash-preview');
+
+    expect(mockBridgeGeminiAuth).toHaveBeenCalledWith('google-test-key');
+    expect(mockGetProviderEnv).not.toHaveBeenCalled();
+    expect(env).toEqual({
+      ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317',
+      ANTHROPIC_AUTH_TOKEN: 'panopticon-local-cliproxy-key',
+    });
+  });
+
+  it('launches Gemini models with Claude Code through CLIProxy-compatible direct routing', async () => {
+    expect(await getAgentRuntimeBaseCommand('gemini-3-flash-preview')).toBe(
+      'claude --dangerously-skip-permissions --permission-mode bypassPermissions --model gemini-3-flash-preview'
+    );
   });
 
   it('launches MiniMax models through claudish with mm@ prefix', async () => {

@@ -52,13 +52,19 @@ describe('getAgentRuntimeBaseCommand harness routing (PAN-636)', () => {
 describe('getAgentRuntimeBaseCommand permission-mode integration', () => {
   const ORIGINAL = process.env.PAN_YOLO
 
-  beforeEach(() => { delete process.env.PAN_YOLO })
+  // Pin PAN_YOLO=false so the resolver returns 'auto' regardless of whatever
+  // claude.permissionMode the developer has set in ~/.panopticon/config.yaml.
+  // Previously this block deleted PAN_YOLO and relied on the resolver falling
+  // through to YAML config — flaky: a dev who sets `permissionMode: bypass`
+  // locally would see this assertion fail with "expected auto, got bypass" on
+  // an otherwise-clean checkout.
+  beforeEach(() => { process.env.PAN_YOLO = 'false' })
   afterEach(() => {
     if (ORIGINAL === undefined) delete process.env.PAN_YOLO
     else process.env.PAN_YOLO = ORIGINAL
   })
 
-  it('default (no PAN_YOLO) emits --permission-mode auto for an Anthropic model', async () => {
+  it('production default emits --permission-mode auto for an Anthropic model', async () => {
     const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6')
     expect(cmd).toBe('claude --permission-mode auto --model claude-sonnet-4-6')
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)

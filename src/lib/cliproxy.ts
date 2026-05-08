@@ -37,7 +37,7 @@ export const CLIPROXY_PORT = 8317;
 export const CLIPROXY_AUTH_TOKEN = 'panopticon-local-cliproxy-key';
 export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
 
-const CLIPROXY_RELEASE_VERSION = 'v6.9.45';
+const CLIPROXY_RELEASE_VERSION = 'v6.10.9';
 
 export function getCliproxyDir(): string {
   return join(PANOPTICON_HOME, 'cliproxy');
@@ -71,6 +71,10 @@ function getCliproxyCodexCredPath(): string {
   return join(getCliproxyAuthDir(), 'codex-primary.json');
 }
 
+function getCliproxyGeminiCredPath(): string {
+  return join(getCliproxyAuthDir(), 'gemini-primary.json');
+}
+
 function ensureDirs(): void {
   for (const dir of [PANOPTICON_HOME, BIN_DIR, getCliproxyDir(), getCliproxyAuthDir()]) {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -97,6 +101,12 @@ interface CliproxyCodexCredentials {
   email: string;
   type: 'codex';
   expired: string;
+  disabled: boolean;
+}
+
+interface CliproxyGeminiCredentials {
+  api_key: string;
+  type: 'gemini';
   disabled: boolean;
 }
 
@@ -244,21 +254,102 @@ export async function bridgeCodexAuthToCliproxyAsync(): Promise<boolean> {
   return true;
 }
 
-function ensureConfigFile(): void {
+function readBridgedGeminiApiKey(): string | null {
+  const target = getCliproxyGeminiCredPath();
+  if (!existsSync(target)) return null;
+
+  try {
+    const parsed = JSON.parse(readFileSync(target, 'utf8')) as Partial<CliproxyGeminiCredentials>;
+    return typeof parsed.api_key === 'string' && parsed.api_key.trim().length > 0
+      ? parsed.api_key.trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function serializeYamlString(value: string): string {
+  return JSON.stringify(value);
+}
+
+/**
+ * Persist a Google Generative Language API key for CLIProxyAPI's Gemini backend.
+ *
+ * CLIProxyAPI v6.10.x accepts Gemini API keys through the `gemini-api-key`
+ * config section. We also keep a small credential marker in auth-dir so future
+ * config rewrites can preserve the bridged key without re-reading Panopticon
+ * settings.
+ */
+export function bridgeGeminiAuthToCliproxy(apiKey: string): boolean {
+  const normalized = apiKey.trim();
+  if (!normalized) return false;
+
+  ensureDirs();
+  const creds: CliproxyGeminiCredentials = {
+    api_key: normalized,
+    type: 'gemini',
+    disabled: false,
+  };
+
+  const serialized = JSON.stringify(creds, null, 2) + '\n';
+  const target = getCliproxyGeminiCredPath();
+  if (!existsSync(target) || readFileSync(target, 'utf8') !== serialized) {
+    writeFileSync(target, serialized, { mode: 0o600 });
+  }
+
+  ensureConfigFile(normalized);
+  return true;
+}
+
+/** Async variant of bridgeGeminiAuthToCliproxy — safe for the event loop. */
+export async function bridgeGeminiAuthToCliproxyAsync(apiKey: string): Promise<boolean> {
+  const normalized = apiKey.trim();
+  if (!normalized) return false;
+
+  ensureDirs();
+  const creds: CliproxyGeminiCredentials = {
+    api_key: normalized,
+    type: 'gemini',
+    disabled: false,
+  };
+  const serialized = JSON.stringify(creds, null, 2) + '\n';
+  const target = getCliproxyGeminiCredPath();
+
+  try {
+    if (!existsSync(target) || await readFile(target, 'utf8') !== serialized) {
+      await writeFile(target, serialized, { mode: 0o600 });
+    }
+  } catch {
+    return false;
+  }
+
+  ensureConfigFile(normalized);
+  return true;
+}
+
+function ensureConfigFile(geminiApiKey: string | null = readBridgedGeminiApiKey()): void {
   ensureDirs();
   const configPath = getCliproxyConfigPath();
   const authDir = getCliproxyAuthDir();
 
   // Config is rewritten every time so upgrades can evolve the format safely.
-  const config = [
+  const lines = [
     `host: "${CLIPROXY_HOST}"`,
     `port: ${CLIPROXY_PORT}`,
     `auth-dir: "${authDir}"`,
     `api-keys:`,
     `  - "${CLIPROXY_AUTH_TOKEN}"`,
-    `debug: false`,
-    '',
-  ].join('\n');
+  ];
+
+  if (geminiApiKey) {
+    lines.push(
+      `gemini-api-key:`,
+      `  - api-key: ${serializeYamlString(geminiApiKey)}`,
+    );
+  }
+
+  lines.push(`debug: false`, '');
+  const config = lines.join('\n');
 
   if (existsSync(configPath)) {
     try {

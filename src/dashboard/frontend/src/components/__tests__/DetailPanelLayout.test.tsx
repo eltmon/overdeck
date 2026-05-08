@@ -24,8 +24,12 @@ vi.mock('../InspectorPanel', () => ({
 }));
 
 vi.mock('../TerminalPanel', () => ({
-  TerminalPanel: ({ sessionName }: { sessionName?: string; agent?: unknown }) => (
-    <div data-testid="terminal-panel" data-session={sessionName ?? '__default__'} />
+  TerminalPanel: ({ sessionName, agent }: { sessionName?: string; agent?: { id?: string } }) => (
+    <div
+      data-testid="terminal-panel"
+      data-session={sessionName ?? '__default__'}
+      data-agent-id={agent?.id ?? '__none__'}
+    />
   ),
 }));
 
@@ -112,12 +116,13 @@ function renderLayout(
   agent: Agent,
   fetchImpl: typeof global.fetch = makeFetch(),
   issueId = 'PAN-509',
+  workAgents: Agent[] = [],
 ) {
   global.fetch = fetchImpl;
   const client = makeQueryClient();
   return render(
     <QueryClientProvider client={client}>
-      <DetailPanelLayout agent={agent} issueId={issueId} onClose={vi.fn()} />
+      <DetailPanelLayout agent={agent} workAgents={workAgents} issueId={issueId} onClose={vi.fn()} />
     </QueryClientProvider>,
   );
 }
@@ -177,6 +182,47 @@ describe('DetailPanelLayout', () => {
 
       // Not the work agent session
       expect(screen.getByTestId('terminal-panel')).not.toHaveAttribute('data-session', 'agent-123');
+    });
+  });
+
+  describe('selected session agent metadata', () => {
+    it('passes the work agent matching the selected session into TerminalPanel', async () => {
+      mockPipelineResult = {
+        phase: 'working',
+        activeSession: 'agent-pan-509-2',
+        availableTerminals: [
+          {
+            id: 'working',
+            label: 'Slot 1',
+            sessionName: 'agent-pan-509-1',
+            isActive: false,
+            disabled: false,
+          } satisfies TerminalTab,
+          {
+            id: 'working-agent-pan-509-2',
+            label: 'Slot 2',
+            sessionName: 'agent-pan-509-2',
+            isActive: true,
+            disabled: false,
+          } satisfies TerminalTab,
+        ],
+        markSessionDead: vi.fn(),
+      };
+
+      renderLayout(
+        makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'healthy' }),
+        makeFetch(),
+        'PAN-509',
+        [
+          makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'healthy' }),
+          makeAgent({ id: 'agent-pan-509-2', issueId: 'PAN-509', status: 'healthy' }),
+        ],
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-panel')).toHaveAttribute('data-session', 'agent-pan-509-2');
+      });
+      expect(screen.getByTestId('terminal-panel')).toHaveAttribute('data-agent-id', 'agent-pan-509-2');
     });
   });
 
