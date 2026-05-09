@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T17:43:03Z",
+  "updated": "2026-05-09T19:06:32.359Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "9fa858de6",
+    "sha": "deb2b0784",
     "dirty": true
   },
   "decisions": [
@@ -127,7 +127,15 @@
       "mitigation": "K1 acceptance criterion ac3 requires `cd packages/contracts && npm run build` followed by a frontend rebuild. Acceptance criterion ac4 requires an end-to-end smoke (open dashboard, observe a running role) before signaling done."
     }
   ],
-  "resumePoint": null,
+  "resumePoint": {
+    "description": "Completed bead workspace-2sr1 by moving the PAN-1048 PRD to docs/prds/planned/PAN-1048-role-primitive.md; close the bead, then run bd ready -l pan-1048 for the next unblocked bead.",
+    "beadId": "workspace-2sr1",
+    "filesToRead": [
+      "docs/prds/planned/PAN-1048-role-primitive.md",
+      ".pan/spec.vbrief.json",
+      ".pan/continue.json"
+    ]
+  },
   "beadsMapping": {},
   "agentModel": "agent:claude-opus-4-7",
   "sessionHistory": [
@@ -136,6 +144,12 @@
       "content": "Planning session for PAN-1048 (Unify agent type system: 5 enums → Role primitive). Pre-planning, the user updated the PRD and GitHub issue with the new Workhorse Models concept (3 user-managed slots — expensive/mid/cheap — referenced from per-role and per-sub-role pickers via `workhorse:<slot>` indirection). The user also clarified that plan + review should both default to workhorse:expensive (planning errors cascade; review gates merge). Architectural decisions surfaced via AskUserQuestion: (1) drop work phases entirely; (2) reactive Cloister hooks into existing internal event emitters rather than building a new tracker poller; (3) hard cut on upgrade — kill in-flight agents, drop legacy fields, no readRole() shim; (4) workhorse pickers list all enabled providers grouped; (5) Pi parity deferred to follow-up; (6) convoy prompt templates migrate to .claude/agents/code-review-<flavor>.md invoked via the Agent tool; (7) runtime → harness unification in this PR. Codebase mapping confirmed: 138 SpecialistType callsites, 167 WorkTypeId callsites, no `roles/` directory exists yet, IssueLifecycle service already emits issue.* domain events, convoy reviewers today are separate Cloister specialists (not subagents). Decomposed into 32 beads with 57 dependency edges across 7 phases (Foundation, Convoy migration, Role files, Per-role spawn wiring, Reactive Cloister + machinery deletion, Settings UI, Backend dead-code deletion + enum deletions + contracts + state.json hard cut + cleanup).",
       "note": "Planning complete. 32 beads written to .pan/spec.vbrief.json. Continue.json populated with 13 decisions and 10 hazards.",
       "timestamp": "2026-05-09T17:43:03Z",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T19:06:32.359Z",
+      "reason": "bead-complete",
+      "note": "Moved .pan/prd.md to docs/prds/planned/PAN-1048-role-primitive.md, marked z2-move-prd-canonical acceptance criteria complete, and left .pan/prd.md absent from the working tree.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],
