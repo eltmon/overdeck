@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T19:06:32.359Z",
+  "updated": "2026-05-09T19:32:22.600Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "deb2b0784",
+    "sha": "1ec51ddeb",
     "dirty": true
   },
   "decisions": [
@@ -73,6 +73,11 @@
       "id": "D13",
       "summary": "PRD location: this planning session left the PRD at .pan/prd.md (workspace-local). The final bead (z2-move-prd-canonical) moves it to docs/prds/planned/PAN-1048-role-primitive.md so the link in the GitHub issue body works after merge. Do not move it earlier — the PRD is mutated repeatedly during planning.",
       "recordedAt": "2026-05-09T17:43:03Z"
+    },
+    {
+      "id": "D14",
+      "summary": "Deferred X1 legacy .claude/agents/pan-*-agent.md deletion because bd surfaced it before all spawn callsites had migrated to role-based launch. The files are still required by planning and specialist dispatch, so deleting them now would brick active and future agents. Treat X1 as out-of-scope until a follow-up after role spawn migration is verified on main.",
+      "recordedAt": "2026-05-09T19:32:22.600Z"
     }
   ],
   "hazards": [
@@ -125,13 +130,17 @@
       "id": "H10",
       "summary": "Contracts migration (E2, K1) crosses the wire-format boundary between server and frontend. If contracts are rebuilt but the frontend isn't recompiled (Vite dev cache, stale dist), runtime errors appear that look like backend bugs.",
       "mitigation": "K1 acceptance criterion ac3 requires `cd packages/contracts && npm run build` followed by a frontend rebuild. Acceptance criterion ac4 requires an end-to-end smoke (open dashboard, observe a running role) before signaling done."
+    },
+    {
+      "id": "H11",
+      "summary": "The bead dependency materialization allowed X1 to become ready too early, despite runtime dependencies on legacy agent definition files.",
+      "mitigation": "Do not touch .claude/agents/pan-*-agent.md in PAN-1048 unless the vBRIEF and bd graph are corrected after S2-S5/C1 land. Keep legacy files in place until a separate cleanup issue verifies role-based launch is stable on main."
     }
   ],
   "resumePoint": {
-    "description": "Completed bead workspace-2sr1 by moving the PAN-1048 PRD to docs/prds/planned/PAN-1048-role-primitive.md; close the bead, then run bd ready -l pan-1048 for the next unblocked bead.",
-    "beadId": "workspace-2sr1",
+    "description": "X1 was deferred as unsafe. Continue with bd ready -l pan-1048 and implement the top ready bead without touching .claude/agents/pan-*-agent.md.",
+    "beadId": "workspace-bnrg",
     "filesToRead": [
-      "docs/prds/planned/PAN-1048-role-primitive.md",
       ".pan/spec.vbrief.json",
       ".pan/continue.json"
     ]
@@ -150,6 +159,12 @@
       "timestamp": "2026-05-09T19:06:32.359Z",
       "reason": "bead-complete",
       "note": "Moved .pan/prd.md to docs/prds/planned/PAN-1048-role-primitive.md, marked z2-move-prd-canonical acceptance criteria complete, and left .pan/prd.md absent from the working tree.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T19:32:22.600Z",
+      "reason": "bead-deferred",
+      "note": "Deferred workspace-bnrg/X1 after user correction: legacy pan agent definition files are still required by current planning and specialist spawn paths. Reverted accidental code-comment edits and preserved only the vBRIEF deferral metadata.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

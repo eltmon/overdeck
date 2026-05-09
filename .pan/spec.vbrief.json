@@ -1576,17 +1576,19 @@
       },
       {
         "id": "x1-delete-old-pan-agent-md",
-        "title": "Delete old .claude/agents/pan-*-agent.md files",
-        "status": "pending",
+        "title": "Delete old .claude/agents/pan-*-agent.md files (DEFERRED — DO NOT EXECUTE)",
+        "status": "deferred",
         "priority": "low",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
           "difficulty": "trivial",
           "issueLabel": "pan-1048",
-          "requiresInspection": false
+          "requiresInspection": true,
+          "deferred": true,
+          "deferredReason": "Hotfix 2026-05-09: file deletion is destructive and depends on every spawn callsite having migrated to spawnRun(role) and shipped to main. Until that lands, deleting these .md files breaks ALL running and future agents. Do NOT execute as part of this issue. File a follow-up issue post-merge once the migration is verified stable on main."
         },
         "narrative": {
-          "Action": "Delete .claude/agents/pan-{work,planning,review,test,inspect,uat,merge}-agent.md (7 files). Verify no spawn paths reference them (grep for 'pan-.*-agent' across src/ should return zero hits in non-comment code). Update any documentation that pointed users at these files."
+          "Action": "DEFERRED — DO NOT EXECUTE. This bead has been moved out of the PAN-1048 scope. The .claude/agents/pan-*-agent.md files MUST remain in place until the spawn-callsite migration (S1–S5, C1, C2) has shipped to main and run successfully for at least 24 hours. Deleting them prematurely will brick every running and future agent because the legacy specialist dispatch and planning spawn path read these files at launch time. A separate cleanup issue will be filed after the migration is verified stable on main; do not attempt this work here."
         },
         "subItems": [
           {
