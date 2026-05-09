@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1030",
   "created": "2026-05-09T00:00:00Z",
-  "updated": "2026-05-09T04:52:48.811Z",
+  "updated": "2026-05-09T05:13:42.788Z",
   "gitState": {
     "branch": "feature/pan-1030",
-    "sha": "14fe5133d",
+    "sha": "e25791ae9",
     "dirty": false
   },
   "decisions": [
@@ -28,6 +28,11 @@
       "id": "D4",
       "summary": "Review feedback requires planning-only awaiting-input badges to open the Issue Inspector, not the Plan dialog, because the inspector owns the exact prompt text and one-click terminal attach affordance.",
       "recordedAt": "2026-05-09T04:52:48.811Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Stopped agents with runtime resolution needs_input must carry a fallback prompt and reason so the stricter frontend pending-question helper still surfaces the blocked state.",
+      "recordedAt": "2026-05-09T05:13:42.788Z"
     }
   ],
   "hazards": [
@@ -53,7 +58,7 @@
     }
   ],
   "resumePoint": {
-    "description": "Review feedback fixed and pushed. Next: rerun pan review request PAN-1030 -m \"Fixed verification error\" and monitor the review pipeline.",
+    "description": "Stopped needs_input prompt feedback fixed locally. Next: commit/push continue state, rerun pan review request PAN-1030 -m \"Fixed verification error\", and monitor the review pipeline.",
     "beadId": "workspace-mla7",
     "filesToRead": [
       "src/lib/agent-input-detection.ts",
@@ -93,6 +98,12 @@
       "timestamp": "2026-05-09T04:52:48.811Z",
       "reason": "review-fix",
       "note": "Addressed review feedback by routing planning-only input badges to the inspector, adding regression coverage, bounding pane-detection cache growth, verifying typecheck/lint/full tests, and pushing the reconciled branch.",
+      "agentModel": "claude-code"
+    },
+    {
+      "timestamp": "2026-05-09T05:13:42.788Z",
+      "reason": "review-fix",
+      "note": "Addressed security review feedback by adding fallback prompt and reason fields to stopped agents whose runtime resolution is needs_input. Verified with typecheck, lint, targeted tests, and full npm test.",
       "agentModel": "claude-code"
     }
   ],
