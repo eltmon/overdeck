@@ -49,6 +49,7 @@ import { useCodexAuthStatus } from '../../hooks/useCodexAuthStatus';
 import { OpenRouterPage } from './OpenRouterPage';
 import { SensitiveText } from '../SensitiveText';
 import { DesktopSettingsSection } from './DesktopSettingsSection';
+import { WorkhorsePanel } from './WorkhorsePanel';
 import {
   ModelOverrideModal,
   getCapabilityMatchScore,
@@ -668,6 +669,8 @@ export function SettingsPage() {
         <h2 className="text-foreground text-base font-semibold tracking-tight mb-4">
           Model Routing
         </h2>
+
+        <WorkhorsePanel />
 
         {/* Preset summary */}
         <div className="flex items-center justify-between px-4 py-3 bg-card border border-border rounded-lg mb-4">

@@ -3320,8 +3320,8 @@
     "hash": "6cc9ed261897e7227d0ffbda4ec292f3"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/Settings/SettingsPage.tsx": {
-    "mtime": 1778301111.3632638,
-    "hash": "c3d8950695cf47ce3eb5e3f23d6cacef"
+    "mtime": 1778360806.2553163,
+    "hash": "6e13f1541b6b02ae150bf1df6c389b04"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/Settings/OpenRouterPage.tsx": {
     "mtime": 1778301111.362865,
@@ -3342,6 +3342,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/Settings/DesktopSettingsSection.tsx": {
     "mtime": 1778301111.362865,
     "hash": "c35f6a62e2e03e2f3e82b6d76d655acc"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/Settings/WorkhorsePanel.tsx": {
+    "mtime": 1778361007.399247,
+    "hash": "84fa72fc11340258da84b7451c2b9b28"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/Settings/types.ts": {
     "mtime": 1778301111.3638043,
@@ -3386,6 +3390,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/Settings/__tests__/OpenRouterPage.test.tsx": {
     "mtime": 1778301111.3636842,
     "hash": "1413228691eed901c070bf3353902fc8"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/Settings/__tests__/WorkhorsePanel.test.tsx": {
+    "mtime": 1778360817.3725142,
+    "hash": "8839ab0022d80b489e9889f655daf556"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/Settings/AgentCards/ModelOverrideModal.tsx": {
     "mtime": 1778301111.362865,

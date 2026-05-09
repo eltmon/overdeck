@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T21:03:50.482Z",
+  "updated": "2026-05-09T21:09:41.150Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "pending-r3",
+    "sha": "pending-u1",
     "dirty": true
   },
   "decisions": [
@@ -158,11 +158,12 @@
     }
   ],
   "resumePoint": {
-    "description": "R3 review role definition implemented: roles/review.md defines review as synthesis, dispatches the four convoy code-review subagents in parallel via Agent tool calls, documents approve/request-changes flow, preserves the human-merge invariant, and keeps the legacy pan-review-agent file. Commit and close workspace-y980 next.",
-    "beadId": "workspace-y980",
+    "description": "U1 WorkhorsePanel settings UI implemented and verified: the Settings model routing section now renders WorkhorsePanel above existing role cards; the panel reads workhorses from /api/settings, lists all enabled-provider models grouped by provider, exposes Expensive/Mid/Cheap dropdowns with descriptions, and PUTs merged settings updates on change. Commit and close workspace-xuld next.",
+    "beadId": "workspace-xuld",
     "filesToRead": [
-      "roles/review.md",
-      "src/lib/__tests__/role-definitions.test.ts"
+      "src/dashboard/frontend/src/components/Settings/WorkhorsePanel.tsx",
+      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+      "src/dashboard/frontend/src/components/Settings/__tests__/WorkhorsePanel.test.tsx"
     ]
   },
   "beadsMapping": {},
@@ -257,6 +258,12 @@
       "timestamp": "2026-05-09T21:03:50.482Z",
       "reason": "bead-complete",
       "note": "Implemented R3 review role definition at roles/review.md. The review role is synthesis (no separate synthesis sub-agent), dispatches code-review-security/correctness/performance/requirements in parallel via Agent tool calls, documents synthesis decision flow, review state transition responsibilities, resolveModel(review, subRole) routing, and the invariant that review NEVER merges. Legacy .claude/agents/pan-review-agent.md remains. Verified role definition test, typecheck, lint, and graphify update.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T21:09:41.150Z",
+      "reason": "bead-complete",
+      "note": "Implemented U1 WorkhorsePanel settings UI with three accessible workhorse dropdowns (Expensive/Mid/Cheap), provider-grouped options from /api/settings/available-models, settings read/PUT round-trip behavior, and inline slot descriptions. Integrated WorkhorsePanel at the top of Settings model routing and added focused component tests. Verified targeted test, typecheck, lint, and graphify update.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],
