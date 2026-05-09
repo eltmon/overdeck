@@ -106,6 +106,10 @@ graphify-out/.graphify_*
 .pan/events/
 .pan/convoy/
 .pan/prompts/
+.pan/continue.json
+.pan/feedback/
+.pan/followup-issues.txt
+.pan/spec.vbrief.json
 .panopticon/
 
 # Beads / Dolt files (added by bd init)
