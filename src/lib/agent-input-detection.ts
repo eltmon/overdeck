@@ -73,6 +73,10 @@ function compactPrompt(prompt: string): string {
   return `${compact.slice(0, MAX_PROMPT_CHARS - 1)}…`
 }
 
+export function normalizeAwaitingInputPrompt(prompt: string): string {
+  return compactPrompt(prompt)
+}
+
 function snippetAround(lines: string[], index: number, before = 8, after = 4): string {
   const start = Math.max(0, index - before)
   const end = Math.min(lines.length, index + after + 1)
@@ -89,6 +93,20 @@ function lastIndexMatching(lines: string[], predicate: (line: string, index: num
 function isRecentPromptIndex(lines: string[], index: number): boolean {
   if (index < 0) return false
   return lines.length - index <= 25
+}
+
+function isCurrentPromptIndex(lines: string[], index: number, maxTrailingLines = 0): boolean {
+  if (index < 0) return false
+  return lines.length - index <= maxTrailingLines + 1
+}
+
+function findPermissionMenuEndIndex(lines: string[], menuStartIndex: number): number {
+  if (menuStartIndex < 0) return -1
+  const end = Math.min(lines.length, menuStartIndex + 8)
+  for (let i = menuStartIndex; i < end; i += 1) {
+    if (/\s*3\.\s*No\b/i.test(lines[i]!)) return i
+  }
+  return menuStartIndex
 }
 
 function looksLikeClaudePermissionMenu(text: string): boolean {
@@ -132,7 +150,8 @@ export function detectAwaitingInputFromPane(
 
   if (looksLikeClaudePermissionMenu(recentText) && looksLikePermissionText(recentText)) {
     const menuIndex = lastIndexMatching(lines, (line) => /❯?\s*1\.\s*Yes\b/i.test(line))
-    if (isRecentPromptIndex(lines, menuIndex)) {
+    const menuEndIndex = findPermissionMenuEndIndex(lines, menuIndex)
+    if (isRecentPromptIndex(lines, menuIndex) && isCurrentPromptIndex(lines, menuEndIndex)) {
       return {
         reason: 'tool_permission',
         prompt: snippetAround(lines, menuIndex, 10, 3),
@@ -141,7 +160,7 @@ export function detectAwaitingInputFromPane(
   }
 
   const piIndex = lastIndexMatching(lines, (line) => looksLikePiPermission(line) || looksLikeGenericConfirmation(line))
-  if (isRecentPromptIndex(lines, piIndex)) {
+  if (isRecentPromptIndex(lines, piIndex) && isCurrentPromptIndex(lines, piIndex)) {
     const snippet = snippetAround(lines, piIndex, 6, 2)
     const reason = looksLikeGenericConfirmation(lines[piIndex]!) ? 'confirmation' : 'tool_permission'
     return { reason, prompt: snippet }

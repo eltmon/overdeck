@@ -115,6 +115,7 @@ import {
 import { parseConversationMessages } from '../services/conversation-service.js';
 import type { ConversationResponse } from '@panctl/contracts';
 import { EventStoreService } from '../services/domain-services.js';
+import { normalizeAwaitingInputPrompt } from '../../../lib/agent-input-detection.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSessionAsync, listSessionsAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 
 const execAsync = promisify(exec);
@@ -575,7 +576,10 @@ const getAgentsRoute = HttpRouter.add(
               const lifecycle = getWorkAgentLifecycleState(dir);
               const needsInput = runtimeData.resolution === 'needs_input';
               const pendingQuestionPrompt = needsInput
-                ? runtimeData.waitingNotification || 'Agent stopped because it needs human input or hit a blocker'
+                ? normalizeAwaitingInputPrompt(
+                    runtimeData.waitingNotification ||
+                      'Agent stopped because it needs human input or hit a blocker',
+                  )
                 : undefined;
               const pendingQuestionReason = needsInput
                 ? runtimeData.waitingReason || 'other'
