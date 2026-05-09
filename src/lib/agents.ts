@@ -1440,13 +1440,29 @@ export async function buildAgentLaunchConfig(opts: {
     // PAN-982: Resume sessions adopt the work-agent definition via --agent.
     // Permissions/model/tools/hooks come from agents/pan-work-agent.md frontmatter.
     // --name <agentId> gives the resumed Claude session a human-readable handle.
+    //
+    // The frontmatter's permissionMode: bypassPermissions only bypasses prompts
+    // INSIDE cwd. Tools that touch siblings of cwd (e.g. bd reading
+    // .beads/issues.jsonl through git subprocesses, pan reading
+    // ~/.panopticon/...) still hit "Do you want to proceed?" without DSP.
+    // Mid-Bash dialog dismissals (deacon nudge, paste-buffer write, sibling
+    // hook output) cancel the in-flight tool call and surface as
+    // `Interrupted · What should Claude do instead?` (PAN-1024 reproduced
+    // this loop on every fresh resume of PAN-1044/PAN-934).
+    //
+    // Match the fresh-spawn path: when permissionMode resolves to 'bypass'
+    // (PAN_YOLO=true OR claude.permissionMode=bypass in config), prepend
+    // --dangerously-skip-permissions on resume too.
+    const bypassFlag = resolvePermissionMode() === 'bypass'
+      ? '--dangerously-skip-permissions '
+      : '';
     const launcherContent = generateLauncherScript({
       agentType: 'resume',
       workingDir: opts.workspace,
       changeDir: false,
       setCi: true,
       providerExports,
-      baseCommand: `claude --agent ${panopticonAgentName('work')}`,
+      baseCommand: `claude ${bypassFlag}--agent ${panopticonAgentName('work')}`,
       resumeSessionId: opts.resumeSessionId,
       model: providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
       extraArgs: `--name ${opts.agentId}`,
