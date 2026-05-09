@@ -10,13 +10,18 @@ import { join } from 'path';
 const mockUnref = vi.hoisted(() => vi.fn());
 const mockSpawnChild = vi.hoisted(() => ({ pid: 12345, unref: mockUnref }));
 const mockSpawn = vi.hoisted(() => vi.fn(() => mockSpawnChild));
-const mockExec = vi.hoisted(() => vi.fn((_cmd: string, _opts: any, cb: any) => {
-  if (typeof _opts === 'function') _opts(null, '', '');
-  else if (cb) cb(null, '', '');
+const mockExecResult = vi.hoisted(() => vi.fn((cmd: string) => {
+  if (cmd.includes('rev-parse --verify')) return { stdout: 'abc123\n', stderr: '' };
+  return { stdout: '', stderr: '' };
+}));
+const mockExec = vi.hoisted(() => vi.fn((cmd: string, _opts: any, cb: any) => {
+  const result = mockExecResult(cmd);
+  if (typeof _opts === 'function') _opts(null, result);
+  else if (cb) cb(null, result);
 }));
 
 const kCustom = Symbol.for('nodejs.util.promisify.custom');
-(mockExec as any)[kCustom] = vi.fn().mockResolvedValue({ stdout: '', stderr: '' });
+(mockExec as any)[kCustom] = vi.fn((cmd: string) => Promise.resolve(mockExecResult(cmd)));
 
 vi.mock('child_process', () => ({
   spawn: mockSpawn,
