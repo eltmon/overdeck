@@ -536,10 +536,12 @@ function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
   const issueLower = issueId.toLowerCase();
   const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
 
-  // Scan all configured projects for legacy naming (e.g. feature-484 for PAN-484)
+  // Scan all configured projects. Priority: numeric-suffix form (feature-1034) before
+  // full lowercased form (feature-pan-1034). The numeric-suffix is the canonical naming
+  // for git worktrees; the full lowercased form is the legacy fallback.
   for (const { config } of listProjects()) {
     if (!config.path) continue;
-    for (const candidate of [`feature-${issueLower}`, `feature-${numericSuffix}`]) {
+    for (const candidate of [`feature-${numericSuffix}`, `feature-${issueLower}`]) {
       const p = join(config.path, 'workspaces', candidate);
       if (existsSync(p)) return { exists: true, isRemote: false, localPath: p };
     }
@@ -547,7 +549,7 @@ function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
 
   // Fallback: canonical path under getProjectPath
   const projectPath = getProjectPath(undefined, issuePrefix);
-  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+  const workspacePath = join(projectPath, 'workspaces', `feature-${numericSuffix}`);
   if (existsSync(workspacePath)) return { exists: true, isRemote: false, localPath: workspacePath };
 
   return { exists: false, isRemote: false };
@@ -3103,12 +3105,14 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
-    const branchName = `feature/${issueLower}`;
+    const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
+    // Use numeric-suffix form (feature/1034) as canonical branch name
+    const branchName = `feature/${numericSuffix}`;
 
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
     const workspacePath = workspaceInfo.isRemote
       ? workspaceInfo.remotePath!
-      : workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${issueLower}`);
+      : workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${numericSuffix}`);
 
     const existingStatus = getReviewStatus(issueId);
 
@@ -3802,10 +3806,12 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
           if (resolved) {
             const wsInfo = getWorkspaceInfoForIssue(issueId);
             const issueLower = issueId.toLowerCase();
-            const branchName = `feature/${issueLower}`;
+            const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
+            // Use numeric-suffix form (feature/1034) as canonical branch name
+            const branchName = `feature/${numericSuffix}`;
             const wsPath =
               wsInfo.localPath ||
-              join(resolved.projectPath, 'workspaces', `feature-${issueLower}`);
+              join(resolved.projectPath, 'workspaces', `feature-${numericSuffix}`);
 
             const result = await dispatchParallelReview({
               issueId,
