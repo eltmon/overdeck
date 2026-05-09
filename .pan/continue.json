@@ -2,9 +2,11 @@
   "version": "1",
   "issueId": "PAN-1044",
   "created": "2026-05-09T17:02:13.086Z",
-  "updated": "2026-05-09T17:30:00.000Z",
+  "updated": "2026-05-09T21:16:26.643Z",
   "gitState": {
-    "branch": "feature/pan-1044"
+    "branch": "feature/pan-1044",
+    "sha": "f2d67ee9c",
+    "dirty": true
   },
   "decisions": [
     {
@@ -82,7 +84,7 @@
   ],
   "resumePoint": null,
   "beadsMapping": {},
-  "agentModel": "agent:claude-opus-4-5",
+  "agentModel": "gpt-5.5",
   "sessionHistory": [
     {
       "timestamp": "2026-05-09T17:02:13.086Z",
@@ -95,6 +97,23 @@
       "reason": "planning-revised",
       "note": "Plan revised: added cost-breakdown-tooltip bead (hover popover for model/stage cost breakdown). Updated pipeline-swimlanes bead to explicitly include cost badge on stuck callout cards. Updated commanddeck-routing to expand IssueCostEntry with byModel/byStage and wire issueCostDetails to ProjectOverview. User requests: (1) cost of issue shown in summary, (2) hover over cost shows model/stage breakdown.",
       "agentModel": "agent:claude-opus-4-5"
+    },
+    {
+      "timestamp": "2026-05-09T17:19:07.860Z",
+      "reason": "start",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-09T21:03:11.463Z",
+      "reason": "bead-complete",
+      "note": "workspace-fran implemented CommandDeck selectedProject routing, issueCostDetails wiring, ProjectNode project-selection props, and CommandDeck coverage for project overview rendering. Commit 7e7c73a1d.",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-09T21:16:26.643Z",
+      "reason": "quality-gates",
+      "note": "Restored full-suite stability by aligning stale model/skill fixtures with current sources and isolating agent-spawning tests from local Channels settings. Gates passed: npm run typecheck, npm run lint, npm test. Commit f2d67ee9c.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": []

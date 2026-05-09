@@ -4,17 +4,17 @@
     "created": "2026-05-08T00:00:00Z",
     "author": "planning-agent:claude-opus-4-5",
     "description": "Plan for PAN-1044: Command Deck — Project Overview Panel with pipeline swimlanes. Empirically scoped 2026-05-09 (revised with cost-breakdown-tooltip bead and cost-on-stuck-callout) — see docs/prds/planned/PAN-1044-project-overview-panel.md.",
-    "updated": "2026-05-09T17:11:38.216Z"
+    "updated": "2026-05-09T17:19:07.829Z"
   },
   "plan": {
     "id": "pan-1044",
     "title": "Command Deck: Project Overview Panel with pipeline swimlanes",
-    "status": "proposed",
+    "status": "running",
     "uid": "b2a7f3c1-4d8e-4f29-9a6b-3c5e7f8d2b1a",
     "author": "planning-agent:claude-opus-4-5",
-    "sequence": 7,
+    "sequence": 8,
     "created": "2026-05-08T00:00:00Z",
-    "updated": "2026-05-09T17:11:38.216Z",
+    "updated": "2026-05-09T17:19:07.829Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1044",
