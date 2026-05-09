@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, FileText, ExternalLink, List, RefreshCw } from 'lucide-react';
+import { X, Loader2, CheckCircle2, AlertCircle, Sparkles, Play, Terminal, Square, List, RefreshCw } from 'lucide-react';
 import { Rnd } from 'react-rnd';
 import { useDashboardStore } from '../lib/store';
-import { Issue, type StartAgentResponse } from '../types';
-import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
+import { Issue } from '../types';
 import { XTerminal } from './XTerminal';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { useConfirm } from './DialogProvider';
@@ -51,7 +50,7 @@ interface PlanningStatus {
   hasCompletionMarker?: boolean;
 }
 
-type Step = 'checking' | 'ready' | 'starting' | 'setting-up' | 'planning' | 'complete' | 'error';
+type Step = 'checking' | 'ready' | 'starting' | 'setting-up' | 'planning' | 'error';
 
 // Default for startDocker - can be overridden by localStorage
 const getDefaultStartDocker = (): boolean => {
@@ -81,12 +80,10 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   // Ref so async SSE callbacks always read the live checkbox value, not a stale closure copy
   const watchPlanningRef = useRef(true);
   const [showTasksPanel, setShowTasksPanel] = useState(false);
-  const [beadsWarning, setBeadsWarning] = useState<string | null>(null);
   const [setupSteps, setSetupSteps] = useState<SetupProgressEvent[]>([]);
   const [setupSessionName, setSetupSessionName] = useState<string | null>(null);
 
-  // Track if we've actually connected to a planning session in THIS dialog instance
-  // This prevents stale cache from incorrectly triggering 'complete' state
+  // Track if we've actually connected to a planning session in THIS dialog instance.
   const hasConnectedToSession = useRef(false);
   const queryClient = useQueryClient();
   const confirm = useConfirm();
@@ -322,11 +319,11 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['issues'] });
       if (data?.beadsWarning) {
-        setBeadsWarning(data.beadsWarning);
         toast.warning(data.beadsWarning, { duration: 10000 });
       }
-      setStep('complete');
       onTerminalReleased?.();
+      onComplete();
+      onClose();
     },
     onError: (err: Error) => {
       console.error('Stop planning failed:', err);
@@ -355,63 +352,6 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     },
     onError: (err: Error) => {
       setError(err.message);
-    },
-  });
-
-  const acknowledgeGuardrailWarnings = useCallback(async (data: StartAgentResponse | undefined) => {
-    const warnings = data?.guardrails?.warnings ?? [];
-    if (warnings.length === 0) return false;
-    if (!data?.requiresAcknowledgement) return true;
-    return confirm({
-      title: 'Start agent with warnings?',
-      message: warnings.map((warning) => `• ${warning.message}`).join('\n'),
-      variant: 'destructive',
-      confirmLabel: 'Start anyway',
-    });
-  }, [confirm]);
-
-  // Start agent mutation - spawns work agent and updates status to "In Progress"
-  const startAgentMutation = useMutation({
-    mutationFn: async () => {
-      const requestBody = { issueId: issue.identifier, phase: 'implementation' };
-      let lastRequestBody: Record<string, unknown> = requestBody;
-      let res = await fetch('/api/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(lastRequestBody),
-      });
-      let data = await res.json().catch(() => ({})) as StartAgentResponse;
-      if (res.status === 409 && data.requiresAcknowledgement) {
-        const confirmed = await acknowledgeGuardrailWarnings(data);
-        if (!confirmed) throw new Error('Agent start canceled');
-        lastRequestBody = { ...requestBody, guardrailAcknowledged: true };
-        res = await fetch('/api/agents', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(lastRequestBody),
-        });
-        data = await res.json().catch(() => ({})) as StartAgentResponse;
-      }
-      if (!res.ok) {
-        if (isCodexBlockedResponse(res, data)) {
-          setPendingCodexSpawn(lastRequestBody);
-          throw new Error(data.hint || data.error || 'Codex authentication expired — re-authenticate to continue');
-        }
-        throw new Error(data.error || data.hint || 'Failed to start agent');
-      }
-      return data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['agents'] });
-      queryClient.invalidateQueries({ queryKey: ['issues'] });
-      if (data.guardrails?.warnings?.length) {
-        toast.success('Agent started after acknowledging system health warnings.', { duration: 6000 });
-      }
-      onComplete();
-      onClose();
-    },
-    onError: (err: Error) => {
-      setError(`Failed to start agent: ${err.message}`);
     },
   });
 
@@ -446,7 +386,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
       hasConnectedToSession.current = false;
       queryClient.invalidateQueries({ queryKey: ['planningStatus', issue.identifier] });
     } else {
-      // Dialog is opening - invalidate stale cache to prevent false 'complete' transitions
+      // Dialog is opening - invalidate stale cache before checking session status
       queryClient.invalidateQueries({ queryKey: ['planningStatus', issue.identifier] });
       hasConnectedToSession.current = false;
     }
@@ -466,12 +406,8 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
             if (data.sessionName) setSetupSessionName(data.sessionName);
             hasConnectedToSession.current = true;
             setStep('planning');
-          } else if (data.planningCompleted) {
-            // Planning was done but not marked complete - go directly to complete step
-            // This allows user to click "Done Planning" without restarting
-            setStep('complete');
           } else {
-            // No active session and no completed planning - show ready step
+            // No active session - show the planning dialog so the user can resume or start.
             setStep('ready');
           }
         })
@@ -482,12 +418,10 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     }
   }, [isOpen, issue.identifier, step]);
 
-  // DELIBERATE: No automatic transition to 'complete' based on session status.
+  // DELIBERATE: No automatic completion screen based on session status.
   // Previous attempts to auto-detect session ending via polling caused persistent
-  // premature 'complete' transitions due to stale cache, Docker network disruption
-  // (PAN-207), and PTY disconnect race conditions. The ONLY paths to 'complete' are:
-  // 1. User clicks "Done" button → stopPlanningMutation.onSuccess
-  // 2. Initial check finds completed planning state → step set in checking effect
+  // premature transitions due to stale cache, Docker network disruption
+  // (PAN-207), and PTY disconnect race conditions.
 
   const handleStartPlanning = () => {
     startPlanningViaSSE();
@@ -513,11 +447,6 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     }
   };
 
-  const handleComplete = () => {
-    // Spawn the work agent - this also updates status to "In Progress"
-    startAgentMutation.mutate();
-  };
-
   // Watch for planning failures via domain events (applied to store by EventRouter).
   // When the store sequence advances, check planning status via REST.
   const storeSequence = useDashboardStore((s) => s.sequence);
@@ -541,33 +470,12 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   const centeredX = position.x === -1 ? (window.innerWidth - size.width) / 2 : position.x;
   const centeredY = position.y === -1 ? (window.innerHeight - size.height) / 2 : position.y;
 
-  // Get PRD path based on workspace path
-  const getPrdPath = () => {
-    const workspacePath = result?.workspace?.path || statusQuery.data?.workspacePath;
-    if (!workspacePath) return null;
-    return `${workspacePath}/docs/${issue.identifier}-plan.md`;
-  };
-
   // When minimized, only render the floating bar (no full-screen wrapper)
   if (minimized) {
     return (
       <div
         className="fixed bottom-4 right-4 z-50 bg-card rounded-lg shadow-2xl border border-border px-4 py-2 flex items-center gap-3 cursor-pointer hover:bg-popover transition-colors"
-        onClick={async () => {
-          // Recheck session status when unminimizing — recover to planning
-          // if session is still active but step was prematurely set to 'complete'
-          if (step === 'complete') {
-            try {
-              const res = await fetch(`/api/planning/${issue.identifier}/status`);
-              const data = await res.json();
-              if (data.active) {
-                hasConnectedToSession.current = true;
-                setStep('planning');
-              }
-            } catch {}
-          }
-          setMinimized(false);
-        }}
+        onClick={() => setMinimized(false)}
       >
         <div className="w-6 h-6 rounded bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
           <Sparkles className="w-3 h-3 text-foreground" />
@@ -588,9 +496,6 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
               <span className="px-1.5 py-0.5 bg-muted text-muted-foreground text-xs rounded">Local</span>
             )}
           </>
-        )}
-        {step === 'complete' && (
-          <span className="px-1.5 py-0.5 badge-bg-success text-success-foreground text-xs rounded">Done</span>
         )}
       </div>
     );
@@ -1051,82 +956,6 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                     </div>
                   </div>
                 </>
-              )}
-
-              {/* Complete step */}
-              {step === 'complete' && (
-                <div className="flex-1 flex flex-col overflow-hidden">
-                  {/* Scrollable content area */}
-                  <div className="flex-1 overflow-y-auto p-8 flex flex-col items-center">
-                    <div className="w-16 h-16 rounded-full badge-bg-success flex items-center justify-center mb-4">
-                      <CheckCircle2 className="w-10 h-10 text-success" />
-                    </div>
-                    <h3 className="text-xl font-semibold text-foreground mb-2">Planning Complete</h3>
-                    <p className="text-muted-foreground text-center max-w-md mb-6">
-                      The planning session has ended. Review the plan and start the execution agent.
-                    </p>
-
-                    {/* Beads warning — shown when beads creation failed during planning */}
-                    {beadsWarning && (
-                      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-6 max-w-md w-full">
-                        <div className="flex items-start gap-3">
-                          <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5 shrink-0" />
-                          <p className="text-sm text-yellow-300">{beadsWarning}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* PRD Link */}
-                    {getPrdPath() && (
-                      <div className="badge-bg-signal-review border badge-border-signal-review rounded-lg p-4 mb-6 max-w-md w-full">
-                        <div className="flex items-center gap-3">
-                          <FileText className="w-8 h-8 text-signal-review" />
-                          <div className="flex-1">
-                            <p className="text-sm text-foreground font-medium">Feature Plan</p>
-                            <p className="text-xs text-muted-foreground font-mono truncate">{getPrdPath()}</p>
-                          </div>
-                          <a
-                            href={`vscode://file${getPrdPath()}`}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-signal-review hover:bg-signal-review/90 text-signal-review-foreground text-sm rounded-lg transition-colors"
-                            title="Open in VS Code"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                            Open
-                          </a>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Tasks Panel - inline vBRIEF view */}
-                    <div className="w-full max-w-2xl mb-6 max-h-64 overflow-auto rounded-lg border border-border">
-                      <BeadsTasksPanel issueId={issue.identifier} />
-                    </div>
-
-                  </div>
-
-                  {/* Pinned footer with action buttons */}
-                  <div className="border-t border-border px-8 py-4 flex justify-center gap-3 bg-card">
-                    <button
-                      onClick={onClose}
-                      disabled={startAgentMutation.isPending}
-                      className="px-4 py-2 bg-popover hover:bg-card text-foreground rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      Close
-                    </button>
-                    <button
-                      onClick={handleComplete}
-                      disabled={startAgentMutation.isPending}
-                      className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      {startAgentMutation.isPending ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <Play className="w-5 h-5" />
-                      )}
-                      {startAgentMutation.isPending ? 'Starting Agent...' : 'Start Agent'}
-                    </button>
-                  </div>
-                </div>
               )}
 
               {/* Error step */}
