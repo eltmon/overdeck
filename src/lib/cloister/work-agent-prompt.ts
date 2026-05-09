@@ -1,11 +1,13 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
+import { readFile } from 'fs/promises';
 import { join, dirname } from 'path';
-import type { ContinueFeedbackEntry } from '../vbrief/continue-state.js';
+import { PAN_DIRNAME } from '../pan-dir/types.js';
+import { readContinueStateAsync, type ContinueFeedbackEntry } from '../vbrief/continue-state.js';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeam } from '../projects.js';
 import { getWorkspacePanPaths, readWorkspaceContext, readFeedback, readWorkspaceContinue, writeWorkspaceContext } from '../pan-dir/index.js';
 import { findPlan, readWorkspacePlan, readPlan } from '../vbrief/io.js';
-import { createActiveSlice, getDispatchableItems, verifyActiveSlicePromptReduction } from '../vbrief/dag.js';
+import { createActiveSlice, getDispatchableItems, workspacePlanPath } from '../vbrief/dag.js';
 import { extractACFromDocument } from '../vbrief/acceptance-criteria.js';
 import { loadConfig } from '../config.js';
 import { createTrackerFromConfig } from '../tracker/factory.js';
@@ -45,7 +47,7 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       stitchDesignsStr = stitchDesigns;
     }
 
-    const activeSliceContext = buildActiveSliceContext(ctx.workspacePath, ctx.issueId);
+    const activeSliceContext = await buildActiveSliceContext(ctx.workspacePath, ctx.issueId);
     if (activeSliceContext) {
       featureContextStr = activeSliceContext;
     } else if (featureContext) {
@@ -76,20 +78,38 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
 }
 
 
-function buildActiveSliceContext(workspacePath: string, issueId: string): string {
+async function readWorkspacePlanAsync(workspacePath: string): Promise<ReturnType<typeof readWorkspacePlan>> {
+  const planPath = workspacePlanPath(workspacePath);
+  if (!existsSync(planPath)) return null;
+  const raw = await readFile(planPath, 'utf-8');
+  if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
+    return null;
+  }
+  return JSON.parse(raw) as NonNullable<ReturnType<typeof readWorkspacePlan>>;
+}
+
+async function buildActiveSliceContext(workspacePath: string, issueId: string): Promise<string> {
   try {
-    const doc = readWorkspacePlan(workspacePath);
+    const doc = await readWorkspacePlanAsync(workspacePath);
     if (!doc) return '';
-    const nextItem = getDispatchableItems(doc, new Set())[0];
+    const nextItem = getDispatchableItems(doc, new Set())[0]
+      ?? doc.plan.items.find(item => item.status === 'running')
+      ?? doc.plan.items.find(item => item.status !== 'completed' && item.status !== 'cancelled' && item.status !== 'blocked');
     if (!nextItem) return '';
-    const slice = createActiveSlice(doc, { issueId: issueId.toUpperCase(), itemId: nextItem.id });
-    const measurement = verifyActiveSlicePromptReduction(doc, slice);
+    const cont = await readContinueStateAsync(join(workspacePath, PAN_DIRNAME), issueId.toUpperCase());
+    const currentItemIds = doc.plan.items
+      .filter(item => item.status === 'running' || item.id === nextItem.id)
+      .map(item => item.id);
+    const slice = createActiveSlice(doc, {
+      issueId: issueId.toUpperCase(),
+      itemId: nextItem.id,
+      currentItemIds,
+      synthesisOutputs: cont?.swarmRuntime?.synthesisOutputs,
+    });
     return [
       '## Active vBRIEF Slice (Canonical Task Graph)',
       '',
       slice.prompt,
-      '',
-      `Prompt-size check: active slice ${measurement.activeSliceBytes} bytes vs full plan ${measurement.fullPlanBytes} bytes (${Math.round(measurement.reductionRatio * 100)}%).`,
       '',
       '_vBRIEF is the canonical task authority during PAN-977 migration; Beads remain a compatibility mirror._',
     ].join('\n');

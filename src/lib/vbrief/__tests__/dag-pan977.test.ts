@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { getDispatchableItems, blockingParentCount, hasFileOverlap, createActiveSlice, applyTaskOperation, applyTaskOperationToPlanFile, runTaskCommand, getPipelineMirror, setPipelineMirror, getTaskGraphView, activeSlicePromptSize, verifyActiveSlicePromptReduction } from '../dag.js';
+import { getDispatchableItems, blockingParentCount, hasFileOverlap, createActiveSlice, applyTaskOperation, applyTaskOperationToPlanFile, runTaskCommand, getPipelineMirror, setPipelineMirror, getTaskGraphView, activeSlicePromptSize, verifyActiveSlicePromptReduction, buildPipelineMirrorFromStatus, writePipelineMirrorToPlanFile } from '../dag.js';
 import type { VBriefDocument, VBriefItem } from '../types.js';
 
 function makeDoc(
@@ -98,6 +98,7 @@ describe('getDispatchableItems', () => {
     const doc = makeDoc([{ id: 'a', status: 'blocked' }, { id: 'b' }], []);
     expect(getDispatchableItems(doc, new Set()).map(i => i.id)).toEqual(['b']);
     expect(getTaskGraphView(doc).next.map(i => i.id)).toEqual(['b']);
+    expect(getTaskGraphView(doc).waves.flatMap(w => w.items.map(i => i.id))).toEqual(['b']);
 
     const unblocked = applyTaskOperation(doc, { type: 'unblock', itemId: 'a' }).doc;
     expect(getDispatchableItems(unblocked, new Set()).map(i => i.id)).toEqual(expect.arrayContaining(['a', 'b']));
@@ -226,6 +227,10 @@ describe('active slices and task operations', () => {
       [{ from: 'a', to: 'b' }],
     );
     doc.plan.sequence = 7;
+    doc.plan.narratives = { Problem: 'Finish PAN-977', Constraint: 'No sync server I/O' };
+    doc.plan.items.push({ id: 'c', title: 'c', status: 'pending' as any, metadata: { phase: 1 } });
+    doc.plan.items[1]!.metadata = { phase: 1 };
+    doc.plan.edges.push({ from: 'b', to: 'c', type: 'blocks' as any });
     doc.plan.items[1]!.subItems = [{ id: 'ac-1', title: 'Works', status: 'pending' }];
     const slice = createActiveSlice(doc, {
       issueId: 'PAN-977',
@@ -234,8 +239,15 @@ describe('active slices and task operations', () => {
     });
 
     expect(slice.planSequence).toBe(7);
+    expect(slice.planTitle).toBe('Test Plan');
+    expect(slice.objective).toBe('Finish PAN-977');
+    expect(slice.globalConstraints).toEqual(['No sync server I/O']);
     expect(slice.dependencies.map(i => i.id)).toEqual(['a']);
+    expect(slice.blockers.map(i => i.id)).toEqual(['a']);
+    expect(slice.unlocks.map(i => i.id)).toEqual(['c']);
+    expect(slice.currentWorkSet.map(i => i.id)).toContain('b');
     expect(slice.acceptanceCriteria.map(i => i.id)).toEqual(['ac-1']);
+    expect(slice.prompt).toContain('## Direct Unlocks / Dependents');
     expect(slice.prompt).toContain('A changed API shape');
     expect(activeSlicePromptSize(slice)).toBeLessThan(8 * 1024);
   });
@@ -260,8 +272,20 @@ describe('active slices and task operations', () => {
 
   it('stores and reads pipeline mirror state in plan metadata', () => {
     const doc = makeDoc([{ id: 'a' }], []);
-    setPipelineMirror(doc, { issueId: 'PAN-977', reviewStatus: 'pending', updatedAt: '2026-01-01T00:00:00Z' });
-    expect(getPipelineMirror(doc)?.reviewStatus).toBe('pending');
+    const mirror = buildPipelineMirrorFromStatus('PAN-977', {
+      reviewStatus: 'CHANGES_REQUESTED',
+      reviewAgentId: 'review-agent',
+      testStatus: 'pending',
+      readyForMerge: false,
+      prUrl: 'https://github.com/example/repo/pull/1',
+    }, '2026-01-01T00:00:00Z');
+    setPipelineMirror(doc, mirror as any);
+    const stored = getPipelineMirror(doc) as any;
+    expect(stored.phase).toBe('test');
+    expect(stored.review.approval).toBe('changes_requested');
+    expect(stored.review.agentId).toBe('review-agent');
+    expect(stored.merge.prUrl).toBe('https://github.com/example/repo/pull/1');
+    expect(stored.review.history[0].status).toBe('CHANGES_REQUESTED');
   });
 
   it('exposes a vBRIEF-first task graph view instead of consulting Beads', () => {
@@ -315,17 +339,43 @@ describe('persisted task authority', () => {
     expect((runTaskCommand('next', { issueId: 'PAN-977', workspacePath: dir }) as VBriefItem[])).toHaveLength(0);
   });
 
-  it('verifies active-slice prompt stays much smaller than a large plan', () => {
-    const many = Array.from({ length: 250 }, (_, idx) => ({ id: `item-${idx}`, status: idx === 0 ? 'pending' : 'blocked' }));
-    const doc = makeDoc(many, []);
+  it('rejects invalid runtime task commands without mutating the plan', () => {
+    const doc = makeDoc([{ id: 'task-a' }], []);
     doc.plan.id = 'PAN-977';
+    doc.plan.sequence = 1;
+    const planPath = writeDoc(doc);
+    const before = readFileSync(planPath, 'utf-8');
+
+    expect(() => runTaskCommand('explode' as any, { issueId: 'PAN-977', workspacePath: dir, itemId: 'task-a', writerId: 'writer-1' })).toThrow(/Unsupported vBRIEF task command/);
+    expect(readFileSync(planPath, 'utf-8')).toBe(before);
+    expect(() => applyTaskOperation(doc, { type: 'explode' as any, itemId: 'task-a' })).toThrow(/Unsupported vBRIEF task operation/);
+  });
+
+  it('releases writer locks after task and pipeline writes', () => {
+    const doc = makeDoc([{ id: 'PAN-977-a' }], []);
+    doc.plan.id = 'PAN-977';
+    doc.plan.sequence = 1;
+    const planPath = writeDoc(doc);
+
+    applyTaskOperationToPlanFile(planPath, { type: 'claim', itemId: 'PAN-977-a', expectedSequence: 1, writerId: 'writer-a' });
+    applyTaskOperationToPlanFile(planPath, { type: 'done', itemId: 'PAN-977-a', expectedSequence: 2, writerId: 'writer-b' });
+    const mirror = buildPipelineMirrorFromStatus('PAN-977', { reviewStatus: 'passed' }, '2026-01-01T00:00:00Z');
+    expect(writePipelineMirrorToPlanFile(planPath, mirror, 'writer-c')).not.toBeNull();
+  });
+
+  it('verifies active-slice prompt stays much smaller than a pan-705-shaped outlier plan', () => {
+    const many = Array.from({ length: 705 }, (_, idx) => ({ id: `pan-705-item-${idx}`, status: idx === 0 ? 'pending' : 'blocked' }));
+    const doc = makeDoc(many, []);
+    doc.plan.id = 'PAN-705';
+    doc.plan.title = 'PAN-705 Outlier Plan Fixture';
     for (const item of doc.plan.items) {
       item.narrative = { Action: 'x'.repeat(500) };
       item.subItems = Array.from({ length: 5 }, (_, i) => ({ id: `${item.id}.ac${i}`, title: 'y'.repeat(120), status: 'pending' as any }));
     }
-    const slice = createActiveSlice(doc, { issueId: 'PAN-977', itemId: 'item-0' });
+    const slice = createActiveSlice(doc, { issueId: 'PAN-705', itemId: 'pan-705-item-0' });
     const check = verifyActiveSlicePromptReduction(doc, slice);
-    expect(check.fullPlanBytes).toBeGreaterThan(300_000);
-    expect(check.reductionRatio).toBeLessThan(0.05);
+    expect(slice.prompt).toContain('PAN-705 Outlier Plan Fixture');
+    expect(check.fullPlanBytes).toBeGreaterThan(800_000);
+    expect(check.reductionRatio).toBeLessThan(0.02);
   });
 });

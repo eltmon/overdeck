@@ -92,6 +92,13 @@ echo "Completed: ${COMPLETED:-NO}"
 REVIEW_STATUS=$(curl -s http://localhost:3011/api/review/$ISSUE_ID/status 2>/dev/null)
 echo "Review status: $REVIEW_STATUS"
 
+# 6b. Branch-portable vBRIEF pipeline mirror (corroborating, not authoritative)
+PIPELINE_MIRROR=""
+if [ -n "$WS_PATH" ] && [ -f "$WS_PATH/.pan/spec.vbrief.json" ]; then
+  PIPELINE_MIRROR=$(jq -c '.plan.metadata.pipeline // empty' "$WS_PATH/.pan/spec.vbrief.json" 2>/dev/null)
+fi
+echo "vBRIEF pipeline mirror: ${PIPELINE_MIRROR:-NONE}"
+
 # 7. Specialist activity?
 SPECIALISTS=$(curl -s http://localhost:3011/api/specialists 2>/dev/null)
 echo "Specialists: $SPECIALISTS"
@@ -99,7 +106,7 @@ echo "Specialists: $SPECIALISTS"
 
 ### Phase Decision Matrix
 
-Based on the checks above, determine the current phase:
+Based on the checks above, determine the current phase. Treat `REVIEW_STATUS` and other live SQLite-backed API status as authoritative; use the branch-portable vBRIEF `plan.metadata.pipeline` mirror as a corroborating signal when API status is missing, stale, or ambiguous. If the mirror disagrees with the API, log a bug and prefer the API.
 
 | Condition | Current Phase | Jump To |
 |-----------|--------------|---------|

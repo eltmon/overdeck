@@ -2,8 +2,8 @@
  * vBRIEF DAG utilities — critical path, graph analysis, wave scheduling, per-item dispatch
  */
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
-import { mkdir, readFile, rename, writeFile } from 'fs/promises';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs';
+import { mkdir, readFile, rename, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import type { VBriefDocument, VBriefItem, VBriefItemStatus } from './types.js';
 
@@ -31,7 +31,7 @@ export interface Wave {
  * can execute in parallel.
  */
 export function groupItemsByWave(doc: VBriefDocument): Wave[] {
-  const skipStatuses = new Set(['completed', 'cancelled']);
+  const skipStatuses = new Set(['completed', 'cancelled', 'blocked']);
   const actionable = doc.plan.items.filter(i => !skipStatuses.has(i.status));
   if (actionable.length === 0) return [];
 
@@ -324,15 +324,25 @@ export function hasFileOverlap(runningItems: VBriefItem[], candidate: VBriefItem
 }
 
 
-/** Active-slice prompt contract for a single work item. */
+/** Active-slice prompt contract for bounded work-agent context. */
 export interface ActiveSlice {
   issueId: string;
   planId: string;
+  planTitle: string;
   planSequence: number;
+  objective?: string;
+  globalConstraints: string[];
   item: VBriefItem;
-  /** Blocking parent items that have already completed/merged and should inform this item. */
+  currentWorkSet: VBriefItem[];
+  /** Direct blocking parent items, regardless of status. */
+  blockers: VBriefItem[];
+  /** Resolved direct blocking parents that should inform this item. */
   dependencies: VBriefItem[];
-  /** Direct child acceptance criteria/subItems for the item, copied for prompt-size boundedness. */
+  /** Direct child items this work unlocks after completion. */
+  unlocks: VBriefItem[];
+  /** Nearby items connected by non-blocking context edges or shared phase. */
+  nearbyContext: VBriefItem[];
+  /** Direct child acceptance criteria/subItems for prompt-size boundedness. */
   acceptanceCriteria: NonNullable<VBriefItem['subItems']>;
   /** Synthesis context for DAG convergence points, when available. */
   synthesisContext?: string;
@@ -343,6 +353,7 @@ export interface ActiveSlice {
 export interface ActiveSliceOptions {
   issueId: string;
   itemId: string;
+  currentItemIds?: string[];
   synthesisOutputs?: Record<string, { contextUpdate: string }>;
 }
 
@@ -354,33 +365,99 @@ function directBlockingParents(doc: VBriefDocument, itemId: string): VBriefItem[
     .filter((item): item is VBriefItem => Boolean(item));
 }
 
+function directUnlocks(doc: VBriefDocument, itemId: string): VBriefItem[] {
+  const itemById = new Map(doc.plan.items.map(i => [i.id, i]));
+  return doc.plan.edges
+    .filter(e => e.type === 'blocks' && e.from === itemId)
+    .map(e => itemById.get(e.to))
+    .filter((item): item is VBriefItem => Boolean(item));
+}
+
+function nearbyItems(doc: VBriefDocument, item: VBriefItem, excludedIds: Set<string>): VBriefItem[] {
+  const itemById = new Map(doc.plan.items.map(i => [i.id, i]));
+  const nearby = new Map<string, VBriefItem>();
+  for (const edge of doc.plan.edges) {
+    if (edge.type === 'blocks') continue;
+    if (edge.from === item.id) {
+      const candidate = itemById.get(edge.to);
+      if (candidate && !excludedIds.has(candidate.id)) nearby.set(candidate.id, candidate);
+    }
+    if (edge.to === item.id) {
+      const candidate = itemById.get(edge.from);
+      if (candidate && !excludedIds.has(candidate.id)) nearby.set(candidate.id, candidate);
+    }
+  }
+  const phase = item.metadata?.phase;
+  if (phase !== undefined) {
+    for (const candidate of doc.plan.items) {
+      if (nearby.size >= 5) break;
+      if (candidate.id !== item.id && candidate.metadata?.phase === phase && !excludedIds.has(candidate.id)) {
+        nearby.set(candidate.id, candidate);
+      }
+    }
+  }
+  return Array.from(nearby.values()).slice(0, 5);
+}
+
+function renderItemLine(item: VBriefItem): string {
+  const phase = item.metadata?.phase !== undefined ? ` phase=${item.metadata.phase}` : '';
+  const difficulty = item.metadata?.difficulty ? ` difficulty=${item.metadata.difficulty}` : '';
+  return `- ${item.id}: ${item.title} [${item.status}]${phase}${difficulty}`;
+}
+
 /**
- * Build the bounded "active slice" that work-agent prompts should receive by
- * default instead of the full vBRIEF. The slice contains only the target item,
- * its direct resolved dependencies, its acceptance criteria, and optional
- * synthesis output for convergence points.
+ * Build the bounded active slice that work-agent prompts should receive by
+ * default instead of the full vBRIEF. The slice includes the target/current work
+ * set, direct blockers, unlocks, nearby context, global constraints, acceptance
+ * criteria, and optional persisted synthesis output for convergence points.
  */
 export function createActiveSlice(doc: VBriefDocument, options: ActiveSliceOptions): ActiveSlice {
   const item = doc.plan.items.find(i => i.id === options.itemId);
   if (!item) throw new Error(`Plan item not found: ${options.itemId}`);
-  const dependencies = directBlockingParents(doc, item.id);
+  const currentIds = Array.from(new Set([...(options.currentItemIds ?? []), item.id]));
+  const currentWorkSet = currentIds
+    .map(id => doc.plan.items.find(i => i.id === id))
+    .filter((candidate): candidate is VBriefItem => Boolean(candidate));
+  const blockers = directBlockingParents(doc, item.id);
+  const resolvedStatuses = new Set(['completed', 'cancelled']);
+  const dependencies = blockers.filter(parent => resolvedStatuses.has(parent.status));
+  const unlocks = directUnlocks(doc, item.id);
+  const excludedIds = new Set([item.id, ...currentWorkSet.map(i => i.id), ...blockers.map(i => i.id), ...unlocks.map(i => i.id)]);
+  const nearbyContext = nearbyItems(doc, item, excludedIds);
   const acceptanceCriteria = item.subItems ?? [];
   const synthesisContext = options.synthesisOutputs?.[item.id]?.contextUpdate;
+  const globalConstraints = [doc.plan.narratives?.Constraint, doc.plan.narratives?.Risk]
+    .filter((value): value is string => Boolean(value));
+  const objective = doc.plan.narratives?.Problem ?? doc.plan.narratives?.Proposal ?? doc.vBRIEFInfo.description;
   const prompt = renderActiveSlicePrompt({
     issueId: options.issueId,
     planId: doc.plan.id,
+    planTitle: doc.plan.title,
     planSequence: doc.plan.sequence ?? 0,
+    objective,
+    globalConstraints,
     item,
+    currentWorkSet,
+    blockers,
     dependencies,
+    unlocks,
+    nearbyContext,
     acceptanceCriteria,
     synthesisContext,
   });
   return {
     issueId: options.issueId,
     planId: doc.plan.id,
+    planTitle: doc.plan.title,
     planSequence: doc.plan.sequence ?? 0,
+    objective,
+    globalConstraints,
     item,
+    currentWorkSet,
+    blockers,
     dependencies,
+    unlocks,
+    nearbyContext,
     acceptanceCriteria,
     synthesisContext,
     prompt,
@@ -390,15 +467,28 @@ export function createActiveSlice(doc: VBriefDocument, options: ActiveSliceOptio
 export function renderActiveSlicePrompt(slice: Omit<ActiveSlice, 'prompt'>): string {
   const lines = [
     `# Active vBRIEF Slice: ${slice.issueId}`,
-    `Plan: ${slice.planId} @ sequence ${slice.planSequence}`,
-    ``,
-    `## Target Item`,
-    `- ${slice.item.id}: ${slice.item.title} [${slice.item.status}]`,
+    `Plan: ${slice.planTitle} (${slice.planId}) @ sequence ${slice.planSequence}`,
   ];
+  if (slice.objective) lines.push(``, `## Issue Objective`, slice.objective);
+  if (slice.globalConstraints.length > 0) lines.push(``, `## Global Constraints`, ...slice.globalConstraints.map(c => `- ${c}`));
+  lines.push(``, `## Current Work Set`, ...slice.currentWorkSet.map(renderItemLine));
+  lines.push(``, `## Target Item`, renderItemLine(slice.item));
   if (slice.item.narrative?.Action) lines.push(`- Action: ${slice.item.narrative.Action}`);
+  if (slice.blockers.length > 0) {
+    lines.push(``, `## Direct Blockers`);
+    for (const dep of slice.blockers) lines.push(renderItemLine(dep));
+  }
   if (slice.dependencies.length > 0) {
     lines.push(``, `## Resolved Dependencies`);
-    for (const dep of slice.dependencies) lines.push(`- ${dep.id}: ${dep.title} [${dep.status}]`);
+    for (const dep of slice.dependencies) lines.push(renderItemLine(dep));
+  }
+  if (slice.unlocks.length > 0) {
+    lines.push(``, `## Direct Unlocks / Dependents`);
+    for (const unlock of slice.unlocks) lines.push(renderItemLine(unlock));
+  }
+  if (slice.nearbyContext.length > 0) {
+    lines.push(``, `## Nearby Context`);
+    for (const nearby of slice.nearbyContext) lines.push(renderItemLine(nearby));
   }
   if (slice.acceptanceCriteria.length > 0) {
     lines.push(``, `## Acceptance Criteria`);
@@ -424,6 +514,17 @@ export interface TaskOperationResult {
   item: VBriefItem;
 }
 
+const TASK_OPERATION_TYPES = new Set<string>(['claim', 'done', 'block', 'unblock', 'cancel']);
+const TASK_COMMANDS = new Set<string>(['next', 'show', ...TASK_OPERATION_TYPES]);
+
+export function isTaskOperationType(value: string): value is TaskOperationType {
+  return TASK_OPERATION_TYPES.has(value);
+}
+
+export function isTaskCommand(value: string): value is TaskCommand {
+  return TASK_COMMANDS.has(value);
+}
+
 function statusForOperation(type: TaskOperationType): VBriefItemStatus {
   switch (type) {
     case 'claim': return 'running';
@@ -431,6 +532,10 @@ function statusForOperation(type: TaskOperationType): VBriefItemStatus {
     case 'block': return 'blocked';
     case 'unblock': return 'pending';
     case 'cancel': return 'cancelled';
+    default: {
+      const exhaustive: never = type;
+      throw new Error(`Unsupported vBRIEF task operation: ${String(exhaustive)}`);
+    }
   }
 }
 
@@ -444,6 +549,9 @@ function cloneDoc(doc: VBriefDocument): VBriefDocument {
  * migration, but the plan document wins and receives the sequence bump.
  */
 export function applyTaskOperation(doc: VBriefDocument, operation: TaskOperation): TaskOperationResult {
+  if (!isTaskOperationType(String(operation.type))) {
+    throw new Error(`Unsupported vBRIEF task operation: ${String(operation.type)}`);
+  }
   const currentSequence = doc.plan.sequence ?? 0;
   if (operation.expectedSequence !== undefined && operation.expectedSequence !== currentSequence) {
     throw new Error(`vBRIEF sequence conflict: expected ${operation.expectedSequence}, found ${currentSequence}`);
@@ -527,16 +635,64 @@ export interface PersistedTaskOperation extends TaskOperation {
 
 const activePlanWriters = new Map<string, string>();
 
+function lockPathForPlan(planPath: string): string {
+  return `${planPath}.writer.lock`;
+}
+
+function lockOwnerPath(planPath: string): string {
+  return join(lockPathForPlan(planPath), 'owner.json');
+}
+
 function assertSingleWriter(planPath: string, writerId: string): void {
   const owner = activePlanWriters.get(planPath);
   if (owner && owner !== writerId) {
     throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${owner} already owns the worktree`);
+  }
+  const lockPath = lockPathForPlan(planPath);
+  try {
+    mkdirSync(lockPath, { mode: 0o700 });
+    writeFileSync(lockOwnerPath(planPath), JSON.stringify({ writerId, pid: process.pid, acquiredAt: new Date().toISOString() }, null, 2), 'utf-8');
+  } catch (err: any) {
+    if (err?.code !== 'EEXIST') throw err;
+    let lockOwner = 'unknown writer';
+    try {
+      const ownerData = JSON.parse(readFileSync(lockOwnerPath(planPath), 'utf-8')) as { writerId?: string; pid?: number; acquiredAt?: string };
+      lockOwner = `${ownerData.writerId ?? 'unknown writer'} pid=${ownerData.pid ?? 'unknown'} acquiredAt=${ownerData.acquiredAt ?? 'unknown'}`;
+    } catch { /* ignore malformed owner file */ }
+    throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${lockOwner} already owns the worktree`);
+  }
+  activePlanWriters.set(planPath, writerId);
+}
+
+async function assertSingleWriterAsync(planPath: string, writerId: string): Promise<void> {
+  const owner = activePlanWriters.get(planPath);
+  if (owner && owner !== writerId) {
+    throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${owner} already owns the worktree`);
+  }
+  const lockPath = lockPathForPlan(planPath);
+  try {
+    await mkdir(lockPath, { mode: 0o700 });
+    await writeFile(lockOwnerPath(planPath), JSON.stringify({ writerId, pid: process.pid, acquiredAt: new Date().toISOString() }, null, 2), 'utf-8');
+  } catch (err: any) {
+    if (err?.code !== 'EEXIST') throw err;
+    let lockOwner = 'unknown writer';
+    try {
+      const ownerData = JSON.parse(await readFile(lockOwnerPath(planPath), 'utf-8')) as { writerId?: string; pid?: number; acquiredAt?: string };
+      lockOwner = `${ownerData.writerId ?? 'unknown writer'} pid=${ownerData.pid ?? 'unknown'} acquiredAt=${ownerData.acquiredAt ?? 'unknown'}`;
+    } catch { /* ignore malformed owner file */ }
+    throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${lockOwner} already owns the worktree`);
   }
   activePlanWriters.set(planPath, writerId);
 }
 
 export function releasePlanWriter(planPath: string, writerId: string): void {
   if (activePlanWriters.get(planPath) === writerId) activePlanWriters.delete(planPath);
+  rmSync(lockPathForPlan(planPath), { recursive: true, force: true });
+}
+
+async function releasePlanWriterAsync(planPath: string, writerId: string): Promise<void> {
+  if (activePlanWriters.get(planPath) === writerId) activePlanWriters.delete(planPath);
+  await rm(lockPathForPlan(planPath), { recursive: true, force: true });
 }
 
 export function workspacePlanPath(workspacePath: string): string {
@@ -573,19 +729,27 @@ async function writePlanFileAtomicAsync(planPath: string, doc: VBriefDocument): 
 export function applyTaskOperationToPlanFile(planPath: string, operation: PersistedTaskOperation): TaskOperationResult {
   if (!existsSync(planPath)) throw new Error(`vBRIEF plan not found: ${planPath}`);
   assertSingleWriter(planPath, operation.writerId);
-  const current = readPlanFile(planPath);
-  const result = applyTaskOperation(current, operation);
-  writePlanFileAtomic(planPath, result.doc);
-  return result;
+  try {
+    const current = readPlanFile(planPath);
+    const result = applyTaskOperation(current, operation);
+    writePlanFileAtomic(planPath, result.doc);
+    return result;
+  } finally {
+    releasePlanWriter(planPath, operation.writerId);
+  }
 }
 
 export async function applyTaskOperationToPlanFileAsync(planPath: string, operation: PersistedTaskOperation): Promise<TaskOperationResult> {
   if (!existsSync(planPath)) throw new Error(`vBRIEF plan not found: ${planPath}`);
-  assertSingleWriter(planPath, operation.writerId);
-  const current = readPlanFile(planPath);
-  const result = applyTaskOperation(current, operation);
-  await writePlanFileAtomicAsync(planPath, result.doc);
-  return result;
+  await assertSingleWriterAsync(planPath, operation.writerId);
+  try {
+    const current = await readPlanFileAsync(planPath);
+    const result = applyTaskOperation(current, operation);
+    await writePlanFileAtomicAsync(planPath, result.doc);
+    return result;
+  } finally {
+    await releasePlanWriterAsync(planPath, operation.writerId);
+  }
 }
 
 export type TaskCommand = 'next' | 'show' | TaskOperationType;
@@ -602,6 +766,9 @@ export interface TaskCommandOptions {
 
 /** CLI/API-facing vBRIEF task operations for next/show/claim/done/block/unblock/cancel. */
 export function runTaskCommand(command: TaskCommand, options: TaskCommandOptions): VBriefItem | VBriefItem[] | TaskOperationResult {
+  if (!isTaskCommand(String(command))) {
+    throw new Error(`Unsupported vBRIEF task command: ${String(command)}`);
+  }
   const planPath = workspacePlanPath(options.workspacePath);
   if (!existsSync(planPath)) throw new Error(`vBRIEF plan not found: ${planPath}`);
   const doc = readPlanFile(planPath);
@@ -623,53 +790,117 @@ export function runTaskCommand(command: TaskCommand, options: TaskCommandOptions
   });
 }
 
-export interface PlanPipelineMirrorStatus {
+export type PlanPipelinePhase = 'work' | 'review' | 'test' | 'uat' | 'merge' | 'done';
+
+export interface PlanPipelineHistoryEntry {
   status?: string;
+  at: string;
+  agentId?: string;
   notes?: string;
+}
+
+export interface PlanPipelineStageMirror {
+  status?: string;
+  agentId?: string;
+  startedAt?: string;
   updatedAt?: string;
+  completedAt?: string;
+  notes?: string;
+  history: PlanPipelineHistoryEntry[];
+}
+
+export interface PlanPipelineReviewMirror extends PlanPipelineStageMirror {
+  approval?: 'approved' | 'changes_requested' | 'pending';
+}
+
+export interface PlanPipelineMergeMirror extends PlanPipelineStageMirror {
+  readyForMerge?: boolean;
+  prUrl?: string;
+  mergeCommit?: string;
+  mergedAt?: string;
 }
 
 export interface NestedPlanPipelineMirror {
-  phase: 'phase-1-sqlite-authoritative';
+  phase: PlanPipelinePhase;
   issueId: string;
   sqliteAuthoritative: true;
   updatedAt: string;
-  verification?: PlanPipelineMirrorStatus;
-  review?: PlanPipelineMirrorStatus;
-  test?: PlanPipelineMirrorStatus;
-  uat?: PlanPipelineMirrorStatus;
-  merge?: PlanPipelineMirrorStatus;
-  readyForMerge?: boolean;
-  prUrl?: string;
+  work: PlanPipelineStageMirror;
+  review: PlanPipelineReviewMirror;
+  test: PlanPipelineStageMirror;
+  uat: PlanPipelineStageMirror;
+  merge: PlanPipelineMergeMirror;
+}
+
+function stageFromStatus(status: Record<string, unknown>, key: string, now: string): PlanPipelineStageMirror {
+  const stageStatus = status[`${key}Status`] as string | undefined;
+  const notes = status[`${key}Notes`] as string | undefined;
+  const agentId = (status[`${key}AgentId`] ?? status.agentId) as string | undefined;
+  const startedAt = status[`${key}StartedAt`] as string | undefined;
+  const completedAt = status[`${key}CompletedAt`] as string | undefined;
+  return {
+    status: stageStatus,
+    agentId,
+    startedAt,
+    updatedAt: now,
+    completedAt,
+    notes,
+    history: stageStatus ? [{ status: stageStatus, at: now, agentId, notes }] : [],
+  };
+}
+
+function inferPipelinePhase(status: Record<string, unknown>): PlanPipelinePhase {
+  if (status.mergeCommit || status.mergedAt || status.mergeStatus === 'merged') return 'done';
+  if (status.mergeStatus || status.readyForMerge) return 'merge';
+  if (status.uatStatus) return 'uat';
+  if (status.testStatus) return 'test';
+  if (status.reviewStatus) return 'review';
+  return 'work';
+}
+
+function reviewApproval(reviewStatus: unknown): PlanPipelineReviewMirror['approval'] {
+  if (reviewStatus === 'approved' || reviewStatus === 'APPROVED') return 'approved';
+  if (reviewStatus === 'changes_requested' || reviewStatus === 'CHANGES_REQUESTED') return 'changes_requested';
+  return reviewStatus ? 'pending' : undefined;
 }
 
 export function buildPipelineMirrorFromStatus(issueId: string, status: Record<string, unknown>, now = new Date().toISOString()): NestedPlanPipelineMirror {
+  const review = stageFromStatus(status, 'review', now) as PlanPipelineReviewMirror;
+  review.approval = reviewApproval(status.reviewStatus);
   return {
-    phase: 'phase-1-sqlite-authoritative',
+    phase: inferPipelinePhase(status),
     issueId: issueId.toUpperCase(),
     sqliteAuthoritative: true,
     updatedAt: now,
-    verification: { status: status.verificationStatus as string | undefined, notes: status.verificationNotes as string | undefined, updatedAt: now },
-    review: { status: status.reviewStatus as string | undefined, notes: status.reviewNotes as string | undefined, updatedAt: now },
-    test: { status: status.testStatus as string | undefined, notes: status.testNotes as string | undefined, updatedAt: now },
-    uat: { status: status.uatStatus as string | undefined, notes: status.uatNotes as string | undefined, updatedAt: now },
-    merge: { status: status.mergeStatus as string | undefined, notes: status.mergeNotes as string | undefined, updatedAt: now },
-    readyForMerge: status.readyForMerge as boolean | undefined,
-    prUrl: status.prUrl as string | undefined,
+    work: stageFromStatus(status, 'work', now),
+    review,
+    test: stageFromStatus(status, 'test', now),
+    uat: stageFromStatus(status, 'uat', now),
+    merge: {
+      ...stageFromStatus(status, 'merge', now),
+      readyForMerge: status.readyForMerge as boolean | undefined,
+      prUrl: status.prUrl as string | undefined,
+      mergeCommit: status.mergeCommit as string | undefined,
+      mergedAt: status.mergedAt as string | undefined,
+    },
   };
 }
 
 export function writePipelineMirrorToPlanFile(planPath: string, mirror: NestedPlanPipelineMirror, writerId = `pipeline-${process.pid}`): VBriefDocument | null {
   if (!existsSync(planPath)) return null;
   assertSingleWriter(planPath, writerId);
-  const doc = readPlanFile(planPath);
-  setPipelineMirror(doc, mirror as unknown as PlanPipelineMirror);
-  const now = new Date().toISOString();
-  doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
-  doc.plan.updated = now;
-  doc.vBRIEFInfo.updated = now;
-  writePlanFileAtomic(planPath, doc);
-  return doc;
+  try {
+    const doc = readPlanFile(planPath);
+    setPipelineMirror(doc, mirror as unknown as PlanPipelineMirror);
+    const now = new Date().toISOString();
+    doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
+    doc.plan.updated = now;
+    doc.vBRIEFInfo.updated = now;
+    writePlanFileAtomic(planPath, doc);
+    return doc;
+  } finally {
+    releasePlanWriter(planPath, writerId);
+  }
 }
 
 
@@ -679,15 +910,19 @@ async function readPlanFileAsync(planPath: string): Promise<VBriefDocument> {
 
 export async function writePipelineMirrorToPlanFileAsync(planPath: string, mirror: NestedPlanPipelineMirror, writerId = `pipeline-${process.pid}`): Promise<VBriefDocument | null> {
   if (!existsSync(planPath)) return null;
-  assertSingleWriter(planPath, writerId);
-  const doc = await readPlanFileAsync(planPath);
-  setPipelineMirror(doc, mirror as unknown as PlanPipelineMirror);
-  const now = new Date().toISOString();
-  doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
-  doc.plan.updated = now;
-  doc.vBRIEFInfo.updated = now;
-  await writePlanFileAtomicAsync(planPath, doc);
-  return doc;
+  await assertSingleWriterAsync(planPath, writerId);
+  try {
+    const doc = await readPlanFileAsync(planPath);
+    setPipelineMirror(doc, mirror as unknown as PlanPipelineMirror);
+    const now = new Date().toISOString();
+    doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
+    doc.plan.updated = now;
+    doc.vBRIEFInfo.updated = now;
+    await writePlanFileAtomicAsync(planPath, doc);
+    return doc;
+  } finally {
+    await releasePlanWriterAsync(planPath, writerId);
+  }
 }
 
 export interface PromptSizeVerification {

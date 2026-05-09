@@ -18,7 +18,7 @@ import { existsSync } from 'fs';
 import { getDashboardApiUrl } from '../../lib/config.js';
 import { resolveProjectFromIssue } from '../../lib/projects.js';
 import { readWorkspacePlan } from '../../lib/vbrief/io.js';
-import { groupItemsByWave, runTaskCommand, createActiveSlice, verifyActiveSlicePromptReduction, type Wave } from '../../lib/vbrief/dag.js';
+import { groupItemsByWave, runTaskCommand, createActiveSlice, verifyActiveSlicePromptReduction, isTaskCommand, type TaskCommand, type Wave } from '../../lib/vbrief/dag.js';
 
 const DASHBOARD_URL = getDashboardApiUrl();
 
@@ -31,6 +31,16 @@ function difficultyColor(d?: string): string {
     case 'expert': return chalk.magenta('expert');
     default: return chalk.dim('—');
   }
+}
+
+function parseFiniteInteger(value: string | undefined, optionName: string): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || !Number.isFinite(parsed)) {
+    console.error(chalk.red(`Invalid ${optionName}: ${value}`));
+    process.exit(1);
+  }
+  return parsed;
 }
 
 function printWavePlan(waves: Wave[], issueId: string): void {
@@ -59,6 +69,10 @@ export async function swarmCommand(
 ): Promise<void> {
   const issueId = id.toUpperCase();
 
+  parseFiniteInteger(options.wave, '--wave');
+  parseFiniteInteger(options.maxSlots, '--max-slots');
+  parseFiniteInteger(options.sequence, '--sequence');
+
   if (options.task) {
     return taskOperation(issueId, options);
   }
@@ -71,9 +85,11 @@ export async function swarmCommand(
 
   try {
     const body: Record<string, unknown> = { issueId };
-    if (options.wave !== undefined) body.wave = parseInt(options.wave, 10);
+    const wave = parseFiniteInteger(options.wave, '--wave');
+    const maxSlots = parseFiniteInteger(options.maxSlots, '--max-slots');
+    if (wave !== undefined) body.wave = wave;
     if (options.model) body.model = options.model;
-    if (options.maxSlots) body.maxSlots = parseInt(options.maxSlots, 10);
+    if (maxSlots !== undefined) body.maxSlots = maxSlots;
     if (options.autoAdvance !== undefined) body.autoAdvance = options.autoAdvance;
 
     const response = await fetch(`${DASHBOARD_URL}/api/swarm`, {
@@ -155,12 +171,17 @@ async function taskOperation(
     process.exit(1);
   }
   const workspacePath = join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-  const command = options.task as any;
+  if (!options.task || !isTaskCommand(options.task)) {
+    console.error(chalk.red(`Invalid --task: ${options.task ?? ''}`));
+    console.error(chalk.dim('Supported task operations: next, show, claim, done, block, unblock, cancel'));
+    process.exit(1);
+  }
+  const command: TaskCommand = options.task;
   const result = runTaskCommand(command, {
     issueId,
     workspacePath,
     itemId: options.item,
-    expectedSequence: options.sequence ? parseInt(options.sequence, 10) : undefined,
+    expectedSequence: parseFiniteInteger(options.sequence, '--sequence'),
     reason: options.reason,
     writerId: `pan-swarm-task-${process.pid}`,
   });
