@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T21:48:25.322Z",
+  "updated": "2026-05-09T22:03:31.034Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "pending-s4",
+    "sha": "pending-c1",
     "dirty": true
   },
   "decisions": [
@@ -158,16 +158,15 @@
     }
   ],
   "resumePoint": {
-    "description": "S4 test role wiring implemented and verified: test dispatch paths now launch spawnRun(issueId, 'test') instead of test-agent/uat-agent specialists; the role prompt folds Playwright UAT into the test role and updates /api/review status on pass/fail; dashboard AgentOutputPanel uses state.role === 'test' plus issueId for test role activity rendering. Next: commit, close workspace-77lp (requiresInspection=false), then continue to the next ready bead.",
-    "beadId": "workspace-77lp",
+    "description": "C1 reactive Cloister scheduler implemented and verified: service.ts now exports stateToRole/onIssueStateChange, subscribes Cloister startup to the domain event store, maps issue.* and completion events into role launches, emits review.approved/test.passed from review status transitions, and skips duplicate active (issueId, role) runs. Next: commit, close workspace-sz3o, run required inspection, then continue to the next ready bead.",
+    "beadId": "workspace-sz3o",
     "filesToRead": [
-      "src/lib/cloister/test-agent-queue.ts",
+      "src/lib/cloister/service.ts",
+      "packages/contracts/src/events.ts",
       "src/lib/review-status.ts",
-      "src/lib/cloister/deacon.ts",
+      "src/dashboard/server/routes/workspaces.ts",
       "src/dashboard/server/routes/specialists.ts",
-      "src/dashboard/frontend/src/components/AgentOutputPanel.tsx",
-      "src/lib/cloister/__tests__/test-agent-queue.test.ts",
-      "src/dashboard/frontend/src/components/__tests__/AgentOutputPanel.test.tsx"
+      "src/lib/cloister/__tests__/reactive-scheduler.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -304,6 +303,12 @@
       "timestamp": "2026-05-09T21:48:25.322Z",
       "reason": "bead-complete",
       "note": "Implemented S4 test role wiring. test-agent-queue now starts spawnRun(issueId, 'test') with a prompt that runs project gates, performs Playwright UAT when required, and posts testStatus/readyForMerge updates. review-status, specialists auto-complete, and Deacon retry/orphan recovery now dispatch the test role instead of test-agent specialists; no uat-agent spawn remains. AgentOutputPanel explicitly renders test role runs from state.role === 'test'. Targeted dispatch/panel tests, typecheck, lint, and graphify update pass.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T22:03:31.034Z",
+      "reason": "bead-complete",
+      "note": "Implemented C1 reactive Cloister scheduler: stateToRole maps issue states to Role, onIssueStateChange launches spawnRun with a concurrency guard, Cloister subscribes to domain events, contracts define agent.completed/work.completed/review.approved/test.passed, review status transitions emit review.approved/test.passed, legacy status routes no longer directly dispatch test after review pass, and tests cover work completion \u2192 review, review approval \u2192 test, and test pass \u2192 ship transitions. Targeted tests, typecheck, lint, and graphify update completed.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

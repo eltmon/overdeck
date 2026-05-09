@@ -2987,29 +2987,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           timestamp: new Date().toISOString(),
           payload: { issueId, passed: true },
         })));
-        const issueLower = issueId.toLowerCase();
-        const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
-        const projectPath = getProjectPath(undefined, issuePrefix);
-        const testWorkspace =
-          body.workspace || join(projectPath, 'workspaces', `feature-${issueLower}`);
-        const testBranch = body.branch || `feature/${issueLower}`;
-
-        const { dispatchTestAgentAndNotify } = yield* Effect.promise(() => import(
-          '../../../lib/cloister/test-agent-queue.js'
-        ));
-        try {
-          yield* Effect.promise(() => dispatchTestAgentAndNotify(issueId, testWorkspace, testBranch, messageAgent));
-          yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-            type: 'pipeline.test-started',
-            timestamp: new Date().toISOString(),
-            payload: { issueId },
-          })));
-        } catch (err) {
-          console.error(
-            `[review-status] Unhandled error in dispatchTestAgentAndNotify for ${issueId}:`,
-            err
-          );
-        }
+        console.log(`[review-status] ${issueId} review approved; reactive Cloister will dispatch the test role`);
       } else if (['blocked', 'failed'].includes(reviewStatus)) {
         yield* Effect.promise(() => Effect.runPromise(eventStore.append({
           type: 'pipeline.review-completed',

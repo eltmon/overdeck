@@ -1036,36 +1036,8 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
         });
       }
 
-      // If passed (by either method), dispatch test-agent immediately
-      const effectiveReviewStatus = alreadyReported
-        ? existingStatus!.reviewStatus
-        : status === 'passed'
-        ? 'passed'
-        : 'blocked';
-      if (effectiveReviewStatus === 'passed') {
-        // Get workspace info from work agent state
-        const workAgentId = `agent-${issueId.toLowerCase()}`;
-        const workStateFile = join(
-          homedir(),
-          '.panopticon',
-          'agents',
-          workAgentId,
-          'state.json',
-        );
-        let workspace: string | undefined;
-        let branch: string | undefined;
-
-        if (existsSync(workStateFile)) {
-          try {
-            const workState = JSON.parse(yield* Effect.promise(() => readFile(workStateFile, 'utf-8')));
-            workspace = workState.workspace;
-            branch = workState.branch || `feature/${issueId.toLowerCase()}`;
-          } catch {}
-        }
-
-        const { dispatchTestAgentAndNotify } = yield* Effect.promise(() => import('../../../lib/cloister/test-agent-queue.js'));
-        yield* Effect.promise(() => dispatchTestAgentAndNotify(issueId, workspace, branch));
-        console.log(`[specialists] Dispatched test role for ${issueId} after review passed`);
+      if ((alreadyReported ? existingStatus!.reviewStatus : status === 'passed' ? 'passed' : 'blocked') === 'passed') {
+        console.log(`[specialists] ${issueId} review approved; reactive Cloister will dispatch the test role`);
       }
     } else if (name === 'test-agent') {
       const alreadyReported =

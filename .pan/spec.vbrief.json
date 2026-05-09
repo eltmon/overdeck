@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system \u2014 5 enums \u2192 Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T21:30:29.345Z"
+    "updated": "2026-05-09T22:03:31.034Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 22,
+    "sequence": 24,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T21:48:25.322Z",
+    "updated": "2026-05-09T22:03:31.034Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -825,7 +825,7 @@
       {
         "id": "c1-reactive-cloister-scheduler",
         "title": "Reactive Cloister: onIssueStateChange + stateToRole hooked into existing emitters",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -840,44 +840,50 @@
           {
             "id": "c1-reactive-cloister-scheduler.ac1",
             "title": "src/lib/cloister/service.ts exports `onIssueStateChange(issueId, newState)` and `stateToRole(state): Role | null`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:59:42.907Z"
           },
           {
             "id": "c1-reactive-cloister-scheduler.ac2",
             "title": "Cloister subscribes to existing issue.* domain events (issue-lifecycle.ts) and existing agent-completion events (agent.completed, work.completed, review.approved, test.passed)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:59:42.907Z"
           },
           {
             "id": "c1-reactive-cloister-scheduler.ac3",
             "title": "stateToRole maps in_planning\u2192plan, in_progress\u2192work, in_review\u2192review, testing\u2192test, shipping\u2192ship; closed/canceled\u2192null",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:59:42.907Z"
           },
           {
             "id": "c1-reactive-cloister-scheduler.ac4",
             "title": "Concurrency guard: if an active run exists for (issueId, role), the second spawn is skipped (and logged)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:59:42.907Z"
           },
           {
             "id": "c1-reactive-cloister-scheduler.ac5",
             "title": "End-to-end test: simulating a work-agent completion event drives the issue to in_review and spawns a review run; review approval drives to testing; test pass drives to shipping; etc.",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:59:42.907Z"
           }
-        ]
+        ],
+        "completed": "2026-05-09T21:59:42.907Z"
       },
       {
         "id": "c2-delete-specialist-machinery",

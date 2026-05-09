@@ -39,6 +39,42 @@ export const AgentStoppedEvent = Schema.Struct({
 })
 export type AgentStoppedEvent = typeof AgentStoppedEvent.Type
 
+/** Role lifecycle — work agent completed implementation and is ready for review. */
+export const WorkCompletedEvent = Schema.Struct({
+  type: Schema.Literal("work.completed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId, agentId: Schema.optional(AgentId) }),
+})
+export type WorkCompletedEvent = typeof WorkCompletedEvent.Type
+
+/** Role lifecycle — generic agent completion signal, normalized by Cloister by role. */
+export const AgentCompletedEvent = Schema.Struct({
+  type: Schema.Literal("agent.completed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId, agentId: Schema.optional(AgentId), role: Schema.optional(Role) }),
+})
+export type AgentCompletedEvent = typeof AgentCompletedEvent.Type
+
+/** Role lifecycle — review approved the branch and testing should start. */
+export const ReviewApprovedEvent = Schema.Struct({
+  type: Schema.Literal("review.approved"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId }),
+})
+export type ReviewApprovedEvent = typeof ReviewApprovedEvent.Type
+
+/** Role lifecycle — tests passed and shipping should prepare the branch. */
+export const TestPassedEvent = Schema.Struct({
+  type: Schema.Literal("test.passed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({ issueId: IssueId }),
+})
+export type TestPassedEvent = typeof TestPassedEvent.Type
+
 /** Replaces socket.io `godview:status-change` */
 export const AgentStatusChangedEvent = Schema.Struct({
   type: Schema.Literal("agent.status_changed"),
@@ -748,6 +784,10 @@ export const DomainEvent = Schema.Union([
   AgentEnrichmentChangedEvent,
   AgentStartedEvent,
   AgentStoppedEvent,
+  WorkCompletedEvent,
+  AgentCompletedEvent,
+  ReviewApprovedEvent,
+  TestPassedEvent,
   AgentStatusChangedEvent,
   AgentOutputReceivedEvent,
   // PAN-800 runtime events

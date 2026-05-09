@@ -26,6 +26,7 @@ import { getDatabase, closeDatabase } from '../database/index.js';
 // are spawned on-demand, no global initialization needed.
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
 import { listRunningAgents, getAgentState, getAgentRuntimeState, saveAgentRuntimeState } from '../agents.js';
+import type { Role } from '../agents.js';
 import { checkAllTriggers, type TriggerDetection } from './triggers.js';
 import { performHandoff, type HandoffResult } from './handoff.js';
 import { logHandoffEvent, createHandoffEvent } from './handoff-logger.js';
@@ -115,6 +116,151 @@ export function parseSpecialistAgentSession(name: string): {
   }
 
   return null;
+}
+
+export type ReactiveIssueState =
+  | 'open'
+  | 'in_planning'
+  | 'in_progress'
+  | 'in_review'
+  | 'testing'
+  | 'shipping'
+  | 'closed'
+  | 'canceled';
+
+export interface CloisterDomainEventLike {
+  type: string;
+  payload?: unknown;
+}
+
+const ROLE_RUN_STATES: Record<ReactiveIssueState, Role | null> = {
+  open: null,
+  in_planning: 'plan',
+  in_progress: 'work',
+  in_review: 'review',
+  testing: 'test',
+  shipping: 'ship',
+  closed: null,
+  canceled: null,
+};
+
+/**
+ * Map issue lifecycle state to the role that should own that state.
+ */
+export function stateToRole(state: string): Role | null {
+  const normalized = state.toLowerCase().replace(/[ -]/g, '_') as ReactiveIssueState;
+  return ROLE_RUN_STATES[normalized] ?? null;
+}
+
+function normalizeIssueId(issueId: string): string {
+  return issueId.trim().toUpperCase();
+}
+
+function roleFromAgentId(agentId: string, issueId: string): Role | null {
+  const base = `agent-${issueId.toLowerCase()}`;
+  if (agentId === base) return 'work';
+  const role = agentId.slice(base.length + 1);
+  return ['plan', 'review', 'test', 'ship'].includes(role) ? role as Role : null;
+}
+
+function activeRoleRunExists(issueId: string, role: Role): boolean {
+  const normalizedIssueId = normalizeIssueId(issueId);
+  return listRunningAgents().some((agent) => {
+    if (!agent.tmuxActive) return false;
+    if (normalizeIssueId(agent.issueId ?? '') !== normalizedIssueId) return false;
+    const agentRole = agent.role ?? roleFromAgentId(agent.id, normalizedIssueId);
+    return agentRole === role && agent.status !== 'stopped' && agent.status !== 'error';
+  });
+}
+
+function buildReactiveRolePrompt(issueId: string, state: string, role: Role): string {
+  return `${role.toUpperCase()} TASK for ${issueId}:
+
+The issue lifecycle transitioned to ${state}. Run the ${role} role for this issue.
+
+Required steps:
+1. Work only in the workspace configured for ${issueId}.
+2. Read .pan/continue.json, .pan/spec.vbrief.json, project instructions, and issue context.
+3. Follow the boundaries and success criteria in roles/${role}.md exactly.
+4. Report the role-specific terminal status when done.`;
+}
+
+/**
+ * Reactive Cloister entrypoint: start the role that owns a new issue state.
+ */
+export async function onIssueStateChange(issueId: string, newState: string): Promise<void> {
+  const normalizedIssueId = normalizeIssueId(issueId);
+  const role = stateToRole(newState);
+  if (!role) {
+    console.log(`[cloister] ${normalizedIssueId}: no role for issue state '${newState}'`);
+    return;
+  }
+
+  if (activeRoleRunExists(normalizedIssueId, role)) {
+    const message = `${normalizedIssueId}: ${role} role already active; skipping lifecycle spawn`;
+    console.log(`[cloister] ${message}`);
+    emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+    return;
+  }
+
+  try {
+    const { spawnRun } = await import('../agents.js');
+    const run = await spawnRun(normalizedIssueId, role, {
+      prompt: buildReactiveRolePrompt(normalizedIssueId, newState, role),
+    });
+    if (role === 'review') {
+      setReviewStatus(normalizedIssueId, { reviewStatus: 'reviewing' });
+    } else if (role === 'test') {
+      setReviewStatus(normalizedIssueId, { testStatus: 'testing' });
+    }
+    const message = `${normalizedIssueId}: ${role} role started from lifecycle state '${newState}' as ${run.id}`;
+    console.log(`[cloister] ${message}`);
+    emitActivityEntry({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('already running')) {
+      const skipMessage = `${normalizedIssueId}: ${role} role already running; skipping lifecycle spawn`;
+      console.log(`[cloister] ${skipMessage}`);
+      emitActivityEntry({ source: 'cloister', level: 'info', message: skipMessage, issueId: normalizedIssueId });
+      return;
+    }
+    console.error(`[cloister] Failed to start ${role} role for ${normalizedIssueId}:`, error);
+    emitActivityEntry({ source: 'cloister', level: 'error', message: `${normalizedIssueId}: failed to start ${role} role: ${message}`, issueId: normalizedIssueId });
+  }
+}
+
+function payloadRecord(event: CloisterDomainEventLike): Record<string, unknown> {
+  return event.payload && typeof event.payload === 'object' ? event.payload as Record<string, unknown> : {};
+}
+
+export function issueStateChangeFromDomainEvent(event: CloisterDomainEventLike): { issueId: string; state: string } | null {
+  const payload = payloadRecord(event);
+  const issueId = typeof payload.issueId === 'string' ? payload.issueId : null;
+  if (!issueId) return null;
+
+  switch (event.type) {
+    case 'issue.transitioned':
+      return typeof payload.state === 'string' ? { issueId, state: payload.state } : null;
+    case 'issue.statusChanged':
+      return typeof payload.canonicalStatus === 'string' ? { issueId, state: payload.canonicalStatus } : null;
+    case 'issue.closed':
+      return { issueId, state: 'closed' };
+    case 'agent.completed':
+    case 'work.completed':
+      return { issueId, state: 'in_review' };
+    case 'review.approved':
+      return { issueId, state: 'testing' };
+    case 'test.passed':
+      return { issueId, state: 'shipping' };
+    default:
+      return null;
+  }
+}
+
+export async function handleCloisterDomainEvent(event: CloisterDomainEventLike): Promise<void> {
+  const change = issueStateChangeFromDomainEvent(event);
+  if (!change) return;
+  await onIssueStateChange(change.issueId, change.state);
 }
 
 /**
@@ -240,6 +386,7 @@ export class CloisterService {
   private processedCompletions: Map<string, number> = new Map(); // Track completion marker retry counts (Infinity = done)
   private healthCheckCount: number = 0;
   private lastPokeTimestamps: Map<string, number> = new Map(); // agentId → last poke timestamp (ms)
+  private domainEventUnsubscribe: (() => void) | null = null;
 
   // ─── Status cache ────────────────────────────────────────────────────────────
   // getStatus() does sync file I/O + tmux calls for every agent. Cache for 3s
@@ -452,8 +599,37 @@ export class CloisterService {
     this.emit({ type: 'started' });
     emitActivityEntry({ source: 'cloister', level: 'info', message: 'Cloister agent watchdog started' });
 
+    await this.subscribeToDomainEvents();
+
     // Start monitoring loop
     this.startMonitoringLoop();
+  }
+
+  private async subscribeToDomainEvents(): Promise<void> {
+    if (this.domainEventUnsubscribe) return;
+
+    try {
+      const { initEventStore } = await import('../../dashboard/server/event-store.js');
+      const store = await initEventStore();
+      this.domainEventUnsubscribe = store.subscribe((event) => {
+        void handleCloisterDomainEvent(event).catch((error) => {
+          console.error('[cloister] Reactive lifecycle event handling failed:', error);
+          emitActivityEntry({
+            source: 'cloister',
+            level: 'error',
+            message: `Reactive lifecycle event handling failed: ${error instanceof Error ? error.message : String(error)}`,
+          });
+        });
+      });
+      console.log('  ✓ Cloister reactive lifecycle scheduler subscribed to domain events');
+    } catch (error) {
+      console.error('  ✗ Failed to subscribe Cloister reactive lifecycle scheduler:', error);
+      emitActivityEntry({
+        source: 'cloister',
+        level: 'error',
+        message: `Failed to subscribe reactive lifecycle scheduler: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
   }
 
   /**
@@ -476,6 +652,11 @@ export class CloisterService {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
+    }
+
+    if (this.domainEventUnsubscribe) {
+      this.domainEventUnsubscribe();
+      this.domainEventUnsubscribe = null;
     }
 
     // Stop deacon health monitor

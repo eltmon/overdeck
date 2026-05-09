@@ -15,6 +15,20 @@ import {
 } from './database/review-status-db.js';
 import { normalizeReviewStatus } from './review-status-normalize.js';
 
+async function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): Promise<void> {
+  try {
+    const { initEventStore } = await import('../dashboard/server/event-store.js');
+    const store = await initEventStore();
+    await store.appendAsync({
+      type,
+      timestamp: new Date().toISOString(),
+      payload: { issueId },
+    } as any);
+  } catch (error) {
+    console.warn(`[review-status] Failed to emit ${type} for ${issueId}:`, error);
+  }
+}
+
 export interface StatusHistoryEntry {
   type: 'review' | 'test' | 'merge' | 'inspect' | 'uat';
   status: string;
@@ -323,15 +337,8 @@ export function setReviewStatus(
     emitActivityTts({ utterance: `${issueId} ready for merge`, priority: 1, issueId });
   }
 
-  // Dispatch test-agent when review transitions to 'passed'.
-  // This fires regardless of how setReviewStatus() is called (API or direct import),
-  // ensuring test-agent is dispatched even when review-agent bypasses the specialist
-  // dispatch endpoint.
-  //
-  // OPTIMIZATION: If reviewedAtCommit matches lastVerifiedCommit, no code changed
-  // between the pre-review verification gate and review completion (review is
-  // read-only). Skip the redundant test-agent and mark tests as passed directly.
-  // The post-rebase verification in triggerMerge() is the real quality gate.
+  // Reactive Cloister owns review→test and test→ship scheduling. setReviewStatus
+  // emits the lifecycle event here so API and direct-import callers share one path.
   if (
     update.reviewStatus === 'passed' &&
     status.reviewStatus !== 'passed' &&
@@ -343,29 +350,16 @@ export function setReviewStatus(
       updated.reviewedAtCommit === updated.lastVerifiedCommit;
 
     if (canSkipTests) {
-      console.log(`[review-status] Skipping test-agent for ${issueId} — no code drift since verification (HEAD=${updated.reviewedAtCommit!.slice(0, 8)})`);
+      console.log(`[review-status] Skipping test role for ${issueId} — no code drift since verification (HEAD=${updated.reviewedAtCommit!.slice(0, 8)})`);
       emitActivityEntry({ source: 'cloister', level: 'info', message: `${issueId} — tests skipped (no code change since verification gate)`, issueId });
       setReviewStatus(issueId, { testStatus: 'passed', testNotes: 'Skipped: no code changed since pre-review verification gate', readyForMerge: true });
     } else {
-      (async () => {
-        try {
-          const { getAgentState } = await import('./agents.js');
-          const { dispatchTestAgentAndNotify } = await import('./cloister/test-agent-queue.js');
-          const workAgentId = `agent-${issueId.toLowerCase()}`;
-          const workState = getAgentState(workAgentId);
-          const workspace = workState?.workspace;
-          const branch = workState?.branch || `feature/${issueId.toLowerCase()}`;
-          const reason = updated.reviewedAtCommit && updated.lastVerifiedCommit
-            ? `code drift detected (verified=${updated.lastVerifiedCommit.slice(0, 8)}, reviewed=${updated.reviewedAtCommit.slice(0, 8)})`
-            : 'no verification snapshot available';
-          console.log(`[review-status] Dispatching test role for ${issueId} — ${reason}`);
-          await dispatchTestAgentAndNotify(issueId, workspace, branch);
-          emitActivityEntry({ source: 'cloister', level: 'info', message: `${issueId} — test role dispatched (${reason})`, issueId });
-        } catch (err: any) {
-          console.warn(`[review-status] Failed to dispatch test-agent for ${issueId}: ${err.message}`);
-        }
-      })();
+      void emitReactiveLifecycleEvent('review.approved', issueId);
     }
+  }
+
+  if (update.testStatus === 'passed' && status.testStatus !== 'passed') {
+    void emitReactiveLifecycleEvent('test.passed', issueId);
   }
 
   return updated;
