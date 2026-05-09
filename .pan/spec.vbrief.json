@@ -4,7 +4,7 @@
     "created": "2026-05-08T00:00:00Z",
     "author": "planning-agent:claude-opus-4-5",
     "description": "Plan for PAN-1044: Command Deck — Project Overview Panel with pipeline swimlanes. Empirically scoped 2026-05-09 (revised with cost-breakdown-tooltip bead and cost-on-stuck-callout) — see docs/prds/planned/PAN-1044-project-overview-panel.md.",
-    "updated": "2026-05-09T23:46:36.792Z"
+    "updated": "2026-05-09T23:54:43.331Z"
   },
   "plan": {
     "id": "pan-1044",
@@ -12,9 +12,9 @@
     "status": "running",
     "uid": "b2a7f3c1-4d8e-4f29-9a6b-3c5e7f8d2b1a",
     "author": "planning-agent:claude-opus-4-5",
-    "sequence": 96,
+    "sequence": 105,
     "created": "2026-05-08T00:00:00Z",
-    "updated": "2026-05-09T23:46:36.792Z",
+    "updated": "2026-05-09T23:54:43.331Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1044",
@@ -73,7 +73,7 @@
             "completed": "2026-05-09T21:20:47.907Z"
           }
         ],
-        "completed": "2026-05-09T23:46:36.792Z"
+        "completed": "2026-05-09T23:54:43.331Z"
       },
       {
         "id": "project-overview-skeleton",
@@ -140,7 +140,7 @@
             "completed": "2026-05-09T21:20:47.907Z"
           }
         ],
-        "completed": "2026-05-09T23:46:36.791Z"
+        "completed": "2026-05-09T23:54:43.331Z"
       },
       {
         "id": "pipeline-swimlanes",
@@ -233,7 +233,7 @@
             "completed": "2026-05-09T21:20:47.906Z"
           }
         ],
-        "completed": "2026-05-09T23:46:36.789Z"
+        "completed": "2026-05-09T23:54:43.328Z"
       },
       {
         "id": "cost-breakdown-tooltip",
@@ -317,7 +317,7 @@
             "completed": "2026-05-09T21:20:47.904Z"
           }
         ],
-        "completed": "2026-05-09T23:46:36.788Z"
+        "completed": "2026-05-09T23:54:43.328Z"
       },
       {
         "id": "project-node-click-split",
@@ -383,7 +383,7 @@
             "completed": "2026-05-09T21:20:47.903Z"
           }
         ],
-        "completed": "2026-05-09T23:46:36.791Z"
+        "completed": "2026-05-09T23:54:43.330Z"
       },
       {
         "id": "commanddeck-routing",
@@ -467,7 +467,7 @@
             "completed": "2026-05-09T21:20:47.900Z"
           }
         ],
-        "completed": "2026-05-09T23:46:36.786Z"
+        "completed": "2026-05-09T23:54:43.326Z"
       }
     ],
     "edges": [
