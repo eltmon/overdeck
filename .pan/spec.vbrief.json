@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T20:26:32.285Z"
+    "updated": "2026-05-09T20:28:21.639Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 8,
+    "sequence": 9,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T20:26:32.285Z",
+    "updated": "2026-05-09T20:28:21.639Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -207,7 +207,7 @@
       {
         "id": "v1-convoy-agents-migration",
         "title": "Migrate convoy review prompt templates to .claude/agents/code-review-*.md",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -222,7 +222,7 @@
           {
             "id": "v1-convoy-agents-migration.ac1",
             "title": "Files exist at .claude/agents/code-review-security.md, code-review-correctness.md, code-review-performance.md, code-review-requirements.md",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -230,7 +230,7 @@
           {
             "id": "v1-convoy-agents-migration.ac2",
             "title": "Each file has `name`, `description`, `tools`, `model` frontmatter that parses as a valid Claude Code agent definition",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -238,7 +238,7 @@
           {
             "id": "v1-convoy-agents-migration.ac3",
             "title": "Prompt body content matches the source prompt-template (modulo frontmatter); no functional drift",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -246,7 +246,7 @@
           {
             "id": "v1-convoy-agents-migration.ac4",
             "title": "Source prompt-template files at src/lib/cloister/prompts/review/*.prompt-template.md are NOT deleted (still referenced by specialist machinery; deleted in C2)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
