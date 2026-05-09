@@ -39,7 +39,43 @@ describe('role definitions', () => {
     expect(body).toContain('Stop after planning is complete');
   });
 
-  it('keeps the legacy pan-planning-agent definition until spawn migration deletes it', () => {
+  it('defines the work role with Jidoka inspection gates and no phase labels', () => {
+    const { frontmatter, body } = splitFrontmatter(readRepoFile('roles/work.md'));
+
+    expect(frontmatter).toMatchObject({
+      name: 'work',
+      model: 'sonnet',
+      permissionMode: 'bypassPermissions',
+      effort: 'high',
+    });
+    expect(frontmatter.hooks).toEqual(expect.any(Object));
+    expect(body).toContain('## Per-Bead Workflow');
+    expect(body).toContain("subagent_type: 'inspect'");
+    expect(body).toContain("subagent_type: 'inspect-deep'");
+    expect(body).toContain('bead.metadata.requiresInspection === true');
+    expect(body).toContain("resolveModel('work', 'inspect')");
+    expect(body).toContain("resolveModel('work', 'inspect-deep')");
+    expect(body).toContain('one undifferentiated mode');
+    for (const phase of ['exploration', 'implementation', 'testing', 'documentation', 'review-response']) {
+      expect(body.toLowerCase()).not.toContain(phase);
+    }
+  });
+
+  it('defines inspect and inspect-deep subagents for the work role Jidoka gates', () => {
+    for (const name of ['inspect', 'inspect-deep']) {
+      const { frontmatter, body } = splitFrontmatter(readRepoFile(`.claude/agents/${name}.md`));
+      expect(frontmatter.name).toBe(name);
+      expect(frontmatter.description).toEqual(expect.any(String));
+      expect(frontmatter.model).toEqual(expect.any(String));
+      expect(frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob', 'Bash']));
+      expect(body).toContain('INSPECTION PASSED');
+      expect(body).toContain('INSPECTION BLOCKED');
+    }
+  });
+
+  it('keeps legacy pan plan/work/inspect agent definitions until spawn migration deletes them', () => {
     expect(existsSync(join(process.cwd(), '.claude/agents/pan-planning-agent.md'))).toBe(true);
+    expect(existsSync(join(process.cwd(), '.claude/agents/pan-work-agent.md'))).toBe(true);
+    expect(existsSync(join(process.cwd(), '.claude/agents/pan-inspect-agent.md'))).toBe(true);
   });
 });

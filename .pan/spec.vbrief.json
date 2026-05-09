@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T20:30:28.904Z"
+    "updated": "2026-05-09T20:33:05.642Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 10,
+    "sequence": 11,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T20:30:28.904Z",
+    "updated": "2026-05-09T20:33:05.642Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -297,7 +297,7 @@
       {
         "id": "r2-role-work-md-jidoka",
         "title": "Create roles/work.md with two-tier Jidoka inspection (universal + deep-flagged)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -312,7 +312,7 @@
           {
             "id": "r2-role-work-md-jidoka.ac1",
             "title": "File exists at roles/work.md (frontmatter: name: work) with Per-Bead Workflow section similar to current pan-work-agent.md",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -320,7 +320,7 @@
           {
             "id": "r2-role-work-md-jidoka.ac2",
             "title": "All phase references (exploration/implementation/testing/documentation/review-response) removed; work is one undifferentiated mode",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -328,7 +328,7 @@
           {
             "id": "r2-role-work-md-jidoka.ac3",
             "title": "Document the universal-gate inspection: every bead, after commit, before claiming the next bead, run an inspect sub-run",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -336,7 +336,7 @@
           {
             "id": "r2-role-work-md-jidoka.ac4",
             "title": "Document the deep-inspect: only when `bead.metadata.requiresInspection === true`, run an additional deep-inspect sub-run with the mid workhorse",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -344,7 +344,7 @@
           {
             "id": "r2-role-work-md-jidoka.ac5",
             "title": "Sub-agent definition files exist at .claude/agents/inspect.md and .claude/agents/inspect-deep.md with appropriate frontmatter and prompts",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -352,7 +352,7 @@
           {
             "id": "r2-role-work-md-jidoka.ac6",
             "title": "Old .claude/agents/pan-work-agent.md and .claude/agents/pan-inspect-agent.md NOT deleted (X1 handles deletion)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
