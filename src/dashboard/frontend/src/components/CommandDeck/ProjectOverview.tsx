@@ -183,6 +183,7 @@ export function ProjectOverview({
               stage={stage}
               entries={entries}
               issueCosts={issueCosts}
+              issueCostDetails={issueCostDetails}
               onSelectFeature={onSelectFeature}
             />
           );

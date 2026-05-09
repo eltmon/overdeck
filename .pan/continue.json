@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1044",
   "created": "2026-05-09T17:02:13.086Z",
-  "updated": "2026-05-09T21:38:06.576Z",
+  "updated": "2026-05-09T23:36:58.066Z",
   "gitState": {
     "branch": "feature/pan-1044",
-    "sha": "f2d67ee9c",
+    "sha": "051b851d7",
     "dirty": true
   },
   "decisions": [
@@ -119,6 +119,12 @@
       "timestamp": "2026-05-09T21:38:06.576Z",
       "reason": "end",
       "note": "Project overview panel implemented"
+    },
+    {
+      "timestamp": "2026-05-09T23:36:58.066Z",
+      "reason": "feedback-fix",
+      "note": "Fixed frontend-typecheck verification failure by passing issueCostDetails into PipelineSection so ProjectOverview cards can render cost breakdown data. Verified with npm --prefix ./src/dashboard/frontend exec tsc --noEmit.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": []
