@@ -58,14 +58,6 @@ export function toRole(v: unknown): Role | undefined {
   return v && VALID_ROLES.has(v as Role) ? v as Role : undefined;
 }
 
-function legacyPhaseToRole(v: unknown): Role | undefined {
-  if (v === 'planning') return 'plan';
-  if (v === 'testing') return 'test';
-  if (v === 'review' || v === 'review-response') return 'review';
-  if (v === 'merge') return 'ship';
-  if (typeof v === 'string') return 'work';
-  return undefined;
-}
 export function toAgentResolution(v: unknown): AgentResolution | undefined {
   return v && VALID_RESOLUTIONS.has(v as AgentResolution) ? v as AgentResolution : undefined;
 }
@@ -325,7 +317,7 @@ export const ReadModelServiceLive = Layer.effect(
               branch: a.branch || undefined,
               costSoFar: a.costSoFar,
               sessionId: a.sessionId || undefined,
-              role: toRole((a as { role?: unknown }).role) ?? toRole((cachedAgent as { role?: unknown } | undefined)?.role) ?? legacyPhaseToRole(a.phase) ?? legacyPhaseToRole((cachedAgent as { agentPhase?: unknown; phase?: unknown } | undefined)?.agentPhase ?? (cachedAgent as { phase?: unknown } | undefined)?.phase),
+              role: toRole((a as { role?: unknown }).role),
               runtimeState: cachedAgent?.runtimeState,
               hasPendingQuestion: cachedAgent?.hasPendingQuestion,
               pendingQuestionCount: cachedAgent?.pendingQuestionCount,
@@ -428,7 +420,7 @@ export const ReadModelServiceLive = Layer.effect(
             branch: a.branch || undefined,
             costSoFar: a.costSoFar,
             sessionId: a.sessionId || undefined,
-            role: toRole((a as { role?: unknown }).role) ?? legacyPhaseToRole(enrichment?.agentPhase ?? a.phase) ?? 'work',
+            role: toRole((a as { role?: unknown }).role),
             runtimeState: completedNormally ? 'completed' : undefined,
             // Enrichment fields (PAN-440)
             hasPendingQuestion: enrichment?.hasPendingQuestion,

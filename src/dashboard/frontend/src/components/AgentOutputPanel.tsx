@@ -84,9 +84,10 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
     };
   }, [specialist, agentId, specialistIsRunning]);
 
-  // For work and planning agents: derive from store or agentId pattern
-  const isPlanningAgent = agent?.role === 'plan' || agentId.startsWith('planning-');
-  const workAgentIssueId = specialist ? null : deriveAgentIssueId(agentId, agent?.issueId);
+  // Planning agents are identified by the persisted role field;
+  // legacy ID prefixes are no longer a role source.
+  const isPlanningAgent = agent?.role === 'plan';
+  const workAgentIssueId = specialist || isPlanningAgent ? null : deriveAgentIssueId(agentId, agent?.issueId);
 
   const label = specialist
     ? `${specialist.projectKey} / ${specialist.type.replace('-agent', '')}`

@@ -27,6 +27,7 @@ import {
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
 import { getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../agents.js';
+import { loadConfig, resolveModel } from '../config-yaml.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext, writeWorkspaceContinue } from '../pan-dir/index.js';
@@ -108,7 +109,7 @@ export interface SpawnPlanningOptions {
   workspaceLocation: 'local' | 'remote';
   startDocker?: boolean;
   shadowMode?: boolean;
-  /** Optional model override — if omitted, the planning-agent setting is used. */
+  /** Optional model override — if omitted, roles.plan.model is used. */
   model?: string;
   /** Optional harness override (PAN-636). Defaults to 'claude-code'. */
   harness?: 'claude-code' | 'pi';
@@ -386,7 +387,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         await writeFile(join(agentStateDir, 'state.json'), JSON.stringify({
           id: sessionName, issueId: issue.identifier, workspace: workspacePath,
           status: 'failed', error: errorMsg,
-          startedAt: new Date().toISOString(), type: 'planning', agentPhase: 'planning', location: workspaceLocation,
+          startedAt: new Date().toISOString(), role: 'plan', location: workspaceLocation,
         }, null, 2));
         return { success: false, error: errorMsg };
       }
@@ -429,17 +430,15 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // ── Step 3: Load specs & PRDs ────────────────────────────────────────
     progress(3, 'Loading specs & PRDs', `Searching for ${issue.identifier} specs`);
 
-    // Determine planning model — explicit override takes precedence over work-type router
-    let settingsModel = 'claude-opus-4-6';
-    let modelSource = 'fallback';
+    // Determine planning model — explicit override takes precedence over role routing.
+    let settingsModel = 'claude-opus-4-7';
+    let modelSource = 'roles.plan.model';
     try {
-      const { getModel } = await import('../work-type-router.js');
-      const resolution = getModel('planning-agent');
-      settingsModel = resolution.model;
-      modelSource = resolution.source;
-      console.log(`[start-planning] Model resolution for planning-agent: model=${resolution.model} source=${resolution.source} usedFallback=${resolution.usedFallback} originalModel=${resolution.originalModel || '(none)'}`);
+      settingsModel = resolveModel('plan', undefined, loadConfig().config);
+      console.log(`[start-planning] Model resolution for role=plan: model=${settingsModel} source=${modelSource}`);
     } catch (err: any) {
-      console.warn(`[start-planning] Work-type router failed for planning-agent, falling back to ${settingsModel}: ${err.message}`);
+      modelSource = 'fallback';
+      console.warn(`[start-planning] Role model resolution failed for plan, falling back to ${settingsModel}: ${err.message}`);
     }
     const planningModel = modelOverride || settingsModel;
     console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource})`);
@@ -490,7 +489,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     await writeFeatureContext(workspacePath, issue);
 
-    // PAN-982: emit 'claude --agent pan-planning-agent --name <sessionName>'.
+    // PAN-1048: emit 'claude --agent roles/plan.md --name <sessionName>'.
     // PAN-636: thread harness through so a planning kickoff with --harness pi
     // produces a `pi --mode rpc --model <id>` line and skips the --agent flag
     // (Pi has no agent-definition system).
@@ -511,7 +510,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         workingDir: workspacePath,
         setCi: true,
         setTerminalEnv: true,
-        panopticonEnv: { agentId: sessionName, issueId: issue.identifier, sessionType: 'planning' },
+        panopticonEnv: { agentId: sessionName, issueId: issue.identifier, sessionType: 'plan' },
         providerExports,
         promptFile,
         baseCommand: cmdWithArgs,
@@ -557,8 +556,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       model: planningModel,
       status: 'running',
       startedAt: new Date().toISOString(),
-      type: 'planning',
-      agentPhase: 'planning',
+      role: 'plan',
       location: workspaceLocation,
     }, null, 2));
 
@@ -578,8 +576,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         status: 'failed',
         error: err.message,
         startedAt: new Date().toISOString(),
-        type: 'planning',
-        agentPhase: 'planning',
+        role: 'plan',
         location: workspaceLocation,
       }, null, 2));
     } catch { /* ignore state write errors */ }

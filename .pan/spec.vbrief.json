@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T20:47:13.807Z"
+    "updated": "2026-05-09T20:59:53.441Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 13,
+    "sequence": 14,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T20:47:13.807Z",
+    "updated": "2026-05-09T20:59:53.441Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -510,7 +510,7 @@
       {
         "id": "s1-wire-plan-end-to-end",
         "title": "Wire `plan` role end-to-end (replaces pan-planning-agent spawn)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -525,7 +525,7 @@
           {
             "id": "s1-wire-plan-end-to-end.ac1",
             "title": "spawn-planning-session.ts writes `role: 'plan'` to state.json and does NOT write type/agentPhase/phase",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -533,7 +533,7 @@
           {
             "id": "s1-wire-plan-end-to-end.ac2",
             "title": "Planning launcher command uses `--agent roles/plan.md` (file in repo root); model resolved via resolveModel('plan')",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -541,7 +541,7 @@
           {
             "id": "s1-wire-plan-end-to-end.ac3",
             "title": "Dashboard AgentOutputPanel.tsx detects planning agents via `agent?.role === 'plan'`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -549,7 +549,7 @@
           {
             "id": "s1-wire-plan-end-to-end.ac4",
             "title": "PlanDialog.tsx fetches default plan model from `roles.plan.model` (not WorkTypeId('planning-agent'))",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -557,7 +557,7 @@
           {
             "id": "s1-wire-plan-end-to-end.ac5",
             "title": "read-model.ts reads `state.role` (no fallback to type/agentPhase/phase)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -565,7 +565,7 @@
           {
             "id": "s1-wire-plan-end-to-end.ac6",
             "title": "Smoke test: spawning a planning session against a test issue produces state.json with role: 'plan' and the planning dialog renders Done correctly",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -573,7 +573,7 @@
           {
             "id": "s1-wire-plan-end-to-end.ac7",
             "title": "Existing planning-related tests updated and pass; no test references planning via type/agentPhase/phase",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

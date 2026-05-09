@@ -115,9 +115,10 @@ export type PanopticonAgentType =
   | 'uat'
   | 'merge';
 
-/** Work role definitions live under roles/; legacy pipeline agents remain under .claude/agents/. */
+/** Plan/work role definitions live under roles/; legacy pipeline agents remain under .claude/agents/. */
 export function panopticonAgentName(type: PanopticonAgentType): string {
   if (type === 'work') return 'roles/work.md';
+  if (type === 'planning') return 'roles/plan.md';
   return `pan-${type}-agent`;
 }
 

@@ -52,6 +52,25 @@ interface PlanningStatus {
 
 type Step = 'checking' | 'ready' | 'starting' | 'setting-up' | 'planning' | 'error';
 
+type SettingsResponse = {
+  workhorses?: Record<string, string>;
+  roles?: {
+    plan?: {
+      model?: string;
+    };
+  };
+};
+
+function resolveSettingsModelRef(
+  modelRef: string | undefined,
+  workhorses: Record<string, string> | undefined,
+): string | undefined {
+  if (!modelRef) return undefined;
+  if (!modelRef.startsWith('workhorse:')) return modelRef;
+  const slot = modelRef.slice('workhorse:'.length);
+  return workhorses?.[slot] ?? modelRef;
+}
+
 // Default for startDocker - can be overridden by localStorage
 const getDefaultStartDocker = (): boolean => {
   const stored = localStorage.getItem('panopticon.planning.startDocker');
@@ -88,17 +107,20 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
   const queryClient = useQueryClient();
   const confirm = useConfirm();
 
-  // Fetch settings to know the default planning-agent model
+  // Fetch settings to know the default plan role model.
   const settingsQuery = useQuery({
     queryKey: ['settings'],
     queryFn: async () => {
       const res = await fetch('/api/settings');
       if (!res.ok) throw new Error('Failed to load settings');
-      return res.json() as Promise<{ models: { overrides: Record<string, string> } }>;
+      return res.json() as Promise<SettingsResponse>;
     },
     staleTime: 60000,
   });
-  const defaultPlanningModel = settingsQuery.data?.models?.overrides?.['planning-agent'] || 'claude-opus-4-6';
+  const defaultPlanningModel = resolveSettingsModelRef(
+    settingsQuery.data?.roles?.plan?.model,
+    settingsQuery.data?.workhorses,
+  ) || 'claude-opus-4-7';
 
   // Fetch available models from all configured providers
   const availableModelsQuery = useQuery({

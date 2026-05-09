@@ -39,6 +39,14 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
 
+  it('Anthropic + Auto + plan role: uses roles/plan.md and no DSP or permission flag', async () => {
+    const cmd = await getAgentRuntimeBaseCommand('claude-opus-4-7', 'planning-pan-1', 'planning')
+    expect(cmd).toMatch(/--agent roles\/plan\.md/)
+    expect(cmd).not.toMatch(/--agent pan-planning-agent/)
+    expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
+    expect(cmd).not.toMatch(/bypassPermissions/)
+  })
+
   it('Kimi direct + Auto: no DSP, --permission-mode auto', async () => {
     const cmd = await getAgentRuntimeBaseCommand('kimi-k2.6')
     expect(cmd).toMatch(/^claude /)
