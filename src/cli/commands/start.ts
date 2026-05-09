@@ -14,6 +14,7 @@ import { hasPRDDraft, getPRDDraftPath } from '../../lib/prd-draft.js';
 import { isGitHubIssue, resolveGitHubIssue } from '../../lib/tracker-utils.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
+import { importVBriefFromPrdDirs } from '../../lib/vbrief/io.js';
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -715,6 +716,20 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     const stateValidation = validateAndCleanStateFile(workspace, id);
     if (stateValidation.removed) {
       spinner.warn(`Cleaned stale planning state from ${stateValidation.wrongIssue}`);
+    }
+
+    // Materialize PRD-published vBRIEF copies into the workspace before validating
+    // or recovering beads. This preserves the workspace-local runtime source of
+    // truth while allowing manual/PRD-first planning flows to start normally.
+    spinner.text = 'Checking for PRD vBRIEF artifacts...';
+    try {
+      const imported = await importVBriefFromPrdDirs(projectRoot, workspace, id);
+      if (imported) {
+        spinner.text = `Imported PRD vBRIEF from ${imported.sourcePath}`;
+      }
+    } catch (importErr: any) {
+      spinner.fail(`Failed to import PRD vBRIEF for ${id}: ${importErr.message}`);
+      process.exit(1);
     }
 
     // Validate spec.vbrief.json belongs to this issue (prevent stale workspace plan state from the wrong issue)
