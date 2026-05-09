@@ -18,6 +18,8 @@ import {
   type ReadModelState,
   INITIAL_READ_MODEL_STATE,
   applyEvent as applyEventReducer,
+  isTerminalTurnDiffSummaryStatus,
+  trimTurnDiffSummaries,
 } from '@panctl/contracts';
 import type { AgentSnapshot, AgentStatus, AgentPhase, AgentResolution, ReviewStatusSnapshot, SpecialistSnapshot, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panctl/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
@@ -34,6 +36,10 @@ export async function discoverNewAgentIds(agentsDir: string, cachedIds: Set<stri
     return [];
   }
   return entries.filter(e => !cachedIds.has(e) && existsSync(join(agentsDir, e, 'state.json')));
+}
+
+export function shouldSkipCheckpointReconciliation(agent: Pick<AgentSnapshot, 'status' | 'workspace'>): boolean {
+  return !agent.workspace || isTerminalTurnDiffSummaryStatus(agent.status)
 }
 
 // ─── Cached event store reference (avoids async dynamic import on each pushUpdated) ──
@@ -495,10 +501,10 @@ export const ReadModelServiceLive = Layer.effect(
           const agents = Object.values(state.agentsById);
           let reconciled = 0;
           for (const agent of agents) {
-            const workspace = (agent as any).workspace as string | undefined;
-            if (!workspace) continue;
+            if (shouldSkipCheckpointReconciliation(agent)) continue;
 
-            const existingSummaries = state.turnDiffSummariesByAgentId[(agent as any).id];
+            const workspace = agent.workspace;
+            const existingSummaries = state.turnDiffSummariesByAgentId[agent.id];
             if (existingSummaries && existingSummaries.length > 0) continue;
 
             try {
@@ -538,7 +544,7 @@ export const ReadModelServiceLive = Layer.effect(
                   ...state,
                   turnDiffSummariesByAgentId: {
                     ...state.turnDiffSummariesByAgentId,
-                    [(agent as any).id]: summaries,
+                    [agent.id]: trimTurnDiffSummaries(summaries),
                   },
                 };
                 reconciled++;
