@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-09T21:07:00.000Z",
+  "updated": "2026-05-09T21:10:00.000Z",
   "gitState": {
     "branch": "feature/pan-1055",
-    "sha": "754460d78",
-    "dirty": true
+    "sha": "2497e06cc",
+    "dirty": false
   },
   "decisions": [
     {
@@ -33,7 +33,7 @@
     }
   ],
   "resumePoint": {
-    "description": "Implementation bead workspace-xgc6 complete; commit changes, close bead, then submit PAN-1055 if no additional beads are ready.",
+    "description": "Bead workspace-xgc6 committed; close bead, run inspection if required, then continue to any remaining pan-1055 beads or submit.",
     "beadId": "workspace-xgc6",
     "filesToRead": [
       "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
@@ -50,6 +50,12 @@
       "timestamp": "2026-05-09T21:07:00.000Z",
       "reason": "bead-complete",
       "note": "Added shared harness picker primitives, surfaced harness in planning/settings flows, passed harness through start endpoints, added settings round-trip support, fixed unrelated post-merge lifecycle test failure, and verified typecheck/lint/npm test pass.",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-09T21:10:00.000Z",
+      "reason": "commit",
+      "note": "Committed bead workspace-xgc6 as 2497e06cc after typecheck, lint, and npm test passed.",
       "agentModel": "Claude Opus 4.7"
     }
   ]
