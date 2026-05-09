@@ -612,6 +612,20 @@ export async function spawnSingleReviewer(
     { encoding: 'utf-8' }
   );
 
+  // Pin remain-on-exit IMMEDIATELY after new-session, before claude has a chance
+  // to exit. Without this, a fast-failing launcher (auth error, model unreachable,
+  // OOM) makes the session vanish in <100ms, which manifests downstream as
+  // "exited without output after Nms" and aborts the entire review even though
+  // the specialist's claude process briefly ran and logged thousands of lines.
+  // The caller used to set this much later in runParallelReview — too late.
+  // PAN-1030 reproduced this: all 4 specialists vanished in 16s while their
+  // claude logs grew to 1.7k–2.3k lines.
+  try {
+    await setOptionAsync(sessionName, 'remain-on-exit', 'on');
+  } catch (err) {
+    console.warn(`[review-agent] Failed to pin remain-on-exit on ${sessionName}: ${err instanceof Error ? err.message : err}`);
+  }
+
   // Pipe all pane output to a log file so connection errors and Claude output are
   // captured even after the session exits.
   const claudeLogFile = join(dirname(promptFile), `${sessionName.split('-').pop()}-claude.log`);
