@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T20:59:53.441Z"
+    "updated": "2026-05-09T21:03:50.482Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 14,
+    "sequence": 15,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T20:59:53.441Z",
+    "updated": "2026-05-09T21:03:50.482Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -363,7 +363,7 @@
       {
         "id": "r3-role-review-md-convoy",
         "title": "Create roles/review.md (synthesis IS review) invoking convoy via Agent tool",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -378,7 +378,7 @@
           {
             "id": "r3-role-review-md-convoy.ac1",
             "title": "File exists at roles/review.md (frontmatter: name: review) with synthesis logic in the body (no separate synthesis sub-agent)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -386,7 +386,7 @@
           {
             "id": "r3-role-review-md-convoy.ac2",
             "title": "Body invokes convoy via 4 parallel Agent({ subagent_type: 'code-review-<flavor>' }) calls (security, correctness, performance, requirements)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -394,7 +394,7 @@
           {
             "id": "r3-role-review-md-convoy.ac3",
             "title": "Documents the approve/request-changes decision flow: synthesize findings → decide → post comment → transition issue state",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -402,7 +402,7 @@
           {
             "id": "r3-role-review-md-convoy.ac4",
             "title": "Documents human-merge invariant: review NEVER merges; only approves",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -410,12 +410,13 @@
           {
             "id": "r3-role-review-md-convoy.ac5",
             "title": "Old .claude/agents/pan-review-agent.md NOT deleted (X1 handles deletion)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-09T21:03:50.482Z"
       },
       {
         "id": "r4-role-test-md-uat",

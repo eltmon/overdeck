@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T20:59:53.441Z",
+  "updated": "2026-05-09T21:03:50.482Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "pending-s1",
+    "sha": "pending-r3",
     "dirty": true
   },
   "decisions": [
@@ -158,14 +158,11 @@
     }
   ],
   "resumePoint": {
-    "description": "S1 plan role spawn path implemented: planning sessions now write role=plan state, resolve models through roles.plan.model, launch Claude Code with --agent roles/plan.md, and dashboard/read-model consumers use state.role without legacy planning field fallbacks. Commit and close workspace-14cf next.",
-    "beadId": "workspace-14cf",
+    "description": "R3 review role definition implemented: roles/review.md defines review as synthesis, dispatches the four convoy code-review subagents in parallel via Agent tool calls, documents approve/request-changes flow, preserves the human-merge invariant, and keeps the legacy pan-review-agent file. Commit and close workspace-y980 next.",
+    "beadId": "workspace-y980",
     "filesToRead": [
-      "src/lib/planning/spawn-planning-session.ts",
-      "src/lib/agents.ts",
-      "src/dashboard/frontend/src/components/AgentOutputPanel.tsx",
-      "src/dashboard/frontend/src/components/PlanDialog.tsx",
-      "src/dashboard/server/read-model.ts"
+      "roles/review.md",
+      "src/lib/__tests__/role-definitions.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -254,6 +251,12 @@
       "timestamp": "2026-05-09T20:59:53.441Z",
       "reason": "bead-complete",
       "note": "Implemented S1 plan role end-to-end: planning state writes role: plan instead of type/agentPhase/phase; model resolution uses resolveModel(plan) via roles/workhorses config; planning Claude Code launch maps to --agent roles/plan.md; launcher env uses PANOPTICON_SESSION_TYPE=plan; AgentOutputPanel and read-model consume state.role without legacy planning field fallbacks; PlanDialog displays the default from roles.plan.model. Verified targeted planning/role tests, typecheck, lint, and graphify update.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T21:03:50.482Z",
+      "reason": "bead-complete",
+      "note": "Implemented R3 review role definition at roles/review.md. The review role is synthesis (no separate synthesis sub-agent), dispatches code-review-security/correctness/performance/requirements in parallel via Agent tool calls, documents synthesis decision flow, review state transition responsibilities, resolveModel(review, subRole) routing, and the invariant that review NEVER merges. Legacy .claude/agents/pan-review-agent.md remains. Verified role definition test, typecheck, lint, and graphify update.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

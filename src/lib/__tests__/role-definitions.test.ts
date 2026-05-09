@@ -73,9 +73,36 @@ describe('role definitions', () => {
     }
   });
 
-  it('keeps legacy pan plan/work/inspect agent definitions until spawn migration deletes them', () => {
+  it('defines the review role as convoy synthesis with no merge authority', () => {
+    const { frontmatter, body } = splitFrontmatter(readRepoFile('roles/review.md'));
+
+    expect(frontmatter).toMatchObject({
+      name: 'review',
+      model: 'opus',
+      permissionMode: 'plan',
+      effort: 'high',
+    });
+    expect(frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob', 'Bash', 'Agent']));
+    expect(frontmatter.hooks).toEqual(expect.any(Object));
+    expect(body).toContain('The review role is the synthesis agent');
+    expect(body).toContain("subagent_type: 'code-review-security'");
+    expect(body).toContain("subagent_type: 'code-review-correctness'");
+    expect(body).toContain("subagent_type: 'code-review-performance'");
+    expect(body).toContain("subagent_type: 'code-review-requirements'");
+    expect(body).toContain('Launch the convoy reviewers in parallel');
+    expect(body).toContain('Approve');
+    expect(body).toContain('Request changes');
+    expect(body).toContain('Review NEVER merges');
+    expect(body).toContain("resolveModel('review', 'security')");
+    expect(body).toContain("resolveModel('review', 'correctness')");
+    expect(body).toContain("resolveModel('review', 'performance')");
+    expect(body).toContain("resolveModel('review', 'requirements')");
+  });
+
+  it('keeps legacy pan plan/work/review/inspect agent definitions until spawn migration deletes them', () => {
     expect(existsSync(join(process.cwd(), '.claude/agents/pan-planning-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), '.claude/agents/pan-work-agent.md'))).toBe(true);
+    expect(existsSync(join(process.cwd(), '.claude/agents/pan-review-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), '.claude/agents/pan-inspect-agent.md'))).toBe(true);
   });
 });
