@@ -575,6 +575,13 @@ const getAgentsRoute = HttpRouter.add(
                 );
               if (stoppedAt && (now - stoppedAt.getTime()) > 60 * 60 * 1000 && !keepStoppedAgentVisible) continue;
               const lifecycle = getWorkAgentLifecycleState(dir);
+              const needsInput = runtimeData.resolution === 'needs_input';
+              const pendingQuestionPrompt = needsInput
+                ? runtimeData.waitingNotification || 'Agent stopped because it needs human input or hit a blocker'
+                : undefined;
+              const pendingQuestionReason = needsInput
+                ? runtimeData.waitingReason || 'other'
+                : undefined;
               stoppedAgents.push({
                 id: dir,
                 issueId,
@@ -589,8 +596,10 @@ const getAgentsRoute = HttpRouter.add(
                 git: null,
                 type: 'agent',
                 agentPhase: isPlanning ? 'planning' : (state.phase || 'implementation'),
-                hasPendingQuestion: runtimeData.resolution === 'needs_input',
+                hasPendingQuestion: needsInput,
                 pendingQuestionCount: 0,
+                pendingQuestionPrompt,
+                pendingQuestionReason,
                 resolution: runtimeData.resolution || 'working',
                 resolutionCount: runtimeData.resolutionCount || 0,
                 hasSession: lifecycle.canResumeSession,
