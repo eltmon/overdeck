@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T23:01:08.000Z",
+  "updated": "2026-05-09T23:11:34.000Z",
   "gitState": {
     "branch": "feature/pan-1048",
     "sha": "pending-c2",
@@ -163,19 +163,16 @@
     }
   ],
   "resumePoint": {
-    "description": "C2 specialist machinery deletion implemented and verified: legacy wake/queue/session helpers removed, router resolveSpecialistBaseCommand deleted, deacon orphan test dispatch now uses spawnRun(test), specialist wake/reset/init routes return unsupported responses, source review prompt templates deleted, stale test mocks/comments no longer mention deleted specialist machinery, graphify refreshed, and npx tsc --noEmit, npx eslint . --max-warnings=0, and full npm test pass. Next: stage the exact bead files (including force-adding .claude/agents/code-review-synthesis.md), commit, close workspace-ifod, then continue with bd ready -l pan-1048.",
-    "beadId": "workspace-ifod",
+    "description": "Z1 documentation bead implemented and verified: CLAUDE.md now documents the five-role taxonomy and sub-roles, docs/HARNESSES.md and dashboard/agent architecture docs describe role runs instead of specialist machinery, and src/lib/cloister/prompts/planning.md teaches planners the role taxonomy. npx tsc --noEmit, npx eslint . --max-warnings=0, full npm test, JSON validation, and graphify update pass. Next: stage exact docs plus vBRIEF/continue changes, commit, close workspace-jdu7, then continue with bd ready -l pan-1048.",
+    "beadId": "workspace-jdu7",
     "filesToRead": [
-      "src/lib/cloister/specialists.ts",
-      "src/lib/cloister/review-agent.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/router.ts",
-      "src/dashboard/server/routes/specialists.ts",
-      "src/cli/commands/specialists/wake.ts",
-      "src/cli/commands/specialists/reset.ts",
-      "src/lib/__tests__/code-review-agent-definitions.test.ts",
-      "tests/lib/cloister/deacon-orphan-recovery.test.ts",
-      "tests/lib/cloister/review-agent.test.ts"
+      "CLAUDE.md",
+      "docs/HARNESSES.md",
+      "docs/AGENT_TYPES_INDEX.md",
+      "docs/AGENTS.md",
+      "docs/KANBAN-MODEL.md",
+      "docs/REVIEW-AGENT-ARCHITECTURE.md",
+      "src/lib/cloister/prompts/planning.md"
     ]
   },
   "beadsMapping": {},
@@ -324,6 +321,12 @@
       "timestamp": "2026-05-09T23:01:08.000Z",
       "reason": "bead-complete",
       "note": "Implemented workspace-ifod/C2: removed legacy specialist wake/queue/session machinery, deleted resolveSpecialistBaseCommand and source review prompt templates, added code-review-synthesis agent definition, converted specialist wake/reset/init surfaces to unsupported responses, routed deacon orphan test recovery through spawnRun(test), updated stale sync-main/settings/read-model/test-delivery/post-merge tests for role-based behavior, and cleaned lingering deleted-specialist mock/comment references in tests. Verified npx tsc --noEmit, npx eslint . --max-warnings=0, full npm test (383 passed/5 skipped test files; 4605 passed/62 skipped tests), and graphify update pass.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T23:11:34.000Z",
+      "reason": "bead-complete",
+      "note": "Implemented workspace-jdu7/Z1 docs: added the role taxonomy to CLAUDE.md, rewrote harness and agent architecture docs around plan/work/review/test/ship roles and sub-roles, updated kanban/review architecture language away from specialist machinery, and refreshed the planning prompt taxonomy so planners encode downstream requirements for roles rather than named specialists. Verified JSON artifacts, npx tsc --noEmit, npx eslint . --max-warnings=0, full npm test (383 passed/5 skipped test files; 4605 passed/62 skipped tests), and graphify update.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

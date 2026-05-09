@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T22:32:50.345Z"
+    "updated": "2026-05-09T23:11:34.000Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 25,
+    "sequence": 26,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T22:32:50.345Z",
+    "updated": "2026-05-09T23:11:34.000Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -907,7 +907,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-05-09T22:32:50.345Z"
+            "completed": "2026-05-09T23:11:34.000Z"
           },
           {
             "id": "c2-delete-specialist-machinery.ac2",
@@ -916,7 +916,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-05-09T22:32:50.345Z"
+            "completed": "2026-05-09T23:11:34.000Z"
           },
           {
             "id": "c2-delete-specialist-machinery.ac3",
@@ -925,7 +925,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-05-09T22:32:50.345Z"
+            "completed": "2026-05-09T23:11:34.000Z"
           },
           {
             "id": "c2-delete-specialist-machinery.ac4",
@@ -934,7 +934,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-05-09T22:32:50.345Z"
+            "completed": "2026-05-09T23:11:34.000Z"
           },
           {
             "id": "c2-delete-specialist-machinery.ac5",
@@ -943,7 +943,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-05-09T22:32:50.345Z"
+            "completed": "2026-05-09T23:11:34.000Z"
           },
           {
             "id": "c2-delete-specialist-machinery.ac6",
@@ -952,7 +952,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-05-09T22:32:50.345Z"
+            "completed": "2026-05-09T23:11:34.000Z"
           },
           {
             "id": "c2-delete-specialist-machinery.ac7",
@@ -961,7 +961,7 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-05-09T22:32:50.345Z"
+            "completed": "2026-05-09T23:11:34.000Z"
           },
           {
             "id": "c2-delete-specialist-machinery.ac8",
@@ -970,10 +970,10 @@
             "metadata": {
               "kind": "acceptance_criterion"
             },
-            "completed": "2026-05-09T22:32:50.345Z"
+            "completed": "2026-05-09T23:11:34.000Z"
           }
         ],
-        "completed": "2026-05-09T22:32:50.345Z"
+        "completed": "2026-05-09T23:11:34.000Z"
       },
       {
         "id": "u1-workhorse-panel-component",
@@ -1657,7 +1657,7 @@
       {
         "id": "z1-update-claude-md-and-docs",
         "title": "Update CLAUDE.md and docs to reflect role primitive (lands with C2)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -1672,7 +1672,7 @@
           {
             "id": "z1-update-claude-md-and-docs.ac1",
             "title": "CLAUDE.md 'Panopticon Agent Taxonomy' section rewritten in terms of roles (5 roles, sub-roles, no specialist references)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1680,7 +1680,7 @@
           {
             "id": "z1-update-claude-md-and-docs.ac2",
             "title": "docs/HARNESSES.md and dashboard architecture docs updated; no remaining 'specialist' references except historical context",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1688,7 +1688,7 @@
           {
             "id": "z1-update-claude-md-and-docs.ac3",
             "title": "src/lib/cloister/prompts/planning.md (the planning prompt template, separate from roles/plan.md) updated to reference roles",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

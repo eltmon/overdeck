@@ -10,7 +10,7 @@ The board has **4 visible columns**:
 |--------|-------------|
 | **Todo** | Prioritized work ready to be planned and started |
 | **In Progress** | Agent actively implementing |
-| **In Review** | PR created, specialist review + UAT — stakeholders re-engage here |
+| **In Review** | PR created, review/test roles running — stakeholders re-engage here |
 | **Done** | Merged — awaiting human close-out |
 
 **Backlog** exists as a state but is **not a visible column**. Backlog items are accessed via a separate view/filter (see PAN-273).
@@ -50,7 +50,7 @@ The board has **4 visible columns**:
                                │  (Column 4)  │               │              │
                                │              │               └──────────────┘
                                └──────┬───────┘
-                                      │                         Specialists run.
+                                       │                         Review/test roles run.
                                       │ human clicks            Stakeholders do UAT.
                                       │ "Close Out"             Human review happens.
                                       ▼
@@ -89,16 +89,16 @@ Moving to In Progress triggers the heavy machinery:
 
 ### In Review
 
-The work agent has completed implementation and created a PR. The specialist pipeline takes over:
+The work role has completed implementation and created a PR. Role-based verification takes over:
 
-- review-agent checks code quality
-- test-agent runs tests
+- `review` checks code quality, requirements, security, and performance through its convoy sub-roles
+- `test` runs automated checks and required browser UAT
 - Stakeholders are notified — this is the signal for **UAT and human review**
-- Once approved, the issue becomes ready for merge
+- Once approved and tested, the issue becomes ready for ship/merge preparation
 
 ### Done
 
-Merged and **moved to Done on the tracker by the merge agent**. The PRD moves to `docs/prds/completed/`. The issue appears in the Done column, where the human can run the **Close-Out Ceremony** (dashboard button or `pan close`) to archive workspace artifacts, clean up agent state, and apply the `closed-out` label. Closed-out issues are hidden from the board by default (toggle "Include closed-out" to see them).
+Merged and **moved to Done on the tracker by the ship/post-merge lifecycle**. The PRD moves to `docs/prds/completed/`. The issue appears in the Done column, where the human can run the **Close-Out Ceremony** (dashboard button or `pan close`) to archive workspace artifacts, clean up agent state, and apply the `closed-out` label. Closed-out issues are hidden from the board by default (toggle "Include closed-out" to see them).
 
 ### Close-Out Ceremony
 
@@ -109,7 +109,7 @@ The close-out ceremony is the final human-gated step in the issue lifecycle. It 
 3. **Archive workspace artifacts** — Copies `.planning/feedback/`, `STATE.md`, and `beads/` to `~/.panopticon/archives/{issue}/`
 4. **Clean up workspace** — Kills tmux sessions, stops Docker containers, removes git worktree
 5. **Clean up agent state** — Removes `~/.panopticon/agents/agent-{issue}/` and `planning-{issue}/`
-6. **Close issue on tracker** — Ensures issue is in Done/Closed state (usually already done by merge agent). (**Hard fail**)
+6. **Close issue on tracker** — Ensures issue is in Done/Closed state (usually already done by the post-merge lifecycle). (**Hard fail**)
 7. **Apply `closed-out` label** — Creates the label if missing (blue `#1d4ed8`), adds to issue
 8. **Clear review status** — Removes from `review-status.json`
 

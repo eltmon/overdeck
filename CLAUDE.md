@@ -77,9 +77,25 @@ These block the Node.js event loop, freezing all HTTP requests, WebSocket connec
 
 ## Harnesses
 
-Panopticon supports two coding-agent harnesses: `claude-code` (default) and `pi` (alternative, multi-provider). The harness is picked per spawn at plan kickoff, work agent start, and the conversation panel; specialists read per-role defaults from Settings. Pi + Anthropic + subscription auth is the only blocked combination (ToS gate in `src/lib/harness-policy.ts`).
+Panopticon supports two coding-agent harnesses: `claude-code` (default) and `pi` (alternative, multi-provider). The harness is picked per spawn at plan kickoff, role runs, work agent start, and the conversation panel; roles read harness/model defaults from Settings. Pi + Anthropic + subscription auth is the only blocked combination (ToS gate in `src/lib/harness-policy.ts`).
 
 See [docs/HARNESSES.md](docs/HARNESSES.md) for installation, picker locations, ToS rules, and troubleshooting.
+
+## Panopticon Agent Taxonomy
+
+Panopticon's pipeline is expressed as five issue-scoped **roles**:
+
+| Role | Purpose | Instruction source |
+| --- | --- | --- |
+| `plan` | Discover requirements and produce vBRIEF/beads artifacts | `roles/plan.md` |
+| `work` | Implement one bead at a time in the workspace | `roles/work.md` |
+| `review` | Synthesize code review and transition approved/blocked work | `roles/review.md` |
+| `test` | Run automated verification and required browser UAT | `roles/test.md` |
+| `ship` | Rebase/verify/push approved branches for human merge | `roles/ship.md` |
+
+Sub-roles are configuration slots under a role, not standalone pipeline stages. Current sub-roles are `work.inspect`, `work.inspect-deep`, and the review convoy (`review.security`, `review.correctness`, `review.performance`, `review.requirements`). They use role-scoped model settings and Claude Code subagent definitions where needed, but the issue lifecycle still advances through the five roles above.
+
+Legacy specialist wake/session/queue machinery has been removed. Use `spawnRun(issueId, role, opts)` and lifecycle state transitions instead of waking named specialists.
 
 ## Project Structure
 
@@ -183,9 +199,9 @@ unconditionally.
   channels`) is dismissed automatically at agent startup via one
   `sendRawKeystrokeAsync(C-m)` call, gated on `state.channelsEnabled`.
 
-**Scope:** only the work-agent prompt-delivery sites in `src/lib/agents.ts`
+**Scope:** only the work-role prompt-delivery sites in `src/lib/agents.ts`
 migrate. The following intentionally stay on `sendKeysAsync`:
-`src/lib/cloister/` (specialists, deacon, review, merge), `src/lib/runtimes/`
+Cloister orchestration helpers outside work-message delivery, `src/lib/runtimes/`
 (non-Claude-Code runtimes), `src/dashboard/server/routes/conversations.ts`,
 and `src/dashboard/server/routes/misc.ts`. Bidirectional reply tools and
 dashboard-routed permission relay are out of scope and tracked as separate
@@ -235,7 +251,7 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 ## Verification Gate (PAN-174)
 
 After a work agent signals completion, Cloister runs quality gates from `projects.yaml`
-before waking the review-agent. If typecheck/lint/test fail, feedback is sent to the
+before advancing to the review role. If typecheck/lint/test fail, feedback is sent to the
 agent's tmux session and the completion marker is NOT processed (allowing retry).
 After 3 consecutive failures, verification is bypassed to prevent permanent blocking.
 
