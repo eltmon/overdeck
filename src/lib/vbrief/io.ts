@@ -17,7 +17,8 @@
  */
 
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { copyFile, mkdir } from 'fs/promises';
+import { dirname, join } from 'path';
 import {
   PROJECT_DOCS_SUBDIR,
   PROJECT_PRDS_ACTIVE_SUBDIR,
@@ -73,6 +74,34 @@ export function findVBriefInPrdDirs(projectRoot: string, issueId: string): strin
   }
 
   return null;
+}
+
+export interface ImportedPrdVBrief {
+  sourcePath: string;
+  workspacePlanPath: string;
+}
+
+/**
+ * Copies a matching PRD-scoped vBRIEF into the workspace-local plan location
+ * when `.pan/spec.vbrief.json` has not been materialized yet.
+ *
+ * Returns null when the workspace already has a plan or no PRD vBRIEF exists.
+ */
+export async function importVBriefFromPrdDirs(
+  projectRoot: string,
+  workspacePath: string,
+  issueId: string,
+): Promise<ImportedPrdVBrief | null> {
+  if (findPlan(workspacePath)) return null;
+
+  const sourcePath = findVBriefInPrdDirs(projectRoot, issueId);
+  if (!sourcePath) return null;
+
+  const workspacePlanPath = join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME);
+  await mkdir(dirname(workspacePlanPath), { recursive: true });
+  await copyFile(sourcePath, workspacePlanPath);
+
+  return { sourcePath, workspacePlanPath };
 }
 
 /**

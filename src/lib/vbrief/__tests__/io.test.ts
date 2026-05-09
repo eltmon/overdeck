@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { findPlan, isPlanningComplete, isPlanningProposed, readPlan, readWorkspacePlan, updateItemStatus, updateSubItemStatus } from '../io.js';
+import { findPlan, findVBriefInPrdDirs, importVBriefFromPrdDirs, isPlanningComplete, isPlanningProposed, readPlan, readWorkspacePlan, updateItemStatus, updateSubItemStatus } from '../io.js';
 import { ensureVBriefDirs, generateVBriefFilename, resolveVBriefDir } from '../lifecycle.js';
 import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../pan-dir/index.js';
 import type { VBriefDocument } from '../types.js';
@@ -115,6 +115,73 @@ describe('findPlan', () => {
     );
 
     expect(findPlan(workspacePath)).toBeNull();
+  });
+});
+
+describe('findVBriefInPrdDirs', () => {
+  it.each([
+    ['docs planned flat uppercase', ['docs', 'prds', 'planned', 'PAN-945-plan.vbrief.json']],
+    ['docs active lowercase subdirectory', ['docs', 'prds', 'active', 'pan-945', 'plan.vbrief.json']],
+    ['api docs planned flat lowercase', ['api', 'docs', 'prds', 'planned', 'pan-945-plan.vbrief.json']],
+    ['api docs active uppercase subdirectory', ['api', 'docs', 'prds', 'active', 'PAN-945', 'plan.vbrief.json']],
+  ])('finds %s vBRIEF copies', (_name, segments) => {
+    const projectRoot = join(TEST_DIR, 'project');
+    const sourcePath = join(projectRoot, ...segments);
+    mkdirSync(join(sourcePath, '..'), { recursive: true });
+    writeFileSync(sourcePath, JSON.stringify(makePlanDoc([{ id: 'item-1' }]), null, 2));
+
+    expect(findVBriefInPrdDirs(projectRoot, 'PAN-945')).toBe(sourcePath);
+  });
+
+  it('returns null when no PRD directory vBRIEF exists for the issue', () => {
+    const projectRoot = join(TEST_DIR, 'project');
+    const otherPath = join(projectRoot, 'docs', 'prds', 'planned', 'PAN-944-plan.vbrief.json');
+    mkdirSync(join(otherPath, '..'), { recursive: true });
+    writeFileSync(otherPath, JSON.stringify(makePlanDoc(), null, 2));
+
+    expect(findVBriefInPrdDirs(projectRoot, 'PAN-945')).toBeNull();
+  });
+});
+
+describe('importVBriefFromPrdDirs', () => {
+  it('copies a matching PRD vBRIEF into the workspace-local plan path when missing', async () => {
+    const projectRoot = join(TEST_DIR, 'project');
+    const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-945');
+    const sourcePath = join(projectRoot, 'api', 'docs', 'prds', 'planned', 'PAN-945-plan.vbrief.json');
+    const sourceDoc = makePlanDoc([{ id: 'item-1' }]);
+    sourceDoc.plan.id = 'PAN-945';
+    sourceDoc.plan.title = 'PRD Plan';
+    mkdirSync(join(sourcePath, '..'), { recursive: true });
+    mkdirSync(workspacePath, { recursive: true });
+    writeFileSync(sourcePath, JSON.stringify(sourceDoc, null, 2));
+
+    const imported = await importVBriefFromPrdDirs(projectRoot, workspacePath, 'PAN-945');
+
+    expect(imported).toEqual({
+      sourcePath,
+      workspacePlanPath: join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME),
+    });
+    expect(findPlan(workspacePath)).toBe(imported!.workspacePlanPath);
+    expect(readWorkspacePlan(workspacePath)?.plan.title).toBe('PRD Plan');
+  });
+
+  it('does not overwrite an existing workspace-local plan', async () => {
+    const projectRoot = join(TEST_DIR, 'project');
+    const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-945');
+    const sourcePath = join(projectRoot, 'docs', 'prds', 'planned', 'PAN-945-plan.vbrief.json');
+    const existingDoc = makePlanDoc([{ id: 'existing' }]);
+    existingDoc.plan.title = 'Existing Workspace Plan';
+    const sourceDoc = makePlanDoc([{ id: 'source' }]);
+    sourceDoc.plan.title = 'PRD Plan';
+    mkdirSync(join(sourcePath, '..'), { recursive: true });
+    mkdirSync(workspacePath, { recursive: true });
+    writePlanDoc(workspacePath, existingDoc);
+    writeFileSync(sourcePath, JSON.stringify(sourceDoc, null, 2));
+
+    const imported = await importVBriefFromPrdDirs(projectRoot, workspacePath, 'PAN-945');
+
+    expect(imported).toBeNull();
+    expect(readWorkspacePlan(workspacePath)?.plan.title).toBe('Existing Workspace Plan');
   });
 });
 

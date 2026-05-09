@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-945",
   "created": "2026-05-07T09:30:00Z",
-  "updated": "2026-05-09T01:15:27Z",
+  "updated": "2026-05-09T01:28:49Z",
   "gitState": {
     "branch": "feature/pan-945",
-    "sha": "d5db45e6f",
+    "sha": "bf16520db",
     "dirty": true
   },
   "decisions": [
@@ -26,6 +26,12 @@
       "summary": "Imported PRD-directory vBRIEFs inside the dashboard start-agent route before plan validation and beads auto-recovery run.",
       "rationale": "The start-agent endpoint already creates the workspace and then validates `.pan/spec.vbrief.json`. Copying the PRD-scoped plan into `.pan/spec.vbrief.json` at that point gives the rest of the existing route a normal workspace-local plan, including stale-issue validation, empty-plan validation, beads recovery, running-status transition, and planning-artifact commit behavior. The copy uses `fs/promises` so the dashboard request path does not block the Node.js event loop.",
       "recordedAt": "2026-05-09T01:15:27Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Extracted the copy operation into `importVBriefFromPrdDirs` and tested both discovery and import behavior in the vBRIEF I/O test suite.",
+      "rationale": "Dashboard and CLI start flows need the same non-overwriting import behavior. Keeping the copy operation in `src/lib/vbrief/io.ts` prevents duplicated path logic, gives tests a focused unit-level seam, and lets both callers materialize a workspace-local `.pan/spec.vbrief.json` while preserving `findPlan` as a workspace-only lookup.",
+      "recordedAt": "2026-05-09T01:28:49Z"
     }
   ],
   "hazards": [
@@ -38,15 +44,20 @@
       "id": "H2",
       "summary": "Dashboard start-agent runs inside the HTTP server, so any import logic that reads directories or copies files synchronously could freeze polling, WebSocket traffic, and terminal streaming.",
       "mitigation": "The route keeps only the fast `existsSync` discovery helper on the synchronous side and performs directory creation plus vBRIEF copying through `fs/promises` inside `Effect.promise`. No `readFileSync`, `writeFileSync`, directory scans, or shell-based copy commands were added to the server route."
+    },
+    {
+      "id": "H3",
+      "summary": "Auto-import must not overwrite a workspace-local plan because the workspace plan may contain newer agent status, bead progress, or user edits than the PRD archive copy.",
+      "mitigation": "`importVBriefFromPrdDirs` returns null immediately when `findPlan(workspacePath)` already finds `.pan/spec.vbrief.json`. The test suite now asserts that an existing workspace plan is preserved even when a matching PRD vBRIEF exists."
     }
   ],
   "resumePoint": {
-    "description": "Finish bead workspace-qmrt by committing the dashboard start-agent PRD vBRIEF import, closing the bead for inspection, and then proceed to bead workspace-bqcl to wire the same PRD vBRIEF import behavior into the CLI `pan start` command.",
-    "beadId": "workspace-qmrt",
+    "description": "Finish bead workspace-2dp3 by committing the vBRIEF discovery and auto-import tests, closing the bead, and then proceed to bead workspace-bqcl to wire `importVBriefFromPrdDirs` into the CLI `pan start` command.",
+    "beadId": "workspace-2dp3",
     "filesToRead": [
-      "src/dashboard/server/routes/agents.ts",
-      "src/cli/commands/start.ts",
-      "src/lib/vbrief/io.ts"
+      "src/lib/vbrief/io.ts",
+      "src/lib/vbrief/__tests__/io.test.ts",
+      "src/cli/commands/start.ts"
     ]
   },
   "beadsMapping": {},
@@ -68,6 +79,12 @@
       "timestamp": "2026-05-09T01:15:27Z",
       "reason": "progress",
       "note": "Implemented dashboard start-agent auto-import for PRD-directory vBRIEFs. When a workspace has no `.pan/spec.vbrief.json`, the route now discovers a matching vBRIEF under `docs/prds/{active,planned}` or `api/docs/prds/{active,planned}`, copies it into `.pan/spec.vbrief.json` with asynchronous filesystem operations, and then lets existing validation, beads recovery, and plan status handling continue against the workspace-local plan. `npm run typecheck` passed after the route change.",
+      "agentModel": "kc@kimi-k2.6"
+    },
+    {
+      "timestamp": "2026-05-09T01:28:49Z",
+      "reason": "progress",
+      "note": "Completed the test bead by adding coverage for all supported PRD vBRIEF discovery layouts, verifying that PRD vBRIEFs are copied into `.pan/spec.vbrief.json` when missing, and verifying that an existing workspace-local plan is never overwritten. The dashboard route now calls the shared async `importVBriefFromPrdDirs` helper instead of carrying its own copy logic. `npm test -- src/lib/vbrief/__tests__/io.test.ts` and `npm run typecheck` both passed.",
       "agentModel": "kc@kimi-k2.6"
     }
   ]
