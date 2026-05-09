@@ -1413,6 +1413,18 @@ export async function buildAgentLaunchConfig(opts: {
 }): Promise<AgentLaunchConfig> {
   const model = opts.model;
 
+  // Substrate guard: inject permission deny rules for Panopticon infrastructure
+  // paths (.claude/agents/, .claude/hooks/, ~/.panopticon/, JSONL session dirs)
+  // into the workspace's .claude/settings.local.json. Idempotent. Without this
+  // a vBRIEF action like "delete the legacy pan-*-agent.md files" can convince
+  // an agent to brick its own runtime. PAN-1048 X1 incident, 2026-05-09.
+  try {
+    const { injectPanopticonInfraDeny } = await import('./claude-settings-overlay.js');
+    await injectPanopticonInfraDeny(opts.workspace);
+  } catch (err) {
+    console.warn(`[agents] injectPanopticonInfraDeny failed for ${opts.agentId} (non-fatal): ${err instanceof Error ? err.message : err}`);
+  }
+
   const providerEnv = await getProviderEnvForModel(model);
 
   const provider = getProviderForModel(model as ModelId);
