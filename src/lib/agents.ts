@@ -36,6 +36,8 @@ import { BRIDGE_TOKEN_HEADER, readBridgeToken, writeBridgeToken } from './bridge
 
 const execAsync = promisify(exec);
 
+export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship';
+
 /**
  * BFS-walk a process subtree rooted at `rootPid` looking for the Claude Code
  * runtime (comm == 'claude'). Returns true if any process in the tree matches,

@@ -17,6 +17,7 @@ import { ModelId } from './settings.js';
 import { ModelProvider } from './model-fallback.js';
 import { MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
 import type { SubscriptionPlan, AuthMode } from './subscription-types.js';
+import type { Role } from './agents.js';
 export type { SubscriptionPlan, AuthMode };
 
 /**
@@ -80,6 +81,31 @@ export interface TtsSummarizerConfig {
   /** Seconds to batch activity before summarizing (default: 15) */
   batch_window_seconds?: number;
 }
+
+export type WorkhorseSlot = 'expensive' | 'mid' | 'cheap';
+export type ModelRef = string;
+
+export type WorkhorsesConfig = Partial<Record<WorkhorseSlot, ModelRef>>;
+
+export interface RoleSubConfig {
+  model: ModelRef;
+}
+
+export interface RoleConfig {
+  model: ModelRef;
+  harness?: 'claude-code' | 'pi';
+  sub?: Record<string, RoleSubConfig>;
+}
+
+export type RolesConfig = Partial<Record<Role, RoleConfig>>;
+
+export const DEFAULT_MODEL_REFS: Record<Role, ModelRef> = {
+  plan: 'workhorse:expensive',
+  work: 'workhorse:mid',
+  review: 'workhorse:expensive',
+  test: 'workhorse:mid',
+  ship: 'workhorse:mid',
+};
 
 export interface ResourcesConfig {
   /** Available RAM threshold that triggers a warning state/guardrail (GiB) */
@@ -174,6 +200,12 @@ export interface YamlConfig {
   tts?: {
     summarizer?: TtsSummarizerConfig;
   };
+
+  /** Workhorse model slots for role model indirection. */
+  workhorses?: WorkhorsesConfig;
+
+  /** Role-specific model and harness configuration. */
+  roles?: RolesConfig;
 
   /** Resource thresholds for dashboard health + spawn guardrails */
   resources?: ResourcesConfig;
@@ -298,6 +330,12 @@ export interface NormalizedConfig {
 
   /** OpenRouter favorite model IDs (shown in ModelPicker) */
   openrouterFavorites: string[];
+
+  /** Optional workhorse model slots used by role model references. */
+  workhorses?: WorkhorsesConfig;
+
+  /** Optional role model/harness configuration. */
+  roles?: RolesConfig;
 
   /** Per-work-type overrides */
   overrides: Partial<Record<WorkTypeId, ModelId>>;
@@ -639,10 +677,99 @@ function mergeCavemanConfig(
   }
 }
 
+function isWorkhorseRef(ref: ModelRef): boolean {
+  return ref.startsWith('workhorse:');
+}
+
+function workhorseSlotFromRef(ref: ModelRef): WorkhorseSlot | string {
+  return ref.slice('workhorse:'.length);
+}
+
+export function derefWorkhorse(
+  ref: ModelRef,
+  config: Pick<NormalizedConfig, 'workhorses'>,
+  fieldPath = 'model',
+): ModelId {
+  if (!isWorkhorseRef(ref)) return resolveModelId(ref) as ModelId;
+
+  const slot = workhorseSlotFromRef(ref) as WorkhorseSlot;
+  const resolved = config.workhorses?.[slot];
+  if (!resolved) {
+    throw new Error(`config.yaml: ${fieldPath} references ${ref} but workhorses.${slot} is not defined`);
+  }
+  if (isWorkhorseRef(resolved)) {
+    throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
+  }
+  return resolveModelId(resolved) as ModelId;
+}
+
+export function resolveModel(
+  role: Role,
+  subRole?: string,
+  config: Pick<NormalizedConfig, 'roles' | 'workhorses'> = {},
+): ModelId {
+  const roleConfig = config.roles?.[role];
+  const subModel = subRole ? roleConfig?.sub?.[subRole]?.model : undefined;
+  const roleModel = roleConfig?.model;
+  const ref = subModel ?? roleModel ?? DEFAULT_MODEL_REFS[role];
+  const fieldPath = subModel
+    ? `roles.${role}.sub.${subRole}.model`
+    : roleModel
+      ? `roles.${role}.model`
+      : `defaults.${role}.model`;
+  return derefWorkhorse(ref, config, fieldPath);
+}
+
+function mergeRoleConfig(result: NormalizedConfig, config: YamlConfig | null): void {
+  if (!config?.workhorses && !config?.roles) return;
+
+  if (config.workhorses) {
+    result.workhorses = {
+      ...(result.workhorses ?? {}),
+      ...config.workhorses,
+    };
+  }
+
+  if (config.roles) {
+    result.roles = { ...(result.roles ?? {}) };
+    for (const [role, roleConfig] of Object.entries(config.roles) as Array<[Role, RoleConfig]>) {
+      const existing = result.roles[role];
+      result.roles[role] = {
+        ...existing,
+        ...roleConfig,
+        sub: {
+          ...(existing?.sub ?? {}),
+          ...(roleConfig.sub ?? {}),
+        },
+      };
+    }
+  }
+}
+
+function validateRoleModelRefs(config: NormalizedConfig): void {
+  for (const [slot, ref] of Object.entries(config.workhorses ?? {}) as Array<[WorkhorseSlot, ModelRef]>) {
+    if (isWorkhorseRef(ref)) {
+      throw new Error(`config.yaml: workhorses.${slot} cannot reference another workhorse`);
+    }
+    resolveModelId(ref);
+  }
+
+  for (const [role, roleConfig] of Object.entries(config.roles ?? {}) as Array<[Role, RoleConfig]>) {
+    if (roleConfig.model) {
+      derefWorkhorse(roleConfig.model, config, `roles.${role}.model`);
+    }
+    for (const [subRole, subConfig] of Object.entries(roleConfig.sub ?? {})) {
+      if (subConfig.model) {
+        derefWorkhorse(subConfig.model, config, `roles.${role}.sub.${subRole}.model`);
+      }
+    }
+  }
+}
+
 /**
  * Merge multiple configs with precedence: project > global > defaults
  */
-function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedConfig; explicitlyDisabled: Set<ModelProvider> } {
+export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedConfig; explicitlyDisabled: Set<ModelProvider> } {
   const result: NormalizedConfig = {
     ...DEFAULT_CONFIG,
     tmux: {
@@ -806,6 +933,9 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       result.openrouterFavorites = config.openrouter.favorites;
     }
 
+    // Merge role/workhorse model configuration
+    mergeRoleConfig(result, config);
+
     // Merge legacy API keys (for backward compatibility)
     // Only enable providers that weren't explicitly disabled in models.providers
     if (config.api_keys) {
@@ -932,6 +1062,8 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       result.claude.permissionMode = config.claude.permissionMode;
     }
   }
+
+  validateRoleModelRefs(result);
 
   return { config: result, explicitlyDisabled };
 }

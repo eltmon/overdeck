@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T17:57:46.968Z"
+    "updated": "2026-05-09T19:43:02.400Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T19:06:32.359Z",
+    "updated": "2026-05-09T19:43:02.400Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -44,7 +44,7 @@
       {
         "id": "f1-role-config-schema",
         "title": "Foundation: Role type, workhorses/roles config schema, resolveModel, derefWorkhorse",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -59,7 +59,7 @@
           {
             "id": "f1-role-config-schema.ac1",
             "title": "`Role` type exported from src/lib/agents.ts with exactly the 5 values",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -67,7 +67,7 @@
           {
             "id": "f1-role-config-schema.ac2",
             "title": "NormalizedConfig in src/lib/config-yaml.ts has `workhorses` and `roles` fields with the documented shape; both optional in TypeScript (defaults applied by F3)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -75,7 +75,7 @@
           {
             "id": "f1-role-config-schema.ac3",
             "title": "`derefWorkhorse(ref, config)` returns the literal model id when ref starts with `workhorse:`, returns ref unchanged otherwise, throws when slot is undefined or chained",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -83,7 +83,7 @@
           {
             "id": "f1-role-config-schema.ac4",
             "title": "`resolveModel(role, subRole?, config)` returns a literal model id, walking sub-role override → role override → DEFAULT_MODEL_REFS[role]",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -91,7 +91,7 @@
           {
             "id": "f1-role-config-schema.ac5",
             "title": "Config-load-time validation rejects unresolved `workhorse:*` references with an error message naming the offending field (e.g., `roles.review.sub.security.model`)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -99,7 +99,7 @@
           {
             "id": "f1-role-config-schema.ac6",
             "title": "Chained workhorse references (e.g., `workhorses.cheap: workhorse:mid`) are rejected at parse with a clear error",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -107,7 +107,7 @@
           {
             "id": "f1-role-config-schema.ac7",
             "title": "Vitest covers: 5 roles × literal/workhorse-ref resolution, sub-role override, chained-ref rejection, missing-slot rejection, config round-trip; all pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

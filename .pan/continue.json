@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T19:32:22.600Z",
+  "updated": "2026-05-09T19:43:02.400Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "1ec51ddeb",
+    "sha": "0d86e0ee1",
     "dirty": true
   },
   "decisions": [
@@ -78,6 +78,11 @@
       "id": "D14",
       "summary": "Deferred X1 legacy .claude/agents/pan-*-agent.md deletion because bd surfaced it before all spawn callsites had migrated to role-based launch. The files are still required by planning and specialist dispatch, so deleting them now would brick active and future agents. Treat X1 as out-of-scope until a follow-up after role spawn migration is verified on main.",
       "recordedAt": "2026-05-09T19:32:22.600Z"
+    },
+    {
+      "id": "D15",
+      "summary": "Role model foundation uses type-only Role import in config-yaml.ts to avoid a runtime circular dependency with agents.ts. mergeConfigs remains the config-load validation boundary, while derefWorkhorse/resolveModel are exported for role spawn and settings code.",
+      "recordedAt": "2026-05-09T19:43:02.400Z"
     }
   ],
   "hazards": [
@@ -135,14 +140,21 @@
       "id": "H11",
       "summary": "The bead dependency materialization allowed X1 to become ready too early, despite runtime dependencies on legacy agent definition files.",
       "mitigation": "Do not touch .claude/agents/pan-*-agent.md in PAN-1048 unless the vBRIEF and bd graph are corrected after S2-S5/C1 land. Keep legacy files in place until a separate cleanup issue verifies role-based launch is stable on main."
+    },
+    {
+      "id": "H12",
+      "summary": "The bd dependency graph for PAN-1048 was materialized in reverse, causing terminal cleanup beads to appear before foundation beads.",
+      "mitigation": "Corrected the active bd graph enough for f1-role-config-schema to be the sole ready bead before implementing it; continue checking bd ready against the vBRIEF order and fix dependency edges before executing any bead that appears before its prerequisites."
     }
   ],
   "resumePoint": {
-    "description": "X1 was deferred as unsafe. Continue with bd ready -l pan-1048 and implement the top ready bead without touching .claude/agents/pan-*-agent.md.",
-    "beadId": "workspace-bnrg",
+    "description": "Completed workspace-t6t4/f1-role-config-schema. Next: commit this bead, close it, run pan inspect because requiresInspection=true, then continue with bd ready -l pan-1048.",
+    "beadId": "workspace-t6t4",
     "filesToRead": [
-      ".pan/spec.vbrief.json",
-      ".pan/continue.json"
+      "src/lib/agents.ts",
+      "src/lib/config-yaml.ts",
+      "src/lib/__tests__/config-yaml-roles.test.ts",
+      ".pan/spec.vbrief.json"
     ]
   },
   "beadsMapping": {},
@@ -165,6 +177,12 @@
       "timestamp": "2026-05-09T19:32:22.600Z",
       "reason": "bead-deferred",
       "note": "Deferred workspace-bnrg/X1 after user correction: legacy pan agent definition files are still required by current planning and specialist spawn paths. Reverted accidental code-comment edits and preserved only the vBRIEF deferral metadata.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T19:43:02.400Z",
+      "reason": "bead-complete",
+      "note": "Implemented Role type plus workhorse/role model config schema, derefWorkhorse, resolveModel, config-load validation through mergeConfigs, and vitest coverage for role resolution, sub-role override, missing-slot and chained-ref errors. Typecheck and targeted role config tests pass.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],
