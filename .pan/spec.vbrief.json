@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T23:33:20.935Z"
+    "updated": "2026-05-09T23:49:32.457Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 27,
+    "sequence": 28,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T23:33:20.935Z",
+    "updated": "2026-05-09T23:49:32.457Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -1094,7 +1094,7 @@
       {
         "id": "u3-settings-page-rewire",
         "title": "Settings UI: rewire SettingsPage to render WorkhorsePanel + RolesPanel",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -1109,28 +1109,32 @@
           {
             "id": "u3-settings-page-rewire.ac1",
             "title": "SettingsPage's Agents/Models route renders WorkhorsePanel + RolesPanel (in that vertical order)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T23:41:48.183Z"
           },
           {
             "id": "u3-settings-page-rewire.ac2",
             "title": "AgentCardsPanel route removed from SettingsPage",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T23:41:48.183Z"
           },
           {
             "id": "u3-settings-page-rewire.ac3",
             "title": "Navigation, scrolling, and any sub-panel transitions work; no console errors",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T23:41:48.183Z"
           }
-        ]
+        ],
+        "completed": "2026-05-09T23:41:48.183Z"
       },
       {
         "id": "u4-delete-agentcards-components",

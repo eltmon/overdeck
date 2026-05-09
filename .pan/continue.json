@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T23:33:20.935Z",
+  "updated": "2026-05-09T23:49:32.457Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "d9dd586cd774d77c486794e8c5d5424fd1dab1ec",
+    "sha": "f1309c65d",
     "dirty": true
   },
   "decisions": [
@@ -163,16 +163,11 @@
     }
   ],
   "resumePoint": {
-    "description": "workspace-00df/D1 implementation and verification are complete: src/lib/work-types.ts and src/lib/work-type-router.ts were deleted; all source/packages/tests references to WorkTypeId, WORK_TYPES, work-type-router, work-types, getModelId, and WorkTypeRouter were migrated to role-based resolveModel(role, subRole?) or removed; smart-model-selector.ts remains only as a decoupled research utility because src/lib/model-research/test-selection.ts still calls it. Verification passed: npx tsc --noEmit, npx eslint . --max-warnings=0, npm test, graphify update ., and source/packages/tests grep for legacy symbols. Next: stage exact D1 files plus .pan updates, commit, close workspace-00df, then wait for inspection feedback.",
-    "beadId": "workspace-00df",
+    "description": "workspace-9uxn/U3 SettingsPage rewire is implemented and verified: the model-routing section renders WorkhorsePanel followed by RolesPanel, and SettingsPage does not mount AgentCardsPanel. Static coverage in SettingsPage.test.ts guards panel order and absence of the old AgentCardsPanel route. Validation passed: npx tsc --noEmit, npx eslint . --max-warnings=0, npm test (381 passed/5 skipped test files; 4531 passed/62 skipped tests), and graphify update. Next: stage exact U3 files plus .pan/graphify updates, commit, close workspace-9uxn, then continue with bd ready -l pan-1048.",
+    "beadId": "workspace-9uxn",
     "filesToRead": [
-      "src/lib/config-yaml.ts",
-      "src/lib/settings-api.ts",
-      "src/lib/cloister/review-agent.ts",
-      "src/lib/cloister/specialists.ts",
-      "src/lib/router-config.ts",
-      "tests/integration/config-precedence.test.ts",
-      "tests/lib/router-config.test.ts"
+      "src/dashboard/frontend/src/components/Settings/SettingsPage.tsx",
+      "src/dashboard/frontend/src/components/Settings/__tests__/SettingsPage.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -333,6 +328,12 @@
       "timestamp": "2026-05-09T23:33:20.935Z",
       "reason": "bead-complete",
       "note": "Implemented workspace-00df/D1: deleted WorkType registry/router modules and their direct tests, migrated backend/dashboard/settings/review/specialist/router-config callsites from WorkTypeId/WORK_TYPES/WorkTypeRouter/getModelId/hasOverride to role-based config-yaml resolveModel(role, subRole?) or opaque legacy model-route strings where compatibility surfaces remain, retained smart-model-selector.ts as a decoupled research utility because it has a non-router caller, rewrote config precedence coverage for role/workhorse resolution, and verified npx tsc --noEmit, npx eslint . --max-warnings=0, full npm test (381 passed/5 skipped test files; 4530 passed/62 skipped tests), source/packages/tests grep for legacy symbols, and graphify update.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T23:49:32.457Z",
+      "reason": "bead-complete",
+      "note": "Implemented workspace-9uxn/U3: SettingsPage now renders WorkhorsePanel followed by RolesPanel in the model-routing section, and a SettingsPage test asserts that order while guarding that the old AgentCardsPanel route is not mounted from SettingsPage. Verified npx tsc --noEmit, npx eslint . --max-warnings=0, full npm test (381 passed/5 skipped test files; 4531 passed/62 skipped tests), and graphify update.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

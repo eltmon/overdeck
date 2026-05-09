@@ -50,6 +50,7 @@ import { OpenRouterPage } from './OpenRouterPage';
 import { SensitiveText } from '../SensitiveText';
 import { DesktopSettingsSection } from './DesktopSettingsSection';
 import { WorkhorsePanel } from './WorkhorsePanel';
+import { RolesPanel } from './RolesPanel';
 import {
   ModelOverrideModal,
   getCapabilityMatchScore,
@@ -671,6 +672,7 @@ export function SettingsPage() {
         </h2>
 
         <WorkhorsePanel />
+        <RolesPanel />
 
         {/* Preset summary */}
         <div className="flex items-center justify-between px-4 py-3 bg-card border border-border rounded-lg mb-4">

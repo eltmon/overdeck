@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { buildMiniMaxFormData } from '../SettingsPage';
 import { MODELS_BY_PROVIDER } from '../AgentCards/ModelOverrideModal';
@@ -40,6 +42,23 @@ const DEPRECATED_MODEL_IDS = [
   'glm-4.7',
   'glm-4.7-flash',
 ];
+
+const SETTINGS_PAGE_SOURCE = readFileSync(
+  resolve(process.cwd(), 'src/dashboard/frontend/src/components/Settings/SettingsPage.tsx'),
+  'utf8',
+);
+
+describe('SettingsPage role model routing panels', () => {
+  it('renders WorkhorsePanel before RolesPanel and does not mount AgentCardsPanel', () => {
+    const workhorseIndex = SETTINGS_PAGE_SOURCE.indexOf('<WorkhorsePanel />');
+    const rolesIndex = SETTINGS_PAGE_SOURCE.indexOf('<RolesPanel />');
+
+    expect(workhorseIndex).toBeGreaterThanOrEqual(0);
+    expect(rolesIndex).toBeGreaterThan(workhorseIndex);
+    expect(SETTINGS_PAGE_SOURCE).not.toContain('<AgentCardsPanel');
+    expect(SETTINGS_PAGE_SOURCE).not.toContain("from './AgentCards'");
+  });
+});
 
 describe('MODELS_BY_PROVIDER', () => {
   it('contains no deprecated model IDs', () => {

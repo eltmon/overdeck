@@ -3316,8 +3316,8 @@
     "hash": "31b03b987fcbf49a939902c4bbc07fb4"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/Settings/SettingsPage.tsx": {
-    "mtime": 1778369586.9867435,
-    "hash": "8e70e1dfdcf2577cd89d6c29cc793c6f"
+    "mtime": 1778370076.8213918,
+    "hash": "f64c470cfecb0ea9326b7983ebb77aea"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/Settings/OpenRouterPage.tsx": {
     "mtime": 1778368791.9936247,
@@ -3380,8 +3380,8 @@
     "hash": "0f07b87318c53c473792b5c473f9f937"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/Settings/__tests__/SettingsPage.test.ts": {
-    "mtime": 1778368792.001625,
-    "hash": "804810e92e356f0abe7be82e6765a800"
+    "mtime": 1778370341.0946326,
+    "hash": "83668a7b91555a48147c18a4349d8a85"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/Settings/__tests__/OpenRouterModelBrowser.test.tsx": {
     "mtime": 1778368792.001625,
