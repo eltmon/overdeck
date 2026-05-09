@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-1044",
   "created": "2026-05-09T17:02:13.086Z",
-  "updated": "2026-05-09T23:38:57.878Z",
+  "updated": "2026-05-09T23:39:32.479Z",
   "gitState": {
     "branch": "feature/pan-1044",
     "sha": "051b851d7",
@@ -128,6 +128,11 @@
     },
     {
       "timestamp": "2026-05-09T23:38:57.878Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-05-09T23:39:32.479Z",
       "reason": "end",
       "note": "Agent signaled work complete"
     }
