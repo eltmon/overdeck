@@ -2607,7 +2607,8 @@ const postAgentsRoute = HttpRouter.add(
       phase,
       workspacePath,
     }));
-    const activityId = yield* Effect.promise(() => spawnPanCommand(['start', issueId, '--local', '--phase', phase, '--model', spawnModel], workspacePath));
+    const requestedHarness = ((body as any).harness === 'pi' || (body as any).harness === 'claude-code') ? (body as any).harness : 'claude-code';
+    const activityId = yield* Effect.promise(() => spawnPanCommand(['start', issueId, '--local', '--phase', phase, '--model', spawnModel, '--harness', requestedHarness], workspacePath));
 
     // Write early state.json so the dashboard immediately shows agent-<id> as the
     // active agent. Without this there's a race window between spawnPanCommand returning
@@ -2619,7 +2620,8 @@ const postAgentsRoute = HttpRouter.add(
     yield* Effect.promise(() => writeFile(join(earlyStateDir, 'state.json'), JSON.stringify({
       id: earlyAgentId,
       issueId,
-      runtime: 'claude',
+      runtime: requestedHarness,
+      harness: requestedHarness,
       model: 'pending-work-spawn',
       status: 'starting',
       startedAt: new Date().toISOString(),

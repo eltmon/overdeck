@@ -10,6 +10,32 @@ import styles from './ModelPicker.module.css';
 
 export const FALLBACK_COMPACTION_MODEL = 'claude-haiku-4-5-20251001';
 
+
+export type Harness = 'claude-code' | 'pi';
+export type AuthMode = 'api-key' | 'subscription';
+
+export const HARNESS_OPTIONS: Array<{ id: Harness; label: string; description: string }> = [
+  { id: 'claude-code', label: 'Claude Code', description: 'Default Claude Code CLI harness' },
+  { id: 'pi', label: 'Pi', description: 'Pi RPC harness (no tmux paste-buffer)' },
+];
+
+export const PI_TOS_BLOCK_REASON = 'Pi cannot run Anthropic models when authenticated via Claude Code subscription. Switch Anthropic to API-key auth, or pick a non-Anthropic model.';
+
+export function getProviderForPickerModel(modelId: string, groups: ModelGroup[]): string | undefined {
+  for (const group of groups) {
+    if (group.models.some((model) => model.id === modelId)) return group.provider;
+  }
+  if (modelId.startsWith('claude-')) return 'anthropic';
+  return undefined;
+}
+
+export function canUsePickerHarness(harness: Harness, provider: string | undefined, authMode?: AuthMode): { allowed: boolean; reason?: string } {
+  if (harness === 'pi' && provider === 'anthropic' && authMode === 'subscription') {
+    return { allowed: false, reason: PI_TOS_BLOCK_REASON };
+  }
+  return { allowed: true };
+}
+
 export interface PickerModel {
   id: string;
   label: string;
@@ -202,5 +228,98 @@ export function ModelSelect({
         )}
       </div>
     </div>
+  );
+}
+
+
+export function HarnessSelect({
+  value,
+  onChange,
+  modelId,
+  groups,
+  authMode,
+  label = 'Harness',
+}: {
+  value: Harness;
+  onChange: (harness: Harness) => void;
+  modelId: string;
+  groups: ModelGroup[];
+  authMode?: AuthMode;
+  label?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const provider = getProviderForPickerModel(modelId, groups);
+  const selected = HARNESS_OPTIONS.find((h) => h.id === value) ?? HARNESS_OPTIONS[0];
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  useEffect(() => {
+    const decision = canUsePickerHarness(value, provider, authMode);
+    if (!decision.allowed) onChange('claude-code');
+  }, [value, provider, authMode, onChange]);
+
+  return (
+    <div className={styles.field}>
+      <span className={styles.fieldLabel}>{label}</span>
+      <div ref={ref} className={styles.pickerWrap}>
+        <button type="button" className={styles.pickerBtn} onClick={() => setOpen((o) => !o)}>
+          <span className={styles.pickerValue}>{selected.label}</span>
+          <ChevronDown size={12} className={styles.pickerChevron} />
+        </button>
+        {open && (
+          <div className={styles.pickerDropdown}>
+            {HARNESS_OPTIONS.map((harness) => {
+              const decision = canUsePickerHarness(harness.id, provider, authMode);
+              return (
+                <button
+                  key={harness.id}
+                  type="button"
+                  className={`${styles.pickerOption} ${harness.id === value ? styles.pickerOptionActive : ''}`}
+                  disabled={!decision.allowed}
+                  title={decision.reason ?? harness.description}
+                  onClick={() => { if (decision.allowed) { onChange(harness.id); setOpen(false); } }}
+                >
+                  <span className={styles.pickerOptionLabel}>{harness.label}</span>
+                  {!decision.allowed && <span className={styles.pickerOptionCost}>ToS gated</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function ModelHarnessPicker({
+  model,
+  harness,
+  onModelChange,
+  onHarnessChange,
+  groups,
+  authMode,
+  modelLabel = 'Model',
+}: {
+  model: string;
+  harness: Harness;
+  onModelChange: (model: string) => void;
+  onHarnessChange: (harness: Harness) => void;
+  groups: ModelGroup[];
+  authMode?: AuthMode;
+  modelLabel?: string;
+}) {
+  return (
+    <>
+      <ModelSelect value={model} onChange={onModelChange} groups={groups} label={modelLabel} />
+      <HarnessSelect value={harness} onChange={onHarnessChange} modelId={model} groups={groups} authMode={authMode} />
+    </>
   );
 }

@@ -10,6 +10,7 @@ import yaml from 'js-yaml';
 import { loadConfig, getGlobalConfigPath, YamlConfig, clearConfigCache } from './config-yaml.js';
 import { WorkTypeId } from './work-types.js';
 import { ModelId } from './settings.js';
+import type { RuntimeName } from './runtimes/types.js';
 import { MODEL_CAPABILITIES, getModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
 import { reloadGlobalRouter } from './work-type-router.js';
 
@@ -98,6 +99,7 @@ export interface ApiSettingsConfig {
       openrouter: boolean;
     };
     overrides: Partial<Record<WorkTypeId, ModelId>>;
+    harness_overrides?: Partial<Record<WorkTypeId, RuntimeName>>;
     gemini_thinking_level?: number;
     default_conversation_model?: ModelId;
   };
@@ -217,6 +219,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         openrouter: config.enabledProviders.has('openrouter'),
       },
       overrides: migratedOverrides,
+      harness_overrides: config.harnessOverrides ?? {},
       gemini_thinking_level: config.geminiThinkingLevel,
       default_conversation_model: getDefaultConversationModelApi(),
     },
@@ -280,6 +283,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
         openrouter: settings.models.providers.openrouter,
       },
       overrides: settings.models.overrides,
+      harness_overrides: settings.models.harness_overrides,
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
       default_conversation_model: settings.models.default_conversation_model,
     },
@@ -435,6 +439,15 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
       // Check if valid (current or deprecated)
       else if (!validModelIds.includes(modelId)) {
         errors.push(`Invalid model ID "${modelId}" for work type "${workType}"`);
+      }
+    }
+  }
+
+  // Validate harness overrides
+  if (settings.models?.harness_overrides) {
+    for (const [workType, harness] of Object.entries(settings.models.harness_overrides)) {
+      if (harness !== 'claude-code' && harness !== 'pi') {
+        errors.push(`Invalid harness "${String(harness)}" for work type "${workType}"`);
       }
     }
   }

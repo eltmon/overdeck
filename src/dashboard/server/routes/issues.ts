@@ -572,6 +572,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       shadowMode = false,
       model: modelOverride,
       effort,
+      harness = 'claude-code',
     } = body as any;
 
     console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
@@ -755,6 +756,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
             startDocker: body.startDocker,
             shadowMode,
             model: modelOverride || undefined,
+            harness,
             effort: effort || undefined,
             onProgress: (event) => {
               console.log(`[start-planning] Progress: step=${event.step} label="${event.label}" status=${event.status} detail="${event.detail}"`);

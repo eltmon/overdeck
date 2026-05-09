@@ -12,7 +12,7 @@ import {
   CheckCircle2,
   Star,
 } from 'lucide-react';
-import { WorkTypeId, ModelId } from '../types';
+import { WorkTypeId, ModelId, Harness } from '../types';
 import { CostWarningBadge, costWarningLevel } from '../../shared/costWarning';
 
 // Model capabilities that can be matched to work types
@@ -220,10 +220,11 @@ export type OpenRouterFavoriteModel = {
 interface ModelOverrideModalProps {
   workType: WorkTypeId;
   currentModel: ModelId;
+  currentHarness?: Harness;
   isOverride: boolean;
   enabledProviders: string[];
   openRouterFavorites?: OpenRouterFavoriteModel[];
-  onApply: (model: ModelId) => void;
+  onApply: (model: ModelId, harness?: Harness) => void;
   onRemove: () => void;
   onClose: () => void;
 }
@@ -231,6 +232,7 @@ interface ModelOverrideModalProps {
 export function ModelOverrideModal({
   workType,
   currentModel,
+  currentHarness = 'claude-code',
   isOverride,
   enabledProviders,
   openRouterFavorites,
@@ -239,6 +241,7 @@ export function ModelOverrideModal({
   onClose,
 }: ModelOverrideModalProps) {
   const [selectedModel, setSelectedModel] = useState<ModelId>(currentModel);
+  const [selectedHarness, setSelectedHarness] = useState<Harness>(currentHarness);
   const [openRouterModels, setOpenRouterModels] = useState<ModelDef[]>([]);
 
   const workTypeName = WORK_TYPE_NAMES[workType] || workType;
@@ -322,11 +325,15 @@ export function ModelOverrideModal({
   }, [displayProviders, requiredCapabilities]);
 
   const handleApply = () => {
-    onApply(selectedModel);
+    onApply(selectedModel, effectiveHarness);
     onClose();
   };
 
-  const hasChanges = selectedModel !== currentModel;
+  const selectedProvider = displayProviders.find((provider) => provider.models.some((model) => model.id === selectedModel))?.key;
+  const piBlocked = selectedProvider === 'anthropic';
+  const effectiveHarness = piBlocked && selectedHarness === 'pi' ? 'claude-code' : selectedHarness;
+  const hasChanges = selectedModel !== currentModel || effectiveHarness !== currentHarness;
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -353,6 +360,21 @@ export function ModelOverrideModal({
               <X className="w-5 h-5" />
             </button>
           </div>
+        </div>
+
+        <div className="px-6 py-4 border-b border-border bg-card">
+          <label className="text-sm font-medium text-foreground mb-1.5 block">Harness</label>
+          <select
+            value={effectiveHarness}
+            onChange={(e) => setSelectedHarness(e.target.value as Harness)}
+            className="w-full px-3 py-2 bg-popover border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="claude-code">Claude Code (default)</option>
+            <option value="pi" disabled={piBlocked}>Pi RPC{piBlocked ? ' — unavailable for Anthropic subscription' : ''}</option>
+          </select>
+          {piBlocked && selectedHarness === 'pi' && (
+            <p className="text-xs text-warning mt-1">Pi cannot run Anthropic models with Claude Code subscription auth; Claude Code will be used.</p>
+          )}
         </div>
 
         {/* Model List */}

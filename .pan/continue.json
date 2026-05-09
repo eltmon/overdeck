@@ -1,217 +1,56 @@
 {
   "version": "1",
-  "issueId": "PAN-1044",
-  "created": "2026-05-09T17:02:13.086Z",
-  "updated": "2026-05-10T02:28:53.004Z",
+  "issueId": "PAN-1055",
+  "created": "2026-05-09T21:07:00.000Z",
+  "updated": "2026-05-09T21:07:00.000Z",
   "gitState": {
-    "branch": "feature/pan-1044",
-    "sha": "c39af48aa",
+    "branch": "feature/pan-1055",
+    "sha": "754460d78",
     "dirty": true
   },
   "decisions": [
     {
       "id": "D1",
-      "summary": "SessionNode.type (not role) classifies session types. PRD draft erroneously used s.role === 'work'. Bucketing logic must use s.type === 'work' to detect work agent sessions.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
+      "summary": "Implemented a shared dashboard HarnessSelect/ModelHarnessPicker surface and threaded harness values through planning and work-agent start endpoints using the existing pan start --harness support.",
+      "recordedAt": "2026-05-09T21:07:00.000Z"
     },
     {
       "id": "D2",
-      "summary": "issueCosts is Record<string, number> (not Map). The CommandDeck index.tsx builds it as a plain object from costData.issues.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
+      "summary": "Persisted per-work-type harness overrides alongside model overrides as models.harness_overrides so settings round-trip model and harness choices together.",
+      "recordedAt": "2026-05-09T21:07:00.000Z"
     },
     {
       "id": "D3",
-      "summary": "feature.issueId is uppercase (e.g., PAN-1044). reviewStatusByIssueId keys are also uppercase. Direct lookup is safe without case normalization.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
-    },
-    {
-      "id": "D4",
-      "summary": "useDashboardStore selector for reviewStatusByIssueId must be called once at component top (const reviewStatusByIssueId = useDashboardStore(s => s.reviewStatusByIssueId)), then indexed per feature — React hooks cannot be called in loops.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
-    },
-    {
-      "id": "D5",
-      "summary": "projectsWithSessions is ProjectData[] (array), not a Map. In CommandDeck routing: projectsWithSessions.find(p => p.name === selectedProject)?.features ?? [] is the correct lookup.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
-    },
-    {
-      "id": "D6",
-      "summary": "Cost breakdown tooltip uses hover-popover pattern from FeatureItem.tsx (onMouseEnter/onMouseLeave/onFocus/onBlur) — not a click modal. This is the in-repo convention for inline popovers next to issue/feature rows.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
-    },
-    {
-      "id": "D7",
-      "summary": "IssueCostEntry in index.tsx is expanded to include byModel and byStage from /api/costs/by-issue (the endpoint already returns this data). CommandDeck builds issueCostDetails: Record<string, { byModel, byStage }> from costData.issues and passes it to ProjectOverview. No new API endpoints needed.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
-    },
-    {
-      "id": "D8",
-      "summary": "ProjectNode click split: ChevronRight wrapped in a span with its own onClick (e.stopPropagation + toggle). The outer button onClick calls onSelectProject and expands if collapsed. MessageSquarePlus already has e.stopPropagation — preserve it exactly.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
-    },
-    {
-      "id": "D9",
-      "summary": "bucketFeature exported from ProjectOverview.tsx for testability. Tests co-located in __tests__/ProjectOverview.test.tsx covering all 9 stage branches.",
-      "recordedAt": "2026-05-09T17:30:00.000Z"
+      "summary": "Fixed postMergeLifecycle verification to tolerate removed source refs after merge cleanup; the previous behavior broke the full test suite when no branch ref remained.",
+      "recordedAt": "2026-05-09T21:07:00.000Z"
     }
   ],
   "hazards": [
     {
       "id": "H1",
-      "summary": "ProjectNode is currently a single <button> that toggles expand. The split requires the ChevronRight to be wrapped in a separate <span onClick e.stopPropagation> inside the button. Do not use a nested <button> inside <button> (invalid HTML).",
-      "mitigation": "Use a <span role='button' tabIndex=0> or plain <span onClick e.stopPropagation> for the chevron wrapper. The PRD narrative specifies plain <span>."
-    },
-    {
-      "id": "H2",
-      "summary": "issueCosts must be passed to ProjectOverview explicitly in the routing block. projectsWithSessions.find(...) returns undefined if the project name changed since last render — always use the ?. and ?? [] fallback.",
-      "mitigation": "Use: projectsWithSessions.find(p => p.name === selectedProject)?.features ?? []"
-    },
-    {
-      "id": "H3",
-      "summary": "The cost-breakdown-tooltip bead adds the CostBreakdownTooltip UI inside ProjectOverview.tsx. The issueCostDetails data is only wired in the commanddeck-routing bead. Until bead 6 is done, the tooltip degrades gracefully (badge shows, no hover). This is by design — the optional prop allows independent delivery.",
-      "mitigation": "issueCostDetails is optional in ProjectOverviewProps. The tooltip checks for presence before rendering hover behavior."
-    },
-    {
-      "id": "H4",
-      "summary": "CostBreakdownTooltip reads from the issueCostDetails prop directly — no local fetch or useQuery. Tooltip data freshness depends on CommandDeck's 15s costData refetch interval. This is acceptable: cost data is not real-time.",
-      "mitigation": "No action needed. Document in code comment."
-    },
-    {
-      "id": "H5",
-      "summary": "Friendly model name display should strip 'claude-' prefix and date suffixes (e.g. '-20250120') to avoid displaying raw API model IDs. Reference: friendlyModelName() in CostBreakdownModal.tsx uses replace('claude-', '').replace(/-20\\d{6}$/, '').replace(/-/g, ' ') with title case.",
-      "mitigation": "Copy the friendlyModelName() utility inline in ProjectOverview.tsx."
+      "summary": "Frontend ToS gating currently treats Anthropic picker contexts as subscription-auth when auth mode is not exposed to the client.",
+      "mitigation": "The backend pan start and harness-policy gate still enforce the single source of truth; future UI can replace the conservative assumption with an auth-mode endpoint."
     }
   ],
-  "resumePoint": null,
-  "beadsMapping": {},
-  "agentModel": "gpt-5.5",
+  "resumePoint": {
+    "description": "Implementation bead workspace-xgc6 complete; commit changes, close bead, then submit PAN-1055 if no additional beads are ready.",
+    "beadId": "workspace-xgc6",
+    "filesToRead": [
+      "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
+      "src/dashboard/frontend/src/components/PlanDialog.tsx",
+      "src/lib/settings-api.ts"
+    ]
+  },
+  "beadsMapping": {
+    "workspace-xgc6": "PAN-1055 dashboard harness picker implementation"
+  },
+  "agentModel": "Claude Opus 4.7",
   "sessionHistory": [
     {
-      "timestamp": "2026-05-09T17:02:13.086Z",
-      "reason": "planning",
-      "note": "Planning session started for PAN-1044: Command Deck: Project Overview Panel with pipeline swimlanes",
-      "agentModel": "agent:claude-opus-4-5"
-    },
-    {
-      "timestamp": "2026-05-09T17:30:00.000Z",
-      "reason": "planning-revised",
-      "note": "Plan revised: added cost-breakdown-tooltip bead (hover popover for model/stage cost breakdown). Updated pipeline-swimlanes bead to explicitly include cost badge on stuck callout cards. Updated commanddeck-routing to expand IssueCostEntry with byModel/byStage and wire issueCostDetails to ProjectOverview. User requests: (1) cost of issue shown in summary, (2) hover over cost shows model/stage breakdown.",
-      "agentModel": "agent:claude-opus-4-5"
-    },
-    {
-      "timestamp": "2026-05-09T17:19:07.860Z",
-      "reason": "start",
-      "agentModel": "gpt-5.5"
-    },
-    {
-      "timestamp": "2026-05-09T21:03:11.463Z",
+      "timestamp": "2026-05-09T21:07:00.000Z",
       "reason": "bead-complete",
-      "note": "workspace-fran implemented CommandDeck selectedProject routing, issueCostDetails wiring, ProjectNode project-selection props, and CommandDeck coverage for project overview rendering. Commit 7e7c73a1d.",
-      "agentModel": "gpt-5.5"
-    },
-    {
-      "timestamp": "2026-05-09T21:16:26.643Z",
-      "reason": "quality-gates",
-      "note": "Restored full-suite stability by aligning stale model/skill fixtures with current sources and isolating agent-spawning tests from local Channels settings. Gates passed: npm run typecheck, npm run lint, npm test. Commit f2d67ee9c.",
-      "agentModel": "gpt-5.5"
-    },
-    {
-      "timestamp": "2026-05-09T21:38:06.576Z",
-      "reason": "end",
-      "note": "Project overview panel implemented"
-    },
-    {
-      "timestamp": "2026-05-09T23:36:58.066Z",
-      "reason": "feedback-fix",
-      "note": "Fixed frontend-typecheck verification failure by passing issueCostDetails into PipelineSection so ProjectOverview cards can render cost breakdown data. Verified with npm --prefix ./src/dashboard/frontend exec tsc --noEmit.",
-      "agentModel": "gpt-5.5"
-    },
-    {
-      "timestamp": "2026-05-09T23:38:57.878Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-05-09T23:39:32.479Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-05-09T23:46:44.875Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-05-09T23:54:00.459Z",
-      "reason": "feedback-fix",
-      "note": "Fixed test verification failure by narrowing tests/global-setup.ts fallback from full npm run build to npm run build:contracts && npm run build:cli, avoiding unrelated dashboard Vite build during clean test setup. Verified npm run build:contracts && npm run build:cli and npm test.",
-      "agentModel": "gpt-5.5"
-    },
-    {
-      "timestamp": "2026-05-09T23:54:52.281Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-05-10T00:02:38.944Z",
-      "reason": "feedback-fix",
-      "note": "Fixed test verification failure where Vitest could not resolve @panctl/contracts when contract dist was missing but CLI dist existed. tests/global-setup.ts now independently rebuilds packages/contracts/dist before checking CLI dist. Verified targeted direct Vitest with contracts dist absent, npm run build, and npm test.",
-      "agentModel": "gpt-5.5"
-    },
-    {
-      "timestamp": "2026-05-10T00:03:30.715Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-05-10T00:18:44.000Z",
-      "reason": "feedback-fix",
-      "note": "Fixed repeated test verification failure where Vitest import analysis resolved @panctl/contracts through package exports and failed when generated dist artifacts were absent. Root and frontend Vitest configs now alias @panctl/contracts to packages/contracts/src/index.ts. Verified targeted contracts reducer test with contracts dist absent, frontend ProjectOverview test, npm test, and npm run build.",
-      "agentModel": "gpt-5.5"
-    },
-    {
-      "timestamp": "2026-05-10T01:28:53.494Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-05-10T01:31:04.000Z",
-      "reason": "feedback-fix",
-      "note": "Fixed frontend CommandDeck test failure after inactive projects added a second project-node test element. The project overview test now waits for all project nodes before selecting test-project. Verified with npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/CommandDeck.test.tsx.",
-      "agentModel": "gpt-5.5"
-    },
-    {
-      "timestamp": "2026-05-10T01:34:49.027Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-05-10T02:19:53.000Z",
-      "reason": "feedback-fix",
-      "note": "Fixed review-requested ProjectOverview correctness issues: blocked review and dispatch-failed tests now bucket as stuck with clear reasons, active-agent counts and working buckets ignore stopped/suspended agents unless an active work session exists, and partial cost breakdown data is safe. Combined cost maps into one memo pass and guarded static cost badges. Verified ProjectOverview tests, frontend typecheck, and npm test.",
-      "agentModel": "gpt-5.5"
-    },
-    {
-      "timestamp": "2026-05-10T02:21:09.354Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-05-10T02:21:27.085Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
-    },
-    {
-      "timestamp": "2026-05-10T02:27:56.000Z",
-      "reason": "feedback-fix",
-      "note": "Fixed test verification failure in read-model checkpoint reconciliation by updating the checkpoint-manager mock for the current deleteLegacyCheckpointRefs export and per-agent diff/timestamp helper signatures. Verified the targeted checkpoint test and npm test.",
-      "agentModel": "gpt-5.5"
-    },
-    {
-      "timestamp": "2026-05-10T02:28:53.003Z",
-      "reason": "end",
-      "note": "Agent signaled work complete"
+      "note": "Added shared harness picker primitives, surfaced harness in planning/settings flows, passed harness through start endpoints, added settings round-trip support, fixed unrelated post-merge lifecycle test failure, and verified typecheck/lint/npm test pass.",
+      "agentModel": "Claude Opus 4.7"
     }
-  ],
-  "feedback": []
+  ]
 }

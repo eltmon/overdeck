@@ -42,7 +42,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useAlert } from '../DialogProvider';
-import { SettingsConfig, Provider, WorkTypeId, ModelId } from './types';
+import { SettingsConfig, Provider, WorkTypeId, ModelId, Harness } from './types';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
 import { useCodexAuthStatus } from '../../hooks/useCodexAuthStatus';
@@ -138,6 +138,7 @@ export function buildMiniMaxFormData(
     models: {
       providers: { ...miniMaxDefaults.models.providers },
       overrides: { ...miniMaxDefaults.models.overrides },
+      harness_overrides: { ...(formData?.models.harness_overrides || {}) },
       gemini_thinking_level: formData?.models.gemini_thinking_level,
     },
     api_keys: { ...(formData?.api_keys || {}) },
@@ -511,7 +512,7 @@ export function SettingsPage() {
   };
 
 
-  const handleSetOverride = (workType: WorkTypeId, model: ModelId) => {
+  const handleSetOverride = (workType: WorkTypeId, model: ModelId, harness?: Harness) => {
     setFormData({
       ...formData,
       models: {
@@ -520,17 +521,23 @@ export function SettingsPage() {
           ...formData.models.overrides,
           [workType]: model,
         },
+        harness_overrides: harness ? {
+          ...(formData.models.harness_overrides || {}),
+          [workType]: harness,
+        } : formData.models.harness_overrides,
       },
     });
   };
 
   const handleRemoveOverride = (workType: WorkTypeId) => {
     const { [workType]: _removed, ...remainingOverrides } = formData.models.overrides;
+    const { [workType]: _removedHarness, ...remainingHarnessOverrides } = formData.models.harness_overrides || {};
     setFormData({
       ...formData,
       models: {
         ...formData.models,
         overrides: remainingOverrides,
+        harness_overrides: remainingHarnessOverrides,
       },
     });
   };
@@ -546,6 +553,7 @@ export function SettingsPage() {
         models: {
           providers: { ...(formData?.models.providers || optimalDefaults.models.providers) },
           overrides: { ...optimalDefaults.models.overrides },
+          harness_overrides: { ...(formData?.models.harness_overrides || {}) },
           gemini_thinking_level: optimalDefaults.models.gemini_thinking_level,
         },
         api_keys: { ...(formData?.api_keys || {}) },
@@ -1609,12 +1617,13 @@ export function SettingsPage() {
         <ModelOverrideModal
           workType={modalWorkType}
           currentModel={getEffectiveModelId(modalWorkType, formData.models.overrides)}
+          currentHarness={(formData.models.harness_overrides || {})[modalWorkType] || 'claude-code'}
           isOverride={!!formData.models.overrides[modalWorkType]}
           enabledProviders={Object.entries(formData.models.providers)
             .filter(([_, enabled]) => enabled)
             .map(([provider]) => provider)}
           openRouterFavorites={openRouterFavoriteModels}
-          onApply={(model) => handleSetOverride(modalWorkType, model)}
+          onApply={(model, harness) => handleSetOverride(modalWorkType, model, harness)}
           onRemove={() => handleRemoveOverride(modalWorkType)}
           onClose={() => setModalWorkType(null)}
         />

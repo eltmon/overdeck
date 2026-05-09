@@ -128,3 +128,13 @@
   color: var(--muted-foreground);
   flex-shrink: 0;
 }
+
+
+.pickerOption:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pickerOption:disabled:hover {
+  background: none;
+}
