@@ -302,6 +302,8 @@ export const ReadModelServiceLive = Layer.effect(
               agentPhase: cachedAgent?.agentPhase,
               hasPendingQuestion: cachedAgent?.hasPendingQuestion,
               pendingQuestionCount: cachedAgent?.pendingQuestionCount,
+              pendingQuestionPrompt: cachedAgent?.pendingQuestionPrompt,
+              pendingQuestionReason: cachedAgent?.pendingQuestionReason,
               resolution: cachedAgent?.resolution,
               resolutionCount: cachedAgent?.resolutionCount,
             };
@@ -407,6 +409,8 @@ export const ReadModelServiceLive = Layer.effect(
             agentPhase: enrichment ? toAgentPhase(enrichment.agentPhase) : undefined,
             hasPendingQuestion: enrichment?.hasPendingQuestion,
             pendingQuestionCount: enrichment?.pendingQuestionCount,
+            pendingQuestionPrompt: enrichment?.pendingQuestionPrompt,
+            pendingQuestionReason: enrichment?.pendingQuestionReason,
             resolution: enrichment ? toAgentResolution(enrichment.resolution) : undefined,
             resolutionCount: enrichment?.resolutionCount,
           };

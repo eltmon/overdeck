@@ -34,7 +34,7 @@ import { PlanDialog } from './PlanDialog';
 import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
-import { isReviewPipelineStuck } from '../lib/pipeline-state';
+import { getPendingQuestionTitle, hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { RecoverButton } from './RecoverButton';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
 import { PanOpenInPicker } from './PanOpenInPicker';
@@ -128,6 +128,9 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
   } | null>(null);
 
   const tmuxCommand = agent ? `tmux attach -t ${agent.id}` : '';
+  const awaitingInput = hasActualPendingQuestion(agent);
+  const awaitingInputTitle = getPendingQuestionTitle(agent);
+  const awaitingInputPrompt = agent?.pendingQuestionPrompt?.trim();
 
   // Check lifecycle state for stopped agents (drives Start vs Resume vs Reset semantics)
   const { data: agentLifecycle } = useQuery<WorkAgentLifecycle | undefined>({
@@ -803,6 +806,34 @@ export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issu
               No workspace created yet. Use <strong>Plan</strong> to create a workspace and plan this issue,
               or <strong>Create Workspace</strong> below.
             </div>
+          </div>
+        )}
+
+        {/* Awaiting input banner */}
+        {agent && awaitingInput && (
+          <div className="px-3 py-2 border-b border-warning/40 bg-warning/10" data-testid={`inspector-input-${issueId}`}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
+              <span className="text-xs font-bold uppercase tracking-wide text-warning">Awaiting Input</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-2" title={awaitingInputTitle}>
+              {awaitingInputTitle}
+            </p>
+            {awaitingInputPrompt && (
+              <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded border border-warning/30 bg-card/80 p-2 text-[10px] leading-4 text-foreground">
+                {awaitingInputPrompt}
+              </pre>
+            )}
+            {onOpenTerminal && (
+              <button
+                onClick={onOpenTerminal}
+                className="mt-2 inline-flex items-center gap-1.5 rounded border border-warning/40 bg-warning/15 px-2 py-1 text-[10px] font-medium text-warning hover:bg-warning/25"
+                title="Open terminal to answer this prompt"
+              >
+                <Terminal className="w-3 h-3" />
+                Attach terminal
+              </button>
+            )}
           </div>
         )}
 

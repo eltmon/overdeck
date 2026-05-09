@@ -335,6 +335,13 @@
   border-color: color-mix(in srgb, var(--destructive) 40%, transparent);
 }
 
+.featureBadge_waiting {
+  background: color-mix(in srgb, var(--warning) 22%, transparent);
+  color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 52%, transparent);
+  font-weight: 700;
+}
+
 .featureActivityError {
   background: var(--destructive) !important;
   opacity: 1 !important;

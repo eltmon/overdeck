@@ -23,7 +23,7 @@ import {
 */
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState, type StartAgentResponse } from '../types';
 import { getFriendlyModelName } from './inspector/utils';
-import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, HelpCircle, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText, Pause, RefreshCw, Radio } from 'lucide-react';
+import { ExternalLink, User, Tag, Play, Eye, MessageCircle, X, Loader2, Filter, FileText, Github, List, CheckCircle, DollarSign, RotateCcw, CheckCheck, Cloud, Monitor, AlertTriangle, Undo, Check, ChevronDown, ChevronRight, GitMerge, Sparkles, XCircle, AlertCircle, ScrollText, Pause, RefreshCw, Radio } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 import { BeadsTasksPanel } from './BeadsTasksPanel';
 import { parseDifficultyLabel, ComplexityLevel } from '../../../../lib/cloister/complexity.js';
@@ -38,7 +38,7 @@ import { StopAgentButton } from './StopAgentButton';
 import { ArtifactLinks } from './ArtifactLinks';
 import { MergeButton } from './MergeButton';
 import { RecoverButton } from './RecoverButton';
-import { hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
+import { getPendingQuestionTitle, hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { getIssueWorkAgentMap, getWorkSessionLabel, isAgentSessionAttachable } from '../lib/swarmSlots';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
@@ -2736,6 +2736,7 @@ function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialis
   const isTerminal = isMerged || canonical === 'done' || canonical === 'canceled';
   const isReviewReady = shouldShowReviewReadyBadge(issue, reviewStatus);
   const hasPendingQuestion = hasActualPendingQuestion(agent);
+  const pendingQuestionTitle = getPendingQuestionTitle(agent);
   const isPipelineStuck = !isTerminal && canonical === 'in_review' && isReviewPipelineStuck(reviewStatus);
   const pipelineCallToAction = canonical === 'in_review' ? getPipelineCallToAction(reviewStatus) : null;
   const phaseLabel =
@@ -3235,12 +3236,14 @@ function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialis
               <span
                 onClick={(e) => {
                   e.stopPropagation();
-                  onPlan();
+                  if (planningAgent && !activeAgent) onPlan();
+                  else onSelect();
                 }}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-warning text-foreground animate-pulse cursor-pointer hover:bg-warning/90"
-                title={`Agent is waiting for user input - click to respond (${agent?.pendingQuestionCount || 1} question${(agent?.pendingQuestionCount || 1) > 1 ? 's' : ''})`}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold bg-warning text-warning-foreground border border-warning/50 animate-pulse cursor-pointer hover:bg-warning/90 uppercase tracking-wide"
+                title={`${pendingQuestionTitle} — click to open ${planningAgent && !activeAgent ? 'planning' : 'inspector'}`}
+                data-testid={`card-input-${issue.identifier}`}
               >
-                <HelpCircle className="w-3 h-3" />
+                <AlertTriangle className="w-3 h-3" />
                 Input
               </span>
             )}

@@ -70,6 +70,8 @@ export const AgentEnrichmentChangedEvent = Schema.Struct({
     agentPhase: Schema.optional(AgentPhase),
     hasPendingQuestion: Schema.Boolean,
     pendingQuestionCount: Schema.Number,
+    pendingQuestionPrompt: Schema.optional(Schema.String),
+    pendingQuestionReason: Schema.optional(Schema.String),
     resolution: Schema.optional(AgentResolution),
     resolutionCount: Schema.optional(Schema.Number),
   }),

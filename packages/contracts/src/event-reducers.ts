@@ -192,6 +192,8 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
             agentPhase: event.payload.agentPhase,
             hasPendingQuestion: event.payload.hasPendingQuestion,
             pendingQuestionCount: event.payload.pendingQuestionCount,
+            pendingQuestionPrompt: event.payload.pendingQuestionPrompt,
+            pendingQuestionReason: event.payload.pendingQuestionReason,
             resolution: event.payload.resolution,
             resolutionCount: event.payload.resolutionCount,
           },

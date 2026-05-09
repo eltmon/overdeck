@@ -97,6 +97,8 @@ export interface Agent {
   agentPhase?: 'planning' | 'implementation' | 'exploration' | string;
   hasPendingQuestion?: boolean;
   pendingQuestionCount?: number;
+  pendingQuestionPrompt?: string;
+  pendingQuestionReason?: string;
   resolution?: AgentResolution;  // Lifecycle completion signal (PAN-309)
   resolutionCount?: number;      // How many times this resolution was set
   runtimeState?: string;         // 'completed' when agent finished normally (not session lost)

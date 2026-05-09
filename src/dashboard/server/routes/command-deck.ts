@@ -33,6 +33,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
 
 import { getAgentRuntimeStateAsync, listRunningAgentsAsync } from '../../../lib/agents.js';
+import { detectAwaitingInputForAgent } from '../../../lib/agent-input-detection.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
@@ -240,6 +241,9 @@ export async function fetchActivityDataWithContext(
     status: string;
     transcript?: string;
     presence: SessionNodePresence;
+    awaitingInput?: boolean;
+    awaitingInputPrompt?: string;
+    awaitingInputReason?: string;
     hasJsonl?: boolean;
     roundMetadata?: ReviewerRoundMetadata;
   }> = [];
@@ -290,6 +294,9 @@ export async function fetchActivityDataWithContext(
 
       const rtState = await getAgentRuntimeStateAsync(checkId);
       const presence = await deriveSessionPresence(checkId, rtState, tmuxSessionNames);
+      const awaitingInput = tmuxSessionNames.has(checkId)
+        ? await detectAwaitingInputForAgent(checkId, { isPlanning })
+        : null;
 
       // Resolve JSONL path for conversation rendering (PAN-821)
       const jsonlPath = await resolveJsonlPath(checkId, workspacePath);
@@ -315,6 +322,9 @@ export async function fetchActivityDataWithContext(
           : (state.status || 'completed'),
         transcript: jsonlPath ? undefined : transcript,
         presence,
+        awaitingInput: awaitingInput !== null,
+        awaitingInputPrompt: awaitingInput?.prompt,
+        awaitingInputReason: awaitingInput?.reason,
         hasJsonl: !!jsonlPath,
         tmuxSession: exposeInteractiveTerminal ? checkId : undefined,
       });

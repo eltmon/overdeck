@@ -1,0 +1,73 @@
+{
+  "version": "1",
+  "issueId": "PAN-1030",
+  "created": "2026-05-09T00:00:00Z",
+  "updated": "2026-05-09T01:37:27Z",
+  "gitState": {
+    "branch": "feature/pan-1030",
+    "sha": "8f1fd3692",
+    "dirty": true
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "The workspace had no PAN-1030 beads on recovery, so I created a single issue-scoped bead for the full awaiting-input indicator feature and kept the implementation in one reviewable commit.",
+      "recordedAt": "2026-05-09T00:00:00Z"
+    },
+    {
+      "id": "D2",
+      "summary": "Awaiting-input state is derived observationally from existing runtime waiting signals, pending AskUserQuestion JSONL records, and read-only tmux pane scans for permission menus, y/n confirmations, and planning-finalized Done prompts. No agent state is mutated by detection.",
+      "recordedAt": "2026-05-09T00:00:00Z"
+    },
+    {
+      "id": "D3",
+      "summary": "The existing pipeline-status skill was already tracked on this branch but missing from the synced-skills fixture, so the fixture was updated to keep the full test suite green without changing skill contents.",
+      "recordedAt": "2026-05-09T01:37:27Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "The recovered workspace started without issue-scoped beads and with a stale tracked continue-file deletion from another issue.",
+      "mitigation": "Created bead workspace-mla7 and replaced the stale continue state with PAN-1030-specific recovery notes."
+    },
+    {
+      "id": "H2",
+      "summary": "Full npm test initially failed on a pre-existing synced-skills fixture mismatch and a project-route unit test mock that did not include the newly-used tmux capture helper.",
+      "mitigation": "Updated the committed fixture to include the tracked pipeline-status skill and extended the route test tmux mock with capturePaneAsync."
+    }
+  ],
+  "resumePoint": {
+    "description": "PAN-1030 implementation verified with build, typecheck, lint, and full tests. Next: commit bead workspace-mla7, close it for inspection, then proceed to final gates if inspection passes.",
+    "beadId": "workspace-mla7",
+    "filesToRead": [
+      "src/lib/agent-input-detection.ts",
+      "src/lib/agent-enrichment.ts",
+      "packages/contracts/src/types.ts",
+      "src/dashboard/frontend/src/lib/pipeline-state.ts",
+      "src/dashboard/frontend/src/components/KanbanBoard.tsx",
+      "src/dashboard/frontend/src/components/InspectorPanel.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx"
+    ]
+  },
+  "beadsMapping": {
+    "awaiting-input-indicators": [
+      "workspace-mla7"
+    ]
+  },
+  "agentModel": "claude-code",
+  "sessionHistory": [
+    {
+      "timestamp": "2026-05-09T00:00:00Z",
+      "reason": "recovery",
+      "note": "Recovered PAN-1030 with no matching beads. Created workspace-mla7, claimed it, and implemented read-only prompt detection plus kanban, command deck, and inspector indicators.",
+      "agentModel": "claude-code"
+    },
+    {
+      "timestamp": "2026-05-09T01:37:27Z",
+      "reason": "verification",
+      "note": "Verified implementation with npm run build, npm run typecheck, npm run lint, targeted detector/pipeline tests, and full npm test (4525 passed, 48 skipped). Fixed the route mock and synced-skills fixture failures found during full test.",
+      "agentModel": "claude-code"
+    }
+  ]
+}
