@@ -40,8 +40,8 @@ import {
   type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { timingSafeEqual } from 'node:crypto';
-import { existsSync, unlinkSync } from 'node:fs';
 import { chmod, mkdir, unlink, appendFile, stat } from 'node:fs/promises';
+import { existsSync, unlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 

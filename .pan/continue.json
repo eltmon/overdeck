@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-945",
   "created": "2026-05-07T09:30:00Z",
-  "updated": "2026-05-09T01:35:25Z",
+  "updated": "2026-05-09T01:41:20Z",
   "gitState": {
     "branch": "feature/pan-945",
-    "sha": "406dedef4",
+    "sha": "f7e0507d0",
     "dirty": true
   },
   "decisions": [
@@ -44,6 +44,18 @@
       "summary": "Updated path module mocks in existing tests to include the PRD directory constants now imported by vBRIEF I/O.",
       "rationale": "Adding PRD vBRIEF discovery made `src/lib/vbrief/io.ts` import `PROJECT_DOCS_SUBDIR`, `PROJECT_PRDS_SUBDIR`, `PROJECT_PRDS_ACTIVE_SUBDIR`, and `PROJECT_PRDS_PLANNED_SUBDIR`. Several older tests mock `paths.js` narrowly for unrelated agent or lifecycle behavior, so the full suite failed at module import time even though the production constants exist. Extending those mocks keeps the tests focused on their original subjects while satisfying the expanded public surface they transitively import.",
       "recordedAt": "2026-05-09T01:35:25Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Resolved the merge from `origin/main` by keeping the PAN-945 workspace continue state instead of unrelated main-branch continue state from another issue.",
+      "rationale": "The only textual merge conflict was `.pan/continue.json`. The incoming main version described PAN-1025 and would have destroyed the recovery context for this PAN-945 workspace. Keeping the PAN-945 continue state preserves the issue-specific decisions, hazards, and resume history while still allowing the rest of the main-branch code and artifact updates to merge normally.",
+      "recordedAt": "2026-05-09T01:42:00Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Fixed merged `panopticon-bridge.ts` typecheck errors by importing the Node APIs used by the new channel bridge code.",
+      "rationale": "After merging `origin/main`, `npm run typecheck` failed because `panopticon-bridge.ts` referenced `timingSafeEqual` and `unlinkSync` without importing them. These were direct missing imports in the merged main changes, not PAN-945 logic. Adding `timingSafeEqual` from `node:crypto` and `unlinkSync` from `node:fs` fixes the TypeScript errors at the source and keeps the channel bridge implementation intact.",
+      "recordedAt": "2026-05-09T01:41:20Z"
     }
   ],
   "hazards": [
@@ -71,10 +83,20 @@
       "id": "H5",
       "summary": "Tests that mock `paths.js` can fail at import time when production modules add new exported path constants, even if those tests do not exercise the new behavior directly.",
       "mitigation": "The affected mocks now include the PRD path constants used by vBRIEF I/O. The previously failing suites were rerun together and passed, proving the test scaffolding matches the production module surface again."
+    },
+    {
+      "id": "H6",
+      "summary": "Main branch may contain a `.pan/continue.json` from a different issue because workspace state files are committed during agent work, creating frequent merge conflicts in recovered workspaces.",
+      "mitigation": "During the merge from `origin/main`, the PAN-945 continue state was kept and the unrelated PAN-1025 state from main was discarded for this workspace. Future cleanup should keep workspace continue files issue-scoped or avoid carrying unrelated continue state across active workspaces."
+    },
+    {
+      "id": "H7",
+      "summary": "Merging a fast-moving main branch can introduce unrelated typecheck failures that block PAN-945 submission even when PAN-945 code is already valid.",
+      "mitigation": "The merged `panopticon-bridge.ts` missing imports were fixed directly and `npm run typecheck` was rerun successfully before continuing to full gate verification."
     }
   ],
   "resumePoint": {
-    "description": "All PAN-945 beads are closed. Commit the test mock compatibility fixes, rerun the full quality gates, push `feature/pan-945`, and call `pan done PAN-945` with a terse summary if the tree is clean and the gates pass.",
+    "description": "The branch has merged `origin/main`, the `.pan/continue.json` conflict is resolved, and the merged channel bridge typecheck errors are fixed. Commit the typecheck fix, rerun full quality gates, push the branch, and rerun `pan done PAN-945`.",
     "beadId": null,
     "filesToRead": [
       "src/lib/vbrief/io.ts",
@@ -120,6 +142,18 @@
       "timestamp": "2026-05-09T01:35:25Z",
       "reason": "progress",
       "note": "The full quality gate initially failed because several unrelated tests mocked `paths.js` without the PRD path constants that `src/lib/vbrief/io.ts` now imports. I updated those mocks to include the missing constants and reran the four previously failing suites together; they all passed. The next step is to commit these test compatibility fixes and rerun the full quality gate.",
+      "agentModel": "kc@kimi-k2.6"
+    },
+    {
+      "timestamp": "2026-05-09T01:42:00Z",
+      "reason": "progress",
+      "note": "Merged `origin/main` after the first `pan done PAN-945` attempt reported a rebase conflict. The merge conflict was limited to `.pan/continue.json`; I resolved it by keeping the PAN-945 recovery state and discarding the unrelated PAN-1025 continue state from main. The merge still needs to be committed, verified, pushed, and submitted through `pan done` again.",
+      "agentModel": "kc@kimi-k2.6"
+    },
+    {
+      "timestamp": "2026-05-09T01:41:20Z",
+      "reason": "progress",
+      "note": "After the merge commit, `npm run typecheck` failed in the newly merged channel bridge code because `timingSafeEqual` and `unlinkSync` were referenced without imports. I added the missing `node:crypto` and `node:fs` imports and reran `npm run typecheck`; it passed. The next step is to commit this merged-main typecheck fix and rerun the full gate.",
       "agentModel": "kc@kimi-k2.6"
     }
   ]
