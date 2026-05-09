@@ -41,24 +41,52 @@ interface OverlayResult {
  * Anything destructive on these paths must go through Panopticon CLI commands or
  * a human, never an agent's Bash/Write/Edit tool.
  */
+// Claude Code's permission matcher requires `:*` at the END of the pattern
+// (prefix-match the tool argument). Mid-glob `**/...` is rejected at startup
+// with a "Settings Warning" dialog that blocks ALL agent input until
+// dismissed (PAN-1024 incident, 2026-05-09). The Edit/Write matcher takes
+// a glob, but Bash takes a command-prefix string — different syntax.
+//
+// These patterns are best-effort: they catch the literal-prefix cases
+// (`rm .claude/agents/...`, `rm ~/.panopticon/...`). They cannot cover
+// `cd .claude && rm -rf agents/`. The proper guard is a PreToolUse hook
+// — tracked separately. These rules are the cheap belt-and-suspenders.
 const PANOPTICON_INFRA_DENY_PATTERNS = [
   // Agent definitions / launch templates
-  'Bash(rm:.claude/agents/**)',
-  'Bash(rm:**/.claude/agents/**)',
+  'Bash(rm .claude/agents/:*)',
+  'Bash(rm -rf .claude/agents/:*)',
+  'Bash(rm -r .claude/agents/:*)',
   'Edit(.claude/agents/**)',
   'Write(.claude/agents/**)',
   // Hook scripts
-  'Bash(rm:.claude/hooks/**)',
-  'Bash(rm:**/.claude/hooks/**)',
+  'Bash(rm .claude/hooks/:*)',
+  'Bash(rm -rf .claude/hooks/:*)',
+  'Bash(rm -r .claude/hooks/:*)',
   'Edit(.claude/hooks/**)',
   'Write(.claude/hooks/**)',
   // Panopticon installed binaries / hooks / config (~/.panopticon)
+  'Bash(rm ~/.panopticon/:*)',
+  'Bash(rm -rf ~/.panopticon/:*)',
+  'Bash(rm -r ~/.panopticon/:*)',
+  // Sacred conversation history — already documented as never-delete
+  'Bash(rm ~/.claude/projects/:*)',
+  'Bash(rm -rf ~/.claude/projects/:*)',
+  'Bash(rm -r ~/.claude/projects/:*)',
+];
+
+// Legacy invalid patterns from PAN-1024 first-pass that Claude Code rejects
+// at startup with a blocking dialog. We strip these on every overlay write
+// so existing workspace settings get auto-cleaned.
+const INVALID_LEGACY_PATTERNS = new Set<string>([
+  'Bash(rm:.claude/agents/**)',
+  'Bash(rm:**/.claude/agents/**)',
+  'Bash(rm:.claude/hooks/**)',
+  'Bash(rm:**/.claude/hooks/**)',
   'Bash(rm:~/.panopticon/**)',
   'Bash(rm:**/.panopticon/**)',
-  // Sacred conversation history — already documented as never-delete
   'Bash(rm:~/.claude/projects/**)',
   'Bash(rm:**/.claude/projects/**)',
-];
+]);
 
 /**
  * Inject Panopticon-infrastructure permission deny rules into the workspace's
@@ -84,7 +112,10 @@ export async function injectPanopticonInfraDeny(workingDir: string): Promise<voi
 
   const permissions = (existing.permissions as Record<string, unknown> | undefined) ?? {};
   const denyList = (permissions.deny as string[] | undefined) ?? [];
-  const merged = new Set<string>([...denyList, ...PANOPTICON_INFRA_DENY_PATTERNS]);
+  // Strip any legacy invalid patterns (would block agent startup with a
+  // Settings Warning dialog) and merge in the current valid set.
+  const cleaned = denyList.filter(p => !INVALID_LEGACY_PATTERNS.has(p));
+  const merged = new Set<string>([...cleaned, ...PANOPTICON_INFRA_DENY_PATTERNS]);
   permissions.deny = Array.from(merged).sort();
   existing.permissions = permissions;
 
