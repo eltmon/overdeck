@@ -1098,11 +1098,20 @@ export async function runParallelReview(
     // previous round, inject the new round's prompt directly. Otherwise
     // spawn fresh and pin `remain-on-exit on` so the pane survives across
     // rounds for Command Deck history.
-    if (await sessionExistsAsync(sessionName)) {
+    // PAN-1034 follow-on: also check pane_dead — a session can exist but have a dead
+    // pane (e.g. specialist crashed). In that case, kill it and fall through to spawn.
+    const paneDead = await isPaneDeadAsync(sessionName);
+    if (await sessionExistsAsync(sessionName) && !paneDead) {
+      // Session exists and pane is alive — resume it
       console.log(`[review-agent] Resuming reviewer ${sessionName} for new round`);
       await sendKeysAsync(sessionName, prompt, 'runParallelReview-resume');
       resumedCount++;
     } else {
+      // Session doesn't exist or pane is dead — kill and respawn
+      if (paneDead) {
+        console.log(`[review-agent] Reviewer ${sessionName} pane is dead — killing and respawning`);
+        await killSessionAsync(sessionName).catch(() => {});
+      }
       await spawnFn(sessionName, model, promptFile, context.projectPath);
       try {
         await setOptionAsync(sessionName, 'remain-on-exit', 'on');
