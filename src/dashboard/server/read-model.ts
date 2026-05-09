@@ -183,7 +183,7 @@ export const ReadModelServiceLive = Layer.effect(
         specialists: Object.values(state.specialistsByName),
         reviewStatuses: Object.values(state.reviewStatusByIssueId),
         agentRuntimeById: state.agentRuntimeById,
-        channelPermissionRequests: Object.values(state.channelPermissionRequestsById),
+        channelPermissionRequests: Object.values(state.channelPermissionRequestsById ?? {}),
         issues: state.issuesRaw,
         resources: state.resources ?? undefined,
         timestamp: new Date().toISOString(),
