@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "1034",
   "created": "2026-05-09T01:13:00Z",
-  "updated": "2026-05-09T01:55:28Z",
+  "updated": "2026-05-09T02:06:50Z",
   "gitState": {
     "branch": "feature/1034",
-    "sha": "c7eaa3dce",
+    "sha": "d921fe118",
     "dirty": true
   },
   "decisions": [
@@ -50,18 +50,19 @@
       "id": "H2",
       "summary": "Running the targeted Vitest suite triggered the build global setup, which regenerated `scripts/record-cost-event.js` with unrelated main-branch build output differences.",
       "mitigation": "Leave `scripts/record-cost-event.js` unstaged for this bead unless a later explicit build-artifact bead is created; avoid mixing unrelated generated-script drift into scoped review-coordinator commits."
+    },
+    {
+      "id": "H3",
+      "summary": "Production dashboard build caught a stranded-review helper type mismatch that root `npm run typecheck` did not catch because frontend workspace TypeScript is compiled during `npm run build`.",
+      "mitigation": "Reopened workspace-8pl5 and narrowed the inspector ReviewButtonInput mergeStatus/verificationStatus unions to match PipelineStateLike before rerunning build verification."
     }
   ],
   "resumePoint": {
-    "description": "Bead workspace-9gr0 is implemented and verified locally: failed/protocol review coordinator exits now preserve an inspectable shell, completed coordinator sessions are restartable on the next dispatch, and unexpected coordinator deaths emit review.coordinator.died telemetry. Next step is commit only this bead, close workspace-9gr0, then run final verification for PAN-1034.",
-    "beadId": "workspace-9gr0",
+    "description": "Build verification exposed a frontend-only TypeScript mismatch in the stranded-review dashboard helper. Bead workspace-8pl5 was reopened and the fix is implemented: ReviewButtonInput now narrows mergeStatus and verificationStatus to the same literal unions accepted by PipelineStateLike. Next step is commit only this small build fix plus continue.json, close workspace-8pl5 again, then rerun final verification.",
+    "beadId": "workspace-8pl5",
     "filesToRead": [
-      "src/lib/cloister/review-agent.ts",
-      "src/lib/pipeline-notifier.ts",
-      "src/dashboard/server/main.ts",
-      "src/dashboard/server/routes/workspaces.ts",
-      "packages/contracts/src/events.ts",
-      "packages/contracts/src/event-reducers.ts"
+      "src/dashboard/frontend/src/components/inspector/utils.ts",
+      "src/dashboard/frontend/src/lib/pipeline-state.ts"
     ]
   },
   "beadsMapping": {
@@ -102,6 +103,12 @@
       "timestamp": "2026-05-09T01:55:28Z",
       "reason": "manual",
       "note": "Implemented workspace-9gr0. The review coordinator launcher now keeps failed/protocol pan review run exits (status >=2) alive in an interactive shell for inspection, records exit markers keyed by coordinator session name so the next dispatch can kill/restart completed coordinators, and emits coordinator_died/review.coordinator.died telemetry only for sessions that disappear without an exit marker. Added focused lifecycle tests and verified with npm test -- src/lib/cloister/__tests__/review-temp-lifecycle.test.ts --run and npm run typecheck.",
+      "agentModel": "claude-code"
+    },
+    {
+      "timestamp": "2026-05-09T02:06:50Z",
+      "reason": "manual",
+      "note": "Final build verification failed in the dashboard frontend because InspectorPanel's ReviewButtonInput allowed arbitrary string mergeStatus/verificationStatus values when passed to isPendingReviewStranded. Reopened workspace-8pl5 and narrowed those fields to the PipelineStateLike literal unions so production build type-checking can accept the stranded-review helper calls.",
       "agentModel": "claude-code"
     }
   ],
