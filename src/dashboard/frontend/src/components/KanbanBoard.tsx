@@ -2850,7 +2850,7 @@ function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialis
 
   const startAgentMutation = useMutation({
     mutationFn: async () => {
-      const requestBody = { issueId: issue.identifier };
+      const requestBody = { issueId: issue.identifier, role: 'work' };
       let lastRequestBody: Record<string, unknown> = requestBody;
       let res = await fetch('/api/agents', {
         method: 'POST',

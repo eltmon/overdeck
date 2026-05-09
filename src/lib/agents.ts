@@ -12,13 +12,12 @@ import { createSession, createSessionAsync, killSession, killSessionAsync, sendK
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
-import { loadCloisterConfig } from './cloister/config.js';
 import { BLANKED_PROVIDER_ENV } from './child-env.js';
 import type { ModelId } from './settings.js';
-import { getModelId, WorkTypeId } from './work-type-router.js';
+import type { WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from './providers.js';
 import { validateProviderHealth } from './provider-health.js';
-import { loadConfig as loadYamlConfig, isClaudeCodeChannelsEnabled } from './config-yaml.js';
+import { loadConfig as loadYamlConfig, isClaudeCodeChannelsEnabled, resolveModel } from './config-yaml.js';
 import type { NormalizedCavemanConfig } from './config-yaml.js';
 import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
@@ -116,8 +115,9 @@ export type PanopticonAgentType =
   | 'uat'
   | 'merge';
 
-/** Agent definitions live at .claude/agents/pan-<type>-agent.md */
+/** Work role definitions live under roles/; legacy pipeline agents remain under .claude/agents/. */
 export function panopticonAgentName(type: PanopticonAgentType): string {
+  if (type === 'work') return 'roles/work.md';
   return `pan-${type}-agent`;
 }
 
@@ -768,7 +768,7 @@ export function decideChannelsForWorkAgent(
     return { eligible: false, reason: 'flag-off' };
   }
 
-  if (options.agentType && options.agentType !== 'work-agent') {
+  if (state.role !== 'work') {
     log(false, 'not-a-work-agent');
     return { eligible: false, reason: 'not-a-work-agent' };
   }
@@ -1188,12 +1188,13 @@ export interface SpawnOptions {
   harness?: 'claude-code' | 'pi';
   model?: string;
   prompt?: string;
+  role?: 'work';
   difficulty?: ComplexityLevel;
   agentType?: 'review-agent' | 'test-agent' | 'merge-agent' | 'work-agent';
 
-  // Work type system (PAN-118)
+  // Legacy fields retained for old callers during migration. Work spawns ignore them.
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning';
-  workType?: WorkTypeId; // Explicit work type ID (overrides phase-based detection)
+  workType?: WorkTypeId;
 
   // Swarm slot support (PAN-970): when set, session name becomes agent-<issueId>-<slotId>
   // and the one-agent-per-issue uniqueness check is scoped to the slot.
@@ -1237,64 +1238,26 @@ export async function buildCavemanExports(
 }
 
 /**
- * Determine which model to use for an agent based on configuration
+ * Determine which model to use for a role-based work agent.
  *
- * New Priority (PAN-118):
+ * Priority:
  * 1. Explicitly provided model (options.model)
- * 2. Explicit work type ID (options.workType)
- * 3. Work type from phase (options.phase → issue-agent:{phase})
- * 4. Specialist work type (options.agentType → specialist-{type})
- * 5. Complexity-based routing (LEGACY - deprecated)
- * 6. Default fallback (claude-sonnet-4-6)
+ * 2. Role routing via config.yaml roles/workhorses (defaults to work)
+ * 3. Safe fallback (claude-sonnet-4-6)
  */
-export function determineModel(options: SpawnOptions): string {
-  console.log(`[DEBUG] determineModel called with:`, { model: options.model, workType: options.workType, phase: options.phase, agentType: options.agentType, difficulty: options.difficulty });
+export function determineModel(options: { model?: string; role?: 'work' } = {}): string {
+  console.log(`[DEBUG] determineModel called with:`, { model: options.model, role: options.role ?? 'work' });
 
-  // Explicit model always wins
   if (options.model) {
     console.log(`[DEBUG] Using explicit model: ${options.model}`);
     return options.model;
   }
 
   try {
-    // Use work type router if work type or phase specified
-    if (options.workType) {
-      return getModelId(options.workType);
-    }
-
-    // Map phase to work type ID
-    if (options.phase) {
-      const workType: WorkTypeId = `issue-agent:${options.phase}` as WorkTypeId;
-      return getModelId(workType);
-    }
-
-    // Map specialist agent type to work type ID
-    if (options.agentType && options.agentType !== 'work-agent') {
-      // Specialists: review-agent, test-agent, merge-agent
-      const workType: WorkTypeId = `specialist-${options.agentType}` as WorkTypeId;
-      return getModelId(workType);
-    }
-
-    // LEGACY: Complexity-based routing removed — settings.json no longer exists.
-    // All model routing goes through work-type-router via config.yaml.
-
-    // Fall back to default model from Cloister config or claude-sonnet-4-6
-    try {
-      const cloisterConfig = loadCloisterConfig();
-      const defaultModel = cloisterConfig.model_selection?.default_model || 'sonnet';
-      const modelMap: Record<string, string> = {
-        'opus': 'claude-opus-4-6',
-        'sonnet': 'claude-sonnet-4-6',
-        'haiku': 'claude-haiku-4-5',
-      };
-      return modelMap[defaultModel] || 'claude-sonnet-4-6';
-    } catch {
-      return 'claude-sonnet-4-6';
-    }
+    return resolveModel(options.role ?? 'work', undefined, loadYamlConfig().config);
   } catch (error) {
-    // If work type router fails, fall back to default
-    console.warn('Warning: Could not resolve model using work type router, using default');
-    return options.model || 'claude-sonnet-4-6';
+    console.warn('Warning: Could not resolve model using role router, using default');
+    return 'claude-sonnet-4-6';
   }
 }
 
@@ -1429,8 +1392,8 @@ export async function buildAgentLaunchConfig(opts: {
   const providerExports = await getProviderExportsForModel(model);
 
   if (opts.agentType === 'resume' && opts.resumeSessionId) {
-    // PAN-982: Resume sessions adopt the work-agent definition via --agent.
-    // Permissions/model/tools/hooks come from agents/pan-work-agent.md frontmatter.
+    // Resume sessions adopt the work role definition via --agent.
+    // Permissions/model/tools/hooks come from roles/work.md frontmatter.
     // --name <agentId> gives the resumed Claude session a human-readable handle.
     const launcherContent = generateLauncherScript({
       agentType: 'resume',
@@ -1493,8 +1456,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Initialize hook for this agent (FPP support)
   initHook(agentId);
 
-  // Determine model based on configuration
-  const selectedModel = determineModel(options);
+  const role: 'work' = options.role ?? 'work';
+
+  // Determine model based on role configuration
+  const selectedModel = determineModel({ model: options.model, role });
   console.log(`[DEBUG] Selected model: ${selectedModel}`);
 
   // When routing a GPT agent through ChatGPT subscription auth, the local
@@ -1524,16 +1489,11 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     workspace: options.workspace,
     runtime: options.runtime || 'claude',
     harness: options.harness ?? 'claude-code',
+    role,
     model: selectedModel,
     status: 'starting',
     startedAt: new Date().toISOString(),
-    // Initialize Phase 4 fields (legacy)
-    complexity: options.difficulty,
-    handoffCount: 0,
     costSoFar: 0,
-    // Work type system (PAN-118)
-    phase: options.phase,
-    workType: options.workType,
     preSpawnStashRef: existingState?.preSpawnStashRef,
     preSpawnStashMessage: existingState?.preSpawnStashMessage,
     preSpawnBaselineHead: existingState?.preSpawnBaselineHead,
@@ -1544,7 +1504,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Transition issue tracker to "in progress" immediately so Linear reflects reality
   // while workspace setup continues. Best-effort, don't block agent spawn.
   // Only for work agents, not planning/specialist agents.
-  if (!options.agentType || options.agentType === 'work-agent') {
+  if (role === 'work') {
     transitionIssueToInProgress(options.issueId, options.workspace).catch((err) => {
       console.warn(`[agents] Could not transition ${options.issueId} to in_progress: ${err.message}`);
     });
@@ -1552,7 +1512,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   // For child stories: synthesize feature context from parent feature plan
   // before the agent starts so readFeatureContext has O(1) local access.
-  if (!options.agentType || options.agentType === 'work-agent') {
+  if (role === 'work') {
     try {
       const { writeStoryFeatureContext } = await import('./cloister/work-agent-prompt.js');
       await writeStoryFeatureContext(options.workspace, options.issueId);
@@ -1626,7 +1586,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     model: selectedModel,
     workspace: options.workspace,
     agentType: 'work',
-    isPlanning: options.phase === 'planning',
+    isPlanning: false,
     channelsBridgeMcpConfig,
     harness: state.harness ?? 'claude-code',
   });
@@ -1669,7 +1629,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       TERM: 'xterm-256color',
       PANOPTICON_AGENT_ID: agentId,
       PANOPTICON_ISSUE_ID: options.issueId,
-      PANOPTICON_SESSION_TYPE: options.phase || 'implementation',
+      PANOPTICON_SESSION_TYPE: role,
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
       GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
       ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
@@ -1726,19 +1686,14 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   startWork(agentId, options.issueId);
 
   // Emit activity + TTS so the user knows an agent has started
-  const isPlanning = options.phase === 'planning';
   emitActivityEntry({
-    source: isPlanning ? 'planning-agent' : 'dashboard',
+    source: 'dashboard',
     level: 'info',
-    message: isPlanning
-      ? `Planning started for ${options.issueId}`
-      : `Work agent started for ${options.issueId}`,
+    message: `Work agent started for ${options.issueId}`,
     issueId: options.issueId,
   });
   emitActivityTts({
-    utterance: isPlanning
-      ? `Planning started for ${options.issueId}`
-      : `Work agent started for ${options.issueId}`,
+    utterance: `Work agent started for ${options.issueId}`,
     priority: 2,
     issueId: options.issueId,
   });
@@ -2452,7 +2407,7 @@ export async function recoverAgent(
     env: {
       PANOPTICON_AGENT_ID: normalizedId,
       PANOPTICON_ISSUE_ID: state.issueId || '',
-      PANOPTICON_SESSION_TYPE: state.phase || 'implementation',
+      PANOPTICON_SESSION_TYPE: state.role ?? (normalizedId.startsWith('planning-') ? 'plan' : 'work'),
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
       ...providerEnv
     }

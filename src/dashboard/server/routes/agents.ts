@@ -1870,6 +1870,18 @@ const postAgentsRoute = HttpRouter.add(
       return jsonResponse({ error: 'issueId required' }, { status: 400 });
     }
 
+    const legacyFields = ['workType', 'phase', 'agentType'].filter((field) => field in (body as Record<string, unknown>));
+    if (legacyFields.length > 0) {
+      return jsonResponse({
+        error: `Legacy start-agent field(s) are no longer accepted: ${legacyFields.join(', ')}. Send role: 'work' instead.`,
+      }, { status: 400 });
+    }
+
+    const role = (body as any).role ?? 'work';
+    if (role !== 'work') {
+      return jsonResponse({ error: `Unsupported agent role "${String(role)}". POST /api/agents only starts role: 'work'.` }, { status: 400 });
+    }
+
     // Reject bare numeric IDs (e.g. "484") — they have no project prefix, so tracker
     // routing and workspace naming both fail. Require "PAN-484" style.
     if (/^\d+$/.test(String(issueId))) {
@@ -2037,13 +2049,9 @@ const postAgentsRoute = HttpRouter.add(
       }, { status: spawnGuardrails.status });
     }
 
-    const spawnPhase = (body as any).phase || 'implementation';
     const spawnModel = determineModel({
       model: (body as any).model,
-      workType: (body as any).workType,
-      phase: spawnPhase,
-      agentType: (body as any).agentType,
-      difficulty: (body as any).difficulty,
+      role,
     });
     const providerAuthMode = getProviderForModel(spawnModel).name === 'openai'
       ? yield* Effect.promise(() => getProviderAuthMode(spawnModel))
@@ -2247,13 +2255,12 @@ const postAgentsRoute = HttpRouter.add(
     // Local workspace
     const devScript = join(workspacePath, 'dev');
     const hasPlanning = existsSync(join(workspacePath, PAN_DIRNAME));
-    const phase = (body as any).phase || (hasPlanning ? 'implementation' : 'exploration');
 
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_requested', {
       issueId,
       workspacePath,
       hasPlanning,
-      phase,
+      role,
     }));
 
     const agentLifecycle = getWorkAgentLifecycleState(agentSessionName);
@@ -2340,7 +2347,7 @@ const postAgentsRoute = HttpRouter.add(
       child.on('error', (error) => {
         void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_error', {
           issueId,
-          phase,
+          role,
           workspacePath,
           activityId,
           error: error.message,
@@ -2352,7 +2359,7 @@ const postAgentsRoute = HttpRouter.add(
       child.once('spawn', () => {
         void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_spawned', {
           issueId,
-          phase,
+          role,
           workspacePath,
           activityId,
           pid: child.pid,
@@ -2364,7 +2371,7 @@ const postAgentsRoute = HttpRouter.add(
       child.once('close', (code, signal) => {
         void appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_process_closed', {
           issueId,
-          phase,
+          role,
           workspacePath,
           activityId,
           code,
@@ -2456,7 +2463,7 @@ const postAgentsRoute = HttpRouter.add(
             status: 'starting',
             startedAt: new Date().toISOString(),
             workspace: workspacePath,
-            phase,
+            role,
             message: 'Waiting for containers to start...',
             ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
             ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
@@ -2466,7 +2473,7 @@ const postAgentsRoute = HttpRouter.add(
             issueId,
             featureName,
             workspacePath,
-            phase,
+            role,
           }));
 
               const containerActivityId = `containers-${Date.now()}`;
@@ -2525,7 +2532,7 @@ const postAgentsRoute = HttpRouter.add(
                       status: 'failed',
                       startedAt: new Date().toISOString(),
                       workspace: workspacePath,
-                      phase,
+                      role,
                       message: 'Container startup timed out before work agent spawn',
                       error: `Containers for ${issueId} did not become healthy within ${maxWaitMs}ms`,
                       ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
@@ -2554,10 +2561,10 @@ const postAgentsRoute = HttpRouter.add(
 
                   await appendAgentLifecycleLog(earlyAgentId, 'agent.work_spawn_requested_after_containers', {
                     issueId,
-                    phase,
+                    role,
                     workspacePath,
                   });
-                  await spawnPanCommand(['start', issueId, '--local', '--phase', phase, '--model', spawnModel], workspacePath);
+                  await spawnPanCommand(['start', issueId, '--local', '--model', spawnModel], workspacePath);
                   await updateIssueStatus();
                 } catch (err: any) {
                   const errorMessage = err instanceof Error ? err.message : String(err);
@@ -2573,7 +2580,7 @@ const postAgentsRoute = HttpRouter.add(
                     status: 'failed',
                     startedAt: new Date().toISOString(),
                     workspace: workspacePath,
-                    phase,
+                    role,
                     message: 'Container startup failed before work agent spawn',
                     error: errorMessage,
                     ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
@@ -2607,10 +2614,10 @@ const postAgentsRoute = HttpRouter.add(
     // Containers already ready or no containers needed
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_requested', {
       issueId,
-      phase,
+      role,
       workspacePath,
     }));
-    const activityId = yield* Effect.promise(() => spawnPanCommand(['start', issueId, '--local', '--phase', phase, '--model', spawnModel], workspacePath));
+    const activityId = yield* Effect.promise(() => spawnPanCommand(['start', issueId, '--local', '--model', spawnModel], workspacePath));
 
     // Write early state.json so the dashboard immediately shows agent-<id> as the
     // active agent. Without this there's a race window between spawnPanCommand returning
@@ -2627,7 +2634,7 @@ const postAgentsRoute = HttpRouter.add(
       status: 'starting',
       startedAt: new Date().toISOString(),
       workspace: workspacePath,
-      phase,
+      role,
       message: 'Work agent spawn requested',
       ...(preSpawnStashRef ? { preSpawnStashRef } : {}),
       ...(preSpawnStashMessage ? { preSpawnStashMessage } : {}),
@@ -2635,7 +2642,7 @@ const postAgentsRoute = HttpRouter.add(
     }, null, 2)));
     yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_placeholder_created', {
       issueId,
-      phase,
+      role,
       workspacePath,
       activityId,
     }));

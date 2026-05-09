@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T20:33:05.642Z",
+  "updated": "2026-05-09T20:47:13.807Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "pending-r2",
+    "sha": "pending-s2",
     "dirty": true
   },
   "decisions": [
@@ -158,13 +158,14 @@
     }
   ],
   "resumePoint": {
-    "description": "R2 work role file implemented: roles/work.md documents one-mode work plus universal/deep Jidoka Agent gates, inspect/inspect-deep subagent definitions exist, and legacy pan work/inspect agents are retained. Commit, close workspace-hs1g, then run inspection because requiresInspection is true.",
-    "beadId": "workspace-hs1g",
+    "description": "S2 work role spawn path implemented: work spawns now set role=work, resolve models via resolveModel(work), launch Claude Code with --agent roles/work.md, reject legacy POST /api/agents workType/phase/agentType fields, and Kanban sends role: work. Commit and close workspace-b2jq next.",
+    "beadId": "workspace-b2jq",
     "filesToRead": [
-      "roles/work.md",
-      ".claude/agents/inspect.md",
-      ".claude/agents/inspect-deep.md",
-      "src/lib/__tests__/role-definitions.test.ts"
+      "src/lib/agents.ts",
+      "src/dashboard/server/routes/agents.ts",
+      "src/dashboard/frontend/src/components/KanbanBoard.tsx",
+      "src/lib/__tests__/agent-state-role.test.ts",
+      "src/lib/__tests__/permission-mode-leak.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -241,6 +242,12 @@
       "timestamp": "2026-05-09T20:33:05.642Z",
       "reason": "bead-complete",
       "note": "Implemented R2 work role with one undifferentiated work mode, per-bead workflow, universal inspect and requiresInspection-only inspect-deep Jidoka gates, explicit resolveModel(work, subRole) contract, and inspect/inspect-deep Claude Code subagent definitions. Legacy pan-work-agent and pan-inspect-agent remain. Targeted role test, typecheck, and lint pass.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T20:47:13.807Z",
+      "reason": "bead-complete",
+      "note": "Implemented S2 work role end-to-end: SpawnOptions accepts role: work; spawnAgent writes role instead of legacy phase/workType/complexity/handoff fields; determineModel now routes through resolveModel(work); work launches use --agent roles/work.md; dashboard POST /api/agents rejects legacy workType/phase/agentType fields and Kanban sends role: work. Updated CLI/dashboard spawn callers, handoff spawn, and launcher/model tests. Verified targeted tests, typecheck, lint, and graphify update.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

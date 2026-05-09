@@ -263,8 +263,7 @@ async function ensureWorkAgentReadyForMerge(
   const state = await spawnAgent({
     issueId,
     workspace: workspacePath,
-    phase: 'implementation',
-    agentType: 'work-agent',
+    role: 'work',
     prompt: rebaseMsg,
   });
 

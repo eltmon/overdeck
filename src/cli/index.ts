@@ -384,7 +384,6 @@ program
   .option('--no-shadow', 'Disable shadow mode')
   .option('--remote', 'Use remote workspace (Fly.io)')
   .option('--local', 'Use local workspace (explicit override)')
-  .option('--phase <phase>', 'Work phase for model routing')
   .action(startCommand);
 
 program

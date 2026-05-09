@@ -17,6 +17,13 @@ describe('AgentState role persistence', () => {
     rmSync(tempHome, { recursive: true, force: true });
   });
 
+  it('resolves the work role model through role config defaults', async () => {
+    const { determineModel } = await import('../agents.js');
+
+    expect(determineModel({ role: 'work' })).toBe('claude-sonnet-4-6');
+    expect(determineModel({ role: 'work', model: 'claude-opus-4-7' })).toBe('claude-opus-4-7');
+  });
+
   it('round-trips the optional role field through state.json', async () => {
     const { getAgentState, saveAgentState } = await import('../agents.js');
 

@@ -31,8 +31,10 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     expect(cmd).toMatch(/--permission-mode auto/)
   })
 
-  it('Anthropic + Auto + --agent: no DSP, no permission flag (frontmatter handles)', async () => {
+  it('Anthropic + Auto + work role: uses roles/work.md and no DSP or permission flag', async () => {
     const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'work')
+    expect(cmd).toMatch(/--agent roles\/work\.md/)
+    expect(cmd).not.toMatch(/--agent pan-work-agent/)
     expect(cmd).not.toMatch(/--dangerously-skip-permissions/)
     expect(cmd).not.toMatch(/bypassPermissions/)
   })
@@ -97,7 +99,7 @@ describe('Permission-mode leak prevention — DSP must NEVER appear under Auto',
     process.env.PAN_YOLO = 'true'
     const cmd = await getAgentRuntimeBaseCommand('claude-sonnet-4-6', 'agent-pan-1', 'work')
     expect(cmd).toMatch(/--dangerously-skip-permissions/)
-    expect(cmd).toMatch(/--agent pan-work-agent/)
+    expect(cmd).toMatch(/--agent roles\/work\.md/)
   })
 
   // ── Sanity: command never emits DSP under Auto across the surface ─────────

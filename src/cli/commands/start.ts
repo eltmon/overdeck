@@ -7,7 +7,7 @@ import { promisify } from 'util';
 import { exec } from 'child_process';
 
 const execAsync = promisify(exec);
-import { spawnAgent, type SpawnOptions } from '../../lib/agents.js';
+import { spawnAgent } from '../../lib/agents.js';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { resolveProjectFromIssue, hasProjects, listProjects, ProjectConfig } from '../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPath } from '../../lib/prd-draft.js';
@@ -83,7 +83,6 @@ interface IssueOptions {
   shadow?: boolean;
   remote?: boolean;
   local?: boolean;
-  phase?: string;
 }
 
 /**
@@ -792,7 +791,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       workspace,
       harness: requestedHarness,
       model: options.model,
-      phase: (options.phase || 'implementation') as SpawnOptions['phase'],
+      role: 'work',
       prompt,
     });
 

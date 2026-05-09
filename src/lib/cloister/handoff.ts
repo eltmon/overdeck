@@ -160,14 +160,12 @@ async function performKillAndSpawn(
       workspace: state.workspace,
       runtime: state.runtime,
       model: options.targetModel,
-      phase: 'implementation',
+      role: 'work',
       prompt,
     });
 
-    // Update handoff metrics
-    newState.handoffCount = (state.handoffCount || 0) + 1;
+    // Preserve accumulated cost without reintroducing legacy phase/complexity routing fields.
     newState.costSoFar = state.costSoFar || 0;
-    newState.complexity = state.complexity;
     saveAgentState(newState);
 
     return {

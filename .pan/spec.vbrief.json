@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T20:33:05.642Z"
+    "updated": "2026-05-09T20:47:13.807Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 11,
+    "sequence": 13,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T20:33:05.642Z",
+    "updated": "2026-05-09T20:47:13.807Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -357,7 +357,8 @@
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-09T20:35:06.855Z"
       },
       {
         "id": "r3-role-review-md-convoy",
@@ -582,7 +583,7 @@
       {
         "id": "s2-wire-work-end-to-end",
         "title": "Wire `work` role end-to-end (replaces pan-work-agent spawn; drops phase/workType reads)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -597,7 +598,7 @@
           {
             "id": "s2-wire-work-end-to-end.ac1",
             "title": "spawnAgent in src/lib/agents.ts accepts `role: 'work'`, writes `role` to state.json, uses `--agent roles/work.md`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -605,7 +606,7 @@
           {
             "id": "s2-wire-work-end-to-end.ac2",
             "title": "determineModel uses resolveModel('work'); workType/phase/difficulty parameters dropped from signature",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -613,7 +614,7 @@
           {
             "id": "s2-wire-work-end-to-end.ac3",
             "title": "POST /api/agents accepts `role` field (workType/phase/agentType fields rejected with 400)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -621,7 +622,7 @@
           {
             "id": "s2-wire-work-end-to-end.ac4",
             "title": "KanbanBoard start-agent mutation sends `role: 'work'`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -629,7 +630,7 @@
           {
             "id": "s2-wire-work-end-to-end.ac5",
             "title": "verification-gate.ts uses `state.role` for gate routing (no reads of state.phase / state.workType / state.complexity / state.handoffCount)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -637,7 +638,7 @@
           {
             "id": "s2-wire-work-end-to-end.ac6",
             "title": "Existing work-agent and verification-gate tests updated and pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
