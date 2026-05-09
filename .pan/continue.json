@@ -2,31 +2,52 @@
   "version": "1",
   "issueId": "PAN-945",
   "created": "2026-05-07T09:30:00Z",
-  "updated": "2026-05-08T09:24:39Z",
-  "gitState": { "branch": "feature/pan-945", "sha": "12c339f08", "dirty": false },
+  "updated": "2026-05-09T01:15:27Z",
+  "gitState": {
+    "branch": "feature/pan-945",
+    "sha": "d5db45e6f",
+    "dirty": true
+  },
   "decisions": [
     {
       "id": "D1",
       "summary": "Added `findVBriefInPrdDirs` to `src/lib/vbrief/io.ts` so start flows can recover a missing workspace plan from PRD-published vBRIEF copies before the workspace `.pan/spec.vbrief.json` exists.",
+      "rationale": "PAN-945 exists because planning artifacts can live in project PRD directories while runtime code expects the workspace-local vBRIEF. A reusable discovery helper lets the start flows find the PRD-published source without broadening `findPlan`, which must remain workspace-local to avoid mutating lifecycle or archive copies by mistake.",
       "recordedAt": "2026-05-08T09:24:39Z"
     },
     {
       "id": "D2",
       "summary": "Kept discovery path checks `existsSync`-only and enumerated known layouts explicitly: flat `PAN-123-plan.vbrief.json`, lowercase flat variants, lowercase per-issue subdirectories, uppercase per-issue subdirectories, and the `api/docs/prds/*` mirror. This keeps later dashboard callers compatible with the no-blocking-server rule.",
+      "rationale": "The dashboard server may use `existsSync` for fast path existence checks but must not perform blocking file reads or directory scans on request paths. Enumerating deterministic candidate paths avoids async glob complexity and covers the historical layouts described in the issue.",
       "recordedAt": "2026-05-08T09:24:39Z"
+    },
+    {
+      "id": "D3",
+      "summary": "Imported PRD-directory vBRIEFs inside the dashboard start-agent route before plan validation and beads auto-recovery run.",
+      "rationale": "The start-agent endpoint already creates the workspace and then validates `.pan/spec.vbrief.json`. Copying the PRD-scoped plan into `.pan/spec.vbrief.json` at that point gives the rest of the existing route a normal workspace-local plan, including stale-issue validation, empty-plan validation, beads recovery, running-status transition, and planning-artifact commit behavior. The copy uses `fs/promises` so the dashboard request path does not block the Node.js event loop.",
+      "recordedAt": "2026-05-09T01:15:27Z"
     }
   ],
   "hazards": [
     {
       "id": "H1",
       "summary": "PRD-published vBRIEFs exist in multiple historical layouts and casing variants, so a narrow filename assumption would miss real plans during recovery.",
-      "mitigation": "The helper now checks both active and planned PRD roots, both flat and subdirectory formats, both lowercase and uppercase issue IDs, and the mirrored `api/docs/prds` tree before returning null."
+      "mitigation": "The helper now checks both active and planned PRD roots, both flat and subdirectory formats, both lowercase and uppercase issue IDs, and the mirrored `api/docs/prds` tree before returning null. Future route and CLI callers should use this helper instead of rebuilding path guesses locally."
+    },
+    {
+      "id": "H2",
+      "summary": "Dashboard start-agent runs inside the HTTP server, so any import logic that reads directories or copies files synchronously could freeze polling, WebSocket traffic, and terminal streaming.",
+      "mitigation": "The route keeps only the fast `existsSync` discovery helper on the synchronous side and performs directory creation plus vBRIEF copying through `fs/promises` inside `Effect.promise`. No `readFileSync`, `writeFileSync`, directory scans, or shell-based copy commands were added to the server route."
     }
   ],
   "resumePoint": {
-    "description": "Implement bead workspace-qmrt by wiring `findVBriefInPrdDirs` into the dashboard start-agent flow so the route can import a PRD-scoped vBRIEF into the workspace before plan validation runs.",
+    "description": "Finish bead workspace-qmrt by committing the dashboard start-agent PRD vBRIEF import, closing the bead for inspection, and then proceed to bead workspace-bqcl to wire the same PRD vBRIEF import behavior into the CLI `pan start` command.",
     "beadId": "workspace-qmrt",
-    "filesToRead": ["src/lib/vbrief/io.ts", "src/dashboard/server/routes/agents.ts"]
+    "filesToRead": [
+      "src/dashboard/server/routes/agents.ts",
+      "src/cli/commands/start.ts",
+      "src/lib/vbrief/io.ts"
+    ]
   },
   "beadsMapping": {},
   "agentModel": "kc@kimi-k2.6",
@@ -40,7 +61,13 @@
     {
       "timestamp": "2026-05-08T09:24:39Z",
       "reason": "progress",
-      "note": "Completed bead workspace-d5qf by adding PRD-directory vBRIEF discovery in `src/lib/vbrief/io.ts` and verified the existing vbrief I/O test suite still passes after the change.",
+      "note": "Completed the initial workspace vBRIEF discovery helper work by adding `findVBriefInPrdDirs` to `src/lib/vbrief/io.ts` and verifying that the existing vBRIEF I/O test suite still passed after the change.",
+      "agentModel": "kc@kimi-k2.6"
+    },
+    {
+      "timestamp": "2026-05-09T01:15:27Z",
+      "reason": "progress",
+      "note": "Implemented dashboard start-agent auto-import for PRD-directory vBRIEFs. When a workspace has no `.pan/spec.vbrief.json`, the route now discovers a matching vBRIEF under `docs/prds/{active,planned}` or `api/docs/prds/{active,planned}`, copies it into `.pan/spec.vbrief.json` with asynchronous filesystem operations, and then lets existing validation, beads recovery, and plan status handling continue against the workspace-local plan. `npm run typecheck` passed after the route change.",
       "agentModel": "kc@kimi-k2.6"
     }
   ]

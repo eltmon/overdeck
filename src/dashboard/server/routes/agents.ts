@@ -41,7 +41,7 @@ import { withBdMutex } from '../../../lib/bd-mutex.js';
 import { exec, spawn } from 'node:child_process';
 import { timingSafeEqual } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { appendFile, mkdir, open, readdir, readFile, rename, rm, stat, symlink, lstat, writeFile } from 'node:fs/promises';
+import { appendFile, copyFile, mkdir, open, readdir, readFile, rename, rm, stat, symlink, lstat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -86,11 +86,11 @@ import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
 import { getProviderForModel } from '../../../lib/providers.js';
 import { validateProviderHealth, ProviderHealthError } from '../../../lib/provider-health.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
-import { findPlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
+import { findPlan, findVBriefInPrdDirs, isPlanningComplete } from '../../../lib/vbrief/io.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../../lib/vbrief/lifecycle-io.js';
 import type { ContinueState } from '../../../lib/vbrief/continue-state.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
-import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
+import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../../lib/pan-dir/types.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataFn } from '../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
@@ -1933,7 +1933,23 @@ const postAgentsRoute = HttpRouter.add(
       }
     }
 
-    const planPath = findPlan(workspacePath);
+    let planPath = findPlan(workspacePath);
+    if (!planPath) {
+      const prdVBriefPath = findVBriefInPrdDirs(projectPath, issueId);
+      if (prdVBriefPath) {
+        yield* Effect.promise(async () => {
+          try {
+            await mkdir(workspacePanDir, { recursive: true });
+            await copyFile(prdVBriefPath, join(workspacePanDir, PAN_SPEC_FILENAME));
+            planPath = findPlan(workspacePath);
+            console.log(`[start-agent] Imported PRD vBRIEF for ${issueId} from ${prdVBriefPath}`);
+          } catch (importErr: any) {
+            console.warn(`[start-agent] Failed to import PRD vBRIEF for ${issueId}: ${importErr?.message ?? importErr}`);
+          }
+        });
+      }
+    }
+
     const hasPlan = planPath !== null;
     // Planning has finished when plan.status is any of:
     // proposed/approved/pending/running/completed/blocked.
