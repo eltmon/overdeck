@@ -20,6 +20,13 @@ import { addDnsEntry, removeDnsEntry, syncDnsToWindows } from './dns.js';
 import { addTunnelIngress, removeTunnelIngress } from './tunnel.js';
 import { createHumeConfig, deleteHumeConfig } from './hume.js';
 import { mergeSkillsIntoWorkspace, mergePanSkillsIntoWorkspace } from './skills-merge.js';
+import {
+  PAN_CONTEXT_FILENAME,
+  PAN_CONTINUE_FILENAME,
+  PAN_DIRNAME,
+  PAN_FEEDBACK_DIRNAME,
+  PAN_SESSIONS_FILENAME,
+} from './pan-dir/index.js';
 
 const execAsync = promisify(exec);
 
@@ -123,6 +130,7 @@ export function copyPanopticonSettingsToWorkspace(workspacePath: string): { copi
     { source: join(homedir(), '.panopticon', 'config.yaml'), target: join(panopticonDir, 'config.yaml') },
     { source: join(homedir(), '.panopticon', 'projects.yaml'), target: join(panopticonDir, 'projects.yaml') },
     { source: join(homedir(), '.panopticon', 'settings.json'), target: join(panopticonDir, 'settings.json') },
+    { source: join(homedir(), '.claude', 'mcp.json'), target: join(claudeDir, 'mcp.json') },
   ];
 
   for (const { source, target } of filesToCopy) {
@@ -167,9 +175,51 @@ export function copyPanopticonSettingsToWorkspace(workspacePath: string): { copi
         }
       }
 
+      // Validate hook paths — remove hooks that reference non-existent absolute paths
+      // to prevent Claude Code from hanging when executing broken hooks.
+      function isBrokenHookCommand(command: string): boolean {
+        const tokens = command.split(/\s+/);
+        for (let token of tokens) {
+          token = token.replace(/^["'`]+|["'`]+$/g, '').replace(/[;|&<>]+$/, '');
+          if (token.startsWith('/')) {
+            try {
+              if (!existsSync(token)) return true;
+            } catch {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      for (const [category, hookList] of Object.entries(mergedHooks)) {
+        if (!Array.isArray(hookList)) continue;
+        const validHooks = (hookList as Array<{ command?: string }>).filter((hook) => {
+          if (typeof hook.command !== 'string') return true;
+          if (!hook.command.trim()) return true;
+          const hasAbsolutePath = hook.command.split(/\s+/).some((t) => {
+            const clean = t.replace(/^["'`]+|["'`]+$/g, '').replace(/[;|&<>]+$/, '');
+            return clean.startsWith('/');
+          });
+          if (!hasAbsolutePath) return true; // relative / shell-only, skip validation
+          if (isBrokenHookCommand(hook.command)) {
+            result.errors.push(`Removed broken hook from workspace settings: ${category} → ${hook.command}`);
+            return false;
+          }
+          return true;
+        });
+        if (validHooks.length === 0) {
+          delete mergedHooks[category];
+        } else {
+          mergedHooks[category] = validHooks;
+        }
+      }
+
       const merged = { ...globalSettings, ...workspaceSettings };
       if (Object.keys(mergedHooks).length > 0) {
         merged.hooks = mergedHooks;
+      } else {
+        delete (merged as Record<string, unknown>).hooks;
       }
 
       writeFileSync(workspaceSettingsPath, JSON.stringify(merged, null, 2), 'utf-8');
@@ -232,56 +282,22 @@ export interface WorkspaceCreateResult {
   steps: string[];
 }
 
-/**
- * Create placeholders for template substitution
- */
-function createPlaceholders(
-  projectConfig: ProjectConfig,
-  featureName: string,
-  workspacePath: string
-): TemplatePlaceholders {
-  const featureFolder = `feature-${featureName}`;
-  const domain = projectConfig.workspace?.dns?.domain || 'localhost';
-
-  return {
-    FEATURE_NAME: featureName,
-    FEATURE_FOLDER: featureFolder,
-    BRANCH_NAME: `feature/${featureName}`,
-    COMPOSE_PROJECT: `${basename(projectConfig.path)}-${featureFolder}`,
-    DOMAIN: domain,
-    PROJECT_NAME: basename(projectConfig.path),
-    PROJECT_PATH: projectConfig.path,
-    PROJECTS_DIR: dirname(projectConfig.path),
-    WORKSPACE_PATH: workspacePath,
-    HOME: homedir(),
-  };
-}
-
-/**
- * Sanitize docker-compose files to use platform-agnostic paths
- * Replaces hardcoded /home/username paths with ${HOME}
- */
-function sanitizeComposeFile(filePath: string): void {
-  if (!existsSync(filePath)) return;
-
-  let content = readFileSync(filePath, 'utf-8');
-  const originalContent = content;
-
-  // Pattern to match hardcoded home paths like /home/username or /Users/username
-  // Replace with ${HOME} which docker-compose expands
-  const homePatterns = [
-    /\/home\/[a-zA-Z0-9_-]+\//g,      // Linux: /home/username/
-    /\/Users\/[a-zA-Z0-9_-]+\//g,     // macOS: /Users/username/
-  ];
-
-  for (const pattern of homePatterns) {
-    content = content.replace(pattern, '${HOME}/');
-  }
-
-  if (content !== originalContent) {
-    writeFileSync(filePath, content, 'utf-8');
-  }
-}
+// Placeholder construction, compose-file sanitization, and template
+// processing live in `./workspace/devcontainer-renderer.ts` so the renderer
+// is a single source of truth shared by:
+//   - the workspace-creation flow below (`createWorkspace`)
+//   - the self-heal entry point (`./workspace/ensure-devcontainer.ts`)
+//   - any future caller (e.g. `pan workspace re-render`)
+// Re-export under the legacy local name to keep diffs in this file small.
+import {
+  createWorkspacePlaceholders as createPlaceholders,
+  sanitizeComposeFile,
+  renderDevcontainer,
+  DEVCONTAINER_DIRNAME,
+} from './workspace/devcontainer-renderer.js';
+// `processTemplates` is still imported for the agent-template flow further
+// below; it lives in the same renderer module.
+import { processTemplates } from './workspace/devcontainer-renderer.js';
 
 /**
  * Validate feature name (alphanumeric and hyphens only)
@@ -439,58 +455,10 @@ function releasePort(portFile: string, featureFolder: string): boolean {
   }
 }
 
-/**
- * Process template files with placeholder replacement
- */
-function processTemplates(
-  templateDir: string,
-  targetDir: string,
-  placeholders: TemplatePlaceholders,
-  templates?: Array<{ source: string; target: string }>
-): string[] {
-  const steps: string[] = [];
-
-  if (!existsSync(templateDir)) {
-    return steps;
-  }
-
-  // If specific templates are defined, process those
-  if (templates && templates.length > 0) {
-    for (const { source, target } of templates) {
-      const sourcePath = join(templateDir, source);
-      const targetPath = join(targetDir, target);
-
-      if (existsSync(sourcePath)) {
-        const content = readFileSync(sourcePath, 'utf-8');
-        const processed = replacePlaceholders(content, placeholders);
-        mkdirSync(dirname(targetPath), { recursive: true });
-        writeFileSync(targetPath, processed);
-        steps.push(`Processed template: ${source} -> ${target}`);
-      }
-    }
-  } else {
-    // Process all .template files
-    const files = readdirSync(templateDir);
-    for (const file of files) {
-      if (file.endsWith('.template')) {
-        const sourcePath = join(templateDir, file);
-        const targetPath = join(targetDir, file.replace('.template', ''));
-
-        const content = readFileSync(sourcePath, 'utf-8');
-        const processed = replacePlaceholders(content, placeholders);
-        writeFileSync(targetPath, processed);
-        // Shell scripts need execute permission
-        const targetName = file.replace('.template', '');
-        if (targetName === 'dev' || targetName.endsWith('.sh')) {
-          chmodSync(targetPath, 0o755);
-        }
-        steps.push(`Processed template: ${file}`);
-      }
-    }
-  }
-
-  return steps;
-}
+// `processTemplates` was previously defined inline here; it now lives in
+// `./workspace/devcontainer-renderer.ts` and is imported above so the
+// devcontainer renderer and the agent-template flow share a single
+// implementation.
 
 /**
  * @deprecated Use copyProjectTemplateDirs instead. Kept for non-.claude paths.
@@ -679,24 +647,58 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     }
   }
 
+  // For polyrepo workspaces, create a beads redirect at the workspace root
+  // pointing to the first repo that has a .beads/ directory. Without this,
+  // agents starting at the workspace root can't find beads and try to re-init.
+  if (workspaceConfig.type === 'polyrepo' && workspaceConfig.repos) {
+    const workspaceBeadsDir = join(workspacePath, '.beads');
+    if (!existsSync(workspaceBeadsDir)) {
+      for (const repo of workspaceConfig.repos) {
+        const sourceRepoPath = join(projectConfig.path, repo.path);
+        const repoBeadsDir = existsSync(sourceRepoPath)
+          ? join(realpathSync(sourceRepoPath), '.beads')
+          : join(sourceRepoPath, '.beads');
+        if (existsSync(repoBeadsDir) && !existsSync(join(repoBeadsDir, 'redirect'))) {
+          try {
+            mkdirSync(workspaceBeadsDir, { recursive: true });
+            writeFileSync(join(workspaceBeadsDir, 'redirect'), repoBeadsDir, 'utf-8');
+            result.steps.push(`Created beads redirect at workspace root → ${repo.name}/.beads`);
+          } catch { /* non-fatal */ }
+          break;
+        }
+      }
+    }
+  }
+
   progress('Creating git worktree', 'Worktree ready', 'complete');
 
-  // Remove stale .planning/ directory inherited from main branch.
-  // This contains STATE.md and other planning artifacts from a PREVIOUS issue.
-  // If left in place, the new agent reads it and works on the wrong issue.
+  // Clear stale workspace-local runtime state inherited from main.
+  // Keep canonical plan state (.pan/spec.vbrief.json); clear only mutable
+  // per-workspace artifacts that would belong to a previous issue/session.
   // SAFETY: resolve() to absolute path and verify it's under a known workspace prefix
   // to prevent path traversal from ever reaching rmSync.
   const resolvedWorkspace = resolve(workspacePath);
-  const resolvedPlanning = resolve(resolvedWorkspace, '.planning');
+  const resolvedPanDir = resolve(resolvedWorkspace, PAN_DIRNAME);
   const isUnderWorkspacesDir = resolvedWorkspace.match(/\/workspaces\/feature-[a-z0-9-]+$/);
-  if (
-    isUnderWorkspacesDir &&
-    resolvedPlanning === join(resolvedWorkspace, '.planning') &&
-    existsSync(join(resolvedWorkspace, '.git')) &&
-    existsSync(resolvedPlanning)
-  ) {
-    rmSync(resolvedPlanning, { recursive: true, force: true });
-    result.steps.push('Removed stale .planning/ directory from previous issue');
+  if (isUnderWorkspacesDir && existsSync(join(resolvedWorkspace, '.git'))) {
+    if (resolvedPanDir === join(resolvedWorkspace, PAN_DIRNAME) && existsSync(resolvedPanDir)) {
+      for (const filePath of [
+        join(resolvedPanDir, PAN_CONTINUE_FILENAME),
+        join(resolvedPanDir, PAN_SESSIONS_FILENAME),
+        join(resolvedPanDir, PAN_CONTEXT_FILENAME),
+      ]) {
+        if (existsSync(filePath)) {
+          unlinkSync(filePath);
+        }
+      }
+
+      const feedbackDir = join(resolvedPanDir, PAN_FEEDBACK_DIRNAME);
+      if (existsSync(feedbackDir)) {
+        rmSync(feedbackDir, { recursive: true, force: true });
+      }
+    }
+
+    result.steps.push('Cleared stale workspace-local .pan runtime state');
   }
 
   // Ensure .pan/events/, .pan/review/, .pan/prompts/ are in the project's .gitignore
@@ -919,50 +921,24 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
     result.steps.push('Created .env file');
   }
 
-  // Process Docker compose templates
+  // Render the workspace's `.devcontainer/` from the project's compose
+  // template. All template processing, file copies, $HOME sanitization, and
+  // ./dev symlink wiring lives in `renderDevcontainer` so the same code path
+  // is used here, by `ensureDevcontainer` (self-heal), and by any future
+  // re-render command. See `./workspace/devcontainer-renderer.ts`.
   if (workspaceConfig.docker?.compose_template) {
-    const templateDir = join(projectConfig.path, workspaceConfig.docker.compose_template);
-    const devcontainerDir = join(workspacePath, '.devcontainer');
-    mkdirSync(devcontainerDir, { recursive: true });
-
-    const templateSteps = processTemplates(templateDir, devcontainerDir, placeholders);
-    result.steps.push(...templateSteps);
-
-    // Copy non-template files (like Dockerfile)
-    if (existsSync(templateDir)) {
-      const files = readdirSync(templateDir);
-      for (const file of files) {
-        if (!file.endsWith('.template')) {
-          const sourcePath = join(templateDir, file);
-          const targetPath = join(devcontainerDir, file);
-          copyFileSync(sourcePath, targetPath);
-        }
+    try {
+      const renderResult = renderDevcontainer({
+        workspacePath,
+        projectConfig,
+        featureName,
+      });
+      result.steps.push(...renderResult.steps);
+      for (const warning of renderResult.warnings) {
+        result.errors.push(warning);
       }
-    }
-
-    // Sanitize docker-compose files to use platform-agnostic paths
-    // This fixes hardcoded /home/username or /Users/username paths
-    const composeFiles = readdirSync(devcontainerDir)
-      .filter(f => f.includes('compose') && (f.endsWith('.yml') || f.endsWith('.yaml')));
-    for (const composeFile of composeFiles) {
-      sanitizeComposeFile(join(devcontainerDir, composeFile));
-    }
-    if (composeFiles.length > 0) {
-      result.steps.push(`Sanitized ${composeFiles.length} compose file(s) for platform compatibility`);
-    }
-
-    // Create ./dev symlink at workspace root pointing to .devcontainer/dev
-    // Symlink keeps changes in sync - editing ./dev updates .devcontainer/dev
-    const devScriptInContainer = join(devcontainerDir, 'dev');
-    const devScriptAtRoot = join(workspacePath, 'dev');
-    if (existsSync(devScriptInContainer) && !existsSync(devScriptAtRoot)) {
-      try {
-        symlinkSync('.devcontainer/dev', devScriptAtRoot);
-        chmodSync(devScriptInContainer, 0o755); // Make executable
-        result.steps.push('Created ./dev symlink');
-      } catch (error) {
-        result.errors.push(`Failed to create ./dev symlink: ${error}`);
-      }
+    } catch (err: any) {
+      result.errors.push(`Failed to render .devcontainer/: ${err.message ?? err}`);
     }
   }
 
@@ -1248,6 +1224,35 @@ export interface DockerCleanupResult {
 }
 
 /**
+ * Return container IDs (running or stopped) whose
+ * `com.docker.compose.project.config_files` label references a path inside
+ * the workspace's `.devcontainer/` directory.
+ */
+export async function getContainersReferencingWorkspacePath(
+  workspacePath: string,
+): Promise<string[]> {
+  try {
+    const { stdout } = await execAsync(
+      `docker ps -a --format '{{.ID}}|{{.Label "com.docker.compose.project.config_files"}}'`,
+      { encoding: 'utf-8' },
+    );
+    const containers: string[] = [];
+    const devcontainerPath = join(workspacePath, DEVCONTAINER_DIRNAME);
+    for (const line of stdout.trim().split('\n').filter(Boolean)) {
+      const sep = line.indexOf('|');
+      if (sep === -1) continue;
+      const configFiles = line.slice(sep + 1);
+      if (configFiles.includes(devcontainerPath)) {
+        containers.push(line.slice(0, sep));
+      }
+    }
+    return containers;
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Stop Docker containers and clean up Docker-created files for a workspace.
  *
  * Extracted as a standalone function so it can be used by:
@@ -1268,7 +1273,7 @@ export async function stopWorkspaceDocker(
   };
 
   // Find all compose files in devcontainer directory (some projects use multiple)
-  const devcontainerDir = join(workspacePath, '.devcontainer');
+  const devcontainerDir = join(workspacePath, DEVCONTAINER_DIRNAME);
   const composeFiles: string[] = [];
 
   if (existsSync(devcontainerDir)) {
@@ -1295,38 +1300,38 @@ export async function stopWorkspaceDocker(
     }
   }
 
+  // Derive compose project name from the dev script (same logic as dashboard)
+  // or fall back to "{projectName}-feature-{featureName}" convention.
+  let composeProjectName = `${projectName}-feature-${featureName}`;
+  const devScriptPaths = [
+    join(workspacePath, DEVCONTAINER_DIRNAME, 'dev'),
+    join(workspacePath, 'dev'),
+  ];
+  for (const devPath of devScriptPaths) {
+    try {
+      if (existsSync(devPath)) {
+        const content = readFileSync(devPath, 'utf-8');
+        const match = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
+        if (match) {
+          composeProjectName = `${match[1]}feature-${featureName}`;
+          break;
+        }
+        const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
+        if (literalMatch) {
+          composeProjectName = literalMatch[1];
+          break;
+        }
+      }
+    } catch {
+      // Fall through to default
+    }
+  }
+
   if (composeFiles.length > 0) {
     result.containersFound = true;
     try {
       const fileFlags = composeFiles.map(f => `-f "${f}"`).join(' ');
       const cwd = existsSync(devcontainerDir) ? devcontainerDir : workspacePath;
-
-      // Derive compose project name from the dev script (same logic as dashboard)
-      // or fall back to "{projectName}-feature-{featureName}" convention.
-      let composeProjectName = `${projectName}-feature-${featureName}`;
-      const devScriptPaths = [
-        join(workspacePath, '.devcontainer', 'dev'),
-        join(workspacePath, 'dev'),
-      ];
-      for (const devPath of devScriptPaths) {
-        try {
-          if (existsSync(devPath)) {
-            const content = readFileSync(devPath, 'utf-8');
-            const match = content.match(/COMPOSE_PROJECT_NAME="([^$"]*)\$\{FEATURE_FOLDER\}"/);
-            if (match) {
-              composeProjectName = `${match[1]}feature-${featureName}`;
-              break;
-            }
-            const literalMatch = content.match(/COMPOSE_PROJECT_NAME="([^"]+)"/);
-            if (literalMatch) {
-              composeProjectName = literalMatch[1];
-              break;
-            }
-          }
-        } catch {
-          // Fall through to default
-        }
-      }
 
       await execAsync(`docker compose ${fileFlags} -p "${composeProjectName}" down -v --remove-orphans`, {
         cwd,
@@ -1336,6 +1341,32 @@ export async function stopWorkspaceDocker(
     } catch (error: any) {
       // Log but don't fail — containers might not be running
       result.steps.push(`Docker cleanup attempted (${error.message?.split('\n')[0] || 'containers may not be running'})`);
+    }
+  } else {
+    // No compose files on disk — check if containers still reference the missing path.
+    // This can happen when .devcontainer/ was deleted after containers were created.
+    const orphanedContainers = await getContainersReferencingWorkspacePath(workspacePath);
+    if (orphanedContainers.length > 0) {
+      result.containersFound = true;
+      try {
+        // Try project-name-based down first (Docker Compose can discover containers by label)
+        await execAsync(`docker compose -p "${composeProjectName}" down -v --remove-orphans`, {
+          cwd: workspacePath,
+          timeout: 60000,
+        });
+        result.steps.push(`Stopped orphaned Docker containers by project name (${orphanedContainers.length} containers)`);
+      } catch {
+        // Fall back to raw docker stop / rm for each container
+        for (const containerId of orphanedContainers) {
+          try {
+            await execAsync(`docker stop "${containerId}"`, { timeout: 30000 });
+            await execAsync(`docker rm "${containerId}"`, { timeout: 30000 });
+          } catch {
+            // Best-effort — container may already be gone
+          }
+        }
+        result.steps.push(`Stopped ${orphanedContainers.length} orphaned Docker containers individually`);
+      }
     }
   }
 
@@ -1474,12 +1505,21 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
     }
   }
 
-  // Remove workspace directory
-  try {
-    await execAsync(`rm -rf "${workspacePath}"`, { maxBuffer: 10 * 1024 * 1024 });
-    result.steps.push('Removed workspace directory');
-  } catch (error) {
-    result.errors.push(`Failed to remove workspace directory: ${error}`);
+  // Guard: never delete workspace while containers still reference its compose path
+  const orphanedContainers = await getContainersReferencingWorkspacePath(workspacePath);
+  if (orphanedContainers.length > 0) {
+    result.errors.push(
+      `Cannot remove workspace directory: ${orphanedContainers.length} Docker container(s) still reference compose paths in ${DEVCONTAINER_DIRNAME}/. ` +
+        `Run workspace Docker cleanup first or stop the containers manually.`,
+    );
+  } else {
+    // Remove workspace directory
+    try {
+      await execAsync(`rm -rf "${workspacePath}"`, { maxBuffer: 10 * 1024 * 1024 });
+      result.steps.push('Removed workspace directory');
+    } catch (error) {
+      result.errors.push(`Failed to remove workspace directory: ${error}`);
+    }
   }
 
   result.success = result.errors.length === 0;

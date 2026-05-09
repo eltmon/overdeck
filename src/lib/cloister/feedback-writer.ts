@@ -1,17 +1,16 @@
 /**
- * Feedback Writer — writes specialist feedback to workspace files.
- *
- * All specialist feedback (review, test, merge) is written to
- * .planning/feedback/ in the workspace, with a breadcrumb in STATE.md.
- * The work agent reads these on startup or after crash recovery.
+ * Feedback Writer — writes specialist feedback to the scope vBRIEF continue
+ * file and mirrors it into workspace `.pan/feedback/` for agent consumption.
  *
  * All I/O is async (fs/promises) — never execSync.
  */
 
-import { writeFile, readFile, mkdir, readdir, rm } from 'fs/promises';
 import { existsSync } from 'fs';
+import { readdir } from 'fs/promises';
 import { join } from 'path';
 import { resolveProjectFromIssue } from '../projects.js';
+import { clearFeedback, getWorkspacePanPaths, readFeedback, writeFeedback } from '../pan-dir/index.js';
+import { appendContinueSessionEntryForIssue, appendFeedbackEntryForIssue, clearFeedbackForIssue, readContinueStateForIssue } from '../vbrief/lifecycle-io.js';
 
 export interface WriteFeedbackOptions {
   issueId: string;
@@ -63,78 +62,41 @@ async function getNextSequenceNumber(feedbackDir: string): Promise<number> {
 }
 
 /**
- * Append a feedback entry to STATE.md's "Specialist Feedback" section.
- * Creates the section if it doesn't exist. Creates STATE.md if it doesn't exist.
- */
-async function appendToStateMd(
-  planningDir: string,
-  entry: { timestamp: string; specialist: string; outcome: string; relativePath: string; issueId: string }
-): Promise<void> {
-  const statePath = join(planningDir, 'STATE.md');
-  const line = `- **[${entry.timestamp}] ${entry.specialist} → ${entry.outcome.toUpperCase()}** — \`${entry.relativePath}\``;
-
-  let content: string;
-  try {
-    content = await readFile(statePath, 'utf-8');
-  } catch {
-    // STATE.md doesn't exist — create a minimal one
-    content = `# Agent State: ${entry.issueId}\n`;
-  }
-
-  const sectionHeader = '## Specialist Feedback';
-  const sectionIndex = content.indexOf(sectionHeader);
-
-  if (sectionIndex >= 0) {
-    // Find the end of the section (next ## or EOF)
-    const afterHeader = sectionIndex + sectionHeader.length;
-    const nextSection = content.indexOf('\n## ', afterHeader);
-    const insertPos = nextSection >= 0 ? nextSection : content.length;
-    content = content.slice(0, insertPos).trimEnd() + '\n' + line + '\n' + content.slice(insertPos);
-  } else {
-    // Append the section at the end
-    content = content.trimEnd() + '\n\n' + sectionHeader + '\n\n' + line + '\n';
-  }
-
-  await writeFile(statePath, content, 'utf-8');
-}
-
-/**
  * Clear existing feedback files from a previous review cycle.
  *
- * Deletes all NNN-*.md files in .planning/feedback/ (and any legacy
- * .planning/feedback/archive/ directory left over from the old archive-based
- * implementation). Feedback has no value once the work agent has consumed it
- * — there's no history we want to preserve here. See
- * docs/REVIEW-AGENT-ARCHITECTURE.md.
+ * Deletes all NNN-*.md files in workspace `.pan/feedback/`.
  */
 export async function clearFeedbackFiles(workspacePath: string): Promise<void> {
-  const feedbackDir = join(workspacePath, '.planning', 'feedback');
-  if (!existsSync(feedbackDir)) return;
+  const { feedbackDir } = getWorkspacePanPaths(workspacePath);
 
-  const files = await readdir(feedbackDir);
-  const feedbackFiles = files.filter(f => /^\d{3}-/.test(f) && f.endsWith('.md'));
-
-  for (const file of feedbackFiles) {
+  // Also clear the continue file's feedback[] (Layer 1+).
+  // Infer issueId from the workspace directory name (feature-<issue-id>).
+  const base = workspacePath.split('/').pop() ?? '';
+  const issueMatch = base.match(/^feature-([a-z]+-\d+)$/i);
+  if (issueMatch) {
+    const issueId = issueMatch[1].toUpperCase();
+    const projectRoot = join(workspacePath, '..', '..');
     try {
-      await rm(join(feedbackDir, file), { force: true });
+      clearFeedbackForIssue(projectRoot, issueId);
     } catch (err: any) {
-      console.error(`[feedback-writer] Failed to delete ${file}:`, err.message);
+      console.error(`[feedback-writer] Failed to clear continue-file feedback[] for ${issueId}:`, err.message);
     }
   }
 
-  // Legacy: older versions moved feedback into .planning/feedback/archive/.
-  // Nuke that tree too — we no longer keep an archive.
-  const legacyArchiveDir = join(feedbackDir, 'archive');
-  if (existsSync(legacyArchiveDir)) {
+  let clearedCount = 0;
+  if (existsSync(feedbackDir)) {
+    const feedbackFiles = readFeedback(workspacePath).filter(f => /^\d{3}-/.test(f.filename) && f.filename.endsWith('.md'));
     try {
-      await rm(legacyArchiveDir, { recursive: true, force: true });
+      clearFeedback(workspacePath);
+      clearedCount += feedbackFiles.length;
     } catch (err: any) {
-      console.error(`[feedback-writer] Failed to remove legacy archive dir:`, err.message);
+      console.error(`[feedback-writer] Failed to clear .pan/feedback for ${workspacePath}:`, err.message);
     }
   }
 
-  if (feedbackFiles.length > 0) {
-    console.log(`[feedback-writer] Cleared ${feedbackFiles.length} feedback file(s) from previous cycle`);
+
+  if (clearedCount > 0) {
+    console.log(`[feedback-writer] Cleared ${clearedCount} feedback file(s) from previous cycle`);
   }
 }
 
@@ -145,77 +107,90 @@ export async function clearFeedbackFiles(workspacePath: string): Promise<void> {
 export const archiveFeedbackFiles = clearFeedbackFiles;
 
 /**
- * Write specialist feedback to a file in the workspace and update STATE.md.
+ * Write specialist feedback to the scope vBRIEF continue file and record a
+ * sessionHistory breadcrumb. The primary data store is the continue file
+ * (Layer 3+) with workspace mirrors in `.pan/feedback/`.
  */
 export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<WriteFeedbackResult> {
-  // Validate workspacePath — reject project roots (must contain /workspaces/ or have .planning dir)
-  let providedPath = opts.workspacePath;
-  if (providedPath && !existsSync(join(providedPath, '.planning')) && !providedPath.includes('/workspaces/')) {
-    // Looks like a project root, not a workspace — fall back to resolution
-    providedPath = undefined;
+  const timestamp = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  const shortTimestamp = timestamp.replace(/:\d{2}Z$/, 'Z');
+
+  const resolved = resolveProjectFromIssue(opts.issueId);
+  if (!resolved) {
+    return { success: false, error: `Project not found for ${opts.issueId}` };
   }
 
-  // Guard: if the provided path looks like a workspace but the issue ID doesn't match the
-  // directory name, fall back to canonical resolution. This catches routing mismatches where
-  // e.g. PAN-645's feedback would be written into feature-pan-647's directory.
-  if (providedPath?.includes('/workspaces/feature-')) {
-    const dirName = providedPath.replace(/.*\/workspaces\/feature-/, '').replace(/\/.*$/, '');
-    const expectedSuffix = opts.issueId.toLowerCase();
-    if (!dirName.includes(expectedSuffix) && !expectedSuffix.replace(/^[a-z]+-/, '').includes(dirName)) {
-      console.error(
-        `[feedback-writer] MISMATCH: issueId=${opts.issueId} but workspacePath points to feature-${dirName} — falling back to canonical resolution`
-      );
-      providedPath = undefined;
+  // Derive sequence number from continue-file feedback first, then keep the
+  // workspace mirror numbering aligned if feedback files already exist.
+  let seq = 1;
+  try {
+    const existing = readContinueStateForIssue(resolved.projectPath, opts.issueId);
+    seq = (existing?.feedback?.length ?? 0) + 1;
+  } catch { /* fall back to 1 */ }
+
+  const workspacePath = opts.workspacePath || resolveWorkspacePath(opts.issueId);
+  if (workspacePath) {
+    const { feedbackDir } = getWorkspacePanPaths(workspacePath);
+    if (existsSync(feedbackDir)) {
+      const fsSeq = await getNextSequenceNumber(feedbackDir);
+      if (fsSeq > seq) seq = fsSeq;
     }
   }
 
-  const workspacePath = providedPath || resolveWorkspacePath(opts.issueId);
-  if (!workspacePath) {
-    return { success: false, error: `Workspace not found for ${opts.issueId}` };
-  }
+  const seqStr = String(seq).padStart(3, '0');
+  const filename = `${seqStr}-${opts.specialist}-${opts.outcome}.md`;
+  const relativePath = `.pan/feedback/${filename}`;
+  const filePath = workspacePath ? join(getWorkspacePanPaths(workspacePath).feedbackDir, filename) : undefined;
 
-  const planningDir = join(workspacePath, '.planning');
-  const feedbackDir = join(planningDir, 'feedback');
-
+  // Write to the scope vBRIEF's continue file (primary store, Layer 3+).
+  //
+  // Best-effort: if a single malformed vBRIEF on main (e.g. one missing a
+  // valid root status) makes appendFeedbackEntryForIssue throw, do NOT abort
+  // the whole feedback delivery. The workspace mirror at .pan/feedback/NNN-*.md
+  // is what the agent reads, and the messageAgent call is what nudges it to
+  // read. Aborting here on a continue-state error blocks feedback for every
+  // issue in the project just because one unrelated spec is malformed
+  // (observed PAN-977 cycle: PAN-1015 spec was bad → review CHANGES_REQUESTED
+  // never reached the work agent → agent sat idle waiting).
+  let continueStateWritten = false;
   try {
-    await mkdir(feedbackDir, { recursive: true });
-
-    const seq = await getNextSequenceNumber(feedbackDir);
-    const seqStr = String(seq).padStart(3, '0');
-    const filename = `${seqStr}-${opts.specialist}-${opts.outcome}.md`;
-    const filePath = join(feedbackDir, filename);
-    const relativePath = `.planning/feedback/${filename}`;
-
-    const timestamp = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-    const shortTimestamp = timestamp.replace(/:\d{2}Z$/, 'Z');
-
-    const content = [
-      '---',
-      `specialist: ${opts.specialist}`,
-      `issueId: ${opts.issueId}`,
-      `outcome: ${opts.outcome}`,
-      `timestamp: ${timestamp}`,
-      '---',
-      '',
-      opts.markdownBody,
-      '',
-    ].join('\n');
-
-    await writeFile(filePath, content, 'utf-8');
-
-    // Update STATE.md with breadcrumb
-    await appendToStateMd(planningDir, {
-      timestamp: shortTimestamp,
+    appendFeedbackEntryForIssue(resolved.projectPath, opts.issueId, {
+      seq,
       specialist: opts.specialist,
       outcome: opts.outcome,
-      relativePath,
-      issueId: opts.issueId,
+      timestamp,
+      markdownBody: opts.markdownBody,
     });
-
-    console.log(`[feedback-writer] Wrote ${relativePath} for ${opts.issueId}`);
-    return { success: true, relativePath, filePath };
-  } catch (error: any) {
-    console.error(`[feedback-writer] Failed to write feedback for ${opts.issueId}:`, error);
-    return { success: false, error: error.message };
+    continueStateWritten = true;
+  } catch (err: any) {
+    console.error(
+      `[feedback-writer] Failed to append continue-file feedback entry for ${opts.issueId} (non-fatal — will still write workspace mirror):`,
+      err.message,
+    );
   }
+  try {
+    appendContinueSessionEntryForIssue(resolved.projectPath, opts.issueId, {
+      reason: 'feedback',
+      note: `[${shortTimestamp}] ${opts.specialist} → ${opts.outcome.toUpperCase()} — seq ${seq}`,
+    });
+  } catch (err: any) {
+    console.error(
+      `[feedback-writer] Failed to append continue-file breadcrumb for ${opts.issueId}:`,
+      err.message,
+    );
+  }
+
+  if (workspacePath) {
+    try {
+      writeFeedback(workspacePath, filename, opts.markdownBody);
+    } catch (err: any) {
+      console.error(`[feedback-writer] Failed to mirror feedback file for ${opts.issueId}:`, err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
+  console.log(
+    `[feedback-writer] Wrote feedback seq ${seq} for ${opts.issueId} (${opts.specialist} → ${opts.outcome})${continueStateWritten ? '' : ' [continue-state skipped]'}`,
+  );
+  return { success: true, relativePath, filePath };
 }

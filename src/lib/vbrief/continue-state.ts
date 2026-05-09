@@ -1,0 +1,294 @@
+/**
+ * Continue State Module
+ *
+ * Replaces STATE.md with a structured `continue-<issue-id>.vbrief.json` that
+ * lives alongside the scope vBRIEF in the same lifecycle directory.
+ *
+ * The scope vBRIEF stays clean ("here's what we're building"). The continue
+ * file is the living session history: git state, decisions, hazards, resume
+ * point, beads mapping, agent model, and a session log. It's written during
+ * planning, updated on agent session start/end and on crash recovery, and
+ * persists through completion for post-mortems.
+ */
+
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { join } from 'path';
+
+export const CONTINUE_FILENAME_PREFIX = 'continue-';
+export const CONTINUE_FILENAME_SUFFIX = '.vbrief.json';
+
+/** Snapshot of git state at write time. */
+export interface ContinueGitState {
+  branch?: string;
+  /** Short SHA for human readability. */
+  sha?: string;
+  /** Whether the working tree had uncommitted changes when written. */
+  dirty?: boolean;
+}
+
+/** Single decision the agent (or planner) made and wants future agents to know. */
+export interface ContinueDecision {
+  /** Short identifier — e.g. "D1". */
+  id: string;
+  /** Free-form summary. */
+  summary: string;
+  /** ISO 8601 datetime, set on append. */
+  recordedAt: string;
+}
+
+/** Risk/edge case the work agent should watch out for. */
+export interface ContinueHazard {
+  id: string;
+  summary: string;
+  /** Optional mitigation description. */
+  mitigation?: string;
+}
+
+/** Where work should resume after a crash, restart, or session boundary. */
+export interface ContinueResumePoint {
+  /** Free-form description of what the next agent should do. */
+  description: string;
+  /** Optional bead ID the next agent should pick up. */
+  beadId?: string;
+  /** Optional file paths the next agent should read first. */
+  filesToRead?: string[];
+}
+
+/** Mapping from plan item / acceptance criterion to bead ID(s). */
+export interface ContinueBeadsMapping {
+  [planItemId: string]: string[];
+}
+
+/** Specialist feedback entry stored on the continue file (Layer 1+). */
+export interface ContinueFeedbackEntry {
+  /** Sequence number — matches the NNN prefix of the legacy .planning/feedback/ filename. */
+  seq: number;
+  specialist: 'verification-gate' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent' | 'merge-agent';
+  /** Outcome label (e.g. "changes-requested", "approved"). */
+  outcome: string;
+  /** ISO 8601 timestamp when feedback was written. */
+  timestamp: string;
+  /** Full markdown body of the feedback (frontmatter excluded). */
+  markdownBody: string;
+}
+
+/** Reason a session ended or restarted. */
+export type ContinueSessionReason =
+  | 'planning'
+  | 'start'
+  | 'end'
+  | 'resume'
+  | 'crash-recovery'
+  | 'feedback'
+  | 'manual';
+
+/** Single entry in the session history log. */
+export interface ContinueSessionEntry {
+  /** ISO 8601 datetime, set on append. */
+  timestamp: string;
+  /** Why this entry was created. */
+  reason: ContinueSessionReason;
+  /** Optional human-readable note. */
+  note?: string;
+  /** Agent model in use for this session (e.g. "claude-opus-4-7"). */
+  agentModel?: string;
+  /** Full text content for entries that capture a document (e.g. planning prompt). */
+  content?: string;
+  /** If this entry records a crash recovery, details about the crash. */
+  crashInfo?: {
+    detectedAt?: string;
+    /** Free-form description of what we observed. */
+    description?: string;
+  };
+}
+
+/**
+ * The continue state document. Structured replacement for STATE.md.
+ *
+ * The file lives at `<lifecycleDir>/continue-<issueId>.vbrief.json` and
+ * follows the same dot-prefixed-suffix convention as the scope vBRIEF so
+ * it's discoverable by file-pattern scans.
+ */
+export interface ContinueState {
+  /** Schema version for future evolution. */
+  version: '1';
+  /** Issue ID this continue file is keyed to (e.g. "PAN-946"). */
+  issueId: string;
+  /** ISO 8601 datetime, set at first write. */
+  created: string;
+  /** ISO 8601 datetime, updated on every write. */
+  updated: string;
+  gitState: ContinueGitState;
+  decisions: ContinueDecision[];
+  hazards: ContinueHazard[];
+  resumePoint: ContinueResumePoint | null;
+  beadsMapping: ContinueBeadsMapping;
+  /** Agent model for the most recent / current session. */
+  agentModel?: string;
+  sessionHistory: ContinueSessionEntry[];
+  /** Pending specialist feedback for the work agent. Cleared at the start of each review cycle. */
+  feedback?: ContinueFeedbackEntry[];
+}
+
+/** Build the continue filename for a given issue ID.
+ *
+ * Issue IDs are case-canonical UPPERCASE (e.g. `PAN-1014`) — matches the GitHub
+ * tracker, the kanban kard ID, the workspace branch prefix, and the review-status
+ * DB key (Run 14 fix `4b660d10` already normalizes those). Some call sites pass
+ * lowercase (`pan-1014`) — usually agent state.json or path-derived strings —
+ * which previously produced a *second* file `continue-pan-1014.vbrief.json`
+ * sitting next to the canonical `continue-PAN-1014.vbrief.json`, defeating
+ * lookups and leaving orphan dirt on `main`. Normalize here so both cases land
+ * on the same file. */
+export function continueFilename(issueId: string): string {
+  return `${CONTINUE_FILENAME_PREFIX}${issueId.toUpperCase()}${CONTINUE_FILENAME_SUFFIX}`;
+}
+
+/** Build the absolute path for a continue file inside a lifecycle directory. */
+export function continueFilePath(dir: string, issueId: string): string {
+  return join(dir, continueFilename(issueId));
+}
+
+/**
+ * Atomically write the continue state to `<dir>/continue-<issueId>.vbrief.json`
+ * using temp-file + rename. Sets `updated` to "now" and `created` if absent.
+ */
+export function writeContinueState(dir: string, issueId: string, state: ContinueState): void {
+  const canonicalIssueId = issueId.toUpperCase();
+  const path = continueFilePath(dir, canonicalIssueId);
+  const now = new Date().toISOString();
+  const next: ContinueState = {
+    ...state,
+    issueId: canonicalIssueId,
+    version: '1',
+    created: state.created || now,
+    updated: now,
+  };
+  const tmp = path + '.tmp';
+  writeFileSync(tmp, JSON.stringify(next, null, 2), 'utf-8');
+  renameSync(tmp, path);
+}
+
+/**
+ * Read and validate the continue file for an issue. Returns null if the file
+ * doesn't exist. Throws if the file exists but is invalid (corrupt JSON or
+ * wrong shape) — callers should handle this rather than silently producing
+ * a fresh state.
+ */
+export function readContinueState(dir: string, issueId: string): ContinueState | null {
+  const path = continueFilePath(dir, issueId);
+  if (!existsSync(path)) return null;
+  const raw = readFileSync(path, 'utf-8');
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`Invalid JSON in continue file ${path}: ${(err as Error).message}`);
+  }
+  validateContinueState(parsed, path);
+  return parsed as ContinueState;
+}
+
+/**
+ * Append a session entry to the continue file's `sessionHistory`. Creates a
+ * fresh continue state if the file doesn't yet exist. Persists atomically.
+ */
+export function appendSessionEntry(
+  dir: string,
+  issueId: string,
+  entry: Omit<ContinueSessionEntry, 'timestamp'> & { timestamp?: string },
+): ContinueState {
+  const existing = readContinueState(dir, issueId);
+  const now = new Date().toISOString();
+  const fullEntry: ContinueSessionEntry = {
+    ...entry,
+    timestamp: entry.timestamp ?? now,
+  };
+  const next: ContinueState = existing
+    ? { ...existing, sessionHistory: [...existing.sessionHistory, fullEntry] }
+    : {
+        version: '1',
+        issueId,
+        created: now,
+        updated: now,
+        gitState: {},
+        decisions: [],
+        hazards: [],
+        resumePoint: null,
+        beadsMapping: {},
+        agentModel: entry.agentModel,
+        sessionHistory: [fullEntry],
+      };
+  writeContinueState(dir, issueId, next);
+  return next;
+}
+
+/**
+ * Append a feedback entry to the continue file's `feedback[]`. Creates a fresh
+ * continue state if the file doesn't yet exist. Persists atomically.
+ */
+export function appendFeedbackEntry(
+  dir: string,
+  issueId: string,
+  entry: ContinueFeedbackEntry,
+): ContinueState {
+  const existing = readContinueState(dir, issueId);
+  const now = new Date().toISOString();
+  const next: ContinueState = existing
+    ? { ...existing, feedback: [...(existing.feedback ?? []), entry] }
+    : {
+        version: '1',
+        issueId,
+        created: now,
+        updated: now,
+        gitState: {},
+        decisions: [],
+        hazards: [],
+        resumePoint: null,
+        beadsMapping: {},
+        feedback: [entry],
+        sessionHistory: [],
+      };
+  writeContinueState(dir, issueId, next);
+  return next;
+}
+
+/**
+ * Clear all feedback entries from the continue file. Returns null if the file
+ * doesn't exist. Persists atomically.
+ */
+export function clearFeedback(dir: string, issueId: string): ContinueState | null {
+  const existing = readContinueState(dir, issueId);
+  if (!existing) return null;
+  const next: ContinueState = { ...existing, feedback: [] };
+  writeContinueState(dir, issueId, next);
+  return next;
+}
+
+function validateContinueState(value: unknown, path: string): asserts value is ContinueState {
+  if (!value || typeof value !== 'object') {
+    throw new Error(`Continue file ${path} is not an object`);
+  }
+  const v = value as Record<string, unknown>;
+  if (v.version !== '1') {
+    throw new Error(`Continue file ${path} has unsupported version: ${String(v.version)}`);
+  }
+  if (typeof v.issueId !== 'string') {
+    throw new Error(`Continue file ${path} missing issueId`);
+  }
+  if (typeof v.created !== 'string' || typeof v.updated !== 'string') {
+    throw new Error(`Continue file ${path} missing created/updated timestamps`);
+  }
+  if (!Array.isArray(v.decisions) || !Array.isArray(v.hazards) || !Array.isArray(v.sessionHistory)) {
+    throw new Error(`Continue file ${path} has malformed array fields`);
+  }
+  if (typeof v.beadsMapping !== 'object' || v.beadsMapping === null) {
+    throw new Error(`Continue file ${path} has malformed beadsMapping`);
+  }
+  // feedback is optional — default to [] for files written before Layer 1
+  if (v.feedback === undefined) {
+    (v as Record<string, unknown>).feedback = [];
+  } else if (!Array.isArray(v.feedback)) {
+    throw new Error(`Continue file ${path} has malformed feedback array`);
+  }
+}

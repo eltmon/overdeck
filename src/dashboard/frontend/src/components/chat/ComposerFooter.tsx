@@ -28,15 +28,16 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 async function switchModel(
   conversationName: string,
   model: string,
+  agentId?: string,
 ): Promise<void> {
-  const res = await fetch(
-    `/api/conversations/${encodeURIComponent(conversationName)}/switch-model`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model }),
-    },
-  );
+  const endpoint = agentId
+    ? `/api/agents/${encodeURIComponent(agentId)}/switch-model`
+    : `/api/conversations/${encodeURIComponent(conversationName)}/switch-model`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model }),
+  });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error(`Failed to switch model (${res.status})${body ? `: ${body}` : ''}`);
@@ -46,15 +47,16 @@ async function switchModel(
 async function sendConversationMessage(
   conversationName: string,
   message: string,
+  agentId?: string,
 ): Promise<void> {
-  const res = await fetch(
-    `/api/conversations/${encodeURIComponent(conversationName)}/message`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message }),
-    },
-  );
+  const endpoint = agentId
+    ? `/api/agents/${encodeURIComponent(agentId)}/message`
+    : `/api/conversations/${encodeURIComponent(conversationName)}/message`;
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error(`Failed to send message (${res.status})${body ? `: ${body}` : ''}`);
@@ -137,11 +139,15 @@ interface ComposerFooterProps {
   conversation: Conversation;
   /** Called with the message text the instant it is sent — use for optimistic display */
   onSend?: (text: string) => void;
+  /** Called when the POST fails — parent should move the optimistic message to the failed outbox */
+  onSendFailed?: (text: string) => void;
+  /** Agent ID for agent sessions (uses /api/agents/* endpoints instead of /api/conversations/*) */
+  agentId?: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
+export function ComposerFooter({ conversation, onSend, onSendFailed, agentId }: ComposerFooterProps) {
   const [model, setModel] = useState<string>(conversation.model ?? getDefaultConversationModel());
   const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
   const [sending, setSending] = useState(false);
@@ -265,14 +271,21 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     processUploadQueue();
   }, [processUploadQueue]);
 
-  // Send /model command to tmux when model is changed on an active conversation
+  // Switch model via API — kills session and respawns with correct provider env.
+  // Unlike /model (same-provider only), this works for cross-provider switches.
   const handleModelChange = useCallback((newModel: string, _effortLevels: readonly string[]) => {
     setModel(newModel);
     saveStoredModel(newModel);
     if (conversation.sessionAlive) {
-      void sendConversationMessage(conversation.name, `/model ${newModel}`).catch((err: unknown) => {
-        console.error('[ComposerFooter] Failed to send /model:', err);
-      });
+      setSending(true);
+      void switchModel(conversation.name, newModel)
+        .catch((err: unknown) => {
+          console.error('[ComposerFooter] Failed to switch model:', err);
+          toast.error(err instanceof Error ? err.message : 'Failed to switch model');
+        })
+        .finally(() => {
+          setSending(false);
+        });
     }
   }, [conversation.name, conversation.sessionAlive]);
 
@@ -345,12 +358,16 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     if (!messageText && uploadedImages.length === 0) return;
 
     setSending(true);
+    const imagePrefix = uploadedImages
+      .map((image) => `@${image.serverPath}`)
+      .join('\n');
+    const composedMessage = [imagePrefix, messageText].filter(Boolean).join('\n');
     try {
       // If the selected model differs from the conversation's current model,
       // kill the session and restart with the new model before sending.
       // switchModel already waits for the new session to be ready before returning.
       if (model !== conversation.model && conversation.sessionAlive) {
-        await switchModel(submitConversationName, model);
+        await switchModel(submitConversationName, model, agentId);
       }
 
       // Abort if conversation switched during the async model switch — the
@@ -363,15 +380,10 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
         return;
       }
 
-      const imagePrefix = uploadedImages
-        .map((image) => `@${image.serverPath}`)
-        .join('\n');
-      const composedMessage = [imagePrefix, messageText].filter(Boolean).join('\n');
-
       // Optimistic: notify parent immediately so message appears before server round-trip
       onSend?.(composedMessage);
 
-      await sendConversationMessage(submitConversationName, composedMessage);
+      await sendConversationMessage(submitConversationName, composedMessage, agentId);
 
       // Only clear state if conversation is still the same (avoid clearing the
       // new conversation's composer if user switched while send was in flight)
@@ -391,12 +403,13 @@ export function ComposerFooter({ conversation, onSend }: ComposerFooterProps) {
     } catch (err) {
       console.error('[ComposerFooter] Failed to send:', err);
       toast.error(err instanceof Error ? err.message : 'Failed to send message');
+      onSendFailed?.(composedMessage);
     } finally {
       setSending(false);
       // Refocus editor
       editor.focus();
     }
-  }, [model, conversation.name, conversation.model, conversation.sessionAlive, sending, isDisabled, onSend]);
+  }, [model, conversation.name, conversation.model, conversation.sessionAlive, sending, isDisabled, onSend, onSendFailed]);
 
   useEffect(() => {
     const previousConversationName = previousConversationNameRef.current;

@@ -30,6 +30,7 @@ import { mkdir } from 'node:fs/promises';
 import { getPanopticonHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdog } from './routes/cliproxy.js';
+import { resumeSwarmAutoAdvanceLoopOnStartup } from './routes/swarm.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
 
 declare const Bun: unknown;
@@ -42,6 +43,7 @@ await mkdir(getPanopticonHome(), { recursive: true });
 // on first start; reused on subsequent starts. Used by /api/internal/pipeline/notify.
 ensureInternalToken();
 
+
 // Prepare the managed tmux context exactly once, before any code path can spawn
 // tmux. After this call `buildTmuxArgs`, `buildTmuxCommandString`, and
 // `tmuxExecAsync` are effectively free — no per-call file writes, no per-call
@@ -49,7 +51,7 @@ ensureInternalToken();
 // and agent message delivery (PAN-785).
 await ensureManagedTmuxContextOnce();
 // Cache .panopticon.env content at startup to avoid blocking FS reads during request handling (PAN-70)
-void initTrackerConfigCache().catch(err => {
+await initTrackerConfigCache().catch(err => {
   console.log('[tracker-config] Warning: failed to cache .panopticon.env:', err.message);
 });
 
@@ -152,6 +154,27 @@ setPipelineHandler((event) => {
       return;
     }
 
+    case 'reviewer_timed_out': {
+      try {
+        const es = getEventStore();
+        es.append({
+          type: 'review.specialist.timed_out',
+          timestamp: new Date().toISOString(),
+          payload: {
+            issueId: event.issueId,
+            role: event.role,
+            sessionName: event.sessionName,
+            attempt: event.attempt,
+            maxRetries: event.maxRetries,
+            willRetry: event.willRetry,
+          },
+        } as any);
+      } catch (err) {
+        console.error('[pipeline] Failed to append reviewer_timed_out event:', err);
+      }
+      return;
+    }
+
     case 'coordinator_started': {
       try {
         const es = getEventStore();
@@ -162,6 +185,20 @@ setPipelineHandler((event) => {
         } as any);
       } catch (err) {
         console.error('[pipeline] Failed to append coordinator_started event:', err);
+      }
+      return;
+    }
+
+    case 'coordinator_died': {
+      try {
+        const es = getEventStore();
+        es.append({
+          type: 'review.coordinator.died',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: event.issueId, sessionName: event.sessionName, reason: event.reason },
+        } as any);
+      } catch (err) {
+        console.error('[pipeline] Failed to append coordinator_died event:', err);
       }
       return;
     }
@@ -219,7 +256,7 @@ void cleanupOrphanedConversationAttachments();
 console.log('[panopticon] Attachment cleanup started');
 
 // Start TTS summarizer (off by default — only starts if tts.summarizer.enabled=true)
-startTtsSummarizer();
+void startTtsSummarizer().catch(err => console.warn('[tts-summarizer] start failed:', err));
 
 // Start CLIProxy watchdog — auto-restarts the sidecar if it crashes
 startCliproxyWatchdog();
@@ -281,22 +318,40 @@ try {
 // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
 await processPendingLifecycle();
 await processPendingFeedbackDeliveries();
+await resumeSwarmAutoAdvanceLoopOnStartup();
 
-void import('../../lib/cloister/deacon.js')
-  .then(({ logNonCanonicalStashesOnStartup }) => logNonCanonicalStashesOnStartup())
-  .then((findings) => {
-    if (findings.length > 0) {
-      emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Detected ${findings.length} non-canonical stash(es) on startup; audit recommended` });
-    }
-  })
-  .catch((err: any) => {
-    console.warn(`[panopticon] Failed non-canonical stash startup scan: ${err.message}`);
-  });
+// Non-canonical stash scan: walks every workspace at startup. Cheap when there
+// are few workspaces, expensive when there are many (each scan does a git
+// stash list + reflog walk per worktree). Gated behind PANOPTICON_DISABLE_DEACON
+// alongside the cloister auto-start so the same escape hatch lets operators
+// bring the dashboard up cleanly when there are too many workspaces.
+if (process.env.PANOPTICON_DISABLE_DEACON !== '1') {
+  void import('../../lib/cloister/deacon.js')
+    .then(({ logNonCanonicalStashesOnStartup }) => logNonCanonicalStashesOnStartup())
+    .then((findings) => {
+      if (findings.length > 0) {
+        emitActivityEntry({ source: 'dashboard', level: 'warn', message: `Detected ${findings.length} non-canonical stash(es) on startup; audit recommended` });
+      }
+    })
+    .catch((err: any) => {
+      console.warn(`[panopticon] Failed non-canonical stash startup scan: ${err.message}`);
+    });
+}
 
 // Cloister/Deacon auto-start. Deacon is the Layer 3 safety net that catches
-// work agents that forgot to call `pan work done`, nudges dead-end agents,
+// work agents that forgot to call `pan done`, nudges dead-end agents,
 // and detects stuck thinking loops. Without it, stalled agents are invisible.
-if (shouldAutoStart()) {
+//
+// Emergency escape hatch: PANOPTICON_DISABLE_DEACON=1 skips auto-start even
+// when config.startup.auto_start is true. Use this when deacon's first-cycle
+// scan over many workspaces is starving the event loop and preventing the
+// HTTP server from accepting connections (the "Bad Gateway after pan up"
+// failure mode). The dashboard comes up clean; start cloister manually from
+// the UI once the workspace backlog is cleaned up.
+if (process.env.PANOPTICON_DISABLE_DEACON === '1') {
+  console.log('[panopticon] Cloister auto-start SKIPPED (PANOPTICON_DISABLE_DEACON=1)');
+  emitActivityEntry({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via PANOPTICON_DISABLE_DEACON — deacon is not running' });
+} else if (shouldAutoStart()) {
   getCloisterService().start().catch((err) => {
     console.error('[panopticon] Cloister auto-start failed:', err);
     emitActivityEntry({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });

@@ -213,6 +213,8 @@ function ComposerPlugin({
 }: InnerPluginProps) {
   const [editor] = useLexicalComposerContext();
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestTextRef = useRef(loadDraft(conversationName));
+  const unmountingRef = useRef(false);
 
   // Register Enter key handler.
   // NOTE: We do NOT check `disabled` here — the submit handler owns that check.
@@ -253,10 +255,22 @@ function ComposerPlugin({
     return () => root.removeEventListener('keydown', handleKeyDown);
   }, [editor, onSlashKey]);
 
+  // Flush draft to localStorage on unmount so tab switches don't lose text
+  useEffect(() => {
+    unmountingRef.current = false;
+    return () => {
+      unmountingRef.current = true;
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+      saveDraft(conversationName, latestTextRef.current);
+    };
+  }, [conversationName]);
+
   // Debounced draft persistence
   const handleChange = useCallback(() => {
+    if (unmountingRef.current) return;
     editor.read(() => {
       const text = $getRoot().getTextContent();
+      latestTextRef.current = text;
       onTextChange(text);
 
       if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
@@ -587,7 +601,7 @@ export function ComposerPromptEditor({
 
   return (
     <div style={{ position: 'relative' }}>
-      <LexicalComposer initialConfig={initialConfig}>
+      <LexicalComposer key={conversationName} initialConfig={initialConfig}>
         <div className={`${styles.composerEditor} ${disabled ? styles.composerEditorDisabled : ''}`}>
           <PlainTextPlugin
             contentEditable={

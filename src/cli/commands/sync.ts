@@ -6,8 +6,10 @@ import { homedir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { loadConfig } from '../../lib/config.js';
+import { parseVBriefFilename } from '../../lib/vbrief/lifecycle.js';
+import { resolveGitHubIssue } from '../../lib/tracker-utils.js';
 import { createBackup } from '../../lib/backup.js';
-import { planSync, executeSync, refreshCache, migrateStalePersonalContent, removeLegacySkills070, planHooksSync, syncHooks, syncStatusline, mirrorProjectSkills } from '../../lib/sync.js';
+import { planSync, executeSync, refreshCache, migrateStalePersonalContent, removeLegacySkills070, planHooksSync, syncHooks, syncStatusline, mirrorProjectSkills, syncPiSettings } from '../../lib/sync.js';
 import { SYNC_TARGET, isDevMode } from '../../lib/paths.js';
 import { getDevrootPath } from '../../lib/config.js';
 import { listProjects } from '../../lib/projects.js';
@@ -313,37 +315,6 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     statuslineSpinner.info('No statusline script found (scripts/statusline.sh)');
   }
 
-  // Check and install claudish if missing (for multi-model routing with OAuth support)
-  const hasClaudish = checkCommand('claudish');
-  if (!hasClaudish) {
-    const claudishSpinner = ora('Installing claudish...').start();
-    const plat = process.platform === 'darwin' ? 'darwin' : 'linux';
-    if (plat === 'darwin') {
-      claudishSpinner.warn('claudish not found - install via Homebrew: brew install eltmon/claudish/claudish');
-    } else {
-      // Linux: download binary from GitHub releases
-      try {
-        const binDir = join(homedir(), '.local', 'bin');
-        const claudishPath = join(binDir, 'claudish');
-        const arch = process.arch === 'x64' ? 'x64' : process.arch === 'arm64' ? 'arm64' : 'x64';
-        mkdirSync(binDir, { recursive: true });
-        execSync(
-          `curl -sL "https://github.com/eltmon/claudish/releases/latest/download/claudish-linux-${arch}" -o "${claudishPath}" && chmod +x "${claudishPath}"`,
-          { stdio: 'pipe', timeout: 60000 }
-        );
-        claudishSpinner.succeed('claudish installed to ~/.local/bin/claudish');
-      } catch {
-        claudishSpinner.warn('claudish installation failed - download from github.com/eltmon/claudish/releases');
-      }
-    }
-  } else {
-    // Log claudish version for diagnostics
-    try {
-      const version = execSync('claudish --version 2>/dev/null || true', { encoding: 'utf8', stdio: 'pipe' }).trim();
-      if (version) console.log(chalk.dim(`  claudish ${version.split('\n')[0]}`));
-    } catch { /* non-fatal */ }
-  }
-
   // Check and install mkcert if missing
   if (!checkCommand('mkcert')) {
     const mkcertSpinner = ora('Installing mkcert...').start();
@@ -361,26 +332,6 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       mkcertSpinner.warn('Failed to install mkcert - run: https://github.com/FiloSottile/mkcert/releases');
     }
   }
-
-  // Check and install SageOx CLI if missing
-  if (!checkCommand('ox')) {
-    const oxSpinner = ora('Installing SageOx CLI (ox)...').start();
-    try {
-      const binDir = join(homedir(), '.local', 'bin');
-      mkdirSync(binDir, { recursive: true });
-      const oxPath = join(binDir, 'ox');
-      const arch = process.arch === 'x64' ? 'amd64' : process.arch;
-      const platform = process.platform === 'darwin' ? 'darwin' : 'linux';
-      execSync(`curl -sL "https://github.com/eltmon/ox/releases/download/latest/ox-${platform}-${arch}" -o "${oxPath}" && chmod +x "${oxPath}"`, {
-        stdio: 'pipe',
-        timeout: 60000,
-      });
-      oxSpinner.succeed('SageOx CLI installed');
-    } catch {
-      oxSpinner.warn('Failed to install SageOx CLI - see: https://github.com/eltmon/ox/releases');
-    }
-  }
-
 
   // Enforce Playwright MCP --isolated flag to prevent stale zoom/profile state
   const mcpPath = join(homedir(), '.claude', 'mcp.json');
@@ -528,6 +479,17 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
   }
 
+  // Pi harness — point Pi's settings file at ~/.claude/skills so it sees the
+  // same skills tree we just synced. No-op when Pi is not on PATH (PAN-636).
+  const piResult = syncPiSettings();
+  if (piResult.status === 'created') {
+    console.log(chalk.cyan(`Pi settings: created ${piResult.path.replace(homedir(), '~')}`));
+  } else if (piResult.status === 'updated') {
+    console.log(chalk.cyan(`Pi settings: merged skills entry into ${piResult.path.replace(homedir(), '~')}`));
+  } else if (piResult.status === 'skipped' && piResult.reason === 'existing settings.json is not valid JSON') {
+    console.log(chalk.yellow(`Pi settings: ${piResult.path.replace(homedir(), '~')} is not valid JSON — left untouched`));
+  }
+
   // Mirror project-level skills/ → .claude/skills/ against the devroot when
   // configured, so pan sync works from any cwd (not just from inside the repo tree).
   const skillsMirror = mirrorProjectSkills(getDevrootPath() ?? process.cwd());
@@ -558,5 +520,127 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     if (agentCleanupResult.protected.length > 0) {
       console.log(chalk.dim(`  Protected (running sessions): ${agentCleanupResult.protected.join(', ')}`));
     }
+  }
+
+  // vBRIEF state disagreement audit (PAN-946: workspace-9ny)
+  try {
+    const auditSpinner = ora('Running vBRIEF state audit...').start();
+    const disagreements: Array<{ issueId: string; problem: string; fix: string }> = [];
+    const hasGh = checkCommand('gh');
+
+    for (const { config } of projects) {
+      if (!existsSync(config.path)) continue;
+
+      const activeDir = join(config.path, 'vbrief', 'active');
+      const completedDir = join(config.path, 'vbrief', 'completed');
+
+      // (1) vBRIEF in active/ but tracker says closed
+      if (existsSync(activeDir)) {
+        const activeFiles = readdirSync(activeDir).filter(
+          f => f.endsWith('.vbrief.json') && !f.startsWith('continue-')
+        );
+        for (const file of activeFiles) {
+          const parsed = parseVBriefFilename(file);
+          if (!parsed) continue;
+          const issueId = parsed.issueId.toUpperCase();
+          const ghInfo = resolveGitHubIssue(issueId);
+          if (ghInfo.isGitHub && hasGh) {
+            try {
+              const state = execSync(
+                `gh issue view ${ghInfo.number} --repo ${ghInfo.owner}/${ghInfo.repo} --json state --jq '.state'`,
+                { encoding: 'utf-8', timeout: 10000, stdio: 'pipe' }
+              ).trim();
+              if (state.toLowerCase() === 'closed') {
+                disagreements.push({
+                  issueId,
+                  problem: 'vBRIEF in active/ but GitHub issue is closed',
+                  fix: `pan scope complete ${issueId}`,
+                });
+              }
+            } catch { /* skip if gh fails */ }
+          }
+        }
+      }
+
+      // (2) vBRIEF in completed/ but workspace still exists
+      if (existsSync(completedDir)) {
+        const completedFiles = readdirSync(completedDir).filter(
+          f => f.endsWith('.vbrief.json') && !f.startsWith('continue-')
+        );
+        for (const file of completedFiles) {
+          const parsed = parseVBriefFilename(file);
+          if (!parsed) continue;
+          const issueId = parsed.issueId.toUpperCase();
+          const workspacePath = join(config.path, 'workspaces', `feature-${issueId.toLowerCase()}`);
+          if (existsSync(workspacePath)) {
+            disagreements.push({
+              issueId,
+              problem: 'vBRIEF in completed/ but workspace worktree still exists',
+              fix: `pan close ${issueId}`,
+            });
+          }
+        }
+      }
+
+      // (3) tracker shows in-progress but no vBRIEF in active/ (scanning worktrees)
+      const workspacesDir = join(config.path, 'workspaces');
+      if (existsSync(workspacesDir)) {
+        let activeIssueIds = new Set<string>();
+        if (existsSync(activeDir)) {
+          activeIssueIds = new Set(
+            readdirSync(activeDir)
+              .filter(f => f.endsWith('.vbrief.json') && !f.startsWith('continue-'))
+              .map(f => {
+                const parsed = parseVBriefFilename(f);
+                return parsed ? parsed.issueId.toUpperCase() : '';
+              })
+              .filter(Boolean)
+          );
+        }
+
+        const worktreeEntries = readdirSync(workspacesDir, { withFileTypes: true })
+          .filter(e => e.isDirectory() && e.name.startsWith('feature-'))
+          .map(e => e.name.replace('feature-', '').toUpperCase());
+
+        for (const worktreeIssueId of worktreeEntries) {
+          if (activeIssueIds.has(worktreeIssueId)) continue;
+
+          let trackerOpen = false;
+          const ghInfo = resolveGitHubIssue(worktreeIssueId);
+          if (ghInfo.isGitHub && hasGh) {
+            try {
+              const state = execSync(
+                `gh issue view ${ghInfo.number} --repo ${ghInfo.owner}/${ghInfo.repo} --json state --jq '.state'`,
+                { encoding: 'utf-8', timeout: 10000, stdio: 'pipe' }
+              ).trim();
+              trackerOpen = state.toLowerCase() === 'open';
+            } catch { /* skip if gh fails — fall through to heuristic */ }
+          }
+
+          // Flag if tracker is open OR if we couldn't check tracker (workspace without active vBRIEF is always suspicious)
+          if (trackerOpen || !ghInfo.isGitHub || !hasGh) {
+            disagreements.push({
+              issueId: worktreeIssueId,
+              problem: trackerOpen
+                ? 'Tracker shows open but no vBRIEF in active/'
+                : 'Workspace exists but no vBRIEF in active/',
+              fix: `pan scope approve ${worktreeIssueId}`,
+            });
+          }
+        }
+      }
+    }
+
+    if (disagreements.length === 0) {
+      auditSpinner.succeed('vBRIEF state audit passed — no disagreements');
+    } else {
+      auditSpinner.warn(`Found ${disagreements.length} vBRIEF state disagreement(s)`);
+      for (const d of disagreements) {
+        console.log(chalk.yellow(`  ⚠ ${d.issueId}: ${d.problem}`));
+        console.log(chalk.dim(`    Fix: ${d.fix}`));
+      }
+    }
+  } catch (auditErr: any) {
+    console.warn(`[pan sync] vBRIEF audit failed (non-fatal): ${auditErr?.message ?? auditErr}`);
   }
 }

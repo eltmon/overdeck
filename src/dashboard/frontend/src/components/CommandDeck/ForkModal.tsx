@@ -1,190 +1,95 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, ChevronDown, GitBranchPlus } from 'lucide-react';
+import { X, GitBranchPlus, HelpCircle } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   getDefaultConversationModel,
-  ensureDefaultConversationModel,
   FALLBACK_DEFAULT_CONVERSATION_MODEL,
 } from '../chat/defaultConversationModel';
 import styles from './styles/command-deck.module.css';
-
-const FALLBACK_COMPACTION_MODEL = 'claude-haiku-4-5-20251001';
+import pickerStyles from '../shared/ModelPicker/ModelPicker.module.css';
+import { ModelSelect, useAvailableModels } from '../shared/ModelPicker';
 import type { Conversation } from './ConversationList';
 
-interface PickerModel {
-  id: string;
-  label: string;
-  provider: string;
-  costDisplay?: string;
-}
+const FORK_HELP_CONTENT = `## Fork Modes
 
-interface ModelGroup {
-  provider: string;
-  label: string;
-  models: PickerModel[];
-}
+There are three ways to fork a conversation, from lightest to richest:
 
-const PROVIDER_LABELS: Record<string, string> = {
-  anthropic: 'Anthropic',
-  openai: 'OpenAI',
-  google: 'Google',
-  minimax: 'MiniMax',
-  zai: 'Z.AI',
-  kimi: 'Kimi',
-  openrouter: 'OpenRouter',
-};
+### Plain Fork
+Copies the raw conversation history into a new session. No summary is generated — the new agent picks up exactly where the previous one left off.
 
-const FALLBACK_GROUPS: ModelGroup[] = [
-  {
-    provider: 'anthropic',
-    label: 'Anthropic',
-    models: [
-      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'anthropic', costDisplay: '$15/1M' },
-      { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'anthropic', costDisplay: '$45/1M' },
-      { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', provider: 'anthropic', costDisplay: '$1/1M' },
-    ],
-  },
-];
+If the conversation was previously compacted, only the history from the last compaction point forward is carried over.
 
-function formatCost(costPer1M: number): string {
-  if (costPer1M === 0) return 'FREE';
-  if (costPer1M < 1) return `$${costPer1M.toFixed(2)}/1M`;
-  return `$${Math.round(costPer1M)}/1M`;
-}
+**Best for:** Continuing a conversation that hit a context limit, especially when staying on the same model.
 
-function useAvailableModels(): { groups: ModelGroup[]; compactionModel: string } {
-  const [groups, setGroups] = useState<ModelGroup[]>(FALLBACK_GROUPS);
-  const [compactionModel, setCompactionModel] = useState(FALLBACK_COMPACTION_MODEL);
+**Cross-model warning:** Raw history may contain model-specific data (like signed thinking blocks) that won't validate on a different provider. Use a summary fork when switching models.
+
+### Fast Summary
+Generates a quick summary **without calling an LLM**. Extracts a bullet list of user messages, files modified, and tools used from the conversation history.
+
+**Best for:** Quick forks where you just need a rough reminder of what happened, without paying for an LLM call.
+
+### Full Summary (default)
+Sends the conversation history to an LLM to produce a structured summary. For very large conversations, the history is processed in chunks — each chunk builds on the previous summary so arbitrarily long sessions can be summarized.
+
+The summary is injected as the first message in the new session, and the agent is instructed to acknowledge it and wait for your next instruction.
+
+**Best for:** Most forks — gives the new agent a clear understanding of what was accomplished and decided.
+
+---
+
+## Options
+
+### Summary Model
+The model used to **generate the summary**. This is independent of the model the new conversation runs on. Cheaper models like Haiku work well for straightforward summarization; use a larger model for complex or nuanced conversations.
+
+### Include Thinking
+When enabled, the model's internal reasoning (thinking blocks) is included in the text sent to the summarizer. This gives the summary model richer context about **why** decisions were made, but increases input size and cost.
+
+### Launch Model
+The model the **new forked conversation** will run on. Completely independent of the summary model — you can summarize with Haiku and launch on Opus, or vice versa. Defaults to the parent conversation's model.
+`;
+
+function ForkHelpModal({ onClose }: { onClose: () => void }) {
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    async function load() {
-      try {
-        await ensureDefaultConversationModel();
-        const [availRes, orRes, settingsRes] = await Promise.allSettled([
-          fetch('/api/settings/available-models').then((r) => r.json()) as Promise<
-            Record<string, Array<{ id: string; name: string; costPer1MTokens: number }>>
-          >,
-          fetch('/api/settings/openrouter/models').then((r) => r.json()) as Promise<{
-            models: Array<{ id: string; name: string; promptCostPer1M: number }>;
-            favorites: string[];
-          }>,
-          fetch('/api/settings').then((r) => r.json()) as Promise<{
-            conversations?: { compaction_model?: string };
-          }>,
-        ]);
-
-        if (settingsRes.status === 'fulfilled' && settingsRes.value?.conversations?.compaction_model) {
-          setCompactionModel(settingsRes.value.conversations.compaction_model);
-        }
-
-        const avail = availRes.status === 'fulfilled' ? availRes.value : {};
-        const orData = orRes.status === 'fulfilled' ? orRes.value : { models: [], favorites: [] };
-        const newGroups: ModelGroup[] = [];
-
-        for (const [prov, models] of Object.entries(avail)) {
-          if (prov === 'openrouter') continue;
-          if (!Array.isArray(models) || models.length === 0) continue;
-          newGroups.push({
-            provider: prov,
-            label: PROVIDER_LABELS[prov] ?? prov,
-            models: models.map((m) => ({
-              id: m.id,
-              label: m.name,
-              provider: prov,
-              costDisplay: formatCost(m.costPer1MTokens),
-            })),
-          });
-        }
-
-        const orFavorites: string[] = orData.favorites ?? [];
-        const orFavoriteModels = (orData.models ?? []).filter((m) => orFavorites.includes(m.id));
-        if (orFavoriteModels.length > 0) {
-          newGroups.push({
-            provider: 'openrouter',
-            label: 'OpenRouter',
-            models: orFavoriteModels.map((m) => ({
-              id: m.id,
-              label: m.name,
-              provider: 'openrouter',
-              costDisplay: formatCost(m.promptCostPer1M),
-            })),
-          });
-        }
-
-        if (newGroups.length > 0) setGroups(newGroups);
-      } catch {
-        // keep fallback
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onClose();
       }
-    }
-    void load();
-  }, []);
-
-  return { groups, compactionModel };
-}
-
-function ModelSelect({
-  value,
-  onChange,
-  groups,
-  label,
-}: {
-  value: string;
-  onChange: (id: string) => void;
-  groups: ModelGroup[];
-  label: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const allModels = groups.flatMap((g) => g.models);
-  const selected = allModels.find((m) => m.id === value);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [open]);
+    };
+    window.addEventListener('keydown', handleKey, true);
+    return () => window.removeEventListener('keydown', handleKey, true);
+  }, [onClose]);
 
   return (
-    <div className={styles.forkField}>
-      <span className={styles.forkFieldLabel}>{label}</span>
-      <div ref={ref} className={styles.forkPickerWrap}>
-        <button
-          type="button"
-          className={styles.forkPickerBtn}
-          onClick={() => setOpen((o) => !o)}
-        >
-          <span className={styles.forkPickerValue}>{selected?.label ?? value}</span>
-          {selected?.costDisplay && (
-            <span className={styles.forkPickerCost}>{selected.costDisplay}</span>
-          )}
-          <ChevronDown size={12} className={styles.forkPickerChevron} />
-        </button>
-        {open && (
-          <div className={styles.forkPickerDropdown}>
-            {groups.map((group) => (
-              <div key={group.provider}>
-                {groups.length > 1 && (
-                  <div className={styles.forkPickerGroupHeader}>{group.label}</div>
-                )}
-                {group.models.map((model) => (
-                  <button
-                    key={model.id}
-                    type="button"
-                    className={`${styles.forkPickerOption} ${model.id === value ? styles.forkPickerOptionActive : ''}`}
-                    onClick={() => { onChange(model.id); setOpen(false); }}
-                  >
-                    <span className={styles.forkPickerOptionLabel}>{model.label}</span>
-                    {model.costDisplay && (
-                      <span className={styles.forkPickerOptionCost}>{model.costDisplay}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            ))}
+    <div
+      ref={overlayRef}
+      className={styles.forkHelpOverlay}
+      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
+    >
+      <div className={styles.forkHelpDialog} role="dialog" aria-labelledby="fork-help-title">
+        <div className={styles.forkHeader}>
+          <div className={styles.forkHeaderLeft}>
+            <HelpCircle size={16} className={styles.forkHeaderIcon} />
+            <h3 id="fork-help-title" className={styles.forkTitle}>Fork Options</h3>
           </div>
-        )}
+          <button className={styles.forkClose} onClick={onClose} aria-label="Close">
+            <X size={14} />
+          </button>
+        </div>
+        <div className={styles.forkHelpBody}>
+          <div className={styles.markdownContent}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{FORK_HELP_CONTENT}</ReactMarkdown>
+          </div>
+        </div>
+        <div className={styles.forkFooter}>
+          <button className={styles.forkConfirmBtn} onClick={onClose}>
+            Got it
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -199,6 +104,7 @@ interface ForkModalProps {
     plainFork: boolean,
     localSummaryOnly: boolean,
     includeThinkingInSummary: boolean,
+    title?: string,
   ) => void;
   onClose: () => void;
   isPending: boolean;
@@ -212,10 +118,16 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
   const [plainFork, setPlainFork] = useState(false);
   const [localSummaryOnly, setLocalSummaryOnly] = useState(false);
   const [includeThinkingInSummary, setIncludeThinkingInSummary] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+
+  const convTitle = conversation.title ?? conversation.name;
+  const [forkTitle, setForkTitle] = useState(`Summary Fork: ${convTitle}`);
 
   useEffect(() => {
     setSummaryModel(compactionModel);
   }, [compactionModel]);
+
+
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const modelChanged = launchModel !== (conversation.model || defaultModel);
@@ -245,10 +157,17 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
             <GitBranchPlus size={16} className={styles.forkHeaderIcon} />
             <h3 id="fork-title" className={styles.forkTitle}>Fork Conversation</h3>
           </div>
-          <button className={styles.forkClose} onClick={onClose} aria-label="Close">
-            <X size={14} />
-          </button>
+          <div className={styles.forkHeaderRight}>
+            <button className={styles.forkClose} onClick={() => setShowHelp(true)} aria-label="Help">
+              <HelpCircle size={14} />
+            </button>
+            <button className={styles.forkClose} onClick={onClose} aria-label="Close">
+              <X size={14} />
+            </button>
+          </div>
         </div>
+
+        {showHelp && <ForkHelpModal onClose={() => setShowHelp(false)} />}
 
         <div className={styles.forkBody}>
           <p className={styles.forkDesc}>
@@ -269,6 +188,20 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
           </p>
 
           <div className={styles.forkFields}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
+              <label htmlFor="fork-title-input" style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>
+                Fork name
+              </label>
+              <input
+                id="fork-title-input"
+                type="text"
+                value={forkTitle}
+                onChange={(e) => setForkTitle(e.target.value)}
+                className={styles.forkTitleInput}
+                autoFocus
+              />
+            </div>
+
             <div className={styles.forkCheckboxRow}>
               <input
                 type="checkbox"
@@ -307,7 +240,7 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
                       groups={groups}
                       label="Summary model"
                     />
-                    <span className={styles.forkFieldHint}>
+                    <span className={pickerStyles.fieldHint}>
                       Generates a concise summary of the conversation history
                     </span>
                   </>
@@ -322,7 +255,7 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
                   />
                   <label htmlFor="include-thinking">Include thinking in summary</label>
                 </div>
-                <span className={styles.forkFieldHint}>
+                <span className={pickerStyles.fieldHint}>
                   When enabled, thinking content is included as labeled text in the summary
                 </span>
               </>
@@ -334,7 +267,7 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
               groups={groups}
               label="Launch model"
             />
-            <span className={styles.forkFieldHint}>
+            <span className={pickerStyles.fieldHint}>
               The model the new forked conversation will use
             </span>
           </div>
@@ -347,7 +280,7 @@ export function ForkModal({ conversation, onConfirm, onClose, isPending }: ForkM
           <button
             className={styles.forkConfirmBtn}
             disabled={isPending}
-            onClick={() => onConfirm(conversation, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary)}
+            onClick={() => onConfirm(conversation, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, forkTitle.trim() || undefined)}
           >
             <GitBranchPlus size={13} />
             {isPending ? 'Forking...' : 'Fork Conversation'}

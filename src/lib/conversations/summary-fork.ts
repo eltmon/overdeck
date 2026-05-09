@@ -27,7 +27,7 @@ import { join } from 'node:path';
 
 import type { Conversation } from '../database/conversations-db.js';
 import { createConversation } from '../database/conversations-db.js';
-import { encodeClaudeProjectDir, sessionFilePath, sessionIdFromFile } from '../paths.js';
+import { encodeClaudeProjectDir, sessionFilePath } from '../paths.js';
 import { loadConfig } from '../config-yaml.js';
 import { generateSmartSummary, runModelSummary } from './smart-compaction.js';
 
@@ -140,11 +140,19 @@ export async function generateSummaryForFork(jsonlPath: string, summaryModel?: s
     summaryModel = 'claude-sonnet-4-6';
   }
 
+  console.log(`[claude-invoke] purpose=summary-fork | model=${summaryModel} | source=summary-fork.ts:generateSummaryForFork | jsonl=${jsonlPath}`);
+
   const { config } = loadConfig();
   const richMode = config.conversations.richCompaction;
 
-  const result = await generateSmartSummary({ jsonlPath, model: summaryModel, richMode, mode: 'fork', includeThinkingInSummary });
-  return { summary: result.summary + FORK_WAIT_INSTRUCTION, summaryModel };
+  try {
+    const result = await generateSmartSummary({ jsonlPath, model: summaryModel, richMode, mode: 'fork', includeThinkingInSummary });
+    console.log(`[claude-invoke] SUCCESS purpose=summary-fork | model=${summaryModel} | outputChars=${result.summary.length}`);
+    return { summary: result.summary + FORK_WAIT_INSTRUCTION, summaryModel };
+  } catch (err: any) {
+    console.error(`[claude-invoke] FAILED purpose=summary-fork | model=${summaryModel} | error="${err.message}"`);
+    throw err;
+  }
 }
 
 export async function reserveSummaryForkSession(
@@ -181,7 +189,7 @@ async function findLastCompactBoundaryOffset(jsonlPath: string): Promise<number>
         }
       } catch { /* skip invalid lines */ }
     }
-    offset += Buffer.byteLength(line, 'utf-8') + 1; // +1 for \n
+    offset += line.length + 1; // +1 for \n
   }
   return lastBoundaryOffset;
 }
@@ -253,7 +261,7 @@ export async function createSummaryFork(
 ): Promise<SummaryForkResult> {
   const sourceSessionFile = conv.claudeSessionId
     ? sessionFilePath(conv.cwd, conv.claudeSessionId)
-    : conv.sessionFile ?? null;
+    : null;
   if (!sourceSessionFile) {
     throw new Error(`No session file found for conversation ${conv.name}`);
   }

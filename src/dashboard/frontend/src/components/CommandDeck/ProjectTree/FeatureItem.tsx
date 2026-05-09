@@ -1,10 +1,33 @@
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
-import { Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge, ChevronRight, ChevronDown, FolderOpen, FileText, Trash2, GitBranch, BookText, Bug, Container, Radio, Workflow } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import {
+  Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge,
+  ChevronRight, ChevronDown, FolderOpen, FileText, Trash2, GitBranch,
+  BookText, Bug, Container, Radio, Workflow, Play, RefreshCw, RotateCcw,
+  XCircle, ClipboardCheck, Zap,
+} from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
 import { SessionNode } from './SessionNode';
 import { StatusDot, type StatusDotStatus } from '../StatusDot';
+import { ResourcesGroup } from './ResourcesGroup';
+import { useAvailableModels } from '../../shared/ModelPicker/ModelPicker';
+import {
+  ContextMenuRoot,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuDestructiveItem,
+  ContextMenuSeparator,
+  ContextMenuLabel,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuSubContent,
+} from '../../shared/ContextMenu';
+import { refreshDashboardState } from '../../../lib/refresh-dashboard-state';
+import { parseContainerServiceName } from '../../../lib/resource-utils';
 import styles from '../styles/command-deck.module.css';
 
 export type TreeSessionFilter = 'all' | 'alive' | 'failed';
@@ -22,28 +45,26 @@ interface FeatureItemProps {
   onViewTerminal?: (sessionId: string) => void;
   onPauseSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
-  onRestartSession?: (sessionId: string, issueId: string) => void;
+  onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => void;
   onDeepWipe?: (issueId: string) => void;
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
   onCleanupOrphanedResources?: (issueId: string) => void;
+  onOpenPlanDialog?: (issueId: string) => void;
+  containerStats?: Record<string, { id: string; name: string; cpuPercent: number; memoryUsage: number; status: 'running' | 'stopped' | 'unhealthy' | 'restarting' }>;
 }
 
-interface ContextMenuState {
-  x: number;
-  y: number;
-  open: boolean;
-}
+// ContextMenuState removed — migrated to Radix UI ContextMenu
 
 const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'vbrief', 'beads', 'pr', 'docker'];
 
 function resourceColor(feature: ProjectFeature): string {
   const state = feature.stateLabel.toLowerCase();
-  if (state.includes('closed') || state.includes('done')) return 'var(--mc-text-muted)';
-  if (state.includes('review')) return 'var(--mc-accent)';
-  if (state.includes('progress')) return 'var(--mc-success)';
-  if (state.includes('suspend')) return 'var(--mc-warning)';
-  return 'var(--mc-text-secondary)';
+  if (state.includes('closed') || state.includes('done')) return 'var(--muted-foreground)';
+  if (state.includes('review')) return 'var(--primary)';
+  if (state.includes('progress')) return 'var(--success)';
+  if (state.includes('suspend')) return 'var(--warning)';
+  return 'var(--muted-foreground)';
 }
 
 function formatPrState(pr: { number: number; title: string; state: string; isDraft: boolean }): string {
@@ -244,29 +265,29 @@ function ResourceStrip({
 function StatusIcon({ status, agentStatus, stateLabel, isRally, readyForMerge }: { status: string; agentStatus: string | null; stateLabel: string; isRally?: boolean; readyForMerge?: boolean }) {
   // Merge-ready takes precedence — human action needed
   if (readyForMerge) {
-    return <GitMerge size={14} style={{ color: 'var(--mc-accent)' }} />;
+    return <GitMerge size={14} style={{ color: 'var(--primary)' }} />;
   }
   // Rally feature: layers icon with color based on state
   if (isRally) {
-    const color = stateLabel === 'Done' ? 'var(--mc-success)'
-      : stateLabel === 'In Progress' ? 'var(--mc-warning)'
-      : 'var(--mc-text-muted)';
+    const color = stateLabel === 'Done' ? 'var(--success)'
+      : stateLabel === 'In Progress' ? 'var(--warning)'
+      : 'var(--muted-foreground)';
     return <Layers size={14} style={{ color }} />;
   }
   // Green spinner: only when agent is truly actively running
   if (status === 'running') {
-    return <Loader2 size={14} className={styles.spinning} style={{ color: 'var(--mc-success)' }} />;
+    return <Loader2 size={14} className={styles.spinning} style={{ color: 'var(--success)' }} />;
   }
   // Yellow triangle: agent exists but not actively working (suspended, idle with session, needs attention)
   if (agentStatus === 'suspended' || stateLabel === 'In Progress' || stateLabel === 'Suspended') {
-    return <AlertTriangle size={14} style={{ color: 'var(--mc-warning)' }} />;
+    return <AlertTriangle size={14} style={{ color: 'var(--warning)' }} />;
   }
   // Check: has planning context
   if (status === 'has_state') {
-    return <CheckCircle2 size={14} style={{ color: 'var(--mc-text-muted)' }} />;
+    return <CheckCircle2 size={14} style={{ color: 'var(--muted-foreground)' }} />;
   }
   // Default: empty circle
-  return <Circle size={14} style={{ color: 'var(--mc-text-muted)' }} />;
+  return <Circle size={14} style={{ color: 'var(--muted-foreground)' }} />;
 }
 
 function formatCost(cost: number): string {
@@ -277,9 +298,17 @@ function formatCost(cost: number): string {
 type AggregateActivityState = 'running' | 'error' | 'queued' | 'stopped';
 
 type AggregateBadge =
+  | { key: 'input'; label: string; tone: 'waiting' }
   | { key: 'work'; label: string; tone: 'running' | 'stopped' }
   | { key: 'reviewers'; label: string; tone: 'running' | 'stopped' }
   | { key: 'review-error'; label: string; tone: 'error' };
+
+function formatRoleList(roles: readonly string[]): string {
+  if (roles.length === 0) return '';
+  if (roles.length === 1) return roles[0]!;
+  if (roles.length === 2) return `${roles[0]} and ${roles[1]}`;
+  return `${roles.slice(0, -1).join(', ')}, and ${roles[roles.length - 1]}`;
+}
 
 function isWorkOrSpecialistSession(session: SessionNodeType): boolean {
   return session.type === 'work'
@@ -312,6 +341,7 @@ function formatSessionDuration(seconds: number): string {
 
 function getAggregateActivityState(sessions: readonly SessionNodeType[]): AggregateActivityState {
   if (sessions.some(isErrorSession)) return 'error';
+  if (sessions.some((session) => session.awaitingInput === true)) return 'queued';
   if (sessions.some(isRunningSession)) return 'running';
   if (sessions.some(isQueuedSession)) return 'queued';
   return 'stopped';
@@ -383,6 +413,14 @@ function getAggregateBadges(sessions: readonly SessionNodeType[]): AggregateBadg
 
   const badges: AggregateBadge[] = [];
 
+  if (sessions.some((session) => session.awaitingInput === true)) {
+    badges.push({
+      key: 'input',
+      label: '! INPUT',
+      tone: 'waiting',
+    });
+  }
+
   if (workSessions.length > 0) {
     badges.push({
       key: 'work',
@@ -418,6 +456,100 @@ function getFeatureStateTone(stateLabel: string): 'done' | 'progress' | 'review'
   if (normalized === 'has context') return 'context';
   if (normalized === 'planning') return 'planning';
   return 'todo';
+}
+
+function getAggregateBadgeTitle(badge: AggregateBadge, sessions: readonly SessionNodeType[]): string {
+  if (badge.key === 'input') {
+    const waiting = sessions.find((session) => session.awaitingInput === true);
+    const firstLine = waiting?.awaitingInputPrompt
+      ?.split('\n')
+      .find((line) => line.trim().length > 0)
+      ?.trim();
+    return firstLine
+      ? `Awaiting user input in ${waiting?.sessionId}: ${firstLine}`
+      : `Awaiting user input in ${waiting?.sessionId ?? 'an agent session'}.`;
+  }
+
+  if (badge.key === 'work') {
+    const workSessions = sessions.filter((session) => session.type === 'work');
+    const runningWork = workSessions.filter(isRunningSession);
+    const queuedWork = workSessions.filter(isQueuedSession);
+    const stoppedWork = workSessions.filter((session) => !isRunningSession(session) && !isQueuedSession(session));
+    const longest = runningWork.reduce((max, session) => Math.max(max, session.duration ?? 0), 0);
+    const parts = [
+      `Work agent sessions for this issue: ${workSessions.length} total.`,
+    ];
+    if (runningWork.length > 0) {
+      parts.push(`${runningWork.length} running${longest > 0 ? ` (${formatSessionDuration(longest)} longest)` : ''}.`);
+    }
+    if (queuedWork.length > 0) parts.push(`${queuedWork.length} queued or starting.`);
+    if (stoppedWork.length > 0) parts.push(`${stoppedWork.length} stopped or idle.`);
+    return parts.join(' ');
+  }
+
+  if (badge.key === 'reviewers') {
+    const reviewerSessions = sessions.filter((session) => session.type === 'review' || session.type === 'reviewer');
+    const running = reviewerSessions.filter(isRunningSession);
+    const queued = reviewerSessions.filter(isQueuedSession);
+    const stopped = reviewerSessions.filter((session) => !isRunningSession(session) && !isQueuedSession(session) && !isErrorSession(session));
+    const roles = Array.from(new Set(
+      reviewerSessions
+        .map((session) => session.role?.trim())
+        .filter((role): role is string => Boolean(role)),
+    ));
+    const parts = [
+      `Review pipeline sessions for this issue: ${reviewerSessions.length} total.`,
+      `${running.length} active, ${queued.length} queued or starting, ${stopped.length} stopped.`,
+    ];
+    if (roles.length > 0) {
+      parts.push(`Roles present: ${formatRoleList(roles)}.`);
+    }
+    return parts.join(' ');
+  }
+
+  const failures = sessions.filter((session) => (session.type === 'review' || session.type === 'reviewer') && isErrorSession(session));
+  const failingRoles = Array.from(new Set(
+    failures
+      .map((session) => session.role?.trim())
+      .filter((role): role is string => Boolean(role)),
+  ));
+  const parts = [`Review pipeline has ${failures.length} failing session${failures.length === 1 ? '' : 's'}.`];
+  if (failingRoles.length > 0) {
+    parts.push(`Affected roles: ${formatRoleList(failingRoles)}.`);
+  }
+  return parts.join(' ');
+}
+
+function getFeatureStateTitle(feature: ProjectFeature, aggregateSessions: readonly SessionNodeType[]): string | undefined {
+  const normalized = feature.stateLabel.trim().toLowerCase();
+  const contextParts = [
+    feature.hasPrd ? 'PRD' : null,
+    feature.hasState ? 'continue file' : null,
+    feature.resourceDetails?.hasVbrief ? 'vBRIEF' : null,
+    feature.resourceDetails?.hasBeads ? 'beads' : null,
+  ].filter((part): part is string => part !== null);
+  const contextSuffix = contextParts.length > 0 ? ` Context present: ${contextParts.join(', ')}.` : '';
+
+  if (normalized === 'planning') {
+    return `Planning context is being prepared for this issue.${contextSuffix}`;
+  }
+  if (normalized === 'has context') {
+    return `Planning artifacts exist for this issue, but active implementation or review has not started yet.${contextSuffix}`;
+  }
+  if (normalized === 'in review' || normalized === 'review') {
+    return feature.readyForMerge
+      ? 'Implementation has moved into review/test/merge flow and is ready for human merge approval.'
+      : 'Implementation has moved into the review/test/merge pipeline for verification.';
+  }
+  if (normalized === 'in progress' || normalized === 'active') {
+    return aggregateSessions.length > 0
+      ? `Implementation work is active or resumable for this issue. ${buildActivitySummary(aggregateSessions)}.`
+      : `Implementation work is active for this issue.${contextSuffix}`;
+  }
+  if (normalized === 'done') {
+    return 'Tracker state is done for this issue.';
+  }
+  return `Tracker state: ${feature.stateLabel}.${contextSuffix}`;
 }
 
 const TYPE_PRIORITY: Record<string, number> = {
@@ -476,11 +608,12 @@ function writeExpanded(issueId: string, expanded: boolean): void {
   } catch { /* ignore */ }
 }
 
-/** Default to collapsed for every issue. The session list dominates the
- *  tree height when expanded — collapsed-by-default keeps the tree scannable.
- *  Users can expand individual features; that choice is persisted. */
-function defaultExpandedFromState(): boolean {
-  return false;
+/** In-flight issues (In Progress, In Review, Testing) default expanded so
+ *  active work is visible at a glance. Done/closed issues default collapsed
+ *  to keep the tree scannable. Users can override; that choice is persisted. */
+function defaultExpandedFromState(stateLabel: string): boolean {
+  const s = stateLabel.toLowerCase();
+  return s.includes('progress') || s.includes('review') || s.includes('testing');
 }
 
 /** Compute the dominant session presence for the feature row StatusDot.
@@ -490,7 +623,8 @@ function computeDominantStatus(sessions: readonly SessionNodeType[]): StatusDotS
   let hasThinking = false;
   let hasWaiting = false;
   for (const s of sessions) {
-    if (s.presence === 'active') return 'active';
+    if (s.awaitingInput === true) hasWaiting = true;
+    if (s.presence === 'active' && s.awaitingInput !== true) return 'active';
     if (s.presence === 'idle') hasIdle = true;
     const st = (s.status || '').toLowerCase();
     if (st.includes('thinking')) hasThinking = true;
@@ -513,164 +647,395 @@ export function sessionMatchesFilter(session: SessionNodeType, filter: TreeSessi
   return true;
 }
 
-function FeatureMenu({
-  x,
-  y,
-  onClose,
-  feature,
-  bestSessionId,
-  hasJsonl,
-  onOpenStateDir,
-  onDeepWipe,
-  onViewJsonl,
-}: {
-  x: number;
-  y: number;
-  onClose: () => void;
+interface FeatureContextMenuProps {
   feature: ProjectFeature;
-  bestSessionId: string | null;
+  workSessionId: string | null;
   hasJsonl: boolean;
   onOpenStateDir?: (sessionId: string) => void;
-  onDeepWipe?: (issueId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
-}) {
-  const menuRef = useRef<HTMLDivElement>(null);
+  onDeepWipe?: (issueId: string) => void;
+  onStopSession?: (sessionId: string) => void;
+  onResumeSession?: (sessionId: string) => void;
+  onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => void;
+  onOpenPlanDialog?: (issueId: string) => void;
+}
 
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    const handleScroll = () => onClose();
-    document.addEventListener('mousedown', handleClick);
-    document.addEventListener('scroll', handleScroll, true);
-    return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('scroll', handleScroll, true);
-    };
-  }, [onClose]);
+function StartModelSubmenu({
+  onStart,
+}: {
+  onStart: (model?: string) => void;
+}) {
+  const { groups } = useAvailableModels();
 
   return (
-    <div
-      ref={menuRef}
-      style={{
-        position: 'fixed',
-        left: x,
-        top: y,
-        zIndex: 1000,
-        background: 'var(--card)',
-        border: '1px solid var(--mc-border, var(--border))',
-        borderRadius: 6,
-        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-        padding: '4px 0',
-        minWidth: 160,
-        fontSize: 12,
-      }}
-    >
-      {bestSessionId && onOpenStateDir && (
-        <button
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            width: '100%',
-            padding: '6px 12px',
-            border: 'none',
-            background: 'none',
-            textAlign: 'left',
-            cursor: 'pointer',
-            color: 'var(--foreground)',
-            fontSize: 12,
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.background = 'var(--accent)';
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.background = 'transparent';
-          }}
-          onClick={() => {
-            onOpenStateDir(bestSessionId);
-            onClose();
-          }}
+    <ContextMenuSub>
+      <ContextMenuSubTrigger>Start with Model…</ContextMenuSubTrigger>
+      <ContextMenuSubContent>
+        <ContextMenuItem onSelect={() => onStart()}>
+          <span className="flex-1">Default model</span>
+        </ContextMenuItem>
+        {groups.map((group) => (
+          <div key={group.provider}>
+            <ContextMenuLabel>{group.label}</ContextMenuLabel>
+            {group.models.map((m) => (
+              <ContextMenuItem key={m.id} onSelect={() => onStart(m.id)}>
+                <span className="flex-1">{m.label}</span>
+                {m.costDisplay && (
+                  <span className="ml-2 shrink-0 text-[10px] opacity-50">{m.costDisplay}</span>
+                )}
+              </ContextMenuItem>
+            ))}
+          </div>
+        ))}
+      </ContextMenuSubContent>
+    </ContextMenuSub>
+  );
+}
+
+function FeatureContextMenu({
+  feature,
+  workSessionId,
+  hasJsonl,
+  onOpenStateDir,
+  onViewJsonl,
+  onDeepWipe,
+  onStopSession,
+  onResumeSession,
+  onRestartSession,
+  onOpenPlanDialog,
+}: FeatureContextMenuProps) {
+  const queryClient = useQueryClient();
+  const { groups } = useAvailableModels();
+
+  const agentRunning = feature.agentStatus === 'running';
+  const agentStopped = feature.agentStatus === 'stopped';
+  const hasAgent = !!feature.agentStatus;
+
+  const startAgentMutation = useMutation({
+    mutationFn: async (model?: string) => {
+      const body: Record<string, unknown> = { issueId: feature.issueId };
+      if (model) body.model = model;
+      const res = await fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok) throw new Error(data.error || 'Failed to start agent');
+      return data;
+    },
+    onSuccess: () => {
+      void refreshDashboardState(queryClient);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
+    },
+  });
+
+  const reviewMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/review/${encodeURIComponent(feature.issueId)}/trigger`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string; success?: boolean; message?: string };
+      if (!res.ok) throw new Error(data.error || 'Failed to start review');
+      if (data.success === false) throw new Error(data.message || 'Review was not started');
+      return data;
+    },
+    onSuccess: () => {
+      void refreshDashboardState(queryClient);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
+    },
+  });
+
+  const recoverMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/review/${encodeURIComponent(feature.issueId)}/reset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rerun: true }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error || 'Failed to recover pipeline');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      void refreshDashboardState(queryClient);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
+    },
+  });
+
+  const completePlanningMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/issues/${encodeURIComponent(feature.issueId)}/complete-planning`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string };
+      if (!res.ok) throw new Error(data.error || 'Failed to complete planning');
+      return data;
+    },
+    onSuccess: () => {
+      toast.success(`Planning complete for ${feature.issueId}`);
+      void refreshDashboardState(queryClient);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
+    },
+  });
+
+  const swarmMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/swarm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueId: feature.issueId }),
+      });
+      const data = await res.json().catch(() => ({})) as { error?: string; dispatched?: number; slots?: unknown[] };
+      if (!res.ok) throw new Error(data.error || 'Failed to dispatch swarm');
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(`Swarm dispatched for ${feature.issueId}: ${(data as any).dispatched ?? 0} slot(s)`);
+      void refreshDashboardState(queryClient);
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
+    },
+  });
+
+  const handleDeepWipe = useCallback(() => {
+    if (!onDeepWipe) return;
+    const confirmed = window.confirm(
+      `Deep wipe will destroy all data for ${feature.issueId} including workspace, state, and git branches. This cannot be undone.\n\nAre you absolutely sure?`,
+    );
+    if (confirmed) {
+      onDeepWipe(feature.issueId);
+    }
+  }, [feature.issueId, onDeepWipe]);
+
+  const isRecoverable = feature.sessions?.some(
+    s => (s.type === 'review' || s.type === 'reviewer') && isErrorSession(s),
+  ) ?? false;
+
+  return (
+    <ContextMenuContent>
+      {/* Lifecycle actions */}
+      {agentRunning && workSessionId && onStopSession && (
+        <ContextMenuItem onSelect={() => onStopSession(workSessionId)}>
+          <XCircle size={12} className="mr-2" />
+          Stop Agent
+        </ContextMenuItem>
+      )}
+
+      {agentStopped && workSessionId && onResumeSession && (
+        <ContextMenuItem onSelect={() => onResumeSession(workSessionId)}>
+          <Play size={12} className="mr-2" />
+          Resume Session
+        </ContextMenuItem>
+      )}
+
+      {!hasAgent && (
+        <ContextMenuItem onSelect={() => startAgentMutation.mutate(undefined)} disabled={startAgentMutation.isPending}>
+          {startAgentMutation.isPending ? <Loader2 size={12} className="mr-2 animate-spin" /> : <Play size={12} className="mr-2" />}
+          Start Agent
+        </ContextMenuItem>
+      )}
+
+      {/* Start/Resume with Model submenu */}
+      {(!hasAgent || agentStopped) && (
+        <StartModelSubmenu onStart={(model) => startAgentMutation.mutate(model)} />
+      )}
+
+      {agentRunning && workSessionId && onRestartSession && (
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>Switch Model…</ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            {groups.map((group) => (
+              <div key={group.provider}>
+                <ContextMenuLabel>{group.label}</ContextMenuLabel>
+                {group.models.map((m) => (
+                  <ContextMenuItem key={m.id} onSelect={() => onRestartSession(workSessionId, feature.issueId, 'work', undefined, m.id)}>
+                    <span className="flex-1">{m.label}</span>
+                    {m.costDisplay && (
+                      <span className="ml-2 shrink-0 text-[10px] opacity-50">{m.costDisplay}</span>
+                    )}
+                  </ContextMenuItem>
+                ))}
+              </div>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      )}
+
+      {/* Pipeline actions */}
+      {(agentRunning || agentStopped || !hasAgent) && (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem onSelect={() => reviewMutation.mutate()} disabled={reviewMutation.isPending}>
+            {reviewMutation.isPending ? <Loader2 size={12} className="mr-2 animate-spin" /> : <RefreshCw size={12} className="mr-2" />}
+            Review & Test
+          </ContextMenuItem>
+        </>
+      )}
+
+      {isRecoverable && (
+        <ContextMenuItem onSelect={() => recoverMutation.mutate()} disabled={recoverMutation.isPending}>
+          {recoverMutation.isPending ? <Loader2 size={12} className="mr-2 animate-spin" /> : <RotateCcw size={12} className="mr-2" />}
+          Recover
+        </ContextMenuItem>
+      )}
+
+      {/* Plan actions — always available so users can (re-)plan stuck/empty issues */}
+      {onOpenPlanDialog && (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>
+              <BookText size={12} className="mr-2" />
+              Plan
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+              <ContextMenuItem onSelect={() => onOpenPlanDialog(feature.issueId)}>
+                <BookText size={12} className="mr-2" />
+                {feature.hasPlanning || feature.resourceDetails?.hasVbrief ? 'Continue Planning…' : 'Start Planning…'}
+              </ContextMenuItem>
+              <ContextMenuItem
+                onSelect={() => completePlanningMutation.mutate()}
+                disabled={completePlanningMutation.isPending || !feature.resourceDetails?.hasVbrief || !feature.resourceDetails?.hasBeads}
+              >
+                {completePlanningMutation.isPending ? <Loader2 size={12} className="mr-2 animate-spin" /> : <ClipboardCheck size={12} className="mr-2" />}
+                Done Planning
+              </ContextMenuItem>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        </>
+      )}
+
+      {/* Swarm action */}
+      {feature.resourceDetails?.hasVbrief && (
+        <ContextMenuItem
+          onSelect={() => swarmMutation.mutate()}
+          disabled={swarmMutation.isPending}
         >
-          <FolderOpen size={14} />
+          {swarmMutation.isPending ? <Loader2 size={12} className="mr-2 animate-spin" /> : <Zap size={12} className="mr-2" />}
+          Swarm
+        </ContextMenuItem>
+      )}
+
+      {/* Utility actions */}
+      <ContextMenuSeparator />
+
+      {workSessionId && onOpenStateDir && (
+        <ContextMenuItem onSelect={() => onOpenStateDir(workSessionId)}>
+          <FolderOpen size={12} className="mr-2" />
           Open State Dir
-        </button>
+        </ContextMenuItem>
       )}
-      {hasJsonl && bestSessionId && onViewJsonl && (
-        <button
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            width: '100%',
-            padding: '6px 12px',
-            border: 'none',
-            background: 'none',
-            textAlign: 'left',
-            cursor: 'pointer',
-            color: 'var(--foreground)',
-            fontSize: 12,
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.background = 'var(--accent)';
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.background = 'transparent';
-          }}
-          onClick={() => {
-            onViewJsonl(bestSessionId);
-            onClose();
-          }}
-        >
-          <FileText size={14} />
+
+      {hasJsonl && workSessionId && onViewJsonl && (
+        <ContextMenuItem onSelect={() => onViewJsonl(workSessionId)}>
+          <FileText size={12} className="mr-2" />
           View JSONL
-        </button>
+        </ContextMenuItem>
       )}
+
       {onDeepWipe && (
         <>
-          <div style={{ height: 1, background: 'var(--mc-border, var(--border))', margin: '4px 8px' }} />
-          <button
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              width: '100%',
-              padding: '6px 12px',
-              border: 'none',
-              background: 'none',
-              textAlign: 'left',
-              cursor: 'pointer',
-              color: 'var(--mc-error, #ef4444)',
-              fontSize: 12,
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.background = 'var(--accent)';
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.background = 'transparent';
-            }}
-            onClick={() => {
-              const confirmed = window.confirm(
-                `Deep wipe will destroy all data for ${feature.issueId} including workspace, state, and git branches. This cannot be undone.\n\nAre you absolutely sure?`,
-              );
-              if (confirmed) {
-                onDeepWipe(feature.issueId);
-              }
-              onClose();
-            }}
-          >
-            <Trash2 size={14} />
+          <ContextMenuSeparator />
+          <ContextMenuDestructiveItem onSelect={handleDeepWipe}>
+            <Trash2 size={12} className="mr-2" />
             Deep Wipe
-          </button>
+          </ContextMenuDestructiveItem>
         </>
+      )}
+    </ContextMenuContent>
+  );
+}
+
+function ReviewGroup({
+  parent,
+  children,
+  issueId,
+  selectedSessionId,
+  onSelectSession,
+  onStopSession,
+  onViewTerminal,
+  onPauseSession,
+  onResumeSession,
+  onRestartSession,
+  onDeepWipe,
+  onOpenStateDir,
+  onViewJsonl,
+}: {
+  parent: SessionNodeType;
+  children: SessionNodeType[];
+  issueId: string;
+  selectedSessionId?: string | null;
+  onSelectSession?: (issueId: string, sessionId: string) => void;
+  onStopSession?: (sessionId: string) => void;
+  onViewTerminal?: (sessionId: string) => void;
+  onPauseSession?: (sessionId: string) => void;
+  onResumeSession?: (sessionId: string) => void;
+  onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => void;
+  onDeepWipe?: (issueId: string) => void;
+  onOpenStateDir?: (sessionId: string) => void;
+  onViewJsonl?: (sessionId: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(true);
+
+  return (
+    <div>
+      <SessionNode
+        session={parent}
+        issueId={issueId}
+        isSelected={selectedSessionId === parent.sessionId}
+        onClick={() => onSelectSession?.(issueId, parent.sessionId)}
+        onStopSession={onStopSession}
+        onViewTerminal={onViewTerminal}
+        onPauseSession={onPauseSession}
+        onResumeSession={onResumeSession}
+        onRestartSession={onRestartSession}
+        onDeepWipe={onDeepWipe}
+        onOpenStateDir={onOpenStateDir}
+        onViewJsonl={onViewJsonl}
+        expandable
+        expanded={expanded}
+        onToggleExpand={() => setExpanded(e => !e)}
+      />
+      {expanded && children.length > 0 && (
+        <div className={styles.sessionChildList}>
+          {children.map(session => (
+            <SessionNode
+              key={session.sessionId}
+              session={session}
+              issueId={issueId}
+              isSelected={selectedSessionId === session.sessionId}
+              onClick={() => onSelectSession?.(issueId, session.sessionId)}
+              onStopSession={onStopSession}
+              onViewTerminal={onViewTerminal}
+              onPauseSession={onPauseSession}
+              onResumeSession={onResumeSession}
+              onRestartSession={onRestartSession}
+              onDeepWipe={onDeepWipe}
+              onOpenStateDir={onOpenStateDir}
+              onViewJsonl={onViewJsonl}
+            />
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
-export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources }: FeatureItemProps) {
+export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, containerStats }: FeatureItemProps) {
   const trimmedTitle = title?.trim() ?? '';
   const displayTitle = trimmedTitle || '(untitled)';
   const titleClassName = trimmedTitle
@@ -679,9 +1044,41 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
 
   const [expanded, setExpanded] = useState(() => {
     const persisted = readExpanded(feature.issueId);
-    return persisted ?? defaultExpandedFromState();
+    return persisted ?? defaultExpandedFromState(feature.stateLabel);
   });
-  const [menu, setMenu] = useState<ContextMenuState>({ x: 0, y: 0, open: false });
+
+  const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
+
+  useEffect(() => {
+    if (!expanded) return;
+    if (!feature.issueId) return;
+    if (detailIdentifiers) return;
+
+    let cancelled = false;
+    void fetch(`/api/issues/${encodeURIComponent(feature.issueId)}/resource-details`)
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return response.json() as Promise<ProjectFeatureResourceIdentifiers>;
+      })
+      .then((payload) => {
+        if (cancelled || !payload) return;
+        setDetailIdentifiers(payload);
+      })
+      .catch(() => {
+        // ignore
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, feature.issueId, detailIdentifiers]);
+
+  const hasResources = feature.resourceDetails && (
+    feature.resourceDetails.dockerContainerCount > 0 ||
+    feature.resourceDetails.prs.length > 0 ||
+    feature.resourceDetails.localBranchCount > 0 ||
+    feature.resourceDetails.remoteBranchCount > 0
+  );
 
   // Derive best session once per data change instead of on every click (PAN-821 review)
   // Respect the tree filter so auto-select picks a visible session.
@@ -699,6 +1096,9 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     () => visibleSessions.some((session) => session.hasJsonl),
     [visibleSessions],
   );
+
+  const workSession = feature.sessions?.find((s) => s.type === 'work');
+  const workSessionId = workSession?.sessionId ?? bestSessionId ?? null;
 
   const aggregateSessions = feature.sessions?.filter(isWorkOrSpecialistSession) ?? [];
   const activityState = getAggregateActivityState(aggregateSessions);
@@ -730,43 +1130,34 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     }
   }, [onSelect, expanded, feature.issueId]);
 
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setMenu({ x: e.clientX, y: e.clientY, open: true });
-  }, []);
-
-  const closeMenu = useCallback(() => {
-    setMenu((m) => ({ ...m, open: false }));
-  }, []);
-
   const progressPct = feature.isRally && feature.childCount && feature.childCount > 0
     ? Math.round((feature.completedCount || 0) / feature.childCount * 100)
     : null;
 
   return (
-    <div className={`${styles.featureItemWrapper} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}>
-      <div className={styles.featureItemRow}>
-        {hasVisibleSessions ? (
-          <button
-            className={styles.featureItemCaret}
-            onClick={handleToggleExpanded}
-            aria-label={expanded ? 'Collapse sessions' : 'Expand sessions'}
-            title={expanded ? 'Collapse sessions' : 'Expand sessions'}
-          >
-            {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          </button>
-        ) : (
-          <span className={styles.featureItemCaretPlaceholder} />
-        )}
-        <button
-          className={`${styles.featureItem} ${isSelected ? styles.featureItemSelected : ''}`}
-          onClick={handleRowClick}
-          onContextMenu={handleContextMenu}
-        >
+    <ContextMenuRoot>
+      <div className={`${styles.featureItemWrapper} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}>
+        <div className={styles.featureItemRow}>
+          {hasVisibleSessions ? (
+            <button
+              className={styles.featureItemCaret}
+              onClick={handleToggleExpanded}
+              aria-label={expanded ? 'Collapse sessions' : 'Expand sessions'}
+              title={expanded ? 'Collapse sessions' : 'Expand sessions'}
+            >
+              {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            </button>
+          ) : (
+            <span className={styles.featureItemCaretPlaceholder} />
+          )}
+          <ContextMenuTrigger asChild>
+            <button
+              className={`${styles.featureItem} ${isSelected ? styles.featureItemSelected : ''}`}
+              onClick={handleRowClick}
+            >
           <span className={styles.featureStatus}>
             {feature.isShadow ? (
-              <Eye size={14} style={{ color: 'var(--mc-accent)' }} />
+              <Eye size={14} style={{ color: 'var(--primary)' }} />
             ) : feature.isRally ? (
               <StatusIcon status={feature.status} agentStatus={feature.agentStatus} stateLabel={feature.stateLabel} isRally={feature.isRally} readyForMerge={feature.readyForMerge} />
             ) : aggregateSessions.length > 0 ? (
@@ -787,6 +1178,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                 <span
                   key={badge.key}
                   className={`${styles.featureBadge} ${styles[`featureBadge_${badge.tone}` as keyof typeof styles]}`}
+                  title={getAggregateBadgeTitle(badge, aggregateSessions)}
                 >
                   {badge.label}
                 </span>
@@ -794,7 +1186,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             </span>
           )}
           {feature.isRally && feature.childCount != null && feature.childCount > 0 ? (
-            <span className={styles.featureState} title={`${feature.completedCount || 0}/${feature.childCount} stories done${feature.inProgressCount ? `, ${feature.inProgressCount} active` : ''}`}>
+            <span className={styles.featureState} title={`${feature.completedCount || 0}/${feature.childCount} stories done${feature.inProgressCount ? `, ${feature.inProgressCount} active` : ''}${progressPct !== null ? ` (${progressPct}% complete)` : ''}`}>
               {feature.completedCount || 0}/{feature.childCount}
               {progressPct !== null && (
                 <span style={{
@@ -802,7 +1194,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                   width: 24,
                   height: 4,
                   marginLeft: 4,
-                  background: 'var(--mc-border)',
+                  background: 'var(--border)',
                   borderRadius: 2,
                   overflow: 'hidden',
                   verticalAlign: 'middle',
@@ -811,57 +1203,125 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                     display: 'block',
                     width: `${progressPct}%`,
                     height: '100%',
-                    background: progressPct === 100 ? 'var(--mc-success)' : 'var(--mc-warning)',
+                    background: progressPct === 100 ? 'var(--success)' : 'var(--warning)',
                     borderRadius: 2,
                   }} />
                 </span>
               )}
             </span>
           ) : (
-            <span className={`${styles.featureState} ${styles[`featureState_${featureStateTone}` as keyof typeof styles]}`}>{feature.stateLabel}</span>
+            <span
+              className={`${styles.featureState} ${styles[`featureState_${featureStateTone}` as keyof typeof styles]}`}
+              title={getFeatureStateTitle(feature, aggregateSessions)}
+            >
+              {feature.stateLabel}
+            </span>
           )}
           {cost !== undefined && cost > 0 && (
             <span className={styles.featureCost}>{formatCost(cost)}</span>
           )}
         </button>
-        <ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} />
+      </ContextMenuTrigger>
+      <ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} />
       </div>
-
-      {menu.open && (
-        <FeatureMenu
-          x={menu.x}
-          y={menu.y}
-          onClose={closeMenu}
-          feature={feature}
-          bestSessionId={bestSessionId}
-          hasJsonl={hasJsonl}
-          onOpenStateDir={onOpenStateDir}
-          onDeepWipe={onDeepWipe}
-          onViewJsonl={onViewJsonl}
-        />
-      )}
 
       {expanded && hasVisibleSessions && (
         <div className={styles.sessionList}>
-          {visibleSessions.map(session => (
-            <SessionNode
-              key={session.sessionId}
-              session={session}
-              issueId={feature.issueId}
-              isSelected={selectedSessionId === session.sessionId}
-              onClick={() => onSelectSession?.(feature.issueId, session.sessionId)}
-              onStopSession={onStopSession}
-              onViewTerminal={onViewTerminal}
-              onPauseSession={onPauseSession}
-              onResumeSession={onResumeSession}
-              onRestartSession={onRestartSession}
-              onDeepWipe={onDeepWipe}
-              onOpenStateDir={onOpenStateDir}
-              onViewJsonl={onViewJsonl}
-            />
-          ))}
+          {(() => {
+            const reviewerChildren = visibleSessions.filter(s => s.type === 'reviewer');
+            // Sort non-reviewer sessions by type priority so review always precedes legacy
+            const sortedNonReviewers = visibleSessions
+              .filter(s => s.type !== 'reviewer')
+              .sort((a, b) => (TYPE_PRIORITY[a.type] ?? 99) - (TYPE_PRIORITY[b.type] ?? 99));
+
+            return (
+              <>
+                {sortedNonReviewers.map(session => {
+                  if (session.type === 'review') {
+                    return (
+                      <ReviewGroup
+                        key={session.sessionId}
+                        parent={session}
+                        children={reviewerChildren}
+                        issueId={feature.issueId}
+                        selectedSessionId={selectedSessionId}
+                        onSelectSession={onSelectSession}
+                        onStopSession={onStopSession}
+                        onViewTerminal={onViewTerminal}
+                        onPauseSession={onPauseSession}
+                        onResumeSession={onResumeSession}
+                        onRestartSession={onRestartSession}
+                        onDeepWipe={onDeepWipe}
+                        onOpenStateDir={onOpenStateDir}
+                        onViewJsonl={onViewJsonl}
+                      />
+                    );
+                  }
+                  return (
+                    <SessionNode
+                      key={session.sessionId}
+                      session={session}
+                      issueId={feature.issueId}
+                      isSelected={selectedSessionId === session.sessionId}
+                      onClick={() => onSelectSession?.(feature.issueId, session.sessionId)}
+                      onStopSession={onStopSession}
+                      onViewTerminal={onViewTerminal}
+                      onPauseSession={onPauseSession}
+                      onResumeSession={onResumeSession}
+                      onRestartSession={onRestartSession}
+                      onDeepWipe={onDeepWipe}
+                      onOpenStateDir={onOpenStateDir}
+                      onViewJsonl={onViewJsonl}
+                      onOpenPlanDialog={onOpenPlanDialog}
+                    />
+                  );
+                })}
+              </>
+            );
+          })()}
         </div>
       )}
+
+      {expanded && hasResources && detailIdentifiers && (
+        <ResourcesGroup
+          issueId={feature.issueId}
+          defaultExpanded={aggregateSessions.length > 0 && activityState !== 'stopped'}
+          containers={(detailIdentifiers.dockerContainerNames ?? []).map((name) => {
+            const stats = containerStats?.[name];
+            return {
+              name,
+              serviceName: parseContainerServiceName(name),
+              status: stats?.status ?? 'running',
+              cpuPercent: stats?.cpuPercent ?? 0,
+              memoryUsage: stats?.memoryUsage ?? 0,
+              id: stats?.id,
+            };
+          })}
+          branches={[
+            ...(detailIdentifiers.localBranchNames ?? []).map((name) => ({ name, isLocal: true as const })),
+            ...(detailIdentifiers.remoteBranchNames ?? []).map((name) => ({ name, isLocal: false as const })),
+          ]}
+          prs={(detailIdentifiers.prs ?? feature.resourceDetails?.prs ?? []).map((pr) => ({
+            number: pr.number,
+            title: pr.title,
+            state: pr.state,
+            isDraft: pr.isDraft,
+          }))}
+        />
+      )}
     </div>
-  );
+    <FeatureContextMenu
+      feature={feature}
+      workSessionId={workSessionId}
+      hasJsonl={hasJsonl}
+      onOpenStateDir={onOpenStateDir}
+      onViewJsonl={onViewJsonl}
+      onDeepWipe={onDeepWipe}
+      onStopSession={onStopSession}
+      onResumeSession={onResumeSession}
+      onRestartSession={onRestartSession}
+      onOpenPlanDialog={onOpenPlanDialog}
+    />
+  </ContextMenuRoot>
+);
 }

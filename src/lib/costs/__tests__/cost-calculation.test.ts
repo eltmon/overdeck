@@ -334,7 +334,7 @@ describe('Cost Calculation Accuracy', () => {
 
     it('should have pricing for Google models', () => {
       expect(getPricing('google', 'gemini-3.1-pro-preview')).toBeDefined();
-      expect(getPricing('google', 'gemini-3-flash')).toBeDefined();
+      expect(getPricing('google', 'gemini-3-flash-preview')).toBeDefined();
     });
 
     it('should calculate OpenAI costs correctly', () => {

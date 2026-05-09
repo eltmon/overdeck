@@ -15,6 +15,7 @@ import {
   ensureDefaultConversationModel,
 } from './defaultConversationModel';
 import { usePickerPosition } from './usePickerPosition';
+import { CostWarningBadge, costWarningLevel } from '../shared/costWarning';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -25,6 +26,8 @@ interface PickerModel {
   provider: string;
   /** Formatted cost string, e.g. "FREE" or "$5.00/1M" */
   costDisplay?: string;
+  /** Raw cost in $/1M tokens — preserved so we can flag expensive models. */
+  costPer1MTokens?: number;
   /** Effort levels supported by this model. Empty = effort not supported. */
   effortLevels: readonly string[];
 }
@@ -60,6 +63,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   minimax: 'MiniMax',
   zai: 'Z.AI',
   kimi: 'Kimi',
+  mimo: 'Xiaomi MiMo',
   openrouter: 'OpenRouter',
 };
 
@@ -69,10 +73,10 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     provider: 'anthropic',
     label: 'Anthropic',
     models: [
-      { id: 'claude-opus-4-7', label: 'Claude Opus 4.7', provider: 'anthropic', costDisplay: '$45/1M', effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
-      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'anthropic', costDisplay: '$15/1M', effortLevels: ['low', 'medium', 'high'] },
-      { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'anthropic', costDisplay: '$45/1M', effortLevels: ['low', 'medium', 'high', 'max'] },
-      { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', provider: 'anthropic', costDisplay: '$1/1M', effortLevels: [] },
+      { id: 'claude-opus-4-7', label: 'Claude Opus 4.7', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', provider: 'anthropic', costDisplay: '$15/1M', costPer1MTokens: 15, effortLevels: ['low', 'medium', 'high'] },
+      { id: 'claude-opus-4-6', label: 'Claude Opus 4.6', provider: 'anthropic', costDisplay: '$45/1M', costPer1MTokens: 45, effortLevels: ['low', 'medium', 'high', 'max'] },
+      { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', provider: 'anthropic', costDisplay: '$1/1M', costPer1MTokens: 1, effortLevels: [] },
     ],
   },
   {
@@ -174,6 +178,7 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
               label: m.name,
               provider: prov,
               costDisplay: formatCost(m.costPer1MTokens),
+              costPer1MTokens: m.costPer1MTokens,
               effortLevels: STATIC_EFFORT_LEVELS[m.id] ?? [],
             })),
           });
@@ -190,6 +195,7 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
               label: m.name,
               provider: 'openrouter',
               costDisplay: formatCost(m.promptCostPer1M),
+              costPer1MTokens: m.promptCostPer1M,
               effortLevels: m.supportsThinking ? ['low', 'medium', 'high'] : [],
             })),
           });
@@ -231,6 +237,7 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
   }
 
   const label = selectedModel?.label ?? value;
+  const selectedWarning = costWarningLevel(selectedModel?.costPer1MTokens);
 
   return (
     <div ref={ref} className={styles.pickerContainer}>
@@ -241,6 +248,9 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
         type="button"
       >
         <span className={styles.pickerLabel}>{label}</span>
+        {selectedWarning && (
+          <CostWarningBadge level={selectedWarning} compact costPer1MTokens={selectedModel?.costPer1MTokens} />
+        )}
         <ChevronDown size={11} />
       </button>
 
@@ -257,19 +267,23 @@ export function ModelPicker({ value, onChange, disabled = false }: ModelPickerPr
               {groups.length > 1 && (
                 <div className={styles.pickerGroupHeader}>{group.label}</div>
               )}
-              {group.models.map((model) => (
-                <button
-                  key={model.id}
-                  className={`${styles.pickerOption} ${model.id === value ? styles.pickerOptionActive : ''}`}
-                  onClick={() => handleSelect(model)}
-                  type="button"
-                >
-                  <span className={styles.pickerOptionLabel}>{model.label}</span>
-                  {model.costDisplay && (
-                    <span className={styles.pickerCostBadge}>{model.costDisplay}</span>
-                  )}
-                </button>
-              ))}
+              {group.models.map((model) => {
+                const lvl = costWarningLevel(model.costPer1MTokens);
+                return (
+                  <button
+                    key={model.id}
+                    className={`${styles.pickerOption} ${model.id === value ? styles.pickerOptionActive : ''}`}
+                    onClick={() => handleSelect(model)}
+                    type="button"
+                  >
+                    <span className={styles.pickerOptionLabel}>{model.label}</span>
+                    {lvl && <CostWarningBadge level={lvl} compact costPer1MTokens={model.costPer1MTokens} />}
+                    {model.costDisplay && (
+                      <span className={styles.pickerCostBadge}>{model.costDisplay}</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           ))}
         </div>

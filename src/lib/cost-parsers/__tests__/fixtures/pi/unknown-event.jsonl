@@ -1,0 +1,6 @@
+{"type":"session","version":3,"id":"019df5a5-eeee-eeee-eeee-eeeeeeeeeeee","timestamp":"2026-05-05T14:00:00.000Z","cwd":"/tmp/proj"}
+{"type":"model_change","id":"u1","parentId":null,"timestamp":"2026-05-05T14:00:01.000Z","provider":"anthropic","modelId":"claude-sonnet-4-6"}
+{"type":"message","id":"u2","parentId":"u1","timestamp":"2026-05-05T14:00:02.000Z","message":{"role":"user","content":[{"type":"text","text":"hi"}],"timestamp":1762358402000}}
+{"type":"future_event_v9","id":"u3","parentId":"u2","timestamp":"2026-05-05T14:00:03.000Z","payload":"unknown"}
+{"type":"another_future_event","id":"u4","parentId":"u3","timestamp":"2026-05-05T14:00:03.500Z","payload":"unknown"}
+{"type":"message","id":"u5","parentId":"u4","timestamp":"2026-05-05T14:00:04.000Z","message":{"role":"assistant","content":[{"type":"text","text":"hello"}],"api":"anthropic","provider":"anthropic","model":"claude-sonnet-4-6","usage":{"input":50,"output":10,"cacheRead":0,"cacheWrite":0,"totalTokens":60,"cost":{"input":0.00015,"output":0.00015,"cacheRead":0,"cacheWrite":0,"total":0.0003}},"stopReason":"stop","timestamp":1762358404000}}

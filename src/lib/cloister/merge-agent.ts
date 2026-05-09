@@ -34,7 +34,7 @@ import { loadProjectsConfig } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
 import { renderPrompt } from './prompts.js';
 import { gitPush, gitForcePush, MainDivergedError } from '../git/operations.js';
-import { markWorkspaceStuck } from '../review-status.js';
+import { markWorkspaceStuck, setReviewStatus } from '../review-status.js';
 import { appendGitOperation, type GitOperationType } from '../git-activity.js';
 import { buildStashMessage, createNamedStash, dropStash, listStashes } from '../stashes.js';
 
@@ -182,11 +182,78 @@ async function dropLingeringPreMergeStashes(issueId: string, projectPath: string
   }
 }
 
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
+
+async function verifyMergedBeforeLifecycle(issueId: string, projectPath: string, sourceBranch?: string): Promise<{ merged: boolean; reason: string }> {
+  const branchName = sourceBranch?.trim() || `feature/${issueId.toLowerCase()}`;
+  const quotedBranch = shellQuote(branchName);
+
+  await execAsync('git fetch origin main --prune', { cwd: projectPath }).catch(() => undefined);
+  await execAsync(`git fetch origin ${shellQuote(`${branchName}:refs/remotes/origin/${branchName}`)}`, { cwd: projectPath }).catch(() => undefined);
+
+  const refsToCheck = [branchName, `origin/${branchName}`];
+  for (const ref of refsToCheck) {
+    const quotedRef = shellQuote(ref);
+    const { stdout } = await execAsync(`git rev-parse --verify ${quotedRef} 2>/dev/null || true`, { cwd: projectPath });
+    if (!stdout.trim()) continue;
+
+    try {
+      await execAsync(`git merge-base --is-ancestor ${quotedRef} origin/main`, { cwd: projectPath });
+      return { merged: true, reason: `${ref} is an ancestor of origin/main` };
+    } catch {
+      const { stdout: codeDiff } = await execAsync(
+        `git diff origin/main...${quotedRef} -- ':!.planning' ':!docs/prds' ':!.panopticon/prompts' 2>/dev/null || true`,
+        { cwd: projectPath },
+      );
+      if (!codeDiff.trim()) {
+        return { merged: true, reason: `${ref} has no remaining code diff against origin/main` };
+      }
+      return { merged: false, reason: `${ref} still has unmerged changes` };
+    }
+  }
+
+  const ghResolved = resolveGitHubIssue(issueId);
+  if (ghResolved.isGitHub) {
+    const { owner, repo } = ghResolved;
+    const { stdout } = await execAsync(
+      `gh pr list --repo ${shellQuote(`${owner}/${repo}`)} --state all --head ${quotedBranch} --json number,mergedAt,mergeCommit --limit 5`,
+      { cwd: projectPath },
+    ).catch(() => ({ stdout: '[]' }));
+    const prs = JSON.parse(stdout || '[]') as Array<{ number: number; mergedAt: string | null; mergeCommit: unknown | null }>;
+    const mergedPr = prs.find((pr) => pr.mergedAt || pr.mergeCommit);
+    if (mergedPr) {
+      return { merged: true, reason: `GitHub PR #${mergedPr.number} is merged` };
+    }
+    if (prs.length > 0) {
+      return { merged: false, reason: `GitHub PR #${prs[0]?.number} is not merged` };
+    }
+  }
+
+  return { merged: false, reason: `No merged branch or PR found for ${branchName}` };
+}
+
 export async function postMergeLifecycle(issueId: string, projectPath: string, sourceBranch?: string, options?: { skipDeploy?: boolean }): Promise<void> {
   // Guard 1: skip if already completed (defense-in-depth against infinite loops)
   if (_completedPostMerge.has(issueId)) {
     console.log(`[merge-agent] postMergeLifecycle already completed for ${issueId}, skipping`);
     return;
+  }
+
+  const mergeVerification = await verifyMergedBeforeLifecycle(issueId, projectPath, sourceBranch);
+  if (!mergeVerification.merged) {
+    console.warn(`[merge-agent] Refusing post-merge lifecycle for ${issueId}: ${mergeVerification.reason}`);
+    return;
+  }
+  console.log(`[merge-agent] Verified merge before lifecycle for ${issueId}: ${mergeVerification.reason}`);
+
+  // Set mergeStatus='merged' after verifying the branch or PR actually landed.
+  try {
+    setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
+    console.log(`[merge-agent] ✓ mergeStatus set to 'merged' for ${issueId}`);
+  } catch (err: any) {
+    console.warn(`[merge-agent] Could not set mergeStatus: ${err.message}`);
   }
 
   // Step 0: Write pending lifecycle file and spawn detached deploy script.
@@ -198,9 +265,17 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
   // dynamic imports already resolve correctly and spawning again would create an infinite loop.
   if (!options?.skipDeploy) {
     const pendingFile = join(PANOPTICON_HOME, 'pending-post-merge.json');
-    const repoRoot = __dirname.includes('/src/')
+    let repoRoot = __dirname.includes('/src/')
       ? __dirname.replace(/\/src\/.*$/, '')
       : __dirname.replace(/\/dist\/.*$/, '').replace(/\/lib\/.*$/, '');
+    // If running from a workspace (workspaces/feature-*/), resolve to the main repo root.
+    // Without this, the deploy script builds and npm-links from the workspace, hijacking
+    // the global `pan` CLI to point at stale workspace code.
+    const wsMatch = repoRoot.match(/^(.+)\/workspaces\/feature-[^/]+$/);
+    if (wsMatch) {
+      repoRoot = wsMatch[1];
+      console.log(`[merge-agent] Resolved workspace repoRoot to main repo: ${repoRoot}`);
+    }
     const deployScript = join(repoRoot, 'scripts', 'post-merge-deploy.sh');
 
     try {
@@ -251,23 +326,7 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     console.warn(`[merge-agent] Could not move PRD: ${err}`);
   }
 
-  // 2. Remove ephemeral planning artifacts from main (via lifecycle module)
-  try {
-    const { cleanPlanningArtifacts } = await import('../lifecycle/clean-planning.js');
-    const cleanResult = await cleanPlanningArtifacts({ issueId, projectPath });
-    if (cleanResult.success && !cleanResult.skipped) {
-      console.log(`[merge-agent] ✓ ${cleanResult.details?.join('; ')}`);
-      logActivity('planning_artifacts_cleaned', cleanResult.details?.join('; ') || 'Planning artifacts removed');
-    } else if (cleanResult.skipped) {
-      console.log(`[merge-agent] Planning artifact cleanup skipped: ${cleanResult.details?.join('; ')}`);
-    } else {
-      console.warn(`[merge-agent] Planning artifact cleanup failed: ${cleanResult.error}`);
-    }
-  } catch (err) {
-    console.warn(`[merge-agent] Could not clean planning artifacts: ${err}`);
-  }
-
-  // 3. Clean up workflow labels + apply 'merged' label (non-fatal)
+  // 2. Clean up workflow labels + apply 'merged' label (non-fatal)
   // MUST run BEFORE closing the issue — once closed on GitHub, label edits fail silently.
   // This was the root cause of in-review labels persisting after merge (PAN-453 incident).
   try {
@@ -315,13 +374,24 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     const { getAgentState, markAgentStoppedState, saveAgentState } = await import('../agents.js');
     const { killSession, sessionExists } = await import('../tmux.js');
     const agentId = `agent-${issueId.toLowerCase()}`;
-    if (sessionExists(agentId)) {
-      killSession(agentId);
+    // Stamp merged: true on the agent state UNCONDITIONALLY (whether or not the
+    // tmux session is alive). autoResumeStoppedWorkAgents reads this flag as a
+    // hard "do-not-resume" signal — without it, an old state.json that says
+    // status='running' can get respawned by orphan recovery during a mergeStatus
+    // flap, putting a work agent on a long-merged issue (saw 10 of these tonight).
+    try {
       const agentState = getAgentState(agentId);
       if (agentState) {
         markAgentStoppedState(agentState);
+        (agentState as any).merged = true;
+        (agentState as any).mergedAt = new Date().toISOString();
         saveAgentState(agentState);
       }
+    } catch (stateErr) {
+      console.warn(`[merge-agent] Could not stamp merged flag on ${agentId}: ${stateErr}`);
+    }
+    if (sessionExists(agentId)) {
+      killSession(agentId);
       console.log(`[merge-agent] ✓ Killed work agent session ${agentId} to free resources`);
       logActivity('agent_session_killed', `Freed resources: killed tmux session for ${agentId}`);
     }
@@ -376,6 +446,26 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     console.warn(`[merge-agent] Could not remove agent state dirs: ${err}`);
   }
 
+  // 5c. vBRIEF lifecycle transition: active/ → completed/ on main (PAN-946)
+  try {
+    const { transitionVBriefOnMain } = await import('../vbrief/lifecycle-io.js');
+    const result = await transitionVBriefOnMain(
+      projectPath,
+      issueId,
+      'completed',
+      'completed',
+      `scope: complete ${issueId.toUpperCase()} vBRIEF`,
+    );
+    if (result.moved) {
+      console.log(`[merge-agent] ✓ vBRIEF moved active → completed for ${issueId}`);
+    }
+    if (result.committed) {
+      console.log(`[merge-agent] ✓ Committed vBRIEF completion on main for ${issueId}`);
+    }
+  } catch (err) {
+    console.warn(`[merge-agent] vBRIEF completion transition failed (non-fatal): ${err}`);
+  }
+
   // 6. Stop Docker containers + networks to prevent network pool exhaustion (non-fatal)
   // Orphaned Docker networks accumulate when workspaces are merged but containers are never
   // torn down, eventually exhausting Docker's address pool and blocking new workspace creation.
@@ -394,6 +484,47 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     }
   } catch (err) {
     console.warn(`[merge-agent] Docker cleanup failed (non-fatal): ${err}`);
+  }
+
+  // 7. Teardown workspace directory + delete feature branches (PAN-925)
+  // Uses the consolidated teardownWorkspace module which handles: tmux sessions (idempotent
+  // with step 5), TLDR daemon, Docker (idempotent with step 6), worktree removal, agent
+  // state cleanup, and branch deletion. Steps already performed above are no-ops.
+  try {
+    const { teardownWorkspace } = await import('../lifecycle/teardown-workspace.js');
+    const ctx = { issueId, projectPath };
+    const teardownResults = await teardownWorkspace(ctx, { deleteBranches: true });
+    const completedSteps = teardownResults.filter(r => r.success && !r.skipped);
+    if (completedSteps.length > 0) {
+      const summary = completedSteps.map(r => r.details?.join('; ') || r.step).join(' | ');
+      console.log(`[merge-agent] ✓ Workspace teardown: ${summary}`);
+      logActivity('workspace_teardown', `Workspace teardown for ${issueId}: ${summary}`);
+    } else {
+      console.log(`[merge-agent] Workspace teardown: nothing to clean up for ${issueId}`);
+    }
+  } catch (err) {
+    console.warn(`[merge-agent] Workspace teardown failed (non-fatal): ${err}`);
+  }
+
+  // 8. Apply 'needs-close-out' label to signal the user that close-out ceremony is pending (PAN-925)
+  // The close-out ceremony is human-gated — it verifies PRD preservation, branch merge status,
+  // and applies the final 'closed-out' label. We don't auto-trigger it because the user must
+  // confirm the work is truly complete before final sign-off.
+  try {
+    const ghResolved = resolveGitHubIssue(issueId);
+    if (ghResolved.isGitHub) {
+      const { owner, repo, number } = ghResolved;
+      // Ensure the label exists (--force is idempotent)
+      await execAsync(
+        `gh label create "needs-close-out" --repo ${owner}/${repo} --color "fbca04" --description "Merged — awaiting close-out ceremony" --force 2>/dev/null || true`,
+      );
+      await execAsync(
+        `gh issue edit ${number} --repo ${owner}/${repo} --add-label "needs-close-out"`,
+      );
+      console.log(`[merge-agent] ✓ Applied 'needs-close-out' label on GitHub #${number}`);
+    }
+  } catch (err) {
+    console.warn(`[merge-agent] Could not apply needs-close-out label (non-fatal): ${err}`);
   }
 
   // Mark completed BEFORE logging — prevents re-entry even if the log line triggers something
@@ -1354,9 +1485,8 @@ INSTRUCTIONS:
    echo "Commits behind origin/${baseBranch}: $BEHIND"
    \`\`\`
 4. If BEHIND is 0: skip rebase entirely — branch is already up to date. Go to step 7.
-5. If BEHIND > 0: Remove .planning/ first (ephemeral artifacts always conflict), then rebase:
+5. If BEHIND > 0: rebase onto latest base:
    \`\`\`bash
-   git rm -rf .planning/ 2>/dev/null && git commit -m "chore: remove planning artifacts before rebase" 2>/dev/null
    git rebase origin/${baseBranch}
    \`\`\`
 6. If rebase has conflicts:

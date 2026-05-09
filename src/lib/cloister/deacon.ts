@@ -33,7 +33,6 @@ import { getShadowState } from '../shadow-state.js';
 import type { TrackerConfig } from '../tracker/factory.js';
 
 // Review status file location (same as dashboard server)
-const REVIEW_STATUS_FILE = join(homedir(), '.panopticon', 'review-status.json');
 
 import {
   SpecialistType,
@@ -45,6 +44,7 @@ import { getAgentRuntimeState, saveAgentRuntimeState, saveSessionId, listRunning
 import { dropStash, isOlderThanDays, listStashes } from '../stashes.js';
 import { emitActivityEntry } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSession, killSessionAsync, listPaneValues, listPaneValuesAsync, listSessionNamesAsync, sessionExists, sessionExistsAsync, sendKeysAsync } from '../tmux.js';
+import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 
 // ============================================================================
 // Configuration
@@ -645,7 +645,13 @@ function isAgentIdleForNudge(agentId: string, staleActiveThresholdMs = 5 * 60 * 
   }
   if (runtimeState.state === 'suspended' || runtimeState.state === 'stopped') return false;
   if (runtimeState.state === 'idle') return true;
-  // Stale-active: heartbeat hasn't fired in staleActiveThresholdMs (state='active'/'uninitialized')
+  // Stale-active fallback: only fires for 'uninitialized' agents — never for
+  // 'active'. An 'active' state means the pre-tool-hook fired and Stop hasn't,
+  // which by definition is mid-turn work. Nudging an active agent injects
+  // text into the pane mid-Bash and surfaces as `Interrupted · What should
+  // Claude do instead?` (PAN-1024 reproduced this with slow gpt-5 runtimes
+  // where the heartbeat between tool calls easily exceeds 5min).
+  if (runtimeState.state !== 'uninitialized') return false;
   const ageMs = Date.now() - new Date(runtimeState.lastActivity).getTime();
   return ageMs > staleActiveThresholdMs;
 }
@@ -803,7 +809,9 @@ export async function checkStuckWorkAgents(): Promise<string[]> {
         // Respawn in a new tmux session with the same launcher
         // Kill stale session first to prevent "duplicate session" error (PAN-430)
         await killSessionAsync(agent.id).catch(() => { /* no stale session */ });
-        await createSessionAsync(agent.id, workspace, `bash ${launcherPath}`);
+        await createSessionAsync(agent.id, workspace, `bash ${launcherPath}`, {
+          env: BLANKED_PROVIDER_ENV,
+        });
 
         // Reset recovery state since we respawned fresh
         stuckRecoveryState.set(agent.id, { lastAttempt: now, attempts: 0 });
@@ -823,6 +831,107 @@ export async function checkStuckWorkAgents(): Promise<string[]> {
       lastAttempt: now,
       attempts: attempts + 1,
     });
+  }
+
+  return actions;
+}
+
+// ============================================================================
+// API Error Recovery
+// ============================================================================
+
+/**
+ * API error patterns that indicate transient server failures.
+ * When an agent stops with one of these in its tmux output, it should
+ * be nudged to retry rather than left idle.
+ */
+const API_ERROR_PATTERNS = [
+  'API Error: The server had an error while processing your request',
+  'API Error: Overloaded',
+  'API Error: Rate limit',
+  'API Error: Request was aborted',
+  'API Error: Timed out',
+  '529 Overloaded',
+  '502 Bad Gateway',
+  '503 Service Unavailable',
+];
+
+/**
+ * Cooldown between API-error recovery nudges per agent.
+ * Prevents spamming agents that are hitting persistent errors.
+ */
+const API_ERROR_RECOVERY_COOLDOWN_MS = 5 * 60_000; // 5 minutes
+
+/**
+ * Track API-error recovery attempts per agent.
+ */
+const apiErrorRecoveryState: Map<string, { lastAttempt: number }> = new Map();
+
+/**
+ * Check for agents (work agents, specialists, planning) that stopped due
+ * to transient API errors.
+ *
+ * Unlike stuck-thinking agents (which are actively processing), API-error
+ * agents have stopped with the prompt showing. The tmux output contains
+ * an error message from the provider. Recovery: send a "continue" nudge.
+ */
+export async function checkApiErrorAgents(): Promise<string[]> {
+  const actions: string[] = [];
+  const now = Date.now();
+
+  // Check all tmux sessions — not just listRunningAgents() — because
+  // specialist sessions aren't always in the agents registry.
+  let sessionNames: string[];
+  try {
+    sessionNames = await listSessionNamesAsync();
+  } catch {
+    return actions;
+  }
+
+  const agentSessions = sessionNames.filter(
+    name => name.startsWith('agent-') || name.startsWith('specialist-') || name.startsWith('planning-'),
+  );
+
+  for (const sessionName of agentSessions) {
+    const recovery = apiErrorRecoveryState.get(sessionName);
+    if (recovery && (now - recovery.lastAttempt) < API_ERROR_RECOVERY_COOLDOWN_MS) {
+      continue;
+    }
+
+    let tmuxOutput: string;
+    try {
+      tmuxOutput = await capturePaneAsync(sessionName, 100);
+    } catch {
+      continue;
+    }
+
+    if (!tmuxOutput.trim()) continue;
+
+    const hasPrompt = tmuxOutput.includes('❯');
+    if (!hasPrompt) continue;
+
+    const hasApiError = API_ERROR_PATTERNS.some(pattern => tmuxOutput.includes(pattern));
+    if (!hasApiError) continue;
+
+    // For work agents, respect stuck/deacon-ignored flags
+    if (sessionName.startsWith('agent-')) {
+      const agentIssueId = (sessionName.replace('agent-', '')).toUpperCase();
+      const agentReviewStatus = getReviewStatus(agentIssueId);
+      if (agentReviewStatus?.stuck || agentReviewStatus?.deaconIgnored) {
+        continue;
+      }
+    }
+
+    console.log(`[deacon] Agent ${sessionName} stopped with API error — nudging retry`);
+
+    try {
+      const continueMsg = 'You stopped due to a transient API error. This is a temporary server issue, not a problem with your work. Continue from where you left off. Do NOT start over — pick up exactly where you stopped.';
+      await sendKeysAsync(sessionName, continueMsg);
+      apiErrorRecoveryState.set(sessionName, { lastAttempt: now });
+      actions.push(`API error recovery: nudged ${sessionName} to retry`);
+    } catch (err) {
+      console.error(`[deacon] Failed to nudge ${sessionName} for API error retry:`, err);
+    }
   }
 
   return actions;
@@ -937,7 +1046,7 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
  * dispatch; merge → close-out removes workspace). This sweep is the safety net
  * for workspaces where those events never fired: work agent is no longer
  * running AND no review is in flight AND feedback files are still sitting in
- * `.planning/feedback/`.
+ * `.pan/feedback/`.
  *
  * The feedback is useless once consumed, so we always delete — no archive, no
  * retention. See docs/REVIEW-AGENT-ARCHITECTURE.md.
@@ -977,8 +1086,8 @@ export async function cleanupAbandonedFeedback(): Promise<string[]> {
   const { clearFeedbackFiles } = await import('./feedback-writer.js');
 
   for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
-    const feedbackDir = join(workspacePath, '.planning', 'feedback');
-    if (!existsSync(feedbackDir)) continue;
+    const panFeedbackDir = join(workspacePath, '.pan', 'feedback');
+    if (!existsSync(panFeedbackDir)) continue;
 
     const issueLower = issueId.toLowerCase();
 
@@ -1001,9 +1110,10 @@ export async function cleanupAbandonedFeedback(): Promise<string[]> {
 
     // Both gates passed — feedback is abandoned, safe to delete.
     try {
-      const before = readdirSync(feedbackDir)
-        .filter(f => /^\d{3}-/.test(f) && f.endsWith('.md'))
-        .length;
+      const countFeedbackFiles = (dir: string) => existsSync(dir)
+        ? readdirSync(dir).filter(f => /^\d{3}-/.test(f) && f.endsWith('.md')).length
+        : 0;
+      const before = countFeedbackFiles(panFeedbackDir);
       if (before === 0) continue;
       await clearFeedbackFiles(workspacePath);
       actions.push(
@@ -1690,6 +1800,22 @@ export async function checkStuckReviewing(): Promise<string[]> {
         activeReviewIssues.add(rState.currentIssue.toUpperCase());
       }
     }
+    // PAN-796: Also check parallel review sessions (review-<issueId>-<ts>-<role>)
+    // and coordinator sessions (review-coordinator-<issueId>-<ts>)
+    try {
+      const { listSessionNamesAsync } = await import('../tmux.js');
+      const { getActiveParallelReviewIssues } = await import('./review-agent.js');
+      const allSessions = await listSessionNamesAsync();
+      for (const issueId of getActiveParallelReviewIssues(allSessions)) {
+        activeReviewIssues.add(issueId.toUpperCase());
+      }
+      for (const s of allSessions) {
+        const coordMatch = s.match(/^review-coordinator-([A-Za-z]+-\d+)-/);
+        if (coordMatch) activeReviewIssues.add(coordMatch[1].toUpperCase());
+      }
+    } catch {
+      // Non-fatal: fall back to specialist-only detection
+    }
 
     for (const [issueId, status] of Object.entries(statuses)) {
       if (status.reviewStatus !== 'reviewing') continue;
@@ -1712,6 +1838,37 @@ export async function checkStuckReviewing(): Promise<string[]> {
     console.error('[deacon] Error checking stuck reviewing statuses:', msg);
   }
 
+  return actions;
+}
+
+// ============================================================================
+// Verification/review contradiction (PAN-796)
+// ============================================================================
+
+export async function checkVerificationReviewContradiction(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { loadReviewStatuses, setReviewStatus } = await import('../review-status.js');
+    const statuses = loadReviewStatuses();
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if (
+        status.verificationStatus === 'passed' &&
+        status.reviewStatus === 'reviewing' &&
+        status.stuckReason === 'review_infrastructure_failure'
+      ) {
+        setReviewStatus(issueId, {
+          reviewStatus: 'passed',
+          reviewNotes: 'Review bypassed: verification passed but review infrastructure repeatedly failed.',
+        });
+        const msg = `Bypassed review for ${issueId}: verification passed, review infra failed`;
+        actions.push(msg);
+        console.log(`[deacon] ${msg}`);
+      }
+    }
+  } catch (error: unknown) {
+    console.error('[deacon] Error checking verification/review contradiction:', error);
+  }
   return actions;
 }
 
@@ -1873,17 +2030,7 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
   const actions: string[] = [];
 
   try {
-    if (!existsSync(REVIEW_STATUS_FILE)) {
-      return actions;
-    }
-
-    const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
-    const statuses: Record<string, {
-      issueId?: string;
-      readyForMerge?: boolean;
-      mergeStatus?: string;
-      updatedAt?: string;
-    }> = JSON.parse(content);
+    const statuses = loadReviewStatuses();
 
     const now = Date.now();
     const state = loadState();
@@ -1943,6 +2090,186 @@ export async function checkReadyForMergeStuck(): Promise<string[]> {
   return actions;
 }
 
+/**
+ * Detect issues whose feature branch is merged to main but mergeStatus is stale.
+ * Happens when a merge bypasses the dashboard (manual git merge, direct push, or
+ * deploy script crash). Sets mergeStatus='merged' so the dashboard shows the
+ * correct state and close-out can proceed.
+ */
+const staleMergeReconciled = new Set<string>();
+
+export async function reconcileStaleMergeStatus(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const statuses = loadReviewStatuses();
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if (status.mergeStatus === 'merged') continue;
+      if (staleMergeReconciled.has(issueId)) continue;
+
+      const project = resolveProjectFromIssue(issueId);
+      if (!project) continue;
+
+      const branch = `feature/${issueId.toLowerCase()}`;
+      let isMerged = false;
+
+      // Check 1: regular merge — branch tip is an ancestor of main
+      try {
+        await execFileAsync('git', ['merge-base', '--is-ancestor', branch, 'main'], {
+          cwd: project.projectPath,
+        });
+        isMerged = true;
+      } catch {
+        // Not a regular merge ancestor — try squash-merge detection
+      }
+
+      // Check 2: squash merge — query GitHub for PR mergedAt/mergeCommit. The
+      // old regex-based detection (`\(PAN-XXXX[ )]` against `git log --pretty=%s`)
+      // matched ANY commit that mentioned the issue in a trailer, not just
+      // genuine squash merges. That's how PAN-977/945/913/544/457 got
+      // mergeStatus=merged and rolled into close-out without an actual merge:
+      // unrelated commits landed on main with `(PAN-977)` references and the
+      // deacon trusted them. GitHub's API is the only authoritative source.
+      if (!isMerged) {
+        const { resolveGitHubIssue: _resolveGitHubIssue } = await import('../tracker-utils.js');
+        const ghResolved = _resolveGitHubIssue(issueId);
+        if (ghResolved.isGitHub) {
+          try {
+            const repoArg = `${ghResolved.owner}/${ghResolved.repo}`;
+            const { stdout } = await execFileAsync(
+              'gh', ['pr', 'list', '--repo', repoArg, '--head', branch, '--state', 'all', '--json', 'number,mergedAt,mergeCommit', '--limit', '5'],
+              { cwd: project.projectPath },
+            );
+            const prs = JSON.parse(stdout || '[]') as Array<{ number: number; mergedAt: string | null; mergeCommit: unknown | null }>;
+            if (prs.some((pr) => pr.mergedAt || pr.mergeCommit)) {
+              isMerged = true;
+            }
+          } catch {
+            // gh query failed — leave isMerged as false rather than guess.
+          }
+        }
+      }
+
+      if (isMerged) {
+        setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
+        staleMergeReconciled.add(issueId);
+        const msg = `Reconciled stale mergeStatus for ${issueId} — branch ${branch} is merged to main`;
+        actions.push(msg);
+        console.log(`[deacon] ${msg}`);
+        // PAN-1027: also run the post-merge cleanup so labels get cleaned, work agent
+        // tmux session is killed, beads compacted, etc. Without this the dashboard knows
+        // the issue is merged but the GitHub labels stay stale ("in-progress"/"in-review")
+        // and orphaned tmux sessions leak memory. skipDeploy avoids respawning the server
+        // — it's a best-effort reconciliation, not a fresh merge.
+        try {
+          const { postMergeLifecycle } = await import('./merge-agent.js');
+          postMergeLifecycle(issueId, project.projectPath, branch, { skipDeploy: true }).catch(err =>
+            console.warn(`[deacon] postMergeLifecycle (reconcile) failed for ${issueId}: ${err}`)
+          );
+        } catch (err) {
+          console.warn(`[deacon] Could not import postMergeLifecycle: ${err}`);
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[deacon] Error in reconcileStaleMergeStatus: ${err.message}`);
+  }
+  return actions;
+}
+
+/**
+ * PAN-1027 reverse direction: detect issues whose internal mergeStatus='merged' but
+ * whose GitHub PR is NOT merged (open, closed-without-merge, or reverted). When the
+ * dashboard previously detected a merge that later got reverted (or the deacon's
+ * forward-direction reconciler matched a squash-commit grep that wasn't actually a
+ * merge), the issue gets stuck because every gate that checks `mergeStatus !== 'merged'`
+ * skips it. This sweep resets the stale merged status so the issue can flow through
+ * the pipeline again.
+ */
+const falseMergedReset = new Set<string>();
+
+export async function reconcileFalseMerged(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { getPullRequestState, isGitHubAppConfigured } = await import('../github-app.js');
+    if (!isGitHubAppConfigured()) return actions;
+
+    const statuses = loadReviewStatuses();
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if (status.mergeStatus !== 'merged') continue;
+      if (!status.prUrl) continue;
+      if (falseMergedReset.has(issueId)) continue;
+
+      const prRef = status.prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+      if (!prRef) continue;
+
+      try {
+        const prState = await getPullRequestState(prRef[1], prRef[2], Number.parseInt(prRef[3], 10));
+        if (!prState.merged) {
+          // GitHub says not merged but our DB says merged — reset internal state.
+          // Leave reviewStatus alone (it may legitimately be passed/failed/blocked from
+          // the prior cycle); the issue can proceed through the pipeline once mergeStatus
+          // is no longer blocking.
+          setReviewStatus(issueId, { mergeStatus: 'pending' });
+          falseMergedReset.add(issueId);
+          const msg = `Reset stale mergeStatus=merged for ${issueId} — PR ${status.prUrl} is not merged on GitHub`;
+          actions.push(msg);
+          console.log(`[deacon] ${msg}`);
+        }
+      } catch (err: any) {
+        // Non-fatal: GitHub API hiccup. Try again next patrol.
+        console.warn(`[deacon] Failed false-merged check for ${issueId}: ${err.message}`);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[deacon] Error in reconcileFalseMerged: ${err.message}`);
+  }
+  return actions;
+}
+
+/**
+ * Detect issues whose merge_status='merged' but review_status is still in a
+ * non-terminal state (reviewing, pending, etc.). If the merge actually
+ * happened, the review must have passed at some point even if the dashboard
+ * missed the transition (e.g. coordinator crashed mid-run, dashboard restart
+ * dropped an in-flight update). Reconciling to review_status='passed' clears
+ * the "running reviewers with no data" UI state PAN-1028 reproduced.
+ */
+const mergedReviewingReconciled = new Set<string>();
+
+export async function reconcileMergedButReviewing(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const statuses = loadReviewStatuses();
+    const nonTerminal = new Set(['reviewing', 'pending', undefined, null]);
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if (status.mergeStatus !== 'merged') continue;
+      const reviewNonTerminal = nonTerminal.has(status.reviewStatus as string | undefined);
+      const testNonTerminal = nonTerminal.has(status.testStatus as string | undefined);
+      if (!reviewNonTerminal && !testNonTerminal) continue;
+      if (mergedReviewingReconciled.has(issueId)) continue;
+
+      // Set BOTH review and test to 'passed' atomically. Setting only review='passed'
+      // trips the canSkipTests dispatch path in setReviewStatus and spawns a test-agent
+      // for an already-merged issue — pure waste. The merge is terminal, no test needed.
+      setReviewStatus(issueId, {
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        testNotes: status.testNotes ?? 'Skipped: issue is already merged',
+      });
+      mergedReviewingReconciled.add(issueId);
+      const msg = `Reconciled review_status=${status.reviewStatus ?? 'null'}, test_status=${status.testStatus ?? 'null'} → passed for ${issueId} (merge_status=merged is terminal)`;
+      actions.push(msg);
+      console.log(`[deacon] ${msg}`);
+    }
+  } catch (err: any) {
+    console.warn(`[deacon] Error in reconcileMergedButReviewing: ${err.message}`);
+  }
+  return actions;
+}
+
 // Track per-issue cooldowns for failed-merge retry to avoid rapid re-queuing
 const failedMergeRetryCooldowns = new Map<string, number>();
 // Track per-issue cooldowns for timeout nudges to avoid spamming the work agent
@@ -1981,19 +2308,7 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
   const actions: string[] = [];
 
   try {
-    if (!existsSync(REVIEW_STATUS_FILE)) return actions;
-
-    const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
-    const statuses: Record<string, {
-      issueId?: string;
-      reviewStatus?: string;
-      testStatus?: string;
-      mergeStatus?: string;
-      mergeNotes?: string;
-      readyForMerge?: boolean;
-      mergeRetryCount?: number;
-      updatedAt?: string;
-    }> = JSON.parse(content);
+    const statuses = loadReviewStatuses();
 
     const now = Date.now();
 
@@ -2156,7 +2471,7 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
 // ============================================================================
 
 /**
- * Remove stale CI-failure feedback files from a workspace's .planning/feedback/ dir.
+ * Remove stale CI-failure feedback files from a workspace's .pan/feedback/ dir.
  * These accumulate when the merge-agent retries CI-blocked merges, and cause
  * the work agent to incorrectly believe CI is still failing on resume.
  */
@@ -2171,14 +2486,14 @@ async function clearStaleCiFeedback(issueId: string): Promise<void> {
 
   // Find the workspace directory: workspaces/feature-<issueLower> under the repo
   const issueLower = issueId.toLowerCase();
-  const candidateFeedbackDir = join(repoDir, 'workspaces', `feature-${issueLower}`, '.planning', 'feedback');
+  const feedbackDir = join(repoDir, 'workspaces', `feature-${issueLower}`, '.pan', 'feedback');
 
   try {
-    if (!existsSync(candidateFeedbackDir)) return;
-    const files = await readdir(candidateFeedbackDir);
+    if (!existsSync(feedbackDir)) return;
+    const files = await readdir(feedbackDir);
     for (const file of files) {
       if (file.includes('merge-agent') && file.includes('ci-failure') && file.endsWith('.md')) {
-        await rm(join(candidateFeedbackDir, file));
+        await rm(join(feedbackDir, file));
         console.log(`[deacon] Cleared stale CI feedback: ${file} for ${issueId}`);
       }
     }
@@ -2215,36 +2530,21 @@ export async function checkDeadEndAgents(): Promise<string[]> {
   const actions: string[] = [];
 
   try {
-    if (!existsSync(REVIEW_STATUS_FILE)) {
-      return actions;
-    }
-
-    const content = readFileSync(REVIEW_STATUS_FILE, 'utf-8');
-    const statuses: Record<string, {
-      issueId?: string;
-      reviewStatus?: string;
-      testStatus?: string;
-      readyForMerge?: boolean;
-      mergeStatus?: string;
-      mergeNotes?: string;
-      mergeRetryCount?: number;
-      updatedAt?: string;
-      autoRequeueCount?: number;
-      history?: Array<{ type: string; status: string; timestamp?: string }>;
-    }> = JSON.parse(content);
+    const statuses = loadReviewStatuses();
 
     const now = Date.now();
 
     for (const [key, status] of Object.entries(statuses)) {
       // Only act on blocked/failed reviews, failed tests, or CI-blocked merges.
-      // 'failed' covers verification gate errors (e.g. JSON parse error in plan.vbrief.json)
+      // 'failed' covers verification gate errors (e.g. JSON parse error in `.pan/spec.vbrief.json`)
       // that prevent the review specialist from running at all.
       const isReviewBlocked = status.reviewStatus === 'blocked' || status.reviewStatus === 'failed';
+      const isVerificationFailed = status.verificationStatus === 'failed';
       const isTestFailed = status.testStatus === 'failed';
       const isMergeCiFailed = status.mergeStatus === 'failed' &&
         typeof status.mergeNotes === 'string' &&
         status.mergeNotes.includes('failing required checks');
-      if (!isReviewBlocked && !isTestFailed && !isMergeCiFailed) continue;
+      if (!isReviewBlocked && !isVerificationFailed && !isTestFailed && !isMergeCiFailed) continue;
 
       // Skip merged/completed issues
       if (status.mergeStatus === 'merged' || status.readyForMerge) continue;
@@ -2295,6 +2595,10 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       let statusType: string;
       if (isReviewBlocked) {
         statusType = status.reviewStatus === 'failed' ? 'review failed' : 'review blocked';
+      } else if (isVerificationFailed) {
+        statusType = status.reviewStatus === 'pending'
+          ? 'verification failed while review pending'
+          : 'verification failed';
       } else if (isTestFailed) {
         statusType = 'tests failed';
       } else {
@@ -2329,7 +2633,7 @@ export async function checkDeadEndAgents(): Promise<string[]> {
         if (resolved) {
           const wsPath = findWorkspacePath(resolved.projectPath, issueId.toLowerCase());
           if (wsPath) {
-            const feedbackDir = join(wsPath, '.planning', 'feedback');
+            const feedbackDir = join(wsPath, '.pan', 'feedback');
             if (existsSync(feedbackDir)) {
               const files = (await readdir(feedbackDir)).filter(f => f.endsWith('.md')).sort();
               if (files.length > 0) {
@@ -2348,10 +2652,12 @@ export async function checkDeadEndAgents(): Promise<string[]> {
           ? `\n\nMUST READ: ${latestFeedbackPath}\n\nUse your Read tool to open this file, read every line, then fix the issues.`
           : '';
         const nudgeMessage = status.reviewStatus === 'failed'
-          ? `Review verification failed for ${issueId}.${feedbackPart}\n\nCommon cause: merge conflict markers in .planning/plan.vbrief.json — fix by resolving conflicts in that file, then run: pan review request ${issueId} -m "Fixed verification error"`
+          ? `Review verification failed for ${issueId}.${feedbackPart}\n\nCommon cause: merge conflict markers in .pan/spec.vbrief.json — fix by resolving conflicts in that file, then run: pan review request ${issueId} -m "Fixed verification error"`
           : isReviewBlocked
             ? `The review agent found issues in your code.${feedbackPart}\n\nFix every issue listed, commit all changes, then run: pan review request ${issueId} -m "Fixed review issues". Do NOT stop until pan review request completes successfully.`
-            : `Tests failed for your changes.${feedbackPart}\n\nFix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". Do NOT stop until pan review request completes successfully.`;
+            : isVerificationFailed
+              ? `Verification failed for ${issueId} while review is pending.${feedbackPart}\n\nFix the failing verification check, commit every change, push your branch, then request a new review with: pan review request ${issueId} -m "Fixed verification failure". Do NOT stop until pan review request completes successfully.`
+              : `Tests failed for your changes.${feedbackPart}\n\nFix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". Do NOT stop until pan review request completes successfully.`;
 
         await sendKeysAsync(agentSessionName, nudgeMessage);
         actions.push(`Dead-end recovery: nudged ${agentSessionName} (${statusType}, idle for ${Math.round((now - new Date(status.updatedAt || '').getTime()) / 60000)}m)`);
@@ -2420,6 +2726,21 @@ async function reconcileAndCheckIfMerged(
           const prState = await getPullRequestState(prRef[1], prRef[2], Number.parseInt(prRef[3], 10));
           if (prState.merged) {
             setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
+            // PAN-1027: also run the post-merge cleanup so labels get cleaned and the
+            // work-agent tmux session is killed. Without this, GitHub-detected merges
+            // leave stale "in-progress" / "in-review" labels and leaked tmux sessions.
+            try {
+              const resolved = resolveProjectFromIssue(issueId);
+              if (resolved) {
+                const branch = `feature/${issueId.toLowerCase()}`;
+                const { postMergeLifecycle } = await import('./merge-agent.js');
+                postMergeLifecycle(issueId, resolved.projectPath, branch, { skipDeploy: true }).catch(err =>
+                  console.warn(`[deacon] postMergeLifecycle (gh-reconcile) failed for ${issueId}: ${err}`)
+                );
+              }
+            } catch (err) {
+              console.warn(`[deacon] Could not run post-merge cleanup for ${issueId}: ${err}`);
+            }
             return remember(true);
           }
         }
@@ -2613,7 +2934,7 @@ const FIRST_COMPLETION_IDLE_MS = 10 * 60 * 1000; // 10 minutes idle before nudgi
 const FIRST_COMPLETION_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes between nudges
 
 /**
- * Detect work agents that finished implementation but never called "pan work done".
+ * Detect work agents that finished implementation but never called `pan done`.
  *
  * This is the Layer 3 safety net. Layer 2 (work-agent-stop-hook) should catch most
  * cases within seconds of the agent going idle. This catches agents where the stop-hook
@@ -2637,9 +2958,10 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
       if (!agentId || !agentId.startsWith('agent-') || !agent.tmuxActive) continue;
       if (agentId.startsWith('specialist-')) continue;
 
-      // Skip if completion marker already exists
+      // Skip if completion marker already exists (or was already processed by cloister)
       const completedFile = join(AGENTS_DIR, agent.id, 'completed');
-      if (existsSync(completedFile)) continue;
+      const processedMarker = join(AGENTS_DIR, agent.id, 'completed.processed');
+      if (existsSync(completedFile) || existsSync(processedMarker)) continue;
 
       // Check idle duration and idle state via Stop hook
       // isAgentIdleForNudge uses FIRST_COMPLETION_IDLE_MS as the stale-active threshold:
@@ -2657,33 +2979,31 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
 
       // HARD GATE: Never nudge agents that have been through the review pipeline.
       // Check review-status.json — if ANY entry exists for this issue, the agent
-      // has entered the specialist pipeline and must NOT receive a "pan work done" nudge.
+      // has entered the specialist pipeline and must NOT receive a "pan done" nudge.
       // (Dead-end detection handles agents stuck in review/test cycles.)
       const issueId = agent.issueId || agent.id.replace('agent-', '').toUpperCase();
       const issueKey = issueId.toLowerCase();
-      if (existsSync(REVIEW_STATUS_FILE)) {
-        try {
-          const statuses = JSON.parse(readFileSync(REVIEW_STATUS_FILE, 'utf-8'));
-          // Keys are stored in original case (e.g., "MIN-727") — check all case variants
-          const hasStatus = statuses[issueKey] || statuses[issueId] || statuses[issueId.toUpperCase()];
-          if (hasStatus) {
-            console.log(`[deacon] First-completion gate: skipping ${agent.id} — has review status entry (readyForMerge=${hasStatus.readyForMerge ?? false})`);
-            continue;
-          }
-        } catch { /* parse error, proceed with check */ }
-      }
+      try {
+        const statuses = loadReviewStatuses();
+        // Keys are stored in original case (e.g., "MIN-727") — check all case variants
+        const hasStatus = statuses[issueKey] || statuses[issueId] || statuses[issueId.toUpperCase()];
+        if (hasStatus) {
+          console.log(`[deacon] First-completion gate: skipping ${agent.id} — has review status entry (readyForMerge=${hasStatus.readyForMerge ?? false})`);
+          continue;
+        }
+      } catch { /* load error, proceed with check */ }
 
       // HARD GATE: Also check for review feedback files in the workspace.
       // If a feedback directory exists and is non-empty, a review agent has already
-      // processed this workspace — never send a "pan work done" nudge.
+      // processed this workspace — never send a "pan done" nudge.
       const agentStateForGate = getAgentState(agent.id);
       if (agentStateForGate?.workspace) {
-        const feedbackDir = join(agentStateForGate.workspace, '.planning', 'feedback');
+        const feedbackDir = join(agentStateForGate.workspace, '.pan', 'feedback');
         if (existsSync(feedbackDir)) {
           try {
             const feedbackFiles = readdirSync(feedbackDir);
             if (feedbackFiles.length > 0) {
-              console.log(`[deacon] First-completion gate: skipping ${agent.id} — has ${feedbackFiles.length} review feedback file(s) in .planning/feedback/`);
+              console.log(`[deacon] First-completion gate: skipping ${agent.id} — has ${feedbackFiles.length} review feedback file(s) in .pan/feedback/`);
               continue;
             }
           } catch { /* can't read feedback dir */ }
@@ -2724,14 +3044,14 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
       }
       if (!hasCommits) continue; // No commits — agent may not have started yet
 
-      // All heuristics passed: agent likely forgot pan work done
+      // All heuristics passed: agent likely forgot pan done
       const idleMinutes = Math.round(idleMs / 60000);
       console.log(`[deacon] First-completion gap detected: ${agent.id} (${issueId}) idle for ${idleMinutes}m with commits but no completion marker`);
 
       firstCompletionCooldowns.set(agent.id, now);
 
       try {
-        const nudgeMessage = `You appear to have stopped working without calling "pan work done". If your implementation is complete, run this now:\n\npan work done ${issueId} -c "Implementation complete"\n\nIf you still have remaining tasks, continue working on them.`;
+        const nudgeMessage = `You appear to have stopped working without calling \`pan done\`. If your implementation is complete, run this now:\n\npan done ${issueId} -c "Implementation complete"\n\nIf you still have remaining tasks, continue working on them.`;
         await sendKeysAsync(agent.id, nudgeMessage);
         actions.push(`First-completion nudge: ${agent.id} (idle ${idleMinutes}m)`);
         console.log(`[deacon] Sent first-completion nudge to ${agent.id}`);
@@ -2760,7 +3080,7 @@ const stuckPokeState: Map<string, { lastPoke: number; pokes: number }> = new Map
  * Patrol work agent resolution fields (PAN-309).
  *
  * For each running work agent:
- * - resolution === 'done' && count >= 2: auto-complete via pan work done
+ * - resolution === 'done' && count >= 2: auto-complete via pan done
  * - resolution === 'stuck' && count >= 3: send a poke (rate-limited, capped — PAN-650)
  */
 export async function patrolWorkAgentResolutions(): Promise<string[]> {
@@ -2793,8 +3113,10 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
         continue;
       }
 
-      if (resolution === 'done' && count >= 2) {
-        // Agent was nudged twice but still hasn't called pan work done — auto-complete
+      if (resolution === 'done' && count >= 1) {
+        // PAN-534: lowered from >= 2 to >= 1. A single done signal is sufficient
+        // evidence. The old threshold deadlocked when review failed and reset to
+        // pending — the agent never re-signaled done, so count stayed at 1 forever.
         console.log(`[deacon] Auto-completing ${agent.id} (${issueId}): resolution=done, count=${count}`);
 
         try {
@@ -2848,7 +3170,7 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
         console.log(`[deacon] Poking stuck agent ${agent.id} (${issueId}): poke ${pokeState.pokes + 1}/${STUCK_POKE_MAX}`);
 
         try {
-          const pokeMsg = `Deacon health check (${pokeState.pokes + 1}/${STUCK_POKE_MAX}): you appear stuck. Please check your current task status, review any errors, and continue working. If work is complete, run: pan work done ${issueId} -c "Implementation complete"`;
+          const pokeMsg = `Deacon health check (${pokeState.pokes + 1}/${STUCK_POKE_MAX}): you appear stuck. Please check your current task status, review any errors, and continue working. If work is complete, run: pan done ${issueId} -c "Implementation complete"`;
           await sendKeysAsync(agent.id, pokeMsg);
           stuckPokeState.set(agent.id, { lastPoke: now, pokes: pokeState.pokes + 1 });
           actions.push(`Deacon poked stuck agent ${agent.id} (${issueId}) [${pokeState.pokes + 1}/${STUCK_POKE_MAX}]`);
@@ -3139,10 +3461,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   if (isDeaconGloballyPaused()) {
     state.lastPatrol = new Date().toISOString();
     saveState(state);
-    // Log once per minute-ish cadence is fine — the patrol interval itself is
-    // already ~60s, so logging every cycle is acceptable.
-    console.log(`[deacon] Patrol cycle ${state.patrolCycle} SKIPPED — globally paused`);
-    addLog('info', `Patrol cycle ${state.patrolCycle} skipped — deacon globally paused`, state.patrolCycle);
+    if (!hasLoggedGlobalPauseSkip) {
+      console.log(`[deacon] Patrol cycle ${state.patrolCycle} SKIPPED — globally paused`);
+      addLog('info', `Patrol cycle ${state.patrolCycle} skipped — deacon globally paused`, state.patrolCycle);
+      hasLoggedGlobalPauseSkip = true;
+    }
     const skipped: PatrolResult = {
       cycle: state.patrolCycle,
       timestamp: state.lastPatrol,
@@ -3154,6 +3477,7 @@ export async function runPatrol(): Promise<PatrolResult> {
     return skipped;
   }
 
+  hasLoggedGlobalPauseSkip = false;
   addLog('info', `Patrol cycle ${state.patrolCycle} — checking per-project specialists`, state.patrolCycle);
   console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking per-project specialists`);
 
@@ -3206,6 +3530,21 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...resumeActions);
   for (const a of resumeActions) addLog('action', a, state.patrolCycle);
 
+  // Nudge work agents that are alive-but-idle with open beads remaining.
+  // Catches the gap autoResume misses: tmux alive, status='running', Stop
+  // hook fired (idle), but no advance to the next bead (gpt-5.5 checkpoint
+  // pattern, prompt mis-interpretation, etc.).
+  const beadNudgeActions = await nudgeIdleWorkAgentsWithOpenBeads();
+  actions.push(...beadNudgeActions);
+  for (const a of beadNudgeActions) addLog('action', a, state.patrolCycle);
+
+  // Detect "Invalid signature in thinking block" in active agent output (PAN-612).
+  // Context compaction corrupts thinking-block signatures; the session cannot be
+  // resumed. Must run before idle-suspend so we recover corrupted agents first.
+  const signatureCorruptionActions = await checkThinkingSignatureCorruption();
+  actions.push(...signatureCorruptionActions);
+  for (const a of signatureCorruptionActions) addLog('action', a, state.patrolCycle);
+
   // Check and auto-suspend idle agents (PAN-80, fixed in PAN-154)
   const suspendActions = await checkAndSuspendIdleAgents();
   actions.push(...suspendActions);
@@ -3252,6 +3591,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...stuckReviewActions);
   for (const a of stuckReviewActions) addLog('action', a, state.patrolCycle);
 
+  // PAN-796: Bypass review for issues where verification passed but review infra keeps failing
+  const verifContradictionActions = await checkVerificationReviewContradiction();
+  actions.push(...verifContradictionActions);
+  for (const a of verifContradictionActions) addLog('action', a, state.patrolCycle);
+
   // Kill orphaned planning sessions whose issue has already progressed past planning.
   // PAN-682 pattern: `planning-pan-<id>` tmux session survives hours after `complete-planning`
   // because either (a) `skipKill=true` was set or (b) complete-planning was never invoked
@@ -3293,6 +3637,25 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...failedMergeRetryActions);
   for (const a of failedMergeRetryActions) addLog('action', a, state.patrolCycle);
 
+  // Reconcile stale merge status: detect branches merged to main outside the dashboard
+  const staleMergeActions = await reconcileStaleMergeStatus();
+  actions.push(...staleMergeActions);
+  for (const a of staleMergeActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-1027 reverse: detect mergeStatus=merged issues whose GitHub PR is not merged
+  // (closed-without-merge, reopened after revert, or false positive from squash detection).
+  // Without this, those issues get stuck because mergeStatus blocks all pipeline gates.
+  const falseMergedActions = await reconcileFalseMerged();
+  actions.push(...falseMergedActions);
+  for (const a of falseMergedActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-1028: detect merge_status=merged but review_status non-terminal (coordinator
+  // crashed mid-run, dashboard missed the transition). Reconcile to review_status=passed
+  // so the dashboard stops showing "running reviewers with no data."
+  const mergedReviewingActions = await reconcileMergedButReviewing();
+  actions.push(...mergedReviewingActions);
+  for (const a of mergedReviewingActions) addLog('action', a, state.patrolCycle);
+
   // Dead-end agent recovery: nudge agents stuck with reviewStatus=blocked/failed after
   // fixing review issues but not re-requesting review. Has 10-min per-issue cooldown and
   // 7-requeue circuit breaker to avoid runaway API credit consumption.
@@ -3318,6 +3681,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   const stuckActions = await checkStuckWorkAgents();
   actions.push(...stuckActions);
   for (const a of stuckActions) addLog('action', a, state.patrolCycle);
+
+  // API error recovery: nudge agents that stopped due to transient provider errors.
+  const apiErrorActions = await checkApiErrorAgents();
+  actions.push(...apiErrorActions);
+  for (const a of apiErrorActions) addLog('action', a, state.patrolCycle);
 
   const configuredStashJanitorEveryCycles = config.stashJanitorEveryCycles
     ?? Math.round((60 * 60 * 1000) / config.patrolIntervalMs);
@@ -3437,6 +3805,28 @@ export async function runPatrol(): Promise<PatrolResult> {
           // Non-fatal — session may have already exited
         }
       }
+
+      // PAN-919: Idle-but-alive specialist — task completed but session lingers
+      // (e.g. Claude Code sitting at "Press Ctrl-D again to exit" after one-shot task).
+      // Ephemeral specialists have no reason to stay alive once idle.
+      const IDLE_LINGER_MS = 5 * 60 * 1000; // 5 minutes
+      if (
+        !isStuck &&
+        (!runtimeState || runtimeState.state === 'idle') &&
+        runtimeState?.lastActivity &&
+        Date.now() - new Date(runtimeState.lastActivity).getTime() > IDLE_LINGER_MS
+      ) {
+        const ageMin = Math.round((Date.now() - new Date(runtimeState.lastActivity).getTime()) / 60000);
+        const msg = `Killed lingering idle specialist ${projSpec.specialistType} (${projSpec.projectKey}) — idle ${ageMin}min`;
+        console.log(`[deacon] ${msg}`);
+        try {
+          await killSessionAsync(projSpec.tmuxSession);
+          actions.push(msg);
+          addLog('action', msg, state.patrolCycle);
+        } catch {
+          // Non-fatal
+        }
+      }
     }
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -3462,6 +3852,7 @@ export async function runPatrol(): Promise<PatrolResult> {
 
 // Store the most recent patrol result for API access
 let lastPatrolResult: PatrolResult | null = null;
+let hasLoggedGlobalPauseSkip = false;
 
 // ============================================================================
 // Deacon Log Buffer
@@ -3504,6 +3895,89 @@ export function getDeaconLogs(limit = 100): DeaconLogEntry[] {
  */
 export function getLastPatrolResult(): PatrolResult | null {
   return lastPatrolResult;
+}
+
+/**
+ * Detect agents whose tmux output contains "Invalid signature in thinking block" —
+ * a symptom of context compaction corrupting thinking-block cryptographic signatures
+ * (PAN-612). The corrupted session cannot be resumed; the agent must start fresh.
+ *
+ * Recovery: kill the tmux session, mark agent stopped, delete session.id so
+ * autoResumeStoppedWorkAgents won't try --resume with the corrupted session.
+ * The JSONL file is NEVER deleted (sacred).
+ */
+async function checkThinkingSignatureCorruption(): Promise<string[]> {
+  const actions: string[] = [];
+  if (!existsSync(AGENTS_DIR)) return actions;
+
+  let agentDirs: string[];
+  try {
+    agentDirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-'));
+  } catch {
+    return actions;
+  }
+
+  for (const agentId of agentDirs) {
+    // Only check agents that claim to be running
+    const stateFile = join(AGENTS_DIR, agentId, 'state.json');
+    if (!existsSync(stateFile)) continue;
+    let state: Record<string, unknown>;
+    try {
+      state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+    } catch {
+      continue;
+    }
+    if (state.status !== 'running') continue;
+
+    // Check if the tmux session is alive
+    if (!sessionExists(agentId)) continue;
+
+    // Capture recent output and scan for signature corruption
+    let output: string;
+    try {
+      output = await capturePaneAsync(agentId, 100);
+    } catch {
+      continue;
+    }
+
+    if (!output.includes('Invalid signature in thinking block')) continue;
+
+    // Corruption detected — recover the agent
+    const issueId = (state.issueId as string | undefined) ?? agentId;
+    console.error(`[deacon] SIGNATURE CORRUPTION detected in ${agentId} (${issueId}) — recovering`);
+    logDeaconEvent(`checkThinkingSignatureCorruption: corruption detected in ${agentId} (${issueId})`);
+    logAgentLifecycle(agentId, 'signature corruption detected — recovering: killed session, cleared session.id');
+
+    // Kill the tmux session
+    try {
+      await killSessionAsync(agentId);
+    } catch { /* non-fatal */ }
+
+    // Delete session.id so resumeAgent won't --resume the corrupted session
+    const sessionFile = join(AGENTS_DIR, agentId, 'session.id');
+    if (existsSync(sessionFile)) {
+      try { rmSync(sessionFile); } catch { /* non-fatal */ }
+    }
+
+    // Mark agent as stopped
+    state.status = 'stopped';
+    state.stoppedAt = new Date().toISOString();
+    try {
+      writeFileSync(stateFile, JSON.stringify(state, null, 2));
+    } catch { /* non-fatal */ }
+
+    // Notify server layer so the read model and frontend update
+    if (agentStoppedNotifier) {
+      try { agentStoppedNotifier(agentId); } catch { /* non-fatal */ }
+    }
+
+    const msg = `Recovered ${agentId} (${issueId}) from thinking-block signature corruption — session killed, will start fresh on next resume`;
+    actions.push(msg);
+    console.log(`[deacon] ${msg}`);
+    logDeaconEvent(`checkThinkingSignatureCorruption: ${msg}`);
+  }
+
+  return actions;
 }
 
 /**
@@ -3713,6 +4187,109 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
 }
 
 /**
+ * Nudge work agents that are alive-but-idle with open beads remaining.
+ *
+ * Detects the gap that autoResumeStoppedWorkAgents misses: agents whose tmux
+ * session is alive and `state.status === 'running'`, but whose Stop hook has
+ * fired (state='idle' in the runtime mirror) and have NOT advanced. The
+ * existing recovery paths only fire on `status='stopped'` (process killed)
+ * or on a downstream review failure — neither matches this case.
+ *
+ * Triggered when ALL of the following hold:
+ *   - state.status === 'running'                  (process still alive)
+ *   - phase === 'implementation' or 'review-response'
+ *   - tmux session exists                          (not orphaned)
+ *   - isAgentIdleForNudge() returns true           (Stop hook authoritative)
+ *   - bd ready -l <issueLabel> has ≥1 ready bead   (work remaining)
+ *   - last nudge older than NUDGE_COOLDOWN_MS      (don't spam)
+ *
+ * Action: send `pan tell` with a concrete imperative pointing at the next
+ * ready bead. Updates `<agentDir>/.last-bead-nudge` for cooldown.
+ *
+ * Returns a list of action descriptions for runPatrol to log.
+ */
+const BEAD_NUDGE_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+
+export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
+  const actions: string[] = [];
+  if (!existsSync(AGENTS_DIR)) return actions;
+
+  let dirs: string[];
+  try {
+    dirs = readdirSync(AGENTS_DIR).filter(d => d.startsWith('agent-'));
+  } catch { return actions; }
+
+  for (const agentId of dirs) {
+    const state = getAgentState(agentId);
+    if (!state) continue;
+    if (state.status !== 'running') continue;
+    if (state.phase !== 'implementation' && state.phase !== 'review-response') continue;
+
+    // Tmux must be alive; orphans are handled by recoverOrphanedAgents.
+    if (!await sessionExistsAsync(agentId)) continue;
+
+    // Authoritative idle signal — Stop hook fired and runtime mirror is idle.
+    // Skips agents currently mid-thought (state='active') and ones we already
+    // know are stopped/suspended.
+    if (!isAgentIdleForNudge(agentId)) continue;
+
+    // Cooldown — don't nudge the same agent more than once per BEAD_NUDGE_COOLDOWN_MS.
+    const cooldownFile = join(getAgentDir(agentId), '.last-bead-nudge');
+    if (existsSync(cooldownFile)) {
+      try {
+        const last = parseInt(readFileSync(cooldownFile, 'utf-8').trim(), 10);
+        if (!Number.isNaN(last) && Date.now() - last < BEAD_NUDGE_COOLDOWN_MS) continue;
+      } catch { /* fall through and nudge */ }
+    }
+
+    // Open beads for THIS issue?
+    const issueLabel = state.issueId.toLowerCase();
+    let openBeads: string[] = [];
+    try {
+      const { stdout } = await execAsync(`bd ready -l ${issueLabel}`, {
+        cwd: state.workspace,
+        encoding: 'utf-8',
+        timeout: 10_000,
+      });
+      // bd ready output: lines starting with "○ workspace-XXXX ● ... pan-NNN: title"
+      openBeads = stdout
+        .split('\n')
+        .filter(l => /^[○◐]\s+workspace-/i.test(l.trim()))
+        .map(l => l.trim());
+    } catch (err: any) {
+      logDeaconEvent(`nudgeIdleWorkAgentsWithOpenBeads: ${agentId} bd ready failed: ${err?.message ?? err}`);
+      continue;
+    }
+    if (openBeads.length === 0) continue;
+
+    // Build the nudge: tell the agent what's next, do not just ping.
+    const firstBead = openBeads[0]?.replace(/^[○◐]\s+/, '').slice(0, 200) ?? '';
+    const message = [
+      `Deacon idle-nudge: your tmux is alive but Claude is idle and you have ${openBeads.length} open bead(s) remaining for ${state.issueId}.`,
+      ``,
+      `Next ready bead: ${firstBead}`,
+      ``,
+      `Continue the per-bead workflow without asking — claim it (\`bd update <bead-id> --claim\`), implement, commit, close. ` +
+      `Inspection is conditional on metadata.requiresInspection (default false; check the plan item before deciding to call \`pan inspect\`). ` +
+      `Do NOT end your turn with a multi-paragraph summary; just advance to the next bead.`,
+    ].join('\n');
+
+    try {
+      const { messageAgent } = await import('../agents.js');
+      await messageAgent(agentId, message);
+      writeFileSync(cooldownFile, String(Date.now()), 'utf-8');
+      const action = `Nudged idle ${agentId} (${state.issueId}) — ${openBeads.length} open bead(s)`;
+      actions.push(action);
+      logDeaconEvent(`nudgeIdleWorkAgentsWithOpenBeads: ${action}`);
+    } catch (err: any) {
+      logDeaconEvent(`nudgeIdleWorkAgentsWithOpenBeads: ${agentId} messageAgent failed: ${err?.message ?? err}`);
+    }
+  }
+
+  return actions;
+}
+
+/**
  * Auto-resume work agents that were stopped by a system crash/reboot
  * but still have incomplete work. Scans all agent state directories for
  * stopped implementation-phase agents and resumes them.
@@ -3721,7 +4298,7 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
  * - Agents with pending review feedback (blocked/failed/verification-failed)
  *   are ALWAYS resumed — the specialist pipeline needs them to fix issues.
  * - Agents without pending feedback are skipped if stoppedByUser=true (the
- *   user deliberately killed them via pan kill / pan work done).
+ *   user deliberately killed them via pan kill / pan done).
  * - Orphaned agents (tmux session missing, no stoppedByUser flag) are resumed.
  *
  * Called by runPatrol() on every patrol cycle AND during deacon startup.
@@ -3791,6 +4368,17 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
     }
     if (review?.mergeStatus === 'merged') {
       logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — already merged`);
+      continue;
+    }
+
+    // Hard gate: postMergeLifecycle stamps `merged: true` on the agent state when
+    // the issue's PR is merged. This is the authoritative do-not-resume signal —
+    // it doesn't depend on review_status being correct (which can flap during
+    // squash-detection races) and doesn't depend on shadow-state being up to
+    // date (old issues may have no shadow file). Saw 10 spurious work agents
+    // get respawned for already-merged issues during a mergeStatus flap window.
+    if ((state as any).merged === true) {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — agent state has merged=true (mergedAt=${(state as any).mergedAt ?? 'unknown'})`);
       continue;
     }
 

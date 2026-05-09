@@ -2,7 +2,9 @@ import { exec } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { findPlan } from './vbrief/io.js';
 import { promisify } from 'node:util';
+import { queryBeadsForIssue } from './beads-query.js';
 import { getForgeAdapter } from './forge.js';
 import { extractNumber } from './issue-id.js';
 import {
@@ -13,6 +15,7 @@ import {
   type MergeSet,
   type MergeSetRepoState,
 } from './merge-set.js';
+import { emitActivityEntry } from './activity-logger.js';
 
 const execAsync = promisify(exec);
 
@@ -38,8 +41,8 @@ export async function buildRichReviewArtifactBody(issueId: string, workspacePath
   lines.push('');
 
   try {
-    const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
-    if (existsSync(planPath)) {
+    const planPath = findPlan(workspacePath);
+    if (planPath && existsSync(planPath)) {
       const raw = await readFile(planPath, 'utf-8');
       const doc = JSON.parse(raw);
       const items: Array<{ status: string; title: string }> = doc?.plan?.items ?? [];
@@ -58,38 +61,15 @@ export async function buildRichReviewArtifactBody(issueId: string, workspacePath
   }
 
   try {
-    let beadsPath: string | null = null;
-    const redirectPath = join(workspacePath, '.beads', 'redirect');
-    if (existsSync(redirectPath)) {
-      const redirectTarget = (await readFile(redirectPath, 'utf-8')).trim();
-      const resolvedPath = redirectTarget.startsWith('/')
-        ? redirectTarget
-        : join(workspacePath, '.beads', redirectTarget);
-      beadsPath = join(resolvedPath, 'issues.jsonl');
-    }
-
-    const localBeadsPath = join(workspacePath, '.beads', 'issues.jsonl');
-    if (!beadsPath && existsSync(localBeadsPath)) beadsPath = localBeadsPath;
-
-    if (beadsPath && existsSync(beadsPath)) {
-      const issueLower = issueId.toLowerCase();
-      const beads = (await readFile(beadsPath, 'utf-8'))
-        .split('\n')
-        .filter(line => line.trim())
-        .map(line => {
-          try { return JSON.parse(line); } catch { return null; }
-        })
-        .filter(bead => bead && bead.labels?.some((label: string) => label.toLowerCase() === issueLower));
-
-      if (beads.length > 0) {
-        lines.push('## Implementation Tasks');
-        lines.push('');
-        for (const bead of beads) {
-          const checked = bead.status === 'closed' ? 'x' : ' ';
-          lines.push(`- [${checked}] ${bead.title.replace(/^[^:]+:\s*/, '')}`);
-        }
-        lines.push('');
+    const beads = await queryBeadsForIssue(workspacePath, issueId);
+    if (beads.length > 0) {
+      lines.push('## Implementation Tasks');
+      lines.push('');
+      for (const bead of beads) {
+        const checked = bead.status === 'closed' ? 'x' : ' ';
+        lines.push(`- [${checked}] ${bead.title.replace(/^[^:]+:\s*/, '')}`);
       }
+      lines.push('');
     }
   } catch {
     // Optional body enrichment only.
@@ -178,6 +158,16 @@ export async function createReviewArtifactsForIssue(
       verificationStatus: 'pending',
       mergeStatus: 'pending',
     });
+    if (artifact.created) {
+      const repoSuffix = mergeSet.repos.length > 1 ? ` (${repo.repoKey})` : '';
+      emitActivityEntry({
+        source: 'merge-agent',
+        level: 'info',
+        message: `Merge request created for ${issueId}${repoSuffix}`,
+        details: artifact.url,
+        issueId,
+      });
+    }
     artifacts.push({
       repoKey: repo.repoKey,
       created: artifact.created,

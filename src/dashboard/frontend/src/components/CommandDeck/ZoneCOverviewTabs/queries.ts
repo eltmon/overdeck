@@ -178,8 +178,23 @@ export interface ReviewStatusData {
   verificationMaxCycles?: number;
   testNotes?: string;
   reviewNotes?: string;
+  mergeNotes?: string;
+  mergeRetryCount?: number;
   readyForMerge: boolean;
   updatedAt: string;
+  /** PAN-905: GitHub-native merge blocker reasons */
+  blockerReasons?: BlockerReason[];
+  /** PAN-366: Queue position — null = not queued, 0 = active, 1+ = position */
+  queuePosition?: number | null;
+  /** PAN-366: Which specialist is active or will handle this issue */
+  activeSpecialist?: 'review' | 'test' | 'merge' | null;
+}
+
+export interface BlockerReason {
+  type: 'failing_checks' | 'merge_conflict' | 'unresolved_conversations' | 'changes_requested' | 'draft_pr' | 'not_mergeable';
+  summary: string;
+  details?: string;
+  detectedAt: string;
 }
 
 export function useReviewStatusQuery(issueId: string): UseQueryResult<ReviewStatusData> {
@@ -247,11 +262,16 @@ export interface PrDetailsResponse extends PrEndpointResponse {
   diff: string | null;
 }
 
-export function usePrQuery(issueId: string): UseQueryResult<PrEndpointResponse> {
+export function usePrQuery(
+  issueId: string,
+  options?: Omit<UseQueryOptions<PrEndpointResponse>, 'queryKey' | 'queryFn'>,
+): UseQueryResult<PrEndpointResponse> {
   return useQuery({
     queryKey: ['issuePr', issueId],
     queryFn: () => fetchJson<PrEndpointResponse>(`/api/issues/${issueId}/pr`),
     refetchInterval: 30_000,
+    enabled: !!issueId,
+    ...options,
   });
 }
 
@@ -310,11 +330,10 @@ export function useDiscussionsQuery(
 
 // ─── Workspace (/api/workspaces/:issueId) ───────────────────────────────────
 
-export interface WorkspaceContainer {
-  name: string;
-  status: string;
-  health?: string;
-  ports?: string;
+export interface WorkspaceContainerStatus {
+  running: boolean;
+  uptime: string | null;
+  status?: string;
 }
 
 export interface WorkspaceData {
@@ -331,7 +350,7 @@ export interface WorkspaceData {
   git?: { ahead: number; behind: number; branch: string; dirty: boolean } | null;
   repoGit?: { ahead: number; behind: number; branch: string; dirty: boolean } | null;
   services?: Array<{ name: string; url?: string }>;
-  containers?: WorkspaceContainer[] | null;
+  containers?: Record<string, WorkspaceContainerStatus> | null;
   hasDocker?: boolean;
   canContainerize?: boolean;
   pendingOperation?: string | null;

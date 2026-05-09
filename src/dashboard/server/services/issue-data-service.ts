@@ -12,11 +12,15 @@
  */
 
 import { Octokit } from '@octokit/rest';
+import { existsSync, statSync } from 'fs';
+import { join } from 'path';
 import { mapGitHubStateToCanonical } from '../../../core/state-mapping.js';
 import { CacheService, DEFAULT_TTLS } from './cache-service.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
 import type { GitHubConfig, RallyConfig } from './tracker-config.js';
 import { loadReviewStatuses } from '../../../lib/review-status.js';
+import { resolveProjectFromIssue } from '../../../lib/projects.js';
+import { findPlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
 
 /**
  * Map a raw status string to its canonical state.
@@ -79,6 +83,28 @@ interface TrackerState {
 }
 
 /**
+ * Cheap change detection for issue arrays.
+ * Compares length + the most recent updatedAt timestamp instead of
+ * serializing the entire array with JSON.stringify (which caused
+ * 600-900ms event loop stalls on large issue sets).
+ */
+function issuesChanged(newIssues: any[], oldIssues: any[]): boolean {
+  if (newIssues.length !== oldIssues.length) return true;
+  if (newIssues.length === 0) return false;
+
+  // Find the most recent updatedAt in each set
+  let newMax = '';
+  let oldMax = '';
+  for (const issue of newIssues) {
+    if (issue.updatedAt && issue.updatedAt > newMax) newMax = issue.updatedAt;
+  }
+  for (const issue of oldIssues) {
+    if (issue.updatedAt && issue.updatedAt > oldMax) oldMax = issue.updatedAt;
+  }
+  return newMax !== oldMax;
+}
+
+/**
  * Map normalized IssueState (open/in_progress/closed) to canonical dashboard status.
  * The Rally tracker already normalizes raw Rally states to IssueState in rally.ts.
  */
@@ -89,6 +115,69 @@ function mapRallyStateToCanonical(issueState: string): string {
   if (stateLower === 'closed') return 'done';
   // 'open' and anything unrecognized → 'todo'
   return 'todo';
+}
+
+/**
+ * Compute planning-state for an issue via cheap filesystem checks.
+ *
+ * `isPlanningComplete()` reads and JSON-parses the workspace's plan.vbrief.json
+ * file. Calling it for every issue on every getSnapshot — which happens once
+ * per WS-RPC bootstrap and then every emitted snapshot — would do 870+ sync
+ * disk reads per call and starve the dashboard event loop until WS clients
+ * timeout. Cache by plan-file mtime so the read happens at most once per file
+ * change.
+ */
+interface PlanningStateCacheEntry {
+  result: { hasPlan: boolean; hasBeads: boolean; planningComplete: boolean; workspacePath: string };
+  planMtimeMs: number; // -1 when no plan file existed at compute time
+}
+const planningStateCache = new Map<string, PlanningStateCacheEntry>();
+
+function computePlanningState(identifier: string): {
+  hasPlan: boolean;
+  hasBeads: boolean;
+  planningComplete: boolean;
+  workspacePath: string;
+} {
+  try {
+    const resolved = resolveProjectFromIssue(identifier);
+    const projectPath = resolved?.projectPath ?? '';
+    if (!projectPath) {
+      return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '' };
+    }
+    const issueLower = identifier.toLowerCase();
+    const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+    if (!existsSync(workspacePath)) {
+      return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath };
+    }
+    const planPath = findPlan(workspacePath);
+
+    // Use the plan file's mtime as the cache key; -1 stands in for "no plan file".
+    let planMtimeMs = -1;
+    if (planPath) {
+      try {
+        planMtimeMs = statSync(planPath).mtimeMs;
+      } catch {
+        planMtimeMs = -1;
+      }
+    }
+
+    const cached = planningStateCache.get(identifier);
+    if (cached && cached.planMtimeMs === planMtimeMs && cached.result.workspacePath === workspacePath) {
+      return cached.result;
+    }
+
+    const hasPlan = planPath !== null;
+    // planningComplete reads the plan file — gated by the cache above so this
+    // only runs when the file actually changes.
+    const planningComplete = isPlanningComplete(workspacePath);
+    const hasBeads = planningComplete;
+    const result = { hasPlan, hasBeads, planningComplete, workspacePath };
+    planningStateCache.set(identifier, { result, planMtimeMs });
+    return result;
+  } catch {
+    return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '' };
+  }
 }
 
 export class IssueDataService {
@@ -276,6 +365,18 @@ export class IssueDataService {
     } catch {
       // review-status.json may not exist yet
     }
+
+    // Enrich with planning-state (filesystem checks, no bd process)
+    allIssues = allIssues.map(issue => {
+      const ps = computePlanningState(issue.identifier);
+      return {
+        ...issue,
+        hasPlan: ps.hasPlan,
+        hasBeads: ps.hasBeads,
+        planningComplete: ps.planningComplete,
+        workspacePath: ps.workspacePath || undefined,
+      };
+    });
 
     // Sort by updatedAt
     allIssues.sort((a, b) =>
@@ -526,9 +627,9 @@ export class IssueDataService {
       }
     }
 
-    // Check if data actually changed
+    // Check if data actually changed (cheap length + updatedAt check)
     const oldData = this.trackers.github.lastFetchedIssues;
-    const changed = JSON.stringify(allIssues) !== JSON.stringify(oldData);
+    const changed = issuesChanged(allIssues, oldData);
 
     this.trackers.github.lastFetchedIssues = allIssues;
     this.trackers.github.lastFetchedAt = new Date().toISOString();
@@ -713,7 +814,7 @@ export class IssueDataService {
       }
 
       const oldData = this.trackers.linear.lastFetchedIssues;
-      const changed = JSON.stringify(allIssues) !== JSON.stringify(oldData);
+      const changed = issuesChanged(allIssues, oldData);
 
       this.trackers.linear.lastFetchedIssues = allIssues;
       this.trackers.linear.lastFetchedAt = new Date().toISOString();
@@ -1071,7 +1172,7 @@ export class IssueDataService {
       allFormatted = this.computeDerivedFeatureStatus(allFormatted);
 
       const oldData = this.trackers.rally.lastFetchedIssues;
-      const changed = JSON.stringify(allFormatted) !== JSON.stringify(oldData);
+      const changed = issuesChanged(allFormatted, oldData);
 
       this.trackers.rally.lastFetchedIssues = allFormatted;
       this.trackers.rally.lastFetchedAt = new Date().toISOString();

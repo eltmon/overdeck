@@ -12,6 +12,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { homedir } from 'os';
 import { getManagedTmuxSocketName } from '../tmux.js';
 import { generateLauncherScript } from '../launcher-generator.js';
+import { getClaudePermissionFlags, getClaudePermissionFlagsString } from '../claude-permissions.js';
 
 const AGENTS_DIR = join(homedir(), '.panopticon', 'agents');
 const REMOTE_PAN_DIR = '/workspace/.pan';
@@ -165,7 +166,7 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
       setRemotePath: true,
       promptFile,
       baseCommand: 'claude',
-      permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
+      permissionFlags: getClaudePermissionFlags(),
       model,
     });
     const launcherBase64 = Buffer.from(launcherContent).toString('base64');
@@ -173,8 +174,10 @@ export async function spawnRemoteAgent(options: SpawnRemoteAgentOptions): Promis
 
     claudeCmd = `bash ${launcherScript}`;
   } else {
-    claudeCmd = `claude --dangerously-skip-permissions --permission-mode bypassPermissions --model ${model}`;
+    claudeCmd = `claude ${getClaudePermissionFlagsString()} --model ${model}`;
   }
+
+  console.log(`[claude-invoke] purpose=remote-agent | model=${model} | source=remote-agents.ts | vm=${vmName} | agent=${agentId} | command="${claudeCmd}"`);
 
   await ensureRemoteTmuxContext(fly, vmName);
 

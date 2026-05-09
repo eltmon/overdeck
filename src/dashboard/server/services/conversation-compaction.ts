@@ -7,8 +7,14 @@ import { generateSmartSummary } from '../../../lib/conversations/smart-compactio
 import { generateFallbackSummary } from '../../../lib/conversations/summary-fork.js';
 import { loadConfig } from '../../../lib/config-yaml.js';
 import { getAgentRuntimeBaseCommand, getProviderExportsForModel } from '../../../lib/agents.js';
+import { getEventStore } from '../event-store.js';
 
 const COMPACT_TOKEN_THRESHOLD = 100_000;
+
+const activeCompactions = new Set<string>();
+export function isCompacting(sessionFile: string): boolean {
+  return activeCompactions.has(sessionFile);
+}
 
 export interface NativeCompactionResult {
   summary: string;
@@ -76,10 +82,25 @@ function buildContinuationSummary(summary: string, model: string): string {
   ].join('\n');
 }
 
-export async function compactConversationNative(sessionFile: string): Promise<NativeCompactionResult> {
+export async function compactConversationNative(sessionFile: string, conversationName?: string): Promise<NativeCompactionResult> {
   if (!existsSync(sessionFile)) {
     throw new Error(`Session file not found: ${sessionFile}`);
   }
+  activeCompactions.add(sessionFile);
+  if (conversationName) {
+    getEventStore().emitOnly({ type: 'conversation.compacting_changed', timestamp: new Date().toISOString(), payload: { conversationName, compacting: true } });
+  }
+  try {
+    return await doCompact(sessionFile);
+  } finally {
+    activeCompactions.delete(sessionFile);
+    if (conversationName) {
+      getEventStore().emitOnly({ type: 'conversation.compacting_changed', timestamp: new Date().toISOString(), payload: { conversationName, compacting: false } });
+    }
+  }
+}
+
+async function doCompact(sessionFile: string): Promise<NativeCompactionResult> {
 
   const settings = getConversationCompactionSettings();
   const tokensBefore = await estimateContextTokens(sessionFile);
@@ -158,9 +179,9 @@ export async function maybeCompactBeforeRespawn(opts: MaybeCompactBeforeRespawnO
   await compactConversationNative(opts.sessionFile);
 }
 
-export function buildCompactionRuntimeInfo(model: string): { command: string; exports: string } {
+export async function buildCompactionRuntimeInfo(model: string): Promise<{ command: string; exports: string }> {
   return {
-    command: getAgentRuntimeBaseCommand(model),
-    exports: getProviderExportsForModel(model),
+    command: await getAgentRuntimeBaseCommand(model),
+    exports: await getProviderExportsForModel(model),
   };
 }

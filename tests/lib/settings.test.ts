@@ -76,11 +76,13 @@ describe('settings', () => {
       const originalMinimax = process.env.MINIMAX_API_KEY;
       const originalZai = process.env.ZAI_API_KEY;
       const originalKimi = process.env.KIMI_API_KEY;
+      const originalKimiCoding = process.env.KIMI_CODING_API_KEY;
       delete process.env.OPENAI_API_KEY;
       delete process.env.GOOGLE_API_KEY;
       delete process.env.MINIMAX_API_KEY;
       delete process.env.ZAI_API_KEY;
       delete process.env.KIMI_API_KEY;
+      delete process.env.KIMI_CODING_API_KEY;
 
       try {
         const loaded = loadSettings();
@@ -94,6 +96,7 @@ describe('settings', () => {
         if (originalMinimax) process.env.MINIMAX_API_KEY = originalMinimax;
         if (originalZai) process.env.ZAI_API_KEY = originalZai;
         if (originalKimi) process.env.KIMI_API_KEY = originalKimi;
+        if (originalKimiCoding) process.env.KIMI_CODING_API_KEY = originalKimiCoding;
       }
     });
 
@@ -134,11 +137,13 @@ describe('settings', () => {
       const originalMinimax = process.env.MINIMAX_API_KEY;
       const originalZai = process.env.ZAI_API_KEY;
       const originalKimi = process.env.KIMI_API_KEY;
+      const originalKimiCoding = process.env.KIMI_CODING_API_KEY;
       delete process.env.OPENAI_API_KEY;
       delete process.env.GOOGLE_API_KEY;
       delete process.env.MINIMAX_API_KEY;
       delete process.env.ZAI_API_KEY;
       delete process.env.KIMI_API_KEY;
+      delete process.env.KIMI_CODING_API_KEY;
 
       try {
         // Write invalid JSON
@@ -157,6 +162,7 @@ describe('settings', () => {
         if (originalMinimax) process.env.MINIMAX_API_KEY = originalMinimax;
         if (originalZai) process.env.ZAI_API_KEY = originalZai;
         if (originalKimi) process.env.KIMI_API_KEY = originalKimi;
+        if (originalKimiCoding) process.env.KIMI_CODING_API_KEY = originalKimiCoding;
       }
     });
 
@@ -169,11 +175,13 @@ describe('settings', () => {
       const originalMinimax = process.env.MINIMAX_API_KEY;
       const originalZai = process.env.ZAI_API_KEY;
       const originalKimi = process.env.KIMI_API_KEY;
+      const originalKimiCoding = process.env.KIMI_CODING_API_KEY;
       delete process.env.OPENAI_API_KEY;
       delete process.env.GOOGLE_API_KEY;
       delete process.env.MINIMAX_API_KEY;
       delete process.env.ZAI_API_KEY;
       delete process.env.KIMI_API_KEY;
+      delete process.env.KIMI_CODING_API_KEY;
 
       try {
         // Write empty JSON
@@ -192,6 +200,7 @@ describe('settings', () => {
         if (originalMinimax) process.env.MINIMAX_API_KEY = originalMinimax;
         if (originalZai) process.env.ZAI_API_KEY = originalZai;
         if (originalKimi) process.env.KIMI_API_KEY = originalKimi;
+        if (originalKimiCoding) process.env.KIMI_CODING_API_KEY = originalKimiCoding;
       }
     });
 
@@ -235,11 +244,13 @@ describe('settings', () => {
       const originalMinimax = process.env.MINIMAX_API_KEY;
       const originalZai = process.env.ZAI_API_KEY;
       const originalKimi = process.env.KIMI_API_KEY;
+      const originalKimiCoding = process.env.KIMI_CODING_API_KEY;
       delete process.env.OPENAI_API_KEY;
       delete process.env.GOOGLE_API_KEY;
       delete process.env.MINIMAX_API_KEY;
       delete process.env.ZAI_API_KEY;
       delete process.env.KIMI_API_KEY;
+      delete process.env.KIMI_CODING_API_KEY;
 
       try {
         const settings = getDefaultSettings();
@@ -258,6 +269,7 @@ describe('settings', () => {
         if (originalMinimax) process.env.MINIMAX_API_KEY = originalMinimax;
         if (originalZai) process.env.ZAI_API_KEY = originalZai;
         if (originalKimi) process.env.KIMI_API_KEY = originalKimi;
+        if (originalKimiCoding) process.env.KIMI_CODING_API_KEY = originalKimiCoding;
       }
     });
 
@@ -459,7 +471,7 @@ describe('settings', () => {
 
       expect(available.google).toEqual([
         'gemini-3.1-pro-preview',
-        'gemini-3-flash',
+        'gemini-3-flash-preview',
         'gemini-3.1-flash-lite-preview',
       ]);
     });

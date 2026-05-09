@@ -58,19 +58,58 @@ import { requestReviewCommand } from './commands/request-review.js';
 import { resetReviewCommand } from './commands/reset-review.js';
 import { abortReviewCommand } from './commands/abort-review.js';
 import { reviewRunCommand } from './commands/review-run.js';
+import { reviewRestartCommand } from './commands/review-restart.js';
 import { registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
 import { registerInstallCommand } from './commands/install.js';
 import { registerAdminCommands } from './commands/admin/index.js';
 import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
+import { systemHealthCommand } from './commands/system-health.js';
 import { updateCommand } from './commands/update.js';
 import { restartCommand } from './commands/restart.js';
 import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
+import { planDoneCommand } from './commands/plan-done.js';
 import { registerCavemanCommands } from './commands/caveman.js';
 import { registerReleaseCommands } from './commands/release.js';
+import { resourcesCommand } from './commands/resources.js';
+import { devCommand } from './commands/dev.js';
+import { registerScopeCommands } from './commands/scope.js';
+import { openCommand } from './commands/open.js';
+import { swarmCommand } from './commands/swarm.js';
+
+// Pre-parse --yolo from argv so it works regardless of position relative to the
+// subcommand. Commander's enablePositionalOptions() routes post-subcommand options
+// to the subcommand, which would either swallow --yolo or error on unknown flag.
+// Doing this here lets `pan --yolo=false up`, `pan up --yolo=false`, and even
+// `pan up agent-foo --yolo=false` all work identically.
+(() => {
+  const argv = process.argv;
+  for (let i = 2; i < argv.length; i++) {
+    const arg = argv[i];
+    let value: string | undefined;
+    if (arg === '--yolo') {
+      // Bare flag — peek at next arg if it doesn't look like another option
+      const next = argv[i + 1];
+      value = next && !next.startsWith('-') ? next : 'true';
+      argv.splice(i, value === 'true' ? 1 : 2);
+      i--;
+    } else if (arg.startsWith('--yolo=')) {
+      value = arg.slice('--yolo='.length);
+      argv.splice(i, 1);
+      i--;
+    } else if (arg === '--no-yolo') {
+      value = 'false';
+      argv.splice(i, 1);
+      i--;
+    } else {
+      continue;
+    }
+    process.env.PAN_YOLO = value.trim().toLowerCase();
+  }
+})();
 
 const program = new Command();
 program.enablePositionalOptions();
@@ -108,7 +147,18 @@ const ensureDashboardBundle = async (
 program
   .name('pan')
   .description('Multi-agent orchestration for AI coding assistants')
-  .version(JSON.parse(readFileSync(join(import.meta.dirname, '../../package.json'), 'utf-8')).version);
+  .version(JSON.parse(readFileSync(join(import.meta.dirname, '../../package.json'), 'utf-8')).version)
+  .option(
+    '--yolo [value]',
+    'Override permission mode for spawned Claude Code agents. ' +
+    'Default is auto (Claude Code\'s classifier blocks destructive ops). ' +
+    '--yolo or --yolo=true switches to --dangerously-skip-permissions; ' +
+    '--yolo=false (--no-yolo) forces auto mode. ' +
+    'Equivalent to setting PAN_YOLO=true|false. Works in any argv position. ' +
+    'Falls back to config.claude.permissionMode.'
+  );
+// Note: --yolo is intercepted by the pre-parse block above before commander runs,
+// so the option declaration is for `--help` rendering only — it never receives a value.
 
 program
   .command('init')
@@ -180,6 +230,13 @@ program
   .option('--json', 'Output as JSON')
   .action(showCommand);
 
+// pan open <id> — open workspace in editor
+program
+  .command('open <id>')
+  .description('Open an issue workspace in your preferred editor')
+  .option('-e, --editor <editor>', 'Editor to use (cursor, windsurf, vscode, zed, etc.)')
+  .action(openCommand);
+
 // pan review — pending, request, reset
 const review = program
   .command('review')
@@ -208,25 +265,38 @@ review
   .action(abortReviewCommand);
 
 review
+  .command('restart <id>')
+  .description('Kill running reviewers and dispatch fresh review pipeline')
+  .option('--model <model>', 'Override model for all reviewers (e.g. gpt-5.4, claude-sonnet-4-6)')
+  .option('--role <role>', 'Restart only a specific reviewer role (correctness/security/performance/requirements)')
+  .action(reviewRestartCommand);
+
+review
   .command('run <id>')
   .description('Run the full review pipeline (blocking): spawn reviewers → synthesize → post to GitHub. Exit codes: 0=approved, 1=changes, 2=failed.')
   .option('--cwd <path>', 'Workspace directory (default: cwd)')
   .option('--pr-url <url>', 'Override PR URL detection')
   .option('--branch <name>', 'Override branch detection')
   .option('--files-changed <list>', 'Comma-separated file list (overrides git diff)')
+  .option('--model <model>', 'Override model for all reviewers')
   .action(reviewRunCommand);
 
 // pan plan finalize <id>
 const planCmd = program
   .command('plan')
-  .description('Finalize an existing plan');
+  .description('Planning lifecycle commands');
 
 planCmd
   .command('finalize')
-  .description('Materialize plan into beads, write completion marker')
-  .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .planning/)')
+  .description('Materialize plan into beads and mark the workspace spec as proposed')
+  .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .pan/)')
   .option('--json', 'Emit JSON result')
   .action(planFinalizeCommand);
+
+planCmd
+  .command('done <id>')
+  .description('Complete planning — promote vBRIEF to proposed, sync beads, transition issue to Planned')
+  .action(planDoneCommand);
 
 // Lifecycle verbs: pan start, pan tell, pan kill, pan fork, pan resume, pan recover, pan sync-main, pan done, pan reopen, pan wipe, pan close
 program
@@ -263,6 +333,7 @@ program
   .description('Recover crashed or stopped agent')
   .option('--all', 'Auto-recover all crashed agents')
   .option('--json', 'Output as JSON')
+  .option('--model <model>', 'Override model on recovery (e.g. switch off Kimi when quota is exhausted)')
   .action(recoverCommand);
 
 program
@@ -307,6 +378,7 @@ program
   .command('start <id>')
   .description('Create workspace and spawn agent for an issue')
   .option('--model <model>', 'Model to use (sonnet/opus/haiku/kimi-k2.5/etc) - defaults to Cloister config')
+  .option('--harness <harness>', 'Coding-agent harness: claude-code (default) | pi')
   .option('--dry-run', 'Show what would be created')
   .option('--shadow', 'Enable shadow mode')
   .option('--no-shadow', 'Disable shadow mode')
@@ -314,6 +386,17 @@ program
   .option('--local', 'Use local workspace (explicit override)')
   .option('--phase <phase>', 'Work phase for model routing')
   .action(startCommand);
+
+program
+  .command('swarm <id>')
+  .description('Swarm execution: spawn parallel agents across vBRIEF plan items using dependency-wave scheduling')
+  .option('--dry-run', 'Print the wave plan without spawning agents')
+  .option('--wave <n>', 'Dispatch only wave N')
+  .option('--model <model>', 'Override model for work slots (default: kimi-k2.6)')
+  .option('--max-slots <n>', 'Max concurrent agents')
+  .option('--auto-advance', 'Automatically dispatch the next wave when the current one completes')
+  .option('--no-auto-advance', 'Disable automatic next-wave dispatching for this swarm')
+  .action(swarmCommand);
 
 // Register workspace commands (pan workspace create, pan workspace list, etc.)
 registerWorkspaceCommands(program);
@@ -335,6 +418,7 @@ registerInspectCommand(program);
 
 // Register caveman commands (pan caveman-compress)
 registerCavemanCommands(program);
+registerScopeCommands(program);
 
 // Shorthand: pan status = pan status
 program
@@ -347,10 +431,18 @@ program
 
 // Dashboard commands
 program
+  .command('dev')
+  .description('Start dashboard in development mode with Vite HMR')
+  .option('--skip-traefik', 'Skip Traefik startup')
+  .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
+  .action(devCommand);
+
+program
   .command('up')
   .description('Start dashboard (and Traefik if enabled)')
   .option('--detach', 'Run in background')
   .option('--skip-traefik', 'Skip Traefik startup')
+  .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
   .action(async (options) => {
     const { spawn, execSync } = await import('child_process');
     const { join, dirname } = await import('path');
@@ -402,6 +494,42 @@ program
         process.stdout.write = origWrite;
         process.stderr.write = origErrWrite;
         console.log(chalk.yellow('⚠ Auto-sync failed (non-fatal, continuing startup)'));
+      }
+    }
+
+    // Ensure tmux is installed — required for all agent/conversation sessions
+    {
+      const { isToolInstalled, installTool } = await import('../lib/prereqs/registry.js');
+      if (!(await isToolInstalled('tmux'))) {
+        console.log(chalk.yellow('  tmux is required but not found. Installing...'));
+        const result = await installTool('tmux');
+        if (result.success) {
+          console.log(chalk.green(`  ✓ ${result.message}`));
+        } else {
+          console.error(chalk.red(`  ✗ Failed to install tmux: ${result.message}`));
+          console.error(chalk.dim('  Install manually: brew install tmux (macOS) or sudo apt-get install tmux (Linux)'));
+          process.exit(1);
+        }
+      }
+    }
+
+    // Flush stale provider env vars from the tmux server's global environment.
+    // The server inherits the parent's env at startup and persists it — stale
+    // ANTHROPIC_BASE_URL etc. would leak into new sessions. Use set-environment
+    // -gu to unset them without killing existing sessions.
+    {
+      const { execSync } = await import('child_process');
+      const providerVars = [
+        'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN',
+        'OPENAI_API_KEY', 'GEMINI_API_KEY', 'API_TIMEOUT_MS',
+        'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
+      ];
+      for (const varName of providerVars) {
+        try {
+          execSync(`tmux -L panopticon set-environment -gu ${varName}`, { stdio: 'ignore' });
+        } catch {
+          // No server running or var not set — fine
+        }
       }
     }
 
@@ -556,10 +684,12 @@ program
       return candidates.find((p) => existsSync(p)) ?? null;
     })();
 
-    if (electronAppPath) {
-      // Start shared sidecars BEFORE launching the Electron app — otherwise
-      // `pan up` would return early and leave CLIProxy/TLDR down, which is
-      // exactly the "restart did not bring the system back up" failure mode.
+    // Shared post-launch sidecars (CLIProxy, smee, TLDR) — must run for
+    // every launch mode so the Electron fast-path does not skip them.
+    async function startPostLaunchSidecars(): Promise<void> {
+      // Start CLIProxyAPI sidecar for ChatGPT subscription → GPT agent routing.
+      // Idempotent + non-fatal: if the user isn't logged into Codex yet, the
+      // sidecar still comes up and will pick up credentials once they log in.
       try {
         const { startCliproxy, CLIPROXY_PORT } = await import('../lib/cliproxy.js');
         console.log(chalk.dim('Starting CLIProxyAPI sidecar (GPT subscription router)...'));
@@ -567,21 +697,52 @@ program
         console.log(chalk.green(`✓ CLIProxyAPI listening on http://127.0.0.1:${CLIPROXY_PORT}`));
       } catch (error: any) {
         console.log(chalk.yellow('⚠ Failed to start CLIProxyAPI sidecar:'), error?.message || String(error));
+        console.log(chalk.dim('  GPT subscription agents will not work until this is resolved.'));
       }
 
+      // Start smee-client webhook relay (optional — non-fatal)
+      try {
+        const { startSmeeProcess } = await import('../lib/smee.js');
+        console.log(chalk.dim('\nStarting smee-client webhook relay...'));
+        startSmeeProcess();
+      } catch (error: any) {
+        console.log(chalk.yellow('⚠ Failed to start smee-client:'), error?.message || String(error));
+        console.log(chalk.dim('  Webhook relay unavailable — GitHub events will use polling fallback'));
+      }
+
+      // Start TLDR daemon on project root (if Python3 and venv available)
       try {
         const { getTldrDaemonService } = await import('../lib/tldr-daemon.js');
         const projectRoot = process.cwd();
         const venvPath = join(projectRoot, '.venv');
         if (existsSync(venvPath)) {
+          console.log(chalk.dim('\nStarting TLDR daemon for project root...'));
           const tldrService = getTldrDaemonService(projectRoot, venvPath);
-          await tldrService.start(true);
+          await tldrService.start(true);  // background mode
           console.log(chalk.green('✓ TLDR daemon started'));
+        } else {
+          console.log(chalk.dim('\nSkipping TLDR daemon (no .venv found)'));
+          console.log(chalk.dim('  Run setup to create venv with llm-tldr'));
         }
       } catch (error: any) {
         console.log(chalk.yellow('⚠ Failed to start TLDR daemon:'), error?.message || String(error));
+        console.log(chalk.dim('  TLDR will be unavailable but dashboard will work normally'));
       }
 
+      // Start the supervisor sidecar — exposes POST /restart-dashboard on a
+      // separate port so the dashboard's Force Restart button still works
+      // when the dashboard process itself has crashed.
+      try {
+        const { startSupervisorProcess, getSupervisorPort } = await import('../lib/supervisor.js');
+        startSupervisorProcess();
+        console.log(chalk.green(`✓ Supervisor listening on http://127.0.0.1:${getSupervisorPort()}`));
+      } catch (error: any) {
+        console.log(chalk.yellow('⚠ Failed to start supervisor:'), error?.message || String(error));
+        console.log(chalk.dim('  Force Restart will only work via the Electron bridge or while dashboard is responding.'));
+      }
+    }
+
+    if (electronAppPath) {
       console.log(chalk.dim(`\nLaunching Panopticon desktop app...`));
       console.log(chalk.dim(`  ${electronAppPath}`));
       const { spawn } = await import('child_process');
@@ -590,13 +751,30 @@ program
         stdio: 'ignore',
         env: process.env,
       });
-      child.on('error', (err) => {
-        console.warn(chalk.yellow(`⚠ Could not launch desktop app: ${err.message}`));
-        console.warn(chalk.dim('  Falling back to bare server mode'));
+
+      const launchSucceeded = await new Promise<boolean>((resolve) => {
+        let settled = false;
+        const settle = (value: boolean) => {
+          if (settled) return;
+          settled = true;
+          resolve(value);
+        };
+
+        child.once('error', (err) => {
+          console.warn(chalk.yellow(`⚠ Could not launch desktop app: ${err.message}`));
+          console.warn(chalk.dim('  Falling back to bare server mode'));
+          settle(false);
+        });
+
+        setTimeout(() => settle(true), 100);
       });
-      child.unref();
-      console.log(chalk.green('✓ Desktop app launched'));
-      return;
+
+      if (launchSucceeded) {
+        child.unref();
+        console.log(chalk.green('✓ Desktop app launched'));
+        await startPostLaunchSidecars();
+        return;
+      }
     }
 
     // Kill any existing dashboard processes before starting a new one.
@@ -658,6 +836,7 @@ program
               ...process.env,
               DASHBOARD_PORT: String(dashboardPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
+              ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
             },
           });
 
@@ -712,6 +891,7 @@ program
               ...process.env,
               DASHBOARD_PORT: String(dashboardPort),
               PANOPTICON_MODE: isProduction ? 'production' : 'development',
+              ...(options.deacon === false ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
             },
           });
 
@@ -721,38 +901,7 @@ program
       });
     }
 
-    // Start CLIProxyAPI sidecar for ChatGPT subscription → GPT agent routing.
-    // Idempotent + non-fatal: if the user isn't logged into Codex yet, the
-    // sidecar still comes up and will pick up credentials once they log in.
-    try {
-      const { startCliproxy, CLIPROXY_PORT } = await import('../lib/cliproxy.js');
-      console.log(chalk.dim('\nStarting CLIProxyAPI sidecar (GPT subscription router)...'));
-      startCliproxy();
-      console.log(chalk.green(`✓ CLIProxyAPI listening on http://127.0.0.1:${CLIPROXY_PORT}`));
-    } catch (error: any) {
-      console.log(chalk.yellow('⚠ Failed to start CLIProxyAPI sidecar:'), error?.message || String(error));
-      console.log(chalk.dim('  GPT subscription agents will not work until this is resolved.'));
-    }
-
-    // Start TLDR daemon on project root (if Python3 and venv available)
-    try {
-      const { getTldrDaemonService } = await import('../lib/tldr-daemon.js');
-      const projectRoot = process.cwd();
-      const venvPath = join(projectRoot, '.venv');
-
-      if (existsSync(venvPath)) {
-        console.log(chalk.dim('\nStarting TLDR daemon for project root...'));
-        const tldrService = getTldrDaemonService(projectRoot, venvPath);
-        await tldrService.start(true);  // background mode
-        console.log(chalk.green('✓ TLDR daemon started'));
-      } else {
-        console.log(chalk.dim('\nSkipping TLDR daemon (no .venv found)'));
-        console.log(chalk.dim('  Run setup to create venv with llm-tldr'));
-      }
-    } catch (error: any) {
-      console.log(chalk.yellow('⚠ Failed to start TLDR daemon:'), error?.message || String(error));
-      console.log(chalk.dim('  TLDR will be unavailable but dashboard will work normally'));
-    }
+    await startPostLaunchSidecars();
   });
 
 program
@@ -766,6 +915,28 @@ program
     const { parse } = await import('@iarna/toml');
 
     console.log(chalk.bold('Stopping Panopticon...\n'));
+
+    // Stop smee-client webhook relay
+    try {
+      const { stopSmeeProcess } = await import('../lib/smee.js');
+      console.log(chalk.dim('Stopping smee-client webhook relay...'));
+      stopSmeeProcess();
+      console.log(chalk.green('✓ smee-client stopped'));
+    } catch {
+      console.log(chalk.dim('  smee-client not running'));
+    }
+
+    // Stop the supervisor sidecar
+    try {
+      const { stopSupervisorProcess, isSupervisorRunning } = await import('../lib/supervisor.js');
+      if (isSupervisorRunning()) {
+        console.log(chalk.dim('Stopping supervisor sidecar...'));
+        stopSupervisorProcess();
+        console.log(chalk.green('✓ Supervisor stopped'));
+      }
+    } catch {
+      // non-fatal
+    }
 
     // Read config for ports and Traefik settings
     const configFile = join(process.env.HOME || '', '.panopticon', 'config.toml');
@@ -797,6 +968,25 @@ program
       console.log(chalk.green('✓ Dashboard stopped'));
     } catch {
       console.log(chalk.dim('  No dashboard processes found'));
+    }
+
+    // Kill review coordinator and reviewer sessions so they don't survive
+    // dashboard restart and block new review dispatch (PAN-931).
+    console.log(chalk.dim('Stopping review sessions...'));
+    try {
+      const { killAllReviewSessions } = await import('../lib/cloister/review-agent.js');
+      const { killed, failed } = await killAllReviewSessions();
+      if (killed.length > 0) {
+        console.log(chalk.green(`✓ Stopped ${killed.length} review session(s)`));
+      }
+      if (failed.length > 0) {
+        console.log(chalk.yellow(`⚠ Failed to stop ${failed.length} review session(s)`));
+      }
+      if (killed.length === 0 && failed.length === 0) {
+        console.log(chalk.dim('  No review sessions running'));
+      }
+    } catch {
+      console.log(chalk.dim('  Review session cleanup skipped'));
     }
 
     // Stop Traefik if enabled
@@ -862,7 +1052,9 @@ program
   .option('--cliproxy', 'Restart only the CLIProxy sidecar')
   .option('--traefik', 'Restart only Traefik')
   .option('--full', 'Restart the entire stack (equivalent to pan down && pan up)')
+  .option('--force', 'For --cliproxy: redownload binary at the pinned version before restarting (use after bumping CLIPROXY_RELEASE_VERSION)')
   .option('--health-timeout <ms>', 'Dashboard /api/health wait budget in ms (default 15000)')
+  .option('--no-deacon', 'Skip Cloister/Deacon auto-start on restart (escape hatch when deacon\'s startup scan is starving the event loop)')
   .action(restartCommand);
 
 // Project management commands
@@ -898,11 +1090,25 @@ project
   .description('Initialize projects.yaml with example configuration')
   .action(projectInitCommand);
 
+// Health command
+program
+  .command('health')
+  .description('Show runtime health of Panopticon services')
+  .action(systemHealthCommand);
+
 // Doctor command
 program
   .command('doctor')
   .description('Check system health and dependencies')
-  .action(doctorCommand);
+  .option('--strict', 'Exit non-zero if any optional dependency is missing (e.g. Pi binary)')
+  .action((options) => doctorCommand(options));
+
+// Resources command
+program
+  .command('resources')
+  .description('Show RAM usage by agents, conversations, and system processes')
+  .option('--json', 'Output as JSON')
+  .action(resourcesCommand);
 
 // Update command
 program

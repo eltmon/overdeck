@@ -1,9 +1,12 @@
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play } from 'lucide-react';
+import { Square, Clock, AlertTriangle, Activity, Bell, DollarSign, ArrowRightLeft, Play, Radio } from 'lucide-react';
 import { useState } from 'react';
+import { useSharedTick } from '../lib/useSharedTick';
+import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { useAgentCost } from '../hooks/useHandoffData';
 import { HandoffPanel } from './HandoffPanel';
 import { useConfirm, useAlert } from './DialogProvider';
+import { getHarness } from '@panctl/contracts';
 
 export interface IssueAgent {
   id: string;
@@ -128,20 +131,27 @@ function formatDuration(startedAt: string): string {
   return `${diffMins}m`;
 }
 
-function formatTimeSince(ms: number | null): string {
-  if (ms === null) return 'unknown';
 
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
+function stalenessClass(ms: number): string {
+  if (ms < 2 * 60_000) return 'text-success';
+  if (ms < 10 * 60_000) return 'text-warning';
+  if (ms < 30 * 60_000) return 'text-orange-400';
+  return 'text-destructive';
+}
 
-  if (hours > 0) {
-    return `${hours}h ago`;
-  } else if (minutes > 0) {
-    return `${minutes}m ago`;
-  } else {
-    return `${seconds}s ago`;
-  }
+function LiveLastHeard({ lastActivity }: { lastActivity: string | null }) {
+  const now = useSharedTick();
+  if (!lastActivity) return null;
+  const ms = now.getTime() - new Date(lastActivity).getTime();
+  if (ms < 1000) return null;
+  const label = formatRelativeTime(lastActivity, now);
+  const cls = stalenessClass(ms);
+  return (
+    <div className={`flex items-center gap-1 text-xs ${cls}`} title={`Last heard: ${label}`}>
+      <Radio className="w-3 h-3" />
+      {label}
+    </div>
+  );
 }
 
 export function IssueAgentCard({
@@ -224,7 +234,7 @@ export function IssueAgentCard({
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className={`w-3 h-3 rounded-full ${STATUS_COLORS[agent.status]}`} />
+          <div className={`w-3 h-3 rounded-full ${STATUS_COLORS[agent.status]} ${agent.status === 'healthy' ? 'animate-pulse' : ''}`} />
           <div>
             <div className="font-medium text-foreground flex items-center gap-2">
               {agent.id}
@@ -238,7 +248,18 @@ export function IssueAgentCard({
               )}
             </div>
             <div className="text-sm text-muted-foreground flex items-center gap-2">
-              {agent.runtime} / {agent.model}
+              <span
+                className={`px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide ${
+                  getHarness(agent) === 'pi'
+                    ? 'bg-purple-500/15 text-purple-300'
+                    : 'bg-blue-500/15 text-blue-300'
+                }`}
+                title={`Coding-agent harness: ${getHarness(agent)}`}
+                data-testid="agent-harness-badge"
+              >
+                {getHarness(agent)}
+              </span>
+              <span>/ {agent.model}</span>
               {costData && costData.cost > 0 && (
                 <span
                   className="flex items-center gap-1 text-xs text-success"
@@ -280,11 +301,8 @@ export function IssueAgentCard({
               <Clock className="w-4 h-4" />
               {formatDuration(agent.startedAt)}
             </div>
-            {health && health.timeSinceActivity !== null && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Activity className="w-3 h-3" />
-                {formatTimeSince(health.timeSinceActivity)}
-              </div>
+            {health && (
+              <LiveLastHeard lastActivity={health.lastActivity} />
             )}
             {agent.consecutiveFailures > 0 && (
               <div className="flex items-center gap-1 text-sm text-warning-foreground">

@@ -9,7 +9,7 @@ import { getDatabase } from './index.js';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type TitleSource = 'auto' | 'ai' | 'manual';
+export type TitleSource = 'auto' | 'ai' | 'manual' | 'default';
 
 export interface Conversation {
   id: number;
@@ -21,8 +21,6 @@ export interface Conversation {
   createdAt: string;
   endedAt: string | null;
   lastAttachedAt: string | null;
-  /** @deprecated Kept for legacy rows — use claudeSessionId + sessionFilePath() instead. */
-  sessionFile: string | null;
   /** Claude Code session UUID. Immutable for the lifetime of the conversation. */
   claudeSessionId: string | null;
   /** Human-readable title, auto-set from first message content. Null until first message sent. */
@@ -58,7 +56,6 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
     createdAt: row['created_at'] as string,
     endedAt: (row['ended_at'] as string | null) ?? null,
     lastAttachedAt: (row['last_attached_at'] as string | null) ?? null,
-    sessionFile: (row['session_file'] as string | null) ?? null,
     claudeSessionId: (row['claude_session_id'] as string | null) ?? null,
     title: (row['title'] as string | null) ?? null,
     titleSource: (row['title_source'] as TitleSource | null) ?? null,
@@ -77,7 +74,7 @@ function rowToConversation(row: Record<string, unknown>): Conversation {
 export function listConversations(options?: { limit?: number; offset?: number }): Conversation[] {
   const db = getDatabase();
   let sql = `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at, session_file, claude_session_id, title,
+              created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error
        FROM conversations
@@ -101,7 +98,7 @@ export function listActiveConversations(): Conversation[] {
   const rows = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at, session_file, claude_session_id, title,
+              created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error
        FROM conversations
@@ -117,7 +114,7 @@ export function getConversationByName(name: string): Conversation | null {
   const row = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at, session_file, claude_session_id, title,
+              created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error
        FROM conversations
@@ -132,7 +129,7 @@ export function getConversationById(id: number): Conversation | null {
   const row = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at, session_file, claude_session_id, title,
+              created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error
        FROM conversations
@@ -142,12 +139,27 @@ export function getConversationById(id: number): Conversation | null {
   return row ? rowToConversation(row) : null;
 }
 
+export function getConversationByClaudeSessionId(claudeSessionId: string): Conversation | null {
+  const db = getDatabase();
+  const row = db
+    .prepare(
+      `SELECT id, name, tmux_session, status, cwd, issue_id,
+              created_at, ended_at, last_attached_at, claude_session_id, title,
+              title_source, title_seed, total_cost, archived_at, model, effort,
+              fork_status, fork_error
+       FROM conversations
+       WHERE claude_session_id = ?`,
+    )
+    .get(claudeSessionId) as Record<string, unknown> | undefined;
+  return row ? rowToConversation(row) : null;
+}
+
 export function listArchivedConversations(): Conversation[] {
   const db = getDatabase();
   const rows = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at, session_file, claude_session_id, title,
+              created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error
        FROM conversations
@@ -207,7 +219,7 @@ export function createConversation(opts: {
   const conv = db
     .prepare(
       `SELECT id, name, tmux_session, status, cwd, issue_id,
-              created_at, ended_at, last_attached_at, session_file, claude_session_id, title,
+              created_at, ended_at, last_attached_at, claude_session_id, title,
               title_source, title_seed, total_cost, archived_at, model, effort,
               fork_status, fork_error
        FROM conversations WHERE id = ?`,
@@ -324,8 +336,8 @@ export function clearStuckForks(): number {
  */
 export function canReplaceTitle(conv: Conversation): boolean {
   if (conv.titleSource === 'manual') return false;
-  if (conv.titleSource === 'auto') return true;
-  // If AI already set it, don't replace again
+  // Allow AI title generation for default (instant-start) and auto (message at creation) titles
+  if (conv.titleSource === 'default' || conv.titleSource === 'auto') return true;
   return false;
 }
 

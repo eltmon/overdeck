@@ -78,7 +78,7 @@ export interface AgentSpawnerShape {
   /**
    * Start a planning agent for an issue.
    *
-   * Creates .planning directory, writes PLANNING_PROMPT.md, sets tmux options
+   * Creates the workspace planning artifacts, writes the planning prompt, and sets tmux options
    * (remain-on-exit on, destroy-unattached off), and spawns the planning session.
    */
   readonly startPlanning: (
@@ -200,16 +200,6 @@ export const AgentSpawnerLive = Layer.effect(
           if (!existsSync(workspacePath)) {
             throw new WorkspaceNotFound({ id: issueId });
           }
-
-          // Create .planning directory if it doesn't exist
-          const { promises: fsp } = await import('node:fs');
-          const planningDir = join(workspacePath, '.planning');
-          await fsp.mkdir(planningDir, { recursive: true });
-
-          // Write PLANNING_PROMPT.md
-          const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
-          const { writeFile } = fsp;
-          await writeFile(planningPromptPath, opts.issue.description ?? '', 'utf-8');
 
           // Delegate to spawn-planning-session
           const sessionName = opts.sessionName ?? `planning-${issueId.toLowerCase()}`;

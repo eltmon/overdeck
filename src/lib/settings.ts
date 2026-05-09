@@ -4,11 +4,12 @@ import { SETTINGS_FILE } from './paths.js';
 // Model identifiers
 export type AnthropicModel = 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
 export type OpenAIModel = 'gpt-5.5' | 'gpt-5.5-mini' | 'gpt-5.5-nano' | 'gpt-5.5-pro' | 'gpt-5.4' | 'gpt-5.4-mini' | 'gpt-5.4-nano' | 'gpt-5.4-pro' | 'o3' | 'o4-mini' | 'gpt-5.2-codex' | 'o3-deep-research' | 'gpt-4o' | 'gpt-4o-mini';
-export type GoogleModel = 'gemini-3.1-pro-preview' | 'gemini-3-flash' | 'gemini-3.1-flash-lite-preview' | 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
+export type GoogleModel = 'gemini-3.1-pro-preview' | 'gemini-3.1-flash-lite-preview' | 'gemini-3-pro-preview' | 'gemini-3-flash-preview' | 'gemini-2.5-pro' | 'gemini-2.5-flash';
 export type KimiModel = 'kimi-k2.6' | 'kimi-k2.5' | 'K2.6-code-preview' | 'kimi-k2';
 export type MiniMaxModel = 'minimax-m2.7' | 'minimax-m2.7-highspeed';
 export type ZAIModel = 'glm-5.1' | 'glm-4.7' | 'glm-4.7-flash';
-export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel;
+export type MimoModel = 'mimo-v2.5-pro' | 'mimo-v2.5';
+export type ModelId = AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel;
 
 // Task complexity levels
 export type ComplexityLevel = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
@@ -38,6 +39,7 @@ export interface ApiKeysConfig {
   google?: string;
   kimi?: string;
   minimax?: string;
+  mimo?: string;
 }
 
 // Complete settings structure
@@ -127,7 +129,9 @@ export function loadSettings(): SettingsConfig {
   if (process.env.OPENAI_API_KEY) envApiKeys.openai = process.env.OPENAI_API_KEY;
   if (process.env.GOOGLE_API_KEY) envApiKeys.google = process.env.GOOGLE_API_KEY;
   if (process.env.MINIMAX_API_KEY) envApiKeys.minimax = process.env.MINIMAX_API_KEY;
-  if (process.env.KIMI_API_KEY) envApiKeys.kimi = process.env.KIMI_API_KEY;
+  if (process.env.KIMI_CODING_API_KEY) envApiKeys.kimi = process.env.KIMI_CODING_API_KEY;
+  else if (process.env.KIMI_API_KEY) envApiKeys.kimi = process.env.KIMI_API_KEY;
+  if (process.env.MIMO_API_KEY) envApiKeys.mimo = process.env.MIMO_API_KEY;
 
   // Merge env vars as fallback (settings.json takes precedence)
   settings.api_keys = {
@@ -203,6 +207,7 @@ export function getAvailableModels(settings: SettingsConfig): {
   google: GoogleModel[];
   kimi: KimiModel[];
   minimax: MiniMaxModel[];
+  mimo: MimoModel[];
 } {
   const anthropicModels: AnthropicModel[] = [
     'claude-opus-4-6',
@@ -215,7 +220,7 @@ export function getAvailableModels(settings: SettingsConfig): {
     : [];
 
   const googleModels: GoogleModel[] = settings.api_keys.google
-    ? ['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview']
+    ? ['gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview']
     : [];
 
   const kimiModels: KimiModel[] = settings.api_keys.kimi
@@ -226,12 +231,17 @@ export function getAvailableModels(settings: SettingsConfig): {
     ? ['minimax-m2.7', 'minimax-m2.7-highspeed']
     : [];
 
+  const mimoModels: MimoModel[] = settings.api_keys.mimo
+    ? ['mimo-v2.5-pro', 'mimo-v2.5']
+    : [];
+
   return {
     anthropic: anthropicModels,
     openai: openaiModels,
     google: googleModels,
     kimi: kimiModels,
     minimax: minimaxModels,
+    mimo: mimoModels,
   };
 }
 

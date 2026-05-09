@@ -22,15 +22,21 @@ import {
   memo,
 } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus } from 'lucide-react';
-import type { WorkLogEntry } from './chat-types';
+import { ChevronDown, ChevronRight, Circle, Bot, GitBranchPlus, RotateCcw, XCircle, Scissors, ClipboardList, ShieldCheck, Wrench } from 'lucide-react';
+import type { WorkingPhase } from '../../lib/workingPhase';
+import type { CompactBoundary, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
+import type { FailedMessage } from './ConversationPanel';
 import { ChatMarkdown } from './ChatMarkdown';
+import { ChangedFilesTree } from './ChangedFilesTree';
+import { DiffStatLabel } from './DiffStatLabel';
+import { summarizeTurnDiffStats } from '../../lib/turnDiffTree';
+import { PlanCard } from './PlanCard';
 import {
   deriveTimelineEntries,
   deriveMessagesTimelineRows,
   estimateMessagesTimelineRowHeight,
   type MessagesTimelineRow,
-} from './session-logic';
+} from './MessagesTimeline.logic';
 import type { ChatMessage } from './chat-types';
 import type { RoundVerdict } from '../CommandDeck/RoundCard';
 import styles from '../CommandDeck/styles/command-deck.module.css';
@@ -85,6 +91,20 @@ export interface MessagesTimelineProps {
   workLog: WorkLogEntry[];
   streaming: boolean;
   roundMarkers?: ReadonlyArray<RoundMarker>;
+  failedMessages?: FailedMessage[];
+  onRetryFailed?: (failedId: string, text: string) => void;
+  onDiscardFailed?: (failedId: string) => void;
+  proposedPlan?: ProposedPlan;
+  compactBoundaries?: CompactBoundary[];
+  compacting?: boolean;
+  conversationName?: string;
+  turnDiffSummaryByAssistantMessageId?: Map<string, TurnDiffSummary>;
+  onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
+  resolvedTheme?: 'light' | 'dark';
+  /** When true, pure tool-call work groups are collapsed to a single muted line. */
+  hideToolCalls?: boolean;
+  /** Current working phase — drives the working indicator icon. */
+  workingPhase?: WorkingPhase;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -94,6 +114,18 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   workLog,
   streaming,
   roundMarkers,
+  failedMessages,
+  onRetryFailed,
+  onDiscardFailed,
+  proposedPlan,
+  compactBoundaries,
+  compacting,
+  conversationName,
+  turnDiffSummaryByAssistantMessageId,
+  onOpenTurnDiff,
+  resolvedTheme,
+  hideToolCalls = false,
+  workingPhase,
 }: MessagesTimelineProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -104,7 +136,70 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   const timelineEntries = useMemo(() => deriveTimelineEntries(messages, workLog), [messages, workLog]);
-  const rows = useMemo(() => deriveMessagesTimelineRows(timelineEntries, streaming), [timelineEntries, streaming]);
+  const baseRows = useMemo(() => deriveMessagesTimelineRows(timelineEntries, streaming), [timelineEntries, streaming]);
+  const rows = useMemo(() => {
+    let result = baseRows;
+
+    // Inject compact boundary dividers by timestamp
+    if (compactBoundaries && compactBoundaries.length > 0) {
+      const copy = [...result];
+      for (const boundary of compactBoundaries) {
+        const boundaryRow: MessagesTimelineRow = {
+          kind: 'compact-boundary',
+          id: `compact-${boundary.id}`,
+          createdAt: boundary.timestamp,
+          boundary,
+        };
+        const idx = copy.findIndex(r => r.createdAt && r.createdAt > boundary.timestamp);
+        if (idx >= 0) {
+          copy.splice(idx, 0, boundaryRow);
+        } else {
+          copy.push(boundaryRow);
+        }
+      }
+      result = copy;
+    }
+
+    // Inject proposed plan
+    if (proposedPlan) {
+      const planRow: MessagesTimelineRow = {
+        kind: 'proposed-plan',
+        id: `plan-${proposedPlan.id}`,
+        createdAt: proposedPlan.createdAt,
+        plan: proposedPlan,
+      };
+      if (proposedPlan.status === 'pending') {
+        const workingIdx = result.findIndex(r => r.kind === 'working');
+        if (workingIdx >= 0) {
+          const copy = [...result];
+          copy.splice(workingIdx, 0, planRow);
+          result = copy;
+        } else {
+          result = [...result, planRow];
+        }
+      } else {
+        const copy = [...result];
+        const insertIdx = copy.findIndex(r => r.createdAt && r.createdAt > proposedPlan.createdAt);
+        if (insertIdx >= 0) {
+          copy.splice(insertIdx, 0, planRow);
+        } else {
+          copy.push(planRow);
+        }
+        result = copy;
+      }
+    }
+
+    // Inject compacting indicator at the end
+    if (compacting) {
+      result = [...result, {
+        kind: 'compacting' as const,
+        id: 'compacting-indicator',
+        createdAt: new Date().toISOString(),
+      }];
+    }
+
+    return result;
+  }, [baseRows, proposedPlan, compactBoundaries, compacting]);
 
   // Index round markers by the row they should follow. A single row can have
   // multiple markers (e.g. two consecutive rounds without any new messages
@@ -132,11 +227,17 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     getScrollElement: () => scrollContainerRef.current,
     getItemKey: (index) => `${widthKey}:${virtualRows[index]!.id}`,
     estimateSize: (index) =>
-      estimateMessagesTimelineRowHeight(virtualRows[index]!, width),
+      estimateMessagesTimelineRowHeight(virtualRows[index]!, { timelineWidth: width, hideToolCalls }),
     measureElement: (el) => el.getBoundingClientRect().height,
     useAnimationFrameWithResizeObserver: true,
     overscan: 8,
   });
+
+  // Remeasure rows when hideToolCalls changes so the virtualizer
+  // updates heights for collapsed / expanded work groups.
+  useEffect(() => {
+    rowVirtualizer.measure();
+  }, [rowVirtualizer, hideToolCalls]);
 
   // Observe container width for height estimation accuracy
   useLayoutEffect(() => {
@@ -223,9 +324,19 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                     left: 0,
                     width: '100%',
                     transform: `translateY(${virtualItem.start}px)`,
+                    background: 'var(--background)',
                   }}
                 >
-                  <TimelineRowRenderer row={row} isStreaming={streaming} />
+                  <TimelineRowRenderer
+                    row={row}
+                    isStreaming={streaming}
+                    conversationName={conversationName}
+                    turnDiffSummary={row.kind === 'message' && row.message.role === 'assistant' ? turnDiffSummaryByAssistantMessageId?.get(row.message.id) : undefined}
+                    onOpenTurnDiff={onOpenTurnDiff}
+                    resolvedTheme={resolvedTheme}
+                    hideToolCalls={hideToolCalls}
+                    workingPhase={workingPhase}
+                  />
                   {markersForRow?.map((marker) => (
                     <RoundDivider
                       key={`marker-${marker.round}-${marker.label ?? ''}`}
@@ -243,7 +354,16 @@ export const MessagesTimeline = memo(function MessagesTimeline({
           const markersForRow = markersByAfterId.get(row.id);
           return (
             <Fragment key={row.id}>
-              <TimelineRowRenderer row={row} isStreaming={streaming} />
+              <TimelineRowRenderer
+                row={row}
+                isStreaming={streaming}
+                conversationName={conversationName}
+                turnDiffSummary={row.kind === 'message' && row.message.role === 'assistant' ? turnDiffSummaryByAssistantMessageId?.get(row.message.id) : undefined}
+                onOpenTurnDiff={onOpenTurnDiff}
+                resolvedTheme={resolvedTheme}
+                hideToolCalls={hideToolCalls}
+                workingPhase={workingPhase}
+              />
               {markersForRow?.map((marker) => (
                 <RoundDivider
                   key={`marker-${marker.round}-${marker.label ?? ''}`}
@@ -255,6 +375,38 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         })}
       </div>
     </div>
+
+    {/* Failed message outbox — shows messages that failed to send with Retry/Discard */}
+    {failedMessages && failedMessages.length > 0 && (
+      <div className={styles.failedOutbox}>
+        {failedMessages.map((fm) => (
+          <div key={fm.id} className={styles.failedMessage}>
+            <div className={styles.failedMessageBubble}>
+              <ChatMarkdown text={fm.text} />
+            </div>
+            <div className={styles.failedMessageActions}>
+              <span className={styles.failedMessageLabel}>Failed to send</span>
+              <button
+                className={styles.failedMessageBtn}
+                onClick={() => onRetryFailed?.(fm.id, fm.text)}
+                title="Retry sending"
+              >
+                <RotateCcw size={12} />
+                Retry
+              </button>
+              <button
+                className={styles.failedMessageBtn}
+                onClick={() => onDiscardFailed?.(fm.id)}
+                title="Discard message"
+              >
+                <XCircle size={12} />
+                Discard
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
 
     {/* Scroll-to-bottom button — appears when user has scrolled up */}
     {showScrollToBottom && (
@@ -294,14 +446,32 @@ export const MessagesTimeline = memo(function MessagesTimeline({
 interface RowProps {
   row: MessagesTimelineRow;
   isStreaming: boolean;
+  conversationName?: string;
+  turnDiffSummary?: TurnDiffSummary;
+  onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
+  resolvedTheme?: 'light' | 'dark';
+  hideToolCalls?: boolean;
+  workingPhase?: WorkingPhase;
 }
 
-const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming }: RowProps) {
+const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming, conversationName, turnDiffSummary, onOpenTurnDiff, resolvedTheme, hideToolCalls, workingPhase }: RowProps) {
   if (row.kind === 'working') {
-    return <WorkingIndicator startedAt={row.createdAt} />;
+    return <WorkingIndicator startedAt={row.createdAt} phase={workingPhase} />;
   }
   if (row.kind === 'work') {
-    return <WorkLogGroup entries={row.groupedEntries} />;
+    return <WorkLogGroup entries={row.groupedEntries} hideToolCalls={hideToolCalls} />;
+  }
+  if (row.kind === 'proposed-plan') {
+    return <PlanCard plan={row.plan} conversationName={conversationName ?? ''} />;
+  }
+  if (row.kind === 'compact-boundary') {
+    return <CompactBoundaryDivider boundary={row.boundary} />;
+  }
+  if (row.kind === 'compacting') {
+    return <CompactingIndicator />;
+  }
+  if (row.message.role === 'system') {
+    return <SessionPermissionsRow message={row.message} />;
   }
   if (row.message.role === 'user') {
     return <UserMessageRow message={row.message} />;
@@ -311,6 +481,9 @@ const TimelineRowRenderer = memo(function TimelineRowRenderer({ row, isStreaming
       message={row.message}
       durationStart={row.durationStart}
       isStreaming={isStreaming}
+      turnDiffSummary={turnDiffSummary}
+      onOpenTurnDiff={onOpenTurnDiff}
+      resolvedTheme={resolvedTheme}
     />
   );
 });
@@ -322,9 +495,16 @@ function isSummaryForkMessage(text: string): boolean {
     text.includes('**Do not take any action.** This is context from a prior conversation fork');
 }
 
+function isReviewerContextMessage(text: string): boolean {
+  return text.startsWith('# Review Context\n');
+}
+
 function UserMessageRow({ message }: { message: ChatMessage }) {
   if (isSummaryForkMessage(message.text)) {
     return <ContextMessageBlock message={message} />;
+  }
+  if (isReviewerContextMessage(message.text)) {
+    return <ReviewerContextBlock message={message} />;
   }
 
   const isPending = message.id.startsWith('optimistic-');
@@ -335,11 +515,11 @@ function UserMessageRow({ message }: { message: ChatMessage }) {
         style={isPending ? { opacity: 0.6 } : undefined}
         title={isPending ? 'Pending — waiting for agent to process' : undefined}
       >
-        <p className={styles.userMessageText}>{message.text}</p>
+        <div className={styles.userMessageText}><ChatMarkdown text={message.text} /></div>
         <span className={styles.messageTimestamp}>
           {isPending ? (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-              <svg style={{ width: '10px', height: '10px', animation: 'spin 1s linear infinite', color: 'var(--mc-accent)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg style={{ width: '10px', height: '10px', animation: 'spin 1s linear infinite', color: 'var(--primary)' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 12a9 9 0 11-6.219-8.56" />
               </svg>
               Sending…
@@ -381,26 +561,97 @@ function ContextMessageBlock({ message }: { message: ChatMessage }) {
   );
 }
 
+function ReviewerContextBlock({ message }: { message: ChatMessage }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className={styles.contextMessageRow}>
+      <div className={styles.contextMessageBlock}>
+        <button
+          type="button"
+          className={styles.contextMessageToggle}
+          onClick={() => setExpanded((v) => !v)}
+        >
+          <ClipboardList size={14} className={styles.contextMessageIcon} />
+          <span className={styles.contextMessageLabel}>Review Context</span>
+          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </button>
+        {expanded && (
+          <div className={styles.contextMessageContent}>
+            <ChatMarkdown text={message.text} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Assistant message ────────────────────────────────────────────────────────
 
 function AssistantMessageRow({
   message,
   durationStart,
   isStreaming,
+  turnDiffSummary,
+  onOpenTurnDiff,
+  resolvedTheme,
 }: {
   message: ChatMessage;
   durationStart: string;
   isStreaming: boolean;
+  turnDiffSummary?: TurnDiffSummary;
+  onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
+  resolvedTheme?: 'light' | 'dark';
 }) {
   const duration = message.completedAt
     ? formatElapsed(durationStart, message.completedAt)
     : null;
+
+  const [allExpanded, setAllExpanded] = useState(false);
 
   return (
     <div className={styles.assistantMessageRow}>
       <Bot size={14} className={styles.assistantMessageAvatar} aria-hidden="true" />
       <div className={styles.assistantMessageContent}>
         <ChatMarkdown text={message.text} isStreaming={isStreaming && !message.completedAt} />
+        {turnDiffSummary && turnDiffSummary.files.length > 0 && (
+          <div className="mt-2 rounded-md border border-border/50 bg-muted/30 p-2">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-medium text-muted-foreground">
+                Changed files ({turnDiffSummary.files.length})
+                {' '}
+                <DiffStatLabel
+                  additions={summarizeTurnDiffStats(turnDiffSummary.files).additions}
+                  deletions={summarizeTurnDiffStats(turnDiffSummary.files).deletions}
+                  showParentheses
+                />
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  className="text-[10px] text-muted-foreground hover:text-foreground"
+                  onClick={() => setAllExpanded((v) => !v)}
+                >
+                  {allExpanded ? 'Collapse all' : 'Expand all'}
+                </button>
+                {onOpenTurnDiff && (
+                  <button
+                    className="text-[10px] text-primary hover:underline"
+                    onClick={() => onOpenTurnDiff(turnDiffSummary.turnId)}
+                  >
+                    View diff
+                  </button>
+                )}
+              </div>
+            </div>
+            <ChangedFilesTree
+              turnId={turnDiffSummary.turnId}
+              files={turnDiffSummary.files}
+              allDirectoriesExpanded={allExpanded}
+              resolvedTheme={resolvedTheme ?? 'dark'}
+              onOpenTurnDiff={onOpenTurnDiff ?? (() => {})}
+            />
+          </div>
+        )}
         <div className={styles.messageMetadata}>
           <span className={styles.messageTimestamp}>
             {formatTimestamp(message.createdAt)}
@@ -419,8 +670,35 @@ function AssistantMessageRow({
 
 // ─── Work log group ───────────────────────────────────────────────────────────
 
-function WorkLogGroup({ entries }: { entries: WorkLogEntry[] }) {
+function WorkLogGroup({ entries, hideToolCalls }: { entries: WorkLogEntry[]; hideToolCalls?: boolean }) {
   const [expanded, setExpanded] = useState(false);
+
+  const onlyToolEntries = entries.every((entry) => entry.tone === 'tool' || entry.tone === 'error');
+  if (hideToolCalls && onlyToolEntries && !expanded) {
+    const n = entries.length;
+    return (
+      <button
+        type="button"
+        className={styles.workLogGroup}
+        onClick={() => setExpanded(true)}
+        title={`Show ${n} tool ${n === 1 ? 'call' : 'calls'}`}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          cursor: 'pointer',
+          opacity: 0.5,
+          fontSize: 11,
+          transition: 'opacity 0.15s',
+        }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.85'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.5'; }}
+      >
+        <Wrench size={12} />
+        <span>{n} tool {n === 1 ? 'call was' : 'calls were'} made</span>
+      </button>
+    );
+  }
 
   const visible = expanded ? entries : entries.slice(0, MAX_VISIBLE_WORK_LOG_ENTRIES);
   const hasOverflow = entries.length > MAX_VISIBLE_WORK_LOG_ENTRIES;
@@ -428,7 +706,7 @@ function WorkLogGroup({ entries }: { entries: WorkLogEntry[] }) {
   return (
     <div className={styles.workLogGroup}>
       {visible.map((entry) => (
-        <WorkLogEntryRow key={entry.id} entry={entry} />
+        <SimpleWorkEntryRow key={entry.id} entry={entry} />
       ))}
       {hasOverflow && !expanded && (
         <button
@@ -454,24 +732,26 @@ function WorkLogGroup({ entries }: { entries: WorkLogEntry[] }) {
 
 const TERMINAL_TOOLS = new Set(['Bash', 'bash', 'terminal', 'shell']);
 
-function WorkLogEntryRow({ entry }: { entry: WorkLogEntry }) {
+function SimpleWorkEntryRow({ entry }: { entry: WorkLogEntry }) {
   const [showResult, setShowResult] = useState(false);
   const toneColor: Record<WorkLogEntry['tone'], string> = {
-    thinking: 'var(--mc-text-secondary)',
-    tool: 'var(--mc-accent)',
-    info: 'var(--mc-success)',
-    error: 'var(--mc-error)',
+    thinking: 'var(--muted-foreground)',
+    tool: 'var(--primary)',
+    info: 'var(--success)',
+    error: 'var(--destructive)',
   };
 
   const isTerminal = TERMINAL_TOOLS.has(entry.toolTitle ?? entry.label);
+  const isThinking = entry.tone === 'thinking';
   const hasResult = !!entry.result;
+  const isExpandable = hasResult || (isThinking && !!entry.detail);
 
   return (
     <div>
       <div
         className={styles.workLogEntry}
-        style={hasResult ? { cursor: 'pointer' } : undefined}
-        onClick={hasResult ? () => setShowResult(prev => !prev) : undefined}
+        style={isExpandable ? { cursor: 'pointer' } : undefined}
+        onClick={isExpandable ? () => setShowResult(prev => !prev) : undefined}
       >
         {isTerminal ? (
           <span
@@ -498,7 +778,7 @@ function WorkLogEntryRow({ entry }: { entry: WorkLogEntry }) {
             {entry.detail.length > 80 ? '…' : ''}
           </span>
         )}
-        {hasResult && (
+        {isExpandable && (
           <ChevronRight
             size={10}
             style={{
@@ -506,19 +786,23 @@ function WorkLogEntryRow({ entry }: { entry: WorkLogEntry }) {
               marginLeft: 'auto',
               transition: 'transform 0.15s',
               transform: showResult ? 'rotate(90deg)' : 'none',
-              color: 'var(--mc-text-muted)',
+              color: 'var(--muted-foreground)',
             }}
           />
         )}
       </div>
-      {showResult && entry.result && (
-        isTerminal ? (
+      {showResult && (
+        isTerminal && entry.result ? (
           <pre className={styles.workLogResult}>{entry.result}</pre>
-        ) : (
+        ) : isThinking && entry.detail ? (
+          <div className={styles.workLogResult}>
+            <ChatMarkdown text={entry.detail} />
+          </div>
+        ) : entry.result ? (
           <div className={styles.workLogResult}>
             <ChatMarkdown text={entry.result} />
           </div>
-        )
+        ) : null
       )}
     </div>
   );
@@ -526,7 +810,7 @@ function WorkLogEntryRow({ entry }: { entry: WorkLogEntry }) {
 
 // ─── Working indicator ────────────────────────────────────────────────────────
 
-function WorkingIndicator({ startedAt }: { startedAt: string | null }) {
+function WorkingIndicator({ startedAt, phase }: { startedAt: string | null; phase?: WorkingPhase }) {
   const [elapsed, setElapsed] = useState(0);
   const startMs = startedAt ? new Date(startedAt).getTime() : Date.now();
 
@@ -537,13 +821,19 @@ function WorkingIndicator({ startedAt }: { startedAt: string | null }) {
     return () => clearInterval(interval);
   }, [startMs]);
 
+  const isToolPhase = phase === 'tool';
+
   return (
     <div className={styles.workingIndicator}>
-      <span className={styles.workingDots}>
-        <span />
-        <span />
-        <span />
-      </span>
+      {isToolPhase ? (
+        <Wrench size={14} className={styles.pulseIcon} aria-label="Using tool" />
+      ) : (
+        <span className={styles.workingDots}>
+          <span />
+          <span />
+          <span />
+        </span>
+      )}
       <span className={styles.workingLabel}>
         Working{elapsed > 0 ? ` for ${elapsed}s` : '…'}
       </span>
@@ -554,10 +844,10 @@ function WorkingIndicator({ startedAt }: { startedAt: string | null }) {
 // ─── Round divider ────────────────────────────────────────────────────────────
 
 const ROUND_VERDICT_COLOR: Record<RoundVerdict, string> = {
-  pending: 'var(--mc-text-muted, var(--muted-foreground))',
-  passed: 'var(--mc-success, var(--success))',
-  failed: 'var(--mc-error, var(--destructive))',
-  running: 'var(--mc-accent, var(--primary))',
+  pending: 'var(--muted-foreground)',
+  passed: 'var(--success)',
+  failed: 'var(--destructive)',
+  running: 'var(--primary)',
 };
 
 const ROUND_VERDICT_LABEL: Record<RoundVerdict, string> = {
@@ -589,7 +879,7 @@ function RoundDivider({ marker }: { marker: RoundMarker }) {
         style={{
           flex: 1,
           height: 1,
-          background: 'var(--mc-border, var(--border))',
+          background: 'var(--border)',
         }}
       />
       <span
@@ -613,9 +903,56 @@ function RoundDivider({ marker }: { marker: RoundMarker }) {
         style={{
           flex: 1,
           height: 1,
-          background: 'var(--mc-border, var(--border))',
+          background: 'var(--border)',
         }}
       />
+    </div>
+  );
+}
+
+// ─── Session permissions banner ──────────────────────────────────────────────
+
+function SessionPermissionsRow({ message }: { message: ChatMessage }) {
+  return (
+    <div className={styles.sessionPermissionsRow}>
+      <ShieldCheck size={11} className={styles.sessionPermissionsIcon} />
+      <span className={styles.sessionPermissionsLabel}>Permissions:</span>
+      <span className={styles.sessionPermissionsTools}>{message.text}</span>
+    </div>
+  );
+}
+
+// ─── Compact boundary divider ────────────────────────────────────────────────
+
+function CompactBoundaryDivider({ boundary }: { boundary: CompactBoundary }) {
+  const label = boundary.preTokens
+    ? `Compacted (${Math.round(boundary.preTokens / 1000)}k tokens)`
+    : 'Conversation compacted';
+  const detail = [
+    boundary.trigger && boundary.trigger !== 'panopticon-native' ? boundary.trigger : null,
+    boundary.model,
+  ].filter(Boolean).join(' · ');
+
+  return (
+    <div className={styles.compactBoundaryDivider}>
+      <div className={styles.compactBoundaryLine} />
+      <div className={styles.compactBoundaryLabel}>
+        <Scissors size={12} />
+        <span>{label}</span>
+        {detail && <span className={styles.compactBoundaryDetail}>{detail}</span>}
+      </div>
+      <div className={styles.compactBoundaryLine} />
+    </div>
+  );
+}
+
+// ─── Compacting indicator ────────────────────────────────────────────────────
+
+function CompactingIndicator() {
+  return (
+    <div className={styles.compactingIndicator}>
+      <Scissors size={14} className={styles.compactingIcon} />
+      <span>Compacting conversation...</span>
     </div>
   );
 }

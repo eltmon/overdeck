@@ -57,7 +57,7 @@ function BreakdownTable({
       data-testid={testid}
       style={{
         background: 'var(--card)',
-        border: '1px solid var(--mc-border, var(--border))',
+        border: '1px solid var(--border)',
         borderRadius: 8,
         padding: 12,
         display: 'flex',
@@ -72,7 +72,7 @@ function BreakdownTable({
           justifyContent: 'space-between',
           fontSize: 12,
           fontWeight: 600,
-          color: 'var(--mc-text-muted, var(--muted-foreground))',
+          color: 'var(--muted-foreground)',
           textTransform: 'uppercase',
           letterSpacing: '0.04em',
         }}
@@ -85,7 +85,7 @@ function BreakdownTable({
       {rows.length === 0 ? (
         <div
           data-testid={`${testid}-empty`}
-          style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}
+          style={{ fontSize: 12, color: 'var(--muted-foreground)' }}
         >
           No data yet.
         </div>
@@ -134,7 +134,7 @@ function BreakdownTable({
                     flex: '0 0 60px',
                     textAlign: 'right',
                     fontSize: 11,
-                    color: 'var(--mc-text-muted, var(--muted-foreground))',
+                    color: 'var(--muted-foreground)',
                     fontVariantNumeric: 'tabular-nums',
                   }}
                 >
@@ -157,7 +157,7 @@ export function CostsTab({ issueId }: CostsTabProps) {
     return (
       <div
         data-testid="costs-tab-loading"
-        style={{ padding: 16, fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}
+        style={{ padding: 16, fontSize: 12, color: 'var(--muted-foreground)' }}
       >
         Loading costs…
       </div>
@@ -198,14 +198,14 @@ export function CostsTab({ issueId }: CostsTabProps) {
           </div>
           <div
             data-testid="costs-stream-total"
-            style={{ fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}
+            style={{ fontSize: 11, color: 'var(--muted-foreground)' }}
           >
             Live stream: {fmtCost(stream.issueCost)} · {stream.issueEvents.length} event
             {stream.issueEvents.length === 1 ? '' : 's'}
             {stream.error ? ' · live updates temporarily unavailable' : ''}
           </div>
         </div>
-        <div style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+        <div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
           {fmtTokens(cost.totalTokens)} tokens · {cost.sessions.length} session
           {cost.sessions.length === 1 ? '' : 's'}
         </div>

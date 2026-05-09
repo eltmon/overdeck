@@ -6,7 +6,8 @@ export function normalizeReviewStatus(status: ReviewStatus): ReviewStatus {
     status.mergeStatus === 'merged' ||
     status.reviewStatus !== 'passed' ||
     (status.testStatus !== 'passed' && status.testStatus !== 'skipped') ||
-    (status.uatStatus !== undefined && status.uatStatus !== 'passed');
+    (status.uatStatus !== undefined && status.uatStatus !== 'passed') ||
+    ((status.blockerReasons?.length ?? 0) > 0);
 
   return {
     ...status,

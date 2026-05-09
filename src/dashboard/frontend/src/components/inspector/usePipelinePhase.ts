@@ -1,11 +1,13 @@
 import { useMemo, useRef, useCallback, useEffect, useState } from 'react';
 import type { Agent } from '../../types';
+import { getWorkSessionLabel, isAgentSessionActive, isAgentSessionAttachable } from '../../lib/swarmSlots';
 import type { ReviewStatus } from './types';
 import type { PipelinePhase, TerminalTab } from './TerminalTabs';
 
 export interface PipelinePhaseInput {
   issueId: string;
   agent?: Agent;
+  workAgents?: Agent[];
   reviewStatus?: ReviewStatus;
   /** The canonical project key used in specialist session names (e.g. "panopticon") */
   projectKey?: string;
@@ -31,10 +33,13 @@ export function derivePipelinePhase(
 ): PipelinePhaseResult {
   const { agent, reviewStatus, projectKey, issueId } = input;
 
-  const isAlive = (s?: string) => s === 'healthy' || s === 'running' || s === 'starting';
+  const workAgents = input.workAgents?.length ? input.workAgents : (agent ? [agent] : []);
+  const primaryAgent = agent ?? workAgents[0];
+  const primaryWorkSession = primaryAgent?.id ?? null;
+  const liveWorkAgents = workAgents.filter(isAgentSessionAttachable);
+  const activeWorkSession = liveWorkAgents.find(isAgentSessionActive)?.id ?? primaryWorkSession;
 
   // Session name helpers
-  const workSession = agent?.id ?? null;
   const specialistSession = (role: string): string =>
     projectKey ? `specialist-${projectKey}-${issueId}-${role}` : `specialist-${role}`;
 
@@ -61,9 +66,9 @@ export function derivePipelinePhase(
     phase = 'merging';
     // Monorepo merges use the work agent for rebase (no merge-agent is spawned).
     // Polyrepo merges spawn a merge-agent (work agent is stopped by then).
-    // If the work agent is alive, it's handling the merge — stream it.
-    if (workSession && isAlive(agent?.status)) {
-      activeSession = workSession;
+    // If any work session is actively alive, it's handling the merge — stream it.
+    if (activeWorkSession && liveWorkAgents.some(isAgentSessionActive)) {
+      activeSession = activeWorkSession;
     } else {
       activeSession = deadSessions.has(mergeSession) ? null : mergeSession;
     }
@@ -82,39 +87,64 @@ export function derivePipelinePhase(
     } else {
       activeSession = null;
     }
-  } else if ((rs === 'failed' || rs === 'blocked') && isAlive(agent?.status)) {
+  } else if ((rs === 'failed' || rs === 'blocked') && activeWorkSession && liveWorkAgents.some(isAgentSessionActive)) {
     phase = 'review-feedback';
-    activeSession = workSession;
-  } else if (agent?.agentPhase === 'planning' && isAlive(agent?.status)) {
+    activeSession = activeWorkSession;
+  } else if (primaryAgent?.agentPhase === 'planning' && isAgentSessionActive(primaryAgent)) {
     phase = 'planning';
-    activeSession = workSession;
-  } else if (isAlive(agent?.status)) {
+    activeSession = primaryWorkSession;
+  } else if (activeWorkSession && liveWorkAgents.some(isAgentSessionActive)) {
     phase = 'working';
-    activeSession = workSession;
-  } else if (agent?.status === 'stopped' && agent?.agentPhase === 'review-response') {
-    // Agent called pan done and is on standby for UAT tweaks / review feedback.
-    phase = 'standby';
-    activeSession = workSession;
+    activeSession = activeWorkSession;
   } else {
-    phase = 'planning';
-    activeSession = null; // planning session only shown if it exists
+    const standbyAgent = liveWorkAgents.find(
+      (workAgent) => workAgent.status === 'stopped' && workAgent.agentPhase === 'review-response',
+    );
+    if (standbyAgent) {
+      phase = 'standby';
+      activeSession = standbyAgent.id;
+    } else {
+      phase = 'planning';
+      activeSession = null; // planning session only shown if it exists
+    }
   }
 
   // Build available tabs — only include tabs that are relevant to the current state
   const tabs: TerminalTab[] = [];
 
-  const isPlanningAgent = agent?.agentPhase === 'planning';
+  const isPlanningAgent = primaryAgent?.agentPhase === 'planning';
 
-  // Work/Planning tab: always show if agent exists
-  if (workSession) {
+  if (isPlanningAgent && primaryWorkSession) {
     tabs.push({
-      id: isPlanningAgent ? 'planning' : 'working',
-      label: isPlanningAgent ? 'Planning' : 'Work',
-      sessionName: workSession,
-      isActive: isPlanningAgent ? phase === 'planning' : phase === 'working' || phase === 'review-feedback' || phase === 'standby',
-      disabled: deadSessions.has(workSession),
-      isRunning: isPlanningAgent ? phase === 'planning' : phase === 'working',
+      id: 'planning',
+      label: 'Planning',
+      sessionName: primaryWorkSession,
+      isActive: phase === 'planning',
+      disabled: deadSessions.has(primaryWorkSession),
+      isRunning: phase === 'planning',
     });
+  } else if (workAgents.length === 1 && primaryWorkSession) {
+    tabs.push({
+      id: 'working',
+      label: 'Work',
+      sessionName: primaryWorkSession,
+      isActive: phase === 'working' || phase === 'review-feedback' || phase === 'standby',
+      disabled: deadSessions.has(primaryWorkSession),
+      isRunning: phase === 'working',
+    });
+  } else {
+    for (const [index, workAgent] of workAgents.entries()) {
+      tabs.push({
+        id: index === 0 ? 'working' : `working-${workAgent.id}`,
+        label: getWorkSessionLabel(workAgent, index),
+        sessionName: workAgent.id,
+        isActive:
+          (phase === 'working' || phase === 'review-feedback' || phase === 'standby') &&
+          activeSession === workAgent.id,
+        disabled: deadSessions.has(workAgent.id),
+        isRunning: isAgentSessionActive(workAgent),
+      });
+    }
   }
 
   // Review tab: show once review has started (not just pending)
@@ -161,9 +191,9 @@ export function derivePipelinePhase(
 
   // Merge tab: show once merge has been queued or beyond
   if (ms && ms !== 'pending') {
-    // Monorepo merges stream the work agent (it handles rebase); polyrepo uses merge-agent.
-    const effectiveMergeSession = (workSession && isAlive(agent?.status))
-      ? workSession
+    // Monorepo merges stream the active work session (it handles rebase); polyrepo uses merge-agent.
+    const effectiveMergeSession = (activeWorkSession && liveWorkAgents.some(isAgentSessionActive))
+      ? activeWorkSession
       : mergeSession;
     tabs.push({
       id: 'merging',
@@ -203,12 +233,19 @@ export function usePipelinePhase(input: PipelinePhaseInput): PipelinePhaseResult
   const cachedSessionNamesRef = useRef<string[] | undefined>(undefined);
   const liveCoordinator = input.reviewStatus?.reviewCoordinatorSessionName;
   const liveNames = input.reviewStatus?.reviewSessionNames;
-  if (liveCoordinator) {
-    cachedCoordinatorSessionRef.current = liveCoordinator;
-  }
-  if (liveNames && liveNames.length > 0) {
-    cachedSessionNamesRef.current = liveNames;
-  }
+
+  useEffect(() => {
+    if (liveCoordinator) {
+      cachedCoordinatorSessionRef.current = liveCoordinator;
+    }
+  }, [liveCoordinator]);
+
+  useEffect(() => {
+    if (liveNames && liveNames.length > 0) {
+      cachedSessionNamesRef.current = liveNames;
+    }
+  }, [liveNames]);
+
   const effectiveInput = useMemo(() => {
     if (!input.reviewStatus) return input;
     const reviewStatus = { ...input.reviewStatus };
@@ -235,11 +272,22 @@ export function usePipelinePhase(input: PipelinePhaseInput): PipelinePhaseResult
   );
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const workAgentKey = (effectiveInput.workAgents ?? [])
+    .map((workAgent) => `${workAgent.id}:${workAgent.status}:${workAgent.agentPhase ?? ''}`)
+    .join('|');
+
   const immediateResult = useMemo(
     () => derivePipelinePhase(effectiveInput, deadSessions),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- input.agent narrowed to id+status;
-    // the full object reference changes on every parent render, which would reset the 1s debounce timer
-    [effectiveInput.agent?.id, effectiveInput.agent?.status, effectiveInput.reviewStatus, effectiveInput.projectKey, effectiveInput.issueId, deadSessions],
+    [
+      effectiveInput.agent?.id,
+      effectiveInput.agent?.status,
+      effectiveInput.agent?.agentPhase,
+      workAgentKey,
+      effectiveInput.reviewStatus,
+      effectiveInput.projectKey,
+      effectiveInput.issueId,
+      deadSessions,
+    ],
   );
 
   useEffect(() => {

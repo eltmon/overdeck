@@ -20,12 +20,33 @@ vi.mock('react-resizable-panels', () => ({
 }));
 
 vi.mock('../InspectorPanel', () => ({
-  InspectorPanel: () => <div data-testid="inspector-panel" />,
+  InspectorPanel: ({
+    agent,
+    onOpenTerminal,
+  }: {
+    agent?: { id: string };
+    onOpenTerminal?: (sessionName?: string) => void;
+  }) => (
+    <div data-testid="inspector-panel">
+      {agent && onOpenTerminal && (
+        <button
+          data-testid="mock-attach-input-terminal"
+          onClick={() => onOpenTerminal(agent.id)}
+        >
+          Attach terminal
+        </button>
+      )}
+    </div>
+  ),
 }));
 
 vi.mock('../TerminalPanel', () => ({
-  TerminalPanel: ({ sessionName }: { sessionName?: string; agent?: unknown }) => (
-    <div data-testid="terminal-panel" data-session={sessionName ?? '__default__'} />
+  TerminalPanel: ({ sessionName, agent }: { sessionName?: string; agent?: { id?: string } }) => (
+    <div
+      data-testid="terminal-panel"
+      data-session={sessionName ?? '__default__'}
+      data-agent-id={agent?.id ?? '__none__'}
+    />
   ),
 }));
 
@@ -112,12 +133,13 @@ function renderLayout(
   agent: Agent,
   fetchImpl: typeof global.fetch = makeFetch(),
   issueId = 'PAN-509',
+  workAgents: Agent[] = [],
 ) {
   global.fetch = fetchImpl;
   const client = makeQueryClient();
   return render(
     <QueryClientProvider client={client}>
-      <DetailPanelLayout agent={agent} issueId={issueId} onClose={vi.fn()} />
+      <DetailPanelLayout agent={agent} workAgents={workAgents} issueId={issueId} onClose={vi.fn()} />
     </QueryClientProvider>,
   );
 }
@@ -177,6 +199,104 @@ describe('DetailPanelLayout', () => {
 
       // Not the work agent session
       expect(screen.getByTestId('terminal-panel')).not.toHaveAttribute('data-session', 'agent-123');
+    });
+  });
+
+  describe('selected session agent metadata', () => {
+    it('passes the work agent matching the selected session into TerminalPanel', async () => {
+      mockPipelineResult = {
+        phase: 'working',
+        activeSession: 'agent-pan-509-2',
+        availableTerminals: [
+          {
+            id: 'working',
+            label: 'Slot 1',
+            sessionName: 'agent-pan-509-1',
+            isActive: false,
+            disabled: false,
+          } satisfies TerminalTab,
+          {
+            id: 'working-agent-pan-509-2',
+            label: 'Slot 2',
+            sessionName: 'agent-pan-509-2',
+            isActive: true,
+            disabled: false,
+          } satisfies TerminalTab,
+        ],
+        markSessionDead: vi.fn(),
+      };
+
+      renderLayout(
+        makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'healthy' }),
+        makeFetch(),
+        'PAN-509',
+        [
+          makeAgent({ id: 'agent-pan-509-1', issueId: 'PAN-509', status: 'healthy' }),
+          makeAgent({ id: 'agent-pan-509-2', issueId: 'PAN-509', status: 'healthy' }),
+        ],
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-panel')).toHaveAttribute('data-session', 'agent-pan-509-2');
+      });
+      expect(screen.getByTestId('terminal-panel')).toHaveAttribute('data-agent-id', 'agent-pan-509-2');
+    });
+  });
+
+  describe('awaiting-input terminal attach', () => {
+    it('opens and pins the terminal session that owns the inspector prompt', async () => {
+      const awaitingInputSession = 'agent-pan-509-awaiting-input';
+      const unrelatedSession = 'agent-pan-509-other';
+
+      localStorage.setItem(
+        'pan-panel-state-PAN-509',
+        JSON.stringify({ panelMode: 'inspector-only', inspectorDefaultSize: '35%' }),
+      );
+      localStorage.setItem('pan-terminal-pin-PAN-509', unrelatedSession);
+
+      const awaitingAgent = makeAgent({
+        id: awaitingInputSession,
+        issueId: 'PAN-509',
+        status: 'running',
+        hasPendingQuestion: true,
+        pendingQuestionPrompt: 'Do you want to proceed?',
+        pendingQuestionReason: 'tool_permission',
+      });
+      const unrelatedAgent = makeAgent({ id: unrelatedSession, issueId: 'PAN-509', status: 'running' });
+
+      mockPipelineResult = {
+        phase: 'working' as PipelinePhase,
+        activeSession: unrelatedSession,
+        availableTerminals: [
+          {
+            id: 'working-other',
+            label: 'Other',
+            sessionName: unrelatedSession,
+            isActive: true,
+            disabled: false,
+          } satisfies TerminalTab,
+          {
+            id: 'working-awaiting-input',
+            label: 'Awaiting input',
+            sessionName: awaitingInputSession,
+            isActive: false,
+            disabled: false,
+          } satisfies TerminalTab,
+        ],
+        markSessionDead: vi.fn(),
+      };
+
+      renderLayout(awaitingAgent, makeFetch(), 'PAN-509', [awaitingAgent, unrelatedAgent]);
+
+      expect(screen.queryByTestId('terminal-panel')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('mock-attach-input-terminal'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('terminal-panel')).toHaveAttribute('data-session', awaitingInputSession);
+      });
+      expect(screen.getByTestId('terminal-panel')).toHaveAttribute('data-agent-id', awaitingInputSession);
+      expect(mockSavePinState).toHaveBeenCalledWith('PAN-509', awaitingInputSession);
     });
   });
 

@@ -1,0 +1,1995 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-09T17:43:03Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
+    "updated": "2026-05-09T17:57:46.968Z"
+  },
+  "plan": {
+    "id": "pan-1048",
+    "title": "Unify agent type system: 5 enums → Role primitive with reactive Cloister",
+    "status": "proposed",
+    "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
+    "author": "agent:claude-opus-4-7",
+    "sequence": 3,
+    "created": "2026-05-09T17:43:03Z",
+    "updated": "2026-05-09T19:06:32.359Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
+        "label": "PAN-1048",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/blob/feature/pan-1048/.pan/prd.md",
+        "label": "PRD (workspace)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "refactor",
+      "agents",
+      "cloister",
+      "settings",
+      "config",
+      "contracts",
+      "type-system"
+    ],
+    "narratives": {
+      "Problem": "Panopticon has 5 overlapping enums (PanopticonAgentType, SpecialistType, LauncherAgentType, WorkTypeId, ActivitySource) that conflate agent identity, spawn modes, model routing, and logging attribution. Three naming conventions exist for the same concept; state.json carries three fields (type, agentPhase, phase) for the same value. The settings UI exposes 17 cards with 24 model overrides. Real bugs result (PAN-1044's Done button broke because the wrong fields were set).",
+      "Proposal": "Replace the 5 enums with a single Role primitive ('plan' | 'work' | 'review' | 'test' | 'ship'). A Run = (role, model, harness). Add a Workhorse Models indirection: 3 user-managed slots (expensive/mid/cheap) at the top of Settings; every per-role and per-sub-role picker accepts either a literal model id or a workhorse:<slot> reference. Plan and Review default to workhorse:expensive (planning errors cascade; review gates merge). Cloister becomes a reactive scheduler hooked into existing internal emitters (issue.* lifecycle events + agent.completed + work.completed + review.approved). Single-branch hard cut: no readRole() shim, no soft transition, in-flight agents killed on upgrade, config.overrides dropped silently."
+    },
+    "items": [
+      {
+        "id": "f1-role-config-schema",
+        "title": "Foundation: Role type, workhorses/roles config schema, resolveModel, derefWorkhorse",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1048",
+          "requiresInspection": true
+        },
+        "narrative": {
+          "Action": "Add the foundation everything else depends on. In src/lib/agents.ts: export `Role = 'plan' | 'work' | 'review' | 'test' | 'ship'`. In src/lib/config-yaml.ts: extend NormalizedConfig with optional `workhorses: { expensive, mid, cheap }` (each a literal model id) and `roles: Record<Role, RoleConfig>` where RoleConfig = `{ model: ModelRef, harness?: 'claude-code' | 'pi', sub?: Record<string, { model: ModelRef }> }` and `ModelRef = string` (literal model id OR `workhorse:<slot>`). Implement `derefWorkhorse(ref, config)` that returns a literal model id or throws. Implement `resolveModel(role, subRole?, config)` that walks role.sub[subRole].model || role.model || DEFAULT_MODEL_REFS[role] and dereferences. Validate at config-load time: every workhorse:<slot> reference must resolve, no chained references (workhorses.cheap: workhorse:mid is rejected with a precise field-pointer error like `config.yaml: workhorses.cheap cannot reference another workhorse`). Tests: round-trip parsing, every role resolves, unresolved refs throw with field path, chained refs throw, sub-role resolution overrides role-level, literal ids pass through unchanged. The schema is the primitive every other bead consumes — get the validation surface right here so downstream work doesn't have to guess."
+        },
+        "subItems": [
+          {
+            "id": "f1-role-config-schema.ac1",
+            "title": "`Role` type exported from src/lib/agents.ts with exactly the 5 values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f1-role-config-schema.ac2",
+            "title": "NormalizedConfig in src/lib/config-yaml.ts has `workhorses` and `roles` fields with the documented shape; both optional in TypeScript (defaults applied by F3)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f1-role-config-schema.ac3",
+            "title": "`derefWorkhorse(ref, config)` returns the literal model id when ref starts with `workhorse:`, returns ref unchanged otherwise, throws when slot is undefined or chained",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f1-role-config-schema.ac4",
+            "title": "`resolveModel(role, subRole?, config)` returns a literal model id, walking sub-role override → role override → DEFAULT_MODEL_REFS[role]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f1-role-config-schema.ac5",
+            "title": "Config-load-time validation rejects unresolved `workhorse:*` references with an error message naming the offending field (e.g., `roles.review.sub.security.model`)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f1-role-config-schema.ac6",
+            "title": "Chained workhorse references (e.g., `workhorses.cheap: workhorse:mid`) are rejected at parse with a clear error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f1-role-config-schema.ac7",
+            "title": "Vitest covers: 5 roles × literal/workhorse-ref resolution, sub-role override, chained-ref rejection, missing-slot rejection, config round-trip; all pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f2-agentstate-role-field",
+        "title": "Foundation: add `role` field to AgentState (additive, not yet required)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Extend `AgentState` interface in src/lib/agents.ts with `role?: Role`. Update `parseAgentState`/`saveAgentState` so reads return the field if present and writes include it when set. No callsite changes — `role` stays optional so existing writers can be migrated bead-by-bead in S1–S5 without breaking each other. M1 later flips role to required. Add a vitest case asserting round-trip serialization preserves `role`."
+        },
+        "subItems": [
+          {
+            "id": "f2-agentstate-role-field.ac1",
+            "title": "AgentState interface has `role?: Role` field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f2-agentstate-role-field.ac2",
+            "title": "Round-trip serialization preserves the `role` field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f2-agentstate-role-field.ac3",
+            "title": "Existing typecheck and tests pass with no behavior change for callers that don't set `role`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "f3-default-config-seed",
+        "title": "Foundation: seed default workhorses + roles when missing from config.yaml",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "When `loadYamlConfig()` finds no `workhorses` or `roles` section (fresh install OR existing user upgrading), apply defaults: workhorses = { expensive: 'claude-opus-4-7', mid: 'claude-sonnet-4-7', cheap: 'claude-haiku-4-5' }; roles = { plan: { model: 'workhorse:expensive' }, work: { model: 'workhorse:mid', sub: { inspect: { model: 'workhorse:cheap' }, 'inspect-deep': { model: 'workhorse:mid' } } }, review: { model: 'workhorse:expensive', sub: { security: { model: 'workhorse:expensive' }, correctness: { model: 'workhorse:mid' }, performance: { model: 'workhorse:mid' }, requirements: { model: 'workhorse:mid' } } }, test: { model: 'workhorse:mid' }, ship: { model: 'workhorse:mid' } }. Defaults are applied in-memory; the on-disk config.yaml is only written when the user edits a value via Settings (no surprise rewrites). Add a vitest covering: missing workhorses → seeded; missing roles → seeded; partial roles (only `work` set) → other roles seeded; user-defined values not overwritten."
+        },
+        "subItems": [
+          {
+            "id": "f3-default-config-seed.ac1",
+            "title": "Missing workhorses section → defaults applied in-memory (claude-opus-4-7 / claude-sonnet-4-7 / claude-haiku-4-5)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f3-default-config-seed.ac2",
+            "title": "Missing roles section → all 5 roles + sub-roles seeded with documented defaults (plan/review = workhorse:expensive; work/test/ship = workhorse:mid; inspect = workhorse:cheap)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f3-default-config-seed.ac3",
+            "title": "Partial user config (e.g. only `roles.work` set) preserves user values and seeds missing roles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "f3-default-config-seed.ac4",
+            "title": "config.yaml on disk is NOT rewritten by the seed; only Settings edits persist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "v1-convoy-agents-migration",
+        "title": "Migrate convoy review prompt templates to .claude/agents/code-review-*.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Each of src/lib/cloister/prompts/review/code-review-{security,correctness,performance,requirements}.prompt-template.md becomes a Claude Code agent definition at .claude/agents/code-review-<flavor>.md. Add proper frontmatter (`name`, `description`, `tools`, `model`) so they're invokable via the Agent tool. Keep the prompt body identical — content is already battle-tested. Do NOT delete the source prompt-template files yet (Cloister specialist machinery still reads them; deletion happens in C2). Add a smoke test that opens each new agent file and asserts the frontmatter shape parses."
+        },
+        "subItems": [
+          {
+            "id": "v1-convoy-agents-migration.ac1",
+            "title": "Files exist at .claude/agents/code-review-security.md, code-review-correctness.md, code-review-performance.md, code-review-requirements.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "v1-convoy-agents-migration.ac2",
+            "title": "Each file has `name`, `description`, `tools`, `model` frontmatter that parses as a valid Claude Code agent definition",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "v1-convoy-agents-migration.ac3",
+            "title": "Prompt body content matches the source prompt-template (modulo frontmatter); no functional drift",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "v1-convoy-agents-migration.ac4",
+            "title": "Source prompt-template files at src/lib/cloister/prompts/review/*.prompt-template.md are NOT deleted (still referenced by specialist machinery; deleted in C2)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "r1-role-plan-md",
+        "title": "Create roles/plan.md (migrated from .claude/agents/pan-planning-agent.md)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create `roles/plan.md` at the repo root. Migrate the body from .claude/agents/pan-planning-agent.md, preserving the planning instructions (vBRIEF format, beads decomposition, AskUserQuestion flow, pan plan-finalize). Frontmatter: `name: plan`, `description`, `model: sonnet` (acts as Claude-Code-side default; resolveModel('plan') is the real source of truth at spawn), `permissionMode`, `effort`, hooks. Do NOT delete the old pan-planning-agent.md — that happens in X1 once spawn paths migrate."
+        },
+        "subItems": [
+          {
+            "id": "r1-role-plan-md.ac1",
+            "title": "File exists at roles/plan.md with valid Claude Code agent frontmatter (name: plan)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "r1-role-plan-md.ac2",
+            "title": "Body covers planning workflow: read PRD, explore codebase, ask clarifying questions, write vBRIEF, run pan plan-finalize, stop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "r1-role-plan-md.ac3",
+            "title": "Old .claude/agents/pan-planning-agent.md NOT deleted (X1 handles deletion)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "r2-role-work-md-jidoka",
+        "title": "Create roles/work.md with two-tier Jidoka inspection (universal + deep-flagged)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1048",
+          "requiresInspection": true
+        },
+        "narrative": {
+          "Action": "Create `roles/work.md` at the repo root. Migrate the body from .claude/agents/pan-work-agent.md but DROP all references to phases (exploration / implementation / testing / documentation / review-response) — phases are gone. Fold inspect: after each bead's commit, the work agent runs a self-inspect (universal-gate, cheap workhorse, 'was the deed done?'); for beads tagged `metadata.requiresInspection: true`, run a deep-inspect (mid workhorse, 'was it done correctly?') as well. Both inspections are sub-runs invoked via the Claude Code Agent tool with subagent_type='inspect' and 'inspect-deep' respectively (these will be added as .claude/agents/inspect.md and .claude/agents/inspect-deep.md as part of this bead). Frontmatter: name: work. Document hooks (pre-tool, heartbeat, inspect-on-bead-close). Pin down: how does the work agent know which model to use for each inspect? Answer in role body: subagent_type alone determines model via resolveModel('work', 'inspect') / resolveModel('work', 'inspect-deep')."
+        },
+        "subItems": [
+          {
+            "id": "r2-role-work-md-jidoka.ac1",
+            "title": "File exists at roles/work.md (frontmatter: name: work) with Per-Bead Workflow section similar to current pan-work-agent.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "r2-role-work-md-jidoka.ac2",
+            "title": "All phase references (exploration/implementation/testing/documentation/review-response) removed; work is one undifferentiated mode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "r2-role-work-md-jidoka.ac3",
+            "title": "Document the universal-gate inspection: every bead, after commit, before claiming the next bead, run an inspect sub-run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "r2-role-work-md-jidoka.ac4",
+            "title": "Document the deep-inspect: only when `bead.metadata.requiresInspection === true`, run an additional deep-inspect sub-run with the mid workhorse",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "r2-role-work-md-jidoka.ac5",
+            "title": "Sub-agent definition files exist at .claude/agents/inspect.md and .claude/agents/inspect-deep.md with appropriate frontmatter and prompts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "r2-role-work-md-jidoka.ac6",
+            "title": "Old .claude/agents/pan-work-agent.md and .claude/agents/pan-inspect-agent.md NOT deleted (X1 handles deletion)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "r3-role-review-md-convoy",
+        "title": "Create roles/review.md (synthesis IS review) invoking convoy via Agent tool",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1048",
+          "requiresInspection": true
+        },
+        "narrative": {
+          "Action": "Create `roles/review.md` at the repo root. The review role IS the synthesis — there is no separate synthesis sub-agent. The review process: (1) read the PR diff and acceptance criteria, (2) spawn 4 convoy sub-runs in parallel via the Agent tool — `Agent({ subagent_type: 'code-review-security', prompt, description })`, same for correctness/performance/requirements (all 4 agent definitions exist from V1), (3) collect findings, (4) decide approve/request-changes, (5) post review comment + update issue state. Each sub-run's model resolves through resolveModel('review', '<flavor>'). Frontmatter: name: review. Document the human-merge invariant: review NEVER merges; it only approves and transitions state."
+        },
+        "subItems": [
+          {
+            "id": "r3-role-review-md-convoy.ac1",
+            "title": "File exists at roles/review.md (frontmatter: name: review) with synthesis logic in the body (no separate synthesis sub-agent)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "r3-role-review-md-convoy.ac2",
+            "title": "Body invokes convoy via 4 parallel Agent({ subagent_type: 'code-review-<flavor>' }) calls (security, correctness, performance, requirements)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "r3-role-review-md-convoy.ac3",
+            "title": "Documents the approve/request-changes decision flow: synthesize findings → decide → post comment → transition issue state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "r3-role-review-md-convoy.ac4",
+            "title": "Documents human-merge invariant: review NEVER merges; only approves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "r3-role-review-md-convoy.ac5",
+            "title": "Old .claude/agents/pan-review-agent.md NOT deleted (X1 handles deletion)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "r4-role-test-md-uat",
+        "title": "Create roles/test.md folding UAT (Playwright tools available)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create `roles/test.md`. Migrate body from .claude/agents/pan-test-agent.md and fold UAT: the test role has Playwright MCP tools available and runs browser-based verification when the issue requires it (signaled via continue.json or vBRIEF acceptance criteria mentioning UI/end-to-end). Frontmatter: name: test. Document Playwright isolation rule (each test session uses an isolated browser; never depends on another agent's session)."
+        },
+        "subItems": [
+          {
+            "id": "r4-role-test-md-uat.ac1",
+            "title": "File exists at roles/test.md (frontmatter: name: test) covering project test suite + browser-based UAT",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "r4-role-test-md-uat.ac2",
+            "title": "Documents Playwright isolation: isolated browser instance per session; no shared state with other agents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "r4-role-test-md-uat.ac3",
+            "title": "Old .claude/agents/pan-test-agent.md and pan-uat-agent.md NOT deleted (X1 handles deletion)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "r5-role-ship-md-human-merge",
+        "title": "Create roles/ship.md with explicit human-merge invariant",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1048",
+          "requiresInspection": true
+        },
+        "narrative": {
+          "Action": "Create `roles/ship.md`. Migrate body from .claude/agents/pan-merge-agent.md, but make the human-merge invariant explicit and enforced: ship NEVER calls any merge endpoint (no `gh pr merge`, no `/api/.../merge` POST). Ship's responsibilities: (1) rebase the feature branch onto main, (2) resolve conflicts, (3) re-run verification gate (typecheck/lint/test), (4) push the branch, (5) transition the issue to a 'ready-to-merge' state, (6) exit. The dashboard's existing Merge button is the only path to actual merge. requiresInspection=true because ship is a trust-gate surface — a regression that lets ship auto-merge would be hard to detect after the fact."
+        },
+        "subItems": [
+          {
+            "id": "r5-role-ship-md-human-merge.ac1",
+            "title": "File exists at roles/ship.md (frontmatter: name: ship) covering rebase/conflict-resolve/re-verify/push",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "r5-role-ship-md-human-merge.ac2",
+            "title": "Body explicitly states ship NEVER merges and lists banned commands: `gh pr merge`, any merge API POST, any `git merge` to main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "r5-role-ship-md-human-merge.ac3",
+            "title": "Body documents the issue-state transition ship makes (e.g., to a 'ready-to-merge' state) so the dashboard can render the Merge button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "r5-role-ship-md-human-merge.ac4",
+            "title": "Old .claude/agents/pan-merge-agent.md NOT deleted (X1 handles deletion)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s1-wire-plan-end-to-end",
+        "title": "Wire `plan` role end-to-end (replaces pan-planning-agent spawn)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1048",
+          "requiresInspection": true
+        },
+        "narrative": {
+          "Action": "Switch the planning spawn path to write `role: 'plan'` and use the new role file. This is the smallest end-to-end migration and sets the pattern S2-S5 follow. Touchpoints: (1) src/lib/planning/spawn-planning-session.ts ~lines 389/561/582: write `role: 'plan'` to state.json (no longer write type/agentPhase/phase). (2) Same file ~lines 437-445: resolve model from `resolveModel('plan', undefined, config)` instead of WorkTypeRouter('planning-agent'). (3) Build the launcher command with `--agent roles/plan.md` (read role.md from the repo root, not from .claude/agents/). (4) src/dashboard/frontend/src/components/AgentOutputPanel.tsx ~line 88: change planning detection to `agent?.role === 'plan'`. (5) src/dashboard/frontend/src/components/PlanDialog.tsx ~lines 94-104: fetch plan model from `roles.plan.model` via /api/settings instead of work-type overrides. (6) src/dashboard/server/read-model.ts ~lines 57-59 and 319-426: read `role` from state.json (no fallback to legacy fields — F2's role field is what's read). End-to-end smoke test: `pan plan PAN-XXX` spawns an agent, state.json shows `role: 'plan'`, dashboard shows planning dialog, `pan plan-finalize` works."
+        },
+        "subItems": [
+          {
+            "id": "s1-wire-plan-end-to-end.ac1",
+            "title": "spawn-planning-session.ts writes `role: 'plan'` to state.json and does NOT write type/agentPhase/phase",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s1-wire-plan-end-to-end.ac2",
+            "title": "Planning launcher command uses `--agent roles/plan.md` (file in repo root); model resolved via resolveModel('plan')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s1-wire-plan-end-to-end.ac3",
+            "title": "Dashboard AgentOutputPanel.tsx detects planning agents via `agent?.role === 'plan'`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s1-wire-plan-end-to-end.ac4",
+            "title": "PlanDialog.tsx fetches default plan model from `roles.plan.model` (not WorkTypeId('planning-agent'))",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s1-wire-plan-end-to-end.ac5",
+            "title": "read-model.ts reads `state.role` (no fallback to type/agentPhase/phase)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s1-wire-plan-end-to-end.ac6",
+            "title": "Smoke test: spawning a planning session against a test issue produces state.json with role: 'plan' and the planning dialog renders Done correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s1-wire-plan-end-to-end.ac7",
+            "title": "Existing planning-related tests updated and pass; no test references planning via type/agentPhase/phase",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s2-wire-work-end-to-end",
+        "title": "Wire `work` role end-to-end (replaces pan-work-agent spawn; drops phase/workType reads)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Switch the work-agent spawn path. Touchpoints: (1) src/lib/agents.ts ~line 1479 spawnAgent: accept `role: 'work'` in SpawnOptions, write `role: 'work'` to state.json, build launcher with `--agent roles/work.md`. (2) src/lib/agents.ts ~line 1247 determineModel: replace WorkTypeRouter call with resolveModel('work'). Drop the workType/phase/difficulty parameters from the function signature. (3) src/dashboard/server/routes/agents.ts ~line 1847 POST /api/agents: accept `role` in request body (no longer accept workType/phase/agentType). (4) src/dashboard/frontend/src/components/KanbanBoard.tsx ~lines 2850-2910: send `role: 'work'` in the start agent mutation. (5) src/lib/cloister/verification-gate.ts: read `role` from state.json for gate decisions (replaces phase/agentPhase reads). Drop all reads of `state.phase`, `state.workType`, `state.complexity`, `state.handoffCount` in spawn paths and verification — these will be removed in M1 but the spawn path stops writing them now. Pattern follows S1."
+        },
+        "subItems": [
+          {
+            "id": "s2-wire-work-end-to-end.ac1",
+            "title": "spawnAgent in src/lib/agents.ts accepts `role: 'work'`, writes `role` to state.json, uses `--agent roles/work.md`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s2-wire-work-end-to-end.ac2",
+            "title": "determineModel uses resolveModel('work'); workType/phase/difficulty parameters dropped from signature",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s2-wire-work-end-to-end.ac3",
+            "title": "POST /api/agents accepts `role` field (workType/phase/agentType fields rejected with 400)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s2-wire-work-end-to-end.ac4",
+            "title": "KanbanBoard start-agent mutation sends `role: 'work'`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s2-wire-work-end-to-end.ac5",
+            "title": "verification-gate.ts uses `state.role` for gate routing (no reads of state.phase / state.workType / state.complexity / state.handoffCount)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s2-wire-work-end-to-end.ac6",
+            "title": "Existing work-agent and verification-gate tests updated and pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s3-wire-review-end-to-end",
+        "title": "Wire `review` role end-to-end (replaces wakeSpecialist for review + 4 convoy specialists)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1048",
+          "requiresInspection": true
+        },
+        "narrative": {
+          "Action": "Replace the review-specialist spawn mechanism with a single `spawnRun(issueId, 'review')` call. Touchpoints: (1) src/lib/cloister/handoff.ts ~lines 232-246: replace `wakeSpecialistOrQueue('review-agent', ...)` with the new spawnRun helper (added in this bead in src/lib/agents.ts) that writes role/model/harness to state.json, builds `claude --agent roles/review.md`, starts the tmux session. (2) Convoy reviewers no longer wake as separate Cloister specialists; they're invoked by the review role via the Agent tool (V1 + R3 set this up). The dashboard read-model and any callers reading `SpecialistType` for review identification switch to reading `state.role === 'review'`. (3) Add a smoke test that exercises the full review path end-to-end against a test diff: review role spawns, fans out to 4 convoy sub-runs, synthesizes, posts decision. requiresInspection=true because this replaces a cross-cutting protocol (specialist-wake) and downstream beads (C1, C2) depend on the new pattern."
+        },
+        "subItems": [
+          {
+            "id": "s3-wire-review-end-to-end.ac1",
+            "title": "src/lib/agents.ts exports `spawnRun(issueId, role, opts?)` that writes role/model/harness to state.json and starts the tmux session for any role",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s3-wire-review-end-to-end.ac2",
+            "title": "cloister/handoff.ts review path calls `spawnRun(issueId, 'review')` instead of `wakeSpecialistOrQueue('review-agent', ...)`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s3-wire-review-end-to-end.ac3",
+            "title": "No code path wakes the 4 convoy specialists separately; convoy is invoked from inside roles/review.md via the Agent tool",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s3-wire-review-end-to-end.ac4",
+            "title": "Dashboard reads `state.role === 'review'` for review identification (no SpecialistType reads)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s3-wire-review-end-to-end.ac5",
+            "title": "End-to-end test: triggering review on a test PR spawns a single review run, fans out to 4 convoy sub-runs, posts a synthesized decision",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s3-wire-review-end-to-end.ac6",
+            "title": "Existing review-related tests updated and pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s4-wire-test-end-to-end",
+        "title": "Wire `test` role end-to-end (replaces wakeSpecialist for test + UAT)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Replace the test-specialist and uat-specialist wake mechanism with `spawnRun(issueId, 'test')`. Touchpoints: (1) src/lib/cloister/test-agent.ts: replace `wakeSpecialist('test-agent', ...)` with `spawnRun(issueId, 'test')`. (2) Same file or wherever uat-specialist is invoked (search for 'uat-agent' wake sites): collapse into the test role; if the issue requires browser verification it's the test role's job (Playwright tools are available to it). (3) Dashboard reads `state.role === 'test'`. (4) Smoke test against a test issue: test role runs, optionally invokes Playwright MCP, reports pass/fail. Pattern follows S1/S2/S3."
+        },
+        "subItems": [
+          {
+            "id": "s4-wire-test-end-to-end.ac1",
+            "title": "test-agent.ts uses spawnRun(issueId, 'test'); no calls to wakeSpecialist('test-agent') or wakeSpecialist('uat-agent')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s4-wire-test-end-to-end.ac2",
+            "title": "UAT scenarios run inside the test role (Playwright tools available); no separate UAT spawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s4-wire-test-end-to-end.ac3",
+            "title": "Dashboard test rendering keys off state.role === 'test'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s4-wire-test-end-to-end.ac4",
+            "title": "Existing test-agent tests updated and pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "s5-wire-ship-end-to-end",
+        "title": "Wire `ship` role end-to-end (replaces wakeSpecialist for merge-agent)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Replace merge-specialist wake with `spawnRun(issueId, 'ship')`. Touchpoints: src/lib/cloister/merge-agent.ts ~lines 1104, 1505, 1853: replace `wakeSpecialist('merge-agent', ...)` calls with `spawnRun(issueId, 'ship')`. The ship role does post-approval prep (rebase, conflict-resolve, re-verify, push), then transitions issue state to 'ready-to-merge' (or whatever new IssueState value indicates 'awaiting human merge click'). The dashboard renders the Merge button when issue state is 'ready-to-merge' (this may already work, or needs wiring — verify). Verify post-merge cleanup (Docker network teardown in postMergeLifecycle, stash cleanup) still triggers — that lives in the merge HTTP path, not in the ship role."
+        },
+        "subItems": [
+          {
+            "id": "s5-wire-ship-end-to-end.ac1",
+            "title": "merge-agent.ts uses spawnRun(issueId, 'ship'); no wakeSpecialist('merge-agent') calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s5-wire-ship-end-to-end.ac2",
+            "title": "Ship role transitions the issue to a state the dashboard interprets as 'ready-to-merge' (Merge button visible) without itself merging",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s5-wire-ship-end-to-end.ac3",
+            "title": "postMergeLifecycle (Docker network teardown, stash cleanup) still fires when the human clicks Merge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "s5-wire-ship-end-to-end.ac4",
+            "title": "Existing merge-agent tests updated and pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "c1-reactive-cloister-scheduler",
+        "title": "Reactive Cloister: onIssueStateChange + stateToRole hooked into existing emitters",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1048",
+          "requiresInspection": true
+        },
+        "narrative": {
+          "Action": "Add `onIssueStateChange(issueId, newState)` and `stateToRole(state)` to src/lib/cloister/service.ts. Hook into existing internal event sources rather than building a new poller: (a) issue-lifecycle service (src/dashboard/server/services/issue-lifecycle.ts) already emits `issue.*` events when state transitions occur — Cloister subscribes via the dashboard event bus / domain-services. (b) When a work agent emits `agent.completed` (or signals via `pan done`), Cloister transitions the issue state to 'in_review' and onIssueStateChange spawns the review role. (c) Review approval emits a `review.approved` event → Cloister transitions to 'testing' → spawns test. (d) Test pass emits `test.passed` → transition to 'shipping' → spawn ship. Concurrency guard: skip spawn if an active run already exists for the (issue, role) tuple. stateToRole maps: in_planning → 'plan', in_progress → 'work', in_review → 'review', testing → 'test', shipping → 'ship'. requiresInspection=true because this is the cross-cutting protocol — C2 deletes the old dispatch machinery on the assumption this works."
+        },
+        "subItems": [
+          {
+            "id": "c1-reactive-cloister-scheduler.ac1",
+            "title": "src/lib/cloister/service.ts exports `onIssueStateChange(issueId, newState)` and `stateToRole(state): Role | null`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c1-reactive-cloister-scheduler.ac2",
+            "title": "Cloister subscribes to existing issue.* domain events (issue-lifecycle.ts) and existing agent-completion events (agent.completed, work.completed, review.approved, test.passed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c1-reactive-cloister-scheduler.ac3",
+            "title": "stateToRole maps in_planning→plan, in_progress→work, in_review→review, testing→test, shipping→ship; closed/canceled→null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c1-reactive-cloister-scheduler.ac4",
+            "title": "Concurrency guard: if an active run exists for (issueId, role), the second spawn is skipped (and logged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c1-reactive-cloister-scheduler.ac5",
+            "title": "End-to-end test: simulating a work-agent completion event drives the issue to in_review and spawns a review run; review approval drives to testing; test pass drives to shipping; etc.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "c2-delete-specialist-machinery",
+        "title": "Delete specialist machinery (wakeSpecialist, queues, sessions, dispatchSpecialist)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "All callsites have migrated to spawnRun via S3-S5 + C1. Now delete the specialist machinery: in src/lib/cloister/specialists.ts delete `wakeSpecialist`, `wakeSpecialistOrQueue`, `wakeSpecialistWithTask`, `dispatchSpecialist`, the SPECIALIST_TASK_QUEUES Map, and session file management (getSessionFilePath, getSessionId, getSessionGeneration, bumpSessionGeneration, setSessionId, clearSessionId, line range ~470-600 plus the queue functions ~2700+). Delete the deacon's specialist-dispatch code path (the call from deacon.ts → dispatchSpecialist). Delete `src/lib/cloister/router.ts` resolveSpecialistBaseCommand. Delete the source convoy prompt-template files at src/lib/cloister/prompts/review/code-review-*.prompt-template.md (V1 already migrated them to .claude/agents/). The `~/.panopticon/specialists/` directory becomes vestigial — add a one-time startup cleanup that removes it if present. typecheck/lint/test are the validation surface."
+        },
+        "subItems": [
+          {
+            "id": "c2-delete-specialist-machinery.ac1",
+            "title": "wakeSpecialist, wakeSpecialistOrQueue, wakeSpecialistWithTask, dispatchSpecialist deleted from src/lib/cloister/specialists.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c2-delete-specialist-machinery.ac2",
+            "title": "SPECIALIST_TASK_QUEUES + queue management functions deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c2-delete-specialist-machinery.ac3",
+            "title": "Session file management (getSessionFilePath/getSessionId/setSessionId/clearSessionId/bumpSessionGeneration) deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c2-delete-specialist-machinery.ac4",
+            "title": "deacon.ts no longer dispatches specialists; specialist-dispatch code path removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c2-delete-specialist-machinery.ac5",
+            "title": "src/lib/cloister/router.ts resolveSpecialistBaseCommand deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c2-delete-specialist-machinery.ac6",
+            "title": "src/lib/cloister/prompts/review/code-review-*.prompt-template.md source files deleted (V1 already moved them to .claude/agents/)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c2-delete-specialist-machinery.ac7",
+            "title": "Startup cleanup removes ~/.panopticon/specialists/ if present (best-effort, non-fatal)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "c2-delete-specialist-machinery.ac8",
+            "title": "typecheck, lint, all tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "u1-workhorse-panel-component",
+        "title": "Settings UI: WorkhorsePanel.tsx (3-slot, all enabled providers grouped)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/Settings/WorkhorsePanel.tsx. Renders 3 dropdowns: Expensive, Mid, Cheap. Each dropdown lists every model from every enabled provider (Anthropic, OpenAI, Google, Z.AI/glm, Kimi, OpenRouter, etc.), grouped by provider with provider headers (e.g., 'Anthropic > claude-opus-4-7', 'Kimi > kimi-k2.6-flash'). Reads workhorses.{slot} from /api/settings; on change, PUTs the new value to /api/settings (handled by U5). The panel renders at the top of the Settings page (above any role cards). Show a small inline tooltip below each slot explaining its intent ('Strongest, costly — used for plan/review by default')."
+        },
+        "subItems": [
+          {
+            "id": "u1-workhorse-panel-component.ac1",
+            "title": "WorkhorsePanel.tsx renders 3 labeled dropdowns: Expensive, Mid, Cheap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "u1-workhorse-panel-component.ac2",
+            "title": "Each dropdown lists models from every enabled provider, grouped by provider with provider header rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "u1-workhorse-panel-component.ac3",
+            "title": "Reads workhorses.{expensive,mid,cheap} from /api/settings on mount; round-trips edits via PUT /api/settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "u1-workhorse-panel-component.ac4",
+            "title": "Each slot shows a one-line description ('Strongest, costly — plan/review default' / 'Balanced default' / 'Fast & cheap — universal inspect')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "u2-roles-panel-with-cards",
+        "title": "Settings UI: RolesPanel.tsx with 5 role cards + sub-role expansion",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/Settings/RolesPanel.tsx with 5 role cards (Plan, Work, Review, Test, Ship). Each card shows: role name, description, default-model badge, model picker dropdown. Work and Review cards are expandable to reveal sub-role pickers (Work: inspect, inspect-deep; Review: security, correctness, performance, requirements). Each model picker has two groups: (a) 'Workhorse' on top showing 3 options live-resolved from workhorses (e.g., 'Expensive (claude-opus-4-7)', 'Mid (claude-sonnet-4-7)', 'Cheap (claude-haiku-4-5)'); (b) 'Specific model' below listing all enabled-provider models grouped by provider. Hovering a 'Workhorse: X' selection shows a tooltip with the current literal value. Reads/writes roles.<id>.model and roles.<id>.sub.<sub>.model via /api/settings. Shipped iconography from Material Icons matching the original ROLES constant."
+        },
+        "subItems": [
+          {
+            "id": "u2-roles-panel-with-cards.ac1",
+            "title": "RolesPanel.tsx renders 5 cards: Plan, Work, Review, Test, Ship (in that order)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "u2-roles-panel-with-cards.ac2",
+            "title": "Work card expands to reveal inspect (workhorse:cheap default) + inspect-deep (workhorse:mid default) sub-pickers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "u2-roles-panel-with-cards.ac3",
+            "title": "Review card expands to reveal security/correctness/performance/requirements sub-pickers (security defaults to workhorse:expensive; others to workhorse:mid)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "u2-roles-panel-with-cards.ac4",
+            "title": "Each model picker has a 'Workhorse' group (3 options, live-resolving) on top and a 'Specific model' group (full provider list) below",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "u2-roles-panel-with-cards.ac5",
+            "title": "Hovering a 'Workhorse: <slot>' selection shows a tooltip with the current literal value (live, not frozen)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "u2-roles-panel-with-cards.ac6",
+            "title": "Plan card defaults to workhorse:expensive; Work/Test/Ship default to workhorse:mid; Review defaults to workhorse:expensive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "u3-settings-page-rewire",
+        "title": "Settings UI: rewire SettingsPage to render WorkhorsePanel + RolesPanel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Modify src/dashboard/frontend/src/components/Settings/SettingsPage.tsx so the Agents tab/route renders WorkhorsePanel at the top and RolesPanel below it. Remove the AgentCardsPanel route. Verify navigation, scroll, and any related UI still works. Existing storybook (if any) for these components updated."
+        },
+        "subItems": [
+          {
+            "id": "u3-settings-page-rewire.ac1",
+            "title": "SettingsPage's Agents/Models route renders WorkhorsePanel + RolesPanel (in that vertical order)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "u3-settings-page-rewire.ac2",
+            "title": "AgentCardsPanel route removed from SettingsPage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "u3-settings-page-rewire.ac3",
+            "title": "Navigation, scrolling, and any sub-panel transitions work; no console errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "u4-delete-agentcards-components",
+        "title": "Settings UI: delete AgentCardsPanel/AgentCard/ModelOverrideModal/WorkTypeOverrides",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Delete src/dashboard/frontend/src/components/Settings/AgentCards/{AgentCardsPanel.tsx, AgentCard.tsx, ModelOverrideModal.tsx} and src/dashboard/frontend/src/components/Settings/Override/WorkTypeOverrides.tsx. Remove all imports across the frontend. Remove any associated test files. Vite/tsc must build cleanly. ~1048 lines of frontend deleted."
+        },
+        "subItems": [
+          {
+            "id": "u4-delete-agentcards-components.ac1",
+            "title": "AgentCardsPanel.tsx, AgentCard.tsx, ModelOverrideModal.tsx, WorkTypeOverrides.tsx deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "u4-delete-agentcards-components.ac2",
+            "title": "All imports of those components removed; vite + tsc build cleanly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "u4-delete-agentcards-components.ac3",
+            "title": "Component-specific test files deleted; remaining frontend tests pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "u5-api-settings-workhorses-roles",
+        "title": "Settings API: GET/PUT workhorses + roles in /api/settings",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Modify src/dashboard/server/routes/* (settings route) and src/lib/settings-api.ts so GET /api/settings returns the `workhorses` and `roles` sections from config.yaml (with seeded defaults from F3 if missing). PUT /api/settings accepts updates to `workhorses.{slot}` and `roles.<id>.model` / `roles.<id>.sub.<sub>.model`. Validate input: reject unknown role names, reject invalid model refs (chained, unresolved), reject unknown sub-role names. Round-trip the YAML so user-formatted comments are preserved (use the existing yaml library; verify which one). Drop the old `overrides` field from the GET response (legacy WorkTypeId map — config.overrides is silently dropped per hard-cut decision)."
+        },
+        "subItems": [
+          {
+            "id": "u5-api-settings-workhorses-roles.ac1",
+            "title": "GET /api/settings response includes workhorses + roles sections (seeded defaults applied if missing on disk)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "u5-api-settings-workhorses-roles.ac2",
+            "title": "PUT /api/settings accepts workhorses.{slot} + roles.<id>.model + roles.<id>.sub.<sub>.model updates and writes config.yaml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "u5-api-settings-workhorses-roles.ac3",
+            "title": "Server rejects unknown role names, unknown sub-role names, and invalid/chained model refs with 400 + clear error message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "u5-api-settings-workhorses-roles.ac4",
+            "title": "Legacy `overrides` field dropped from response (no longer surfaced; silently absent from new config.yaml)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "u5-api-settings-workhorses-roles.ac5",
+            "title": "API test covers: get/put workhorses, get/put role model, get/put sub-role model, validation rejections",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "d1-delete-work-types-and-router",
+        "title": "Delete src/lib/work-types.ts and src/lib/work-type-router.ts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Delete src/lib/work-types.ts (the WORK_TYPES const + WorkTypeId type) and src/lib/work-type-router.ts (the WorkTypeRouter class). Update all callsites (~167 references) to use resolveModel(role, subRole?) from F1 instead. If src/lib/smart-model-selector.ts has callers other than WorkTypeRouter, leave it; if not, delete it as part of this bead. typecheck is the validation surface — every orphaned import surfaces as an error. Update tests that reference WorkTypeId / WORK_TYPES."
+        },
+        "subItems": [
+          {
+            "id": "d1-delete-work-types-and-router.ac1",
+            "title": "src/lib/work-types.ts and src/lib/work-type-router.ts deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "d1-delete-work-types-and-router.ac2",
+            "title": "All 167+ callsites migrated to resolveModel(role, subRole?) or removed; typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "d1-delete-work-types-and-router.ac3",
+            "title": "src/lib/smart-model-selector.ts deleted if its only callers were inside WorkTypeRouter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "d1-delete-work-types-and-router.ac4",
+            "title": "Tests referencing WorkTypeId / WORK_TYPES updated or deleted; full test suite passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e1-delete-panopticon-agent-type",
+        "title": "Delete PanopticonAgentType + panopticonAgentName()",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Delete the PanopticonAgentType type union and panopticonAgentName() helper from src/lib/agents.ts. Replace any remaining callers (should be zero after S1-S5) with the Role type. typecheck surfaces any stragglers."
+        },
+        "subItems": [
+          {
+            "id": "e1-delete-panopticon-agent-type.ac1",
+            "title": "PanopticonAgentType type and panopticonAgentName function deleted from src/lib/agents.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e1-delete-panopticon-agent-type.ac2",
+            "title": "No remaining imports of PanopticonAgentType or panopticonAgentName anywhere; typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e2-delete-specialist-type",
+        "title": "Delete SpecialistType, SpecialistMetadata, SpecialistStatus (and contracts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1048",
+          "requiresInspection": true
+        },
+        "narrative": {
+          "Action": "Delete SpecialistType (line ~172), SpecialistMetadata (line ~182), SpecialistStatus (line ~196) from src/lib/cloister/specialists.ts. Delete the SpecialistType schema and SpecialistSnapshot from packages/contracts/src/types.ts. Update packages/contracts/src/events.ts: any agent event payload that referenced specialist types now uses Role. Rebuild contracts (cd packages/contracts && npm run build). Frontend consumers that imported SpecialistType/SpecialistSnapshot must be updated; typecheck surfaces them. requiresInspection=true because contracts is a wire-format boundary — silent drift here breaks dashboard/server communication."
+        },
+        "subItems": [
+          {
+            "id": "e2-delete-specialist-type.ac1",
+            "title": "SpecialistType, SpecialistMetadata, SpecialistStatus deleted from src/lib/cloister/specialists.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2-delete-specialist-type.ac2",
+            "title": "SpecialistType schema and SpecialistSnapshot deleted from packages/contracts/src/types.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2-delete-specialist-type.ac3",
+            "title": "Agent event payloads in packages/contracts/src/events.ts use Role (not specialist types); contracts rebuilt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e2-delete-specialist-type.ac4",
+            "title": "Frontend consumers of SpecialistType/SpecialistSnapshot updated; typecheck passes; dashboard renders correctly end-to-end",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e3-delete-launcher-agent-type",
+        "title": "Delete LauncherAgentType (replace with Role + spawnMode field)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Delete LauncherAgentType (line 1) from src/lib/launcher-generator.ts. Refactor LauncherConfig: replace `agentType: LauncherAgentType` with `role: Role` plus a separate `spawnMode?: 'conversation' | 'remote' | 'resume'`. Delete the specialist-dispatch and specialist-init code branches in launcher-generator.ts (lines 274 and 337) — those code paths are gone. Update the 2 callers."
+        },
+        "subItems": [
+          {
+            "id": "e3-delete-launcher-agent-type.ac1",
+            "title": "LauncherAgentType deleted from src/lib/launcher-generator.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e3-delete-launcher-agent-type.ac2",
+            "title": "LauncherConfig has `role: Role` and optional `spawnMode?: 'conversation' | 'remote' | 'resume'` fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e3-delete-launcher-agent-type.ac3",
+            "title": "specialist-dispatch and specialist-init branches deleted from launcher-generator.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e3-delete-launcher-agent-type.ac4",
+            "title": "2 callers updated; typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e4-confirm-work-type-id-gone",
+        "title": "Confirm WorkTypeId has zero remaining references",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "After D1 deletes work-types.ts and work-type-router.ts, verify no orphan references to WorkTypeId, WORK_TYPES, or any 'specialist-*'/'review:*'/'subagent:*'/'cli:*' string literal remain. grep across src/ and packages/. Delete any test fixture files that referenced WorkTypeId. This is a confirmation/cleanup bead — typecheck has already surfaced anything that broke; this one ensures stringly-typed leaks are gone too."
+        },
+        "subItems": [
+          {
+            "id": "e4-confirm-work-type-id-gone.ac1",
+            "title": "grep -r 'WorkTypeId\\|WORK_TYPES' src/ packages/ returns zero hits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e4-confirm-work-type-id-gone.ac2",
+            "title": "grep -r '\"specialist-\\|review:[a-z]\\|subagent:\\|cli:' src/ packages/ returns zero hits in non-comment code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e4-confirm-work-type-id-gone.ac3",
+            "title": "Orphaned test fixtures referencing WorkTypeId deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "e5-delete-activity-source",
+        "title": "Delete ActivitySource enum (derive from role + literal contexts)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Delete the ActivitySource type union from src/lib/activity-logger.ts (line 21). Replace callers with: agent activity uses `state.role` directly ('plan'/'work'/'review'/'test'/'ship'); non-agent activity uses literal strings 'cloister' or 'dashboard'. The deploy-script source value is dropped (unused). Update activity log render in the dashboard if necessary. typecheck is the validation surface."
+        },
+        "subItems": [
+          {
+            "id": "e5-delete-activity-source.ac1",
+            "title": "ActivitySource type deleted from src/lib/activity-logger.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e5-delete-activity-source.ac2",
+            "title": "Activity callers use `state.role` (literal Role values) or 'cloister'/'dashboard' literals; deploy-script value removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "e5-delete-activity-source.ac3",
+            "title": "Activity log rendering in dashboard handles new source set; typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "k1-contracts-agent-phase-to-role",
+        "title": "Contracts: AgentPhase → Role, delete SpecialistSnapshot, update event payloads",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Final contracts cleanup. In packages/contracts/src/types.ts: replace AgentPhase schema (literals union) with the Role schema (5 values). Confirm SpecialistSnapshot is already deleted (E2). In packages/contracts/src/events.ts: AgentStartedEvent and any other events that carried `phase`/`agentPhase` use `role` instead. Rebuild contracts. Update frontend consumers (Zustand store, EventRouter, any AgentPhase-typed prop). The dashboard read-model already reads `role` (S1); the contracts swap aligns the wire format. Typecheck across server and frontend is the validation surface."
+        },
+        "subItems": [
+          {
+            "id": "k1-contracts-agent-phase-to-role.ac1",
+            "title": "AgentPhase deleted from packages/contracts/src/types.ts; Role exported in its place",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "k1-contracts-agent-phase-to-role.ac2",
+            "title": "Event payloads in packages/contracts/src/events.ts use `role` (not phase/agentPhase)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "k1-contracts-agent-phase-to-role.ac3",
+            "title": "Contracts rebuilt; frontend Zustand store, EventRouter, and any AgentPhase-typed props updated; full typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "k1-contracts-agent-phase-to-role.ac4",
+            "title": "End-to-end smoke: dashboard receives a domain event for a running role and renders correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "m1-state-json-hard-cut",
+        "title": "state.json hard cut: drop legacy fields, role required, move Channels gate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-1048",
+          "requiresInspection": true
+        },
+        "narrative": {
+          "Action": "The data-model break. In src/lib/agents.ts: remove `type`, `agentPhase`, `phase`, `workType`, `complexity`, `handoffCount`, `runtime` fields from AgentState. Make `role` required (was optional in F2). Update parseAgentState/saveAgentState. Move the Channels eligibility check (~line 775): replace `state.runtime !== 'claude' && state.runtime !== 'claude-code'` with `state.harness !== 'claude-code'` and add a `state.role !== 'work'` check (Channels was always work-only). Add a startup migration in src/lib/agents.ts: scan ~/.panopticon/agents/*/state.json on first load; for any state.json missing `role`, kill the tmux session (best-effort) and remove the agent state directory. Log the count of dropped agents at startup. requiresInspection=true because this is the data-model crystallization point — every other bead has been preparing for this; downstream X1 (delete old .md files) assumes nothing reads/writes legacy fields anymore."
+        },
+        "subItems": [
+          {
+            "id": "m1-state-json-hard-cut.ac1",
+            "title": "AgentState interface: type/agentPhase/phase/workType/complexity/handoffCount/runtime fields deleted; role becomes required (no `?`)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m1-state-json-hard-cut.ac2",
+            "title": "parseAgentState/saveAgentState updated; round-trip preserves only the new fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m1-state-json-hard-cut.ac3",
+            "title": "Channels eligibility check moved from state.runtime to state.harness === 'claude-code' && state.role === 'work'; ineligibility reason strings updated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m1-state-json-hard-cut.ac4",
+            "title": "Startup migration: state.json files lacking `role` are dropped; their tmux sessions killed best-effort; count logged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m1-state-json-hard-cut.ac5",
+            "title": "No code path reads state.type / state.agentPhase / state.phase / state.workType / state.complexity / state.handoffCount / state.runtime anywhere; grep returns zero hits in src/",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "m1-state-json-hard-cut.ac6",
+            "title": "Existing tests updated; channels-eligibility tests, agent-state tests, and verification-gate tests all pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "x1-delete-old-pan-agent-md",
+        "title": "Delete old .claude/agents/pan-*-agent.md files (DEFERRED — DO NOT EXECUTE)",
+        "status": "deferred",
+        "priority": "low",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1048",
+          "requiresInspection": true,
+          "deferred": true,
+          "deferredReason": "Hotfix 2026-05-09: file deletion is destructive and depends on every spawn callsite having migrated to spawnRun(role) and shipped to main. Until that lands, deleting these .md files breaks ALL running and future agents. Do NOT execute as part of this issue. File a follow-up issue post-merge once the migration is verified stable on main."
+        },
+        "narrative": {
+          "Action": "DEFERRED — DO NOT EXECUTE. This bead has been moved out of the PAN-1048 scope. The .claude/agents/pan-*-agent.md files MUST remain in place until the spawn-callsite migration (S1–S5, C1, C2) has shipped to main and run successfully for at least 24 hours. Deleting them prematurely will brick every running and future agent because the legacy specialist dispatch and planning spawn path read these files at launch time. A separate cleanup issue will be filed after the migration is verified stable on main; do not attempt this work here."
+        },
+        "subItems": [
+          {
+            "id": "x1-delete-old-pan-agent-md.ac1",
+            "title": "All 7 .claude/agents/pan-*-agent.md files deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "x1-delete-old-pan-agent-md.ac2",
+            "title": "grep -r 'pan-\\(work\\|planning\\|review\\|test\\|inspect\\|uat\\|merge\\)-agent' src/ returns zero hits in non-comment code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "x1-delete-old-pan-agent-md.ac3",
+            "title": "End-to-end: a fresh planning + work + review + test + ship cycle succeeds against a test issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "z1-update-claude-md-and-docs",
+        "title": "Update CLAUDE.md and docs to reflect role primitive (lands with C2)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Update the project-level CLAUDE.md 'Panopticon Agent Taxonomy' section to describe roles instead of specialists. Update docs/HARNESSES.md if it references specialist types. Update the dashboard architecture sections that mention specialist machinery. Rewrite the planning-agent prompt template at src/lib/cloister/prompts/planning.md to reference roles rather than specialists. The planning role file (roles/plan.md) is already correct from R1 — this bead handles the surrounding doc surface. Lands roughly alongside C2 (specialist machinery deletion); blocks Z2."
+        },
+        "subItems": [
+          {
+            "id": "z1-update-claude-md-and-docs.ac1",
+            "title": "CLAUDE.md 'Panopticon Agent Taxonomy' section rewritten in terms of roles (5 roles, sub-roles, no specialist references)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "z1-update-claude-md-and-docs.ac2",
+            "title": "docs/HARNESSES.md and dashboard architecture docs updated; no remaining 'specialist' references except historical context",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "z1-update-claude-md-and-docs.ac3",
+            "title": "src/lib/cloister/prompts/planning.md (the planning prompt template, separate from roles/plan.md) updated to reference roles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "z2-move-prd-canonical",
+        "title": "Move .pan/prd.md to docs/prds/planned/PAN-1048-role-primitive.md",
+        "status": "completed",
+        "priority": "low",
+        "created": "2026-05-09T17:43:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "issueLabel": "pan-1048",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Final administrative step. Move the PRD from the workspace-local .pan/prd.md to the canonical docs/prds/planned/PAN-1048-role-primitive.md so the link in the GitHub issue body works after merge. Update any internal links to the PRD."
+        },
+        "subItems": [
+          {
+            "id": "z2-move-prd-canonical.ac1",
+            "title": "docs/prds/planned/PAN-1048-role-primitive.md exists with the full PRD content",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "z2-move-prd-canonical.ac2",
+            "title": "The GitHub issue body's PRD link resolves to a valid file (verified by clicking from the issue post-merge)",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "z2-move-prd-canonical.ac3",
+            "title": ".pan/prd.md no longer exists in the working tree",
+            "status": "completed",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "f1-role-config-schema",
+        "to": "f2-agentstate-role-field",
+        "type": "blocks"
+      },
+      {
+        "from": "f1-role-config-schema",
+        "to": "f3-default-config-seed",
+        "type": "blocks"
+      },
+      {
+        "from": "f1-role-config-schema",
+        "to": "u1-workhorse-panel-component",
+        "type": "blocks"
+      },
+      {
+        "from": "f1-role-config-schema",
+        "to": "u5-api-settings-workhorses-roles",
+        "type": "blocks"
+      },
+      {
+        "from": "f2-agentstate-role-field",
+        "to": "s1-wire-plan-end-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "f2-agentstate-role-field",
+        "to": "s2-wire-work-end-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "f2-agentstate-role-field",
+        "to": "s3-wire-review-end-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "f2-agentstate-role-field",
+        "to": "s4-wire-test-end-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "f2-agentstate-role-field",
+        "to": "s5-wire-ship-end-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "f3-default-config-seed",
+        "to": "s1-wire-plan-end-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "f3-default-config-seed",
+        "to": "s2-wire-work-end-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "f3-default-config-seed",
+        "to": "s3-wire-review-end-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "f3-default-config-seed",
+        "to": "s4-wire-test-end-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "f3-default-config-seed",
+        "to": "s5-wire-ship-end-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "v1-convoy-agents-migration",
+        "to": "r3-role-review-md-convoy",
+        "type": "blocks"
+      },
+      {
+        "from": "r1-role-plan-md",
+        "to": "s1-wire-plan-end-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "r2-role-work-md-jidoka",
+        "to": "s2-wire-work-end-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "r3-role-review-md-convoy",
+        "to": "s3-wire-review-end-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "r4-role-test-md-uat",
+        "to": "s4-wire-test-end-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "r5-role-ship-md-human-merge",
+        "to": "s5-wire-ship-end-to-end",
+        "type": "blocks"
+      },
+      {
+        "from": "s1-wire-plan-end-to-end",
+        "to": "s2-wire-work-end-to-end",
+        "type": "informs"
+      },
+      {
+        "from": "s1-wire-plan-end-to-end",
+        "to": "s3-wire-review-end-to-end",
+        "type": "informs"
+      },
+      {
+        "from": "s1-wire-plan-end-to-end",
+        "to": "s4-wire-test-end-to-end",
+        "type": "informs"
+      },
+      {
+        "from": "s1-wire-plan-end-to-end",
+        "to": "s5-wire-ship-end-to-end",
+        "type": "informs"
+      },
+      {
+        "from": "s1-wire-plan-end-to-end",
+        "to": "c1-reactive-cloister-scheduler",
+        "type": "blocks"
+      },
+      {
+        "from": "s2-wire-work-end-to-end",
+        "to": "c1-reactive-cloister-scheduler",
+        "type": "blocks"
+      },
+      {
+        "from": "s3-wire-review-end-to-end",
+        "to": "c1-reactive-cloister-scheduler",
+        "type": "blocks"
+      },
+      {
+        "from": "s4-wire-test-end-to-end",
+        "to": "c1-reactive-cloister-scheduler",
+        "type": "blocks"
+      },
+      {
+        "from": "s5-wire-ship-end-to-end",
+        "to": "c1-reactive-cloister-scheduler",
+        "type": "blocks"
+      },
+      {
+        "from": "s5-wire-ship-end-to-end",
+        "to": "e1-delete-panopticon-agent-type",
+        "type": "blocks"
+      },
+      {
+        "from": "s5-wire-ship-end-to-end",
+        "to": "e3-delete-launcher-agent-type",
+        "type": "blocks"
+      },
+      {
+        "from": "s5-wire-ship-end-to-end",
+        "to": "e5-delete-activity-source",
+        "type": "blocks"
+      },
+      {
+        "from": "c1-reactive-cloister-scheduler",
+        "to": "c2-delete-specialist-machinery",
+        "type": "blocks"
+      },
+      {
+        "from": "c2-delete-specialist-machinery",
+        "to": "d1-delete-work-types-and-router",
+        "type": "blocks"
+      },
+      {
+        "from": "c2-delete-specialist-machinery",
+        "to": "e2-delete-specialist-type",
+        "type": "blocks"
+      },
+      {
+        "from": "c2-delete-specialist-machinery",
+        "to": "z1-update-claude-md-and-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "d1-delete-work-types-and-router",
+        "to": "e4-confirm-work-type-id-gone",
+        "type": "blocks"
+      },
+      {
+        "from": "u1-workhorse-panel-component",
+        "to": "u2-roles-panel-with-cards",
+        "type": "blocks"
+      },
+      {
+        "from": "u1-workhorse-panel-component",
+        "to": "u5-api-settings-workhorses-roles",
+        "type": "informs"
+      },
+      {
+        "from": "u2-roles-panel-with-cards",
+        "to": "u3-settings-page-rewire",
+        "type": "blocks"
+      },
+      {
+        "from": "u5-api-settings-workhorses-roles",
+        "to": "u3-settings-page-rewire",
+        "type": "blocks"
+      },
+      {
+        "from": "u3-settings-page-rewire",
+        "to": "u4-delete-agentcards-components",
+        "type": "blocks"
+      },
+      {
+        "from": "e1-delete-panopticon-agent-type",
+        "to": "k1-contracts-agent-phase-to-role",
+        "type": "blocks"
+      },
+      {
+        "from": "e2-delete-specialist-type",
+        "to": "k1-contracts-agent-phase-to-role",
+        "type": "blocks"
+      },
+      {
+        "from": "e3-delete-launcher-agent-type",
+        "to": "k1-contracts-agent-phase-to-role",
+        "type": "blocks"
+      },
+      {
+        "from": "e4-confirm-work-type-id-gone",
+        "to": "k1-contracts-agent-phase-to-role",
+        "type": "blocks"
+      },
+      {
+        "from": "e5-delete-activity-source",
+        "to": "k1-contracts-agent-phase-to-role",
+        "type": "blocks"
+      },
+      {
+        "from": "e1-delete-panopticon-agent-type",
+        "to": "m1-state-json-hard-cut",
+        "type": "blocks"
+      },
+      {
+        "from": "e2-delete-specialist-type",
+        "to": "m1-state-json-hard-cut",
+        "type": "blocks"
+      },
+      {
+        "from": "e3-delete-launcher-agent-type",
+        "to": "m1-state-json-hard-cut",
+        "type": "blocks"
+      },
+      {
+        "from": "e4-confirm-work-type-id-gone",
+        "to": "m1-state-json-hard-cut",
+        "type": "blocks"
+      },
+      {
+        "from": "e5-delete-activity-source",
+        "to": "m1-state-json-hard-cut",
+        "type": "blocks"
+      },
+      {
+        "from": "u4-delete-agentcards-components",
+        "to": "m1-state-json-hard-cut",
+        "type": "blocks"
+      },
+      {
+        "from": "k1-contracts-agent-phase-to-role",
+        "to": "m1-state-json-hard-cut",
+        "type": "blocks"
+      },
+      {
+        "from": "m1-state-json-hard-cut",
+        "to": "x1-delete-old-pan-agent-md",
+        "type": "blocks"
+      },
+      {
+        "from": "x1-delete-old-pan-agent-md",
+        "to": "z2-move-prd-canonical",
+        "type": "blocks"
+      },
+      {
+        "from": "z1-update-claude-md-and-docs",
+        "to": "z2-move-prd-canonical",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-09-PAN-1048-unify-agent-type-system-5-enums-role-primitive-with-reactive-cloister.vbrief.json"
+    }
+  },
+  "updated": "2026-05-09T19:06:32.359Z"
+}

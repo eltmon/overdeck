@@ -20,13 +20,20 @@ describe('formatRelativeTime', () => {
     expect(formatRelativeTime('not-a-date', NOW)).toBe('');
   });
 
-  it('returns "just now" for < 60s ago', () => {
-    const date = new Date(NOW.getTime() - 30_000); // 30s ago
+  it('returns "just now" for < 5s ago', () => {
+    const date = new Date(NOW.getTime() - 3_000); // 3s ago
     expect(formatRelativeTime(date, NOW)).toBe('just now');
   });
 
   it('returns "just now" for 0s ago (same instant)', () => {
     expect(formatRelativeTime(NOW, NOW)).toBe('just now');
+  });
+
+  it('returns "Xs ago" for 5s–59s ago', () => {
+    const thirtyS = new Date(NOW.getTime() - 30_000);
+    expect(formatRelativeTime(thirtyS, NOW)).toBe('30s ago');
+    const fiftyNineS = new Date(NOW.getTime() - 59_000);
+    expect(formatRelativeTime(fiftyNineS, NOW)).toBe('59s ago');
   });
 
   it('returns minutes for 1m–59m ago', () => {

@@ -65,6 +65,8 @@ export interface ConversationsConfig {
   manual_compact_mode?: ManualCompactMode;
   /** Whether to use the richer 9-section summary format (more tokens, less efficient incremental updates) */
   rich_compaction?: boolean;
+  /** Model used for AI-generated conversation titles (default: claude-haiku-4-5) */
+  title_model?: ModelId;
 }
 
 /**
@@ -73,7 +75,7 @@ export interface ConversationsConfig {
 export interface TtsSummarizerConfig {
   /** Whether the TTS summarizer is active */
   enabled?: boolean;
-  /** Model ID to use for summarization (default: gpt-5.4-nano) */
+  /** Model ID to use for summarization (default: gpt-5.5-nano) */
   model?: ModelId;
   /** Seconds to batch activity before summarizing (default: 15) */
   batch_window_seconds?: number;
@@ -104,6 +106,7 @@ export interface YamlConfig {
       minimax?: ProviderConfig | boolean;
       zai?: ProviderConfig | boolean;
       kimi?: ProviderConfig | boolean;
+      mimo?: ProviderConfig | boolean;
       openrouter?: ProviderConfig | boolean;
     };
 
@@ -130,6 +133,7 @@ export interface YamlConfig {
     minimax?: string;
     zai?: string;
     kimi?: string;
+    mimo?: string;
     openrouter?: string;
   };
 
@@ -173,6 +177,38 @@ export interface YamlConfig {
 
   /** Resource thresholds for dashboard health + spawn guardrails */
   resources?: ResourcesConfig;
+
+  /** Experimental, opt-in features. Each flag is research-preview and may be removed. */
+  experimental?: ExperimentalConfig;
+
+  /**
+   * Claude Code spawn behavior.
+   *
+   * `permissionMode: 'auto'` (default) emits `--permission-mode auto`; the classifier
+   * blocks destructive ops while still running fully autonomously. `'bypass'` emits
+   * `--dangerously-skip-permissions --permission-mode bypassPermissions` (legacy).
+   * Override per-invocation with `--yolo` / `--no-yolo` / `PAN_YOLO`.
+   */
+  claude?: {
+    permissionMode?: 'auto' | 'bypass';
+  };
+}
+
+/**
+ * Experimental, opt-in feature flags. All default to false.
+ *
+ * Flags here gate research-preview features that may break or be removed in future
+ * releases. Code paths gated by these flags must always degrade silently to the
+ * existing default behaviour when the flag is off.
+ */
+export interface ExperimentalConfig {
+  /**
+   * Use Claude Code Channels (research-preview MCP capability) for prompt delivery
+   * to eligible work agents. When enabled, eligible agents receive prompts via a
+   * per-agent MCP bridge over a Unix socket; ineligible agents and all non-work
+   * delivery sites continue to use tmux send-keys. Default: false.
+   */
+  claudeCodeChannels?: boolean;
 }
 
 /**
@@ -250,6 +286,7 @@ export interface NormalizedConfig {
     minimax?: string;
     zai?: string;
     kimi?: string;
+    mimo?: string;
     openrouter?: string;
   };
 
@@ -284,6 +321,7 @@ export interface NormalizedConfig {
     compactionModel: ModelId;
     manualCompactMode: ManualCompactMode;
     richCompaction: boolean;
+    titleModel: ModelId;
   };
 
   /** Shadow mode configuration */
@@ -306,6 +344,22 @@ export interface NormalizedConfig {
     agentWarnCount: number;
     agentBlockCount: number;
   };
+
+  /** Experimental flag values, normalised (always defined, never undefined). */
+  experimental: NormalizedExperimentalConfig;
+
+  /** Permission-mode for spawned Claude Code agents. Always defined; defaults to 'auto'. */
+  claude: {
+    permissionMode: 'auto' | 'bypass';
+  };
+}
+
+/**
+ * Normalized experimental flags — every flag has a concrete boolean value.
+ */
+export interface NormalizedExperimentalConfig {
+  /** Whether Claude Code Channels prompt delivery is enabled for eligible work agents. */
+  claudeCodeChannels: boolean;
 }
 
 /**
@@ -374,6 +428,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     compactionModel: 'claude-haiku-4-5',
     manualCompactMode: 'claude-code',
     richCompaction: true,
+    titleModel: 'claude-haiku-4-5',
   },
   shadow: {
     enabled: false,
@@ -396,7 +451,7 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   },
   ttsSummarizer: {
     enabled: false,
-    model: 'gpt-5.4-nano',
+    model: 'gpt-5.5-nano',
     batchWindowSeconds: 15,
   },
   resources: {
@@ -404,6 +459,12 @@ const DEFAULT_CONFIG: NormalizedConfig = {
     memoryBlockGb: 2,
     agentWarnCount: 8,
     agentBlockCount: 10,
+  },
+  experimental: {
+    claudeCodeChannels: false,
+  },
+  claude: {
+    permissionMode: 'auto',
   },
 };
 
@@ -608,6 +669,12 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       agentWarnCount: DEFAULT_CONFIG.resources.agentWarnCount,
       agentBlockCount: DEFAULT_CONFIG.resources.agentBlockCount,
     },
+    experimental: {
+      claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
+    },
+    claude: {
+      permissionMode: DEFAULT_CONFIG.claude.permissionMode,
+    },
   };
 
   // Track providers explicitly disabled in models.providers so that legacy
@@ -702,6 +769,17 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       } else if (providers.openrouter !== undefined) {
         explicitlyDisabled.add('openrouter');
       }
+
+      // MiMo
+      const mimo = normalizeProviderConfig(providers.mimo, legacyKeys.mimo);
+      if (mimo.enabled) {
+        result.enabledProviders.add('mimo');
+        if (mimo.api_key) {
+          result.apiKeys.mimo = resolveEnvVar(mimo.api_key);
+        }
+      } else if (providers.mimo !== undefined) {
+        explicitlyDisabled.add('mimo');
+      }
     }
 
     // Merge tmux configuration
@@ -718,6 +796,9 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
     }
     if (config.conversations?.rich_compaction !== undefined) {
       result.conversations.richCompaction = config.conversations.rich_compaction;
+    }
+    if (config.conversations?.title_model) {
+      result.conversations.titleModel = resolveModelId(config.conversations.title_model);
     }
 
     // Merge OpenRouter favorites
@@ -762,6 +843,12 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
         result.apiKeys.openrouter = resolveEnvVar(config.api_keys.openrouter);
         if (!explicitlyDisabled.has('openrouter')) {
           result.enabledProviders.add('openrouter');
+        }
+      }
+      if (config.api_keys.mimo) {
+        result.apiKeys.mimo = resolveEnvVar(config.api_keys.mimo);
+        if (!explicitlyDisabled.has('mimo')) {
+          result.enabledProviders.add('mimo');
         }
       }
     }
@@ -833,6 +920,16 @@ function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedCo
       if (typeof config.resources.agent_block_count === 'number') {
         result.resources.agentBlockCount = config.resources.agent_block_count;
       }
+    }
+
+    if (config.experimental) {
+      if (typeof config.experimental.claudeCodeChannels === 'boolean') {
+        result.experimental.claudeCodeChannels = config.experimental.claudeCodeChannels;
+      }
+    }
+
+    if (config.claude && (config.claude.permissionMode === 'auto' || config.claude.permissionMode === 'bypass')) {
+      result.claude.permissionMode = config.claude.permissionMode;
     }
   }
 
@@ -953,6 +1050,18 @@ interface ConfigCache {
 
 let configCache: ConfigCache | null = null;
 
+/**
+ * Explicitly clear the in-memory config cache.
+ *
+ * The mtime-based cache invalidation in loadConfig() can miss rapid writes
+ * (same-millisecond save → spawn) or coarse filesystem mtime resolution.
+ * Call this after writing config.yaml to guarantee the next loadConfig()
+ * reads from disk rather than returning stale cached data.
+ */
+export function clearConfigCache(): void {
+  configCache = null;
+}
+
 function getConfigMtimes(): { global: number; project: number } {
   let globalMtime = 0;
   let projectMtime = 0;
@@ -1063,8 +1172,9 @@ export function loadConfig(): ConfigLoadResult {
       config.enabledProviders.add('zai');
     }
   }
-  if (process.env.KIMI_API_KEY && !config.apiKeys.kimi) {
-    config.apiKeys.kimi = process.env.KIMI_API_KEY;
+  const kimiKey = process.env.KIMI_CODING_API_KEY || process.env.KIMI_API_KEY;
+  if (kimiKey && !config.apiKeys.kimi) {
+    config.apiKeys.kimi = kimiKey;
     if (!explicitlyDisabled.has('kimi')) {
       config.enabledProviders.add('kimi');
     }
@@ -1073,6 +1183,12 @@ export function loadConfig(): ConfigLoadResult {
     config.apiKeys.openrouter = process.env.OPENROUTER_API_KEY;
     if (!explicitlyDisabled.has('openrouter')) {
       config.enabledProviders.add('openrouter');
+    }
+  }
+  if (process.env.MIMO_API_KEY && !config.apiKeys.mimo) {
+    config.apiKeys.mimo = process.env.MIMO_API_KEY;
+    if (!explicitlyDisabled.has('mimo')) {
+      config.enabledProviders.add('mimo');
     }
   }
 
@@ -1147,4 +1263,13 @@ export function getProjectConfigPath(): string | null {
     return join(projectRoot, '.panopticon.yaml');
   }
   return join(projectRoot, '.pan.yaml');
+}
+
+/**
+ * Returns whether the experimental Claude Code Channels prompt-delivery flag
+ * is enabled. Resolves via loadConfig() so the value reflects merged global,
+ * project, and env-var sources at the moment of the call.
+ */
+export function isClaudeCodeChannelsEnabled(): boolean {
+  return loadConfig().config.experimental.claudeCodeChannels;
 }

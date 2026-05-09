@@ -20,53 +20,32 @@ import {
   Box,
   Play,
   GitMerge,
+  GitPullRequest,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import rehypeSanitize from 'rehype-sanitize';
 import { Agent, Issue, WorkAgentLifecycle, type StartAgentResponse } from '../types';
 import type { ContainerStatus, ReviewStatus, SalvageableStashInfo, WorkspaceInfo } from './inspector/types';
-import { getFriendlyModelName, shouldForceReviewTrigger } from './inspector/utils';
+import { formatRelativeTime, getFriendlyModelName, shouldForceReviewTrigger } from './inspector/utils';
 import { useAlert } from './DialogProvider';
 import { BeadsDialog } from './BeadsDialog';
 import { VBriefDialog } from './vbrief/VBriefDialog';
+import { PlanDialog } from './PlanDialog';
 import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { isCodexBlockedResponse, setPendingCodexSpawn } from '../lib/pending-codex-spawn';
+import { getPendingQuestionTitle, hasActualPendingQuestion, isPendingReviewStranded, isReviewPipelineStuck } from '../lib/pipeline-state';
+import { RecoverButton } from './RecoverButton';
 import { AgentInfoSection } from './inspector/AgentInfoSection';
+import { PanOpenInPicker } from './PanOpenInPicker';
 import { ContainerSection } from './inspector/ContainerSection';
 import { ActionsSection } from './inspector/ActionsSection';
 import { PHASE_CHIP_COLORS, PHASE_LABELS, type PipelinePhase } from './inspector/TerminalTabs';
-
-interface SessionCost {
-  id: string;
-  startedAt: string;
-  endedAt: string | null;
-  type: string;
-  model: string;
-  cost?: number;
-  tokenCount?: number;
-}
-
-interface ModelCostInfo {
-  cost: number;
-  tokens: number;
-}
-
-interface StageCostInfo {
-  cost: number;
-  tokens: number;
-}
-
-interface IssueCostData {
-  issueId: string;
-  totalCost: number;
-  totalTokens: number;
-  inputTokens?: number;
-  outputTokens?: number;
-  sessions: SessionCost[];
-  byModel: Record<string, ModelCostInfo>;
-  byStage?: Record<string, StageCostInfo>;
-}
+import { SwitchModelModal } from './SwitchModelModal';
+import { useSwitchModel } from '../hooks/useSwitchModel';
+import { SensitiveText } from './SensitiveText';
+import { useActivityQuery, usePrQuery } from './CommandDeck/ZoneCOverviewTabs/queries';
+import { getWorkSessionLabel, isAgentSessionAttachable } from '../lib/swarmSlots';
 
 function formatCost(cost: number): string {
   if (cost >= 100) return `$${cost.toFixed(0)}`;
@@ -112,6 +91,7 @@ function copyToClipboard(text: string): boolean {
 
 export interface InspectorPanelProps {
   agent?: Agent;
+  workAgents?: Agent[];
   issueId: string;
   issueUrl?: string;
   issue?: Issue;
@@ -122,12 +102,14 @@ export interface InspectorPanelProps {
   /** Loading state for reviewStatus */
   reviewStatusLoading?: boolean;
   onClose: () => void;
-  onOpenTerminal?: () => void;
+  onOpenTerminal?: (sessionName?: string) => void;
+  /** Open the terminal and select the active merge session (PAN-905) */
+  onViewMergeLog?: () => void;
   /** When true, render without sidebar chrome (border-r, close btn) for embedded use */
   embedded?: boolean;
 }
 
-export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewStatus: reviewStatusProp, reviewStatusLoading: reviewStatusLoadingProp, onClose, onOpenTerminal, embedded }: InspectorPanelProps) {
+export function InspectorPanel({ agent, workAgents = [], issueId, issueUrl, issue, phase, reviewStatus: reviewStatusProp, reviewStatusLoading: reviewStatusLoadingProp, onClose, onOpenTerminal, onViewMergeLog, embedded }: InspectorPanelProps) {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const showAlert = useAlert();
@@ -139,11 +121,16 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
   const [containersStarting, setContainersStarting] = useState(false);
   const [containersStartedAt, setContainersStartedAt] = useState(0);
   const [agentLaunchState, setAgentLaunchState] = useState<'starting' | 'resuming' | null>(null);
+  const [showSwitchModel, setShowSwitchModel] = useState(false);
+  const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null);
   const [containerMenu, setContainerMenu] = useState<{
     x: number; y: number; containerName: string; isRunning: boolean;
   } | null>(null);
 
   const tmuxCommand = agent ? `tmux attach -t ${agent.id}` : '';
+  const awaitingInput = hasActualPendingQuestion(agent);
+  const awaitingInputTitle = getPendingQuestionTitle(agent);
+  const awaitingInputPrompt = agent?.pendingQuestionPrompt?.trim();
 
   // Check lifecycle state for stopped agents (drives Start vs Resume vs Reset semantics)
   const { data: agentLifecycle } = useQuery<WorkAgentLifecycle | undefined>({
@@ -176,7 +163,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     });
   }, [confirm]);
 
-  const { data: workspace } = useQuery<WorkspaceInfo>({
+  const { data: workspace } = useQuery<WorkspaceInfo & { salvageableStashes?: SalvageableStashInfo[] }>({
     queryKey: ['workspace', issueId],
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}`);
@@ -196,18 +183,6 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     refetchInterval: (workspaceCreating || containersStarting || !!agentLaunchState) ? 5000 : 30000,
   });
 
-  const { data: stashData } = useQuery<{ salvageableStashes: SalvageableStashInfo[] }>({
-    queryKey: ['workspace-stashes', issueId],
-    queryFn: async () => {
-      const res = await fetch(`/api/workspaces/${issueId}/stashes`);
-      if (!res.ok) throw new Error('Failed to fetch workspace stashes');
-      return res.json();
-    },
-    enabled: workspace?.exists === true,
-    refetchInterval: 60000,
-    staleTime: 30000,
-  });
-
   // Self-contained review status query (shares cache key with DetailPanelLayout)
   const { data: fetchedReviewStatus, isLoading: fetchedReviewStatusLoading } = useQuery<ReviewStatus>({
     queryKey: ['review-status', issueId],
@@ -222,6 +197,13 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
 
   const reviewStatus = reviewStatusProp ?? fetchedReviewStatus;
   const reviewStatusLoading = reviewStatusLoadingProp ?? fetchedReviewStatusLoading ?? false;
+  const pendingReviewStranded = isPendingReviewStranded(reviewStatus);
+  const pendingReviewStrandedSince = pendingReviewStranded
+    ? (reviewStatus?.reviewSpawnedAt ?? reviewStatus?.updatedAt)
+    : undefined;
+  const pendingReviewStrandedAge = pendingReviewStrandedSince
+    ? formatRelativeTime(pendingReviewStrandedSince)
+    : 'over an hour ago';
 
   useEffect(() => {
     if (!agentLaunchState) return;
@@ -249,28 +231,31 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
     staleTime: 60000,
   });
 
-  const { data: costData } = useQuery<IssueCostData>({
-    queryKey: ['issueCosts', issueId],
-    queryFn: async () => {
-      const res = await fetch(`/api/issues/${issueId}/costs`);
-      if (!res.ok) throw new Error('Failed to fetch costs');
-      return res.json();
-    },
-    refetchInterval: 30000,
-    staleTime: 10000,
-  });
+  // Activity query — shared cache with CommandDeck overview
+  const { data: activityData } = useActivityQuery(issueId);
+  const sections = activityData?.sections ?? [];
+  const sessionCount = sections.length;
+  const lastActivity = (() => {
+    let latest = 0;
+    for (const s of sections) {
+      const t = Date.parse(s.startedAt);
+      if (!Number.isNaN(t) && t > latest) latest = t;
+    }
+    if (!latest) return null;
+    const ageMs = Date.now() - latest;
+    if (ageMs < 60_000) return `last activity ${Math.round(ageMs / 1000)}s ago`;
+    if (ageMs < 3_600_000) return `last activity ${Math.round(ageMs / 60_000)}m ago`;
+    return `last activity ${Math.round(ageMs / 3_600_000)}h ago`;
+  })();
 
-  const { data: planningState } = useQuery({
-    queryKey: ['planning-state', issueId],
-    queryFn: async () => {
-      const res = await fetch(`/api/issues/${issueId}/planning-state`);
-      if (!res.ok) throw new Error('Failed to fetch planning state');
-      return res.json() as Promise<{ hasPlan: boolean; hasBeads: boolean; beadsCount: number; planningComplete: boolean }>;
-    },
-    enabled: !!issueId,
-    refetchInterval: 30000,
-    staleTime: 15000,
-  });
+  const swarmWorkAgents = workAgents.length > 1 ? workAgents : [];
+
+  // Reviewer summary data
+  const reviewerSections = sections.filter((s) => s.type === 'reviewer');
+
+  // PR query — shared cache with CommandDeck overview
+  const { data: prData } = usePrQuery(issueId);
+  const pr = prData?.pr;
 
   const startAgentMutation = useMutation({
     mutationFn: async (message?: string) => {
@@ -437,6 +422,9 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       queryClient.invalidateQueries({ queryKey: ['workspace', issueId] });
       await refreshDashboardState(queryClient);
     },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
+    },
   });
 
   const cancelMutation = useMutation({
@@ -500,6 +488,8 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
       toast.error(err.message, { duration: 8000 });
     },
   });
+
+  const { switchMutation, isPending: isSwitchPending } = useSwitchModel(agent?.id, issueId);
 
   const dismissPendingMutation = useMutation({
     mutationFn: async () => {
@@ -632,11 +622,16 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
   };
 
   const handleReview = async () => {
+    const strandedPendingReview = isPendingReviewStranded(reviewStatus);
     const forceReview = shouldForceReviewTrigger(reviewStatus);
-    const message = forceReview
-      ? `Re-run review & test pipeline for ${issueId}?`
-      : `Start review & test pipeline for ${issueId}?`;
-    if (await confirm({ title: forceReview ? 'Re-run Review' : 'Start Review', message, confirmLabel: forceReview ? 'Re-run' : 'Start Review' })) {
+    const title = strandedPendingReview ? 'Re-request Review' : forceReview ? 'Re-run Review' : 'Start Review';
+    const message = strandedPendingReview
+      ? `Pending review for ${issueId} appears stranded (${pendingReviewStrandedAge}). Re-request the review now?`
+      : forceReview
+        ? `Re-run review & test pipeline for ${issueId}?`
+        : `Start review & test pipeline for ${issueId}?`;
+    const confirmLabel = strandedPendingReview ? 'Re-request Review' : forceReview ? 'Re-run' : 'Start Review';
+    if (await confirm({ title, message, confirmLabel })) {
       forceReviewRef.current = forceReview;
       reviewMutation.mutate();
     }
@@ -656,7 +651,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
   const handleReopen = async () => {
     if (await confirm({
       title: 'Reopen Issue',
-      message: `Reopen ${issueId} for re-work?\n\nThis will:\n- Move the issue to "In Progress"\n- Reset review/test/merge status to pending\n- Remove any queued specialist tasks\n- Append a "Reopened" section to STATE.md`,
+      message: `Reopen ${issueId} for re-work?\n\nThis will:\n- Move the issue to "In Progress"\n- Reset review/test/merge status to pending\n- Remove any queued specialist tasks\n- Append a "Reopened" entry to the continue file`,
       confirmLabel: 'Reopen',
     })) {
       reopenMutation.mutate(undefined);
@@ -729,7 +724,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
             <div className="flex items-center gap-1 shrink-0">
               {onOpenTerminal && agent && (
                 <button
-                  onClick={onOpenTerminal}
+                  onClick={() => onOpenTerminal()}
                   className="p-1 rounded transition-colors hover:bg-popover text-muted-foreground"
                   title="Open terminal"
                   data-testid={`inspector-open-terminal-${issueId}`}
@@ -776,8 +771,44 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
             <User className="w-3 h-3 shrink-0 text-muted-foreground" />
             <span className="text-foreground truncate">{issue.assignee.name}</span>
             {issue.assignee.email && (
-              <span className="text-[10px] truncate text-muted-foreground">{issue.assignee.email}</span>
+              <SensitiveText value={issue.assignee.email} className="text-[10px] truncate text-muted-foreground" />
             )}
+          </div>
+        )}
+
+        {/* Pipeline stuck banner */}
+        {reviewStatus && isReviewPipelineStuck(reviewStatus) && (
+          <div className="px-3 py-2 border-b border-border bg-warning/10">
+            <div className="flex items-center gap-2 mb-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
+              <span className="text-xs font-medium text-warning">Pipeline Stuck</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-2">
+              Review/test/merge pipeline is stuck and needs recovery.
+            </p>
+            <RecoverButton issueId={issueId} reviewStatus={reviewStatus} variant="inspector" />
+          </div>
+        )}
+
+        {/* PAN-1034: pending review stranded beyond 2x reviewer timeout. */}
+        {pendingReviewStranded && (
+          <div className="px-3 py-2 border-b border-border bg-amber-500/10">
+            <div className="flex items-center gap-2 mb-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+              <span className="text-xs font-medium text-amber-200">Pending Review Stranded</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-2">
+              Pending review started {pendingReviewStrandedAge} and no reviewer is queued or active. Re-request review to restart the pipeline.
+            </p>
+            <button
+              onClick={handleReview}
+              disabled={reviewMutation.isPending}
+              className="flex items-center justify-center gap-1 px-2 py-1 rounded text-xs bg-amber-500/20 text-amber-100 hover:bg-amber-500/30 border border-amber-500/40 disabled:opacity-50 w-full"
+              data-testid="stranded-review-request-btn"
+            >
+              {reviewMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+              Re-request Review
+            </button>
           </div>
         )}
 
@@ -792,11 +823,11 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
               This issue was completed and merged outside of Panopticon's workspace pipeline.
               No workspace, agent, or pipeline state is available.
             </p>
-            {costData && costData.totalCost > 0 && (
+            {workspace?.costs && workspace.costs.totalCost > 0 && (
               <div className="mt-2 flex items-center gap-2 text-[10px]">
                 <DollarSign className="w-3 h-3 text-success" />
                 <span className="text-muted-foreground">Total cost:</span>
-                <span className="text-success font-medium">{formatCost(costData.totalCost)}</span>
+                <span className="text-success font-medium">{formatCost(workspace.costs.totalCost)}</span>
               </div>
             )}
           </div>
@@ -809,6 +840,34 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
               No workspace created yet. Use <strong>Plan</strong> to create a workspace and plan this issue,
               or <strong>Create Workspace</strong> below.
             </div>
+          </div>
+        )}
+
+        {/* Awaiting input banner */}
+        {agent && awaitingInput && (
+          <div className="px-3 py-2 border-b border-warning/40 bg-warning/10" data-testid={`inspector-input-${issueId}`}>
+            <div className="flex items-center gap-2 mb-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-warning shrink-0" />
+              <span className="text-xs font-bold uppercase tracking-wide text-warning">Awaiting Input</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-2" title={awaitingInputTitle}>
+              {awaitingInputTitle}
+            </p>
+            {awaitingInputPrompt && (
+              <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded border border-warning/30 bg-card/80 p-2 text-[10px] leading-4 text-foreground">
+                {awaitingInputPrompt}
+              </pre>
+            )}
+            {onOpenTerminal && (
+              <button
+                onClick={() => onOpenTerminal(agent.id)}
+                className="mt-2 inline-flex items-center gap-1.5 rounded border border-warning/40 bg-warning/15 px-2 py-1 text-[10px] font-medium text-warning hover:bg-warning/25"
+                title="Open terminal to answer this prompt"
+              >
+                <Terminal className="w-3 h-3" />
+                Attach terminal
+              </button>
+            )}
           </div>
         )}
 
@@ -827,10 +886,123 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
         {!agent && workspace?.exists && workspace.path && (
           <div className="px-3 py-2 border-b border-border text-xs">
             <div className="flex items-center gap-1.5 text-muted-foreground">
-              <span className="font-mono truncate text-[10px]" title={workspace.path}>
+              <span className="font-mono truncate text-[10px] flex-1" title={workspace.path}>
                 {workspace.path}
               </span>
+              <a
+                href={`vscode://file/${workspace.path}`}
+                className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded bg-card text-primary hover:text-primary/80 border border-border"
+                title="Open in VS Code"
+              >
+                <ExternalLink className="w-2.5 h-2.5" />
+                VS Code
+              </a>
+              <PanOpenInPicker cwd={workspace.path} />
             </div>
+          </div>
+        )}
+
+        {/* Activity summary */}
+        {(sessionCount > 0 || lastActivity) && (
+          <div className="px-3 py-2 border-b border-border text-xs">
+            <div className="uppercase tracking-wider text-[10px] mb-1.5 font-semibold text-muted-foreground">Activity</div>
+            <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+              {sessionCount > 0 && (
+                <span>{sessionCount} session{sessionCount === 1 ? '' : 's'}</span>
+              )}
+              {lastActivity && <span>{lastActivity}</span>}
+            </div>
+          </div>
+        )}
+
+        {swarmWorkAgents.length > 1 && (
+          <div className="px-3 py-2 border-b border-border text-xs">
+            <div className="uppercase tracking-wider text-[10px] mb-1.5 font-semibold text-muted-foreground">Swarm Slots</div>
+            <div className="flex flex-wrap gap-1.5">
+              {swarmWorkAgents.map((workAgent, index) => {
+                const attachable = isAgentSessionAttachable(workAgent);
+                return (
+                  <span
+                    key={workAgent.id}
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] ${
+                      attachable
+                        ? 'badge-bg-primary text-primary-foreground'
+                        : 'border border-border/70 bg-card text-muted-foreground'
+                    }`}
+                    title={workAgent.id}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${attachable ? 'bg-primary-foreground/90' : 'bg-muted-foreground'}`}
+                    />
+                    {getWorkSessionLabel(workAgent, index)}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Reviewer summary */}
+        {reviewerSections.length > 0 && (
+          <div className="px-3 py-2 border-b border-border text-xs">
+            <div className="uppercase tracking-wider text-[10px] mb-1.5 font-semibold text-muted-foreground">Reviewer Summary</div>
+            <div className="grid grid-cols-5 gap-1">
+              {(['correctness', 'security', 'performance', 'requirements', 'synthesis'] as const).map((role) => {
+                const sec = reviewerSections.find((s) => s.role === role);
+                const meta = sec?.roundMetadata;
+                const latest = meta?.history?.find((r) => r.round === meta.latestRound);
+                const isRunning = sec?.status === 'running' || sec?.status === 'active';
+                let color = 'bg-muted-foreground';
+                let label = '—';
+                if (isRunning) { color = 'bg-primary'; label = `R${(meta?.latestRound ?? 0) + 1}`; }
+                else if (latest) {
+                  const status = latest.status?.toLowerCase();
+                  if (status === 'passed' || status === 'approved') { color = 'bg-success'; label = `R${latest.round}`; }
+                  else if (status === 'failed' || status === 'blocked') { color = 'bg-destructive'; label = `R${latest.round}`; }
+                  else { color = 'bg-warning'; label = `R${latest.round}`; }
+                }
+                return (
+                  <div key={role} className="flex flex-col items-center gap-0.5">
+                    <span className="text-[9px] text-muted-foreground capitalize truncate w-full text-center">{role.slice(0, 3)}</span>
+                    <span className={`inline-block w-2 h-2 rounded-full ${color}`} title={`${role}: ${label}`} />
+                    <span className="text-[9px] text-muted-foreground">{label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* PR link / status */}
+        {pr && (
+          <div className="px-3 py-2 border-b border-border text-xs">
+            <div className="uppercase tracking-wider text-[10px] mb-1.5 font-semibold text-muted-foreground">Pull Request</div>
+            <div className="flex items-center gap-1.5">
+              <GitPullRequest className="w-3 h-3 text-primary" />
+              <a href={pr.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 truncate text-[10px] font-medium">
+                #{pr.number} {pr.title}
+              </a>
+              <span className={`text-[10px] px-1 py-0.5 rounded ml-auto ${
+                pr.state === 'OPEN' ? 'bg-success/20 text-success' :
+                pr.state === 'MERGED' ? 'bg-primary/20 text-primary' :
+                'bg-muted-foreground/20 text-muted-foreground'
+              }`}>
+                {pr.state?.toLowerCase()}
+              </span>
+            </div>
+            {(pr.additions !== undefined || pr.deletions !== undefined || pr.changedFiles !== undefined) && (
+              <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+                {pr.additions !== undefined && pr.deletions !== undefined && (
+                  <span>+{pr.additions} -{pr.deletions}</span>
+                )}
+                {pr.changedFiles !== undefined && (
+                  <span>{pr.changedFiles} file{pr.changedFiles === 1 ? '' : 's'}</span>
+                )}
+                {pr.reviewDecision && (
+                  <span className="capitalize">{pr.reviewDecision.replace(/_/g, ' ')}</span>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -854,28 +1026,28 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
         </div>
 
         {/* Cost summary */}
-        {costData && costData.totalCost > 0 && (
+        {workspace?.costs && workspace.costs.totalCost > 0 && (
           <div className="px-3 py-2 border-b border-border text-xs">
             <div className="flex items-center gap-1.5 mb-2">
               <DollarSign className="w-3 h-3 text-success" />
               <span className="uppercase tracking-wider text-[10px] font-semibold text-muted-foreground">Cost</span>
-              <span className="text-success font-medium ml-auto">{formatCost(costData.totalCost)}</span>
+              <span className="text-success font-medium ml-auto">{formatCost(workspace.costs.totalCost)}</span>
             </div>
-            {costData.totalTokens > 0 && (
+            {workspace.costs.totalTokens > 0 && (
               <div className="space-y-0.5">
                 <div className="flex justify-between text-[10px]">
                   <span className="text-muted-foreground">Input tokens</span>
-                  <span className="text-foreground">{formatTokens(costData.inputTokens ?? 0)}</span>
+                  <span className="text-foreground">{formatTokens(workspace.costs.inputTokens ?? 0)}</span>
                 </div>
                 <div className="flex justify-between text-[10px]">
                   <span className="text-muted-foreground">Output tokens</span>
-                  <span className="text-foreground">{formatTokens(costData.outputTokens ?? 0)}</span>
+                  <span className="text-foreground">{formatTokens(workspace.costs.outputTokens ?? 0)}</span>
                 </div>
               </div>
             )}
-            {Object.keys(costData.byModel).length > 0 && (
+            {Object.keys(workspace.costs.byModel).length > 0 && (
               <div className="mt-1.5 space-y-0.5">
-                {Object.entries(costData.byModel).sort(([, a], [, b]) => b.cost - a.cost).map(([model, info]) => (
+                {Object.entries(workspace.costs.byModel).sort(([, a], [, b]) => b.cost - a.cost).map(([model, info]) => (
                   <div key={model} className="flex justify-between text-[10px]">
                     <span className="truncate text-muted-foreground" title={model}>{getFriendlyModelName(model)}</span>
                     <span className="text-foreground ml-2">{formatCost(info.cost)} ({formatTokens(info.tokens)})</span>
@@ -883,10 +1055,10 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
                 ))}
               </div>
             )}
-            {costData.byStage && Object.keys(costData.byStage).length > 0 && (
+            {workspace.costs.byStage && Object.keys(workspace.costs.byStage).length > 0 && (
               <div className="mt-1.5 pt-1.5 border-t border-border space-y-0.5">
                 <div className="text-[10px] uppercase tracking-wider mb-1 text-muted-foreground">By Stage</div>
-                {Object.entries(costData.byStage).sort(([, a], [, b]) => b.cost - a.cost).map(([stage, info]) => (
+                {Object.entries(workspace.costs.byStage).sort(([, a], [, b]) => b.cost - a.cost).map(([stage, info]) => (
                   <div key={stage} className="flex justify-between text-[10px]">
                     <span className="truncate text-muted-foreground" title={stage}>{stage.charAt(0).toUpperCase() + stage.slice(1)}</span>
                     <span className="text-foreground ml-2">{formatCost(info.cost)} ({formatTokens(info.tokens)})</span>
@@ -916,7 +1088,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
         )}
 
         {/* Service URLs */}
-        {workspace?.hasDocker && (workspace?.frontendUrl || workspace?.apiUrl) && (
+        {(workspace?.frontendUrl || workspace?.apiUrl) && (
           <div className="px-3 py-2 border-b border-border text-xs">
             <div className="uppercase tracking-wider text-[10px] mb-2 font-semibold text-muted-foreground">Services</div>
             <div className="space-y-1.5">
@@ -951,7 +1123,7 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
         )}
 
         {/* Git-only workspace / containerize */}
-        {workspace?.exists && !workspace.hasDocker && workspace.canContainerize && (
+        {workspace?.exists && !workspace.hasDocker && workspace.canContainerize && !workspace.hasAgent && (
           <div className="px-3 py-2 border-b border-border">
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Git-only workspace</span>
@@ -1004,11 +1176,11 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           </div>
         )}
 
-        {stashData?.salvageableStashes && stashData.salvageableStashes.length > 0 && (
+        {workspace?.salvageableStashes && workspace.salvageableStashes.length > 0 && (
           <div className="px-3 py-2 border-b border-border text-xs">
             <div className="uppercase tracking-wider text-[10px] mb-2 font-semibold text-muted-foreground">Salvageable Stashes</div>
             <div className="space-y-2">
-              {stashData.salvageableStashes.map((stash) => (
+              {workspace.salvageableStashes.map((stash) => (
                 <div key={stash.ref} className="rounded border border-border px-2 py-2 bg-card/40">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -1050,8 +1222,9 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           reviewStatus={reviewStatus}
           reviewStatusLoading={reviewStatusLoading}
           workspace={workspace}
-          hasPlan={planningState?.hasPlan ?? false}
-          beadsCount={planningState?.beadsCount ?? 0}
+          hasPlan={workspace?.planningState?.hasPlan ?? false}
+          hasBeads={workspace?.planningState?.hasBeads ?? false}
+          beadsCount={workspace?.planningState?.beadsCount ?? 0}
           reviewMutation={reviewMutation}
           cancelMutation={cancelMutation}
           startAgentMutation={startAgentMutation}
@@ -1071,8 +1244,13 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
           onReopen={handleReopen}
           onViewBeads={() => setShowBeads(true)}
           onViewVBrief={() => setShowVBrief(true)}
+          onViewLog={onViewMergeLog}
+          onSwitchModel={() => setShowSwitchModel(true)}
           lifecycle={agentLifecycle}
           agentLaunchState={agentLaunchState}
+          isFeature={issue?.artifactType?.includes('PortfolioItem') ?? false}
+          issueStatus={issue?.status}
+          onPlan={() => setPlanDialogIssue(issue ?? null)}
         />
 
         {/* Issue labels/tags for no-agent view */}
@@ -1090,6 +1268,43 @@ export function InspectorPanel({ agent, issueId, issueUrl, issue, phase, reviewS
 
         <div className="flex-1" />
       </div>
+
+      {/* Switch Model modal */}
+      {showSwitchModel && agent && (
+        <SwitchModelModal
+          currentModel={agent.model}
+          agentId={agent.id}
+          issueId={issueId}
+          agentStatus={agent.status}
+          hasResumableSession={agentLifecycle?.canResumeSession ?? false}
+          onClose={() => setShowSwitchModel(false)}
+          onSwitch={(model, message) => {
+            switchMutation.mutate({ model, message }, {
+              onSuccess: () => {
+                setShowSwitchModel(false);
+                toast.success(`Agent restarted on ${model}`);
+              },
+              onError: (err) => {
+                toast.error(err.message, { duration: 8000 });
+              },
+            });
+          }}
+          isPending={isSwitchPending}
+        />
+      )}
+
+      {/* Plan dialog */}
+      {planDialogIssue && (
+        <PlanDialog
+          issue={planDialogIssue}
+          isOpen={true}
+          onClose={() => setPlanDialogIssue(null)}
+          onComplete={async () => {
+            setPlanDialogIssue(null);
+            await refreshDashboardState(queryClient);
+          }}
+        />
+      )}
 
       {/* Beads dialog */}
       {showBeads && <BeadsDialog issueId={issueId} isOpen={showBeads} onClose={() => setShowBeads(false)} />}

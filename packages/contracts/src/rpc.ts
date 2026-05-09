@@ -3,6 +3,7 @@ import * as Rpc from "effect/unstable/rpc/Rpc"
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup"
 import { DomainEvent } from "./events"
 import { AgentStatus, DashboardSnapshot, IssueId, SequenceNumber, SessionNodePresence, WorkspaceDetail } from "./types"
+import { EditorIdSchema, OpenInEditorInput } from "./editor"
 
 // ─── RPC method names ─────────────────────────────────────────────────────────
 
@@ -33,6 +34,10 @@ export const WS_METHODS = {
   deepWipe: "pan.deepWipe",
   sendTerminalInput: "pan.sendTerminalInput",
   resizeTerminal: "pan.resizeTerminal",
+
+  // Editor integration (PAN-966)
+  shellOpenInEditor: "pan.shellOpenInEditor",
+  getAvailableEditors: "pan.getAvailableEditors",
 } as const
 
 // ─── Error types ──────────────────────────────────────────────────────────────
@@ -55,6 +60,29 @@ export const AgentOutput = Schema.Struct({
   line: Schema.String,
 })
 export type AgentOutput = typeof AgentOutput.Type
+
+// ─── Plan mode types ─────────────────────────────────────────────────────────
+
+export const ProposedPlan = Schema.Struct({
+  id: Schema.String,
+  plan: Schema.String,
+  planFilePath: Schema.optional(Schema.String),
+  status: Schema.Literals(['pending', 'approved', 'rejected']),
+  createdAt: Schema.String,
+  resolvedAt: Schema.optional(Schema.String),
+})
+export type ProposedPlan = typeof ProposedPlan.Type
+
+// ─── Compact boundary types ──────────────────────────────────────────────────
+
+export const CompactBoundary = Schema.Struct({
+  id: Schema.String,
+  timestamp: Schema.String,
+  trigger: Schema.optional(Schema.String),
+  preTokens: Schema.optional(Schema.Number),
+  model: Schema.optional(Schema.String),
+})
+export type CompactBoundary = typeof CompactBoundary.Type
 
 // ─── Chat / conversation message types (PAN-451) ──────────────────────────────
 
@@ -95,6 +123,8 @@ export interface ConversationResponse {
   streaming: boolean;
   totalCost: number;
   byteOffset: number;
+  proposedPlan?: ProposedPlan;
+  compactBoundaries?: CompactBoundary[];
 }
 
 export const ConversationEvent = Schema.Union([
@@ -103,6 +133,8 @@ export const ConversationEvent = Schema.Union([
     messages: Schema.Array(ChatMessage),
     workLog: Schema.Array(WorkLogEntry),
     streaming: Schema.Boolean,
+    proposedPlan: Schema.optional(ProposedPlan),
+    compactBoundaries: Schema.optional(Schema.Array(CompactBoundary)),
   }),
   Schema.Struct({
     kind: Schema.Literal('discovering'),
@@ -242,9 +274,21 @@ export const SubscribeProjectSessionTreeRpc = Rpc.make(WS_METHODS.subscribeProje
   stream: true,
 })
 
+/** 18. Open a workspace in an editor (PAN-966) */
+export const ShellOpenInEditorRpc = Rpc.make(WS_METHODS.shellOpenInEditor, {
+  payload: OpenInEditorInput,
+  error: PanRpcError,
+})
+
+/** 19. Get available (installed) editors (PAN-966) */
+export const GetAvailableEditorsRpc = Rpc.make(WS_METHODS.getAvailableEditors, {
+  success: Schema.Struct({ editors: Schema.Array(EditorIdSchema) }),
+  error: PanRpcError,
+})
+
 // ─── RPC Group ────────────────────────────────────────────────────────────────
 
-/** All 17 Panopticon WebSocket RPC methods */
+/** All 19 Panopticon WebSocket RPC methods */
 export const PanRpcGroup = RpcGroup.make(
   SubscribeDomainEventsRpc,
   SubscribeTerminalRpc,
@@ -263,5 +307,7 @@ export const PanRpcGroup = RpcGroup.make(
   ResizeTerminalRpc,
   SubscribeConversationMessagesRpc,
   SubscribeProjectSessionTreeRpc,
+  ShellOpenInEditorRpc,
+  GetAvailableEditorsRpc,
 )
 export type PanRpcGroup = typeof PanRpcGroup

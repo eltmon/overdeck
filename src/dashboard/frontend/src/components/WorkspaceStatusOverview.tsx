@@ -120,7 +120,7 @@ export function WorkspaceStatusOverview({
     || hasVerificationState
   );
 
-  const isStandby = agent?.status === 'stopped' && agent?.agentPhase === 'review-response';
+  const isStandby = agent?.status === 'stopped' && agent?.agentPhase === 'review-response' && !!lifecycle?.hasLiveTmuxSession;
   const isRunning = agent && agent.status !== 'dead' && (agent.status !== 'stopped' || isStandby);
   const isLaunching = agentLaunchState === 'starting' || agentLaunchState === 'resuming';
   const launchLabel = agentLaunchState === 'resuming' ? 'Resuming...' : 'Starting...';
@@ -160,7 +160,7 @@ export function WorkspaceStatusOverview({
         {/* Pipeline status */}
         {showPipelineStatus && reviewStatus && (
           <div className="mt-2">
-            <ReviewPipelineSection reviewStatus={reviewStatus} />
+            <ReviewPipelineSection reviewStatus={reviewStatus} issueId={issue.id} />
           </div>
         )}
         {reviewActionHint && (
@@ -548,7 +548,7 @@ export function WorkspaceStatusOverview({
           <textarea
             value={resumeMessage || ''}
             onChange={(e) => onResumeMessageChange?.(e.target.value)}
-            placeholder="Tell the agent what to do, e.g. 'Address the PR feedback about error handling' or leave empty to let it pick up from STATE.md"
+            placeholder="Tell the agent what to do, e.g. 'Address the PR feedback about error handling' or leave empty to let it pick up from the continue file"
             className="w-full px-2 py-1.5 text-xs bg-card border border-border rounded resize-none text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
             rows={3}
             autoFocus

@@ -40,6 +40,11 @@ export interface Issue {
   completedChildCount?: number;  // Children in Done state
   inProgressChildCount?: number;  // Children in active work
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';  // From review-status, set by specialist pipeline
+  // Planning-state (embedded from /api/issues via filesystem checks)
+  hasPlan?: boolean;
+  hasBeads?: boolean;
+  planningComplete?: boolean;
+  workspacePath?: string;
 }
 
 export interface GitStatus {
@@ -48,7 +53,7 @@ export interface GitStatus {
   latestCommit: string;
 }
 
-export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear' | 'abandoned';
+export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear' | 'abandoned' | 'api_error';
 
 export interface WorkAgentLifecycle {
   agentId: string;
@@ -92,6 +97,8 @@ export interface Agent {
   agentPhase?: 'planning' | 'implementation' | 'exploration' | string;
   hasPendingQuestion?: boolean;
   pendingQuestionCount?: number;
+  pendingQuestionPrompt?: string;
+  pendingQuestionReason?: string;
   resolution?: AgentResolution;  // Lifecycle completion signal (PAN-309)
   resolutionCount?: number;      // How many times this resolution was set
   runtimeState?: string;         // 'completed' when agent finished normally (not session lost)

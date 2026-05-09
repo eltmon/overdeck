@@ -21,14 +21,18 @@ vi.mock('util', async (importOriginal) => {
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
   sessionExists: vi.fn().mockReturnValue(false),
+  killSessionAsync: vi.fn().mockResolvedValue(undefined),
+  listSessionNamesAsync: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../../../src/lib/paths.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../src/lib/paths.js')>();
+  const testHome = join(tmpdir(), 'panopticon-wf-test-home');
   return {
     ...actual,
-    AGENTS_DIR: join(tmpdir(), 'panopticon-wf-test-agents'),
-    PANOPTICON_HOME: join(tmpdir(), 'panopticon-wf-test-home'),
+    PANOPTICON_HOME: testHome,
+    AGENTS_DIR: join(testHome, 'agents'),
+    ARCHIVES_DIR: join(testHome, 'archives'),
   };
 });
 
@@ -40,7 +44,7 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
   clearReviewStatus: vi.fn(),
 }));
 
-import { approve, closeOut, deepWipe, close } from '../../../../src/lib/lifecycle/workflows.js';
+import { approve, closeOut, deepWipe, close, __testInternals } from '../../../../src/lib/lifecycle/workflows.js';
 import { AGENTS_DIR, PANOPTICON_HOME } from '../../../../src/lib/paths.js';
 
 describe('workflows', () => {
@@ -139,12 +143,11 @@ describe('workflows', () => {
       mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      const result = await closeOut(ctx);
+      const verifyStep = await __testInternals.verifyBranchMerged(ctx);
 
-      expect(result.workflow).toBe('close-out');
-      const verifyStep = result.steps.find(s => s.step === 'close-out:verify-merged');
-      expect(verifyStep).toBeDefined();
-      expect(verifyStep!.success).toBe(true);
+      expect(verifyStep.step).toBe('close-out:verify-merged');
+      expect(verifyStep.success).toBe(true);
+      expect(verifyStep.details).toEqual(['Branch already cleaned up (squash-merged)']);
     });
 
     it('should abort if archive fails', async () => {

@@ -114,14 +114,32 @@ Only review files that were changed in this PR (listed in **Files changed** in t
 - If a performance pattern is missing in unchanged files that were not part of this PR, do NOT flag it as a blocker.
 - Blocker severity (`!`) is reserved for performance regressions introduced BY this PR.
 
-## Review Process
+## Review Process (Multi-Pass)
 
-1. **Identify hot paths** - Find frequently executed code
-2. **Analyze algorithms** - Check time complexity
-3. **Review database queries** - Look for N+1 and missing indexes
-4. **Check memory usage** - Find leaks and large allocations
-5. **Examine I/O operations** - Verify async, caching, pooling
-6. **Document findings** - Write to the path specified in `**Output file**` in the Review Context
+You MUST complete 3 review passes. Each pass deepens your analysis. This catches performance issues that a single pass misses.
+
+### Pass 1: Hot path identification
+1. Read all changed files and identify hot paths — frequently executed code, request handlers, event loops, database access patterns
+2. Check time complexity of algorithms and data structure choices
+3. Find your **top 3 most critical performance findings**
+4. Write them to the output file immediately (don't wait until the end)
+
+### Pass 2: Pattern-adjacent search
+1. For each finding from Pass 1, **grep for the same pattern in OTHER changed files** — if you found a synchronous call in one handler, check ALL handlers for sync calls; if you found an N+1 query, check all query sites
+2. Review database queries, I/O operations, and caching strategies across ALL changed files
+3. Check memory usage — find leaks, large allocations, unclosed subscriptions
+4. Find **3 more findings** and append to your output
+
+### Pass 3: Scalability deep dive
+1. Pick the 3 most performance-sensitive changed files and **re-read them line by line**
+2. Focus specifically on: blocking calls in async contexts, missing pagination, unbounded loops, serial operations that could be parallel, unnecessary work on every request
+3. Examine frontend changes for unnecessary re-renders, missing memoization, large bundle impact
+4. Append any remaining findings to your output
+
+### Consolidate
+- Re-read your complete output file
+- Remove duplicates, adjust severities based on the full picture
+- Finalize the output
 
 ## Output Format
 
@@ -355,6 +373,6 @@ const html = parts.join('');
 
 After writing your review:
 1. Confirm the file was written successfully.
-2. **Display the full review markdown in this conversation.** Read the file you just wrote and paste its entire contents back as a fenced markdown block in your final response. This is required — it lets the work agent, dashboard conversation viewer, and tmux pane history show the findings without anyone having to open the file. Don't summarize; render the whole thing.
+2. **Display the full review markdown in this conversation.** Read the file you just wrote and paste its entire contents back **as plain markdown directly in your response — do NOT wrap it in a fenced code block** (no ```markdown ... ```). The dashboard renders your message as markdown, so the headings, lists, and code blocks inside your review render properly only when they aren't nested inside a code fence. This is required — it lets the work agent, dashboard conversation viewer, and tmux pane history show the findings without anyone having to open the file. Don't summarize; render the whole thing.
 3. Report completion status with issue count.
 4. Wait for synthesis agent to combine all reviews.

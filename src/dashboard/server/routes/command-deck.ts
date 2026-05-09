@@ -1,4 +1,5 @@
 import { jsonResponse } from "../http-helpers.js";
+import { buildChildEnv } from '../../../lib/child-env.js';
 /**
  * Command Deck route module — Effect HttpRouter.Layer (PAN-428 B13)
  *
@@ -30,12 +31,14 @@ import { promisify } from 'node:util';
 import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../services/domain-services.js';
+import { ReadModelService } from '../read-model.js';
 
 import { getAgentRuntimeStateAsync, listRunningAgentsAsync } from '../../../lib/agents.js';
+import { detectAwaitingInputForAgent, detectAwaitingInputFromPane, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { syncCache, getCostsForIssue } from '../../../lib/costs/index.js';
 import { capturePaneAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
-import { SessionNodePresence } from '@panctl/contracts';
+import type { AgentSnapshot, SessionNodePresence } from '@panctl/contracts';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
@@ -58,6 +61,8 @@ import {
 import { httpHandler } from './http-handler.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, type ReviewerRoundMetadata } from './reviewer-tree.js';
+import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
+import { findPlan } from '../../../lib/vbrief/io.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -184,12 +189,15 @@ const getMissionControlActivityRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const request = yield* HttpServerRequest.HttpServerRequest;
+    const readModel = yield* ReadModelService;
     const issueId = params['issueId'] ?? '';
     const url = new URL(request.url, 'http://localhost');
     const includeTranscripts = url.searchParams.get('summary') !== '1';
+    const snapshot = yield* readModel.getSnapshot;
+    const agentSnapshotsById = new Map(snapshot.agents.map((agent) => [agent.id, agent]));
 
     const result = yield* Effect.tryPromise({
-      try: () => fetchActivityDataWithContext(issueId, { includeTranscripts }),
+      try: () => fetchActivityDataWithContext(issueId, { includeTranscripts, agentSnapshotsById }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     return jsonResponse(result);
@@ -200,6 +208,20 @@ export interface ActivityContext {
   tmuxSessionNames?: Set<string>;
   taskFileContents?: Map<string, string>;
   includeTranscripts?: boolean;
+  agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>;
+}
+
+function awaitingInputFromProjection(
+  agentId: string,
+  agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>,
+): AwaitingInputDetection | null | undefined {
+  const agent = agentSnapshotsById?.get(agentId);
+  if (!agent) return undefined;
+  if (agent.hasPendingQuestion !== true) return null;
+  return {
+    reason: (agent.pendingQuestionReason as AwaitingInputDetection['reason'] | undefined) ?? 'other',
+    prompt: agent.pendingQuestionPrompt || 'Agent is waiting for human input',
+  };
 }
 
 export async function fetchActivityData(issueId: string): Promise<unknown> {
@@ -237,6 +259,9 @@ export async function fetchActivityDataWithContext(
     status: string;
     transcript?: string;
     presence: SessionNodePresence;
+    awaitingInput?: boolean;
+    awaitingInputPrompt?: string;
+    awaitingInputReason?: string;
     hasJsonl?: boolean;
     roundMetadata?: ReviewerRoundMetadata;
   }> = [];
@@ -265,9 +290,11 @@ export async function fetchActivityDataWithContext(
       if (isPlanning) hasPlanningSection = true;
 
       let transcript = '';
+      let transcriptFromPane = false;
       if (includeTranscripts) {
         try {
           transcript = (await capturePaneAsync(checkId, 500)).trim();
+          transcriptFromPane = transcript.length > 0;
         } catch { /* agent may not be running */ }
 
         if (!isPlanning && !transcript) {
@@ -277,13 +304,24 @@ export async function fetchActivityDataWithContext(
 
         if (isPlanning && !transcript) {
           const projectPath = getProjectPath(issuePrefix);
-          const stateMdText = await readOptional(join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning', 'STATE.md'));
-          if (stateMdText) transcript = `PLANNING COMPLETE\n\n${stateMdText}`;
+          const workspacePanDir = join(projectPath, 'workspaces', `feature-${issueLower}`, PAN_DIRNAME);
+          const continueText = await readOptional(join(workspacePanDir, PAN_CONTINUE_FILENAME));
+          if (continueText) {
+            transcript = `PLANNING COMPLETE\n\n${continueText}`;
+          }
         }
       }
 
       const rtState = await getAgentRuntimeStateAsync(checkId);
       const presence = await deriveSessionPresence(checkId, rtState, tmuxSessionNames);
+      const projectedAwaitingInput = awaitingInputFromProjection(checkId, context.agentSnapshotsById);
+      const awaitingInput = projectedAwaitingInput !== undefined
+        ? projectedAwaitingInput
+        : transcriptFromPane
+          ? detectAwaitingInputFromPane(transcript, { isPlanning })
+          : tmuxSessionNames.has(checkId)
+            ? await detectAwaitingInputForAgent(checkId, { isPlanning })
+            : null;
 
       // Resolve JSONL path for conversation rendering (PAN-821)
       const jsonlPath = await resolveJsonlPath(checkId, workspacePath);
@@ -309,18 +347,21 @@ export async function fetchActivityDataWithContext(
           : (state.status || 'completed'),
         transcript: jsonlPath ? undefined : transcript,
         presence,
+        awaitingInput: awaitingInput !== null,
+        awaitingInputPrompt: awaitingInput?.prompt,
+        awaitingInputReason: awaitingInput?.reason,
         hasJsonl: !!jsonlPath,
         tmuxSession: exposeInteractiveTerminal ? checkId : undefined,
       });
     } catch { /* skip malformed state */ }
   }
 
-  // If no planning agent but STATE.md exists, create synthetic planning section
+  // If no planning agent but continue file exists, create synthetic planning section
   if (!hasPlanningSection) {
-    const stateMdPath = join(workspacePath, '.planning', 'STATE.md');
-    const stateMdText = await readOptional(stateMdPath);
-    if (stateMdText) {
-      const fileStat = await stat(stateMdPath).catch(() => null);
+    const continuePath = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
+    const continueText = await readOptional(continuePath);
+    if (continueText) {
+      const fileStat = await stat(continuePath).catch(() => null);
       const sessionId = `planning-${issueLower}-state`;
       const jsonlPath = await resolveJsonlPath(sessionId, workspacePath);
       sections.push({
@@ -332,7 +373,7 @@ export async function fetchActivityDataWithContext(
           || new Date().toISOString(),
         duration: null,
         status: 'completed',
-        transcript: jsonlPath ? undefined : `PLANNING COMPLETE\n\n${stateMdText}`,
+        transcript: jsonlPath ? undefined : `PLANNING COMPLETE\n\n${continueText}`,
         presence: 'ended',
         hasJsonl: !!jsonlPath,
       });
@@ -613,7 +654,8 @@ async function fetchPlanningData(
 
   const projectPath = getProjectPath(issuePrefix);
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-  const planningDir = join(workspacePath, '.planning');
+  const planningDir = join(workspacePath, PAN_DIRNAME);
+  const panContinuePath = join(planningDir, PAN_CONTINUE_FILENAME);
 
   const result: {
     hasPrd: boolean;
@@ -633,14 +675,26 @@ async function fetchPlanningData(
   // Helper: read PRD content from a location, handling both flat and subdir formats.
   const readPrdContent = async (loc: PrdLocation | null): Promise<string | undefined> => {
     if (!loc) return undefined;
-    if (loc.format === 'flat') {
+    if (loc.format === 'flat' || loc.format === 'pan-draft') {
       return (await readOptional(loc.path)) ?? undefined;
     }
-    // Subdirectory format: STATE.md is the human-readable PRD content.
-    return (await readOptional(join(loc.path, 'STATE.md'))) ?? undefined;
+
+    const files = (await readdir(loc.path).catch(() => [] as string[]))
+      .filter((file) => file.endsWith('.md'))
+      .sort((a, b) => {
+        if (a === 'prd.md') return -1;
+        if (b === 'prd.md') return 1;
+        return a.localeCompare(b);
+      });
+    const firstMarkdown = files[0];
+    if (!firstMarkdown) return undefined;
+    return (await readOptional(join(loc.path, firstMarkdown))) ?? undefined;
   };
 
-  if (!await pathExists(planningDir)) {
+  const hasPlanningDir = await pathExists(planningDir);
+  const hasPanContinue = await pathExists(panContinuePath);
+
+  if (!hasPlanningDir && !hasPanContinue) {
     const prd = await readPrdContent(findPrdAtStatus(projectPath, issueId, 'active'));
     if (prd) {
       result.prd = prd;
@@ -662,8 +716,9 @@ async function fetchPlanningData(
     return result;
   }
 
-  result.state = await readOptional(join(planningDir, 'STATE.md')) ?? undefined;
-  result.inference = await readOptional(join(planningDir, 'INFERENCE.md')) ?? undefined;
+  const continueState = await readOptional(panContinuePath);
+  result.state = continueState ?? undefined;
+  result.inference = hasPlanningDir ? (await readOptional(join(planningDir, 'INFERENCE.md')) ?? undefined) : undefined;
   result.hasState = Boolean(result.state);
 
   const statusReviewPath = join(planningDir, 'STATUS_REVIEW.md');
@@ -689,6 +744,7 @@ async function fetchPlanningData(
   result.hasPrd = Boolean(result.prd);
 
   const listArtifactFiles = async (subdir: string): Promise<Array<{ filename: string; mtime: string }>> => {
+    if (!hasPlanningDir) return [];
     const dirPath = join(planningDir, subdir);
     if (!await pathExists(dirPath)) return [];
     const files = (await readdir(dirPath).catch(() => [] as string[])).filter(
@@ -717,8 +773,8 @@ async function fetchPlanningData(
 
   // Acceptance criteria progress from vBRIEF plan (PAN-847)
   try {
-    const planPath = join(planningDir, 'plan.vbrief.json');
-    if (await pathExists(planPath)) {
+    const planPath = findPlan(workspacePath);
+    if (planPath && await pathExists(planPath)) {
       const raw = await readFile(planPath, 'utf-8');
       const doc = JSON.parse(raw);
       const items: Array<{ status?: string }> = doc?.plan?.items ?? [];
@@ -807,13 +863,14 @@ async function generateStatusReview(issueId: string): Promise<
 
   const projectPath = getProjectPath(issuePrefix);
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-  const planningDir = join(workspacePath, '.planning');
+  const planningDir = join(workspacePath, PAN_DIRNAME);
+  const panContinuePath = join(planningDir, PAN_CONTINUE_FILENAME);
 
-  if (!await pathExists(planningDir)) {
-    return { type: 'err', response: { error: 'No planning directory found' }, status: 404 };
+  if (!await pathExists(planningDir) && !await pathExists(panContinuePath)) {
+    return { type: 'err', response: { error: 'No planning state found' }, status: 404 };
   }
 
-  const state = await readOptional(join(planningDir, 'STATE.md'));
+  const state = await readOptional(panContinuePath);
 
   const readPlanningSubdir = async (subdir: string, limit = 5, maxPerFile = 2000): Promise<string> => {
     const dirPath = join(planningDir, subdir);
@@ -884,6 +941,7 @@ async function generateStatusReview(issueId: string): Promise<
     .update([state, discussionsContent, transcriptsContent, notesContent, issueContext, gitDiff, gitDiffFull, gitLog, filesChanged, reviewStatus, testStatus].filter(Boolean).join('|'))
     .digest('hex');
 
+  await mkdir(planningDir, { recursive: true });
   const hashPath = join(planningDir, '.status-review-hash');
   const statusReviewPath = join(planningDir, 'STATUS_REVIEW.md');
 
@@ -905,8 +963,8 @@ ${issueContext ? `\n${issueContext}\n` : ''}
 - Review: ${reviewStatus}
 - Tests: ${testStatus}
 
-## STATE.md (Planning Context and Progress Notes)
-${state ? state.slice(0, 4000) : '(No STATE.md available)'}
+## Planning Context (continue.vbrief.json)
+${state ? state.slice(0, 4000) : '(No planning state available)'}
 
 ## Files Changed
 ${filesChanged.slice(0, 2000) || 'No changes detected'}
@@ -970,7 +1028,7 @@ Be specific: reference actual file names, function names, requirement text, disc
   console.log(`[status-review] ${issueId}: generating with ${providerEnvStr}${cliCmd}${modelFlag}`);
 
   try {
-    const env = { ...process.env, ...providerEnv };
+    const env = buildChildEnv(process.env, providerEnv);
     const promptContent = await readFile(promptFile, 'utf-8');
     const { stdout: aiReview } = await execAsync(
       `${cliCmd} -p${modelFlag} --no-session-persistence`,
@@ -1061,7 +1119,7 @@ const postMissionControlUploadRoute = HttpRouter.add(
     const projectPath = getProjectPath(issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     const subdir = type === 'transcript' ? 'transcripts' : 'notes';
-    const dirPath = join(workspacePath, '.planning', subdir);
+    const dirPath = join(workspacePath, PAN_DIRNAME, subdir);
 
     yield* Effect.tryPromise({
       try: async () => {
@@ -1099,7 +1157,7 @@ const postMissionControlSyncDiscussionsRoute = HttpRouter.add(
 
     const projectPath = getProjectPath(issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const discussionsDir = join(workspacePath, '.planning', 'discussions');
+    const discussionsDir = join(workspacePath, PAN_DIRNAME, 'discussions');
 
     yield* Effect.tryPromise({
       try: () => mkdir(discussionsDir, { recursive: true }),
@@ -1248,7 +1306,7 @@ const postMissionControlPlanningInitRoute = HttpRouter.add(
 
     const projectPath = getProjectPath(issuePrefix);
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const planningDir = join(workspacePath, '.planning');
+    const planningDir = join(workspacePath, PAN_DIRNAME);
 
     yield* Effect.tryPromise({
       try: async () => {

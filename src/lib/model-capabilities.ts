@@ -40,9 +40,9 @@ export const MODEL_DEPRECATIONS: Record<string, ModelId> = {
   // Do NOT treat gpt-4o/gpt-4o-mini as deprecated — they are the actual API names.
   // Google deprecated models
   'gemini-3-pro-preview': 'gemini-3.1-pro-preview',
-  'gemini-3-flash-preview': 'gemini-3-flash',
+  'gemini-3-flash': 'gemini-3-flash-preview',
   'gemini-2.5-pro': 'gemini-3.1-pro-preview',
-  'gemini-2.5-flash': 'gemini-3-flash',
+  'gemini-2.5-flash': 'gemini-3-flash-preview',
   // Kimi deprecated
   'kimi-k2': 'kimi-k2.5',
   // Z.AI deprecated
@@ -86,7 +86,7 @@ export interface ModelCapability {
   /** Model identifier */
   model: ModelId;
   /** Provider for this model */
-  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai';
+  provider: 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo';
   /** Display name */
   displayName: string;
   /** Cost per 1M tokens (average of input/output) in USD */
@@ -492,10 +492,10 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
     notes: 'Google flagship (March 2026). Replaces Gemini 3 Pro (shut down). Strong agentic and coding capabilities.',
   },
 
-  'gemini-3-flash': {
-    model: 'gemini-3-flash',
+  'gemini-3-flash-preview': {
+    model: 'gemini-3-flash-preview',
     provider: 'google',
-    displayName: 'Gemini 3 Flash',
+    displayName: 'Gemini 3 Flash Preview',
     costPer1MTokens: 0.4, // ~$0.15 in / $0.60 out
     contextWindow: 1000000,
     skills: {
@@ -538,7 +538,6 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
 
   // Legacy Google IDs — deprecated aliases kept for backward compat with saved configs
   'gemini-3-pro-preview': { model: 'gemini-3-pro-preview', provider: 'google', displayName: 'Gemini 3 Pro (deprecated)', costPer1MTokens: 7.0, contextWindow: 1000000, skills: { 'code-generation': 93, 'code-review': 90, debugging: 88, planning: 88, documentation: 90, testing: 88, security: 82, performance: 88, synthesis: 92, speed: 75, 'context-length': 100 } },
-  'gemini-3-flash-preview': { model: 'gemini-3-flash-preview', provider: 'google', displayName: 'Gemini 3 Flash (deprecated)', costPer1MTokens: 0.4, contextWindow: 1000000, skills: { 'code-generation': 80, 'code-review': 75, debugging: 72, planning: 68, documentation: 76, testing: 72, security: 60, performance: 70, synthesis: 75, speed: 96, 'context-length': 100 } },
   'gemini-2.5-pro': { model: 'gemini-2.5-pro', provider: 'google', displayName: 'Gemini 2.5 Pro (deprecated)', costPer1MTokens: 7.0, contextWindow: 1000000, skills: { 'code-generation': 90, 'code-review': 88, debugging: 86, planning: 86, documentation: 88, testing: 86, security: 80, performance: 86, synthesis: 90, speed: 70, 'context-length': 100 } },
   'gemini-2.5-flash': { model: 'gemini-2.5-flash', provider: 'google', displayName: 'Gemini 2.5 Flash (deprecated)', costPer1MTokens: 0.4, contextWindow: 1000000, skills: { 'code-generation': 78, 'code-review': 74, debugging: 70, planning: 66, documentation: 74, testing: 70, security: 58, performance: 68, synthesis: 74, speed: 94, 'context-length': 100 } },
 
@@ -728,6 +727,54 @@ export const MODEL_CAPABILITIES: Record<ModelId, ModelCapability> = {
       'context-length': 92,
     },
     notes: 'Fast and affordable GLM model for quick iterations. 200K context.',
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // XIAOMI MIMO MODELS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  'mimo-v2.5-pro': {
+    model: 'mimo-v2.5-pro',
+    provider: 'mimo',
+    displayName: 'MiMo V2.5 Pro',
+    costPer1MTokens: 2.0,
+    contextWindow: 1048576,
+    skills: {
+      'code-generation': 88,
+      'code-review': 86,
+      debugging: 86,
+      planning: 84,
+      documentation: 84,
+      testing: 84,
+      security: 80,
+      performance: 82,
+      synthesis: 88,
+      speed: 78,
+      'context-length': 100,
+    },
+    notes: 'Xiaomi MiMo flagship reasoning model. Enhanced agent efficiency, 1M context window.',
+  },
+
+  'mimo-v2.5': {
+    model: 'mimo-v2.5',
+    provider: 'mimo',
+    displayName: 'MiMo V2.5',
+    costPer1MTokens: 1.0,
+    contextWindow: 262144,
+    skills: {
+      'code-generation': 82,
+      'code-review': 80,
+      debugging: 80,
+      planning: 78,
+      documentation: 78,
+      testing: 78,
+      security: 74,
+      performance: 76,
+      synthesis: 82,
+      speed: 85,
+      'context-length': 96,
+    },
+    notes: 'Xiaomi MiMo multimodal model. 262K context, strong agentic and coding capabilities.',
   },
 };
 

@@ -42,7 +42,6 @@ export function ZoneA({
         title={title}
         source={source}
         url={url}
-        onOpenBeads={onOpenBeads}
       />
       <ZoneActionStrip
         issueId={issueId}

@@ -1,37 +1,45 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync } from 'fs';
 import { readFile, readdir } from 'fs/promises';
-import { join, resolve } from 'path';
+import { Agent as HttpAgent, request as httpRequest } from 'node:http';
+import { join, resolve, dirname } from 'path';
 import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
-import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync, waitForClaudePrompt } from './tmux.js';
+import { getClaudePermissionFlagsString, resolvePermissionMode } from './claude-permissions.js';
+import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sendRawKeystrokeAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync, waitForClaudePrompt } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
 import { loadCloisterConfig } from './cloister/config.js';
+import { BLANKED_PROVIDER_ENV } from './child-env.js';
 import type { ModelId } from './settings.js';
 import { getModelId, WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from './providers.js';
-import { loadConfig as loadYamlConfig } from './config-yaml.js';
+import { validateProviderHealth } from './provider-health.js';
+import { loadConfig as loadYamlConfig, isClaudeCodeChannelsEnabled } from './config-yaml.js';
 import type { NormalizedCavemanConfig } from './config-yaml.js';
+import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
 import { loadConfig } from './config.js';
-import { getOpenAIAuthStatusSync } from './openai-auth.js';
-import { getCliproxyClientEnv } from './cliproxy.js';
+import { getOpenAIAuthStatus, getOpenAIAuthStatusSync } from './openai-auth.js';
+import { bridgeGeminiAuthToCliproxyAsync, getCliproxyClientEnv } from './cliproxy.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
-import { findProjectByPath, getIssuePrefix } from './projects.js';
+import { findProjectByPath, getIssuePrefix, resolveProjectFromIssue } from './projects.js';
+import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 import { generateLauncherScript } from './launcher-generator.js';
 import { logAgentLifecycle } from './persistent-logger.js';
+import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
+import { BRIDGE_TOKEN_HEADER, readBridgeToken, writeBridgeToken } from './bridge-token.js';
 
 const execAsync = promisify(exec);
 
 /**
- * BFS-walk a process subtree rooted at `rootPid` looking for a claude-family
- * runtime (comm == 'claude' or 'claudish'). Returns true if any process in the
- * tree matches, false if the tree exists but no match, false on any error.
+ * BFS-walk a process subtree rooted at `rootPid` looking for the Claude Code
+ * runtime (comm == 'claude'). Returns true if any process in the tree matches,
+ * false if the tree exists but no match, false on any error.
  *
  * Used by sendAgentMessage zombie detection. pane_pid is the tmux pane's root
  * process, which is bash for work-agent launchers (`bash launcher.sh`) but
@@ -48,7 +56,7 @@ async function hasAgentRuntimeInSubtree(rootPid: string): Promise<boolean> {
     try {
       const { stdout: comm } = await execAsync(`ps -p ${pid} -o comm=`);
       const name = comm.trim();
-      if (name === 'claude' || name === 'claudish') return true;
+      if (name === 'claude') return true;
     } catch {
       continue;
     }
@@ -65,11 +73,12 @@ async function hasAgentRuntimeInSubtree(rootPid: string): Promise<boolean> {
   return false;
 }
 
-export function getProviderAuthMode(model: string): string | undefined {
+export async function getProviderAuthMode(model: string): Promise<AuthMode | undefined> {
   const provider = getProviderForModel(model);
   if (provider.name === 'openai') {
     const { config } = loadYamlConfig();
-    return getOpenAIAuthStatusSync().loggedIn
+    const authStatus = await getOpenAIAuthStatus();
+    return authStatus.loggedIn
       ? 'subscription'
       : (config.providerAuth?.openai ?? 'api-key');
   }
@@ -89,29 +98,92 @@ const CLI_PROXY_MODEL_ALIASES: Record<string, string> = {
   'gpt-5.4-pro': 'gpt-5.4',
 };
 
-export function getLaunchModelForModel(model: string): string {
-  return getClaudishPrefix(model, getProviderAuthMode(model));
+/**
+ * Panopticon pipeline agent types that map 1:1 to .claude/agents/pan-<type>-agent.md
+ * definitions. Bead workspace-7if (modify-base-command) consumes this to emit
+ * `claude --agent pan-<type>-agent` instead of inline --model/--permission flags.
+ * Bead workspace-eet wires the parameter through; bead workspace-7if turns the
+ * parameter into the --agent flag emission.
+ */
+export type PanopticonAgentType =
+  | 'work'
+  | 'planning'
+  | 'review'
+  | 'test'
+  | 'inspect'
+  | 'uat'
+  | 'merge';
+
+/** Agent definitions live at .claude/agents/pan-<type>-agent.md */
+export function panopticonAgentName(type: PanopticonAgentType): string {
+  return `pan-${type}-agent`;
 }
 
-export function getAgentRuntimeBaseCommand(model: string): string {
-  const provider = getProviderForModel(model);
-  const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
-  if (provider.compatibility === 'direct') {
-    return `claude ${permissionFlags} --model ${model}`;
+/**
+ * Build the base command that the launcher will exec for an agent.
+ *
+ * The `harness` parameter (PAN-636) selects between Claude Code (default)
+ * and Pi. When `harness === 'pi'` the function short-circuits to a
+ * `pi --mode rpc --model <model>` line; the launcher generator then layers
+ * --session-dir, --extension, --no-context-files, and the stdin-from-fifo
+ * redirect on top via generateLauncherScript. The `agentName` (PAN-982:
+ * --name) and `agentType` (PAN-982: --agent) parameters only apply to the
+ * Claude Code path — Pi has no agent-definition system.
+ */
+export async function getAgentRuntimeBaseCommand(
+  model: string,
+  agentName?: string,
+  agentType?: PanopticonAgentType,
+  harness: 'claude-code' | 'pi' = 'claude-code',
+): Promise<string> {
+  if (harness === 'pi') {
+    return `pi --mode rpc --model ${model}`;
   }
+
+
+  const provider = getProviderForModel(model);
+  const permissionFlags = getClaudePermissionFlagsString();
+  // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
+  // `claude --resume`.
+  const nameFlag = agentName ? ` --name ${agentName}` : '';
+  // PAN-982: When agentType is provided, select the matching .claude/agents/pan-<type>-agent.md
+  // definition. The agent frontmatter declares model, permissionMode, tools, and per-agent hooks,
+  // so we usually omit --permission-mode and (for Anthropic models) --model.
+  // Non-Anthropic providers still need --model to pin the routed model id, since the
+  // frontmatter `model:` only accepts Anthropic identifiers.
+  const agentFlag = agentType ? ` --agent ${panopticonAgentName(agentType)}` : '';
+  // When the user has opted into full bypass (PAN_YOLO=true or claude.permissionMode=bypass
+  // in config), --dangerously-skip-permissions is added on top of --agent. The agent
+  // frontmatter's permissionMode: bypassPermissions only bypasses prompts INSIDE cwd —
+  // cross-directory reads (e.g. ~/.panopticon/cliproxy/, ~/pan-tts/) still prompt without
+  // DSP. The flag is passed through ahead of --agent so it applies before frontmatter is
+  // resolved.
+  const bypassWithAgent = agentType && resolvePermissionMode() === 'bypass'
+    ? ' --dangerously-skip-permissions'
+    : '';
 
   // OpenAI subscription → local CLIProxyAPI sidecar exposes an
   // Anthropic-compatible /v1/messages endpoint, so Claude Code can drive
-  // gpt-* models directly via ANTHROPIC_BASE_URL (no claudish wrapper).
+  // gpt-* models directly via ANTHROPIC_BASE_URL (no wrapper process).
   // The provider env vars are injected separately by getProviderEnvForModel.
-  if (provider.name === 'openai' && getProviderAuthMode(model) === 'subscription') {
+  if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
     // CLIProxy supports gpt-5.x but not the -pro variant; map aliases to real names.
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
-    return `claude ${permissionFlags} --model ${resolvedModel}`;
+    if (agentType) {
+      // CLIProxy: --agent + --model override (frontmatter model: only accepts Anthropic ids).
+      return `claude${bypassWithAgent}${agentFlag} --model ${resolvedModel}${nameFlag}`;
+    }
+    return `claude ${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
 
-  const routedModel = getLaunchModelForModel(model);
-  return `claudish -i --model ${routedModel} ${permissionFlags}`;
+  if (agentType) {
+    // Anthropic direct: --agent fully replaces --model. Non-Anthropic
+    // direct providers still need --model because agent frontmatter model:
+    // only accepts Anthropic identifiers.
+    const modelFlag = provider.name === 'anthropic' ? '' : ` --model ${model}`;
+    return `claude${bypassWithAgent}${agentFlag}${modelFlag}${nameFlag}`;
+  }
+  return `claude ${permissionFlags} --model ${model}${nameFlag}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
@@ -130,7 +202,7 @@ export function normalizeAgentId(agentId: string): string {
  * Reads the current API key from settings so resumed/recovered agents
  * always use the latest key.
  */
-export function getProviderEnvForModel(model: string): Record<string, string> {
+export async function getProviderEnvForModel(model: string): Promise<Record<string, string>> {
   const provider = getProviderForModel(model);
   if (provider.name === 'anthropic') return {};
 
@@ -147,22 +219,38 @@ export function getProviderEnvForModel(model: string): Record<string, string> {
 
   const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
 
+  if (provider.name === 'google') {
+    if (!apiKey) {
+      throw new Error(`Google API key not configured. Add GOOGLE_API_KEY in Settings → Google or ~/.panopticon.env before using model "${model}".`);
+    }
+
+    if (!await bridgeGeminiAuthToCliproxyAsync(apiKey)) {
+      throw new Error(`Failed to bridge Google API key into CLIProxy before using model "${model}".`);
+    }
+
+    return getCliproxyClientEnv();
+  }
+
   if (provider.name === 'openai') {
-    const authStatus = getOpenAIAuthStatusSync();
+    const authStatus = await getOpenAIAuthStatus();
     if (authStatus.loggedIn) {
       // Route through the local CLIProxyAPI sidecar using the user's
       // ChatGPT subscription OAuth tokens. Claude Code sees a normal
       // Anthropic-compatible endpoint and never needs an API key.
       return getCliproxyClientEnv();
     }
+
+    const configuredKey = apiKey || authStatus.hasOpenAIApiKey;
+    throw new Error(
+      configuredKey
+        ? `OpenAI API-key routing is no longer supported for model "${model}" because api.openai.com does not expose an Anthropic-compatible /v1/messages endpoint. Sign in with a Codex/ChatGPT subscription via \`pan admin specialists codex login\` or Dashboard Settings → Codex Login.`
+        : `Codex/ChatGPT subscription login required for OpenAI model "${model}". Sign in via \`pan admin specialists codex login\` or Dashboard Settings → Codex Login.`,
+    );
   }
 
   if (apiKey) {
+    await validateProviderHealth(model, apiKey);
     return getProviderEnv(provider, apiKey);
-  }
-
-  if (provider.name === 'openai' && getOpenAIAuthStatusSync().loggedIn) {
-    return getCliproxyClientEnv();
   }
 
   throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);
@@ -173,24 +261,31 @@ export function getProviderEnvForModel(model: string): Record<string, string> {
  * Returns empty string for Anthropic models.
  */
 const PROVIDER_ENV_KEYS = [
+  'ANTHROPIC_API_KEY',
   'ANTHROPIC_BASE_URL',
   'ANTHROPIC_AUTH_TOKEN',
+  'ANTHROPIC_DEFAULT_HAIKU_MODEL',
+  'ANTHROPIC_DEFAULT_OPUS_MODEL',
+  'ANTHROPIC_DEFAULT_SONNET_MODEL',
+  'ANTHROPIC_SMALL_FAST_MODEL',
+  'CLAUDE_CODE_SUBAGENT_MODEL',
   'OPENAI_API_KEY',
   'GEMINI_API_KEY',
   'API_TIMEOUT_MS',
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
 ] as const;
 
-export function getProviderExportsForModel(model: string): string {
-  const envVars = getProviderEnvForModel(model);
+export async function getProviderExportsForModel(model: string): Promise<string> {
+  const envVars = await getProviderEnvForModel(model);
   const unsetLines = PROVIDER_ENV_KEYS.map(key => `unset ${key}`);
   const exportLines = Object.entries(envVars)
     .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`);
+
   return [...unsetLines, ...exportLines].join('\n') + '\n';
 }
 
 /**
- * Build a sanitized env for programmatically spawning `claude`/`claudish`.
+ * Build a sanitized env for programmatically spawning `claude`.
  *
  * The dashboard parent process may inherit provider env vars (e.g.
  * ANTHROPIC_BASE_URL pointing at the CLIProxy sidecar) that would mis-route
@@ -200,17 +295,17 @@ export function getProviderExportsForModel(model: string): string {
  * Returns a copy of `baseEnv` (default: process.env) with all PROVIDER_ENV_KEYS
  * deleted, then overlaid with the correct provider env for `model`.
  */
-export function buildSpawnEnvForModel(
+export async function buildSpawnEnvForModel(
   model: string,
   baseEnv: NodeJS.ProcessEnv = process.env,
-): Record<string, string> {
+): Promise<Record<string, string>> {
   const sanitized: Record<string, string> = {};
   for (const [k, v] of Object.entries(baseEnv)) {
     if (v === undefined) continue;
     if ((PROVIDER_ENV_KEYS as readonly string[]).includes(k)) continue;
     sanitized[k] = v;
   }
-  const providerEnv = getProviderEnvForModel(model);
+  const providerEnv = await getProviderEnvForModel(model);
   return { ...sanitized, ...providerEnv };
 }
 
@@ -218,61 +313,13 @@ export function buildSpawnEnvForModel(
  * Get tmux -e flags for provider env vars (for use in tmux new-session).
  * Returns empty string for Anthropic models.
  */
-export function getProviderTmuxFlags(model: string): string {
-  const envVars = getProviderEnvForModel(model);
+export async function getProviderTmuxFlags(model: string): Promise<string> {
+  const envVars = await getProviderEnvForModel(model);
   let flags = '';
   for (const [key, value] of Object.entries(envVars)) {
     flags += ` -e ${key}="${value.replace(/"/g, '\\"')}"`;
   }
   return flags;
-}
-
-/**
- * claudish prefix mapping: auth mode → provider prefix for OpenAI models.
- *
- * claudish routes models using the provider@model syntax:
- *   oai@model  → OpenAI Direct API (API key auth)
- *   cx@model  → ChatGPT OAuth subscription (PLUS/PRO tiers)
- *   go@model  → Google OAuth CodeAssist
- *
- * cx@ is the ChatGPT subscription prefix (confirmed in claudish v6.12+).
- * Note: cx@ is for ChatGPT OAuth, distinct from oai@ which uses OpenAI API keys.
- */
-const CLAUDISH_OPENAI_PREFIX: Record<string, string> = {
-  'api-key': 'oai',
-  subscription: 'cx',
-};
-
-/**
- * Get the claudish prefix for a model based on auth mode.
- *
- * Anthropic models: no prefix (use direct claude CLI).
- * OpenAI models: prefix depends on auth mode (oai@ or cx@).
- * Google models (CodeAssist OAuth): go@ prefix.
- *
- * @param model   Model ID (e.g. 'gpt-5.4', 'claude-sonnet-4-6')
- * @param authMode Auth mode: 'api-key' or 'subscription' (undefined = api-key default)
- * @returns Prefixed model string for claudish, or bare model if not applicable
- */
-export function getClaudishPrefix(model: string, authMode?: string): string {
-  // Anthropic models — use direct claude CLI, no prefix needed
-  if (model.startsWith('claude-')) {
-    return model;
-  }
-
-  // OpenAI models — prefix depends on auth mode
-  if (model.startsWith('gpt-') || model.startsWith('o') && !model.startsWith('ollama')) {
-    const prefix = CLAUDISH_OPENAI_PREFIX[authMode ?? 'api-key'] ?? 'oai';
-    return `${prefix}@${model}`;
-  }
-
-  // Google CodeAssist OAuth — go@ prefix
-  if (model.startsWith('gemini-') && authMode === 'subscription') {
-    return `go@${model}`;
-  }
-
-  // Other providers — return bare model (fallback to default routing)
-  return model;
 }
 
 // ============================================================================
@@ -343,6 +390,13 @@ export interface AgentState {
   issueId: string;
   workspace: string;
   runtime: string;
+  /**
+   * Coding-agent harness this agent runs under (PAN-636).
+   * Optional for forward compat with state.json files written before
+   * harness existed; readers must default unset/legacy values to
+   * 'claude-code' (see getHarness in @panctl/contracts).
+   */
+  harness?: 'claude-code' | 'pi';
   model: string;
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: string;
@@ -364,11 +418,18 @@ export interface AgentState {
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning';
   workType?: WorkTypeId; // Current work type ID
 
-  // SageOx session tracking (PAN-278)
-  sageoxSessionPath?: string; // Path to SageOx session folder for parent linking
   preSpawnStashRef?: string;
   preSpawnStashMessage?: string;
   preSpawnBaselineHead?: string;
+
+  /**
+   * Whether this work agent was launched with the experimental Claude Code
+   * Channels prompt-delivery path enabled. Set at launch time after the
+   * eligibility check; never mutated after. Read by deliverAgentMessage to
+   * decide whether to attempt the bridge socket before falling back to
+   * sendKeysAsync. Absent or false means tmux-only delivery (current default).
+   */
+  channelsEnabled?: boolean;
 }
 
 export function getAgentDir(agentId: string): string {
@@ -425,6 +486,404 @@ export function saveAgentState(state: AgentState): void {
   if (oldStatus && oldStatus !== state.status) {
     logAgentLifecycle(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentState)`);
   }
+}
+
+/**
+ * Resolve PANOPTICON_HOME — same fallback semantics as panopticon-bridge.
+ */
+function panopticonHomeForChannels(): string {
+  return process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon');
+}
+
+const bridgeHttpAgents = new Map<string, HttpAgent>();
+
+function getBridgeHttpAgent(socketPath: string): HttpAgent {
+  const existing = bridgeHttpAgents.get(socketPath);
+  if (existing) {
+    return existing;
+  }
+  const agent = new HttpAgent({
+    keepAlive: true,
+    maxSockets: 1,
+    maxFreeSockets: 1,
+  });
+  bridgeHttpAgents.set(socketPath, agent);
+  return agent;
+}
+
+function destroyBridgeHttpAgent(socketPath: string): void {
+  const agent = bridgeHttpAgents.get(socketPath);
+  if (!agent) return;
+  bridgeHttpAgents.delete(socketPath);
+  agent.destroy();
+}
+
+/**
+ * Append a delivery-event log line to the per-agent bridge log. Best-effort.
+ */
+async function appendChannelDeliveryLog(
+  agentId: string,
+  entry: { path: 'channel' | 'tmux'; reason?: string; caller?: string },
+): Promise<void> {
+  try {
+    const home = panopticonHomeForChannels();
+    const dir = join(home, 'logs');
+    await (await import('fs/promises')).mkdir(dir, { recursive: true });
+    const line = JSON.stringify({
+      ts: new Date().toISOString(),
+      agentId,
+      ...entry,
+    });
+    await (await import('fs/promises')).appendFile(
+      join(dir, `bridge-${agentId}.log`),
+      `${line}\n`,
+      'utf-8',
+    );
+  } catch {
+    // Non-critical
+  }
+}
+
+/**
+ * POST a JSON body to a Unix-domain socket using node:net + a hand-rolled
+ * minimal HTTP/1.1 request. Resolves on a 200-class response, rejects on any
+ * error including socket-not-found, connection refused, write timeout, or
+ * non-2xx status. Kept tiny on purpose: this is a hot path, only one caller,
+ * and the whole point of a fallback to tmux is that we do not need a robust
+ * HTTP client here.
+ */
+async function postUnixSocketJson(
+  socketPath: string,
+  body: unknown,
+  timeoutMs: number,
+  bridgeToken: string,
+): Promise<{ status: number; body: string }> {
+  const payload = JSON.stringify(body);
+  const agent = getBridgeHttpAgent(socketPath);
+
+  return new Promise((resolveCall, reject) => {
+    const req = httpRequest(
+      {
+        socketPath,
+        path: '/',
+        method: 'POST',
+        agent,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+          [BRIDGE_TOKEN_HEADER]: bridgeToken,
+        },
+      },
+      (res) => {
+        let responseBody = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => {
+          responseBody += chunk;
+        });
+        res.on('end', () => {
+          const status = res.statusCode ?? 0;
+          if (status >= 200 && status < 300) {
+            resolveCall({ status, body: responseBody });
+            return;
+          }
+          reject(new Error(`socket POST: status ${status}: ${responseBody.slice(0, 100)}`));
+        });
+      },
+    );
+
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error('socket POST timeout'));
+    });
+    req.on('error', (err: Error) => {
+      destroyBridgeHttpAgent(socketPath);
+      reject(err);
+    });
+    req.write(payload);
+    req.end();
+  });
+}
+
+/**
+ * Single delivery primitive for orchestrator-to-work-agent messages. When the
+ * target agent has channelsEnabled set in its state.json AND the per-agent
+ * bridge socket exists AND the POST returns 200, the message goes through the
+ * bridge and tmux is not involved. In every other case (flag off, state file
+ * missing, socket missing, socket POST failure for any reason) the call falls
+ * back to sendKeysAsync — the user-visible behaviour is identical to today's
+ * tmux-only delivery. Internal callers that today reach for sendKeysAsync to
+ * talk to a work agent should call this primitive instead so the eligibility
+ * and fallback policy live in one place.
+ */
+export async function deliverAgentMessage(
+  agentId: string,
+  message: string,
+  caller: string = 'unknown',
+): Promise<void> {
+  const normalizedId = normalizeAgentId(agentId);
+
+  let channelsEnabled = false;
+  try {
+    const state = await getAgentStateAsync(normalizedId);
+    channelsEnabled = Boolean(state?.channelsEnabled);
+  } catch {
+    channelsEnabled = false;
+  }
+
+  if (!channelsEnabled) {
+    await sendKeysAsync(normalizedId, message);
+    return;
+  }
+
+  const socketPath = join(panopticonHomeForChannels(), 'sockets', `agent-${normalizedId}.sock`);
+  if (!existsSync(socketPath)) {
+    await appendChannelDeliveryLog(normalizedId, {
+      path: 'tmux',
+      reason: 'socket-missing',
+      caller,
+    });
+    await sendKeysAsync(normalizedId, message);
+    return;
+  }
+
+  const bridgeToken = readBridgeToken(normalizedId);
+  if (!bridgeToken) {
+    await appendChannelDeliveryLog(normalizedId, {
+      path: 'tmux',
+      reason: 'bridge-token-missing',
+      caller,
+    });
+    await sendKeysAsync(normalizedId, message);
+    return;
+  }
+
+  try {
+    await postUnixSocketJson(
+      socketPath,
+      { content: message, meta: { caller } },
+      2000,
+      bridgeToken,
+    );
+    await appendChannelDeliveryLog(normalizedId, { path: 'channel', caller });
+    return;
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    await appendChannelDeliveryLog(normalizedId, {
+      path: 'tmux',
+      reason: `socket-post-failed: ${reason}`,
+      caller,
+    });
+    await sendKeysAsync(normalizedId, message);
+    return;
+  }
+}
+
+export async function deliverAgentPermissionDecision(
+  agentId: string,
+  requestId: string,
+  behavior: 'allow' | 'deny',
+): Promise<void> {
+  const normalizedId = normalizeAgentId(agentId);
+
+  let state: AgentState | null = null;
+  try {
+    state = await getAgentStateAsync(normalizedId);
+  } catch {
+    state = null;
+  }
+
+  if (!state?.channelsEnabled) {
+    throw new Error(`agent ${normalizedId} is not using Claude channels`);
+  }
+
+  const socketPath = join(panopticonHomeForChannels(), 'sockets', `agent-${normalizedId}.sock`);
+  if (!existsSync(socketPath)) {
+    throw new Error(`bridge socket missing for ${normalizedId}`);
+  }
+
+  const bridgeToken = readBridgeToken(normalizedId);
+  if (!bridgeToken) {
+    throw new Error(`bridge token missing for ${normalizedId}`);
+  }
+
+  await postUnixSocketJson(
+    socketPath,
+    {
+      type: 'permission_response',
+      requestId,
+      behavior,
+    },
+    2000,
+    bridgeToken,
+  );
+
+  await appendChannelDeliveryLog(normalizedId, {
+    path: 'channel',
+    caller: `permission-response:${requestId}:${behavior}`,
+  });
+}
+
+/**
+ * Inputs to the channels eligibility decision. We pass through agentId,
+ * SpawnOptions, and the in-construction AgentState so this function can be
+ * called from the spawn path without re-reading the state file.
+ */
+interface ChannelsDecision {
+  eligible: boolean;
+  reason?: string;
+}
+
+/**
+ * Decide whether to enable Claude Code Channels for a work-agent launch.
+ *
+ * Eligibility (all required):
+ *   - experimental.claudeCodeChannels is true in the merged config
+ *   - the agent is a work agent (specialists/conversations stay on tmux)
+ *   - the runtime is Claude Code (not Codex/Cursor/Gemini/Cliproxy-routed-GPT)
+ *   - auth provider is Anthropic-direct (excludes Bedrock/Vertex/Foundry)
+ *   - the workspace is not running inside a Docker container
+ *
+ * Logs the decision exactly once with a category prefix so users can see why
+ * the bridge did or did not engage. The function is otherwise side-effect
+ * free; the caller is responsible for writing the .mcp.json and mutating
+ * state.channelsEnabled when eligible is true.
+ */
+export function decideChannelsForWorkAgent(
+  agentId: string,
+  options: SpawnOptions,
+  state: AgentState,
+): ChannelsDecision {
+  const log = (eligible: boolean, reason?: string): void => {
+    const tag = eligible ? 'channels:eligible' : `channels:ineligible:${reason ?? 'unknown'}`;
+    console.log(`[${agentId}] ${tag}`);
+  };
+
+  if (!isClaudeCodeChannelsEnabled()) {
+    // Flag-off path is the silent default: no log line, no work. The bead
+    // explicitly limits eligibility logs to launches where the flag is on so
+    // the signal is meaningful.
+    return { eligible: false, reason: 'flag-off' };
+  }
+
+  if (options.agentType && options.agentType !== 'work-agent') {
+    log(false, 'not-a-work-agent');
+    return { eligible: false, reason: 'not-a-work-agent' };
+  }
+
+  // Runtime gate. The runtime field is 'claude' for Claude Code; specialised
+  // launchers set it to 'codex' / 'cursor' / 'gemini' and those are not
+  // Channel-capable.
+  const runtime = state.runtime;
+  if (runtime !== 'claude' && runtime !== 'claude-code') {
+    log(false, `runtime-${runtime}`);
+    return { eligible: false, reason: `runtime-${runtime}` };
+  }
+
+  // Auth gate. The Channels capability is gated by Anthropic auth in the
+  // compiled Claude Code binary; we only attempt the bridge when the model
+  // routes to the anthropic provider.
+  const provider = getProviderForModel(state.model as ModelId);
+  if (provider.name !== 'anthropic') {
+    log(false, `provider-${provider.name}`);
+    return { eligible: false, reason: `provider-${provider.name}` };
+  }
+
+  if (
+    process.env.CLAUDE_CODE_USE_BEDROCK === '1' ||
+    process.env.CLAUDE_CODE_USE_VERTEX === '1' ||
+    process.env.CLAUDE_CODE_USE_FOUNDRY === '1'
+  ) {
+    log(false, 'auth-bedrock-vertex-foundry');
+    return { eligible: false, reason: 'auth-bedrock-vertex-foundry' };
+  }
+
+  // Docker workspace gate. We do not yet share a socket dir between host and
+  // container; deferred to a follow-up issue (see hazards H10).
+  if (
+    process.env.PANOPTICON_DOCKER_WORKSPACE === '1' ||
+    process.env.PAN_DOCKER === '1'
+  ) {
+    log(false, 'docker-not-supported-yet');
+    return { eligible: false, reason: 'docker-not-supported-yet' };
+  }
+
+  log(true);
+  return { eligible: true };
+}
+
+/**
+ * Write the per-agent MCP config that points claude at the panopticon-bridge
+ * stdio server. The path is the workspace-local <workspace>/.pan/agent-mcp.json
+ * — one config per agent, never shared, never reused.
+ */
+async function writeChannelsBridgeMcpConfig(
+  configPath: string,
+  agentId: string,
+): Promise<void> {
+  const fsp = await import('fs/promises');
+  await fsp.mkdir(dirname(configPath), { recursive: true });
+  // Resolve the bridge entrypoint relative to this module so the config is
+  // valid no matter where the workspace lives. We write the path of the
+  // checked-in bridge script — the launcher invokes it with `bun run`.
+  const repoBridgePath = join(
+    // src/lib/agents.ts → src/lib/channels/panopticon-bridge.ts
+    dirname(import.meta.url.replace('file://', '')),
+    'channels',
+    'panopticon-bridge.ts',
+  );
+  const mcpConfig = {
+    mcpServers: {
+      'panopticon-bridge': {
+        command: 'bun',
+        args: ['run', repoBridgePath],
+        env: {
+          PANOPTICON_AGENT_ID: agentId,
+          PANOPTICON_HOME: process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon'),
+        },
+      },
+    },
+  };
+  await fsp.writeFile(configPath, JSON.stringify(mcpConfig, null, 2), 'utf-8');
+}
+
+/**
+ * Dismiss the dev-channels confirmation TUI dialog rendered by
+ * `claude --dangerously-load-development-channels`. The dialog text
+ * 'WARNING: Loading development channels' must be on screen before any prompt
+ * is delivered, otherwise the channel listener never registers and every
+ * early channel push silently falls back to tmux.
+ *
+ * Polling budget is 20s because cold-start claude with TLDR + Playwright MCP
+ * servers attached commonly takes 8–15s to render the first frame; a tighter
+ * budget false-negatives. If the dialog is not detected within the timeout,
+ * we proceed — the dialog is suppressed in some auth states (e.g. when the
+ * binary takes a non-interactive code path), and the launch must not block
+ * forever.
+ *
+ * Uses sendRawKeystrokeAsync intentionally: sendKeysAsync's load-buffer +
+ * paste-buffer machinery is for typing message bodies, not for a single
+ * Enter on a TUI prompt where mistimed paste can fire before the dialog
+ * accepts input.
+ */
+export async function dismissDevChannelsDialog(agentId: string): Promise<void> {
+  const TIMEOUT_MS = 20_000;
+  const POLL_INTERVAL_MS = 200;
+  const NEEDLE = 'WARNING: Loading development channels';
+  const start = Date.now();
+  while (Date.now() - start < TIMEOUT_MS) {
+    try {
+      const pane = await capturePaneAsync(agentId, 50);
+      if (pane.includes(NEEDLE)) {
+        await sendRawKeystrokeAsync(agentId, 'C-m', 'channels:dismiss-dev-dialog');
+        await new Promise((r) => setTimeout(r, 500));
+        return;
+      }
+    } catch {
+      // Capture failures are transient (tmux session not yet visible to
+      // the new pane); keep polling within the budget.
+    }
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+  }
+  console.log(`[${agentId}] channels:dismiss:dialog-not-detected`);
 }
 
 function markAgentRunning(state: AgentState): void {
@@ -721,6 +1180,8 @@ export interface SpawnOptions {
   issueId: string;
   workspace: string;
   runtime?: string;
+  /** Coding-agent harness (PAN-636). Defaults to 'claude-code' when omitted. */
+  harness?: 'claude-code' | 'pi';
   model?: string;
   prompt?: string;
   difficulty?: ComplexityLevel;
@@ -729,6 +1190,11 @@ export interface SpawnOptions {
   // Work type system (PAN-118)
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning';
   workType?: WorkTypeId; // Explicit work type ID (overrides phase-based detection)
+
+  // Swarm slot support (PAN-970): when set, session name becomes agent-<issueId>-<slotId>
+  // and the one-agent-per-issue uniqueness check is scoped to the slot.
+  slotId?: number;
+  swarmItemId?: string; // vBRIEF item ID this slot is working on
 }
 
 /**
@@ -920,10 +1386,130 @@ export async function transitionIssueToInReview(issueId: string, workspacePath?:
   return transitionIssueState(issueId, 'in_review', workspacePath);
 }
 
-export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
-  const agentId = `agent-${options.issueId.toLowerCase()}`;
+export interface AgentLaunchConfig {
+  launcherContent: string;
+  providerEnv: Record<string, string>;
+}
 
-  // Check if already running
+export async function buildAgentLaunchConfig(opts: {
+  agentId: string;
+  model: string;
+  workspace: string;
+  agentType: 'work' | 'resume';
+  resumeSessionId?: string;
+  isPlanning?: boolean;
+  /** Per-agent .mcp.json path for the experimental Channels bridge. */
+  channelsBridgeMcpConfig?: string;
+  /** MCP server name to load as a Channel; defaults to 'panopticon-bridge'. */
+  channelsBridgeServerName?: string;
+  /**
+   * Coding-agent harness (PAN-636). Defaults to 'claude-code' when omitted —
+   * preserves bit-for-bit pre-PAN-636 behavior. When 'pi', the launcher is
+   * built via the Pi command-line generator instead of the claude path; opts
+   * like agentId-as-name and agent-frontmatter are ignored because Pi has
+   * no agent-definition system.
+   */
+  harness?: 'claude-code' | 'pi';
+}): Promise<AgentLaunchConfig> {
+  const model = opts.model;
+
+  // Substrate guard: inject permission deny rules for Panopticon infrastructure
+  // paths (.claude/agents/, .claude/hooks/, ~/.panopticon/, JSONL session dirs)
+  // into the workspace's .claude/settings.local.json. Idempotent. Without this
+  // a vBRIEF action like "delete the legacy pan-*-agent.md files" can convince
+  // an agent to brick its own runtime. PAN-1048 X1 incident, 2026-05-09.
+  try {
+    const { injectPanopticonInfraDeny } = await import('./claude-settings-overlay.js');
+    await injectPanopticonInfraDeny(opts.workspace);
+  } catch (err) {
+    console.warn(`[agents] injectPanopticonInfraDeny failed for ${opts.agentId} (non-fatal): ${err instanceof Error ? err.message : err}`);
+  }
+
+  const providerEnv = await getProviderEnvForModel(model);
+
+  const provider = getProviderForModel(model as ModelId);
+  if (provider.authType === 'credential-file') {
+    setupCredentialFileAuth(provider, opts.workspace);
+  } else {
+    clearCredentialFileAuth(opts.workspace);
+  }
+
+  const providerExports = await getProviderExportsForModel(model);
+
+  if (opts.agentType === 'resume' && opts.resumeSessionId) {
+    // PAN-982: Resume sessions adopt the work-agent definition via --agent.
+    // Permissions/model/tools/hooks come from agents/pan-work-agent.md frontmatter.
+    // --name <agentId> gives the resumed Claude session a human-readable handle.
+    //
+    // The frontmatter's permissionMode: bypassPermissions only bypasses prompts
+    // INSIDE cwd. Tools that touch siblings of cwd (e.g. bd reading
+    // .beads/issues.jsonl through git subprocesses, pan reading
+    // ~/.panopticon/...) still hit "Do you want to proceed?" without DSP.
+    // Mid-Bash dialog dismissals (deacon nudge, paste-buffer write, sibling
+    // hook output) cancel the in-flight tool call and surface as
+    // `Interrupted · What should Claude do instead?` (PAN-1024 reproduced
+    // this loop on every fresh resume of PAN-1044/PAN-934).
+    //
+    // Match the fresh-spawn path: when permissionMode resolves to 'bypass'
+    // (PAN_YOLO=true OR claude.permissionMode=bypass in config), prepend
+    // --dangerously-skip-permissions on resume too.
+    const bypassFlag = resolvePermissionMode() === 'bypass'
+      ? '--dangerously-skip-permissions '
+      : '';
+    const launcherContent = generateLauncherScript({
+      agentType: 'resume',
+      workingDir: opts.workspace,
+      changeDir: false,
+      setCi: true,
+      providerExports,
+      baseCommand: `claude ${bypassFlag}--agent ${panopticonAgentName('work')}`,
+      resumeSessionId: opts.resumeSessionId,
+      model: providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
+      extraArgs: `--name ${opts.agentId}`,
+    });
+    return { launcherContent, providerEnv };
+  }
+
+  const yamlConfig = loadYamlConfig();
+  const cavemanExports = await buildCavemanExports(
+    opts.workspace,
+    yamlConfig.config.caveman,
+    opts.isPlanning ?? false,
+  );
+
+  // PAN-982: pass agentType + agentId through getAgentRuntimeBaseCommand so it
+  // emits 'claude --agent pan-<work|planning>-agent --name <agentId>'.
+  // PAN-636: when harness === 'pi' the helper short-circuits to a pi --mode rpc
+  // line and the agentName/panAgentType arguments are ignored (Pi has no agent
+  // definitions). The launcher generator's pi branch then layers --session-dir
+  // and the fifo redirect on top.
+  const panAgentType: PanopticonAgentType = opts.isPlanning ? 'planning' : 'work';
+  const launcherContent = generateLauncherScript({
+    agentType: 'work',
+    workingDir: opts.workspace,
+    changeDir: false,
+    setCi: true,
+    setTerminalEnv: true,
+    providerExports,
+    cavemanExports,
+    baseCommand: await getAgentRuntimeBaseCommand(model, opts.agentId, panAgentType, opts.harness ?? 'claude-code'),
+    ...(opts.channelsBridgeMcpConfig
+      ? {
+          channelsBridgeMcpConfig: opts.channelsBridgeMcpConfig,
+          channelsBridgeServerName: opts.channelsBridgeServerName ?? 'panopticon-bridge',
+        }
+      : {}),
+  });
+
+  return { launcherContent, providerEnv };
+}
+
+export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
+  const agentId = options.slotId != null
+    ? `agent-${options.issueId.toLowerCase()}-${options.slotId}`
+    : `agent-${options.issueId.toLowerCase()}`;
+
+  // Check if already running (scoped to the exact session name, including slot suffix)
   if (await sessionExistsAsync(agentId)) {
     throw new Error(`Agent ${agentId} already running. Use 'pan tell' to message it.`);
   }
@@ -942,7 +1528,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // (see PAN-70 / PAN-446 — no blocking I/O in server code).
   if (
     getProviderForModel(selectedModel).name === 'openai'
-    && getProviderAuthMode(selectedModel) === 'subscription'
+    && (await getProviderAuthMode(selectedModel)) === 'subscription'
   ) {
     const { isCliproxyRunningAsync } = await import('./cliproxy.js');
     if (!(await isCliproxyRunningAsync())) {
@@ -961,6 +1547,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     issueId: options.issueId,
     workspace: options.workspace,
     runtime: options.runtime || 'claude',
+    harness: options.harness ?? 'claude-code',
     model: selectedModel,
     status: 'starting',
     startedAt: new Date().toISOString(),
@@ -977,6 +1564,26 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   };
 
   saveAgentState(state);
+
+  // Transition issue tracker to "in progress" immediately so Linear reflects reality
+  // while workspace setup continues. Best-effort, don't block agent spawn.
+  // Only for work agents, not planning/specialist agents.
+  if (!options.agentType || options.agentType === 'work-agent') {
+    transitionIssueToInProgress(options.issueId, options.workspace).catch((err) => {
+      console.warn(`[agents] Could not transition ${options.issueId} to in_progress: ${err.message}`);
+    });
+  }
+
+  // For child stories: synthesize feature context from parent feature plan
+  // before the agent starts so readFeatureContext has O(1) local access.
+  if (!options.agentType || options.agentType === 'work-agent') {
+    try {
+      const { writeStoryFeatureContext } = await import('./cloister/work-agent-prompt.js');
+      await writeStoryFeatureContext(options.workspace, options.issueId);
+    } catch (ctxErr: any) {
+      console.warn(`[agents] Could not write story feature context for ${options.issueId}: ${ctxErr.message}`);
+    }
+  }
 
   // Build prompt with FPP work if available
   let prompt = options.prompt || '';
@@ -1021,51 +1628,37 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Clear ready signal before spawning (clean slate for PAN-87 fix)
   clearReadySignal(agentId);
 
-  // Get provider-specific environment variables (BASE_URL, AUTH_TOKEN)
-  const providerEnv = getProviderEnvForModel(selectedModel);
-
-  // Determine auth mode for OpenAI. A live Codex/ChatGPT login always wins.
-  const provider = getProviderForModel(selectedModel as ModelId);
-
-  // For credential-file providers (e.g. Kimi Code Plan), configure apiKeyHelper
-  // so Claude Code can refresh short-lived tokens dynamically.
-  // For all other providers, CLEAR any stale apiKeyHelper from previous runs
-  // (e.g. switching from Kimi to Anthropic plan-based auth).
-  if (provider.authType === 'credential-file') {
-    setupCredentialFileAuth(provider, options.workspace);
-  } else {
-    clearCredentialFileAuth(options.workspace);
+  // Channels gate: when the experimental flag is on AND this work agent is
+  // eligible, write a per-agent .mcp.json that wires the panopticon-bridge as
+  // a stdio MCP server, set channelsEnabled in the agent state record, and
+  // pass the bridge MCP path through to buildAgentLaunchConfig so claude is
+  // started with --mcp-config + --dangerously-load-development-channels. When
+  // the flag is off OR the agent is ineligible we touch nothing here — same
+  // code path, same files on disk, as before PAN-985.
+  const channelsDecision = decideChannelsForWorkAgent(agentId, options, state);
+  let channelsBridgeMcpConfig: string | undefined;
+  if (channelsDecision.eligible) {
+    channelsBridgeMcpConfig = join(options.workspace, '.pan', 'agent-mcp.json');
+    writeBridgeToken(agentId);
+    await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, agentId);
+    state.channelsEnabled = true;
+    saveAgentState(state);
   }
 
-  // Create tmux session and start claude in interactive mode.
-  // Previous approach used a positional prompt argument (print mode) which exits after
-  // one tool-use cycle on recent Claude Code versions. The fix is to start interactive
-  // (no positional prompt), then send the prompt via sendKeysAsync once Claude is ready.
-  const providerExports = getProviderExportsForModel(state.model);
-
-  // Build caveman env exports for the launcher script.
-  // Planning agents are excluded — their output is user-facing and must remain readable.
-  // Inspect agents are excluded because their INSPECTION PASSED/BLOCKED sentinels are
-  // parsed by Cloister and must not be compressed.
-  const yamlConfig = loadYamlConfig();
-  const cavemanExports = await buildCavemanExports(
-    options.workspace,
-    yamlConfig.config.caveman,
-    options.phase === 'planning'
-  );
+  const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
+    agentId,
+    model: selectedModel,
+    workspace: options.workspace,
+    agentType: 'work',
+    isPlanning: options.phase === 'planning',
+    channelsBridgeMcpConfig,
+    harness: state.harness ?? 'claude-code',
+  });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
-  const launcherContent = generateLauncherScript({
-    agentType: 'work',
-    workingDir: options.workspace,
-    changeDir: false,
-    setCi: true,
-    providerExports,
-    cavemanExports,
-    baseCommand: getAgentRuntimeBaseCommand(state.model),
-  });
   writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
   const claudeCmd = `bash ${launcherScript}`;
+  console.log(`[claude-invoke] purpose=work-agent | model=${state.model} | source=agents.ts:spawnAgent | session=${agentId} | command="${claudeCmd}"`);
 
   // Pre-trust workspace directory in Claude Code to avoid the trust prompt
   try {
@@ -1092,46 +1685,28 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     console.warn(`[${agentId}] GitHub App config failed (falling back to SSH): ${err.message}`);
   }
 
-  // Build SageOx environment variables for session linking (only if project is SageOx-initialized)
-  // Derive project root from workspace path: <project-root>/workspaces/<branch>
-  const projectRoot = resolve(options.workspace, '..', '..');
-  const sageoxEnabled = existsSync(join(projectRoot, '.sageox'));
-  const sageoxEnv: Record<string, string> = {};
-
-  if (sageoxEnabled) {
-    sageoxEnv.OX_PROJECT_ROOT = projectRoot;
-
-    // Add issue tracking for multi-agent pipelines
-    if (options.issueId) {
-      sageoxEnv.PAN_ISSUE_ID = options.issueId;
-    }
-    if (options.phase) {
-      sageoxEnv.PAN_PHASE = options.phase;
-    }
-
-    // For non-planner agents, find the planner's session path for parent linking
-    if (options.phase && options.phase !== 'planning') {
-      const plannerAgentId = `agent-${options.issueId.toLowerCase()}`;
-      const plannerState = getAgentState(plannerAgentId);
-      if (plannerState?.sageoxSessionPath) {
-        sageoxEnv.PAN_PARENT_SESSION = plannerState.sageoxSessionPath;
-      }
-    }
-  }
-
   clearReadySignal(agentId);
 
   await createSessionAsync(agentId, options.workspace, claudeCmd, {
     env: {
+      ...BLANKED_PROVIDER_ENV, // Blank stale provider vars inherited by tmux server
+      TERM: 'xterm-256color',
       PANOPTICON_AGENT_ID: agentId,
       PANOPTICON_ISSUE_ID: options.issueId,
       PANOPTICON_SESSION_TYPE: options.phase || 'implementation',
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
       GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
-      ...providerEnv, // Add provider-specific env vars (BASE_URL, AUTH_TOKEN, etc.)
-      ...sageoxEnv // Add SageOx environment variables
+      ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
     }
   });
+
+  // Channels: dismiss the dev-channels confirmation dialog before any prompt
+  // delivery. Must run while we are still in the launch path so the channel
+  // listener is registered before deliverAgentMessage starts preferring the
+  // socket. Skipped when the agent was not eligible at launch time.
+  if (state.channelsEnabled) {
+    await dismissDevChannelsDialog(agentId);
+  }
 
   // Send the initial prompt after Claude's interactive prompt is ready.
   // Wait for the session to be ready by polling tmux output for Claude's prompt.
@@ -1161,7 +1736,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     if (ready) {
       // Small delay after ready to ensure Claude is fully rendered and accepting input
       await new Promise(r => setTimeout(r, 500));
-      await sendKeysAsync(agentId, prompt);
+      await deliverAgentMessage(agentId, prompt, 'spawnAgent:initial-prompt');
     } else {
       console.error(`[${agentId}] Claude did not become ready within 30s`);
     }
@@ -1174,20 +1749,23 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Track work in CV
   startWork(agentId, options.issueId);
 
-  // Transition issue tracker to "in progress" (best-effort, don't block agent spawn)
-  // Only for work agents, not planning/specialist agents
-  if (!options.agentType || options.agentType === 'work-agent') {
-    transitionIssueToInProgress(options.issueId, options.workspace).catch((err) => {
-      console.warn(`[agents] Could not transition ${options.issueId} to in_progress: ${err.message}`);
-    });
-  }
-
-  // For planner agents, capture SageOx session path after it becomes available
-  if (sageoxEnabled && options.phase === 'planning') {
-    captureSageoxSessionPath(agentId, projectRoot).catch((err) => {
-      console.warn(`[agents] Could not capture SageOx session path: ${err.message}`);
-    });
-  }
+  // Emit activity + TTS so the user knows an agent has started
+  const isPlanning = options.phase === 'planning';
+  emitActivityEntry({
+    source: isPlanning ? 'planning-agent' : 'dashboard',
+    level: 'info',
+    message: isPlanning
+      ? `Planning started for ${options.issueId}`
+      : `Work agent started for ${options.issueId}`,
+    issueId: options.issueId,
+  });
+  emitActivityTts({
+    utterance: isPlanning
+      ? `Planning started for ${options.issueId}`
+      : `Work agent started for ${options.issueId}`,
+    priority: 2,
+    issueId: options.issueId,
+  });
 
   return state;
 }
@@ -1411,7 +1989,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
       console.warn(`[agents] Resume succeeded for ${normalizedId} but message not delivered (ready signal timed out) — falling back to fresh launch`);
     }
 
-    const providerEnv = agentState.model ? getProviderEnvForModel(agentState.model) : {};
+    const providerEnv = agentState.model ? await getProviderEnvForModel(agentState.model) : {};
     if (agentState.model) {
       const provider = getProviderForModel(agentState.model as ModelId);
       if (provider.authType === 'credential-file') {
@@ -1426,7 +2004,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
       try { await killSessionAsync(normalizedId); } catch { /* ignore */ }
     }
 
-    const providerExports = getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
+    const providerExports = await getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
     const fallbackLauncher = join(getAgentDir(normalizedId), 'launcher.sh');
     const fallbackContent = generateLauncherScript({
       agentType: 'work',
@@ -1434,11 +2012,17 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
       changeDir: false,
       setCi: true,
       providerExports,
-      baseCommand: getAgentRuntimeBaseCommand(agentState.model || 'claude-sonnet-4-6'),
+      baseCommand: await getAgentRuntimeBaseCommand(
+        agentState.model || 'claude-sonnet-4-6',
+        normalizedId,
+        'work',
+        agentState.harness ?? 'claude-code',
+      ),
     });
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
     await createSessionAsync(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
       env: {
+        ...BLANKED_PROVIDER_ENV,
         PANOPTICON_AGENT_ID: normalizedId,
         PANOPTICON_ISSUE_ID: agentState.issueId || '',
         PANOPTICON_SESSION_TYPE: agentState.phase || 'implementation',
@@ -1451,9 +2035,9 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     saveAgentState(agentState);
 
     const ready = await waitForReadySignal(normalizedId, 30);
-    const resumePrompt = `You are resuming work on ${agentState.issueId}. Check .planning/feedback/ for specialist feedback that arrived while you were stopped, then continue working.\n\n${message}`;
+    const resumePrompt = `You are resuming work on ${agentState.issueId}. Check .pan/feedback/ for specialist feedback that arrived while you were stopped, then continue working.\n\n${message}`;
     if (ready) {
-      await sendKeysAsync(normalizedId, resumePrompt);
+      await deliverAgentMessage(normalizedId, resumePrompt, 'resumeAgent:resume-prompt');
       console.log(`[agents] Fallback-restarted ${normalizedId} and delivered feedback`);
     } else {
       console.warn(`[agents] Fallback-restarted ${normalizedId} but ready signal not detected — feedback in mail queue`);
@@ -1508,7 +2092,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
     console.warn(`[agents] ${normalizedId} not at ready prompt after 5s — sending message anyway`);
   }
 
-  await sendKeysAsync(normalizedId, message);
+  await deliverAgentMessage(normalizedId, message, 'messageAgent:pan-tell');
 
   // Also save to mail queue
   const mailDir = join(getAgentDir(normalizedId), 'mail');
@@ -1531,7 +2115,7 @@ export async function messageAgent(agentId: string, message: string): Promise<vo
  * - Specialists: When queued work arrives
  * - Work agents: When message is sent via /work-tell
  */
-export async function resumeAgent(agentId: string, message?: string): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
+export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
   logAgentLifecycle(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'})`);
 
@@ -1593,51 +2177,46 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
     try { unlinkSync(completedFile); } catch { /* non-fatal */ }
   }
 
+  // Append 'resume' session entry to continue state (PAN-946: workspace-44p)
+  try {
+    if (agentState?.workspace) {
+      const issueId = agentState.issueId || normalizedId.replace('agent-', '').toUpperCase();
+      const resolved = resolveProjectFromIssue(issueId);
+      if (resolved) {
+        appendContinueSessionEntryForIssue(resolved.projectPath, issueId, {
+          reason: 'resume',
+          agentModel: agentState.model || undefined,
+        });
+      }
+    }
+  } catch (continueErr: any) {
+    console.warn(`[resumeAgent] Failed to append resume entry to continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
+  }
+
   try {
     // Clear ready signal before resuming (clean slate for PAN-87 fix)
     clearReadySignal(normalizedId);
 
-    // Get provider env for the agent's model (reads latest API key from settings)
-    const providerEnv = agentState.model ? getProviderEnvForModel(agentState.model) : {};
-
-    // For credential-file providers, ensure apiKeyHelper is configured.
-    // For all other providers, clear stale apiKeyHelper from previous runs.
-    if (agentState.model) {
-      const provider = getProviderForModel(agentState.model as ModelId);
-      if (provider.authType === 'credential-file') {
-        setupCredentialFileAuth(provider, agentState.workspace);
-      } else {
-        clearCredentialFileAuth(agentState.workspace);
-      }
+    const model = opts?.model || agentState.model || 'claude-sonnet-4-6';
+    if (opts?.model && opts.model !== agentState.model) {
+      agentState.model = opts.model;
+      saveAgentState(agentState);
     }
-
-    // Create new tmux session with resume command.
-    // Write a launcher.sh that unsets any leaked provider env vars (ANTHROPIC_BASE_URL,
-    // ANTHROPIC_AUTH_TOKEN, etc — see PAN-705) and then execs claude --resume. tmux's
-    // `-e KEY=VALUE` flag can only SET env, not UNSET — so env cleanup must happen
-    // inside the shell tmux spawns. This mirrors the spawnAgent pattern at ~line 806.
-    const model = agentState.model || 'claude-sonnet-4-6';
-    const providerExports = getProviderExportsForModel(model);
-    // Non-Anthropic models route through a proxy (ANTHROPIC_BASE_URL). Without an explicit
-    // --model flag, Claude Code defaults to claude-sonnet-4-6 on resume, sending claude
-    // requests through the proxy → "unknown provider" 502. Always include --model when
-    // providerExports sets ANTHROPIC_BASE_URL so the resumed session uses the correct model.
-    const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
-    const launcherContent = generateLauncherScript({
+    const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
+      agentId: normalizedId,
+      model,
+      workspace: agentState.workspace,
       agentType: 'resume',
-      workingDir: agentState.workspace,
-      changeDir: false,
-      setCi: true,
-      providerExports,
-      baseCommand: 'claude',
-      permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
       resumeSessionId: sessionId,
-      model: providerExports.includes('ANTHROPIC_BASE_URL') ? model : undefined,
     });
+
+    const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
     const claudeCmd = `bash ${launcherScript}`;
+
     await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {
       env: {
+        ...BLANKED_PROVIDER_ENV,
         PANOPTICON_AGENT_ID: normalizedId,
         PANOPTICON_ISSUE_ID: agentState.issueId || '',
         PANOPTICON_SESSION_TYPE: agentState.phase || 'implementation',
@@ -1646,19 +2225,25 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
       }
     });
 
-    // If there's a message, wait for ready signal then send
-    let messageDelivered = false;
-    if (message) {
-      // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
-      const ready = await waitForReadySignal(normalizedId, 30);
+    // Always wake the resumed agent with a continue prompt — without it, the
+    // re-attached claude session sits silently at its last state, and the user
+    // (or deacon nudge loop) ends up sending one manually anyway. Default
+    // matches restartAgent's wording so behaviour is consistent across both
+    // entry points. Caller-supplied message wins.
+    const issueId = agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase();
+    const effectiveMessage =
+      message ??
+      `You are resuming work on ${issueId}. Read .pan/continue.json for context and pick up where you left off — do not wait for further instructions.`;
 
-      if (ready) {
-        // Send message
-        await sendKeysAsync(normalizedId, message);
-        messageDelivered = true;
-      } else {
-        console.error('Claude SessionStart hook did not fire during resume, message not sent');
-      }
+    let messageDelivered = false;
+    // Wait for SessionStart hook to signal ready (PAN-87: reliable message delivery)
+    const ready = await waitForReadySignal(normalizedId, 30);
+
+    if (ready) {
+      await deliverAgentMessage(normalizedId, effectiveMessage, 'resumeAgent:auto-continue');
+      messageDelivered = true;
+    } else {
+      console.error('Claude SessionStart hook did not fire during resume, continue prompt not sent');
     }
 
     const resumedAt = new Date().toISOString();
@@ -1683,6 +2268,110 @@ export async function resumeAgent(agentId: string, message?: string): Promise<{ 
       success: false,
       error: `Failed to resume agent: ${msg}`
     };
+  }
+}
+
+export interface RestartAgentOptions {
+  model?: string;
+  graceful?: boolean;
+  message?: string;
+}
+
+export async function restartAgent(
+  agentId: string,
+  opts: RestartAgentOptions = {},
+): Promise<{ success: boolean; error?: string }> {
+  const normalizedId = normalizeAgentId(agentId);
+  const { graceful = true, model: newModel, message } = opts;
+
+  const agentState = getAgentState(normalizedId);
+  if (!agentState) {
+    return { success: false, error: `Agent ${normalizedId} not found` };
+  }
+  if (!agentState.workspace || !existsSync(agentState.workspace)) {
+    return { success: false, error: `Agent workspace missing: ${agentState.workspace}` };
+  }
+
+  logAgentLifecycle(normalizedId, `restartAgent called (graceful=${graceful}, model=${newModel || 'unchanged'})`);
+
+  if (graceful && await sessionExistsAsync(normalizedId)) {
+    const warning = 'Restarting in 30s. Update .pan/continue.json now with all progress, decisions, hazards, and resume point.';
+    try {
+      await sendKeysAsync(normalizedId, warning);
+    } catch { /* non-fatal — session may already be dead */ }
+
+    await new Promise(r => setTimeout(r, 30_000));
+
+    const continueFile = join(agentState.workspace, '.pan', 'continue.json');
+    if (existsSync(continueFile)) {
+      const mtime = statSync(continueFile).mtimeMs;
+      const ageMs = Date.now() - mtime;
+      if (ageMs > 5 * 60 * 1000) {
+        console.warn(`[restartAgent] continue.json is stale (${Math.round(ageMs / 1000)}s old) — proceeding anyway`);
+      }
+    }
+  }
+
+  await stopAgentAsync(normalizedId);
+
+  const effectiveModel = newModel || agentState.model || 'claude-sonnet-4-6';
+  if (newModel && newModel !== agentState.model) {
+    agentState.model = newModel;
+  }
+  agentState.status = 'starting';
+  saveAgentState(agentState);
+
+  try {
+    clearReadySignal(normalizedId);
+
+    const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
+      agentId: normalizedId,
+      model: effectiveModel,
+      workspace: agentState.workspace,
+      agentType: 'work',
+      isPlanning: agentState.phase === 'planning',
+    });
+
+    const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
+    writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
+    const claudeCmd = `bash ${launcherScript}`;
+
+    await createSessionAsync(normalizedId, agentState.workspace, claudeCmd, {
+      env: {
+        ...BLANKED_PROVIDER_ENV,
+        TERM: 'xterm-256color',
+        PANOPTICON_AGENT_ID: normalizedId,
+        PANOPTICON_ISSUE_ID: agentState.issueId || '',
+        PANOPTICON_SESSION_TYPE: agentState.phase || 'implementation',
+        CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
+        GIT_SEQUENCE_EDITOR: 'false',
+        ...providerEnv,
+      },
+    });
+
+    const prompt = message || `You are resuming work on ${agentState.issueId}. Read .pan/continue.json for context and pick up where you left off.`;
+    const ready = await waitForReadySignal(normalizedId, 30);
+    if (ready) {
+      await new Promise(r => setTimeout(r, 500));
+      await sendKeysAsync(normalizedId, prompt);
+    } else {
+      console.error(`[restartAgent] Claude did not become ready within 30s for ${normalizedId}`);
+    }
+
+    markAgentRunning(agentState);
+    saveAgentState(agentState);
+
+    await saveAgentRuntimeState(normalizedId, {
+      state: 'active',
+      lastActivity: new Date().toISOString(),
+    });
+
+    logAgentLifecycle(normalizedId, `restartAgent SUCCESS: model=${effectiveModel}`);
+    return { success: true };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logAgentLifecycle(normalizedId, `restartAgent FAILED: ${msg}`);
+    return { success: false, error: `Failed to restart agent: ${msg}` };
   }
 }
 
@@ -1715,7 +2404,10 @@ export function detectCrashedAgents(): AgentState[] {
 /**
  * Recover a crashed agent by restarting it with context
  */
-export function recoverAgent(agentId: string): AgentState | null {
+export async function recoverAgent(
+  agentId: string,
+  opts: { modelOverride?: string } = {},
+): Promise<AgentState | null> {
   const normalizedId = normalizeAgentId(agentId);
   logAgentLifecycle(normalizedId, 'recoverAgent called');
   const state = getAgentState(normalizedId);
@@ -1727,6 +2419,10 @@ export function recoverAgent(agentId: string): AgentState | null {
 
   // Runtime state files may lack required fields (PAN-150)
   if (!state.id) state.id = normalizedId;
+  if (opts.modelOverride) {
+    state.model = opts.modelOverride;
+    logAgentLifecycle(normalizedId, `recoverAgent: model overridden → ${opts.modelOverride}`);
+  }
   if (!state.workspace || !state.model) {
     const reason = `[agents] Cannot recover ${normalizedId}: state.json missing workspace or model`;
     console.error(reason);
@@ -1759,7 +2455,7 @@ export function recoverAgent(agentId: string): AgentState | null {
   const recoveryPrompt = generateRecoveryPrompt(state);
 
   // Get provider env for the agent's model (reads latest API key from settings)
-  const providerEnv = state.model ? getProviderEnvForModel(state.model) : {};
+  const providerEnv = state.model ? await getProviderEnvForModel(state.model) : {};
 
   // For credential-file providers, ensure apiKeyHelper is configured.
   // For all other providers, clear stale apiKeyHelper from previous runs.
@@ -1772,8 +2468,10 @@ export function recoverAgent(agentId: string): AgentState | null {
     }
   }
 
-  // Restart the agent with recovery context (YOLO mode - skip permissions)
-  const claudeCmd = `${getAgentRuntimeBaseCommand(state.model)} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
+  // Restart the agent with recovery context. Agent type is derived from the session id:
+  // planning sessions use the planner definition; everything else uses the work definition.
+  const recoveryAgentType: PanopticonAgentType = normalizedId.startsWith('planning-') ? 'planning' : 'work';
+  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model, agentId, recoveryAgentType, state.harness ?? 'claude-code')} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
   createSession(normalizedId, state.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: normalizedId,
@@ -1834,14 +2532,14 @@ function generateRecoveryPrompt(state: AgentState): string {
 /**
  * Auto-recover all crashed agents
  */
-export function autoRecoverAgents(): { recovered: string[]; failed: string[] } {
+export async function autoRecoverAgents(): Promise<{ recovered: string[]; failed: string[] }> {
   const crashed = detectCrashedAgents();
   const recovered: string[] = [];
   const failed: string[] = [];
 
   for (const agent of crashed) {
     try {
-      const result = recoverAgent(agent.id);
+      const result = await recoverAgent(agent.id);
       if (result) {
         recovered.push(agent.id);
       } else {
@@ -1920,69 +2618,3 @@ function writeTaskCache(agentId: string, issueId: string): void {
   );
 }
 
-/**
- * Capture SageOx session path for a planner agent.
- * This is used for parent-child session linking in multi-agent pipelines.
- * Subsequent agents (worker, reviewer, tester, merger) will use this path
- * as their PAN_PARENT_SESSION to link their sessions to the planner's session.
- */
-async function captureSageoxSessionPath(agentId: string, projectRoot: string): Promise<void> {
-  // Wait for SageOx session to be created by the hook (up to 10 seconds)
-  const sessionsDir = join(projectRoot, '.sageox', 'sessions');
-  let attempts = 0;
-  const maxAttempts = 20;
-  const delayMs = 500;
-
-  while (attempts < maxAttempts) {
-    // Check if sessions directory exists
-    if (existsSync(sessionsDir)) {
-      // Find the most recent session directory for this agent
-      const sessions = readdirSync(sessionsDir, { withFileTypes: true })
-        .filter(d => d.isDirectory())
-        .map(d => ({
-          name: d.name,
-          path: join(sessionsDir, d.name),
-          mtime: existsSync(join(sessionsDir, d.name, '.recording.json'))
-            ? readFileSync(join(sessionsDir, d.name, '.recording.json'), 'utf-8')
-            : null
-        }))
-        .filter(s => {
-          // Check if this session belongs to our agent
-          if (!s.mtime) return false;
-          try {
-            const state = JSON.parse(s.mtime);
-            return state.agent_id === agentId || state.AgentID === agentId;
-          } catch {
-            return false;
-          }
-        })
-        .sort((a, b) => {
-          // Sort by modification time (newest first)
-          const aTime = existsSync(join(a.path, '.recording.json'))
-            ? (statSync(join(a.path, '.recording.json')).mtimeMs || 0)
-            : 0;
-          const bTime = existsSync(join(b.path, '.recording.json'))
-            ? (statSync(join(b.path, '.recording.json')).mtimeMs || 0)
-            : 0;
-          return bTime - aTime;
-        });
-
-      if (sessions.length > 0) {
-        // Update agent state with SageOx session path
-        const state = getAgentState(agentId);
-        if (state) {
-          state.sageoxSessionPath = sessions[0].path;
-          saveAgentState(state);
-          console.log(`[agents] Captured SageOx session path for ${agentId}: ${sessions[0].path}`);
-          return;
-        }
-      }
-    }
-
-    // Wait before retrying
-    await new Promise(resolve => setTimeout(resolve, delayMs));
-    attempts++;
-  }
-
-  throw new Error(`Could not find SageOx session for ${agentId} after ${maxAttempts * delayMs}ms`);
-}

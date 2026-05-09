@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     'cli/index': 'src/cli/index.ts',
     'index': 'src/index.ts',
+    'supervisor/server': 'src/supervisor/server.ts',
   },
   format: 'esm',
   dts: true,

@@ -72,7 +72,7 @@ describe('schema migrations', () => {
       .prepare(`SELECT session_file FROM conversations WHERE name = ?`)
       .get('conv-1') as { session_file: string };
     expect(row.session_file).toBe(correctedPath);
-    expect(db.pragma('user_version', { simple: true })).toBe(29);
+    expect(db.pragma('user_version', { simple: true })).toBe(32);
   });
 
   it('v16 → v17: creates favorites table and idx_favorites_type index', () => {
@@ -96,7 +96,7 @@ describe('schema migrations', () => {
       .get() as { name: string } | undefined;
     expect(index?.name).toBe('idx_favorites_type');
 
-    expect(db.pragma('user_version', { simple: true })).toBe(29);
+    expect(db.pragma('user_version', { simple: true })).toBe(32);
   });
 
   // ── v21 → v22: reviewed_at_commit column (PAN-653) ──────────────────────────
@@ -128,7 +128,7 @@ describe('schema migrations', () => {
     // After migration the column must exist
     const colsAfter = db.pragma('table_info(review_status)') as Array<{ name: string }>;
     expect(colsAfter.map(c => c.name)).toContain('reviewed_at_commit');
-    expect(db.pragma('user_version', { simple: true })).toBe(29);
+    expect(db.pragma('user_version', { simple: true })).toBe(32);
   });
 
   it('v21 → v22: can write and read reviewed_at_commit after migration', () => {
@@ -169,7 +169,9 @@ describe('schema migrations', () => {
     const names = cols.map(c => c.name);
     expect(names).toContain('reviewed_at_commit');
     expect(names).toContain('merge_retry_count');
-    expect(db.pragma('user_version', { simple: true })).toBe(29);
+    expect(names).toContain('pr_head_sha');
+    expect(names).toContain('pr_number');
+    expect(db.pragma('user_version', { simple: true })).toBe(32);
   });
 
   // ── v22 → v23: merge_retry_count column (PAN-653) ──────────────────────────
@@ -252,7 +254,7 @@ describe('schema migrations', () => {
     const colsAfter = db.pragma('table_info(review_status)') as Array<{ name: string }>;
     expect(colsAfter.map(c => c.name)).toContain('review_spawned_at');
     expect(colsAfter.map(c => c.name)).toContain('test_retry_count');
-    expect(db.pragma('user_version', { simple: true })).toBe(29);
+    expect(db.pragma('user_version', { simple: true })).toBe(32);
   });
 
   it('v23 → v24: can write and read new columns after migration', () => {
@@ -311,6 +313,6 @@ describe('schema migrations', () => {
       .prepare(`SELECT session_file FROM conversations WHERE name = ?`)
       .get('conv-2') as { session_file: string };
     expect(row.session_file).toBe(stalePath);
-    expect(db.pragma('user_version', { simple: true })).toBe(29);
+    expect(db.pragma('user_version', { simple: true })).toBe(32);
   });
 });

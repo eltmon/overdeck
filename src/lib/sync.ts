@@ -243,7 +243,21 @@ export function refreshCache(): RefreshCacheResult {
     }
   }
 
-  // Copy agent definitions from repo to cache
+  // Copy agent definitions from repo to cache.
+  //
+  // PAN-982: This pass deploys both Claude Code subagent definitions
+  // (codebase-explorer, planning-agent, triage-agent, health-monitor — used by
+  // the in-session Agent tool) and the Panopticon pipeline agents
+  // (pan-work-agent, pan-planning-agent, pan-review-agent, pan-test-agent,
+  // pan-inspect-agent, pan-uat-agent, pan-merge-agent — used by `claude --agent
+  // pan-<type>-agent` when Cloister spawns the work/review/test/inspect/uat/
+  // merge processes).
+  //
+  // Both kinds live side by side in the repo's `agents/` directory and both get
+  // mirrored into ~/.panopticon/agent-definitions/ here, then on to
+  // <devroot>/.claude/agents/ via planSync/executeSync. The downstream sync
+  // never deletes existing files in the target, so non-Panopticon agent
+  // definitions a project may have authored stay intact.
   if (existsSync(SOURCE_AGENTS_DIR)) {
     mkdirSync(CACHE_AGENTS_DIR, { recursive: true });
     const agents = readdirSync(SOURCE_AGENTS_DIR, { withFileTypes: true })
@@ -253,6 +267,29 @@ export function refreshCache(): RefreshCacheResult {
     for (const agent of agents) {
       copyFileSync(join(SOURCE_AGENTS_DIR, agent.name), join(CACHE_AGENTS_DIR, agent.name));
       result.agents.copied++;
+    }
+
+    // PAN-982: Warn if any of the pipeline agent definitions are missing from the
+    // source. Cloister depends on these names existing in <devroot>/.claude/agents/
+    // — otherwise `claude --agent pan-<type>-agent` exits immediately with
+    // "agent not found". Surfacing the gap during sync is far cheaper than
+    // discovering it when a work/review/test/inspect/uat/merge spawn fails.
+    const REQUIRED_PIPELINE_AGENTS = [
+      'pan-work-agent.md',
+      'pan-planning-agent.md',
+      'pan-review-agent.md',
+      'pan-test-agent.md',
+      'pan-inspect-agent.md',
+      'pan-uat-agent.md',
+      'pan-merge-agent.md',
+    ];
+    const presentNames = new Set(agents.map((a) => a.name));
+    const missing = REQUIRED_PIPELINE_AGENTS.filter((name) => !presentNames.has(name));
+    if (missing.length > 0) {
+      console.warn(
+        `[sync] WARN: pipeline agent definition(s) missing from agents/: ${missing.join(', ')}. ` +
+          `Cloister will fail to spawn the corresponding specialists with --agent.`,
+      );
     }
   }
 
@@ -880,4 +917,83 @@ export function mirrorProjectSkills(
   writeFileSync(manifestPath, sortedMirrored.join('\n') + '\n', 'utf-8');
 
   return result;
+}
+
+/**
+ * Result of syncing the Pi agent settings file.
+ *
+ * `status` is one of:
+ *   - "skipped" — Pi binary not on PATH; we never touch ~/.pi/agent/settings.json
+ *   - "created" — settings file did not exist; we wrote a new one
+ *   - "updated" — file existed but the skills entry was missing/stale; we merged it
+ *   - "unchanged" — file already contained the expected skills entry
+ */
+export interface PiSettingsSyncResult {
+  status: 'skipped' | 'created' | 'updated' | 'unchanged';
+  path: string;
+  reason?: string;
+}
+
+const PI_SKILLS_PATH = join(homedir(), '.claude', 'skills');
+
+function isPiOnPath(): boolean {
+  try {
+    execSync('which pi', { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Ensure ~/.pi/agent/settings.json contains a `skills` array that includes
+ * ~/.claude/skills, so Pi reads the same skills tree that Claude Code does
+ * (PAN-636 workspace-63b).
+ *
+ * Idempotent: existing keys outside `skills` are preserved untouched, and an
+ * already-correct `skills` entry yields status "unchanged". When Pi is not on
+ * PATH the function returns status "skipped" without ever opening the file —
+ * we never overwrite user config for a tool they have not installed.
+ */
+export function syncPiSettings(): PiSettingsSyncResult {
+  const settingsPath = join(homedir(), '.pi', 'agent', 'settings.json');
+
+  if (!isPiOnPath()) {
+    return { status: 'skipped', path: settingsPath, reason: 'pi not on PATH' };
+  }
+
+  let existing: Record<string, unknown> = {};
+  if (existsSync(settingsPath)) {
+    try {
+      const raw = readFileSync(settingsPath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        existing = parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Malformed JSON — leave the file alone rather than risk clobbering user content.
+      return { status: 'skipped', path: settingsPath, reason: 'existing settings.json is not valid JSON' };
+    }
+  }
+
+  const currentSkills = Array.isArray(existing['skills'])
+    ? (existing['skills'] as unknown[]).filter((s): s is string => typeof s === 'string')
+    : [];
+
+  const fileExistedBefore = existsSync(settingsPath);
+  const alreadyPresent = currentSkills.includes(PI_SKILLS_PATH);
+  if (alreadyPresent && fileExistedBefore) {
+    return { status: 'unchanged', path: settingsPath };
+  }
+
+  const nextSkills = alreadyPresent ? currentSkills : [...currentSkills, PI_SKILLS_PATH];
+  const next = { ...existing, skills: nextSkills };
+
+  mkdirSync(dirname(settingsPath), { recursive: true });
+  writeFileSync(settingsPath, JSON.stringify(next, null, 2) + '\n', 'utf-8');
+
+  return {
+    status: fileExistedBefore ? 'updated' : 'created',
+    path: settingsPath,
+  };
 }

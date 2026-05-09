@@ -1,0 +1,26 @@
+#!/bin/bash
+# ~/.panopticon/bin/pre-compact-hook
+#
+# Fires on Claude Code PreCompact. Emits agent.activity_changed(working, tool=compact)
+# so the dashboard shows a "compacting" indicator while context is being summarised.
+# PostCompact hook clears this back to idle.
+
+set +e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=pan-hook-lib.sh
+. "$SCRIPT_DIR/pan-hook-lib.sh" 2>/dev/null || exit 0
+
+pan_resolve_agent_id || exit 0
+
+TS=$(date -Iseconds)
+
+if command -v jq >/dev/null 2>&1; then
+  BODY=$(jq -n --arg ts "$TS" \
+    '{kind: "activity", activity: "working", tool: "compact", timestamp: $ts}')
+else
+  BODY="{\"kind\":\"activity\",\"activity\":\"working\",\"tool\":\"compact\",\"timestamp\":\"$TS\"}"
+fi
+
+pan_emit_event "$AGENT_ID" "$BODY"
+exit 0

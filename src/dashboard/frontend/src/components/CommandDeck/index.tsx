@@ -1,17 +1,18 @@
 import { useState, useCallback, useRef, useEffect, useMemo, useReducer } from 'react';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Compass, Plus } from 'lucide-react';
+import { Compass, Plus, ChevronDown, ChevronRight } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { sessionMatchesFilter, type TreeSessionFilter } from './ProjectTree/FeatureItem';
 import { DeaconStatus } from './DeaconStatus';
 import { IssueWorkbench } from './IssueWorkbench';
 import { BeadsDialog } from '../BeadsDialog';
+import { PlanDialog } from '../PlanDialog';
 import { ConversationList, type Conversation } from './ConversationList';
+import { useConversationMutations } from './useConversationMutations';
+import { ForkModal } from './ForkModal';
 import { ConversationPanel, type ViewMode } from '../chat/ConversationPanel';
 import { ModelPicker, loadStoredModel, saveStoredModel } from '../chat/ModelPicker';
-import { DraftConversationPanel } from '../chat/DraftConversationPanel';
-import type { ChatMessage } from '../chat/chat-types';
 import type { Agent, Issue, StartAgentResponse } from '../../types';
 import { useDashboardStore, selectAgentList } from '../../lib/store';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
@@ -60,10 +61,28 @@ function groupProjects(issues: ProjectFeature[]): ProjectData[] {
 }
 
 async function fetchProjects(): Promise<ProjectData[]> {
-  const res = await fetch('/api/issues/resource-allocated');
-  if (!res.ok) throw new Error('Failed to fetch resource-allocated issues');
-  const issues = await res.json() as ProjectFeature[];
-  return groupProjects(issues);
+  const [issuesRes, registeredRes] = await Promise.all([
+    fetch('/api/issues/resource-allocated'),
+    fetch('/api/registered-projects'),
+  ]);
+  if (!issuesRes.ok) throw new Error('Failed to fetch resource-allocated issues');
+  if (!registeredRes.ok) throw new Error('Failed to fetch registered projects');
+
+  const issues = await issuesRes.json() as ProjectFeature[];
+  const registered = await registeredRes.json() as { key: string; name: string; path: string }[];
+
+  // Start with projects that have qualifying issues
+  const projectMap = new Map(groupProjects(issues).map(p => [p.name, p]));
+
+  // Add registered projects that have no qualifying issues (empty features list)
+  for (const proj of registered) {
+    const name = proj.name ?? proj.key;
+    if (!projectMap.has(name)) {
+      projectMap.set(name, { name, path: proj.path, features: [] });
+    }
+  }
+
+  return [...projectMap.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 interface IssueCostEntry {
@@ -81,6 +100,19 @@ async function fetchVersion(): Promise<{ version: string }> {
   const res = await fetch('/api/version');
   if (!res.ok) throw new Error('Failed to fetch version');
   return res.json();
+}
+
+interface RegisteredProject {
+  key: string;
+  name: string;
+  path: string;
+}
+
+async function fetchRegisteredProjects(): Promise<RegisteredProject[]> {
+  const res = await fetch('/api/registered-projects');
+  if (!res.ok) throw new Error('Failed to fetch registered projects');
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
 }
 
 async function fetchAllSessionTrees(projectKeys: string[]): Promise<ProjectSessionTree[]> {
@@ -133,6 +165,18 @@ function applySessionTreeDelta(tree: ProjectSessionTree, delta: SessionTreeDelta
   }
 }
 
+interface ContainerStats {
+  id: string;
+  name: string;
+  cpuPercent: number;
+  memoryUsage: number;
+  memoryLimit: number;
+  memoryPercent: number;
+  networkIn: number;
+  networkOut: number;
+  status: 'running' | 'stopped' | 'unhealthy' | 'restarting';
+}
+
 interface CommandDeckProps {
   issues?: Issue[];
   /** Deep-link conversation ID — selects this conversation on mount */
@@ -143,19 +187,9 @@ interface CommandDeckProps {
   onConversationViewModeChange?: (mode: ViewMode) => void;
 }
 
-type SidebarMode = 'projects' | 'conversations';
-
-const SIDEBAR_MODE_KEY = 'mc-sidebar-mode';
-
-function loadSidebarMode(): SidebarMode {
-  try {
-    const v = localStorage.getItem(SIDEBAR_MODE_KEY);
-    if (v === 'conversations') return 'conversations';
-  } catch {
-    // ignore
-  }
-  return 'projects';
-}
+const CONVS_COLLAPSED_KEY = 'mc-convs-collapsed';
+const PROJECTS_COLLAPSED_KEY = 'mc-projects-collapsed';
+const SECTION_SPLIT_KEY = 'mc-section-split';
 
 export function CommandDeck({
   issues = [],
@@ -167,15 +201,38 @@ export function CommandDeck({
   const [projectQueryEpoch, bumpProjectQueryEpoch] = useReducer((value: number) => value + 1, 0);
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
-  const [isDraft, setIsDraft] = useState(false);
   const [showBeads, setShowBeads] = useState(false);
-  const [sidebarMode, setSidebarModeState] = useState<SidebarMode>(() => loadSidebarMode());
-  const showConversations = sidebarMode === 'conversations';
-  const showProjects = sidebarMode === 'projects';
-  const setSidebarMode = useCallback((mode: SidebarMode) => {
-    setSidebarModeState(mode);
-    try { localStorage.setItem(SIDEBAR_MODE_KEY, mode); } catch { /* ignore */ }
+  const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null);
+  const [convsCollapsed, setConvsCollapsed] = useState(() => {
+    try { return localStorage.getItem(CONVS_COLLAPSED_KEY) === 'true'; } catch { return false; }
+  });
+  const [projectsCollapsed, setProjectsCollapsed] = useState(() => {
+    try { return localStorage.getItem(PROJECTS_COLLAPSED_KEY) === 'true'; } catch { return false; }
+  });
+  const toggleConvsCollapsed = useCallback(() => {
+    setConvsCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem(CONVS_COLLAPSED_KEY, String(next)); } catch { /* ignore */ }
+      return next;
+    });
   }, []);
+  const toggleProjectsCollapsed = useCallback(() => {
+    setProjectsCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem(PROJECTS_COLLAPSED_KEY, String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+  const [sectionSplit, setSectionSplit] = useState(() => {
+    try {
+      const saved = localStorage.getItem(SECTION_SPLIT_KEY);
+      return saved ? Math.max(20, Math.min(80, Number(saved))) : 50;
+    } catch { return 50; }
+  });
+  const isSectionDragging = useRef(false);
+  const sectionDragStartY = useRef(0);
+  const sectionDragStartSplit = useRef(50);
+  const sectionContainerRef = useRef<HTMLDivElement>(null);
   const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
 
@@ -186,8 +243,6 @@ export function CommandDeck({
   const selectedSessionId = selectedFeature
     ? selectedSessionByIssue[selectedFeature] ?? null
     : null;
-  // Increments each time + is clicked, forcing DraftConversationPanel to remount and re-read localStorage
-  const [draftKey, setDraftKey] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem('mc-sidebar-width');
     return saved ? Math.max(280, Number(saved)) : 320;
@@ -210,6 +265,12 @@ export function CommandDeck({
     refetchInterval: 15000,
   });
 
+  const { data: registeredProjects = [] } = useQuery({
+    queryKey: ['registered-projects'],
+    queryFn: fetchRegisteredProjects,
+    staleTime: 60000,
+  });
+
   const { data: versionData } = useQuery({
     queryKey: ['version'],
     queryFn: fetchVersion,
@@ -222,7 +283,7 @@ export function CommandDeck({
   const { data: sessionTrees = [] } = useQuery({
     queryKey: ['session-trees', projectNamesKey],
     queryFn: () => fetchAllSessionTrees(projects.map(p => p.name)),
-    enabled: showProjects && projects.length > 0,
+    enabled: projects.length > 0,
   });
 
   const sessionTreeDataRef = useRef<Record<string, ProjectSessionTree>>({});
@@ -243,7 +304,6 @@ export function CommandDeck({
   // Track current project names key for delta handlers (avoids stale closure)
   // Subscribe to live session tree deltas for each project
   useEffect(() => {
-    if (!showProjects) return;
     const transport = getTransport();
     const unsubscribes: Array<() => void> = [];
 
@@ -278,7 +338,7 @@ export function CommandDeck({
         unsubscribe();
       }
     };
-  }, [showProjects, projectNamesKey, projects, queryClient]);
+  }, [projectNamesKey, projects, queryClient]);
 
   // Merge session trees into project features, preserving object identity
   // for features whose sessions haven't changed (avoids O(total features)
@@ -306,6 +366,49 @@ export function CommandDeck({
     });
   }, [projects, sessionTreeMap]);
 
+  // Split projects into active (has features) and inactive (empty features from registered projects with no issues)
+  const { activeProjects, inactiveProjects } = useMemo(() => {
+    const active: typeof projects = [];
+    const inactive: typeof projects = [];
+    for (const project of projectsWithSessions) {
+      if (project.features.length > 0) {
+        active.push(project);
+      } else {
+        inactive.push(project);
+      }
+    }
+    return { activeProjects: active, inactiveProjects: inactive };
+  }, [projectsWithSessions]);
+
+  const [containerStats, setContainerStats] = useState<Record<string, ContainerStats>>({});
+
+  // Poll container stats every 5s when issues have containers
+  useEffect(() => {
+    const hasContainers = projectsWithSessions.some((p) =>
+      p.features.some((f) => (f.resourceDetails?.dockerContainerCount ?? 0) > 0),
+    );
+    if (!hasContainers) return;
+
+    const fetchStats = async () => {
+      try {
+        const res = await fetch('/api/resources');
+        if (!res.ok) return;
+        const data = (await res.json()) as { containers: ContainerStats[] };
+        const byName: Record<string, ContainerStats> = {};
+        for (const c of data.containers) {
+          byName[c.name] = c;
+        }
+        setContainerStats(byName);
+      } catch {
+        // ignore
+      }
+    };
+
+    fetchStats();
+    const interval = setInterval(fetchStats, 5000);
+    return () => clearInterval(interval);
+  }, [projectsWithSessions]);
+
   // Agents from dashboard store (for terminal panel in detail view)
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
 
@@ -323,6 +426,7 @@ export function CommandDeck({
   const issueTitles = useMemo(() => {
     const map: Record<string, string> = {};
     for (const issue of issues) {
+      if (!issue.identifier) continue;
       map[issue.identifier.toLowerCase()] = issue.title;
       map[issue.identifier] = issue.title;
     }
@@ -334,6 +438,32 @@ export function CommandDeck({
     queryFn: fetchConversations,
     refetchInterval: 10000,
   });
+
+  // Partition conversations into project-scoped vs unscoped
+  const { projectConversations, excludeConvIds } = useMemo(() => {
+    const map: Record<string, import('./ConversationList').Conversation[]> = {};
+    const excludeSet = new Set<number>();
+    if (!Array.isArray(registeredProjects) || registeredProjects.length === 0) return { projectConversations: map, excludeConvIds: excludeSet };
+
+    const pathToKey = new Map<string, string>();
+    for (const rp of registeredProjects) {
+      if (rp.path) pathToKey.set(rp.path, rp.key);
+    }
+
+    for (const conv of conversations) {
+      if (!conv.cwd) continue;
+      for (const [projectPath, projectKey] of pathToKey) {
+        if (conv.cwd === projectPath || conv.cwd.startsWith(projectPath + '/')) {
+          if (!map[projectKey]) map[projectKey] = [];
+          map[projectKey].push(conv);
+          excludeSet.add(conv.id);
+          break;
+        }
+      }
+    }
+
+    return { projectConversations: map, excludeConvIds: excludeSet };
+  }, [conversations, registeredProjects]);
 
   // Track the last deep-link ID we applied so we only navigate for *new* deep-links
   // (e.g. popstate), not on every conversations refetch.
@@ -354,11 +484,10 @@ export function CommandDeck({
   const hasAutoSelected = useRef(false);
   useEffect(() => {
     if (hasAutoSelected.current) return;
-    if (!showConversations) return;
     if (conversations.length === 0 || convId || selectedConversation !== null || selectedFeature !== null) return;
     setSelectedConversation(conversations[0].name);
     hasAutoSelected.current = true;
-  }, [conversations, convId, selectedConversation, selectedFeature, showConversations]);
+  }, [conversations, convId, selectedConversation, selectedFeature]);
 
   // Sync URL when selected conversation changes (user clicks, draft promoted, etc.)
   // Use a ref to track the previous value so we only call onConvIdChange when it actually changes.
@@ -381,16 +510,23 @@ export function CommandDeck({
 
   const handleSelectFeature = useCallback((issueId: string) => {
     setSelectedFeature(issueId);
-    selectSession(issueId, null);
     setSelectedConversation(null);
-    setIsDraft(false);
-  }, [selectSession]);
+
+    // Auto-select the active work agent session so the user lands in
+    // conversation view instead of the overview with a disabled composer.
+    const feature = projectsWithSessions
+      .flatMap(p => p.features)
+      .find(f => f.issueId === issueId);
+    const activeWorkSession = feature?.sessions?.find(
+      (s) => s.presence === 'active' && s.type === 'work',
+    );
+    selectSession(issueId, activeWorkSession?.sessionId ?? null);
+  }, [selectSession, projectsWithSessions]);
 
   const handleSelectSession = useCallback((issueId: string, sessionId: string) => {
     setSelectedFeature(issueId);
     selectSession(issueId, sessionId);
     setSelectedConversation(null);
-    setIsDraft(false);
   }, [selectSession]);
 
   const handleStopSession = useCallback(async (sessionId: string) => {
@@ -398,8 +534,8 @@ export function CommandDeck({
       const res = await fetch(`/api/agents/${sessionId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to stop session');
       await refreshDashboardState(queryClient);
-    } catch {
-      // Silently ignore — the user can retry from Zone B if needed
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to stop session');
     }
   }, [queryClient]);
 
@@ -412,8 +548,8 @@ export function CommandDeck({
       if (!res.ok) throw new Error('Failed to clean up orphaned resources');
       bumpProjectQueryEpoch();
       await refreshDashboardState(queryClient);
-    } catch {
-      // Silently ignore — user can retry from the resource popover
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to clean up resources');
     }
   }, [queryClient]);
 
@@ -425,7 +561,6 @@ export function CommandDeck({
           setSelectedFeature(feature.issueId);
           selectSession(feature.issueId, sessionId);
           setSelectedConversation(null);
-          setIsDraft(false);
           return;
         }
       }
@@ -441,8 +576,8 @@ export function CommandDeck({
       });
       if (!res.ok) throw new Error('Failed to pause session');
       await refreshDashboardState(queryClient);
-    } catch {
-      // Silently ignore — user can retry
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to pause session');
     }
   }, [queryClient]);
 
@@ -455,16 +590,96 @@ export function CommandDeck({
       });
       if (!res.ok) throw new Error('Failed to resume session');
       await refreshDashboardState(queryClient);
-    } catch {
-      // Silently ignore — user can retry
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to resume session');
     }
   }, [queryClient]);
 
-  const handleRestartSession = useCallback(async (sessionId: string, issueId: string) => {
+  const handleRestartSession = useCallback(async (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string) => {
     try {
+      // Find project key for this issue. Primary: resource-allocated issue list.
+      // Fallback: session tree (covers issues where the work agent is done but
+      // review is still running — those drop off resource-allocated but stay in the tree).
+      const projectKey = projectsWithSessions.find(p =>
+        p.features.some(f => f.issueId === issueId),
+      )?.name
+        ?? Object.entries(sessionTreeMap).find(([, tree]) =>
+          tree.features.some(f => f.issueId.toLowerCase() === issueId.toLowerCase()),
+        )?.[0];
+
+      if (sessionType === 'review') {
+        // Restart all reviewers — kill coordinator + all 5, then re-dispatch.
+        // Guard here so review sessions never fall through to the work-agent restart path.
+        if (!projectKey) throw new Error(`Cannot find project for ${issueId}`);
+        const res = await fetch(`/api/specialists/${encodeURIComponent(projectKey)}/${encodeURIComponent(issueId)}/review/restart`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Failed to restart review');
+        toast.success('Review restarted');
+        await refreshDashboardState(queryClient);
+        return;
+      }
+
+      if (sessionType === 'reviewer' && role) {
+        // Restart single reviewer role.
+        // Guard here so reviewer sessions never fall through to the work-agent restart path.
+        if (!projectKey) throw new Error(`Cannot find project for ${issueId}`);
+        const res = await fetch(`/api/specialists/${encodeURIComponent(projectKey)}/${encodeURIComponent(issueId)}/reviewer/${encodeURIComponent(role)}/restart`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `Failed to restart ${role} reviewer`);
+        toast.success(`${role} reviewer restarted`);
+        await refreshDashboardState(queryClient);
+        return;
+      }
+
+      // Default: work agent restart. Try resume first — Claude sessions are never
+      // discarded. Only start fresh if the agent has no saved session to resume.
+      const resumeRes = await fetch(`/api/agents/${sessionId}/resume`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(model ? { model } : {}),
+      });
+      const resumeData = await resumeRes.json().catch(() => ({})) as { success?: boolean; error?: string; lifecycle?: { canResumeSession?: boolean; hasLiveTmuxSession?: boolean; isRunning?: boolean } };
+      if (resumeRes.ok) {
+        toast.success('Agent resumed');
+        await refreshDashboardState(queryClient);
+        return;
+      }
+      // Agent is currently running — true restart: stop it, then resume from saved session.
+      if (resumeData.lifecycle?.isRunning) {
+        const stopRes = await fetch(`/api/agents/${sessionId}`, { method: 'DELETE' });
+        if (!stopRes.ok) throw new Error('Failed to stop agent before restart');
+        const resumeRetryRes = await fetch(`/api/agents/${sessionId}/resume`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(model ? { model } : {}),
+        });
+        if (!resumeRetryRes.ok) {
+          const retryData = await resumeRetryRes.json().catch(() => ({})) as { error?: string };
+          throw new Error(retryData.error || 'Failed to restart agent');
+        }
+        toast.success('Agent restarted');
+        await refreshDashboardState(queryClient);
+        return;
+      }
+      // Only fall through to start-fresh when there is genuinely no session to resume.
+      const noSession = resumeData.lifecycle?.canResumeSession === false && !resumeData.lifecycle?.hasLiveTmuxSession;
+      if (!noSession) {
+        throw new Error(resumeData.error || 'Failed to resume agent');
+      }
+
+      // No saved session — start fresh.
       await fetch(`/api/agents/${sessionId}`, { method: 'DELETE' });
-      const requestBody = { issueId };
-      let lastRequestBody: Record<string, unknown> = requestBody;
+      const requestBody: Record<string, unknown> = { issueId };
+      if (model) requestBody.model = model;
+      let lastRequestBody = requestBody;
       let res = await fetch('/api/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -487,16 +702,16 @@ export function CommandDeck({
           setPendingCodexSpawn(lastRequestBody);
           throw new Error(data.hint || data.error || 'Codex authentication expired — re-authenticate to continue');
         }
-        throw new Error(data.error || data.hint || 'Failed to restart agent');
+        throw new Error(data.error || data.hint || 'Failed to start agent');
       }
       if (data.guardrails?.warnings?.length) {
         toast.success('Agent started after acknowledging system health warnings.', { duration: 6000 });
       }
       await refreshDashboardState(queryClient);
-    } catch {
-      // Silently ignore — user can retry
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to restart session');
     }
-  }, [queryClient]);
+  }, [queryClient, projectsWithSessions, sessionTreeMap]);
 
   const handleDeepWipe = useCallback(async (issueId: string) => {
     try {
@@ -510,8 +725,8 @@ export function CommandDeck({
       // Deselect the feature since its workspace is gone
       setSelectedFeature(null);
       selectSession(issueId, null);
-    } catch {
-      // Silently ignore — user can retry
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to deep wipe');
     }
   }, [queryClient, selectSession]);
 
@@ -519,6 +734,11 @@ export function CommandDeck({
     const path = `~/.panopticon/agents/${sessionId}/`;
     navigator.clipboard?.writeText(path).catch(() => { /* ignore */ });
   }, []);
+
+  const handleOpenPlanDialog = useCallback((issueId: string) => {
+    const issue = issues.find(i => i.identifier.toLowerCase() === issueId.toLowerCase());
+    if (issue) setPlanDialogIssue(issue);
+  }, [issues]);
 
   const handleViewJsonl = useCallback((sessionId: string) => {
     // Select the session so the conversation panel shows its JSONL transcript
@@ -528,7 +748,6 @@ export function CommandDeck({
           setSelectedFeature(feature.issueId);
           selectSession(feature.issueId, sessionId);
           setSelectedConversation(null);
-          setIsDraft(false);
           return;
         }
       }
@@ -536,51 +755,95 @@ export function CommandDeck({
   }, [projectsWithSessions, selectSession]);
 
   const handleSelectConversation = useCallback((name: string | null) => {
-    setDraftKey(0);
     setSelectedConversation(name);
     if (selectedFeature) {
       selectSession(selectedFeature, null);
     }
-    setIsDraft(false);
     if (name !== null) {
       setSelectedFeature(null);
     }
   }, [selectSession, selectedFeature]);
 
-  const handleDraftCreated = useCallback(() => {
-    setDraftKey(k => k + 1);
-    setIsDraft(true);
-    setSelectedConversation(null);
-    setSelectedFeature(null);
-    setSidebarMode('conversations');
-  }, [setSidebarMode]);
+  const projectConvMutations = useConversationMutations(selectedConversation, handleSelectConversation);
 
-  const handleDraftPromoted = useCallback((conv: Conversation, firstMessage: string) => {
-    setDraftKey(0);
-    setIsDraft(false);
-    setSelectedConversation(conv.name);
-    // Update URL immediately — the conv isn't in the query cache yet so the
-    // URL-sync effect can't resolve it; do it eagerly here.
-    if (onConvIdChange) {
-      const newId = String(conv.id);
-      onConvIdChange(newId);
-      appliedConvId.current = newId;
-      prevSelectedRef.current = conv.name;
+  const createConversationForProject = useCallback(async (projectKey?: string) => {
+    try {
+      const payload: Record<string, unknown> = { model: sidebarModel };
+      if (projectKey) payload.projectKey = projectKey;
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Request failed' }));
+        throw new Error((err as { error?: string }).error || 'Failed to create conversation');
+      }
+      const conv = await res.json() as Conversation;
+      setSelectedConversation(conv.name);
+      setSelectedFeature(null);
+      if (convsCollapsed) setConvsCollapsed(false);
+      if (onConvIdChange) {
+        const newId = String(conv.id);
+        onConvIdChange(newId);
+        appliedConvId.current = newId;
+        prevSelectedRef.current = conv.name;
+      }
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    } catch (err) {
+      console.error('[CommandDeck] Failed to create conversation:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to create conversation');
     }
-    // Seed optimistic first message so it appears immediately before polling returns data
-    const optimistic: ChatMessage = {
-      id: `optimistic-${Date.now()}`,
-      role: 'user',
-      text: firstMessage,
-      createdAt: new Date().toISOString(),
+  }, [sidebarModel, queryClient, onConvIdChange, convsCollapsed]);
+
+  const handleNewConversation = useCallback(() => {
+    void createConversationForProject();
+  }, [createConversationForProject]);
+
+  const handleNewProjectConversation = useCallback((projectKey: string) => {
+    void createConversationForProject(projectKey);
+  }, [createConversationForProject]);
+
+  // Section divider drag handlers
+  const handleSectionDragStart = useCallback((e: React.MouseEvent) => {
+    isSectionDragging.current = true;
+    sectionDragStartY.current = e.clientY;
+    sectionDragStartSplit.current = sectionSplit;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  }, [sectionSplit]);
+
+  useEffect(() => {
+    const handleSectionDragMove = (e: MouseEvent) => {
+      if (!isSectionDragging.current || !sectionContainerRef.current) return;
+      const containerHeight = sectionContainerRef.current.getBoundingClientRect().height;
+      if (containerHeight <= 0) return;
+      const deltaY = e.clientY - sectionDragStartY.current;
+      const deltaPct = (deltaY / containerHeight) * 100;
+      const newSplit = Math.max(15, Math.min(85, sectionDragStartSplit.current + deltaPct));
+      setSectionSplit(newSplit);
     };
-    queryClient.setQueryData(['conversation-messages', conv.name], {
-      messages: [optimistic],
-      workLog: [],
-      streaming: true,
-    });
-    queryClient.invalidateQueries({ queryKey: ['conversations'] });
-  }, [queryClient, onConvIdChange]);
+
+    const handleSectionDragEnd = () => {
+      if (isSectionDragging.current) {
+        isSectionDragging.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        setSectionSplit(prev => {
+          try { localStorage.setItem(SECTION_SPLIT_KEY, String(Math.round(prev))); } catch { /* ignore */ }
+          return prev;
+        });
+      }
+    };
+
+    document.addEventListener('mousemove', handleSectionDragMove);
+    document.addEventListener('mouseup', handleSectionDragEnd);
+    return () => {
+      document.removeEventListener('mousemove', handleSectionDragMove);
+      document.removeEventListener('mouseup', handleSectionDragEnd);
+    };
+  }, []);
 
   // Resizable sidebar drag handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -673,7 +936,7 @@ export function CommandDeck({
                 />
                 <button
                   className={styles.conversationAddBtn}
-                  onClick={handleDraftCreated}
+                  onClick={handleNewConversation}
                   title="New conversation"
                   aria-label="New conversation"
                 >
@@ -682,96 +945,166 @@ export function CommandDeck({
               </div>
             </div>
 
-            {/* Filter chips */}
-            <div className={styles.segmentControl}>
-              <button
-                className={`${styles.segmentButton} ${showProjects ? styles.segmentButtonActive : ''}`}
-                onClick={() => setSidebarMode('projects')}
-                aria-pressed={showProjects}
-              >
-                Projects
-                <span className={styles.segmentCount}>
-                  {projects.reduce((sum, p) => sum + p.features.length, 0)}
-                </span>
-              </button>
-              <button
-                className={`${styles.segmentButton} ${showConversations ? styles.segmentButtonActive : ''}`}
-                onClick={() => setSidebarMode('conversations')}
-                aria-pressed={showConversations}
-              >
-                Conversations
-                <span className={styles.segmentCount}>{conversations.length}</span>
-              </button>
-            </div>
+          </div>
 
-            {/* Tree session filter (blocker-4) */}
-            {showProjects && (
-              <div className={styles.treeFilterRow}>
-                {(['all', 'alive', 'failed'] as TreeSessionFilter[]).map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => setTreeFilter(f)}
-                    className={`${styles.treeFilterButton} ${treeFilter === f ? styles.treeFilterButtonActive : ''}`}
-                  >
-                    {f === 'all' ? 'All' : f === 'alive' ? 'Alive' : 'Failed'}
-                  </button>
-                ))}
+          <div ref={sectionContainerRef} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          {/* ── Conversations section ─────────────────────────────── */}
+          <div
+            className={`${styles.sidebarSection} ${convsCollapsed ? styles.sidebarSectionCollapsed : ''}`}
+            style={!convsCollapsed && !projectsCollapsed ? { flex: `0 0 ${sectionSplit}%` } : undefined}
+          >
+            <div className={styles.sectionHeader} onClick={toggleConvsCollapsed}>
+              {convsCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+              <span className={styles.sectionTitle}>Conversations</span>
+              <span className={styles.segmentCount}>{conversations.length - excludeConvIds.size}</span>
+            </div>
+            {!convsCollapsed && (
+              <div className={styles.sectionBody}>
+                <ConversationList
+                  selectedConversation={selectedConversation}
+                  onSelectConversation={handleSelectConversation}
+                  excludeIds={excludeConvIds}
+                />
               </div>
             )}
           </div>
 
-          {/* Unified sidebar content */}
-          <div className={styles.projectTree}>
-            {showConversations && (
-              <ConversationList
-                selectedConversation={selectedConversation}
-                onSelectConversation={handleSelectConversation}
-              />
-            )}
-            {showProjects && (
-              isLoading && projects.length === 0 ? (
-                <div className={styles.skeletonList}>
-                  <div className={styles.skeletonItem} style={{ width: '60%' }} />
-                  <div className={styles.skeletonItem} style={{ width: '80%' }} />
-                  <div className={styles.skeletonItem} style={{ width: '45%' }} />
-                  <div className={styles.skeletonItem} style={{ width: '70%' }} />
+          {/* ── Draggable divider ─────────────────────────────────── */}
+          {!convsCollapsed && !projectsCollapsed && (
+            <div
+              className={styles.sectionDivider}
+              onMouseDown={handleSectionDragStart}
+            />
+          )}
+
+          {/* ── Projects section ──────────────────────────────────── */}
+          <div
+            className={`${styles.sidebarSection} ${projectsCollapsed ? styles.sidebarSectionCollapsed : ''}`}
+            style={!convsCollapsed && !projectsCollapsed ? { flex: `0 0 ${100 - sectionSplit}%` } : undefined}
+          >
+            <div className={styles.sectionHeader} onClick={toggleProjectsCollapsed}>
+              {projectsCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+              <span className={styles.sectionTitle}>Projects</span>
+              <span className={styles.segmentCount}>
+                {activeProjects.reduce((sum, p) => sum + p.features.length, 0)}
+              </span>
+            </div>
+            {!projectsCollapsed && (
+              <div className={styles.sectionBody}>
+                <div className={styles.treeFilterRow}>
+                  {(['all', 'alive', 'failed'] as TreeSessionFilter[]).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setTreeFilter(f)}
+                      className={`${styles.treeFilterButton} ${treeFilter === f ? styles.treeFilterButtonActive : ''}`}
+                    >
+                      {f === 'all' ? 'All' : f === 'alive' ? 'Alive' : 'Failed'}
+                    </button>
+                  ))}
                 </div>
-              ) : projects.length === 0 ? (
-                <div className={styles.emptyProject}>No projects configured</div>
-              ) : (
-                projectsWithSessions
-                  .filter((project) => {
-                    if (treeFilter === 'all') return project.features.length > 0;
-                    return project.features.some((feature) =>
-                      (feature.sessions ?? []).some((session) => sessionMatchesFilter(session, treeFilter)),
-                    );
-                  })
-                  .map(project => (
-                  <ProjectNode
-                    key={project.path}
-                    name={project.name}
-                    features={project.features}
-                    selectedFeature={selectedFeature}
-                    onSelectFeature={handleSelectFeature}
-                    selectedSessionId={selectedSessionId}
-                    onSelectSession={handleSelectSession}
-                    issueTitles={issueTitles}
-                    issueCosts={issueCosts}
-                    filter={treeFilter}
-                    onStopSession={handleStopSession}
-                    onViewTerminal={handleViewTerminal}
-                    onPauseSession={handlePauseSession}
-                    onResumeSession={handleResumeSession}
-                    onRestartSession={handleRestartSession}
-                    onDeepWipe={handleDeepWipe}
-                    onOpenStateDir={handleOpenStateDir}
-                    onViewJsonl={handleViewJsonl}
-                    onCleanupOrphanedResources={handleCleanupOrphanedResources}
-                  />
-                ))
-              )
+                {isLoading && activeProjects.length === 0 && inactiveProjects.length === 0 ? (
+                  <div className={styles.skeletonList}>
+                    <div className={styles.skeletonItem} style={{ width: '60%' }} />
+                    <div className={styles.skeletonItem} style={{ width: '80%' }} />
+                    <div className={styles.skeletonItem} style={{ width: '45%' }} />
+                    <div className={styles.skeletonItem} style={{ width: '70%' }} />
+                  </div>
+                ) : activeProjects.length === 0 && inactiveProjects.length === 0 ? (
+                  <div className={styles.emptyProject}>No projects configured</div>
+                ) : (
+                  <>
+                    {activeProjects
+                      .filter((project) => {
+                        const hasConvs = (projectConversations[project.name]?.length ?? 0) > 0;
+                        if (treeFilter === 'all') return project.features.length > 0 || hasConvs;
+                        return project.features.some((feature) =>
+                          (feature.sessions ?? []).some((session) => sessionMatchesFilter(session, treeFilter)),
+                        ) || hasConvs;
+                      })
+                      .map(project => (
+                      <ProjectNode
+                        key={project.path}
+                        name={project.name}
+                        features={project.features}
+                        selectedFeature={selectedFeature}
+                        onSelectFeature={handleSelectFeature}
+                        selectedSessionId={selectedSessionId}
+                        onSelectSession={handleSelectSession}
+                        issueTitles={issueTitles}
+                        issueCosts={issueCosts}
+                        filter={treeFilter}
+                        onStopSession={handleStopSession}
+                        onViewTerminal={handleViewTerminal}
+                        onPauseSession={handlePauseSession}
+                        onResumeSession={handleResumeSession}
+                        onRestartSession={handleRestartSession}
+                        onDeepWipe={handleDeepWipe}
+                        onOpenStateDir={handleOpenStateDir}
+                        onViewJsonl={handleViewJsonl}
+                        onCleanupOrphanedResources={handleCleanupOrphanedResources}
+                        onOpenPlanDialog={handleOpenPlanDialog}
+                        onNewConversation={handleNewProjectConversation}
+                        conversations={projectConversations[project.name] ?? []}
+                        selectedConversation={selectedConversation}
+                        onSelectConversation={handleSelectConversation}
+                        conversationMutations={projectConvMutations}
+                        containerStats={containerStats}
+                      />
+                    ))}
+                    {inactiveProjects.length > 0 && (
+                      <div className={styles.inactiveProjectsSection}>
+                        <div className={styles.inactiveProjectsSectionHeader}>
+                          Projects (Inactive)
+                        </div>
+                        {inactiveProjects.map(project => (
+                          <ProjectNode
+                            key={project.path}
+                            name={project.name}
+                            features={project.features}
+                            selectedFeature={selectedFeature}
+                            onSelectFeature={handleSelectFeature}
+                            selectedSessionId={selectedSessionId}
+                            onSelectSession={handleSelectSession}
+                            issueTitles={issueTitles}
+                            issueCosts={issueCosts}
+                            filter={treeFilter}
+                            onStopSession={handleStopSession}
+                            onViewTerminal={handleViewTerminal}
+                            onPauseSession={handlePauseSession}
+                            onResumeSession={handleResumeSession}
+                            onRestartSession={handleRestartSession}
+                            onDeepWipe={handleDeepWipe}
+                            onOpenStateDir={handleOpenStateDir}
+                            onViewJsonl={handleViewJsonl}
+                            onCleanupOrphanedResources={handleCleanupOrphanedResources}
+                            onOpenPlanDialog={handleOpenPlanDialog}
+                            onNewConversation={handleNewProjectConversation}
+                            conversations={projectConversations[project.name] ?? []}
+                            selectedConversation={selectedConversation}
+                            onSelectConversation={handleSelectConversation}
+                            conversationMutations={projectConvMutations}
+                            containerStats={containerStats}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             )}
           </div>
+          </div>
+
+          {projectConvMutations.forkTarget && (
+            <ForkModal
+              conversation={projectConvMutations.forkTarget}
+              isPending={projectConvMutations.isForkPending}
+              onClose={projectConvMutations.closeForkModal}
+              onConfirm={(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title) => {
+                projectConvMutations.submitFork(conv, launchModel, summaryModel, plainFork, localSummaryOnly, includeThinkingInSummary, title);
+              }}
+            />
+          )}
 
           <DeaconStatus />
           {versionData && (
@@ -789,12 +1122,7 @@ export function CommandDeck({
 
         {/* Content Area */}
         <div className={styles.content}>
-          {isDraft ? (
-            <DraftConversationPanel
-              key={draftKey}
-              onPromoted={handleDraftPromoted}
-            />
-          ) : selectedConversation ? (
+          {selectedConversation ? (
             (() => {
               const conv = conversations.find(c => c.name === selectedConversation);
               return conv ? (
@@ -803,6 +1131,7 @@ export function CommandDeck({
                   conversation={conv}
                   viewMode={conversationViewMode}
                   onViewModeChange={onConversationViewModeChange}
+                  agentId={selectedAgent?.id}
                   onArchived={() => {
                     setSelectedConversation(null);
                     queryClient.invalidateQueries({ queryKey: ['conversations'] });
@@ -830,7 +1159,7 @@ export function CommandDeck({
           ) : (
             <div className={styles.contentEmpty}>
               <div style={{ textAlign: 'center' }}>
-                <Compass size={48} style={{ marginBottom: 'var(--mc-space-4)', opacity: 0.3 }} />
+                <Compass size={48} style={{ marginBottom: '16px', opacity: 0.3 }} />
                 <p>Select a feature to view activity</p>
               </div>
             </div>
@@ -844,6 +1173,18 @@ export function CommandDeck({
           issueId={selectedFeature}
           isOpen={showBeads}
           onClose={() => setShowBeads(false)}
+        />
+      )}
+
+      {planDialogIssue && (
+        <PlanDialog
+          issue={planDialogIssue}
+          isOpen={true}
+          onClose={() => setPlanDialogIssue(null)}
+          onComplete={async () => {
+            setPlanDialogIssue(null);
+            await refreshDashboardState(queryClient);
+          }}
         />
       )}
     </div>

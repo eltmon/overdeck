@@ -1,9 +1,10 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora, { type Ora } from 'ora';
-import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync, symlinkSync, lstatSync, chmodSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync, symlinkSync, lstatSync, chmodSync, unlinkSync } from 'fs';
 import { join, basename, resolve } from 'path';
 import { createWorktree, removeWorktree, listWorktrees } from '../../lib/worktree.js';
+import { PAN_DIRNAME, PAN_CONTINUE_FILENAME, PAN_CONTEXT_FILENAME, PAN_FEEDBACK_DIRNAME, PAN_SESSIONS_FILENAME } from '../../lib/pan-dir/index.js';
 import { generateClaudeMd, TemplateVariables } from '../../lib/template.js';
 import { mergeSkillsIntoWorkspace, applyProjectTemplateOverlay } from '../../lib/skills-merge.js';
 import { listRunningAgents } from '../../lib/agents.js';
@@ -207,6 +208,46 @@ export function registerWorkspaceCommands(program: Command): void {
     .option('--force', 'Force removal even with uncommitted changes')
     .option('--project <path>', 'Explicit project path (overrides registry)')
     .action(destroyCommand);
+
+  // Re-render `<workspace>/.devcontainer/` from the project's compose
+  // template. Idempotent. The single source of truth for how the
+  // devcontainer files look — used by project-specific bootstrap scripts
+  // (e.g. MYN's `infra/new-feature`) instead of duplicating the render in
+  // bash + `sed`. See MIN-848.
+  workspace
+    .command('render-devcontainer <featureName>')
+    .description('Re-render <workspace>/.devcontainer/ from the project compose template')
+    .option('--project <key>', 'Project key in projects.yaml (e.g. mind-your-now)')
+    .option('--workspace <path>', 'Override the inferred workspace path')
+    .option('--json', 'Emit JSON instead of human-readable output')
+    .action(
+      async (
+        featureName: string,
+        opts: { project?: string; workspace?: string; json?: boolean },
+      ) => {
+        const { workspaceRenderDevcontainerCommand } = await import(
+          './workspace-render-devcontainer.js'
+        );
+        await workspaceRenderDevcontainerCommand(featureName, opts);
+      },
+    );
+
+  // The ONLY allowed call site for `git clean -fd` against a workspace.
+  // Refuses to run if stdin is not a TTY. Lists what would be deleted, asks
+  // the user to type the issue ID to confirm, then runs the chokepointed
+  // `runGitClean(..., userInvoked: true)`. See:
+  //   src/lib/safety/dangerous-git-ops.ts
+  //   src/cli/commands/workspace-deep-clean.ts
+  workspace
+    .command('deep-clean <issueId>')
+    .description(
+      'Interactive: git clean -fd against a workspace (preserves protected paths)',
+    )
+    .option('--yes', 'Skip confirmation prompt (still requires a TTY)')
+    .action(async (issueId: string, opts: { yes?: boolean }) => {
+      const { workspaceDeepCleanCommand } = await import('./workspace-deep-clean.js');
+      await workspaceDeepCleanCommand(issueId, opts);
+    });
 
   workspace
     .command('update <issueId>')
@@ -438,22 +479,31 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
     spinner.text = 'Creating git worktree...';
     createWorktree(projectRoot, workspacePath, branchName);
 
-    // Remove stale .planning/ directory inherited from main branch.
-    // This contains STATE.md and other planning artifacts from a PREVIOUS issue.
-    // If left in place, the new agent reads it and works on the wrong issue.
-    // SAFETY: resolve() to absolute path and verify it's under a known workspace prefix
-    // to prevent path traversal from ever reaching rmSync.
+    // Clear stale workspace-local runtime state inherited from main.
+    // Keep canonical plan state (.pan/spec.vbrief.json); clear only mutable
+    // per-workspace artifacts that would belong to a previous issue/session.
     const resolvedWorkspace = resolve(workspacePath);
-    const resolvedPlanning = resolve(resolvedWorkspace, '.planning');
+    const resolvedPanDir = resolve(resolvedWorkspace, PAN_DIRNAME);
     const isUnderWorkspacesDir = resolvedWorkspace.match(/\/workspaces\/feature-[a-z0-9-]+$/);
-    if (
-      isUnderWorkspacesDir &&
-      resolvedPlanning === join(resolvedWorkspace, '.planning') &&
-      existsSync(join(resolvedWorkspace, '.git')) &&
-      existsSync(resolvedPlanning)
-    ) {
-      rmSync(resolvedPlanning, { recursive: true, force: true });
-      console.log('  Removed stale .planning/ directory from previous issue');
+    if (isUnderWorkspacesDir && existsSync(join(resolvedWorkspace, '.git'))) {
+      if (resolvedPanDir === join(resolvedWorkspace, PAN_DIRNAME) && existsSync(resolvedPanDir)) {
+        for (const filePath of [
+          join(resolvedPanDir, PAN_CONTINUE_FILENAME),
+          join(resolvedPanDir, PAN_SESSIONS_FILENAME),
+          join(resolvedPanDir, PAN_CONTEXT_FILENAME),
+        ]) {
+          if (existsSync(filePath)) {
+            unlinkSync(filePath);
+          }
+        }
+
+        const feedbackDir = join(resolvedPanDir, PAN_FEEDBACK_DIRNAME);
+        if (existsSync(feedbackDir)) {
+          rmSync(feedbackDir, { recursive: true, force: true });
+        }
+      }
+
+      console.log('  Cleared stale workspace-local .pan runtime state');
     }
 
     // Initialize fresh beads for this workspace (remove inherited beads from main)
@@ -500,6 +550,18 @@ async function createCommand(issueId: string, options: CreateOptions): Promise<v
         join(workspacePath, '.devcontainer', 'compose.yml'),
         join(workspacePath, '.devcontainer', 'compose.yaml'),
       ];
+
+      // Self-heal: if the workspace already exists from an earlier run but
+      // `.devcontainer/` was deleted (the original PAN-955 bug), regenerate
+      // it from the project template before looking for a compose file.
+      // Idempotent — no-op when `.devcontainer/` is already present.
+      if (!composeLocations.some(f => existsSync(f))) {
+        const { ensureDevcontainer } = await import('../../lib/workspace/ensure-devcontainer.js');
+        const ensure = ensureDevcontainer({ workspacePath, issueId });
+        if (ensure.rendered) {
+          spinner.text = 'Regenerated .devcontainer/ from project template';
+        }
+      }
 
       const composeFile = composeLocations.find(f => existsSync(f));
 

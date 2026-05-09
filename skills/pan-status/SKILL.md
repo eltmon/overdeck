@@ -14,6 +14,24 @@ allowed-tools:
 
 # Panopticon Status Overview
 
+## Lead with the pipeline-status table
+
+**Before running any of the steps below**, surface the cross-room visual board
+from the `pipeline-status` skill. That table — one row per in-flight PAN
+issue, one column per workflow phase, with checkmark/X cells — is the
+headline. Everything in this document is the appendix to it.
+
+```
+Invoke first: pipeline-status
+Then: continue with the system/health detail below
+```
+
+If the user wants only the visual table ("status snapshot", "where are we",
+"status board"), stop after `pipeline-status` and don't run the rest. If they
+want full system detail or asked specifically for "pan status" / "system
+health" / "what's running", run `pipeline-status` first as a header and then
+continue with the detailed sections below.
+
 ## Overview
 
 This skill guides you through checking the status of all Panopticon components, including running agents, workspaces, services, and system health.

@@ -75,6 +75,7 @@ docker-compose.devcontainer.yml
 .claude/prompts/code-review-*.prompt-template.md
 # Workspace-specific settings (absolute paths, caveman variant — must not merge to main)
 .claude/settings.json
+.claude/settings.local.json
 .claude/.caveman-variant
 
 # Build source maps
@@ -96,10 +97,19 @@ temp/
 .playwright-mcp/
 .playwright-mcp/
 
+# Graphify output — track reports/viz, exclude large raw data and machine-specific state
+graphify-out/graph.json
+graphify-out/cache/
+graphify-out/.graphify_*
+
 # Panopticon runtime artifacts (ephemeral, not tracked)
 .pan/events/
 .pan/convoy/
 .pan/prompts/
+.pan/continue.json
+.pan/feedback/
+.pan/followup-issues.txt
+.pan/spec.vbrief.json
 .panopticon/
 
 # Beads / Dolt files (added by bd init)
@@ -120,3 +130,8 @@ apps/desktop/server/
 multica/
 *.log.1
 .panopticon/config.yaml
+.cache/
+.tldr/
+.claude/mcp.json
+graphify-out/cost.json
+vbrief/active/*.vbrief.json

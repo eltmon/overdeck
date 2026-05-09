@@ -10,6 +10,7 @@ import { Effect, Layer, Queue, Stream } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
 import { PanRpcGroup, PanRpcError, WS_METHODS } from '@panctl/contracts';
+import { PanOpen } from './services/open.js';
 import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
@@ -35,12 +36,13 @@ function storedToDomainEvent(stored: StoredEvent): DomainEvent {
 // ─── Session Tree Subscription Helpers (PAN-821) ──────────────────────────────
 
 /** Extract issue ID from a tmux session name. */
-function extractIssueIdFromSession(sessionName: string): string | null {
-  const agentMatch = sessionName.match(/^(agent|planning)-([a-z0-9-]+)$/);
+export function extractIssueIdFromSession(sessionName: string): string | null {
+  const issuePattern = '((?:[a-z]+-\\d+|(?:f|us|de|ta|tc)\\d+))';
+  const agentMatch = sessionName.match(new RegExp(`^(agent|planning)-${issuePattern}(?:-\\d+)?$`, 'i'));
   if (agentMatch) return agentMatch[2]!.toUpperCase();
 
-  const reviewMatch = sessionName.match(/^review-(?:coordinator-)?([A-Z0-9-]+)-\d+/);
-  if (reviewMatch) return reviewMatch[1]!;
+  const reviewMatch = sessionName.match(new RegExp(`^review-(?:coordinator-)?${issuePattern}-\\d+(?:-[a-z]+)?$`, 'i'));
+  if (reviewMatch) return reviewMatch[1]!.toUpperCase();
 
   return null;
 }
@@ -256,13 +258,16 @@ const PanRpcLayer = PanRpcGroup.toLayer(
     const eventStore = yield* EventStoreService;
     const readModel = yield* ReadModelService;
     const terminalService = yield* TerminalService;
+    const panOpen = yield* PanOpen;
 
     return PanRpcGroup.of({
       // ── subscribeDomainEvents ────────────────────────────────────────────────
-      [WS_METHODS.subscribeDomainEvents]: (_input) =>
-        eventStore.streamEvents.pipe(
+      [WS_METHODS.subscribeDomainEvents]: (_input) => {
+        console.log('[ws-rpc] subscribeDomainEvents invoked');
+        return eventStore.streamEvents.pipe(
           Stream.map(storedToDomainEvent),
-        ),
+        );
+      },
 
       // ── subscribeTerminal — live PTY stream (B20) ────────────────────────────
       [WS_METHODS.subscribeTerminal]: (input) =>
@@ -286,7 +291,15 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
       // ── getSnapshot — returns clean read model data (PAN-433) ─────────────────
       [WS_METHODS.getSnapshot]: (_input) =>
-        readModel.getSnapshot.pipe(
+        Effect.gen(function* () {
+          const t0 = Date.now();
+          console.log('[ws-rpc] getSnapshot invoked');
+          const snapshot = yield* readModel.getSnapshot;
+          const issuesLen = Array.isArray(snapshot.issues) ? snapshot.issues.length : 'none';
+          const agentsLen = Array.isArray(snapshot.agents) ? snapshot.agents.length : 'none';
+          console.log(`[ws-rpc] getSnapshot resolved in ${Date.now() - t0}ms — agents=${agentsLen} issues=${issuesLen} seq=${snapshot.sequence}`);
+          return snapshot;
+        }).pipe(
           Effect.mapError(
             (cause) =>
               new PanRpcError({
@@ -350,6 +363,8 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                     messages: initial.messages,
                     workLog: initial.workLog,
                     streaming: initial.streaming,
+                    proposedPlan: initial.proposedPlan,
+                    compactBoundaries: initial.compactBoundaries.length > 0 ? initial.compactBoundaries : undefined,
                   });
 
                   // Watch for new content and stream incremental updates
@@ -361,6 +376,8 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                       messages: result.messages,
                       workLog: result.workLog,
                       streaming: result.streaming,
+                      proposedPlan: result.proposedPlan,
+                      compactBoundaries: result.compactBoundaries.length > 0 ? result.compactBoundaries : undefined,
                     });
                   });
 
@@ -392,6 +409,16 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
           return Stream.merge(eventDeltas, pollDeltas);
         }).pipe(Stream.unwrap),
+
+      // ── shellOpenInEditor — open workspace in editor (PAN-966) ──────────────
+      [WS_METHODS.shellOpenInEditor]: (input) =>
+        panOpen.openInEditor(input),
+
+      // ── getAvailableEditors — list detected editors (PAN-966) ───────────────
+      [WS_METHODS.getAvailableEditors]: () =>
+        panOpen.getAvailableEditors().pipe(
+          Effect.map((editors) => ({ editors })),
+        ),
     });
   }),
 );

@@ -9,6 +9,7 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
   listSessionNamesAsync: vi.fn(),
+  capturePaneAsync: vi.fn(async () => ''),
 }));
 
 vi.mock('../../../../../src/lib/agents.js', () => ({
@@ -103,7 +104,8 @@ describe('fetchProjectSessionTree', () => {
     (getAgentRuntimeStateAsync as any).mockResolvedValue({ state: 'active' });
     mockAccess(new Set([
       '/tmp/panopticon-cli/workspaces',
-      '/tmp/panopticon-cli/workspaces/feature-pan-821/.planning',
+      '/tmp/panopticon-cli/workspaces/feature-pan-821/.pan',
+      '/tmp/panopticon-cli/workspaces/feature-pan-821/.pan/spec.vbrief.json',
       join(homedir(), '.panopticon', 'agents', 'agent-pan-539'),
       join(homedir(), '.panopticon', 'agents', 'agent-pan-539', 'state.json'),
     ]));
@@ -170,7 +172,7 @@ describe('fetchProjectSessionTree', () => {
     expect(result).toEqual({ projectKey: 'Panopticon CLI', features: [] });
   });
 
-  it('resolves feature title from PLANNING_PROMPT.md when available', async () => {
+  it('resolves feature title from .pan/spec.vbrief.json when available', async () => {
     (listProjects as any).mockReturnValue([
       {
         key: 'panopticon-cli',
@@ -180,14 +182,17 @@ describe('fetchProjectSessionTree', () => {
     (listSessionNamesAsync as any).mockResolvedValue([]);
     mockAccess(new Set([
       '/tmp/panopticon-cli/workspaces',
-      '/tmp/panopticon-cli/workspaces/feature-pan-123/.planning',
+      '/tmp/panopticon-cli/workspaces/feature-pan-123/.pan',
+      '/tmp/panopticon-cli/workspaces/feature-pan-123/.pan/spec.vbrief.json',
     ]));
     (readdir as any).mockResolvedValue([
       { name: 'feature-pan-123', isDirectory: () => true },
     ]);
     (readFile as any).mockImplementation((p: string) => {
-      if (p.includes('PLANNING_PROMPT.md')) {
-        return Promise.resolve('# Implement Command Deck Session Tree\n\nSome details here.');
+      if (p.includes('.pan/spec.vbrief.json')) {
+        return Promise.resolve(JSON.stringify({
+          plan: { title: 'Implement Command Deck Session Tree' },
+        }));
       }
       const err = new Error('ENOENT');
       (err as any).code = 'ENOENT';

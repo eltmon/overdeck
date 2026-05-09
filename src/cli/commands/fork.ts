@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import { existsSync } from 'fs';
 import { getConversationById, getConversationByName } from '../../lib/database/conversations-db.js';
 import { createSummaryFork } from '../../lib/conversations/summary-fork.js';
+import { sessionFilePath } from '../../lib/paths.js';
 
 interface ForkOptions {
   model?: string;
@@ -26,7 +27,8 @@ export async function forkCommand(
     process.exit(1);
   }
 
-  if (!conv.sessionFile || !existsSync(conv.sessionFile)) {
+  const sessionFile = conv.claudeSessionId ? sessionFilePath(conv.cwd, conv.claudeSessionId) : null;
+  if (!sessionFile || !existsSync(sessionFile)) {
     console.log(chalk.yellow(`No session file found for conversation ${conv.name}`));
     process.exit(1);
   }

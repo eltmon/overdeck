@@ -22,7 +22,9 @@ export type PipelineEvent =
   | { type: 'task_queued'; specialist: string; issueId: string }
   | { type: 'reviewer_started'; issueId: string; role: string; sessionName: string }
   | { type: 'reviewer_completed'; issueId: string; role: string }
-  | { type: 'coordinator_started'; issueId: string; sessionName: string };
+  | { type: 'reviewer_timed_out'; issueId: string; role: string; sessionName: string; attempt: number; maxRetries: number; willRetry: boolean }
+  | { type: 'coordinator_started'; issueId: string; sessionName: string }
+  | { type: 'coordinator_died'; issueId: string; sessionName: string; reason: string };
 
 type Handler = (event: PipelineEvent) => void;
 let handler: Handler | null = null;

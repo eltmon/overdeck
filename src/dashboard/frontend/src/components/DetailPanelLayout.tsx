@@ -45,6 +45,7 @@ function savePanelState(issueId: string, state: Partial<PanelState>): void {
 
 export interface DetailPanelLayoutProps {
   agent?: Agent;
+  workAgents?: Agent[];
   issueId: string;
   issueUrl?: string;
   issue?: Issue;
@@ -55,7 +56,7 @@ export interface DetailPanelLayoutProps {
   inline?: boolean;
 }
 
-export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, suppressTerminal, inline }: DetailPanelLayoutProps) {
+export function DetailPanelLayout({ agent, workAgents = [], issueId, issueUrl, issue, onClose, suppressTerminal, inline }: DetailPanelLayoutProps) {
   const [panelState, setPanelState] = useState<PanelState>(() => loadPanelState(issueId));
   const [isResizing, setIsResizing] = useState(false);
 
@@ -82,6 +83,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
   const { phase, activeSession, availableTerminals, markSessionDead } = usePipelinePhase({
     issueId,
     agent,
+    workAgents,
     reviewStatus,
     projectKey,
   });
@@ -106,6 +108,8 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
 
   // The currently displayed session: pinned overrides auto
   const selectedSession = pinned ? pinnedSession : activeSession;
+  const selectedSessionAgent = workAgents.find((workAgent) => workAgent.id === selectedSession);
+  const terminalAgent = selectedSessionAgent ?? agent ?? workAgents[0] ?? null;
 
   const handleSelectSession = useCallback((sessionName: string | null) => {
     setPinnedSession(sessionName);
@@ -158,13 +162,18 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
     }
   }, [availableTerminals, pinned, pinnedSession, issueId]);
 
-  const openTerminal = useCallback(() => {
+  const openTerminal = useCallback((sessionName?: string) => {
+    if (sessionName) {
+      handleSelectSession(sessionName);
+      setPinned(true);
+    }
+
     setPanelState(prev => {
       const newState: PanelState = { ...prev, panelMode: 'inspector+terminal' };
       savePanelState(issueId, newState);
       return newState;
     });
-  }, [issueId]);
+  }, [issueId, handleSelectSession]);
 
   const closeTerminal = useCallback(() => {
     setPanelState(prev => {
@@ -174,9 +183,17 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
     });
   }, [issueId]);
 
+  const onViewMergeLog = useCallback(() => {
+    const mergeTab = availableTerminals.find(t => t.id === 'merging' && !t.disabled);
+    if (!mergeTab?.sessionName) return;
+    openTerminal();
+    handleSelectSession(mergeTab.sessionName);
+    setPinned(true);
+  }, [availableTerminals, openTerminal, handleSelectSession]);
+
   if (panelState.panelMode === 'closed') return null;
 
-  const showTerminal = panelState.panelMode === 'inspector+terminal' && !!agent && !suppressTerminal;
+  const showTerminal = panelState.panelMode === 'inspector+terminal' && terminalAgent != null && !suppressTerminal;
   const defaultWidth = showTerminal ? 760 : 360;
   const minWidth = showTerminal ? 480 : 280;
   const maxWidth = 1200;
@@ -227,6 +244,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
           <InspectorPanel
             key={issueId}
             agent={agent}
+            workAgents={workAgents}
             issueId={issueId}
             issueUrl={issueUrl}
             issue={issue}
@@ -235,6 +253,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
             reviewStatusLoading={reviewStatusLoading}
             onClose={onClose}
             onOpenTerminal={openTerminal}
+            onViewMergeLog={onViewMergeLog}
           />
         </div>
       </Panel>
@@ -282,14 +301,14 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
             ) : selectedSession ? (
               <TerminalPanel
                 key={selectedSession}
-                agent={agent}
+                agent={terminalAgent}
                 onClose={closeTerminal}
                 sessionName={selectedSession}
                 title={selectedSession}
                 onSessionEnded={markSessionDead}
               />
             ) : (
-              <TerminalPanel key={agent.id} agent={agent} onClose={closeTerminal} />
+              <TerminalPanel key={terminalAgent.id} agent={terminalAgent} onClose={closeTerminal} />
             )}
           </div>
         </div>
@@ -300,6 +319,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
       <InspectorPanel
         key={issueId}
         agent={agent}
+        workAgents={workAgents}
         issueId={issueId}
         issueUrl={issueUrl}
         issue={issue}
@@ -308,6 +328,7 @@ export function DetailPanelLayout({ agent, issueId, issueUrl, issue, onClose, su
         reviewStatusLoading={reviewStatusLoading}
         onClose={onClose}
         onOpenTerminal={agent ? openTerminal : undefined}
+        onViewMergeLog={onViewMergeLog}
       />
     </div>
   );

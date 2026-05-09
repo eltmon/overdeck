@@ -137,11 +137,11 @@ export function BadgeBar({ issueId, source, onOpenBeads }: BadgeBarProps) {
           Tasks
         </button>
 
-        {/* STATE.md badge */}
+        {/* Continue file badge */}
         <button
           className={`${styles.badge} ${!planning?.state ? styles.badgeDisabled : ''}`}
-          onClick={() => planning?.state && setShowModal({ title: 'STATE.md', content: planning.state })}
-          title={planning?.state ? 'View STATE.md' : 'No STATE.md available'}
+          onClick={() => planning?.state && setShowModal({ title: 'Continue file', content: planning.state })}
+          title={planning?.state ? 'View continue file' : 'No continue file available'}
         >
           <FileText size={12} />
           STATE
@@ -255,7 +255,7 @@ export function BadgeBar({ issueId, source, onOpenBeads }: BadgeBarProps) {
           <span
             className={styles.badge}
             style={{
-              color: syncResult.isError ? 'var(--mc-error, #ef4444)' : 'var(--mc-success, #22c55e)',
+              color: syncResult.isError ? 'var(--destructive)' : 'var(--success)',
               fontSize: '0.7rem',
               opacity: 0.9,
             }}

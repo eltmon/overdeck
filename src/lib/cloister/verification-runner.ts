@@ -11,6 +11,8 @@
 import { basename, dirname, join } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
+import { existsSync } from 'fs';
+import { readdir } from 'fs/promises';
 import { promisify } from 'util';
 import { getReviewStatus, setReviewStatus } from '../review-status.js';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
@@ -40,15 +42,136 @@ export interface VerificationRunnerOptions {
   syncTargetBranch?: boolean;
 }
 
+interface SyncResult {
+  repoDir: string;
+  repoName: string;
+  targetBranch: string;
+  success: boolean;
+  alreadyUpToDate?: boolean;
+  hasConflicts?: boolean;
+  conflictLines?: string;
+  errorOutput?: string;
+}
+
+async function resolveGitDirs(
+  workspacePath: string,
+  projectConfig: ReturnType<typeof findProjectByPath>,
+): Promise<{ gitDirs: string[]; isPolyrepo: boolean }> {
+  const isPolyrepoConfig = projectConfig?.workspace?.type === 'polyrepo';
+
+  if (!isPolyrepoConfig && existsSync(join(workspacePath, '.git'))) {
+    return { gitDirs: [workspacePath], isPolyrepo: false };
+  }
+
+  const gitDirs: string[] = [];
+  try {
+    const entries = await readdir(workspacePath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && !entry.name.startsWith('.') && existsSync(join(workspacePath, entry.name, '.git'))) {
+        gitDirs.push(join(workspacePath, entry.name));
+      }
+    }
+  } catch {}
+
+  if (gitDirs.length > 0) {
+    return { gitDirs, isPolyrepo: true };
+  }
+
+  if (existsSync(join(workspacePath, '.git'))) {
+    return { gitDirs: [workspacePath], isPolyrepo: false };
+  }
+
+  return { gitDirs: [], isPolyrepo: false };
+}
+
+async function syncSingleRepo(gitDir: string, targetBranch: string): Promise<SyncResult> {
+  const repoName = basename(gitDir);
+  try {
+    await execAsync(`git fetch origin ${targetBranch}`, { cwd: gitDir, encoding: 'utf-8', timeout: 30000 });
+    const mergeResult = await execAsync(`git merge origin/${targetBranch} --no-edit`, {
+      cwd: gitDir,
+      encoding: 'utf-8',
+      timeout: 60000,
+    });
+    const mergeOut = (mergeResult.stdout || '') + (mergeResult.stderr || '');
+    const alreadyUpToDate = mergeOut.includes('Already up to date') || mergeOut.includes('Already up-to-date');
+    return { repoDir: gitDir, repoName, targetBranch, success: true, alreadyUpToDate };
+  } catch (mergeErr: any) {
+    const mergeOut = (mergeErr.stdout || '') + (mergeErr.stderr || '');
+    const hasConflicts = mergeOut.includes('CONFLICT') || mergeOut.includes('Merge conflict');
+
+    if (hasConflicts) {
+      try { await execAsync('git merge --abort', { cwd: gitDir, encoding: 'utf-8' }); } catch {}
+      const conflictLines = mergeOut
+        .split('\n')
+        .filter((line: string) => line.startsWith('CONFLICT'))
+        .map((line: string) => line.replace(/^CONFLICT \([^)]+\): /, '').replace(/Merge conflict in /, ''))
+        .join('\n  - ');
+      return { repoDir: gitDir, repoName, targetBranch, success: false, hasConflicts: true, conflictLines };
+    }
+
+    const rawOutput = mergeOut || mergeErr.message || '(no output)';
+    const errorOutput = rawOutput.length > 3000 ? rawOutput.slice(0, 3000) + '\n...(truncated)' : rawOutput;
+    return { repoDir: gitDir, repoName, targetBranch, success: false, errorOutput };
+  }
+}
+
+function buildSyncFailureFeedback(
+  issueId: string,
+  failures: SyncResult[],
+  isPolyrepo: boolean,
+  cycleCount: number,
+): { summary: string; feedbackBody: string } {
+  const hasConflicts = failures.some(f => f.hasConflicts);
+
+  const summaryParts = failures.map(f => {
+    const prefix = isPolyrepo ? `[${f.repoName}] ` : '';
+    if (f.hasConflicts) {
+      return `${prefix}Merge conflicts with ${f.targetBranch}:\n  - ${f.conflictLines}`;
+    }
+    return `${prefix}Sync with ${f.targetBranch} FAILED:\n${f.errorOutput}`;
+  });
+  const summary = isPolyrepo
+    ? `Sync FAILED in ${failures.length} repo(s):\n\n${summaryParts.join('\n\n')}`
+    : `Sync with ${failures[0].targetBranch} FAILED${hasConflicts ? ' — merge conflicts detected' : ''}:\n\n${summaryParts.join('\n\n')}`;
+
+  const repoInstructions = isPolyrepo
+    ? failures.map(f => {
+        if (f.hasConflicts) {
+          return `### ${f.repoName}/\n1. \`cd ${f.repoName}\`\n2. \`git fetch origin ${f.targetBranch} && git merge origin/${f.targetBranch}\`\n3. Resolve all conflicts and commit`;
+        }
+        return `### ${f.repoName}/\n1. \`cd ${f.repoName}\`\n2. Investigate and fix the sync failure\n3. Commit changes`;
+      }).join('\n\n')
+    : hasConflicts
+      ? `1. Run: \`git fetch origin ${failures[0].targetBranch} && git merge origin/${failures[0].targetBranch}\`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes`
+      : `1. Run: \`git fetch origin ${failures[0].targetBranch}\`\n2. Run: \`git merge origin/${failures[0].targetBranch}\`\n3. If git reports conflicts, resolve them and verify the merge succeeds cleanly\n4. Run the project's build and tests to verify nothing broke\n5. Commit and push ALL changes`;
+
+  const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${cycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: sync-target-branch\n\n${summary}\n\n## REQUIRED: ${hasConflicts ? 'Resolve merge conflicts' : 'Fix the sync failure'} BEFORE resubmitting\n\n${isPolyrepo ? 'This is a polyrepo workspace. Fix each failing repo individually:\n\n' : ''}${repoInstructions}\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request ${issueId} -m "Fixed sync-target-branch"\n\nDo NOT resubmit until all repos sync cleanly and tests pass.`;
+
+  return { summary, feedbackBody };
+}
+
 function getSyncTargetBranch(
   workspacePath: string,
-  projectConfig: ReturnType<typeof findProjectByPath>
+  projectConfig: ReturnType<typeof findProjectByPath>,
+  repoName?: string,
 ): string {
   if (!projectConfig) return 'main';
 
-  const repoName = basename(workspacePath);
+  if (repoName) {
+    const matchingRepo = projectConfig.workspace?.repos?.find(repo => repo.name === repoName);
+    return (
+      matchingRepo?.pr_target ||
+      projectConfig.workspace?.pr_target ||
+      matchingRepo?.default_branch ||
+      projectConfig.workspace?.default_branch ||
+      'main'
+    );
+  }
+
+  const wsName = basename(workspacePath);
   const matchingRepo = projectConfig.workspace?.repos?.find(repo =>
-    repo.name === repoName || basename(repo.path) === repoName
+    repo.name === wsName || basename(repo.path) === wsName
   );
 
   return (
@@ -89,41 +212,28 @@ export async function runVerificationForIssue(
 
   try {
     const projectConfig = findProjectByPath(workspacePath);
-    const syncTargetBranch = getSyncTargetBranch(workspacePath, projectConfig);
+    const { gitDirs, isPolyrepo } = await resolveGitDirs(workspacePath, projectConfig);
 
+    // === Sync target branch ===
     if (options.syncTargetBranch !== false) {
-      try {
-        console.log(`[${logPrefix}] Syncing ${syncTargetBranch} into workspace for ${issueId}...`);
-        await execAsync(`git fetch origin ${syncTargetBranch}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 30000 });
-        const mergeResult = await execAsync(`git merge origin/${syncTargetBranch} --no-edit`, {
-          cwd: workspacePath,
-          encoding: 'utf-8',
-          timeout: 60000,
-        });
-        const mergeOut = (mergeResult.stdout || '') + (mergeResult.stderr || '');
-        if (mergeOut.includes('Already up to date') || mergeOut.includes('Already up-to-date')) {
-          console.log(`[${logPrefix}] Already up to date with ${syncTargetBranch}`);
-        } else {
-          console.log(`[${logPrefix}] Merged latest ${syncTargetBranch} into workspace`);
+      if (gitDirs.length === 0) {
+        console.log(`[${logPrefix}] No git directories found in workspace ${workspacePath} — skipping sync`);
+      } else {
+        const syncResults: SyncResult[] = [];
+        for (const gitDir of gitDirs) {
+          const repoName = isPolyrepo ? basename(gitDir) : undefined;
+          const targetBranch = getSyncTargetBranch(workspacePath, projectConfig, repoName);
+          const displayName = repoName || basename(workspacePath);
+          console.log(`[${logPrefix}] Syncing ${targetBranch} into ${displayName} for ${issueId}...`);
+          syncResults.push(await syncSingleRepo(gitDir, targetBranch));
         }
-      } catch (mergeErr: any) {
-        const mergeOut = (mergeErr.stdout || '') + (mergeErr.stderr || '');
-        const hasConflicts = mergeOut.includes('CONFLICT') || mergeOut.includes('Merge conflict');
 
-        if (hasConflicts) {
-          // Abort the merge so the workspace is in a clean state for the agent
-          try { await execAsync('git merge --abort', { cwd: workspacePath, encoding: 'utf-8' }); } catch {}
+        const failures = syncResults.filter(r => !r.success);
 
-          // Extract conflicting file names from git output
-          const conflictLines = mergeOut
-            .split('\n')
-            .filter((line: string) => line.startsWith('CONFLICT'))
-            .map((line: string) => line.replace(/^CONFLICT \([^)]+\): /, '').replace(/Merge conflict in /, ''))
-            .join('\n  - ');
-
+        if (failures.length > 0) {
           const newCycleCount = currentCycles + 1;
           const failedCheck = 'sync-target-branch';
-          const summary = `Sync with ${syncTargetBranch} FAILED — merge conflicts detected:\n  - ${conflictLines}`;
+          const { summary, feedbackBody } = buildSyncFailureFeedback(issueId, failures, isPolyrepo, newCycleCount);
 
           setReviewStatus(issueId, {
             reviewStatus: 'pending',
@@ -133,22 +243,22 @@ export async function runVerificationForIssue(
             verificationMaxCycles: VERIFICATION_MAX_CYCLES,
           });
 
-          const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Resolve merge conflicts with ${syncTargetBranch} BEFORE resubmitting\n\nThe target branch advanced since you started working. Your branch has merge conflicts that must be resolved.\n\n1. Run: git fetch origin ${syncTargetBranch} && git merge origin/${syncTargetBranch}\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Resolved ${syncTargetBranch} conflicts"\n\nDo NOT resubmit until all conflicts are resolved and tests pass.`;
-
           try {
             const fileResult = await writeFeedbackFile({
               issueId,
               workspacePath,
               specialist: 'verification-gate',
               outcome: 'failed',
-              summary: `Sync with ${syncTargetBranch} FAILED — merge conflicts (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
+              summary: `Sync FAILED${isPolyrepo ? ` in ${failures.length} repo(s)` : ''} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
               markdownBody: feedbackBody,
             });
             if (fileResult.success) {
               const agentId = `agent-${issueId.toLowerCase()}`;
-              const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — merge conflicts with ${syncTargetBranch}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix the merge conflicts and re-run verification. Do NOT stop at the prompt — keep working until verification passes.`;
+              const hasConflicts = failures.some(f => f.hasConflicts);
+              const repoList = isPolyrepo ? failures.map(f => f.repoName).join(', ') : basename(workspacePath);
+              const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}${hasConflicts ? ' — merge conflicts' : ''} in ${repoList}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, fix the sync issues, commit and push every change, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
               await messageAgent(agentId, msg);
-              console.log(`[${logPrefix}] Sync-target failed for ${issueId} — sent conflict feedback to ${agentId}`);
+              console.log(`[${logPrefix}] Sync failed for ${issueId} — sent feedback to ${agentId}`);
             }
           } catch (feedbackErr: any) {
             console.error(`[${logPrefix}] Failed to write sync-target feedback for ${issueId}:`, feedbackErr);
@@ -157,43 +267,14 @@ export async function runVerificationForIssue(
           return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
         }
 
-        const newCycleCount = currentCycles + 1;
-        const failedCheck = 'sync-target-branch';
-        const rawOutput = mergeOut || mergeErr.message || '(no output)';
-        const truncatedOutput =
-          rawOutput.length > 3000 ? rawOutput.slice(0, 3000) + '\n...(truncated)' : rawOutput;
-        const summary = `Sync with ${syncTargetBranch} FAILED:\n\n${truncatedOutput}`;
-
-        setReviewStatus(issueId, {
-          reviewStatus: 'pending',
-          verificationStatus: 'failed',
-          verificationNotes: summary,
-          verificationCycleCount: newCycleCount,
-          verificationMaxCycles: VERIFICATION_MAX_CYCLES,
-        });
-
-        const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix the ${syncTargetBranch} sync failure BEFORE resubmitting\n\nThe verification gate could not sync the latest ${syncTargetBranch} into your workspace.\n\n1. Read the error output above carefully\n2. Run: git fetch origin ${syncTargetBranch}\n3. Run: git merge origin/${syncTargetBranch}\n4. If git reports conflicts, resolve them and verify the merge succeeds cleanly\n5. Run the project's build and tests to verify nothing broke\n6. Commit and push ALL changes\n7. ONLY THEN resubmit: pan review request ${issueId} -m "Fixed ${failedCheck}"\n\nDo NOT resubmit until your branch syncs cleanly with ${syncTargetBranch} and tests pass.`;
-
-        try {
-          const fileResult = await writeFeedbackFile({
-            issueId,
-            workspacePath,
-            specialist: 'verification-gate',
-            outcome: 'failed',
-            summary: `Sync with ${syncTargetBranch} FAILED (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
-            markdownBody: feedbackBody,
-          });
-          if (fileResult.success) {
-            const agentId = `agent-${issueId.toLowerCase()}`;
-            const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — could not sync ${syncTargetBranch}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix the sync failure and re-run verification. Do NOT stop at the prompt — keep working until verification passes.`;
-            await messageAgent(agentId, msg);
-            console.log(`[${logPrefix}] Sync-target failed for ${issueId} — sent sync failure feedback to ${agentId}`);
+        for (const result of syncResults) {
+          const displayName = isPolyrepo ? result.repoName : basename(workspacePath);
+          if (result.alreadyUpToDate) {
+            console.log(`[${logPrefix}] ${displayName}: Already up to date with ${result.targetBranch}`);
+          } else {
+            console.log(`[${logPrefix}] ${displayName}: Merged latest ${result.targetBranch}`);
           }
-        } catch (feedbackErr: any) {
-          console.error(`[${logPrefix}] Failed to write sync-target feedback for ${issueId}:`, feedbackErr);
         }
-
-        return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
       }
     } else {
       console.log(`[${logPrefix}] Skipping target-branch sync for ${issueId}; verifying current workspace state`);
@@ -224,31 +305,33 @@ export async function runVerificationForIssue(
       HOME: homedir(),
     };
 
-    // Ensure dependencies are installed and workspace packages are built.
-    // Worktrees need their own node_modules (not symlinked from main repo)
-    // so that local workspace packages like @panctl/contracts resolve
-    // to the worktree's version, not the main repo's stale build.
-    const packageManager = projectConfig?.package_manager || 'npm';
-    const installCmd = packageManager === 'bun' ? 'bun install' : `${packageManager} install`;
-    try {
-      console.log(`[${logPrefix}] Installing dependencies: ${installCmd}`);
-      await execAsync(installCmd, { cwd: workspacePath, encoding: 'utf-8', timeout: 60000 });
-    } catch (installErr: any) {
-      console.warn(`[${logPrefix}] Dependency install warning: ${installErr.message}`);
-    }
+    // Install dependencies for monorepo workspaces.
+    // Polyrepo workspaces manage deps per-repo via quality gate commands or containers.
+    if (!isPolyrepo) {
+      const packageManager = projectConfig?.package_manager || 'npm';
+      const installCmd = packageManager === 'bun' ? 'bun install' : `${packageManager} install`;
+      try {
+        console.log(`[${logPrefix}] Installing dependencies: ${installCmd}`);
+        await execAsync(installCmd, { cwd: workspacePath, encoding: 'utf-8', timeout: 60000 });
+      } catch (installErr: any) {
+        console.warn(`[${logPrefix}] Dependency install warning: ${installErr.message}`);
+      }
 
-    // Build workspace packages (e.g., @panctl/contracts) before running gates
-    const workspacePackages = (projectConfig as any)?.workspace_packages as Array<{ path: string; build_command: string }> | undefined;
-    if (workspacePackages) {
-      for (const pkg of workspacePackages) {
-        const pkgPath = join(workspacePath, pkg.path);
-        try {
-          console.log(`[${logPrefix}] Building workspace package: ${pkg.path}`);
-          await execAsync(pkg.build_command, { cwd: pkgPath, encoding: 'utf-8', timeout: 30000 });
-        } catch (buildErr: any) {
-          console.warn(`[${logPrefix}] Workspace package build warning (${pkg.path}): ${buildErr.message}`);
+      // Build workspace packages (e.g., @panctl/contracts) before running gates
+      const workspacePackages = (projectConfig as any)?.workspace_packages as Array<{ path: string; build_command: string }> | undefined;
+      if (workspacePackages) {
+        for (const pkg of workspacePackages) {
+          const pkgPath = join(workspacePath, pkg.path);
+          try {
+            console.log(`[${logPrefix}] Building workspace package: ${pkg.path}`);
+            await execAsync(pkg.build_command, { cwd: pkgPath, encoding: 'utf-8', timeout: 30000 });
+          } catch (buildErr: any) {
+            console.warn(`[${logPrefix}] Workspace package build warning (${pkg.path}): ${buildErr.message}`);
+          }
         }
       }
+    } else {
+      console.log(`[${logPrefix}] Polyrepo workspace — per-repo dependencies managed by quality gates`);
     }
 
     const gateResults = await runQualityGates(gates, workspacePath, 'pre_push', {
@@ -275,7 +358,7 @@ export async function runVerificationForIssue(
         verificationMaxCycles: VERIFICATION_MAX_CYCLES,
       });
 
-      const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix the failing check, then invoke the /rebase-and-submit skill\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task. Because verification already ran once (a PR exists), the skill will run \`pan review request ${issueId} -m "Fixed ${failedCheck}"\` for you. NEVER curl \`/api/review/...\` or any dashboard endpoint — \`pan review request\` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until \`pan review request\` has completed successfully.`;
+      const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run \`pan review request ${issueId} -m "Fixed ${failedCheck}"\` for you. NEVER curl \`/api/review/...\` or any dashboard endpoint — \`pan review request\` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until \`pan review request\` has completed successfully.`;
 
       try {
         const fileResult = await writeFeedbackFile({
@@ -288,7 +371,7 @@ export async function runVerificationForIssue(
         });
         if (fileResult.success) {
           const agentId = `agent-${issueId.toLowerCase()}`;
-          const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix the failing check and re-run verification. Do NOT stop at the prompt — keep working until verification passes.`;
+          const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, fix the failing check, commit every change, and invoke /rebase-and-submit. The skill will push and request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
           await messageAgent(agentId, msg);
           console.log(`[${logPrefix}] Verification failed for ${issueId} — sent feedback to ${agentId}`);
         }
@@ -309,7 +392,7 @@ export async function runVerificationForIssue(
       if (vbriefErr instanceof VBriefMergeConflictError) {
         const newCycleCount = currentCycles + 1;
         const failedCheck = 'vbrief-conflicts';
-        const summary = `plan.vbrief.json has unresolved git merge conflict markers. Resolve all conflict markers in .planning/plan.vbrief.json and commit before resubmitting.`;
+        const summary = `spec.vbrief.json has unresolved git merge conflict markers. Resolve all conflict markers in .pan/spec.vbrief.json and commit before resubmitting.`;
         setReviewStatus(issueId, {
           reviewStatus: 'pending',
           verificationStatus: 'failed',
@@ -317,7 +400,7 @@ export async function runVerificationForIssue(
           verificationCycleCount: newCycleCount,
           verificationMaxCycles: VERIFICATION_MAX_CYCLES,
         });
-        const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix merge conflicts in plan.vbrief.json BEFORE resubmitting\n\n1. Open .planning/plan.vbrief.json\n2. Find and resolve all <<<<<<< HEAD / ======= / >>>>>>> conflict markers\n3. Ensure the file is valid JSON (only keep ONE version of each conflicted block)\n4. Commit the fixed file\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Resolved plan.vbrief.json merge conflict"\n\nDo NOT resubmit until plan.vbrief.json parses cleanly.`;
+        const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix merge conflicts in spec.vbrief.json BEFORE resubmitting\n\n1. Open .pan/spec.vbrief.json\n2. Find and resolve all <<<<<<< HEAD / ======= / >>>>>>> conflict markers\n3. Ensure the file is valid JSON (only keep ONE version of each conflicted block)\n4. Commit the fixed file\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Resolved spec.vbrief.json merge conflict"\n\nDo NOT resubmit until spec.vbrief.json parses cleanly.`;
         try {
           const fileResult = await writeFeedbackFile({
             issueId,
@@ -329,7 +412,7 @@ export async function runVerificationForIssue(
           });
           if (fileResult.success) {
             const agentId = `agent-${issueId.toLowerCase()}`;
-            const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — plan.vbrief.json has merge conflict markers.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then resolve the merge conflict markers and re-run verification. Do NOT stop at the prompt — keep working until verification passes.`;
+            const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — plan.vbrief.json has merge conflict markers.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, resolve the merge conflict markers, commit and push the fix, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
             await messageAgent(agentId, msg);
             console.log(`[${logPrefix}] vBRIEF conflict detected for ${issueId} — sent feedback to ${agentId}`);
           }
@@ -376,7 +459,7 @@ export async function runVerificationForIssue(
         });
         if (fileResult.success) {
           const agentId = `agent-${issueId.toLowerCase()}`;
-          const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — ${acStatus.totalPending} AC incomplete.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then complete all pending acceptance criteria and re-run verification. Do NOT stop at the prompt — keep working until verification passes.`;
+          const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — ${acStatus.totalPending} AC incomplete.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, complete all pending acceptance criteria, commit and push every change, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
           await messageAgent(agentId, msg);
           console.log(`[${logPrefix}] AC verification failed for ${issueId} — sent feedback to ${agentId}`);
         }
@@ -387,8 +470,20 @@ export async function runVerificationForIssue(
       return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
     }
 
-    setReviewStatus(issueId, { verificationStatus: 'passed', verificationNotes: undefined });
-    console.log(`[${logPrefix}] Verification passed for ${issueId} — proceeding to review-agent`);
+    // Snapshot HEAD at verification pass time — compared with reviewedAtCommit
+    // after review to skip redundant test-agent when no code changed.
+    let lastVerifiedCommit: string | undefined;
+    try {
+      const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath, encoding: 'utf-8', timeout: 5000 });
+      lastVerifiedCommit = stdout.trim();
+    } catch { /* non-fatal — skip optimization if we can't get HEAD */ }
+
+    setReviewStatus(issueId, {
+      verificationStatus: 'passed',
+      verificationNotes: undefined,
+      ...(lastVerifiedCommit ? { lastVerifiedCommit } : {}),
+    });
+    console.log(`[${logPrefix}] Verification passed for ${issueId}${lastVerifiedCommit ? ` (HEAD=${lastVerifiedCommit.slice(0, 8)})` : ''} — proceeding to review-agent`);
     return { outcome: 'passed' };
 
   } catch (verifyErr: any) {

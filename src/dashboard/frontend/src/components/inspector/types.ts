@@ -22,7 +22,11 @@ export interface ReviewStatus {
   verificationMaxCycles?: number;
   reviewNotes?: string;
   testNotes?: string;
+  mergeNotes?: string;
+  mergeRetryCount?: number;
   updatedAt: string;
+  /** Timestamp when the current/last review fan-out was dispatched. */
+  reviewSpawnedAt?: string;
   readyForMerge: boolean;
   autoRequeueCount?: number;
   history?: StatusHistoryEntry[];
@@ -32,12 +36,22 @@ export interface ReviewStatus {
   reviewSessionNames?: string[];
   /** Per-role completion status for parallel review sub-agents */
   reviewSubStatuses?: Record<string, 'running' | 'done'>;
+  /** PAN-366: Queue position — null = not queued, 0 = active, 1+ = position */
+  queuePosition?: number | null;
+  /** PAN-366: Which specialist is active or will handle this issue */
+  activeSpecialist?: 'review' | 'test' | 'merge' | null;
+  /** PAN-905: GitHub-native merge blockers preventing merge */
+  blockerReasons?: ReadonlyArray<{ type: string; summary: string; details?: string; detectedAt: string }>;
 }
 
 export interface ContainerStatus {
   running: boolean;
   uptime: string | null;
   status?: string;
+  health?: 'healthy' | 'unhealthy' | 'starting' | 'unknown';
+  ports?: number[];
+  lastProbeAt?: string;
+  lastFailureReason?: string;
 }
 
 export interface PendingOperation {
@@ -78,6 +92,33 @@ export interface WorkspaceInfo {
   git?: GitStatus;
   repoGit?: { frontend: GitStatus | null; api: GitStatus | null };
   services?: { name: string; url?: string }[];
+  planningState?: {
+    hasPlan: boolean;
+    hasBeads: boolean;
+    beadsCount: number;
+    planningComplete: boolean;
+    workspacePath?: string;
+  };
+  costs?: IssueCostData;
+}
+
+export interface IssueCostData {
+  issueId: string;
+  totalCost: number;
+  resolvedTotalCost?: number;
+  aggregateCost?: number;
+  liveCost?: number;
+  totalTokens: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  sessions: { model: string; cost: number; tokens: number; durationMs?: number }[];
+  byModel: Record<string, { cost: number; tokens: number }>;
+  byStage?: Record<string, { cost: number; tokens: number }>;
+  budget?: number;
+  budgetWarning?: boolean;
+  lastUpdated?: string;
 }
 
 export interface ContainerMenuState {

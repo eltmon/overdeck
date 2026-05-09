@@ -1,7 +1,7 @@
 // Settings data types matching the new config.yaml structure
 // Now uses smart (capability-based) model selection instead of static presets
 
-export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'openrouter';
+export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'mimo' | 'openrouter';
 
 export type WorkTypeId =
   // Issue agent phases
@@ -45,6 +45,7 @@ export interface ProvidersConfig {
   zai: boolean;
   kimi: boolean;
   minimax: boolean;
+  mimo: boolean;
   openrouter: boolean;
 }
 
@@ -61,6 +62,7 @@ export interface ApiKeysConfig {
   zai?: string;
   kimi?: string;
   minimax?: string;
+  mimo?: string;
   openrouter?: string;
 }
 
@@ -92,6 +94,20 @@ export interface SettingsConfig {
     compaction_model?: ModelId;
     manual_compact_mode?: 'claude-code' | 'panopticon-native';
     rich_compaction?: boolean;
+    title_model?: ModelId;
+  };
+  experimental?: {
+    /** Use Claude Code Channels (research-preview) for prompt delivery to eligible work agents. */
+    claudeCodeChannels?: boolean;
+  };
+  /**
+   * Permission mode for spawned Claude Code agents.
+   *
+   * 'auto' (default) — Claude Code's classifier blocks destructive ops while running autonomously
+   * 'bypass'         — pass --dangerously-skip-permissions (legacy behavior)
+   */
+  claude?: {
+    permissionMode?: 'auto' | 'bypass';
   };
 }
 

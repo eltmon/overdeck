@@ -1,6 +1,6 @@
 {
   "name": "@panctl/cli",
-  "version": "0.8.1",
+  "version": "0.8.20",
   "description": "Multi-agent orchestration for AI coding assistants (Claude Code, Codex, Cursor, Gemini CLI)",
   "keywords": [
     "ai-agents",
@@ -27,6 +27,7 @@
   "workspaces": {
     "packages": [
       "packages/contracts",
+      "packages/pi-extension",
       "src/dashboard/server",
       "src/dashboard/frontend",
       "apps/desktop"
@@ -65,18 +66,19 @@
   "scripts": {
     "dev": "tsx watch src/cli/index.ts",
     "build": "npm run build:contracts && npm run build:cli && npm run build:scripts && npm run build:dashboard",
-    "build:cli": "node scripts/build-cli.mjs && mkdir -p dist/cli/caveman/skills/caveman dist/cli/caveman/skills/caveman-review dist/cli/caveman-compress && cp src/lib/caveman/*.js src/lib/caveman/caveman-statusline.sh dist/cli/caveman/ && cp src/lib/caveman/skills/caveman/SKILL.md dist/cli/caveman/skills/caveman/ && cp src/lib/caveman/skills/caveman-review/SKILL.md dist/cli/caveman/skills/caveman-review/ && cp src/lib/caveman/compress/*.py dist/cli/caveman-compress/",
-    "build:contracts": "rm -rf packages/contracts/dist && cd packages/contracts && npm run build",
+    "build:cli": "node scripts/build-cli.mjs && mkdir -p dist/cli/caveman/skills/caveman dist/cli/caveman/skills/caveman-review dist/cli/caveman-compress && cp src/lib/caveman/*.js src/lib/caveman/caveman-statusline.sh dist/cli/caveman/ && cp src/lib/caveman/skills/caveman/SKILL.md dist/cli/caveman/skills/caveman/ && cp src/lib/caveman/skills/caveman-review/SKILL.md dist/cli/caveman/skills/caveman-review/ && cp src/lib/caveman/compress/*.py dist/cli/caveman-compress/ && cp -r dist/cli/caveman dist/caveman && cp -r dist/cli/caveman-compress dist/caveman-compress",
+    "build:contracts": "rm -rf packages/contracts/dist && npm --prefix ./packages/contracts run build",
     "build:scripts": "cd scripts && tsdown",
     "build:dashboard": "npm run build:dashboard:frontend && npm run build:dashboard:server",
-    "build:dashboard:frontend": "cd src/dashboard/frontend && npm run build",
-    "build:dashboard:server": "npm run build:contracts && cd src/dashboard/server && npm run build && mkdir -p ../../../dist/dashboard/prompts && cp ../../lib/cloister/prompts/*.md ../../../dist/dashboard/prompts/",
+    "build:dashboard:frontend": "npm --prefix ./src/dashboard/frontend run build",
+    "build:dashboard:server": "npm run build:contracts && npm --prefix ./src/dashboard/server run build && mkdir -p dist/dashboard/prompts && cp src/lib/cloister/prompts/*.md dist/dashboard/prompts/",
     "build:desktop": "cd apps/desktop && bun run build && bun run dist:linux && bun run dist:mac && bun run dist:win",
     "build:desktop:linux": "cd apps/desktop && bun run build && bun run dist:linux",
     "build:desktop:mac": "cd apps/desktop && bun run build && bun run dist:mac",
     "build:desktop:win": "cd apps/desktop && bun run build && bun run dist:win",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
+    "pretest": "npm run build:contracts",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
@@ -95,6 +97,7 @@
     "@homebridge/node-pty-prebuilt-multiarch": "^0.13.1",
     "@iarna/toml": "^2.2.5",
     "@linear/sdk": "^70.0.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@octokit/rest": "^22.0.1",
     "@types/mustache": "^4.2.6",
     "@types/ws": "^8.18.1",
@@ -107,6 +110,7 @@
     "js-yaml": "^4.1.1",
     "mustache": "^4.2.0",
     "ora": "^8.2.0",
+    "smee-client": "^5.0.0",
     "ws": "^8.20.0",
     "yaml": "^2.8.2"
   },
@@ -118,6 +122,7 @@
     "@types/inquirer": "^9.0.9",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.10.0",
+    "@typescript-eslint/parser": "6.21.0",
     "@vitest/coverage-v8": "^2.1.9",
     "effect": "catalog:",
     "eslint": "^8.55.0",

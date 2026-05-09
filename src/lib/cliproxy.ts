@@ -22,7 +22,7 @@ import {
   writeFileSync,
   statSync,
 } from 'fs';
-import { readFile, writeFile } from 'fs/promises';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
 import { spawn, execSync, exec } from 'child_process';
@@ -37,7 +37,7 @@ export const CLIPROXY_PORT = 8317;
 export const CLIPROXY_AUTH_TOKEN = 'panopticon-local-cliproxy-key';
 export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
 
-const CLIPROXY_RELEASE_VERSION = 'v6.9.24';
+const CLIPROXY_RELEASE_VERSION = 'v6.10.9';
 
 export function getCliproxyDir(): string {
   return join(PANOPTICON_HOME, 'cliproxy');
@@ -71,10 +71,22 @@ function getCliproxyCodexCredPath(): string {
   return join(getCliproxyAuthDir(), 'codex-primary.json');
 }
 
+function getCliproxyGeminiCredPath(): string {
+  return join(getCliproxyAuthDir(), 'gemini-primary.json');
+}
+
 function ensureDirs(): void {
   for (const dir of [PANOPTICON_HOME, BIN_DIR, getCliproxyDir(), getCliproxyAuthDir()]) {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   }
+}
+
+async function ensureDirsAsync(): Promise<void> {
+  await Promise.all(
+    [PANOPTICON_HOME, BIN_DIR, getCliproxyDir(), getCliproxyAuthDir()].map((dir) =>
+      mkdir(dir, { recursive: true }),
+    ),
+  );
 }
 
 interface CodexAuthFile {
@@ -97,6 +109,12 @@ interface CliproxyCodexCredentials {
   email: string;
   type: 'codex';
   expired: string;
+  disabled: boolean;
+}
+
+interface CliproxyGeminiCredentials {
+  api_key: string;
+  type: 'gemini';
   disabled: boolean;
 }
 
@@ -244,21 +262,113 @@ export async function bridgeCodexAuthToCliproxyAsync(): Promise<boolean> {
   return true;
 }
 
-function ensureConfigFile(): void {
-  ensureDirs();
-  const configPath = getCliproxyConfigPath();
+function parseBridgedGeminiApiKey(raw: string): string | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<CliproxyGeminiCredentials>;
+    return typeof parsed.api_key === 'string' && parsed.api_key.trim().length > 0
+      ? parsed.api_key.trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function readBridgedGeminiApiKey(): string | null {
+  const target = getCliproxyGeminiCredPath();
+  if (!existsSync(target)) return null;
+
+  try {
+    return parseBridgedGeminiApiKey(readFileSync(target, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+async function readBridgedGeminiApiKeyAsync(): Promise<string | null> {
+  try {
+    return parseBridgedGeminiApiKey(await readFile(getCliproxyGeminiCredPath(), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function serializeYamlString(value: string): string {
+  return JSON.stringify(value);
+}
+
+/**
+ * Persist a Google Generative Language API key for CLIProxyAPI's Gemini backend.
+ *
+ * CLIProxyAPI v6.10.x accepts Gemini API keys through the `gemini-api-key`
+ * config section. We also keep a small credential marker in auth-dir so future
+ * config rewrites can preserve the bridged key without re-reading Panopticon
+ * settings. This path is used by getProviderEnvForModel(), which is reachable
+ * from dashboard HTTP routes, so all credential/config persistence is async.
+ */
+export async function bridgeGeminiAuthToCliproxyAsync(apiKey: string): Promise<boolean> {
+  const normalized = apiKey.trim();
+  if (!normalized) return false;
+
+  try {
+    await ensureDirsAsync();
+  } catch {
+    return false;
+  }
+
+  const creds: CliproxyGeminiCredentials = {
+    api_key: normalized,
+    type: 'gemini',
+    disabled: false,
+  };
+  const serialized = JSON.stringify(creds, null, 2) + '\n';
+  const target = getCliproxyGeminiCredPath();
+
+  try {
+    let existing: string | null = null;
+    try {
+      existing = await readFile(target, 'utf8');
+    } catch {
+      existing = null;
+    }
+
+    if (existing !== serialized) {
+      await writeFile(target, serialized, { mode: 0o600 });
+    }
+    await ensureConfigFileAsync(normalized);
+  } catch {
+    return false;
+  }
+
+  return true;
+}
+
+function buildCliproxyConfig(geminiApiKey: string | null): string {
   const authDir = getCliproxyAuthDir();
 
   // Config is rewritten every time so upgrades can evolve the format safely.
-  const config = [
+  const lines = [
     `host: "${CLIPROXY_HOST}"`,
     `port: ${CLIPROXY_PORT}`,
     `auth-dir: "${authDir}"`,
     `api-keys:`,
     `  - "${CLIPROXY_AUTH_TOKEN}"`,
-    `debug: false`,
-    '',
-  ].join('\n');
+  ];
+
+  if (geminiApiKey) {
+    lines.push(
+      `gemini-api-key:`,
+      `  - api-key: ${serializeYamlString(geminiApiKey)}`,
+    );
+  }
+
+  lines.push(`debug: false`, '');
+  return lines.join('\n');
+}
+
+function ensureConfigFile(geminiApiKey: string | null = readBridgedGeminiApiKey()): void {
+  ensureDirs();
+  const configPath = getCliproxyConfigPath();
+  const config = buildCliproxyConfig(geminiApiKey);
 
   if (existsSync(configPath)) {
     try {
@@ -268,6 +378,25 @@ function ensureConfigFile(): void {
     }
   }
   writeFileSync(configPath, config);
+}
+
+async function ensureConfigFileAsync(geminiApiKey?: string | null): Promise<void> {
+  await ensureDirsAsync();
+  const configPath = getCliproxyConfigPath();
+  const effectiveGeminiApiKey = geminiApiKey === undefined
+    ? await readBridgedGeminiApiKeyAsync()
+    : geminiApiKey;
+  const config = buildCliproxyConfig(effectiveGeminiApiKey);
+
+  let existing: string | null = null;
+  try {
+    existing = await readFile(configPath, 'utf8');
+  } catch {
+    existing = null;
+  }
+
+  if (existing === config) return;
+  await writeFile(configPath, config);
 }
 
 function detectPlatformAsset(): { archive: string; } | null {
@@ -334,6 +463,42 @@ export function installCliproxy(force = false): void {
   execSync(`install -m 0755 "${extracted}" "${target}"`, { stdio: 'pipe' });
   try {
     execSync(`rm -rf "${tmpDir}"`, { stdio: 'pipe' });
+  } catch { /* non-fatal */ }
+}
+
+/**
+ * Async variant of installCliproxy — safe for the event loop.
+ * Uses execAsync instead of execSync so it won't block the dashboard server.
+ */
+export async function installCliproxyAsync(force = false): Promise<void> {
+  ensureDirs();
+  if (!force && isCliproxyInstalled()) return;
+
+  const asset = detectPlatformAsset();
+  if (!asset) {
+    throw new Error(
+      `CLIProxyAPI does not publish a prebuilt binary for ${process.platform}/${process.arch}. `
+      + `GPT subscription routing is currently supported on linux and darwin (amd64/arm64) only.`,
+    );
+  }
+
+  const url = `https://github.com/router-for-me/CLIProxyAPI/releases/download/${CLIPROXY_RELEASE_VERSION}/${asset.archive}`;
+  const tmpDir = join(getCliproxyDir(), 'tmp');
+  if (!existsSync(tmpDir)) mkdirSync(tmpDir, { recursive: true });
+  const archivePath = join(tmpDir, asset.archive);
+
+  await execAsync(`curl -sSL -o "${archivePath}" "${url}"`, { timeout: 60_000 });
+  await execAsync(`tar -xzf "${archivePath}" -C "${tmpDir}"`, { timeout: 10_000 });
+
+  const extracted = join(tmpDir, 'cli-proxy-api');
+  if (!existsSync(extracted)) {
+    throw new Error(`cliproxy archive did not contain expected cli-proxy-api binary`);
+  }
+
+  const target = getCliproxyBinary();
+  await execAsync(`install -m 0755 "${extracted}" "${target}"`, { timeout: 10_000 });
+  try {
+    await execAsync(`rm -rf "${tmpDir}"`, { timeout: 10_000 });
   } catch { /* non-fatal */ }
 }
 
@@ -495,7 +660,7 @@ export async function stopCliproxyAsync(): Promise<void> {
 }
 
 /** Async variant of startCliproxy — safe for the event loop.
- *  Throws if cliproxy is not installed (does not perform blocking install). */
+ *  Auto-installs cliproxy if missing (non-blocking download). */
 export async function startCliproxyAsync(): Promise<void> {
   ensureDirs();
   ensureConfigFile();
@@ -504,9 +669,7 @@ export async function startCliproxyAsync(): Promise<void> {
   if (await isCliproxyRunningAsync()) return;
 
   if (!isCliproxyInstalled()) {
-    throw new Error(
-      'CLIProxy is not installed. Run `pan up` from the CLI to install it.',
-    );
+    await installCliproxyAsync();
   }
 
   const bin = getCliproxyBinary();

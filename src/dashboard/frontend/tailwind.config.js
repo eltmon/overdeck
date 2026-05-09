@@ -91,11 +91,28 @@ export default {
           '0%': { transform: 'translateX(0)' },
           '100%': { transform: 'translateX(100%)' },
         },
+        'slide-down-banner': {
+          '0%': {
+            maxHeight: '0',
+            opacity: '0',
+            paddingTop: '0',
+            paddingBottom: '0',
+            borderBottomWidth: '0',
+          },
+          '100%': {
+            maxHeight: '4rem',
+            opacity: '1',
+            paddingTop: '0.75rem',
+            paddingBottom: '0.75rem',
+            borderBottomWidth: '2px',
+          },
+        },
       },
       animation: {
         'fade-in': 'fade-in 0.3s ease-out',
         'slide-in-right': 'slide-in-right 0.2s ease-out',
         'slide-out-right': 'slide-out-right 0.2s ease-in',
+        'slide-down-banner': 'slide-down-banner 0.25s ease-out',
       },
     },
   },

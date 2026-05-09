@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { buildSpawnEnvForModel, getProviderEnvForModel } from '../agents.js';
+import { getClaudePermissionFlags } from '../claude-permissions.js';
 
 const SUMMARY_TIMEOUT_MS = 60_000;
 const FORK_SUMMARY_TIMEOUT_MS = 300_000;
@@ -605,19 +606,20 @@ Be thorough. Preserve exact file paths, function names, error messages, and code
 
 export async function runModelSummary(prompt: string, model?: string, timeoutMs?: number): Promise<string> {
   const useModel = model || DEFAULT_SUMMARY_MODEL;
+  console.log(`[claude-invoke] purpose=smart-summary | model=${useModel} | source=smart-compaction.ts:runModelSummary | promptChars=${prompt.length} | timeoutMs=${timeoutMs ?? SUMMARY_TIMEOUT_MS}`);
+
   const args = [
     '-p',
     '--model', useModel,
-    '--dangerously-skip-permissions',
-    '--permission-mode', 'bypassPermissions',
+    ...getClaudePermissionFlags(),
   ];
 
   // Sanitize parent provider env (strip ANTHROPIC_BASE_URL etc.) and inject the
   // correct provider env for `useModel`. If provider env lookup fails (e.g.
   // missing API key), let it throw — the caller (compactConversationNative)
   // falls back to a heuristic summary.
-  const spawnEnv = buildSpawnEnvForModel(useModel);
-  const injectedKeys = Object.keys(getProviderEnvForModel(useModel));
+  const spawnEnv = await buildSpawnEnvForModel(useModel);
+  const injectedKeys = Object.keys(await getProviderEnvForModel(useModel));
   if (injectedKeys.length > 0) {
     console.log(`[smart-compaction] Spawning claude -p for summary with model ${useModel}, injecting provider env: ${injectedKeys.join(', ')}`);
   } else {
@@ -652,14 +654,17 @@ export async function runModelSummary(prompt: string, model?: string, timeoutMs?
       clearTimeout(timeout);
       if (code !== 0) {
         const detail = stderr.trim() || stdout.trim() || `exit code ${code}`;
+        console.error(`[claude-invoke] FAILED purpose=smart-summary | model=${useModel} | error="exit code ${code}: ${detail.slice(0, 200)}"`);
         reject(new Error(`Summary generation failed: ${detail}`));
         return;
       }
       const summary = stdout.trim();
       if (!summary) {
+        console.error(`[claude-invoke] FAILED purpose=smart-summary | model=${useModel} | error="empty output"`);
         reject(new Error(`Summary generation returned empty output`));
         return;
       }
+      console.log(`[claude-invoke] SUCCESS purpose=smart-summary | model=${useModel} | outputChars=${summary.length}`);
       resolve(summary);
     });
   });

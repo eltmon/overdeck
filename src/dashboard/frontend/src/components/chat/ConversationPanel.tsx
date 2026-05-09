@@ -1,6 +1,9 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useDashboardStore } from '../../lib/store';
+import { useTheme } from '../../hooks/useTheme';
+import { useConversationUiState } from '../../hooks/useConversationUiState';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranchPlus, CheckCircle2, AlertCircle, Archive } from 'lucide-react';
 import { XTerminal } from '../XTerminal';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { updateConversationTitle } from '../CommandDeck/ConversationList';
@@ -8,10 +11,14 @@ import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
 import { ComposerFooter } from './ComposerFooter';
 import { ModelPicker, saveStoredModel } from './ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
-import type { ChatMessage, WorkLogEntry } from './chat-types';
-import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase } from '../../lib/workingPhase';
+import type { ChatMessage, CompactBoundary, ProposedPlan, TurnDiffSummary, WorkLogEntry } from './chat-types';
+import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, type WorkingPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import type { ReviewerRoundMetadata } from '@panctl/contracts';
+import { DiffPanel } from '../DiffPanel';
+import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
+import { parseDiffRouteSearch } from '../../lib/diffRouteSearch';
+import { useConfirm } from '../DialogProvider';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // ─── Phase icon map ───────────────────────────────────────────────────────────
@@ -47,6 +54,8 @@ interface ConversationPanelProps {
    *  Resume/Archive — used when embedded inside SessionPanel where ZoneB
    *  already shows session info and specialists can't be resumed. */
   embedded?: boolean;
+  /** Agent ID for fetching turn diffs. Omit to skip diff display. */
+  agentId?: string;
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -71,9 +80,12 @@ export function ConversationPanel({
   roundMarkers,
   roundMetadata,
   embedded = false,
+  agentId,
 }: ConversationPanelProps) {
   const [resumed, setResumed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  const confirm = useConfirm();
   const [selectedModel, setSelectedModel] = useState<string>(() => conversation.model || getDefaultConversationModel());
   const [editingTitle, setEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
@@ -115,6 +127,109 @@ export function ConversationPanel({
   const WorkingIcon = PHASE_ICONS[workingPhase];
   const workingIconClass = isSpinnerPhase(workingPhase) ? styles.spinnerIcon : styles.pulseIcon;
 
+  // Theme for diff tree icons
+  const { resolvedTheme } = useTheme();
+
+  // Fetch turn diff summaries — agent diffs (checkpoint-based) or conversation diffs (JSONL-based)
+  const { data: diffData } = useQuery({
+    queryKey: agentId
+      ? ['agent-diffs', agentId]
+      : ['conversation-diffs', conversation.name],
+    queryFn: async () => {
+      if (agentId) {
+        const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/diffs`)
+        if (!res.ok) return null
+        return res.json() as Promise<{ summaries: TurnDiffSummary[] }>
+      }
+      const res = await fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/diffs`)
+      if (!res.ok) return null
+      return res.json() as Promise<{ summaries: TurnDiffSummary[] }>
+    },
+    refetchInterval: 5000,
+  })
+
+  const turnDiffSummaryByAssistantMessageId = useMemo(() => {
+    const map = new Map<string, TurnDiffSummary>()
+    if (!diffData?.summaries) return map
+
+    // Get assistant messages for timestamp-based matching
+    const assistantMessages = (messagesData?.messages ?? [])
+      .filter((m: any) => m.role === 'assistant')
+      .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+
+    for (const summary of diffData.summaries) {
+      if (summary.assistantMessageId) {
+        map.set(summary.assistantMessageId, summary)
+        continue
+      }
+
+      // Match by timestamp: find the closest assistant message before the diff completed
+      if (assistantMessages.length > 0 && summary.completedAt) {
+        const diffTime = new Date(summary.completedAt).getTime()
+        let bestMatch: string | null = null
+        let bestDelta = Infinity
+        for (const msg of assistantMessages) {
+          const msgTime = new Date(msg.createdAt).getTime()
+          const delta = diffTime - msgTime
+          if (delta >= 0 && delta < bestDelta) {
+            bestDelta = delta
+            bestMatch = msg.id
+          }
+        }
+        // Only match if within 7 days — reconciled checkpoints may have been
+        // created long after the agent turn completed.
+        if (bestMatch && bestDelta < 7 * 24 * 60 * 60 * 1000) {
+          map.set(bestMatch, summary)
+        }
+      }
+    }
+    return map
+  }, [diffData?.summaries, messagesData?.messages])
+
+  // Diff panel state — read from URL
+  const [diffOpen, setDiffOpen] = useState(() => {
+    const params = parseDiffRouteSearch(
+      Object.fromEntries(new URLSearchParams(window.location.search)),
+    )
+    return params.diff === '1'
+  })
+
+  // Listen for URL changes (popstate)
+  useEffect(() => {
+    const onPopState = () => {
+      const params = parseDiffRouteSearch(
+        Object.fromEntries(new URLSearchParams(window.location.search)),
+      )
+      setDiffOpen(params.diff === '1')
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
+
+  const handleOpenTurnDiff = useCallback((turnId: string, filePath?: string) => {
+    const searchParams = new URLSearchParams(window.location.search)
+    searchParams.set('diff', '1')
+    searchParams.set('diffTurnId', turnId)
+    if (filePath) searchParams.set('diffFilePath', filePath)
+    else searchParams.delete('diffFilePath')
+    const url = `${window.location.pathname}?${searchParams.toString()}`
+    window.history.pushState({}, '', url)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    setDiffOpen(true)
+  }, [])
+
+  const handleCloseDiff = useCallback(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    searchParams.delete('diff')
+    searchParams.delete('diffTurnId')
+    searchParams.delete('diffFilePath')
+    const query = searchParams.toString()
+    const url = query ? `${window.location.pathname}?${query}` : window.location.pathname
+    window.history.pushState({}, '', url)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+    setDiffOpen(false)
+  }, [])
+
   const resumeMutation = useMutation({
     mutationFn: () => resumeConversation(conversation.name, selectedModel),
     onSuccess: () => {
@@ -125,12 +240,16 @@ export function ConversationPanel({
   });
 
   const switchModelMutation = useMutation({
-    mutationFn: (model: string) =>
-      fetch(`/api/conversations/${encodeURIComponent(conversation.name)}/switch-model`, {
+    mutationFn: (model: string) => {
+      const endpoint = agentId
+        ? `/api/agents/${encodeURIComponent(agentId)}/switch-model`
+        : `/api/conversations/${encodeURIComponent(conversation.name)}/switch-model`;
+      return fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model }),
-      }).then(r => { if (!r.ok) throw new Error('Failed to switch model'); return r.json(); }),
+      }).then(r => { if (!r.ok) throw new Error('Failed to switch model'); return r.json(); });
+    },
     onSuccess: (_, model) => {
       saveStoredModel(model);
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
@@ -190,6 +309,9 @@ export function ConversationPanel({
     onViewModeChange?.(mode);
   }, [onViewModeChange]);
 
+  // Per-conversation UI state (client-only, localStorage)
+  const { hideToolCalls, toggleHideToolCalls } = useConversationUiState(conversation.name);
+
   const handleCopyLink = useCallback(() => {
     const params = new URLSearchParams();
     if (viewMode === 'terminal') {
@@ -208,12 +330,12 @@ export function ConversationPanel({
   const isForkingHeader = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailedHeader = conversation.forkStatus === 'failed';
   const statusColor = isForkingHeader
-    ? 'var(--mc-warning)'
+    ? 'var(--warning)'
     : isForkFailedHeader
-    ? 'var(--mc-error)'
+    ? 'var(--destructive)'
     : conversation.sessionAlive
-    ? 'var(--mc-success)'
-    : 'var(--mc-text-muted)';
+    ? 'var(--success)'
+    : 'var(--muted-foreground)';
   const statusLabel = isForkingHeader ? 'forking' : isForkFailedHeader ? 'failed' : conversation.sessionAlive ? 'active' : 'ended';
 
   return (
@@ -278,6 +400,58 @@ export function ConversationPanel({
             {copied ? <Check size={14} /> : <Copy size={14} />}
           </button>
 
+          {/* Hide tool calls toggle */}
+          <button
+            className={styles.copyLinkButton}
+            onClick={toggleHideToolCalls}
+            title={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
+            aria-label={hideToolCalls ? 'Show tool calls' : 'Hide tool calls'}
+            style={hideToolCalls ? { color: 'var(--primary)' } : undefined}
+          >
+            <Wrench size={14} />
+          </button>
+
+          {/* Archive button with inline confirmation (dialog for favorited) */}
+          {onArchived && !confirmArchive && (
+            <button
+              className={styles.copyLinkButton}
+              onClick={async () => {
+                if (conversation.isFavorited) {
+                  const ok = await confirm({
+                    title: 'Archive favorited conversation',
+                    message: `"${conversation.title ?? conversation.name}" is favorited.\n\nArchiving will remove the favorite, end the session, and move it to the archive.`,
+                    confirmLabel: 'Archive',
+                    cancelLabel: 'Cancel',
+                    variant: 'destructive',
+                  });
+                  if (ok) handleArchive();
+                } else {
+                  setConfirmArchive(true);
+                }
+              }}
+              title="Archive conversation"
+            >
+              <Archive size={14} />
+            </button>
+          )}
+          {onArchived && confirmArchive && (
+            <span className={styles.archiveConfirm}>
+              <span className={styles.archiveConfirmLabel}>Archive?</span>
+              <button
+                className={styles.archiveConfirmYes}
+                onClick={() => { setConfirmArchive(false); handleArchive(); }}
+              >
+                Yes
+              </button>
+              <button
+                className={styles.archiveConfirmNo}
+                onClick={() => setConfirmArchive(false)}
+              >
+                No
+              </button>
+            </span>
+          )}
+
           {/* View toggle — only show when session is live */}
           {showTerminal && (
             <div className={styles.viewToggle}>
@@ -298,31 +472,51 @@ export function ConversationPanel({
         </div>
       )}
 
-      {/* Body */}
-      <div className={styles.conversationTerminalBody}>
-        {/* Terminal: only mounted when actively viewing (xterm.js crashes with visibility:hidden) */}
-        {showTerminal && viewMode === 'terminal' && (
-          <XTerminal sessionName={conversation.tmuxSession} />
-        )}
-        {/* Conversation view — shown when in conversation mode or session ended */}
-        {(viewMode === 'conversation' || !showTerminal) && (
-          <ConversationView
-            conversation={conversation}
-            onResume={!embedded && !showTerminal ? handleResume : undefined}
-            onArchive={!embedded ? handleArchive : undefined}
-            resumePending={resumeMutation.isPending}
-            roundMarkers={roundMarkers}
-            roundMetadata={roundMetadata}
-            modelPicker={!embedded ? (
-              <ModelPicker
-                value={selectedModel}
-                onChange={(modelId) => {
-                  setSelectedModel(modelId);
-                  switchModelMutation.mutate(modelId);
-                }}
-              />
-            ) : undefined}
-          />
+      {/* Body — conversation + optional diff panel */}
+      <div className="flex flex-1 overflow-hidden">
+        <div className={styles.conversationTerminalBody}>
+          {/* Terminal: only mounted when actively viewing (xterm.js crashes with visibility:hidden) */}
+          {showTerminal && viewMode === 'terminal' && (
+            <XTerminal sessionName={conversation.tmuxSession} />
+          )}
+          {/* Conversation view — shown when in conversation mode or session ended */}
+          {(viewMode === 'conversation' || !showTerminal) && (
+            <ConversationView
+              conversation={conversation}
+              onResume={!embedded && !showTerminal ? handleResume : undefined}
+              onArchive={!embedded ? handleArchive : undefined}
+              resumePending={resumeMutation.isPending}
+              roundMarkers={roundMarkers}
+              roundMetadata={roundMetadata}
+              turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
+              onOpenTurnDiff={handleOpenTurnDiff}
+              resolvedTheme={resolvedTheme}
+              agentId={agentId}
+              hideToolCalls={hideToolCalls}
+              workingPhase={isWorking ? workingPhase : undefined}
+              modelPicker={!embedded ? (
+                <ModelPicker
+                  value={selectedModel}
+                  onChange={(modelId) => {
+                    setSelectedModel(modelId);
+                    switchModelMutation.mutate(modelId);
+                  }}
+                />
+              ) : undefined}
+            />
+          )}
+        </div>
+        {/* Diff side panel — rendered when ?diff=1 is in the URL */}
+        {diffOpen && diffData?.summaries && (
+          <DiffWorkerPoolProvider>
+            <DiffPanel
+              mode="inline"
+              agentId={agentId ?? conversation.name}
+              turnDiffSummaries={diffData.summaries}
+              onClose={handleCloseDiff}
+              {...(!agentId ? { diffUrlPrefix: `/api/conversations/${encodeURIComponent(conversation.name)}/diffs` } : {})}
+            />
+          </DiffWorkerPoolProvider>
         )}
       </div>
     </div>
@@ -408,6 +602,9 @@ interface MessagesResponse {
   streaming: boolean;
   discovering?: boolean;
   totalCost?: number;
+  proposedPlan?: ProposedPlan;
+  compactBoundaries?: CompactBoundary[];
+  compacting?: boolean;
 }
 
 async function fetchMessages(name: string): Promise<MessagesResponse> {
@@ -427,12 +624,41 @@ interface ConversationViewProps {
   roundMarkers?: ReadonlyArray<RoundMarker>;
   /** Reviewer round metadata to derive timeline dividers (PAN-830 high-8). */
   roundMetadata?: ReviewerRoundMetadata;
+  turnDiffSummaryByAssistantMessageId?: Map<string, TurnDiffSummary>;
+  onOpenTurnDiff?: (turnId: string, filePath?: string) => void;
+  resolvedTheme?: 'light' | 'dark';
+  /** Agent ID for agent sessions (uses /api/agents/* endpoints instead of /api/conversations/*) */
+  agentId?: string;
+  /** When true, pure tool-call work groups are collapsed to a single muted line. */
+  hideToolCalls?: boolean;
+  /** Current working phase — drives the working indicator icon. */
+  workingPhase?: WorkingPhase;
 }
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata }: ConversationViewProps) {
+export interface FailedMessage {
+  id: string;
+  text: string;
+  createdAt: string;
+}
+
+function ConversationView({ conversation, onResume, onArchive, resumePending, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase }: ConversationViewProps) {
+  const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   const [optimisticMessages, setOptimisticMessages] = useState<ChatMessage[]>([]);
+  const [failedMessages, setFailedMessages] = useState<FailedMessage[]>([]);
   // Track count so we know when the server caught up
   const prevServerCountRef = useRef(0);
+  const queryClient = useQueryClient();
+
+  // When forkStatus transitions from non-null to null (fork completed),
+  // immediately re-fetch messages so the user doesn't see a stale empty state.
+  const prevForkStatusRef = useRef(conversation.forkStatus);
+  useEffect(() => {
+    const prev = prevForkStatusRef.current;
+    prevForkStatusRef.current = conversation.forkStatus;
+    if (prev && !conversation.forkStatus) {
+      queryClient.invalidateQueries({ queryKey: ['conversation-messages', conversation.name] });
+    }
+  }, [conversation.forkStatus, conversation.name, queryClient]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['conversation-messages', conversation.name],
@@ -461,6 +687,53 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
     };
     setOptimisticMessages([optimistic]);
   }, [serverMessages.length]);
+
+  // Called by ComposerFooter when POST fails — move optimistic to failed outbox
+  const handleSendFailed = useCallback((text: string) => {
+    setOptimisticMessages([]);
+    const failed: FailedMessage = {
+      id: `failed-${Date.now()}`,
+      text,
+      createdAt: new Date().toISOString(),
+    };
+    setFailedMessages(prev => [...prev, failed]);
+  }, []);
+
+  const handleRetryFailed = useCallback(async (failedId: string, text: string) => {
+    // Remove from failed list and re-send
+    setFailedMessages(prev => prev.filter(f => f.id !== failedId));
+    try {
+      const endpoint = agentId
+        ? `/api/agents/${encodeURIComponent(agentId)}/message`
+        : `/api/conversations/${encodeURIComponent(conversation.name)}/message`;
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Failed to send message (${res.status})${body ? `: ${body}` : ''}`);
+      }
+    } catch {
+      // Re-add to failed list on retry failure
+      const failed: FailedMessage = {
+        id: `failed-${Date.now()}`,
+        text,
+        createdAt: new Date().toISOString(),
+      };
+      setFailedMessages(prev => [...prev, failed]);
+    }
+  }, [conversation.name, agentId]);
+
+  const handleDiscardFailed = useCallback((failedId: string) => {
+    setFailedMessages(prev => prev.filter(f => f.id !== failedId));
+  }, []);
+
+  // Clear failed messages when switching conversations
+  useEffect(() => {
+    setFailedMessages([]);
+  }, [conversation.name]);
 
   // Clean up optimistic messages in an effect once the server catches up
   useEffect(() => {
@@ -535,6 +808,18 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           workLog={workLog}
           streaming={isWorking}
           roundMarkers={derivedRoundMarkers}
+          failedMessages={failedMessages}
+          onRetryFailed={handleRetryFailed}
+          onDiscardFailed={handleDiscardFailed}
+          proposedPlan={data?.proposedPlan}
+          compactBoundaries={data?.compactBoundaries}
+          compacting={isCompacting}
+          conversationName={conversation.name}
+          turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
+          onOpenTurnDiff={onOpenTurnDiff}
+          resolvedTheme={resolvedTheme}
+          hideToolCalls={hideToolCalls}
+          workingPhase={workingPhase}
         />
       )}
       {isForking ? null : onResume ? (
@@ -549,7 +834,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, mo
           </button>
         </div>
       ) : (
-        <ComposerFooter conversation={conversation} onSend={handleMessageSent} />
+        <ComposerFooter conversation={conversation} onSend={handleMessageSent} onSendFailed={handleSendFailed} agentId={agentId} />
       )}
     </div>
   );

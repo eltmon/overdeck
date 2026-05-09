@@ -27,6 +27,7 @@ import { IssueLifecycleLive } from './services/issue-lifecycle.js';
 import { AgentSpawnerLive } from './services/agent-spawner.js';
 import { WorkspaceServiceLive } from './services/workspace-service.js';
 import { OpenRouterServiceLive } from './services/openrouter-service.js';
+import { PanOpenLive } from './services/open.js';
 import { setupTerminalWebSocket } from './ws-terminal.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
@@ -48,7 +49,11 @@ import { projectsRouteLayer } from './routes/projects.js';
 import { adminRouteLayer } from './routes/admin.js';
 import { prereqsRouteLayer } from './routes/prereqs.js';
 import { cliproxyRouteLayer } from './routes/cliproxy.js';
+import { webhooksRouteLayer } from './routes/webhooks.js';
+import { hooksRouteLayer } from './routes/hooks.js';
+import { diffsRouteLayer } from './routes/diffs.js';
 import { codexAuthRouteLayer } from './routes/codex-auth.js';
+import { swarmRouteLayer } from './routes/swarm.js';
 import { emitActivityEntry, emitActivityTts } from '../../lib/activity-logger.js';
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
@@ -213,7 +218,11 @@ export const makeRoutesLayer = Layer.mergeAll(
   adminRouteLayer,
   prereqsRouteLayer,
   cliproxyRouteLayer,
+  webhooksRouteLayer,
+  hooksRouteLayer,
+  diffsRouteLayer,
   codexAuthRouteLayer,
+  swarmRouteLayer,
   staticRouteLayer,
 );
 
@@ -245,6 +254,7 @@ const DomainServicesLive = Layer.mergeAll(
   AgentSpawnerLive,
   WorkspaceServiceLive,
   OpenRouterServiceLive,
+  PanOpenLive,
 );
 
 // ─── Full server layer ────────────────────────────────────────────────────────

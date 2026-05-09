@@ -1,5 +1,6 @@
 import { jsonResponse } from "../http-helpers.js";
 import { httpHandler } from './http-handler.js';
+import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
 /**
  * Workspaces route module — Effect HttpRouter.Layer (PAN-428 B8)
  *
@@ -38,6 +39,7 @@ import { httpHandler } from './http-handler.js';
  */
 
 import { exec, execFile, spawn } from 'node:child_process';
+import { createConnection } from 'node:net';
 import { existsSync } from 'node:fs';
 import { access, chmod, mkdir, readdir, readFile, stat, symlink, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -84,23 +86,63 @@ import {
   spawnAgent,
 } from '../../../lib/agents.js';
 import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js';
-import { findPlan, readPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
+import { getCostsForIssue } from '../../../lib/costs/index.js';
+import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
+import { getCachedRunningAgents } from '../services/running-agents-cache.js';
+import { findPlan, readPlan, readWorkspacePlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
+import type { VBriefDocument } from '../../../lib/vbrief/types.js';
+import { findVBriefByIssueAsync, readVBriefDocumentAsync } from '../../../lib/vbrief/vbrief-index.js';
 import { criticalPath } from '../../../lib/vbrief/dag.js';
 import { syncMainIntoWorkspace } from '../../../lib/cloister/merge-agent.js';
 import { capturePaneAsync, killSessionAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
+import { queryBeadsForIssue } from '../../../lib/beads-query.js';
 import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { getUnblockedItems } from '../../../lib/cloister/task-readiness.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
 import { getTldrDaemonService } from '../../../lib/tldr-daemon.js';
 import { loadWorkspaceMetadata } from '../../../lib/remote/workspace-metadata.js';
 import { extractPrefix, extractNumber, parseIssueId } from '../../../lib/issue-id.js';
+import { getContainersReferencingWorkspacePath } from '../../../lib/workspace-manager.js';
+import { DEVCONTAINER_DIRNAME } from '../../../lib/workspace/devcontainer-renderer.js';
 import { setMergeQueueTriggerHandler } from '../services/merge-queue-service.js';
 import { getWorkAgentLifecycleState } from '../../../lib/work-agent-lifecycle.js';
 import { enrichReviewStatusFromSessions } from '../../../lib/review-status-enrichment.js';
 import { createRecoveryBranchFromStash, dropStash, isSalvageableStash, listStashes } from '../../../lib/stashes.js';
+import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
+const MAX_PROBED_PORTS = 5;
+const MAX_PROBED_CONTAINERS = 10;
+const PROBE_CACHE_TTL_MS = 30_000;
+
+function safeToISOString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return d.toISOString();
+}
+
+interface ProbeCacheEntry {
+  result: { healthy: boolean; reason?: string };
+  cachedAt: number;
+}
+
+const probeCache = new Map<string, ProbeCacheEntry>();
+
+function getCachedProbe(key: string): { healthy: boolean; reason?: string } | undefined {
+  const entry = probeCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() - entry.cachedAt > PROBE_CACHE_TTL_MS) {
+    probeCache.delete(key);
+    return undefined;
+  }
+  return entry.result;
+}
+
+function setCachedProbe(key: string, result: { healthy: boolean; reason?: string }): void {
+  probeCache.set(key, { result, cachedAt: Date.now() });
+}
 
 export function getWorkspacePathForIssue(projectPath: string, rawIssueId: string): { parsedIssueId: string; workspacePath: string } {
   const parsed = parseIssueId(rawIssueId);
@@ -123,18 +165,36 @@ export function getWorkspacePathForIssue(projectPath: string, rawIssueId: string
 
 async function readWorkspacePlanningMarkdown(
   issueId: string,
-  fileName: 'STATE.md' | 'INFERENCE.md',
+  fileName: 'INFERENCE.md',
 ): Promise<{ issueId: string; body: string }> {
   const parsed = parseIssueId(issueId);
   const issuePrefix = parsed?.prefix ?? extractPrefix(issueId) ?? issueId.split('-')[0];
   const projectPath = getProjectPath(undefined, issuePrefix);
   const { parsedIssueId, workspacePath } = getWorkspacePathForIssue(projectPath, issueId);
 
-  const content = await readFile(join(workspacePath, '.planning', fileName), 'utf-8');
+  const content = await readFile(join(workspacePath, PAN_DIRNAME, fileName), 'utf-8');
   return {
     issueId: parsedIssueId,
     body: content,
   };
+}
+
+/**
+ * Read the workspace `.pan/continue.json` file asynchronously and return it as
+ * normalized JSON text, or null when it does not exist.
+ */
+async function readWorkspaceContinueFile(
+  _projectPath: string,
+  workspacePath: string,
+  _issueId: string,
+): Promise<string | null> {
+  try {
+    const continuePath = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
+    const raw = await readFile(continuePath, 'utf-8');
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    return null;
+  }
 }
 
 function shouldTreatAsRerun(status: Pick<ReviewStatus, 'readyForMerge' | 'reviewStatus' | 'testStatus' | 'mergeStatus'> | null | undefined): boolean {
@@ -360,10 +420,12 @@ function requireTrustedMutationOrigin(request: HttpServerRequest.HttpServerReque
   const port = parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
   const dashboardUrl = process.env['DASHBOARD_URL'] ?? `http://localhost:${port}`;
   const trustedOrigins = new Set<string>([dashboardUrl]);
+  // Always trust direct localhost access — the dashboard may be reached via
+  // reverse proxy (e.g. https://pan.localhost) OR directly (http://localhost:3011).
+  trustedOrigins.add(`http://localhost:${port}`);
+  trustedOrigins.add(`http://127.0.0.1:${port}`);
   if (process.env['NODE_ENV'] === 'development') {
-    trustedOrigins.add('http://localhost:3011');
     trustedOrigins.add('http://localhost:3000');
-    trustedOrigins.add('http://127.0.0.1:3011');
     trustedOrigins.add('http://127.0.0.1:3000');
   }
 
@@ -474,10 +536,12 @@ function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
   const issueLower = issueId.toLowerCase();
   const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
 
-  // Scan all configured projects for legacy naming (e.g. feature-484 for PAN-484)
+  // Scan all configured projects. Priority: numeric-suffix form (feature-1034) before
+  // full lowercased form (feature-pan-1034). The numeric-suffix is the canonical naming
+  // for git worktrees; the full lowercased form is the legacy fallback.
   for (const { config } of listProjects()) {
     if (!config.path) continue;
-    for (const candidate of [`feature-${issueLower}`, `feature-${numericSuffix}`]) {
+    for (const candidate of [`feature-${numericSuffix}`, `feature-${issueLower}`]) {
       const p = join(config.path, 'workspaces', candidate);
       if (existsSync(p)) return { exists: true, isRemote: false, localPath: p };
     }
@@ -485,7 +549,7 @@ function getWorkspaceInfoForIssue(issueId: string): WorkspaceInfo {
 
   // Fallback: canonical path under getProjectPath
   const projectPath = getProjectPath(undefined, issuePrefix);
-  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+  const workspacePath = join(projectPath, 'workspaces', `feature-${numericSuffix}`);
   if (existsSync(workspacePath)) return { exists: true, isRemote: false, localPath: workspacePath };
 
   return { exists: false, isRemote: false };
@@ -581,17 +645,27 @@ async function getRepoGitStatusAsync(workspacePath: string): Promise<{
   }
 }
 
+export interface WorkspaceContainerStatus {
+  running: boolean;
+  uptime: string | null;
+  status?: string;
+  health?: 'healthy' | 'unhealthy' | 'starting' | 'unknown';
+  ports?: number[];
+  lastProbeAt?: string;
+  lastFailureReason?: string;
+}
+
 async function getContainerStatusAsync(
   issueId: string,
   projectPath?: string
-): Promise<Record<string, { running: boolean; uptime: string | null; status?: string }>> {
-  const result: Record<string, { running: boolean; uptime: string | null; status?: string }> = {};
+): Promise<Record<string, WorkspaceContainerStatus>> {
+  const result: Record<string, WorkspaceContainerStatus> = {};
   try {
-    const { stdout } = await execAsync(
-      `docker ps -a --format "{{.Names}}\\t{{.Status}}" 2>/dev/null | grep "${issueId.toLowerCase()}" || true`,
-      { encoding: 'utf-8' }
-    );
-    for (const line of stdout.trim().split('\n').filter(Boolean)) {
+    const { stdout } = await execFileAsync('docker', ['ps', '-a', '--format', '{{.Names}}\t{{.Status}}'], { encoding: 'utf-8' });
+    const search = issueId.toLowerCase();
+    const lines = stdout.trim().split('\n').filter(Boolean);
+    for (const line of lines) {
+      if (!line.toLowerCase().includes(search)) continue;
       const [name, ...statusParts] = line.split('\t');
       const statusStr = statusParts.join('\t');
       const running = statusStr.toLowerCase().startsWith('up');
@@ -602,22 +676,244 @@ async function getContainerStatusAsync(
         status: statusStr,
       };
     }
+
+    // Batch docker inspect for all running containers to avoid serial O(n) latency
+    const runningNames = Object.entries(result)
+      .filter(([, info]) => info.running)
+      .map(([name]) => name);
+
+    if (runningNames.length > 0) {
+      let inspectByName = new Map<string, any>();
+      try {
+        const { stdout: inspectStdout } = await execFileAsync(
+          'docker',
+          ['inspect', ...runningNames],
+          { encoding: 'utf-8', timeout: 10000 }
+        );
+        const inspects: Array<{
+          Name?: string;
+          Config?: { Labels?: Record<string, string>; ExposedPorts?: Record<string, unknown> };
+          NetworkSettings?: { Ports?: Record<string, unknown> };
+          State?: { Health?: { Status?: string; LastExecution?: { End?: string }; FailingStreak?: number; ExitCode?: number } };
+        }> = JSON.parse(inspectStdout);
+        inspectByName = new Map(inspects.map((i) => [i.Name?.replace(/^\//, ''), i]));
+      } catch (err: any) {
+        // Docker inspect may return partial JSON on stderr even when one container is missing.
+        // Try to salvage valid results from stdout so one missing container doesn't drop all health data.
+        const partial = err?.stdout;
+        if (typeof partial === 'string' && partial.trim().startsWith('[')) {
+          try {
+            const inspects = JSON.parse(partial);
+            if (Array.isArray(inspects)) {
+              inspectByName = new Map(inspects.map((i: any) => [i.Name?.replace(/^\//, ''), i]));
+            }
+          } catch {
+            // Partial JSON unreadable — fall through to empty inspectByName
+          }
+        }
+      }
+
+      // Cap total probed containers to prevent unbounded fan-out per request
+      const namesToProbe = runningNames.slice(0, MAX_PROBED_CONTAINERS);
+
+      await Promise.all(
+        namesToProbe.map(async (name) => {
+          const info = result[name];
+          const inspect = inspectByName.get(name);
+          const serviceHealth = extractContainerServiceHealth(inspect);
+          let health: WorkspaceContainerStatus['health'] = serviceHealth.health;
+          let lastFailureReason = serviceHealth.lastFailureReason;
+          let lastProbeAt = serviceHealth.lastProbeAt;
+
+          // If docker healthcheck is unknown but we have host-mapped ports, probe them
+          if (health === 'unknown' && serviceHealth.bindings.length > 0) {
+            // Deduplicate and cap probe targets
+            const dedupedBindings = Array.from(
+              new Map(
+                serviceHealth.bindings.map((b) => [`${b.hostIp}:${b.hostPort}`, b])
+              ).values()
+            ).slice(0, MAX_PROBED_PORTS);
+
+            const probeResults = await Promise.all(
+              dedupedBindings.map(async (b) => {
+                const cacheKey = `${name}::${b.hostIp}:${b.hostPort}`;
+                const cached = getCachedProbe(cacheKey);
+                if (cached) return cached;
+                const probeResult = await probeContainerPortAsync(b.hostPort, b.hostIp);
+                setCachedProbe(cacheKey, probeResult);
+                return probeResult;
+              })
+            );
+            const anyHealthy = probeResults.some((r) => r.healthy);
+            health = anyHealthy ? 'healthy' : 'unhealthy';
+            lastProbeAt = new Date().toISOString();
+            if (!anyHealthy) {
+              const firstFailure = probeResults.find((r) => !r.healthy);
+              lastFailureReason = firstFailure?.reason ?? 'probe failed';
+            }
+          }
+
+          result[name] = {
+            ...info,
+            health,
+            ports: serviceHealth.ports,
+            lastProbeAt,
+            lastFailureReason,
+          };
+        })
+      );
+    }
   } catch { /* non-fatal */ }
   return result;
+}
+
+interface ContainerPortBinding {
+  containerPort: number;
+  hostIp: string;
+  hostPort: number;
+}
+
+interface ContainerServiceHealth {
+  health: 'healthy' | 'unhealthy' | 'starting' | 'unknown';
+  ports: number[];
+  bindings: ContainerPortBinding[];
+  lastProbeAt?: string;
+  lastFailureReason?: string;
+}
+
+function extractContainerServiceHealth(
+  inspect?: {
+    Config?: { Labels?: Record<string, string>; ExposedPorts?: Record<string, unknown> };
+    NetworkSettings?: { Ports?: Record<string, unknown> };
+    State?: { Health?: { Status?: string; LastExecution?: { End?: string }; FailingStreak?: number; ExitCode?: number } };
+  }
+): ContainerServiceHealth {
+  if (!inspect) return { health: 'unknown', ports: [], bindings: [] };
+  const labels = inspect?.Config?.Labels ?? {};
+  const healthState = inspect?.State?.Health;
+  const exposedPorts = inspect?.Config?.ExposedPorts ?? {};
+  const portBindings = inspect?.NetworkSettings?.Ports ?? {};
+
+  // Parse exposed ports
+  const ports = Object.keys(exposedPorts)
+    .map((p) => parseInt(p.split('/')[0], 10))
+    .filter((n) => !Number.isNaN(n));
+
+  // Parse Traefik loadbalancer port labels
+  const traefikPorts: number[] = [];
+  for (const [key, value] of Object.entries(labels)) {
+    if (key.endsWith('.loadbalancer.server.port') && value) {
+      const port = parseInt(value, 10);
+      if (!Number.isNaN(port)) traefikPorts.push(port);
+    }
+  }
+
+  const allPorts = traefikPorts.length > 0 ? traefikPorts : ports;
+
+  // Extract host-mapped ports from NetworkSettings.Ports
+  const bindings: ContainerPortBinding[] = [];
+  for (const [containerPortProto, hostBindings] of Object.entries(portBindings)) {
+    if (!Array.isArray(hostBindings)) continue;
+    const containerPort = parseInt(containerPortProto.split('/')[0], 10);
+    if (Number.isNaN(containerPort)) continue;
+    for (const hb of hostBindings) {
+      if (!hb || typeof hb !== 'object') continue;
+      const hostPort = parseInt((hb as any).HostPort, 10);
+      if (Number.isNaN(hostPort) || hostPort < 1 || hostPort > 65535) continue;
+      bindings.push({
+        containerPort,
+        hostIp: String((hb as any).HostIp || '127.0.0.1'),
+        hostPort,
+      });
+    }
+  }
+
+  // If container has a Docker healthcheck, use its state
+  if (healthState?.Status) {
+    const status = String(healthState.Status).toLowerCase();
+    const health: ContainerServiceHealth['health'] =
+      status === 'healthy' ? 'healthy' :
+      status === 'unhealthy' ? 'unhealthy' :
+      status === 'starting' ? 'starting' : 'unknown';
+    const lastProbeAt = safeToISOString(healthState?.LastExecution?.End);
+    const exitCode = healthState?.LastExecution?.ExitCode;
+    const failingStreak = healthState?.FailingStreak;
+    const lastFailureReason = failingStreak && failingStreak > 0
+      ? (typeof exitCode === 'number' && exitCode !== 0 ? `exit code ${exitCode}` : 'healthcheck failed')
+      : undefined;
+    return {
+      health,
+      ports: allPorts,
+      bindings,
+      lastProbeAt,
+      lastFailureReason,
+    };
+  }
+
+  return {
+    health: 'unknown',
+    ports: allPorts,
+    bindings,
+  };
+}
+
+async function probeContainerPortAsync(hostPort: number, hostIp = '127.0.0.1'): Promise<{ healthy: boolean; reason?: string }> {
+  return new Promise((resolve) => {
+    const socket = createConnection(hostPort, hostIp);
+    socket.setTimeout(5000);
+
+    socket.on('connect', () => {
+      socket.end();
+      resolve({ healthy: true });
+    });
+
+    socket.on('error', (err) => {
+      resolve({ healthy: false, reason: err.message.slice(0, 200) });
+    });
+
+    socket.on('timeout', () => {
+      socket.destroy();
+      resolve({ healthy: false, reason: 'connection timeout' });
+    });
+  });
 }
 
 async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<string | null> {
   try {
     const issueLower = issueId.toLowerCase();
     const branchName = `feature/${issueLower}`;
-    const { stdout } = await execAsync(
-      `gh pr view ${branchName} --json url --jq .url 2>/dev/null || true`,
-      { cwd: workspacePath, encoding: 'utf-8' }
-    );
+    const { stdout } = await execFileAsync('gh', ['pr', 'view', branchName, '--json', 'url', '--jq', '.url'], { cwd: workspacePath, encoding: 'utf-8' });
     const url = stdout.trim();
     return url || null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Fallback bead reader that parses .beads/issues.jsonl directly.
+ * Used when the bd CLI is unavailable (e.g. in tests).
+ */
+async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promise<Array<{ title: string; status: string }>> {
+  try {
+    const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
+    if (!existsSync(jsonlPath)) return [];
+    const raw = await readFile(jsonlPath, 'utf-8');
+    const issueLower = issueId.toLowerCase();
+    const beads: Array<{ title: string; status: string }> = [];
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const entry = JSON.parse(line);
+        const labels = Array.isArray(entry.labels) ? entry.labels : [];
+        if (labels.some((l: string) => l.toLowerCase() === issueLower)) {
+          beads.push({ title: String(entry.title ?? ''), status: String(entry.status ?? 'open') });
+        }
+      } catch { /* skip malformed lines */ }
+    }
+    return beads;
+  } catch {
+    return [];
   }
 }
 
@@ -633,8 +929,8 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
 
   // Acceptance criteria checklist from vBRIEF plan items
   try {
-    const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
-    if (existsSync(planPath)) {
+    const planPath = findPlan(workspacePath);
+    if (planPath && existsSync(planPath)) {
       const raw = await readFile(planPath, 'utf-8');
       const doc = JSON.parse(raw);
       const items: Array<{ status: string; title: string }> = doc?.plan?.items ?? [];
@@ -652,39 +948,21 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
     // No vBRIEF plan — omit checklist
   }
 
-  // Beads task summary from .beads/issues.jsonl (if available)
+  // Beads task summary from live Dolt database via bd CLI
   try {
-    let beadsPath: string | null = null;
-    const workspaceBeadsRedirect = join(workspacePath, '.beads', 'redirect');
-    if (existsSync(workspaceBeadsRedirect)) {
-      const redirectTarget = (await readFile(workspaceBeadsRedirect, 'utf-8')).trim();
-      const resolvedPath = redirectTarget.startsWith('/')
-        ? redirectTarget
-        : join(workspacePath, '.beads', redirectTarget);
-      beadsPath = join(resolvedPath, 'issues.jsonl');
+    let beads = await queryBeadsForIssue(workspacePath, issueId);
+    if (beads.length === 0) {
+      // Fallback: read from .beads/issues.jsonl when bd CLI is unavailable
+      beads = await readBeadsFromJsonl(workspacePath, issueId);
     }
-    const localBeadsPath = join(workspacePath, '.beads', 'issues.jsonl');
-    if (!beadsPath && existsSync(localBeadsPath)) beadsPath = localBeadsPath;
-
-    if (beadsPath && existsSync(beadsPath)) {
-      const issueLower = issueId.toLowerCase();
-      const beads = (await readFile(beadsPath, 'utf-8'))
-        .split('\n')
-        .filter(l => l.trim())
-        .map(l => {
-          try { return JSON.parse(l); } catch { return null; }
-        })
-        .filter(b => b && b.labels?.some((lbl: string) => lbl.toLowerCase() === issueLower));
-
-      if (beads.length > 0) {
-        lines.push('## Implementation Tasks');
-        lines.push('');
-        for (const bead of beads) {
-          const checked = bead.status === 'closed' ? 'x' : ' ';
-          lines.push(`- [${checked}] ${bead.title.replace(/^[^:]+:\s*/, '')}`);
-        }
-        lines.push('');
+    if (beads.length > 0) {
+      lines.push('## Implementation Tasks');
+      lines.push('');
+      for (const bead of beads) {
+        const checked = bead.status === 'closed' ? 'x' : ' ';
+        lines.push(`- [${checked}] ${bead.title.replace(/^[^:]+:\s*/, '')}`);
       }
+      lines.push('');
     }
   } catch {
     // No beads — omit task list
@@ -701,14 +979,14 @@ async function ensurePRExists(
     const issueLower = issueId.toLowerCase();
     const branchName = options?.branchName ?? `feature/${issueLower}`;
     const targetBranch = options?.targetBranch ?? 'main';
-    const execOptions: Parameters<typeof execAsync>[1] = { encoding: 'utf-8' };
+    const execOptions: Parameters<typeof execFileAsync>[2] = { encoding: 'utf-8' };
     if (options?.cwd) execOptions.cwd = options.cwd;
 
     // Check for existing PR
-    const { stdout: existingOut } = await execAsync(
-      `gh pr view ${branchName} --json url --jq .url 2>/dev/null || true`,
-      execOptions
-    );
+    let existingOut = '';
+    try {
+      ({ stdout: existingOut } = await execFileAsync('gh', ['pr', 'view', branchName, '--json', 'url', '--jq', '.url'], execOptions));
+    } catch { /* no existing PR */ }
     const existing = existingOut.trim();
     if (existing) return { created: false, prUrl: existing };
 
@@ -723,10 +1001,7 @@ async function ensurePRExists(
     await writeFileAsync(bodyFile, prBody, 'utf-8');
 
     try {
-      const { stdout: createOut } = await execAsync(
-        `gh pr create --head ${branchName} --base ${targetBranch} --title "${issueId}" --body-file "${bodyFile}"`,
-        execOptions
-      );
+      const { stdout: createOut } = await execFileAsync('gh', ['pr', 'create', '--head', branchName, '--base', targetBranch, '--title', issueId, '--body-file', bodyFile], execOptions);
       // gh pr create prints the PR URL as the last line of stdout
       const prUrl = createOut.trim().split('\n').pop()?.trim() || createOut.trim();
       return { created: true, prUrl };
@@ -980,6 +1255,9 @@ const getWorkspaceRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
@@ -1056,12 +1334,12 @@ const getWorkspaceRoute = HttpRouter.add(
         }
 
         let services: { name: string; url?: string }[] = [];
-        const stateMd = join(workspacePath, '.planning', 'STATE.md');
+        const panContinueFile = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
         const workspaceMd = join(workspacePath, 'WORKSPACE.md');
         const dockerCompose = join(workspacePath, 'docker-compose.yml');
 
-        const urlSourceFile = existsSync(stateMd)
-          ? stateMd
+        const urlSourceFile = existsSync(panContinueFile)
+          ? panContinueFile
           : existsSync(workspaceMd)
           ? workspaceMd
           : null;
@@ -1084,7 +1362,7 @@ const getWorkspaceRoute = HttpRouter.add(
         }
 
         const devcontainerPath = join(workspacePath, '.devcontainer');
-        const hasDocker =
+        let hasDocker =
           existsSync(dockerCompose) ||
           existsSync(join(workspacePath, 'compose.yaml')) ||
           existsSync(join(devcontainerPath, 'docker-compose.yml')) ||
@@ -1093,7 +1371,22 @@ const getWorkspaceRoute = HttpRouter.add(
           existsSync(join(devcontainerPath, 'compose.infra.yml')) ||
           existsSync(devcontainerPath);
 
-        const canContainerize = !hasDocker && existsSync(join(projectPath, 'infra', 'new-feature'));
+        // For polyrepo workspaces, also check compose files inside sub-repos
+        if (!hasDocker && projectConfig?.workspace?.repos) {
+          for (const repo of projectConfig.workspace.repos) {
+            const repoPath = join(workspacePath, repo.path);
+            if (
+              existsSync(join(repoPath, 'docker-compose.yml')) ||
+              existsSync(join(repoPath, 'docker-compose.yaml')) ||
+              existsSync(join(repoPath, 'compose.yaml'))
+            ) {
+              hasDocker = true;
+              break;
+            }
+          }
+        }
+
+        const canContainerize = false;
 
         const agentSession = `agent-${issueLower}`;
         const [git, repoGit, containers, mrUrl, sessionNames, paneOutput] = yield* Effect.promise(() => Promise.all([
@@ -1137,6 +1430,24 @@ const getWorkspaceRoute = HttpRouter.add(
           yield* Effect.promise(() => reconcileGitHubMergeStatus(issueId, reviewStatus));
         }
 
+        const stashes = yield* Effect.promise(() => listStashes(workspacePath));
+        const salvageableStashes = stashes
+          .filter(isSalvageableStash)
+          .filter((entry) => entry.issueId === issueId.toUpperCase());
+
+        const planPath = findPlan(workspacePath);
+        const hasPlan = planPath !== null;
+        const planningComplete = hasPlan ? isPlanningComplete(workspacePath) : false;
+        const hasBeads = planningComplete;
+
+        const issueData = getCostsForIssue(issueId);
+        const agents = yield* Effect.promise(() => getCachedRunningAgents());
+        const resolvedCost = resolveIssueHeadlineCost({
+          issueId: issueId,
+          aggregateCost: issueData?.totalCost,
+          agents,
+        });
+
         return jsonResponse({
           exists: true,
           issueId,
@@ -1156,6 +1467,64 @@ const getWorkspaceRoute = HttpRouter.add(
           canContainerize,
           pendingOperation,
           location,
+          salvageableStashes,
+          planningState: {
+            hasPlan,
+            hasBeads,
+            beadsCount: 0,
+            planningComplete,
+            workspacePath,
+          },
+          costs: issueData
+            ? {
+                issueId: issueId.toUpperCase(),
+                totalCost: issueData.totalCost,
+                resolvedTotalCost: resolvedCost.resolvedTotalCost,
+                aggregateCost: resolvedCost.aggregateCost,
+                liveCost: resolvedCost.liveCost,
+                totalTokens: issueData.inputTokens + issueData.outputTokens + issueData.cacheReadTokens + issueData.cacheWriteTokens,
+                inputTokens: issueData.inputTokens,
+                outputTokens: issueData.outputTokens,
+                cacheReadTokens: issueData.cacheReadTokens,
+                cacheWriteTokens: issueData.cacheWriteTokens,
+                models: issueData.models,
+                providers: issueData.providers,
+                byModel: Object.fromEntries(
+                  Object.entries(issueData.models).map(([model, stats]: [string, any]) => [
+                    model,
+                    { cost: stats.cost, tokens: stats.tokens },
+                  ])
+                ),
+                sessions: issueData.sessions ?? [],
+                byStage: Object.fromEntries(
+                  Object.entries(issueData.stages || {}).map(([stage, stats]: [string, any]) => [
+                    stage,
+                    { cost: stats.cost, tokens: stats.tokens },
+                  ])
+                ),
+                budget: issueData.budget,
+                budgetWarning: issueData.budgetWarning,
+                lastUpdated: issueData.lastUpdated,
+              }
+            : {
+                issueId: issueId.toUpperCase(),
+                totalCost: 0,
+                resolvedTotalCost: resolvedCost.resolvedTotalCost,
+                aggregateCost: resolvedCost.aggregateCost,
+                liveCost: resolvedCost.liveCost,
+                totalTokens: 0,
+                inputTokens: 0,
+                outputTokens: 0,
+                cacheReadTokens: 0,
+                cacheWriteTokens: 0,
+                models: {},
+                providers: {},
+                byModel: {},
+                sessions: [],
+                byStage: {},
+                budget: undefined,
+                budgetWarning: false,
+              },
         });
   }))
 );
@@ -1197,24 +1566,21 @@ const getWorkspaceStateMdRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
-    return yield* Effect.promise(() =>
-      readWorkspacePlanningMarkdown(issueId, 'STATE.md')
-        .then((result) => jsonResponse(result))
-        .catch((err: unknown) => {
-          if (
-            typeof err === 'object'
-            && err !== null
-            && ('code' in err || 'message' in err)
-            && ((err as { code?: unknown }).code === 'ENOENT'
-              || String((err as { message?: unknown }).message ?? '').includes('Invalid issue ID'))
-          ) {
-            return jsonResponse({ error: 'STATE.md not found for this workspace' }, { status: 404 });
-          }
-          console.error('[workspaces] Failed to read STATE.md:', err);
-          return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-        })
-    );
+    const parsed = parseIssueId(issueId);
+    const issuePrefix = parsed?.prefix ?? extractPrefix(issueId) ?? issueId.split('-')[0];
+    const projectPath = getProjectPath(undefined, issuePrefix);
+    const { parsedIssueId, workspacePath } = getWorkspacePathForIssue(projectPath, issueId);
+
+    const continueBody = yield* Effect.promise(() => readWorkspaceContinueFile(projectPath, workspacePath, issueId));
+    if (continueBody) {
+      return jsonResponse({ issueId: parsedIssueId, body: continueBody });
+    }
+
+    return jsonResponse({ error: 'Planning state not found for this workspace' }, { status: 404 });
   }))
 );
 
@@ -1224,6 +1590,9 @@ const getWorkspaceInferenceMdRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     return yield* Effect.promise(() =>
       readWorkspacePlanningMarkdown(issueId, 'INFERENCE.md')
@@ -1251,23 +1620,47 @@ const getWorkspacePlanRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
     const workspaceName = `feature-${issueLower}`;
     const workspacePath = join(projectPath, 'workspaces', workspaceName);
 
-    const planPath = findPlan(workspacePath);
-    if (!planPath) {
+    // Resolve from lifecycle specs first (cached/async), then fall back to the
+    // workspace-local `.pan/spec.vbrief.json` when planning is still in progress.
+    let planPath: string | null = null;
+    let lifecycleDir: string | null = null;
+    let doc: VBriefDocument | null = null;
+
+    const found = yield* Effect.promise(() => findVBriefByIssueAsync(projectPath, issueId));
+    if (found) {
+      planPath = found.path;
+      lifecycleDir = found.lifecycleDir;
+      doc = yield* Effect.promise(() => readVBriefDocumentAsync(found.path));
+    } else {
+      planPath = findPlan(workspacePath);
+      if (planPath) {
+        lifecycleDir = 'workspace';
+        const planPathConst = planPath;
+        doc = yield* Effect.promise(async () => {
+          const raw = await readFile(planPathConst, 'utf-8');
+          return JSON.parse(raw) as VBriefDocument;
+        });
+      }
+    }
+
+    if (!doc) {
       return jsonResponse(
         { error: 'No vBRIEF plan found for this workspace' },
         { status: 404 }
       );
     }
 
-    const doc = readPlan(planPath);
     const cp = criticalPath(doc);
-    return jsonResponse({ ...doc, criticalPath: cp });
+    return jsonResponse({ ...doc, criticalPath: cp, lifecycleDir });
   }))
 );
 
@@ -1277,6 +1670,9 @@ const getWorkspaceStashesRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const workspacePath = resolveWorkspacePath(issueId);
 
     if (!workspacePath || !existsSync(workspacePath)) {
@@ -1310,6 +1706,9 @@ const postWorkspaceRecoverStashRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const stashRef = decodeURIComponent(params['stashRef'] ?? '');
     const workspacePath = resolveWorkspacePath(issueId);
 
@@ -1344,6 +1743,9 @@ const deleteWorkspaceStashRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const stashRef = decodeURIComponent(params['stashRef'] ?? '');
     const workspacePath = resolveWorkspacePath(issueId);
 
@@ -1370,6 +1772,9 @@ const getWorkspaceCleanPreviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
@@ -1542,6 +1947,9 @@ const postWorkspaceCleanRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const { createBackup } = body as { createBackup?: boolean };
 
@@ -1571,6 +1979,20 @@ const postWorkspaceCleanRoute = HttpRouter.add(
     }
 
     console.log(`Removing corrupted workspace: ${workspacePath}`);
+
+    // Guard: never delete workspace while containers still reference its compose path
+    const orphanedContainers = yield* Effect.promise(() =>
+      getContainersReferencingWorkspacePath(workspacePath)
+    );
+    if (orphanedContainers.length > 0) {
+      return jsonResponse(
+        {
+          error: `Cannot remove workspace: ${orphanedContainers.length} Docker container(s) still reference compose paths in ${DEVCONTAINER_DIRNAME}/. Stop the containers first.`,
+        },
+        { status: 409 },
+      );
+    }
+
     try {
       yield* Effect.promise(() => execAsync(`rm -rf "${workspacePath}"`, {
         encoding: 'utf-8',
@@ -1611,6 +2033,9 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
@@ -1639,10 +2064,10 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
     }
 
     if (existsSync(workspacePath)) {
-      yield* Effect.promise(() => execAsync(`pan workspace destroy ${issueId} --force 2>/dev/null || true`, {
-        cwd: projectPath,
-        encoding: 'utf-8',
-      }));
+      return jsonResponse(
+        { error: 'Workspace already exists. Use the workspace inspector to manage it, or remove it first with: pan workspace destroy ' + issueId },
+        { status: 409 }
+      );
     }
 
     const featureName = issueLower;
@@ -1689,12 +2114,7 @@ const postWorkspaceContainerizeRoute = HttpRouter.add(
           cwd: workspaceDir,
           detached: true,
           stdio: ['ignore', 'pipe', 'pipe'],
-          env: {
-            ...process.env,
-            UID: String(uid),
-            GID: String(gid),
-            DOCKER_USER: `${uid}:${gid}`,
-          },
+          env: buildChildEnvWithoutTmux(process.env, { UID: String(uid), GID: String(gid), DOCKER_USER: `${uid}:${gid}` }),
         });
 
         devUp.stdout?.on('data', (data) => {
@@ -1745,6 +2165,9 @@ const postWorkspaceStartRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
@@ -1752,26 +2175,6 @@ const postWorkspaceStartRoute = HttpRouter.add(
 
     if (!existsSync(workspacePath)) {
       return jsonResponse({ error: 'Workspace does not exist' }, { status: 400 });
-    }
-
-    // Copy planning artifacts from project root if needed
-    const workspacePlanningDir = join(workspacePath, '.planning');
-    if (!existsSync(join(workspacePlanningDir, 'STATE.md'))) {
-      const legacyPlanningDir = join(projectPath, '.planning', issueLower);
-      if (existsSync(legacyPlanningDir)) {
-        try {
-          yield* Effect.promise(() => mkdir(workspacePlanningDir, { recursive: true }));
-          yield* Effect.promise(() => execAsync(
-            `cp -r "${legacyPlanningDir}/"* "${workspacePlanningDir}/"`,
-            { encoding: 'utf-8', shell: '/bin/bash' }
-          ));
-          console.log(
-            `[workspace/start] Copied planning from ${legacyPlanningDir} to workspace for ${issueId}`
-          );
-        } catch (e) {
-          console.warn(`[workspace/start] Could not copy planning: ${e}`);
-        }
-      }
     }
 
     const workspaceBeadsDir = join(workspacePath, '.beads');
@@ -1956,12 +2359,7 @@ const postWorkspaceStartRoute = HttpRouter.add(
       cwd: workspacePath,
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        UID: String(uid),
-        GID: String(gid),
-        DOCKER_USER: `${uid}:${gid}`,
-      },
+      env: buildChildEnvWithoutTmux(process.env, { UID: String(uid), GID: String(gid), DOCKER_USER: `${uid}:${gid}` }),
     });
 
     child.stdout?.on('data', (data) => {
@@ -2078,6 +2476,9 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const containerName = params['containerName'] ?? '';
     const action = params['action'] ?? '';
 
@@ -2128,6 +2529,30 @@ const postWorkspaceContainerActionRoute = HttpRouter.add(
         { error: `Workspace not found for ${issueId}` },
         { status: 404 }
       );
+    }
+
+    // Self-heal: if .devcontainer/ is missing for start/restart, re-render
+    // from the project template so docker compose can operate on containers.
+    if (!composeFile && ['start', 'restart'].includes(action)) {
+      const { ensureDevcontainer } = yield* Effect.promise(() =>
+        import('../../../lib/workspace/ensure-devcontainer.js')
+      );
+      const ensure = ensureDevcontainer({ workspacePath, issueId });
+      if (ensure.rendered) {
+        console.log(`[container-control] Re-rendered ${DEVCONTAINER_DIRNAME}/ from project template`);
+      }
+      // Re-scan for compose file after re-render
+      const composePaths = [
+        join(workspacePath, '.devcontainer/docker-compose.devcontainer.yml'),
+        join(workspacePath, 'docker-compose.yml'),
+        join(workspacePath, 'docker-compose.yaml'),
+      ];
+      for (const cp of composePaths) {
+        if (existsSync(cp)) {
+          composeFile = cp;
+          break;
+        }
+      }
     }
 
     if (!composeFile) {
@@ -2242,6 +2667,9 @@ const postWorkspaceRefreshDbRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const teamPrefix = extractTeamPrefix(issueId);
     const projectConfig = teamPrefix ? findProjectByTeam(teamPrefix) : null;
@@ -2394,6 +2822,9 @@ const getWorkspaceReviewStatusRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const status = getReviewStatus(issueId);
     const base: ReviewStatus = status || {
@@ -2459,6 +2890,9 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
     const { reviewStatus, testStatus, mergeStatus, reviewNotes, testNotes, verificationStatus, readyForMerge } = body as {
@@ -2471,7 +2905,23 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
       readyForMerge?: boolean;
     };
 
+    // Snapshot reviewedAtCommit BEFORE the first setReviewStatus call so canSkipTests
+    // fires correctly in that same call — setting it afterward is too late (the
+    // async test-agent dispatch is already scheduled).
     const update: Partial<ReviewStatus> = {};
+    if (reviewStatus === 'passed') {
+      const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+      if (workspaceInfo.exists) {
+        const { getWorkspaceGitInfo } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
+        try {
+          const gitInfo = yield* Effect.promise(() => getWorkspaceGitInfo(workspaceInfo.path));
+          if (gitInfo.HEAD) {
+            update.reviewedAtCommit = gitInfo.HEAD;
+            console.log(`[review-status] Will snapshot reviewedAtCommit=${gitInfo.HEAD.substring(0, 8)} for ${issueId}`);
+          }
+        } catch {}
+      }
+    }
     if (reviewStatus) update.reviewStatus = reviewStatus as any;
     if (testStatus) update.testStatus = testStatus as any;
     if (mergeStatus) update.mergeStatus = mergeStatus as any;
@@ -2656,6 +3106,9 @@ const postWorkspaceReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const request = yield* HttpServerRequest.HttpServerRequest;
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
@@ -2668,12 +3121,14 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
     const issueLower = issueId.toLowerCase();
-    const branchName = `feature/${issueLower}`;
+    const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
+    // Use numeric-suffix form (feature/1034) as canonical branch name
+    const branchName = `feature/${numericSuffix}`;
 
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
     const workspacePath = workspaceInfo.isRemote
       ? workspaceInfo.remotePath!
-      : workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${issueLower}`);
+      : workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${numericSuffix}`);
 
     const existingStatus = getReviewStatus(issueId);
 
@@ -2908,6 +3363,9 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const { message } = body as { message?: string };
     const eventStore = yield* EventStoreService;
@@ -3331,6 +3789,9 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
 
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
@@ -3361,10 +3822,12 @@ const postWorkspaceResetReviewRoute = HttpRouter.add(
           if (resolved) {
             const wsInfo = getWorkspaceInfoForIssue(issueId);
             const issueLower = issueId.toLowerCase();
-            const branchName = `feature/${issueLower}`;
+            const numericSuffix = issueLower.replace(/^[a-z]+-/, '');
+            // Use numeric-suffix form (feature/1034) as canonical branch name
+            const branchName = `feature/${numericSuffix}`;
             const wsPath =
               wsInfo.localPath ||
-              join(resolved.projectPath, 'workspaces', `feature-${issueLower}`);
+              join(resolved.projectPath, 'workspaces', `feature-${numericSuffix}`);
 
             const result = await dispatchParallelReview({
               issueId,
@@ -3416,6 +3879,9 @@ const postWorkspaceAbortReviewRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = (params['issueId'] ?? '').toUpperCase();
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     if (!issueId) {
       return jsonResponse({ success: false, error: 'Missing issueId' }, { status: 400 });
     }
@@ -3586,6 +4052,9 @@ const postWorkspaceUnstickRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
     const current = getReviewStatus(issueId);
@@ -3623,6 +4092,9 @@ const postWorkspaceDeaconIgnoreRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = (params['issueId'] ?? '').toUpperCase();
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     if (!issueId) {
       return jsonResponse({ success: false, error: 'Missing issueId' }, { status: 400 });
     }
@@ -3658,6 +4130,9 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
@@ -3826,7 +4301,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
   if (currentlyMerging && currentlyMerging !== normalizedId) {
     // Another merge is in progress — queue this one
     const position = enqueueMerge(projectKey, normalizedId);
-    setReviewStatus(issueId, { mergeStatus: 'queued' });
+    setReviewStatus(issueId, { mergeStatus: 'queued', mergeStep: 'queued' });
     console.log(`[merge] Queued ${issueId} (position ${position}, waiting for ${currentlyMerging})`);
     return {
       success: true,
@@ -3850,7 +4325,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     ? `feature/${workspaceDirName.slice('feature-'.length)}`
     : `feature/${issueLower}`;
 
-  setReviewStatus(issueId, { mergeStatus: 'merging' });
+  setReviewStatus(issueId, { mergeStatus: 'merging', mergeStep: 'validating-pr' });
 
   const normalizedMergeId = issueId.toUpperCase();
   _serverManagedMerges.add(normalizedMergeId);
@@ -4249,6 +4724,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     const agentId = `agent-${issueId.toLowerCase()}`;
     const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto ${targetBranch} and push:\n\n1. git fetch origin ${targetBranch}\n2. git rebase origin/${targetBranch}\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
 
+    setReviewStatus(issueId, { mergeStep: 'rebasing' });
     console.log(`[merge] Rebasing ${branchName} onto ${targetBranch} for ${issueId} (agent=${await sessionExistsAsync(agentId) ? 'running' : 'stopped'})...`);
 
     let rebaseResult: { success: boolean; reason?: string; conflictFiles?: string[]; newHead?: string };
@@ -4340,45 +4816,13 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
       return { success: false, statusCode: 500, error };
     }
 
-    // Step 2b: Strip ephemeral `.planning/` from the feature branch BEFORE merge (#888).
-    // `.planning/` is tracked on feature branches for live workspace use, but must not
-    // land on main — otherwise other active workspaces sync-main pull each other's
-    // STATE.md/feedback files and cross-contaminate. The post-merge cleanup
-    // (`cleanPlanningArtifacts`) is a safety net that runs AFTER the squash commit is
-    // already public; this strip is the primary defense and runs BEFORE `gh pr merge`.
-    //
-    // NOTE: `rebaseFeatureBranch()` in merge-rebase.ts ALSO performs an idempotent
-    // `.planning/` strip during its rebase prep. The two are not currently composed
-    // (this route does not call rebaseFeatureBranch), so there's no double-strip
-    // today. If a future caller chains both, the second strip is a no-op (ls-files
-    // returns nothing → skip). Keep the dual-path safety; do not consolidate
-    // without auditing every entry point that triggers a merge.
-    try {
-      const { stripPlanningFromFeatureBranch } = await import(
-        '../../../lib/cloister/strip-planning-from-branch.js'
-      );
-      const stripResult = await stripPlanningFromFeatureBranch(workspacePath, branchName, issueId);
-      if (!stripResult.success) {
-        const error = `Pre-merge .planning/ strip failed: ${stripResult.reason}`;
-        console.error(`[merge] ${error}`);
-        setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error, readyForMerge: false });
-        completePendingOperation(issueId, error);
-        return { success: false, statusCode: 500, error };
-      }
-      if (stripResult.pushed) {
-        console.log(`[merge] Stripped .planning/ from ${branchName} for ${issueId} — new HEAD ${stripResult.newHead?.slice(0, 8)}`);
-      }
-    } catch (stripErr: any) {
-      const error = `Pre-merge .planning/ strip threw: ${stripErr.message}`;
-      console.error(`[merge] ${error}`);
-      setReviewStatus(issueId, { mergeStatus: 'failed', mergeNotes: error, readyForMerge: false });
-      completePendingOperation(issueId, error);
-      return { success: false, statusCode: 500, error };
-    }
+    setReviewStatus(issueId, { mergeStep: 'stripping-planning' });
+    // Planning-state stripping is gone: workspace state lives in `.pan/` and
+    // merges to main naturally with the code.
 
     // Step 3: Post-rebase verification gate (typecheck, lint, test)
     // Ensures the rebase didn't introduce issues before merging.
-    setReviewStatus(issueId, { mergeStatus: 'verifying', mergeNotes: undefined });
+    setReviewStatus(issueId, { mergeStatus: 'verifying', mergeStep: 'verifying', mergeNotes: undefined });
     console.log(`[merge] Running post-rebase verification for ${issueId}...`);
 
     const { runVerificationForIssue } = await import(
@@ -4417,6 +4861,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
 
     // Step 4a: Report commit statuses on post-rebase HEAD (branch protection requires them).
     // Must happen AFTER rebase because rebase changes the HEAD SHA.
+    setReviewStatus(issueId, { mergeStep: 'reporting-statuses' });
     try {
       const { getPullRequestState, isGitHubAppConfigured, reportCommitStatus } = await import('../../../lib/github-app.js');
       if (githubPrRef && isGitHubAppConfigured()) {
@@ -4433,6 +4878,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     }
 
     // Step 4b: Merge the review artifact via the configured forge.
+    setReviewStatus(issueId, { mergeStep: 'squash-merging' });
     let artifactMerged = false;
     try {
       console.log(`[merge] Merging ${primaryForge} review artifact for ${issueId}...`);
@@ -4489,7 +4935,7 @@ async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
     // Step 5: Mark merged and dequeue next BEFORE post-merge lifecycle.
     // postMergeLifecycle spawns a deploy script that may kill this server process,
     // so queue processing must happen before that point.
-    setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false });
+    setReviewStatus(issueId, { mergeStatus: 'merged', mergeStep: 'post-merge-cleanup', mergeNotes: undefined, readyForMerge: false });
     completePendingOperation(issueId, null);
 
     // Dequeue next merge before lifecycle (which may kill the process)
@@ -4526,6 +4972,9 @@ const postWorkspaceMergeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     if (!/^[A-Z]+-\d+$/i.test(issueId)) {
       return jsonResponse({ error: 'Invalid issue ID format' }, { status: 400 });
     }
@@ -4544,6 +4993,217 @@ const postWorkspaceMergeRoute = HttpRouter.add(
   }))
 );
 
+// ─── Route: POST /api/issues/:issueId/forge-approve ──────────────────────
+// Approves the PR/MR on GitHub/GitLab (submits an approving review).
+// This is distinct from the Panopticon /approve endpoint which runs the
+// full merge flow. This just clicks "Approve" on the forge.
+
+const postForgeApproveRoute = HttpRouter.add(
+  'POST',
+  '/api/issues/:issueId/forge-approve',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
+    if (!/^[A-Z]+-\d+$/i.test(issueId)) {
+      return jsonResponse({ error: 'Invalid issue ID format' }, { status: 400 });
+    }
+
+    return yield* Effect.promise(async () => {
+      const { getMergeSet, upsertMergeSet, withRepoArtifactUrl, withRepoState } = await import('../../../lib/merge-set.js');
+      const { getForgeAdapter } = await import('../../../lib/forge.js');
+
+      let mergeSet = getMergeSet(issueId);
+      if (!mergeSet) {
+        return jsonResponse({ error: `No merge set found for ${issueId}` }, { status: 404 });
+      }
+
+      const results: Array<{ repoKey: string; approved: boolean; error?: string }> = [];
+      for (const repo of mergeSet.repos) {
+        if (repo.mergeStatus === 'merged' || repo.mergeStatus === 'skipped') {
+          results.push({ repoKey: repo.repoKey, approved: true });
+          continue;
+        }
+
+        const adapter = getForgeAdapter(repo.forge);
+        const workspacePath = mergeSet.workspaceType === 'polyrepo'
+          ? join(mergeSet.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`, repo.repoKey)
+          : join(mergeSet.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+
+        let artifactUrl = repo.artifactUrl;
+        let artifactId = repo.artifactId;
+
+        if (!artifactUrl && !artifactId) {
+          try {
+            const discovered = await adapter.discoverArtifact({
+              sourceBranch: repo.sourceBranch,
+              cwd: existsSync(workspacePath) ? workspacePath : repo.repoPath,
+            });
+            if (discovered?.url || discovered?.id) {
+              artifactUrl = discovered.url;
+              artifactId = discovered.id;
+              mergeSet = withRepoArtifactUrl(mergeSet, repo.repoKey, artifactUrl ?? '', artifactId);
+              upsertMergeSet(mergeSet);
+              console.log(`[forge-approve] Discovered artifact for ${issueId}/${repo.repoKey}: ${artifactUrl}`);
+            } else {
+              results.push({ repoKey: repo.repoKey, approved: true });
+              continue;
+            }
+          } catch {
+            results.push({ repoKey: repo.repoKey, approved: true });
+            continue;
+          }
+        }
+
+        try {
+          await adapter.approveReviewArtifact({
+            forge: repo.forge,
+            url: artifactUrl,
+            id: artifactId,
+            cwd: existsSync(workspacePath) ? workspacePath : repo.repoPath,
+          });
+          results.push({ repoKey: repo.repoKey, approved: true });
+        } catch (err: any) {
+          results.push({ repoKey: repo.repoKey, approved: false, error: err.message });
+        }
+      }
+
+      const approvedCount = results.filter(r => r.approved).length;
+      if (approvedCount > 0) {
+        const { emitActivityEntry, emitActivityTts } = await import('../../../lib/activity-logger.js');
+        emitActivityEntry({
+          source: 'dashboard',
+          level: 'success',
+          message: `Merge approved for ${issueId}`,
+          issueId,
+        });
+        emitActivityTts({
+          utterance: `Merge approved for ${issueId}`,
+          priority: 1,
+          issueId,
+        });
+      }
+
+      const allApproved = results.every(r => r.approved);
+      return jsonResponse(
+        { success: allApproved, results },
+        { status: allApproved ? 200 : 207 }
+      );
+    });
+  }))
+);
+
+// ─── Route: POST /api/issues/:issueId/forge-merge ────────────────────────
+// Merges the PR/MR directly on GitHub/GitLab via the forge adapter.
+// This is a lightweight forge-level merge — it does NOT run Panopticon's
+// full post-merge lifecycle (label cleanup, workspace teardown, etc.).
+
+const postForgeMergeRoute = HttpRouter.add(
+  'POST',
+  '/api/issues/:issueId/forge-merge',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
+    if (!/^[A-Z]+-\d+$/i.test(issueId)) {
+      return jsonResponse({ error: 'Invalid issue ID format' }, { status: 400 });
+    }
+
+    return yield* Effect.promise(async () => {
+      const { getMergeSet, upsertMergeSet, withRepoArtifactUrl, withRepoState } = await import('../../../lib/merge-set.js');
+      const { getForgeAdapter } = await import('../../../lib/forge.js');
+
+      let mergeSet = getMergeSet(issueId);
+      if (!mergeSet) {
+        return jsonResponse({ error: `No merge set found for ${issueId}` }, { status: 404 });
+      }
+
+      const results: Array<{ repoKey: string; merged: boolean; error?: string }> = [];
+      for (const repo of mergeSet.repos) {
+        if (repo.mergeStatus === 'merged' || repo.mergeStatus === 'skipped') {
+          results.push({ repoKey: repo.repoKey, merged: true });
+          continue;
+        }
+
+        const adapter = getForgeAdapter(repo.forge);
+        const workspacePath = mergeSet.workspaceType === 'polyrepo'
+          ? join(mergeSet.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`, repo.repoKey)
+          : join(mergeSet.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+
+        let artifactUrl = repo.artifactUrl;
+        let artifactId = repo.artifactId;
+
+        if (!artifactUrl && !artifactId) {
+          try {
+            const discovered = await adapter.discoverArtifact({
+              sourceBranch: repo.sourceBranch,
+              cwd: existsSync(workspacePath) ? workspacePath : repo.repoPath,
+            });
+            if (discovered?.url || discovered?.id) {
+              artifactUrl = discovered.url;
+              artifactId = discovered.id;
+              mergeSet = withRepoArtifactUrl(mergeSet, repo.repoKey, artifactUrl ?? '', artifactId);
+              upsertMergeSet(mergeSet);
+              console.log(`[forge-merge] Discovered artifact for ${issueId}/${repo.repoKey}: ${artifactUrl}`);
+            } else {
+              mergeSet = withRepoState(mergeSet, repo.repoKey, { mergeStatus: 'skipped' });
+              upsertMergeSet(mergeSet);
+              results.push({ repoKey: repo.repoKey, merged: true });
+              continue;
+            }
+          } catch {
+            mergeSet = withRepoState(mergeSet, repo.repoKey, { mergeStatus: 'skipped' });
+            upsertMergeSet(mergeSet);
+            results.push({ repoKey: repo.repoKey, merged: true });
+            continue;
+          }
+        }
+
+        try {
+          await adapter.mergeReviewArtifact({
+            forge: repo.forge,
+            url: artifactUrl,
+            id: artifactId,
+            method: 'squash',
+            cwd: existsSync(workspacePath) ? workspacePath : repo.repoPath,
+          });
+          mergeSet = withRepoState(mergeSet, repo.repoKey, { mergeStatus: 'merged' });
+          upsertMergeSet(mergeSet);
+          results.push({ repoKey: repo.repoKey, merged: true });
+        } catch (err: any) {
+          results.push({ repoKey: repo.repoKey, merged: false, error: err.message });
+        }
+      }
+
+      const mergedCount = results.filter(r => r.merged).length;
+      if (mergedCount > 0) {
+        const { emitActivityEntry, emitActivityTts } = await import('../../../lib/activity-logger.js');
+        emitActivityEntry({
+          source: 'dashboard',
+          level: 'success',
+          message: `Merged ${issueId} on ${mergeSet.repos[0]?.forge ?? 'forge'}`,
+          issueId,
+        });
+        emitActivityTts({
+          utterance: `${issueId} has been merged`,
+          priority: 1,
+          issueId,
+        });
+      }
+
+      const allMerged = results.every(r => r.merged);
+      return jsonResponse(
+        { success: allMerged, results },
+        { status: allMerged ? 200 : 207 }
+      );
+    });
+  }))
+);
+
 // ─── Route: POST /api/issues/:issueId/approve ────────────────────────────
 
 const postWorkspaceApproveRoute = HttpRouter.add(
@@ -4552,6 +5212,9 @@ const postWorkspaceApproveRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const existingStatus = getReviewStatus(issueId);
     if (
@@ -4883,6 +5546,9 @@ const deleteWorkspacePendingRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     clearPendingOperation(issueId);
     return jsonResponse({ success: true });
   }))
@@ -4896,6 +5562,9 @@ const getWorkspaceTldrRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     return yield* Effect.promise(async () => {
         const projectRoot = process.cwd();
@@ -4939,6 +5608,9 @@ const postWorkspaceRefreshTokenRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const issueLower = issueId.toLowerCase();
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
@@ -4984,7 +5656,9 @@ const getMergeQueueRoute = HttpRouter.add(
 //   { type: 'task_queued', specialist, issueId }
 //   { type: 'reviewer_started', issueId, role, sessionName }
 //   { type: 'reviewer_completed', issueId, role }
+//   { type: 'reviewer_timed_out', issueId, role, sessionName, attempt, maxRetries, willRetry }
 //   { type: 'coordinator_started', issueId, sessionName }
+//   { type: 'coordinator_died', issueId, sessionName, reason }
 //     — Forwarded verbatim to the in-process handler.
 
 const postInternalPipelineNotifyRoute = HttpRouter.add(
@@ -5058,6 +5732,19 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
         notifyPipeline({ type: 'reviewer_completed', issueId, role });
         return jsonResponse({ ok: true });
       }
+      case 'reviewer_timed_out': {
+        const issueId = event.issueId as string | undefined;
+        const role = event.role as string | undefined;
+        const sessionName = event.sessionName as string | undefined;
+        const attempt = typeof event.attempt === 'number' ? event.attempt : undefined;
+        const maxRetries = typeof event.maxRetries === 'number' ? event.maxRetries : undefined;
+        const willRetry = typeof event.willRetry === 'boolean' ? event.willRetry : undefined;
+        if (!issueId || !role || !sessionName || attempt === undefined || maxRetries === undefined || willRetry === undefined) {
+          return jsonResponse({ ok: false, error: 'reviewer_timed_out requires issueId, role, sessionName, attempt, maxRetries, willRetry' }, 400);
+        }
+        notifyPipeline({ type: 'reviewer_timed_out', issueId, role, sessionName, attempt, maxRetries, willRetry });
+        return jsonResponse({ ok: true });
+      }
       case 'coordinator_started': {
         const issueId = event.issueId as string | undefined;
         const sessionName = event.sessionName as string | undefined;
@@ -5065,6 +5752,16 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
           return jsonResponse({ ok: false, error: 'coordinator_started requires issueId, sessionName' }, 400);
         }
         notifyPipeline({ type: 'coordinator_started', issueId, sessionName });
+        return jsonResponse({ ok: true });
+      }
+      case 'coordinator_died': {
+        const issueId = event.issueId as string | undefined;
+        const sessionName = event.sessionName as string | undefined;
+        const reason = event.reason as string | undefined;
+        if (!issueId || !sessionName || !reason) {
+          return jsonResponse({ ok: false, error: 'coordinator_died requires issueId, sessionName, reason' }, 400);
+        }
+        notifyPipeline({ type: 'coordinator_died', issueId, sessionName, reason });
         return jsonResponse({ ok: true });
       }
       default:
@@ -5098,6 +5795,8 @@ export const workspacesRouteLayer = Layer.mergeAll(
   postWorkspaceDeaconIgnoreRoute,
   postWorkspaceSyncMainRoute,
   postWorkspaceMergeRoute,
+  postForgeApproveRoute,
+  postForgeMergeRoute,
   postWorkspaceApproveRoute,
   deleteWorkspacePendingRoute,
   getWorkspaceTldrRoute,

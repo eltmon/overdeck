@@ -7,10 +7,10 @@
  * All file I/O uses fs/promises (no sync calls).
  */
 
-import { readdir, stat, watch, open } from 'node:fs/promises';
+import { readdir, readFile, stat, watch, open } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { ChatMessage, WorkLogEntry } from '@panctl/contracts';
+import type { ChatMessage, CompactBoundary, ProposedPlan, WorkLogEntry } from '@panctl/contracts';
 import { calculateCost, getPricing, type AIProvider } from '../../../lib/cost.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 
@@ -41,6 +41,14 @@ export interface ParseResult {
   lastSequence: number;
   /** File modification time in ms from the stat call made during parsing. */
   mtimeMs: number;
+  /** Active proposed plan (ExitPlanMode with no matching tool_result yet). */
+  proposedPlan?: ProposedPlan;
+  /** ExitPlanMode tool_use IDs (persist across incremental calls). */
+  planToolUseIds: Set<string>;
+  /** Compact boundary markers detected in the JSONL. */
+  compactBoundaries: CompactBoundary[];
+  /** Current permission mode (plan/default/bypassPermissions/acceptEdits). */
+  permissionMode?: string;
 }
 
 /** State carried across incremental parseConversationMessages calls. */
@@ -48,6 +56,12 @@ export interface ParseState {
   pendingToolUse: Map<string, WorkLogEntry>;
   unresolvedResults: Map<string, { resultText?: string; isError: boolean; rawContent: unknown }>;
   lastSequence: number;
+  planToolUseIds: Set<string>;
+  proposedPlan?: ProposedPlan;
+  /** Current permission mode (plan/default/bypassPermissions/acceptEdits). */
+  permissionMode?: string;
+  /** Map assistant message ID → file paths touched by file-modifying tool_use calls in that turn. */
+  fileEditsByAssistantId: Map<string, Array<{ tool: string; filePath: string }>>;
 }
 
 export interface ConversationActivitySummary {
@@ -212,6 +226,8 @@ export async function parseConversationMessages(
       unresolvedResults: priorState?.unresolvedResults ?? new Map(),
       lastSequence: priorState?.lastSequence ?? 0,
       mtimeMs: fileStats.mtimeMs,
+      permissionMode: priorState?.permissionMode,
+      fileEditsByAssistantId: new Map(),
     };
   }
 
@@ -280,6 +296,17 @@ export async function parseConversationMessages(
   const unresolvedResults = priorState?.unresolvedResults ?? new Map<string, { resultText?: string; isError: boolean; rawContent: unknown }>();
   // Monotonic sequence counter per JSONL line
   let sequence = priorState?.lastSequence ?? 0;
+  // Plan mode: track ExitPlanMode tool_use id → ProposedPlan
+  let proposedPlan: ProposedPlan | undefined = priorState?.proposedPlan;
+  // Set of ExitPlanMode tool_use IDs so we can match tool_results to plans
+  const planToolUseIds = priorState?.planToolUseIds ?? new Set<string>();
+  // Compact boundary markers
+  const compactBoundaries: CompactBoundary[] = [];
+  // Track permission mode across incremental parses
+  let permissionMode: string | undefined = priorState?.permissionMode;
+  // Track file-modifying tool_use calls per assistant message for diff computation
+  const fileEditsByAssistantId = new Map<string, Array<{ tool: string; filePath: string }>>();
+  const FILE_EDIT_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'MultiEdit']);
 
   for (const line of lines) {
     let entry: JsonlEntry;
@@ -318,7 +345,6 @@ export async function parseConversationMessages(
         // Collect tool_result blocks first (they complete pending WorkLogEntries)
         for (const block of rawContent as ContentBlock[]) {
           if (block.type === 'tool_result' && block.tool_use_id) {
-            const pending = pendingToolUse.get(block.tool_use_id);
             let resultText: string | undefined;
             if (typeof block.content === 'string') {
               resultText = block.content;
@@ -328,22 +354,36 @@ export async function parseConversationMessages(
                 .map(b => b.text)
                 .join('\n');
             }
-            if (pending) {
-              pendingToolUse.delete(block.tool_use_id);
-              workLog.push({
-                ...pending,
-                detail: block.is_error
-                  ? `Error: ${resultText ?? JSON.stringify(block.content)}`
-                  : pending.detail,
-                result: resultText,
-                tone: block.is_error ? 'error' : pending.tone,
-              });
+            if (planToolUseIds.has(block.tool_use_id)) {
+              if (proposedPlan && proposedPlan.id === block.tool_use_id) {
+                const text = resultText ?? '';
+                if (text.includes('approved')) {
+                  proposedPlan.status = 'approved';
+                  proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+                } else if (text.includes("doesn't want to proceed") || text.includes('does not want')) {
+                  proposedPlan.status = 'rejected';
+                  proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+                }
+              }
             } else {
-              unresolvedResults.set(block.tool_use_id, {
-                resultText,
-                isError: block.is_error ?? false,
-                rawContent: block.content,
-              });
+              const pending = pendingToolUse.get(block.tool_use_id);
+              if (pending) {
+                pendingToolUse.delete(block.tool_use_id);
+                workLog.push({
+                  ...pending,
+                  detail: block.is_error
+                    ? `Error: ${resultText ?? JSON.stringify(block.content)}`
+                    : pending.detail,
+                  result: resultText,
+                  tone: block.is_error ? 'error' : pending.tone,
+                });
+              } else {
+                unresolvedResults.set(block.tool_use_id, {
+                  resultText,
+                  isError: block.is_error ?? false,
+                  rawContent: block.content,
+                });
+              }
             }
           }
         }
@@ -399,29 +439,73 @@ export async function parseConversationMessages(
             sequence: lineSequence,
           });
         } else if (block.type === 'tool_use' && block.id) {
-          // WorkLogEntry for the tool call
-          const toolEntry: WorkLogEntry = {
-            id: block.id,
-            createdAt: entry.timestamp ?? new Date().toISOString(),
-            label: block.name ?? 'tool',
-            tone: 'tool',
-            toolTitle: block.name,
-            detail: block.input ? JSON.stringify(block.input) : undefined,
-            sequence: lineSequence,
-          };
-          const unresolved = unresolvedResults.get(block.id);
-          if (unresolved) {
-            unresolvedResults.delete(block.id);
-            workLog.push({
-              ...toolEntry,
-              detail: unresolved.isError
-                ? `Error: ${unresolved.resultText ?? JSON.stringify(unresolved.rawContent)}`
-                : toolEntry.detail,
-              result: unresolved.resultText,
-              tone: unresolved.isError ? 'error' : toolEntry.tone,
-            });
+          if (block.name === 'ExitPlanMode') {
+            const input = block.input as Record<string, unknown> | undefined;
+            const planText = typeof input?.plan === 'string' ? input.plan : '';
+            const planFilePath = typeof input?.planFilePath === 'string' ? input.planFilePath : undefined;
+            proposedPlan = {
+              id: block.id,
+              plan: planText,
+              planFilePath,
+              status: 'pending',
+              createdAt: entry.timestamp ?? new Date().toISOString(),
+            };
+            planToolUseIds.add(block.id);
+            const unresolved = unresolvedResults.get(block.id);
+            if (unresolved) {
+              unresolvedResults.delete(block.id);
+              const resultText = unresolved.resultText ?? '';
+              if (resultText.includes('approved')) {
+                proposedPlan.status = 'approved';
+                proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+              } else if (resultText.includes("doesn't want to proceed") || resultText.includes('does not want')) {
+                proposedPlan.status = 'rejected';
+                proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+              }
+            }
+          } else if (block.name === 'EnterPlanMode') {
+            // Skip — don't add to workLog
           } else {
-            pendingToolUse.set(block.id, toolEntry);
+            // Track file-modifying tools for diff computation
+            if (block.name && FILE_EDIT_TOOLS.has(block.name) && block.input) {
+              const input = block.input as Record<string, unknown>;
+              const filePath = typeof input.file_path === 'string' ? input.file_path : undefined;
+              if (filePath) {
+                const asstId = pendingAssistant?.id ?? entry.uuid ?? msg.id ?? `asst-${messages.length}`;
+                let edits = fileEditsByAssistantId.get(asstId);
+                if (!edits) {
+                  edits = [];
+                  fileEditsByAssistantId.set(asstId, edits);
+                }
+                if (!edits.some(e => e.filePath === filePath)) {
+                  edits.push({ tool: block.name!, filePath });
+                }
+              }
+            }
+            // WorkLogEntry for the tool call
+            const toolEntry: WorkLogEntry = {
+              id: block.id,
+              createdAt: entry.timestamp ?? new Date().toISOString(),
+              label: block.name ?? 'tool',
+              tone: 'tool',
+              toolTitle: block.name,
+              detail: block.input ? JSON.stringify(block.input) : undefined,
+              sequence: lineSequence,
+            };
+            const unresolved = unresolvedResults.get(block.id);
+            if (unresolved) {
+              unresolvedResults.delete(block.id);
+              workLog.push({
+                ...toolEntry,
+                detail: unresolved.isError
+                  ? `Error: ${unresolved.resultText ?? JSON.stringify(unresolved.rawContent)}`
+                  : toolEntry.detail,
+                result: unresolved.resultText,
+                tone: unresolved.isError ? 'error' : toolEntry.tone,
+              });
+            } else {
+              pendingToolUse.set(block.id, toolEntry);
+            }
           }
         }
         blockIndex++;
@@ -450,6 +534,120 @@ export async function parseConversationMessages(
           sequence: lineSequence,
         };
       }
+    } else if (entry.type === 'system' && (entry as Record<string, unknown>).subtype === 'compact_boundary') {
+      const meta = (entry as Record<string, unknown>).compactMetadata as Record<string, unknown> | undefined;
+      compactBoundaries.push({
+        id: (entry as Record<string, unknown>).uuid as string ?? `compact-${lineSequence}`,
+        timestamp: entry.timestamp ?? new Date().toISOString(),
+        trigger: typeof meta?.trigger === 'string' ? meta.trigger : undefined,
+        preTokens: typeof meta?.preTokens === 'number' ? meta.preTokens : undefined,
+        model: typeof meta?.model === 'string' ? meta.model : undefined,
+      });
+    } else if (entry.type === 'permission-mode') {
+      // Track permission mode transitions. Exiting 'plan' mode is an approval
+      // signal when no explicit plan_mode_exit attachment was emitted.
+      const newMode = (entry as Record<string, unknown>).permissionMode as string | undefined;
+      if (newMode && permissionMode === 'plan' && newMode !== 'plan') {
+        if (proposedPlan && proposedPlan.status === 'pending') {
+          proposedPlan.status = 'approved';
+          proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+        }
+      }
+      permissionMode = newMode;
+    } else if (entry.type === 'attachment') {
+      // Claude Code 2.1.121+ attachment-based plan mode protocol.
+      // The agent writes the plan to ~/.claude/plans/<slug>.md and the runtime
+      // emits a `plan_file_reference` attachment with the full content. Approval
+      // is signalled by a subsequent `plan_mode_exit` attachment.
+      const attachment = (entry as Record<string, unknown>).attachment as Record<string, unknown> | undefined;
+      if (attachment?.type === 'plan_file_reference') {
+        const planContent = typeof attachment.planContent === 'string' ? attachment.planContent : '';
+        if (planContent) {
+          const planFilePath = typeof attachment.planFilePath === 'string' ? attachment.planFilePath : undefined;
+          const id = ((entry as Record<string, unknown>).uuid as string | undefined) ?? `plan-${lineSequence}`;
+          // If permission mode has already exited 'plan', auto-approve since the
+          // user already approved before this attachment arrived (or no exit was emitted).
+          const alreadyApproved = permissionMode !== 'plan' && permissionMode !== undefined;
+          proposedPlan = {
+            id,
+            plan: planContent,
+            planFilePath,
+            status: alreadyApproved ? 'approved' : 'pending',
+            createdAt: entry.timestamp ?? new Date().toISOString(),
+            ...(alreadyApproved ? { resolvedAt: entry.timestamp ?? new Date().toISOString() } : {}),
+          };
+        }
+      } else if (attachment?.type === 'plan_mode_exit') {
+        if (proposedPlan && proposedPlan.status === 'pending') {
+          proposedPlan.status = 'approved';
+          proposedPlan.resolvedAt = entry.timestamp ?? new Date().toISOString();
+        }
+      } else if (attachment?.type === 'plan_mode') {
+        // Claude Code plan_mode attachment: agent called EnterPlanMode, plan written
+        // to an external file. Always start as 'pending' — the permission-mode
+        // transition handler (plan → other) will mark it approved when that fires.
+        const planFilePath = typeof attachment.planFilePath === 'string' ? attachment.planFilePath : undefined;
+        if (planFilePath) {
+          try {
+            const planContent = (await readFile(planFilePath, 'utf-8')).trim();
+            if (planContent) {
+              const id = ((entry as Record<string, unknown>).uuid as string | undefined) ?? `plan-${lineSequence}`;
+              proposedPlan = {
+                id,
+                plan: planContent,
+                planFilePath,
+                status: 'pending',
+                createdAt: entry.timestamp ?? new Date().toISOString(),
+              };
+            }
+          } catch {
+            // Plan file not yet written — will show once the agent finishes planning
+          }
+        }
+      } else if (attachment?.type === 'queued_command' && attachment?.commandMode === 'prompt') {
+        // User message sent as an interrupt while Claude was running — stored as
+        // queued_command instead of a regular user entry. Render it in the timeline.
+        const prompt = attachment.prompt;
+        let text = '';
+        if (typeof prompt === 'string') {
+          text = prompt;
+        } else if (Array.isArray(prompt)) {
+          text = (prompt as Array<{ type?: string; text?: string }>)
+            .filter((b) => b.type === 'text' && b.text)
+            .map((b) => b.text)
+            .join('\n');
+        }
+        if (text && !isSystemInjection(text)) {
+          if (pendingAssistant) {
+            messages.push(pendingAssistant);
+            pendingAssistant = null;
+          }
+          const ts = entry.timestamp ?? new Date().toISOString();
+          lastUserTimestamp = ts;
+          messages.push({
+            id: ((entry as Record<string, unknown>).uuid as string | undefined) ?? `queued-${lineSequence}`,
+            role: 'user',
+            text,
+            createdAt: ts,
+            sequence: lineSequence,
+          });
+        }
+      } else if (attachment?.type === 'command_permissions') {
+        // Session start / resume record — contains the allowedTools list.
+        // Render as a system message so the user can see what permissions are in effect.
+        const rawTools = Array.isArray(attachment.allowedTools)
+          ? (attachment.allowedTools as unknown[]).filter((t) => typeof t === 'string') as string[]
+          : [];
+        const tools = rawTools.length > 0 ? rawTools.join(', ') : 'None';
+        const ts = entry.timestamp ?? new Date().toISOString();
+        messages.push({
+          id: ((entry as Record<string, unknown>).uuid as string | undefined) ?? `perm-${lineSequence}`,
+          role: 'system',
+          text: tools,
+          createdAt: ts,
+          sequence: lineSequence,
+        });
+      }
     }
   }
 
@@ -462,8 +660,10 @@ export async function parseConversationMessages(
   // Only flush on non-incremental parses; incremental callers pass priorState
   // and will receive pendingToolUse back for the next call.
   if (!priorState) {
-    for (const [, entry] of pendingToolUse) {
-      workLog.push(entry);
+    for (const [id, entry] of pendingToolUse) {
+      if (!planToolUseIds.has(id)) {
+        workLog.push(entry);
+      }
     }
     pendingToolUse.clear();
   }
@@ -508,6 +708,11 @@ export async function parseConversationMessages(
     unresolvedResults,
     lastSequence: sequence,
     mtimeMs: fileStats.mtimeMs,
+    proposedPlan,
+    planToolUseIds,
+    compactBoundaries,
+    permissionMode,
+    fileEditsByAssistantId,
   };
 }
 
@@ -807,6 +1012,9 @@ export function watchConversation(
             pendingToolUse: fullResult.pendingToolUse,
             unresolvedResults: fullResult.unresolvedResults,
             lastSequence: fullResult.lastSequence,
+            planToolUseIds: fullResult.planToolUseIds,
+            proposedPlan: fullResult.proposedPlan,
+            permissionMode: fullResult.permissionMode,
           };
           // Include in-flight tools so the live view shows pending work
           const workLog = [...fullResult.workLog, ...fullResult.pendingToolUse.values()];
@@ -818,6 +1026,8 @@ export function watchConversation(
           pendingToolUse: result.pendingToolUse,
           unresolvedResults: result.unresolvedResults,
           lastSequence: result.lastSequence,
+          planToolUseIds: result.planToolUseIds,
+          proposedPlan: result.proposedPlan,
         };
         // Include in-flight tools so the live view shows pending work
         const workLog = [...result.workLog, ...result.pendingToolUse.values()];

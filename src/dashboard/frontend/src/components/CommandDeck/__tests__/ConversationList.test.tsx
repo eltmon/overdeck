@@ -6,6 +6,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConversationList, updateConversationTitle } from '../ConversationList';
+import { DialogProvider } from '../../DialogProvider';
+
+vi.mock('../../DialogProvider', () => ({
+  DialogProvider: ({ children }: { children: React.ReactNode }) => children,
+  useConfirm: () => vi.fn().mockResolvedValue(true),
+  useAlert: () => vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('lucide-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('lucide-react')>();
@@ -57,6 +64,14 @@ const mockConversation = {
   title: 'My Test Conversation',
 };
 
+const secondMockConversation = {
+  ...mockConversation,
+  id: 2,
+  name: 'second-conv',
+  tmuxSession: 'test-session-2',
+  title: 'Second Test Conversation',
+};
+
 function makeClient() {
   const client = new QueryClient({
     defaultOptions: {
@@ -71,12 +86,14 @@ function makeClient() {
 function renderList(props?: { selectedConversation?: string | null }) {
   const client = makeClient();
   render(
-    <QueryClientProvider client={client}>
-      <ConversationList
-        selectedConversation={props?.selectedConversation ?? null}
-        onSelectConversation={() => {}}
-      />
-    </QueryClientProvider>,
+    <DialogProvider>
+      <QueryClientProvider client={client}>
+        <ConversationList
+          selectedConversation={props?.selectedConversation ?? null}
+          onSelectConversation={() => {}}
+        />
+      </QueryClientProvider>
+    </DialogProvider>,
   );
   return client;
 }
@@ -139,9 +156,11 @@ describe('ConversationList rename flow', () => {
     const client = makeClient();
     client.setQueryData(['conversations'], [{ ...mockConversation, sessionAlive: true, isWorking: true }]);
     render(
-      <QueryClientProvider client={client}>
-        <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
-      </QueryClientProvider>,
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
     );
     expect(screen.getByTestId('conversation-spinner')).toBeInTheDocument();
     expect(screen.queryByTestId('conversation-dot')).not.toBeInTheDocument();
@@ -151,9 +170,11 @@ describe('ConversationList rename flow', () => {
     const client = makeClient();
     client.setQueryData(['conversations'], [{ ...mockConversation, sessionAlive: true, isWorking: false }]);
     render(
-      <QueryClientProvider client={client}>
-        <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
-      </QueryClientProvider>,
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
     );
     expect(screen.getByTestId('conversation-dot')).toBeInTheDocument();
     expect(screen.queryByTestId('conversation-spinner')).not.toBeInTheDocument();
@@ -311,5 +332,47 @@ describe('ConversationList rename flow', () => {
       );
       expect(patchCalls).toHaveLength(2);
     });
+  });
+
+  it('allows favoriting another conversation while one favorite request is pending', async () => {
+    const pendingResponses: Array<() => void> = [];
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => new Promise((resolve) => {
+      pendingResponses.push(() => resolve({ ok: true }));
+    })));
+
+    const client = makeClient();
+    client.setQueryData(['conversations'], [mockConversation, secondMockConversation]);
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+
+    fireEvent.click(screen.getByLabelText('Favorite My Test Conversation'));
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByLabelText('Favorite Second Test Conversation'));
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(2));
+
+    pendingResponses.forEach((resolve) => resolve());
+  });
+
+  it('ignores repeated favorite clicks for the same pending conversation', async () => {
+    let resolveResponse: (() => void) | undefined;
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => new Promise((resolve) => {
+      resolveResponse = () => resolve({ ok: true });
+    })));
+
+    renderList();
+
+    fireEvent.click(screen.getByLabelText('Favorite My Test Conversation'));
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByLabelText('Unfavorite My Test Conversation'));
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+
+    resolveResponse?.();
   });
 });

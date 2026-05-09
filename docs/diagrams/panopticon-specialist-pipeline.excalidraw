@@ -1,0 +1,878 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "mcp-excalidraw-server",
+  "elements": [
+    {
+      "id": "title",
+      "type": "text",
+      "x": 150,
+      "y": 10,
+      "width": 600,
+      "height": 40,
+      "text": "Panopticon Specialist Pipeline",
+      "fontSize": 32,
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "work-done",
+      "type": "rectangle",
+      "x": 310,
+      "y": 80,
+      "width": 220,
+      "height": 55,
+      "backgroundColor": "#a5d8ff",
+      "label": {
+        "text": "Work Agent Done"
+      },
+      "roundness": {
+        "type": 3
+      },
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "verify",
+      "type": "rectangle",
+      "x": 260,
+      "y": 185,
+      "width": 320,
+      "height": 60,
+      "backgroundColor": "#ffec99",
+      "label": {
+        "text": "Verification Gate"
+      },
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "verify-sub",
+      "type": "text",
+      "x": 310,
+      "y": 250,
+      "width": 220,
+      "height": 22,
+      "text": "typecheck  /  lint  /  test",
+      "fontSize": 14,
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "verify-sha",
+      "type": "text",
+      "x": 590,
+      "y": 195,
+      "width": 280,
+      "height": 22,
+      "text": "snapshot HEAD → lastVerifiedCommit",
+      "fontSize": 13,
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "review",
+      "type": "rectangle",
+      "x": 280,
+      "y": 320,
+      "width": 280,
+      "height": 60,
+      "backgroundColor": "#d0bfff",
+      "label": {
+        "text": "Review (4 parallel)"
+      },
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "review-sha",
+      "type": "text",
+      "x": 590,
+      "y": 330,
+      "width": 290,
+      "height": 22,
+      "text": "snapshot HEAD → reviewedAtCommit",
+      "fontSize": 13,
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "drift",
+      "type": "diamond",
+      "x": 345,
+      "y": 440,
+      "width": 150,
+      "height": 100,
+      "backgroundColor": "#fff9db",
+      "label": {
+        "text": "Code\ndrift?"
+      },
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "lbl-no",
+      "type": "text",
+      "x": 200,
+      "y": 458,
+      "width": 50,
+      "height": 22,
+      "text": "No",
+      "fontSize": 16,
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "lbl-yes",
+      "type": "text",
+      "x": 585,
+      "y": 458,
+      "width": 50,
+      "height": 22,
+      "text": "Yes",
+      "fontSize": 16,
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "skip",
+      "type": "rectangle",
+      "x": 40,
+      "y": 465,
+      "width": 160,
+      "height": 50,
+      "backgroundColor": "#b2f2bb",
+      "label": {
+        "text": "Skip Tests"
+      },
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "skip-note",
+      "type": "text",
+      "x": 25,
+      "y": 520,
+      "width": 200,
+      "height": 30,
+      "text": "No code change since\nverification gate",
+      "fontSize": 12,
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "test-agent",
+      "type": "rectangle",
+      "x": 640,
+      "y": 465,
+      "width": 180,
+      "height": 50,
+      "backgroundColor": "#a5d8ff",
+      "label": {
+        "text": "Test Agent"
+      },
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "test-note",
+      "type": "text",
+      "x": 630,
+      "y": 520,
+      "width": 200,
+      "height": 30,
+      "text": "Drift detected — run\nfull test suite",
+      "fontSize": 12,
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "ready",
+      "type": "rectangle",
+      "x": 290,
+      "y": 600,
+      "width": 260,
+      "height": 55,
+      "backgroundColor": "#b2f2bb",
+      "label": {
+        "text": "Ready for Merge"
+      },
+      "roundness": {
+        "type": 3
+      },
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "human",
+      "type": "rectangle",
+      "x": 290,
+      "y": 710,
+      "width": 260,
+      "height": 55,
+      "backgroundColor": "#ffec99",
+      "strokeColor": "#e67700",
+      "strokeWidth": 2,
+      "label": {
+        "text": "Human Clicks Merge"
+      },
+      "roundness": {
+        "type": 3
+      },
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "zone",
+      "type": "rectangle",
+      "x": 20,
+      "y": 820,
+      "width": 1080,
+      "height": 260,
+      "backgroundColor": "#f1f5f9",
+      "strokeColor": "#94a3b8",
+      "strokeStyle": "dashed",
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "zone-title",
+      "type": "text",
+      "x": 40,
+      "y": 830,
+      "width": 400,
+      "height": 30,
+      "text": "triggerMerge() Pipeline",
+      "fontSize": 22,
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "m1",
+      "type": "rectangle",
+      "x": 40,
+      "y": 880,
+      "width": 200,
+      "height": 50,
+      "backgroundColor": "#e7f5ff",
+      "label": {
+        "text": "1. Queued"
+      },
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "m2",
+      "type": "rectangle",
+      "x": 290,
+      "y": 880,
+      "width": 210,
+      "height": 50,
+      "backgroundColor": "#e7f5ff",
+      "label": {
+        "text": "2. Validating PR"
+      },
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "m3",
+      "type": "rectangle",
+      "x": 550,
+      "y": 880,
+      "width": 200,
+      "height": 50,
+      "backgroundColor": "#e7f5ff",
+      "label": {
+        "text": "3. Rebasing"
+      },
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "m4",
+      "type": "rectangle",
+      "x": 800,
+      "y": 880,
+      "width": 270,
+      "height": 50,
+      "backgroundColor": "#e7f5ff",
+      "label": {
+        "text": "4. Stripping .planning/"
+      },
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "m5",
+      "type": "rectangle",
+      "x": 40,
+      "y": 975,
+      "width": 200,
+      "height": 50,
+      "backgroundColor": "#e7f5ff",
+      "label": {
+        "text": "5. Verifying"
+      },
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "m6",
+      "type": "rectangle",
+      "x": 290,
+      "y": 975,
+      "width": 230,
+      "height": 50,
+      "backgroundColor": "#e7f5ff",
+      "label": {
+        "text": "6. Reporting Statuses"
+      },
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "m7",
+      "type": "rectangle",
+      "x": 570,
+      "y": 975,
+      "width": 210,
+      "height": 50,
+      "backgroundColor": "#e7f5ff",
+      "label": {
+        "text": "7. Squash Merge"
+      },
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "m8",
+      "type": "rectangle",
+      "x": 830,
+      "y": 975,
+      "width": 240,
+      "height": 50,
+      "backgroundColor": "#d3f9d8",
+      "label": {
+        "text": "8. Post-merge Cleanup"
+      },
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "failed",
+      "type": "rectangle",
+      "x": 920,
+      "y": 620,
+      "width": 150,
+      "height": 50,
+      "backgroundColor": "#ffc9c9",
+      "strokeColor": "#c92a2a",
+      "strokeWidth": 2,
+      "label": {
+        "text": "Failed"
+      },
+      "roundness": {
+        "type": 3
+      },
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "failed-note",
+      "type": "text",
+      "x": 895,
+      "y": 675,
+      "width": 200,
+      "height": 22,
+      "text": "Any step can fail →\nmergeNotes has reason",
+      "fontSize": 12,
+      "createdAt": "2026-05-04T03:01:47.957Z",
+      "updatedAt": "2026-05-04T03:01:47.957Z",
+      "version": 1
+    },
+    {
+      "id": "a-work-verify",
+      "type": "arrow",
+      "x": 420,
+      "y": 143,
+      "strokeWidth": 2,
+      "start": {
+        "id": "work-done"
+      },
+      "end": {
+        "id": "verify"
+      },
+      "createdAt": "2026-05-04T03:02:02.320Z",
+      "updatedAt": "2026-05-04T03:02:02.320Z",
+      "version": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          34
+        ]
+      ]
+    },
+    {
+      "id": "a-verify-review",
+      "type": "arrow",
+      "x": 420,
+      "y": 253,
+      "strokeWidth": 2,
+      "start": {
+        "id": "verify"
+      },
+      "end": {
+        "id": "review"
+      },
+      "createdAt": "2026-05-04T03:02:02.320Z",
+      "updatedAt": "2026-05-04T03:02:02.320Z",
+      "version": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          59
+        ]
+      ]
+    },
+    {
+      "id": "a-review-drift",
+      "type": "arrow",
+      "x": 420,
+      "y": 388,
+      "strokeWidth": 2,
+      "start": {
+        "id": "review"
+      },
+      "end": {
+        "id": "drift"
+      },
+      "createdAt": "2026-05-04T03:02:02.320Z",
+      "updatedAt": "2026-05-04T03:02:02.320Z",
+      "version": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          44
+        ]
+      ]
+    },
+    {
+      "id": "a-drift-skip",
+      "type": "arrow",
+      "x": 337,
+      "y": 490,
+      "strokeColor": "#2f9e44",
+      "strokeWidth": 2,
+      "start": {
+        "id": "drift"
+      },
+      "end": {
+        "id": "skip"
+      },
+      "createdAt": "2026-05-04T03:02:02.320Z",
+      "updatedAt": "2026-05-04T03:02:02.320Z",
+      "version": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -129,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "a-drift-test",
+      "type": "arrow",
+      "x": 503,
+      "y": 490,
+      "strokeWidth": 2,
+      "start": {
+        "id": "drift"
+      },
+      "end": {
+        "id": "test-agent"
+      },
+      "createdAt": "2026-05-04T03:02:02.320Z",
+      "updatedAt": "2026-05-04T03:02:02.320Z",
+      "version": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          129,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "a-skip-ready",
+      "type": "arrow",
+      "x": 181.81797312860883,
+      "y": 518.3332376839458,
+      "strokeColor": "#2f9e44",
+      "strokeWidth": 2,
+      "start": {
+        "id": "skip"
+      },
+      "end": {
+        "id": "ready"
+      },
+      "createdAt": "2026-05-04T03:02:02.320Z",
+      "updatedAt": "2026-05-04T03:02:02.320Z",
+      "version": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          170.90950828823688,
+          78.33352463210849
+        ]
+      ]
+    },
+    {
+      "id": "a-test-ready",
+      "type": "arrow",
+      "x": 666.3234413290957,
+      "y": 518.2436348943527,
+      "strokeWidth": 2,
+      "start": {
+        "id": "test-agent"
+      },
+      "end": {
+        "id": "ready"
+      },
+      "createdAt": "2026-05-04T03:02:02.320Z",
+      "updatedAt": "2026-05-04T03:02:02.320Z",
+      "version": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -177.0105190218277,
+          78.51273021129464
+        ]
+      ]
+    },
+    {
+      "id": "a-ready-human",
+      "type": "arrow",
+      "x": 420,
+      "y": 663,
+      "strokeWidth": 2,
+      "start": {
+        "id": "ready"
+      },
+      "end": {
+        "id": "human"
+      },
+      "createdAt": "2026-05-04T03:02:02.320Z",
+      "updatedAt": "2026-05-04T03:02:02.320Z",
+      "version": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          0,
+          39
+        ]
+      ]
+    },
+    {
+      "id": "a-human-m1",
+      "type": "arrow",
+      "x": 367.16450463977264,
+      "y": 769.1069481172789,
+      "strokeColor": "#e67700",
+      "strokeWidth": 2,
+      "start": {
+        "id": "human"
+      },
+      "end": {
+        "id": "m1"
+      },
+      "createdAt": "2026-05-04T03:02:02.320Z",
+      "updatedAt": "2026-05-04T03:02:02.320Z",
+      "version": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -178.50811375715725,
+          106.78610376544225
+        ]
+      ]
+    },
+    {
+      "id": "a-m1-m2",
+      "type": "arrow",
+      "x": 248,
+      "y": 905,
+      "strokeColor": "#1971c2",
+      "strokeWidth": 2,
+      "start": {
+        "id": "m1"
+      },
+      "end": {
+        "id": "m2"
+      },
+      "createdAt": "2026-05-04T03:02:02.320Z",
+      "updatedAt": "2026-05-04T03:02:02.320Z",
+      "version": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          34,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "a-m2-m3",
+      "type": "arrow",
+      "x": 508,
+      "y": 905,
+      "strokeColor": "#1971c2",
+      "strokeWidth": 2,
+      "start": {
+        "id": "m2"
+      },
+      "end": {
+        "id": "m3"
+      },
+      "createdAt": "2026-05-04T03:02:02.320Z",
+      "updatedAt": "2026-05-04T03:02:02.320Z",
+      "version": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          34,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "a-m3-m4",
+      "type": "arrow",
+      "x": 758,
+      "y": 905,
+      "strokeColor": "#1971c2",
+      "strokeWidth": 2,
+      "start": {
+        "id": "m3"
+      },
+      "end": {
+        "id": "m4"
+      },
+      "createdAt": "2026-05-04T03:02:02.320Z",
+      "updatedAt": "2026-05-04T03:02:02.320Z",
+      "version": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          34,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "a-m4-m5",
+      "type": "arrow",
+      "x": 792.0565134708476,
+      "y": 922.0812971324145,
+      "strokeColor": "#1971c2",
+      "strokeWidth": 2,
+      "start": {
+        "id": "m4"
+      },
+      "end": {
+        "id": "m5"
+      },
+      "createdAt": "2026-05-04T03:02:02.320Z",
+      "updatedAt": "2026-05-04T03:02:02.320Z",
+      "version": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          -544.1130269416951,
+          65.01979567227795
+        ]
+      ]
+    },
+    {
+      "id": "a-m5-m6",
+      "type": "arrow",
+      "x": 248,
+      "y": 1000,
+      "strokeColor": "#1971c2",
+      "strokeWidth": 2,
+      "start": {
+        "id": "m5"
+      },
+      "end": {
+        "id": "m6"
+      },
+      "createdAt": "2026-05-04T03:02:02.320Z",
+      "updatedAt": "2026-05-04T03:02:02.320Z",
+      "version": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          34,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "a-m6-m7",
+      "type": "arrow",
+      "x": 528,
+      "y": 1000,
+      "strokeColor": "#1971c2",
+      "strokeWidth": 2,
+      "start": {
+        "id": "m6"
+      },
+      "end": {
+        "id": "m7"
+      },
+      "createdAt": "2026-05-04T03:02:02.320Z",
+      "updatedAt": "2026-05-04T03:02:02.320Z",
+      "version": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          34,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "a-m7-m8",
+      "type": "arrow",
+      "x": 788,
+      "y": 1000,
+      "strokeColor": "#1971c2",
+      "strokeWidth": 2,
+      "start": {
+        "id": "m7"
+      },
+      "end": {
+        "id": "m8"
+      },
+      "createdAt": "2026-05-04T03:02:02.320Z",
+      "updatedAt": "2026-05-04T03:02:02.320Z",
+      "version": 1,
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          34,
+          0
+        ]
+      ]
+    },
+    {
+      "id": "a-m-fail",
+      "type": "arrow",
+      "x": 570,
+      "y": 905,
+      "strokeColor": "#c92a2a",
+      "strokeWidth": 1,
+      "strokeStyle": "dashed",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          350,
+          0
+        ],
+        [
+          350,
+          -240
+        ]
+      ],
+      "createdAt": "2026-05-04T03:02:02.320Z",
+      "updatedAt": "2026-05-04T03:02:02.320Z",
+      "version": 1
+    }
+  ],
+  "appState": {
+    "viewBackgroundColor": "#ffffff",
+    "gridSize": null
+  }
+}

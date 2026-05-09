@@ -270,6 +270,11 @@ export class LinearTracker implements IssueTracker {
     });
   }
 
+  async getChildIssues(_parentId: string): Promise<Issue[]> {
+    // Linear does not expose parent-child issue hierarchy via its public API
+    return [];
+  }
+
   private async normalizeIssue(linearIssue: any): Promise<Issue> {
     const state = await linearIssue.state;
     const assignee = await linearIssue.assignee;

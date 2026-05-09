@@ -1,5 +1,5 @@
-import { useRef, useEffect } from 'react';
-import { Box, Database, Loader2, RefreshCw, Square, Play } from 'lucide-react';
+import { useRef, useEffect, useState } from 'react';
+import { Box, Database, Loader2, RefreshCw, Square, Play, Check, X, Activity } from 'lucide-react';
 import type { ContainerStatus, ContainerMenuState } from './types';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
 
@@ -35,6 +35,7 @@ export function ContainerSection({
   confirm,
 }: ContainerSectionProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [expandedContainer, setExpandedContainer] = useState<string | null>(null);
 
   useEffect(() => {
     if (!containerMenu) return;
@@ -59,24 +60,66 @@ export function ContainerSection({
             const isStarting = (startPending || containersStarting) && !status.running && !status.status?.startsWith('exited');
             const isControlling = containerControlPending && controllingContainer === name;
             const isFailed = status.status?.startsWith('exited') && !status.running;
+            const serviceHealth = status.running ? status.health : undefined;
+            const chipStyle =
+              isFailed ? 'badge-bg-destructive text-destructive' :
+              isStarting || isControlling ? 'badge-bg-warning text-warning animate-pulse' :
+              !status.running ? 'bg-card text-muted-foreground' :
+              serviceHealth === 'healthy' ? 'badge-bg-success text-success' :
+              serviceHealth === 'unhealthy' ? 'badge-bg-destructive text-destructive' :
+              serviceHealth === 'starting' ? 'badge-bg-warning text-warning animate-pulse' :
+              serviceHealth === 'unknown' ? 'bg-card text-muted-foreground' :
+              'badge-bg-success text-success';
+            const icon =
+              isStarting || isControlling || serviceHealth === 'starting' ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> :
+              serviceHealth === 'healthy' ? <Check className="w-2.5 h-2.5" /> :
+              serviceHealth === 'unhealthy' ? <X className="w-2.5 h-2.5" /> :
+              name === 'postgres' || name === 'redis' ? <Database className="w-2.5 h-2.5" /> :
+              <Box className="w-2.5 h-2.5" />;
+            const title = [
+              name,
+              status.running && status.uptime ? `Up ${status.uptime}` : null,
+              serviceHealth ? `Health: ${serviceHealth}` : null,
+              status.lastProbeAt ? `Last probe: ${new Date(status.lastProbeAt).toLocaleString()}` : null,
+              status.lastFailureReason ? `Last failure: ${status.lastFailureReason}` : null,
+              status.ports?.length ? `Ports: ${status.ports.join(', ')}` : null,
+            ].filter(Boolean).join(' • ');
             return (
-              <span
-                key={name}
-                onContextMenu={(e) => onContainerContextMenu(e, name, status.running)}
-                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] cursor-context-menu select-none ${
-                  status.running ? 'badge-bg-success text-success' :
-                  isFailed ? 'badge-bg-destructive text-destructive' :
-                  isStarting || isControlling ? 'badge-bg-warning text-warning animate-pulse' :
-                  'bg-card text-muted-foreground'
-                }`}
-                title="Right-click for options"
-              >
-                {isStarting || isControlling ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> :
-                  name === 'postgres' || name === 'redis' ? <Database className="w-2.5 h-2.5" /> : <Box className="w-2.5 h-2.5" />}
-                {name}
-                {status.running && status.uptime && <span className="ml-1 text-muted-foreground">{status.uptime}</span>}
-                {isFailed && <span className="text-destructive ml-1">{status.status}</span>}
-              </span>
+              <div key={name} className="flex flex-col gap-1">
+                <span
+                  onContextMenu={(e) => onContainerContextMenu(e, name, status.running)}
+                  onClick={() => setExpandedContainer(expandedContainer === name ? null : name)}
+                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] cursor-pointer select-none ${chipStyle}`}
+                  title={title || 'Right-click for options'}
+                >
+                  {icon}
+                  {name}
+                  {status.running && status.uptime && <span className="ml-1 text-muted-foreground">{status.uptime}</span>}
+                  {isFailed && <span className="text-destructive ml-1">{status.status}</span>}
+                </span>
+                {expandedContainer === name && (
+                  <div className="px-2 py-1.5 rounded bg-card border border-border text-[10px] text-muted-foreground space-y-0.5 min-w-[180px]">
+                    {status.ports && status.ports.length > 0 && (
+                      <div className="flex items-center gap-1">
+                        <Activity className="w-2.5 h-2.5" />
+                        <span>Ports: {status.ports.join(', ')}</span>
+                      </div>
+                    )}
+                    {status.lastProbeAt && (
+                      <div>Last probe: {(() => {
+                        const d = new Date(status.lastProbeAt);
+                        return Number.isNaN(d.getTime()) ? 'Invalid Date' : d.toLocaleString();
+                      })()}</div>
+                    )}
+                    {status.lastFailureReason && (
+                      <div className="text-destructive">Last failure: {status.lastFailureReason}</div>
+                    )}
+                    {!status.ports?.length && !status.lastProbeAt && !status.lastFailureReason && (
+                      <div>No probe data available</div>
+                    )}
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

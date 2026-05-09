@@ -63,6 +63,11 @@ export function IssueWorkbench({
     return sessions.find((s) => s.sessionId === selectedSessionId) ?? null;
   }, [sessions, selectedSessionId]);
 
+  const reviewers = useMemo<readonly SessionNodeType[]>(() => {
+    if (selectedSession?.type !== 'review') return [];
+    return sessions.filter((s) => s.type === 'reviewer');
+  }, [sessions, selectedSession]);
+
   const isAgentSelected = !!selectedSession;
 
   const readTabFromUrl = useCallback((): OverviewTab => {
@@ -138,7 +143,7 @@ export function IssueWorkbench({
       {isAgentSelected ? (
         <>
           <ZoneB session={selectedSession} issueId={issueId} />
-          <ZoneCConversation session={selectedSession} issueId={issueId} />
+          <ZoneCConversation key={selectedSession.sessionId} session={selectedSession} issueId={issueId} reviewers={reviewers} />
         </>
       ) : (
         <>
@@ -146,6 +151,8 @@ export function IssueWorkbench({
             issueId={issueId}
             activeTab={activeTab}
             onTabChange={handleSwitchTab}
+            agent={agent}
+            issue={issue}
           />
           <IssueComposer issueId={issueId} sessions={sessions} />
         </>

@@ -12,14 +12,23 @@
 import type {
   AgentRuntimeSnapshot,
   AgentSnapshot,
+  ChannelPermissionRequestSnapshot,
   DashboardSnapshot,
   DomainEvent,
   ResourceStats,
   ReviewStatusSnapshot,
   SpecialistSnapshot,
+  TurnDiffSummary,
 } from './index'
 
 // ─── Read model state shape ──────────────────────────────────────────────────
+
+export interface ResolvedChannelPermissionDecision {
+  requestId: string
+  agentId: string
+  issueId: string
+  behavior: 'allow' | 'deny'
+}
 
 export interface ReadModelState {
   sequence: number
@@ -39,7 +48,16 @@ export interface ReadModelState {
   detailedActivity: unknown[]
   ttsActivity: unknown[]
   shadowInferenceByIssueId: Record<string, string>
+  turnDiffSummariesByAgentId: Record<string, TurnDiffSummary[]>
+  channelPermissionRequestsById: Record<string, ChannelPermissionRequestSnapshot>
+  channelPermissionRequestIdsByAgentId: Record<string, string[]>
+  resolvedChannelPermissionDecisionsById: Record<string, ResolvedChannelPermissionDecision>
+  resolvedChannelPermissionDecisionIdsByAgentId: Record<string, string[]>
   dashboardLifecycle: DashboardLifecycleState
+  /** Conversation names currently undergoing Panopticon-native compaction. */
+  conversationsCompactingByName: Record<string, boolean>
+  /** Conversation names currently waiting for user permission (PermissionRequest hook). */
+  conversationsAwaitingPermissionByName: Record<string, boolean>
 }
 
 export interface DashboardLifecycleState {
@@ -66,6 +84,13 @@ export const INITIAL_READ_MODEL_STATE: ReadModelState = {
   detailedActivity: [],
   ttsActivity: [],
   shadowInferenceByIssueId: {},
+  turnDiffSummariesByAgentId: {},
+  channelPermissionRequestsById: {},
+  channelPermissionRequestIdsByAgentId: {},
+  resolvedChannelPermissionDecisionsById: {},
+  resolvedChannelPermissionDecisionIdsByAgentId: {},
+  conversationsCompactingByName: {},
+  conversationsAwaitingPermissionByName: {},
   dashboardLifecycle: {
     active: false,
     reason: null,
@@ -130,12 +155,25 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     reviewStatusByIssueId[rs.issueId] = rs
   }
 
+  const channelPermissionRequestsById: Record<string, ChannelPermissionRequestSnapshot> = {}
+  const channelPermissionRequestIdsByAgentId: Record<string, string[]> = {}
+  for (const request of snapshot.channelPermissionRequests ?? []) {
+    channelPermissionRequestsById[request.requestId] = request
+    const existing = channelPermissionRequestIdsByAgentId[request.agentId] ?? []
+    channelPermissionRequestIdsByAgentId[request.agentId] = [...existing, request.requestId]
+  }
+
   return {
     ...state,
     sequence: snapshot.sequence,
     agentsById,
     specialistsByName,
     reviewStatusByIssueId,
+    agentRuntimeById: snapshot.agentRuntimeById ?? state.agentRuntimeById,
+    channelPermissionRequestsById,
+    channelPermissionRequestIdsByAgentId,
+    resolvedChannelPermissionDecisionsById: {},
+    resolvedChannelPermissionDecisionIdsByAgentId: {},
     resources: (snapshot.resources as ResourceStats | undefined) ?? null,
     issuesRaw: (snapshot as any).issues ?? state.issuesRaw,
   }
@@ -182,6 +220,8 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
             agentPhase: event.payload.agentPhase,
             hasPendingQuestion: event.payload.hasPendingQuestion,
             pendingQuestionCount: event.payload.pendingQuestionCount,
+            pendingQuestionPrompt: event.payload.pendingQuestionPrompt,
+            pendingQuestionReason: event.payload.pendingQuestionReason,
             resolution: event.payload.resolution,
             resolutionCount: event.payload.resolutionCount,
           },
@@ -206,16 +246,39 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
               currentTool: undefined,
               thinking: undefined,
               waiting: undefined,
+              channelReply: undefined,
               lastActivity: event.timestamp,
               updatedAtSequence: event.sequence,
             },
           }
         : runtimeById
+      const permissionRequestIdsByAgentId = state.channelPermissionRequestIdsByAgentId ?? {}
+      const pendingIds = permissionRequestIdsByAgentId[event.payload.agentId] ?? []
+      const nextPermissionRequestsById = { ...state.channelPermissionRequestsById }
+      for (const requestId of pendingIds) {
+        delete nextPermissionRequestsById[requestId]
+      }
+      const { [event.payload.agentId]: _removedPendingIds, ...restPendingIds } =
+        permissionRequestIdsByAgentId
+
+      const resolvedDecisionIdsByAgentId = state.resolvedChannelPermissionDecisionIdsByAgentId ?? {}
+      const resolvedIds = resolvedDecisionIdsByAgentId[event.payload.agentId] ?? []
+      const nextResolvedDecisionsById = { ...(state.resolvedChannelPermissionDecisionsById ?? {}) }
+      for (const requestId of resolvedIds) {
+        delete nextResolvedDecisionsById[requestId]
+      }
+      const { [event.payload.agentId]: _removedResolvedIds, ...restResolvedIds } =
+        resolvedDecisionIdsByAgentId
+
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         agentsById: rest,
         agentRuntimeById: nextRuntimeById,
+        channelPermissionRequestsById: nextPermissionRequestsById,
+        channelPermissionRequestIdsByAgentId: restPendingIds,
+        resolvedChannelPermissionDecisionsById: nextResolvedDecisionsById,
+        resolvedChannelPermissionDecisionIdsByAgentId: restResolvedIds,
       }
     }
 
@@ -292,6 +355,11 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       }
     }
 
+    case 'review.specialist.timed_out':
+      // Telemetry-only event. Sequence update lets clients observe the event
+      // stream without mutating the durable review-status snapshot.
+      return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+
     case 'review.coordinator_started': {
       const { issueId, sessionName } = event.payload
       const existing = state.reviewStatusByIssueId[issueId]
@@ -305,6 +373,11 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         reviewStatusByIssueId: { ...state.reviewStatusByIssueId, [issueId]: nextStatus },
       }
     }
+
+    case 'review.coordinator.died':
+      // Telemetry-only. The durable review-status row is updated by recovery
+      // checks; keep clients in sequence so event stream subscribers can alert.
+      return { ...state, sequence: Math.max(state.sequence, event.sequence) }
 
     case 'pipeline.review-started':
     case 'pipeline.review-completed':
@@ -418,7 +491,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
               issueId,
               status: 'running',
               startedAt: event.timestamp,
-              runtime: 'claude',
+              runtime: 'claude-code',
               agentPhase: 'planning' as const,
             },
           },
@@ -502,6 +575,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         // Clear thinking/waiting on transitions away from those activities.
         thinking: activity === 'thinking' ? prev.thinking : undefined,
         waiting: activity === 'waiting' ? prev.waiting : undefined,
+        channelReply: activity === 'working' ? undefined : prev.channelReply,
         lastActivity: event.timestamp,
         updatedAtSequence: event.sequence,
       }
@@ -523,6 +597,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         currentTool: undefined,
         thinking: { since: event.timestamp, lastToolAt },
         waiting: undefined,
+        channelReply: undefined,
         lastActivity: event.timestamp,
         updatedAtSequence: event.sequence,
       }
@@ -597,13 +672,118 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       }
     }
 
+    case 'agent.permission_requested': {
+      const request = event.payload
+      const permissionRequestIdsByAgentId = state.channelPermissionRequestIdsByAgentId ?? {}
+      const resolvedDecisionsById = state.resolvedChannelPermissionDecisionsById ?? {}
+      const resolvedDecisionIdsByAgentId = state.resolvedChannelPermissionDecisionIdsByAgentId ?? {}
+      const nextPendingIds = permissionRequestIdsByAgentId[request.agentId] ?? []
+      const resolvedDecision = resolvedDecisionsById[request.requestId]
+      const nextResolvedDecisionsById = { ...resolvedDecisionsById }
+      const nextResolvedIdsByAgentId = { ...resolvedDecisionIdsByAgentId }
+      if (resolvedDecision) {
+        delete nextResolvedDecisionsById[request.requestId]
+        const prevResolvedIds = nextResolvedIdsByAgentId[resolvedDecision.agentId] ?? []
+        const filteredResolvedIds = prevResolvedIds.filter((id) => id !== request.requestId)
+        if (filteredResolvedIds.length > 0) {
+          nextResolvedIdsByAgentId[resolvedDecision.agentId] = filteredResolvedIds
+        } else {
+          delete nextResolvedIdsByAgentId[resolvedDecision.agentId]
+        }
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        channelPermissionRequestsById: {
+          ...state.channelPermissionRequestsById,
+          [request.requestId]: request,
+        },
+        channelPermissionRequestIdsByAgentId: {
+          ...permissionRequestIdsByAgentId,
+          [request.agentId]: nextPendingIds.includes(request.requestId)
+            ? nextPendingIds
+            : [...nextPendingIds, request.requestId],
+        },
+        resolvedChannelPermissionDecisionsById: nextResolvedDecisionsById,
+        resolvedChannelPermissionDecisionIdsByAgentId: nextResolvedIdsByAgentId,
+      }
+    }
+
+    case 'agent.permission_resolved': {
+      const { [event.payload.requestId]: _removed, ...rest } = state.channelPermissionRequestsById
+      const nextPendingIdsByAgentId = { ...(state.channelPermissionRequestIdsByAgentId ?? {}) }
+      const prevPendingIds = nextPendingIdsByAgentId[event.payload.agentId] ?? []
+      const filteredPendingIds = prevPendingIds.filter((id) => id !== event.payload.requestId)
+      if (filteredPendingIds.length > 0) {
+        nextPendingIdsByAgentId[event.payload.agentId] = filteredPendingIds
+      } else {
+        delete nextPendingIdsByAgentId[event.payload.agentId]
+      }
+
+      const resolvedDecisionIdsByAgentId = state.resolvedChannelPermissionDecisionIdsByAgentId ?? {}
+      const nextResolvedIds = resolvedDecisionIdsByAgentId[event.payload.agentId] ?? []
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        channelPermissionRequestsById: rest,
+        channelPermissionRequestIdsByAgentId: nextPendingIdsByAgentId,
+        resolvedChannelPermissionDecisionsById: {
+          ...(state.resolvedChannelPermissionDecisionsById ?? {}),
+          [event.payload.requestId]: {
+            requestId: event.payload.requestId,
+            agentId: event.payload.agentId,
+            issueId: event.payload.issueId,
+            behavior: event.payload.behavior,
+          },
+        },
+        resolvedChannelPermissionDecisionIdsByAgentId: {
+          ...resolvedDecisionIdsByAgentId,
+          [event.payload.agentId]: nextResolvedIds.includes(event.payload.requestId)
+            ? nextResolvedIds
+            : [...nextResolvedIds, event.payload.requestId],
+        },
+      }
+    }
+
     case 'agent.message_received': {
-      const { agentId } = event.payload
+      const { agentId, direction } = event.payload
       const prev = state.agentRuntimeById[agentId]
         ?? defaultRuntimeSnapshot(agentId, event.timestamp, event.sequence)
       const next: AgentRuntimeSnapshot = {
         ...prev,
         lastMessageAt: event.timestamp,
+        channelReply: direction === 'to_agent' ? undefined : prev.channelReply,
+        lastActivity: event.timestamp,
+        updatedAtSequence: event.sequence,
+      }
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        agentRuntimeById: { ...state.agentRuntimeById, [agentId]: next },
+        agentsById: bumpRuntimeSnapshotSequence(state.agentsById, agentId, event.sequence),
+      }
+    }
+
+    case 'agent.channel_reply': {
+      const { agentId, reply } = event.payload
+      const prev = state.agentRuntimeById[agentId]
+        ?? defaultRuntimeSnapshot(agentId, event.timestamp, event.sequence)
+      const next: AgentRuntimeSnapshot = {
+        ...prev,
+        channelReply: {
+          ...reply,
+          reportedAt: event.timestamp,
+        },
+        resolution:
+          reply.kind === 'done'
+            ? 'done'
+            : reply.kind === 'needs_input'
+              ? 'needs_input'
+              : prev.resolution,
+        resolutionUpdatedAt:
+          reply.kind === 'done' || reply.kind === 'needs_input'
+            ? event.timestamp
+            : prev.resolutionUpdatedAt,
         lastActivity: event.timestamp,
         updatedAtSequence: event.sequence,
       }
@@ -756,6 +936,64 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           error,
         },
       };
+    }
+
+    case 'agent.turn_diff_completed': {
+      const p = event.payload as {
+        agentId: string
+        turnId: string
+        completedAt: string
+        files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }>
+        checkpointRef?: string
+        assistantMessageId?: string
+        checkpointTurnCount?: number
+      }
+      const existing = state.turnDiffSummariesByAgentId[p.agentId] ?? []
+      const summary: TurnDiffSummary = {
+        turnId: p.turnId,
+        completedAt: p.completedAt,
+        files: p.files,
+        checkpointRef: p.checkpointRef,
+        assistantMessageId: p.assistantMessageId ?? undefined,
+        checkpointTurnCount: p.checkpointTurnCount,
+      }
+      // Deduplicate by turnId — replace if exists, append otherwise
+      const idx = existing.findIndex(s => s.turnId === p.turnId)
+      const updated = idx >= 0
+        ? existing.map((s, i) => i === idx ? summary : s)
+        : [...existing, summary]
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        turnDiffSummariesByAgentId: {
+          ...state.turnDiffSummariesByAgentId,
+          [p.agentId]: updated,
+        },
+      }
+    }
+
+    case 'conversation.compacting_changed': {
+      const { conversationName, compacting } = event.payload
+      if (!compacting) {
+        const { [conversationName]: _removed, ...rest } = state.conversationsCompactingByName
+        return { ...state, conversationsCompactingByName: rest }
+      }
+      return {
+        ...state,
+        conversationsCompactingByName: { ...state.conversationsCompactingByName, [conversationName]: true },
+      }
+    }
+
+    case 'conversation.permission_changed': {
+      const { conversationName, waiting } = event.payload
+      if (!waiting) {
+        const { [conversationName]: _removed, ...rest } = state.conversationsAwaitingPermissionByName
+        return { ...state, conversationsAwaitingPermissionByName: rest }
+      }
+      return {
+        ...state,
+        conversationsAwaitingPermissionByName: { ...state.conversationsAwaitingPermissionByName, [conversationName]: true },
+      }
     }
 
     default: {

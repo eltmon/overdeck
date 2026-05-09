@@ -4,7 +4,7 @@
  * Maps Linear team prefixes and labels to project paths for workspace creation.
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs';
 import { join, resolve } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { PANOPTICON_HOME } from './paths.js';
@@ -121,6 +121,11 @@ export interface ProjectConfig {
   /** Local workspace packages that need building before quality gates (e.g., @panctl/contracts) */
   workspace_packages?: Array<{ path: string; build_command: string }>;
   /**
+   * Directory name for vBRIEF lifecycle directories (proposed/active/completed/cancelled).
+   * Defaults to "vbrief". Relative to the project root.
+   */
+  vbrief_dir?: string;
+  /**
    * Path to the repo where per-project cost WAL files live.
    * Defaults to `path` (the project repo itself).
    * For polyrepo setups, point this at the docs/shared repo.
@@ -155,18 +160,27 @@ export interface ResolvedProject {
   linearTeam?: string;
 }
 
-/**
- * Load projects configuration from ~/.panopticon/projects.yaml
- */
+// Mtime-based cache: re-parse projects.yaml only when the file changes on disk.
+// Without this cache, every call to resolveProjectFromIssue (enrichment service,
+// deacon patrol, status updates — dozens of times per minute) re-read and re-parsed
+// the YAML, consuming ~50% of the server's non-idle CPU and causing 1.5-second
+// event loop stalls.
+let _projectsCache: { mtime: number; config: ProjectsConfig } | null = null;
+
 export function loadProjectsConfig(): ProjectsConfig {
   if (!existsSync(PROJECTS_CONFIG_FILE)) {
     return { projects: {} };
   }
 
   try {
+    const mtime = statSync(PROJECTS_CONFIG_FILE).mtimeMs;
+    if (_projectsCache && _projectsCache.mtime === mtime) {
+      return _projectsCache.config;
+    }
     const content = readFileSync(PROJECTS_CONFIG_FILE, 'utf-8');
-    const config = parseYaml(content) as ProjectsConfig;
-    return config || { projects: {} };
+    const config = (parseYaml(content) as ProjectsConfig) || { projects: {} };
+    _projectsCache = { mtime, config };
+    return config;
   } catch (error: any) {
     console.error(`Failed to parse projects.yaml: ${error.message}`);
     return { projects: {} };
@@ -184,6 +198,7 @@ export function saveProjectsConfig(config: ProjectsConfig): void {
 
   const yaml = stringifyYaml(config, { indent: 2 });
   writeFileSync(PROJECTS_CONFIG_FILE, yaml, 'utf-8');
+  _projectsCache = null;
 }
 
 /**

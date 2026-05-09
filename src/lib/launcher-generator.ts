@@ -9,9 +9,26 @@ export type LauncherAgentType =
   | 'runtime'
   | 'resume';
 
+export type LauncherHarness = 'claude-code' | 'pi';
+
 export interface LauncherConfig {
   agentType: LauncherAgentType;
   workingDir: string;
+
+  /**
+   * Which coding-agent harness this launcher targets. Defaults to
+   * 'claude-code' when omitted so existing call sites stay bit-for-bit
+   * unchanged. When 'pi', the generator emits a Pi command line and
+   * redirects stdin from piFifoPath instead of leaving stdin attached
+   * to the tmux pane.
+   */
+  harness?: LauncherHarness;
+  /** Absolute path to packages/pi-extension/dist/index.js. Required for harness='pi'. */
+  piExtensionPath?: string;
+  /** Absolute path to ~/.panopticon/agents/<id>/rpc.in. Required for harness='pi'. */
+  piFifoPath?: string;
+  /** Absolute path to per-agent Pi session-dir (Pi --session-dir). Required for harness='pi'. */
+  piSessionDir?: string;
 
   // Command construction
   /**
@@ -56,6 +73,29 @@ export interface LauncherConfig {
 
   // File permissions for the generated script (default: 0o755)
   fileMode?: number;
+
+  /**
+   * Absolute path to a per-agent .mcp.json that wires the panopticon-bridge
+   * (and any other custom MCP servers) into the claude invocation. When set
+   * together with channelsBridgeServerName, the launcher appends
+   *   --mcp-config <path> --dangerously-load-development-channels server:<name>
+   * to the claude command before --session-id and --model.
+   *
+   * --mcp-config is additive — project-level .mcp.json continues to load —
+   * so we MUST NOT also pass --strict-mcp-config.
+   *
+   * When undefined, the generated script is byte-for-byte identical to the
+   * pre-PAN-985 behaviour (channels off path).
+   */
+  channelsBridgeMcpConfig?: string;
+
+  /**
+   * Server name from the per-agent .mcp.json that should be loaded as a
+   * Claude Code Channel. Defaults to 'panopticon-bridge' when
+   * channelsBridgeMcpConfig is set; ignored when the MCP config path is
+   * not also provided.
+   */
+  channelsBridgeServerName?: string;
 }
 
 /**
@@ -64,6 +104,20 @@ export interface LauncherConfig {
  */
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\''`)}'`;
+}
+
+/**
+ * Build the trailing `--mcp-config <path> --dangerously-load-development-channels server:<name>`
+ * fragment when both channels-bridge fields are set. Returns an empty string when
+ * channelsBridgeMcpConfig is unset so existing call sites stay byte-identical.
+ *
+ * Note: --mcp-config is intentionally additive (no --strict-mcp-config) so the
+ * project's .mcp.json continues to load alongside the bridge.
+ */
+function buildChannelsArgs(config: LauncherConfig): string {
+  if (!config.channelsBridgeMcpConfig) return '';
+  const serverName = config.channelsBridgeServerName ?? 'panopticon-bridge';
+  return ` --mcp-config ${shellQuote(config.channelsBridgeMcpConfig)} --dangerously-load-development-channels server:${serverName}`;
 }
 
 /**
@@ -251,6 +305,7 @@ export function generateLauncherWrapper(config: LauncherConfig): string | null {
 
 /** Env vars that may leak from a parent tmux server and must be unset. */
 const PROVIDER_ENV_UNSETS = [
+  'ANTHROPIC_API_KEY',
   'ANTHROPIC_BASE_URL',
   'ANTHROPIC_AUTH_TOKEN',
   'OPENAI_API_KEY',
@@ -284,6 +339,7 @@ function buildCommand(config: LauncherConfig): string[] {
     if (config.baseCommand) {
       let cmd = config.baseCommand;
 
+      cmd += buildChannelsArgs(config);
       if (config.sessionId) {
         cmd += ` --session-id ${shellQuote(config.sessionId)}`;
       }
@@ -317,17 +373,27 @@ function buildCommand(config: LauncherConfig): string[] {
 
 /**
  * Shared command builder for planning and exec-based agent types.
- * Appends permission flags (with token-level dedup), session args,
- * extra args, and prompt references.
+ * Appends session args, extra args, and prompt references.
+ *
+ * PAN-982: When `baseCommand` contains `--agent` (i.e. an agent definition
+ * is selecting permissions, model, and tools via `.claude/agents/pan-*.md`
+ * frontmatter), permission flags are skipped — the frontmatter handles them.
+ * Specialists not yet migrated to --agent (e.g. specialist-init for review
+ * canonical sessions) still pass permissionFlags and get them emitted.
  */
 function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): string[] {
+  if (config.harness === 'pi') {
+    return buildPiCommand(config, useExec);
+  }
+
   const parts: string[] = [];
   if (!config.baseCommand) return parts;
 
   let cmd = config.baseCommand;
+  const usesAgentFlag = cmd.includes('--agent ');
 
-  // Append permission flags if not already present (token-level check)
-  if (config.permissionFlags && config.permissionFlags.length > 0) {
+  // Append permission flags only when --agent is NOT handling permissions via frontmatter.
+  if (!usesAgentFlag && config.permissionFlags && config.permissionFlags.length > 0) {
     const cmdTokens = cmd.split(/\s+/);
     for (const flag of config.permissionFlags) {
       if (!cmdTokens.includes(flag)) {
@@ -335,6 +401,9 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
       }
     }
   }
+
+  // Append channels bridge args (no-op when channelsBridgeMcpConfig unset)
+  cmd += buildChannelsArgs(config);
 
   // Append session args
   if (config.resumeSessionId) {
@@ -360,4 +429,59 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
 
   parts.push(useExec ? `exec ${cmd.trim()}` : cmd.trim());
   return parts;
+}
+
+/**
+ * Build a Pi command line.
+ *
+ *   pi --mode rpc \
+ *      --model <model> \
+ *      --session-dir <piSessionDir> \
+ *      --extension <piExtensionPath> \
+ *      --no-context-files \
+ *      [--session <resumeSessionId>] \
+ *      [--append-system-prompt "$prompt"] \
+ *      < <piFifoPath>
+ *
+ * Pi has no permission system, so permissionFlags are intentionally
+ * dropped (AC4). baseCommand is ignored — Pi launchers always start with
+ * the literal `pi` so callers cannot accidentally smuggle in claude flags.
+ */
+function buildPiCommand(config: LauncherConfig, useExec: boolean): string[] {
+  if (!config.piExtensionPath) {
+    throw new Error('Pi launcher requires piExtensionPath');
+  }
+  if (!config.piFifoPath) {
+    throw new Error('Pi launcher requires piFifoPath');
+  }
+  if (!config.piSessionDir) {
+    throw new Error('Pi launcher requires piSessionDir');
+  }
+
+  const tokens: string[] = ['pi', '--mode', 'rpc'];
+  if (config.model) {
+    tokens.push('--model', config.model);
+  }
+  tokens.push('--session-dir', shellQuote(config.piSessionDir));
+  tokens.push('--extension', shellQuote(config.piExtensionPath));
+  tokens.push('--no-context-files');
+
+  if (config.resumeSessionId) {
+    tokens.push('--session', shellQuote(config.resumeSessionId));
+  }
+  if (config.extraArgs) {
+    tokens.push(config.extraArgs);
+  }
+  if (config.promptFile) {
+    tokens.push('--append-system-prompt', '"$prompt"');
+  } else if (config.promptInline) {
+    tokens.push('--append-system-prompt', shellQuote(config.promptInline));
+  }
+
+  // stdin redirection from the per-agent fifo. Pi reads JSONL RPC commands
+  // from stdin in --mode rpc.
+  const stdinRedirect = `< ${shellQuote(config.piFifoPath)}`;
+  const cmd = `${tokens.join(' ')} ${stdinRedirect}`.replace(/\s+/g, ' ').trim();
+
+  return [useExec ? `exec ${cmd}` : cmd];
 }

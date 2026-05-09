@@ -34,9 +34,10 @@ import { jsonResponse } from "../http-helpers.js";
  *   POST /api/shadow/:issueId/monitor
  *   POST /api/shadow/:issueId/observe
  *   POST /api/dev/rebuild
+ *   POST /api/system/restart-dashboard
  */
 
-import { exec } from 'node:child_process';
+import { exec, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { access, mkdir, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -49,8 +50,9 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
-import { createSessionAsync, killSessionAsync, resizeWindowAsync, sendKeysAsync, sessionExistsAsync } from '../../../lib/tmux.js';
+import { createSessionAsync, killSessionAsync, listSessionNamesAsync, resizeWindowAsync, sendKeysAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 import { generateLauncherScript } from '../../../lib/launcher-generator.js';
+import { getClaudePermissionFlagsString } from '../../../lib/claude-permissions.js';
 import { listProjects, resolveProjectFromIssue, findProjectByTeam, extractTeamPrefix, getIssuePrefix } from '../../../lib/projects.js';
 import { getLinearApiKey, getGitHubConfig, getRallyConfig } from '../services/tracker-config.js';
 import {
@@ -63,12 +65,14 @@ import { loadConfig as loadPanConfig } from '../../../lib/config.js';
 import { checkAgentHealthAsync, determineHealthStatusAsync } from '../../lib/health-filtering.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared } from '../../../lib/tracker-utils.js';
 import { extractPrefix } from '../../../lib/issue-id.js';
+import { findPlan, isPlanningComplete, isPlanningProposed } from '../../../lib/vbrief/io.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { ReadModelService } from '../read-model.js';
 import { getSystemHealthSnapshot } from '../services/system-health-service.js';
 import { httpHandler } from './http-handler.js';
 import { isDeaconGloballyPaused, setDeaconGloballyPaused } from '../../../lib/database/app-settings.js';
+import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
 
 const execAsync = promisify(exec);
 
@@ -435,20 +439,26 @@ const getHealthAgentsRoute = HttpRouter.add(
           name.startsWith('specialist-'),
       );
 
+      // Fetch the live tmux session set ONCE for the whole request — without
+      // this, determineHealthStatusAsync would spawn a tmux subprocess per
+      // agent dir (~150 forks per /api/health poll, every 5s).
+      const liveSessions = new Set(await listSessionNamesAsync());
+
       const agents = await Promise.all(
         agentNames.map(async name => {
           const stateFile = join(agentsDir, name, 'state.json');
           const healthFile = join(agentsDir, name, 'health.json');
 
+          const healthStatus = await determineHealthStatusAsync(name, stateFile, liveSessions);
+          if (!healthStatus) return null;
+
+          // Only read health.json for agents that survive the status filter —
+          // most agent dirs are stopped/completed and bail out above.
           let storedHealth = { consecutiveFailures: 0, killCount: 0 };
           try {
             const healthContent = await readFile(healthFile, 'utf-8');
             storedHealth = { ...storedHealth, ...JSON.parse(healthContent) };
           } catch {}
-
-          const healthStatus = await determineHealthStatusAsync(name, stateFile);
-
-          if (!healthStatus) return null;
 
           let contextPercent: number | null = null;
           try {
@@ -777,7 +787,19 @@ const postDeaconPauseRoute = HttpRouter.add(
 const getVersionRoute = HttpRouter.add(
   'GET',
   '/api/version',
-  Effect.promise(() => getPanopticonVersion().then(version => jsonResponse({ version, isDev: panopticonDevMode }))),
+  Effect.promise(async () => {
+    const version = await getPanopticonVersion();
+    // Expose supervisor URL so the frontend can cache it while the dashboard
+    // is healthy, then use it as a fallback when the dashboard is dead.
+    let supervisorUrl: string | null = null;
+    try {
+      const { getSupervisorUrl } = await import('../../../lib/supervisor.js');
+      supervisorUrl = getSupervisorUrl();
+    } catch {
+      // supervisor module not available in this build — benign
+    }
+    return jsonResponse({ version, isDev: panopticonDevMode, supervisorUrl });
+  }),
 );
 
 // ─── Route: GET /api/registered-projects ─────────────────────────────────────
@@ -957,29 +979,28 @@ const getPlanningStatusRoute = HttpRouter.add(
           } catch {}
         }
 
-        const planningDirInWorkspace = join(workspacePath, '.planning');
-        const legacyPlanningDir = join(projectPath, '.planning', issueLower);
-        const planningDir = existsSync(planningDirInWorkspace)
-          ? planningDirInWorkspace
-          : existsSync(legacyPlanningDir)
-            ? legacyPlanningDir
-            : null;
-
-        const hasStateFile = planningDir ? existsSync(join(planningDir, 'STATE.md')) : false;
-        const hasPromptFile = planningDir
-          ? existsSync(join(planningDir, 'PLANNING_PROMPT.md'))
+        const panDir = join(workspacePath, PAN_DIRNAME);
+        const panContinueFile = join(panDir, PAN_CONTINUE_FILENAME);
+        const hasContinueFile = existsSync(panContinueFile);
+        const hasPlanningState = hasContinueFile || findPlan(workspacePath) !== null;
+        const hasPromptFile = hasPlanningState;
+        // hasCompletionMarker means `plan.status === 'proposed'` (gates the
+        // dashboard Done button which should hide once the user has approved).
+        // planningCompleted means `plan.status` indicates planning has finished
+        // (any of proposed/approved/pending/running/completed/blocked).
+        const hasCompletionMarker = existsSync(panDir)
+          ? isPlanningProposed(workspacePath, panDir)
           : false;
-        const hasCompletionMarker = planningDir
-          ? existsSync(join(planningDir, '.planning-complete'))
+        const planningCompleted = existsSync(panDir)
+          ? isPlanningComplete(workspacePath, panDir)
           : false;
-        const planningCompleted = hasCompletionMarker;
 
         return jsonResponse({
           active: sessionExists || agentStarting,
           sessionName,
           workspacePath: existsSync(workspacePath) ? workspacePath : undefined,
           planningCompleted,
-          hasStateFile,
+          hasStateFile: hasPlanningState,
           hasPromptFile,
           hasCompletionMarker,
           isRemote,
@@ -1044,15 +1065,8 @@ const postPlanningMessageRoute = HttpRouter.add(
         }
 
         const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-        const workspacePlanningDir = join(workspacePath, '.planning');
-        const legacyPlanningDir = join(projectPath, '.planning', issueLower);
-
-        let planningDir: string;
-        if (existsSync(workspacePlanningDir)) {
-          planningDir = workspacePlanningDir;
-        } else if (existsSync(legacyPlanningDir)) {
-          planningDir = legacyPlanningDir;
-        } else {
+        const planningDir = join(workspacePath, PAN_DIRNAME);
+        if (!existsSync(planningDir)) {
           return jsonResponse(
             { error: 'Planning directory not found', sessionEnded: true },
             { status: 404 },
@@ -1131,7 +1145,7 @@ const postPlanningMessageRoute = HttpRouter.add(
 **YOU SHOULD ONLY:**
 - Ask clarifying questions
 - Explore the codebase to understand context
-- Generate planning artifacts (STATE.md, vBRIEF plan at \`.planning/plan.vbrief.json\`, implementation plan at \`docs/prds/active/{issue-id-lowercase}/STATE.md\` — directory MUST be lowercase)
+- Generate planning artifacts (\`.pan/continue.json\`, \`.pan/spec.vbrief.json\`)
 - Present options and tradeoffs
 
 ---
@@ -1169,10 +1183,11 @@ Continue the PLANNING session. Do NOT implement anything.
           msgPlanningModel = getModelId('planning-agent');
         } catch { /* fall back to default */ }
         const msgAgentCmd = getAgentCommand(msgPlanningModel);
+        const msgPermissionFlags = getClaudePermissionFlagsString();
         const msgCmdWithArgs =
           msgAgentCmd.args.length > 0
-            ? `${msgAgentCmd.command} ${msgAgentCmd.args.join(' ')} --dangerously-skip-permissions --permission-mode bypassPermissions`
-            : `${msgAgentCmd.command} --dangerously-skip-permissions --permission-mode bypassPermissions`;
+            ? `${msgAgentCmd.command} ${msgAgentCmd.args.join(' ')} ${msgPermissionFlags}`
+            : `${msgAgentCmd.command} ${msgPermissionFlags}`;
 
         const launcherScript = join(agentStateDir, 'continuation-launcher.sh');
         await mkdir(agentStateDir, { recursive: true });
@@ -1642,6 +1657,31 @@ const postDevRebuildRoute = HttpRouter.add(
   }),
 );
 
+// POST /api/system/restart-dashboard — fire-and-forget restart of the dashboard
+// server. Spawns a detached `pan restart --dashboard` so the new process
+// outlives the SIGTERM that kills this server. Used by the browser fallback
+// path in App.tsx when window.panopticonBridge is not available.
+const postRestartDashboardRoute = HttpRouter.add(
+  'POST',
+  '/api/system/restart-dashboard',
+  Effect.sync(() => {
+    try {
+      const child = spawn('pan', ['restart', '--dashboard'], {
+        detached: true,
+        stdio: 'ignore',
+      });
+      child.on('error', (err) => {
+        console.error('[restart-dashboard] pan restart spawn failed:', err);
+      });
+      child.unref();
+      return jsonResponse({ ok: true, pid: child.pid ?? null }, { status: 202 });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return jsonResponse({ error: 'Restart failed: ' + msg }, { status: 500 });
+    }
+  }),
+);
+
 export const miscRouteLayer = Layer.mergeAll(
   postTrackersRefreshRoute,
   getProjectMappingsRoute,
@@ -1676,6 +1716,7 @@ export const miscRouteLayer = Layer.mergeAll(
   postShadowMonitorRoute,
   postShadowObserveRoute,
   postDevRebuildRoute,
+  postRestartDashboardRoute,
 );
 
 export default miscRouteLayer;

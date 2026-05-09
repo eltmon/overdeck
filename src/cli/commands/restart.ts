@@ -41,7 +41,9 @@ export interface RestartOptions {
   cliproxy?: boolean;
   traefik?: boolean;
   full?: boolean;
+  force?: boolean;
   healthTimeout?: string;
+  deacon?: boolean;
 }
 
 function resolveScope(options: RestartOptions): 'dashboard' | 'cliproxy' | 'traefik' | 'full' {
@@ -74,7 +76,7 @@ function resolveBundledServerPath(): string {
   return join(__dirname, '..', 'dashboard', 'server.js');
 }
 
-function spawnDashboardDetached(config: PlatformConfig): void {
+function spawnDashboardDetached(config: PlatformConfig, opts?: { disableDeacon?: boolean }): void {
   const serverPath = resolveBundledServerPath();
   if (!existsSync(serverPath)) {
     throw new StageError({
@@ -89,6 +91,7 @@ function spawnDashboardDetached(config: PlatformConfig): void {
       ...process.env,
       DASHBOARD_PORT: String(config.dashboardPort),
       PANOPTICON_MODE: 'production',
+      ...(opts?.disableDeacon ? { PANOPTICON_DISABLE_DEACON: '1' } : {}),
     },
   });
   child.unref();
@@ -101,12 +104,24 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
     ? parseInt(options.healthTimeout, 10)
     : undefined;
 
+  const disableDeacon = options.deacon === false;
+  if (disableDeacon) {
+    console.log(chalk.yellow('  Deacon auto-start disabled for this restart (--no-deacon)'));
+  }
+
   console.log(chalk.bold(`Restarting Panopticon (${scope})...\n`));
 
   try {
     switch (scope) {
       case 'dashboard': {
-        await restartDashboard(config, () => spawnDashboardDetached(config), {
+        // Cycle the supervisor so it picks up the latest bundle.
+        try {
+          const { stopSupervisorProcess, startSupervisorProcess } = await import('../../lib/supervisor.js');
+          stopSupervisorProcess();
+          startSupervisorProcess();
+        } catch { /* non-fatal */ }
+
+        await restartDashboard(config, () => spawnDashboardDetached(config, { disableDeacon }), {
           healthTimeoutMs,
         });
         console.log(chalk.green('✓ Dashboard restarted and healthy'));
@@ -115,8 +130,12 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
       }
       case 'cliproxy': {
         const cliproxy = await import('../../lib/cliproxy.js');
-        await restartCliproxy(cliproxy);
-        console.log(chalk.green('✓ CLIProxy restarted'));
+        await restartCliproxy(cliproxy, { force: options.force === true });
+        if (options.force) {
+          console.log(chalk.green('✓ CLIProxy reinstalled at pinned version and restarted'));
+        } else {
+          console.log(chalk.green('✓ CLIProxy restarted'));
+        }
         console.log(chalk.dim('  Dashboard and Traefik were left running.'));
         break;
       }
@@ -127,7 +146,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
         break;
       }
       case 'full': {
-        await runFullRestart(config, { healthTimeoutMs });
+        await runFullRestart(config, { healthTimeoutMs, disableDeacon });
         break;
       }
     }
@@ -156,7 +175,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
  */
 async function runFullRestart(
   config: PlatformConfig,
-  opts: { healthTimeoutMs?: number },
+  opts: { healthTimeoutMs?: number; disableDeacon?: boolean },
 ): Promise<void> {
   const projectRoot = process.cwd();
   const venvPath = join(projectRoot, '.venv');
@@ -165,6 +184,13 @@ async function runFullRestart(
   // ── Stop phase ──
   // Dashboard first so it doesn't spam errors while sidecars die.
   await stopDashboard(config);
+
+  try {
+    const { stopSupervisorProcess } = await import('../../lib/supervisor.js');
+    stopSupervisorProcess();
+  } catch {
+    // non-fatal
+  }
 
   if (tldrAvailable) {
     try {
@@ -191,10 +217,17 @@ async function runFullRestart(
   const cliproxy = await import('../../lib/cliproxy.js');
   await restartCliproxy(cliproxy);
 
-  spawnDashboardDetached(config);
+  spawnDashboardDetached(config, { disableDeacon: opts.disableDeacon });
   await waitForDashboardHealth(config.dashboardApiPort, {
     timeoutMs: opts.healthTimeoutMs,
   });
+
+  try {
+    const { startSupervisorProcess } = await import('../../lib/supervisor.js');
+    startSupervisorProcess();
+  } catch {
+    // non-fatal
+  }
 
   if (tldrAvailable) {
     try {

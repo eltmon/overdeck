@@ -64,6 +64,27 @@ describe('deriveRoundMarkers', () => {
     expect(markers[0]).toMatchObject({ afterMessageId: 'm5', verdict: 'passed' });
   });
 
+  it('PAN-915: drops markers for rounds whose endedAt predates the first visible message', () => {
+    const meta: ReviewerRoundMetadata = {
+      roundCount: 4,
+      latestRound: 4,
+      history: [
+        // Rounds 1-2 ended yesterday — predate the transcript's first message.
+        // Their messages live in a prior JSONL (legacy per-round-killed session).
+        { round: 1, endedAt: '2026-04-25T12:00:00Z', status: 'failed' },
+        { round: 2, endedAt: '2026-04-25T13:00:00Z', status: 'blocked' },
+        // Round 3 ended within the visible range — anchor inline.
+        { round: 3, endedAt: '2026-04-26T10:08:00Z', status: 'failed' },
+        // Round 4 ended after all messages — fallback to last message.
+        { round: 4, endedAt: '2026-04-26T11:00:00Z', status: 'passed' },
+      ],
+    };
+    const markers = deriveRoundMarkers(meta, MESSAGES);
+    expect(markers).toHaveLength(2);
+    expect(markers[0]).toMatchObject({ round: 3, afterMessageId: 'm2' });
+    expect(markers[1]).toMatchObject({ round: 4, afterMessageId: 'm5' });
+  });
+
   it('maps status to verdict correctly', () => {
     const meta: ReviewerRoundMetadata = {
       roundCount: 5,

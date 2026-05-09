@@ -1,21 +1,34 @@
 /**
  * vBRIEF File I/O Utilities
  *
- * Read and write plan.vbrief.json from workspace .planning/ directories.
+ * Read and write workspace vBRIEF plans from `.pan/spec.vbrief.json`.
+ *
+ * IMPORTANT (PAN-946): Workspace mutations MUST NEVER reach into project-level
+ * lifecycle directories. `findPlan`, `readWorkspacePlan`, `updateItemStatus`,
+ * and `updateSubItemStatus` resolve only the workspace-local spec file.
+ * Lifecycle (proposed/active/completed/cancelled) lookups go through
+ * `findVBriefByIssue` in `lifecycle-io.ts` (read-only) or
+ * `findVBriefByIssueAsync` in `vbrief-index.ts` (read-only, indexed).
+ *
+ * Conflating the two surfaces caused a high-severity correctness bug where
+ * routine workspace progress updates (item status writes, beads sync) could
+ * mutate `vbrief/active`, `vbrief/completed`, or `vbrief/cancelled` files
+ * after lifecycle promotion — corrupting the archived plan.
  */
 
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';
 import type { VBriefDocument, VBriefItemStatus } from './types.js';
 
-const PLAN_FILENAME = 'plan.vbrief.json';
-
 /**
- * Returns the path to plan.vbrief.json for a workspace, or null if it doesn't exist.
+ * Returns the path to the workspace-local spec file if it exists, or null.
+ * **Workspace-only.** Does NOT scan lifecycle directories — lifecycle/discovery
+ * lookups belong in `findVBriefByIssue` / `findVBriefByIssueAsync`.
  */
 export function findPlan(workspacePath: string): string | null {
-  const planPath = join(workspacePath, '.planning', PLAN_FILENAME);
-  return existsSync(planPath) ? planPath : null;
+  const panPlanPath = join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME);
+  return existsSync(panPlanPath) ? panPlanPath : null;
 }
 
 /**
@@ -63,6 +76,66 @@ export function readWorkspacePlan(workspacePath: string): VBriefDocument | null 
   if (!planPath) return null;
   return readPlan(planPath);
 }
+
+/**
+ * vBRIEF lifecycle statuses that mean "planning has finished" — i.e., the
+ * agent can pick up work or the plan is done. Excludes 'draft' (still being
+ * written) and 'cancelled' (abandoned).
+ */
+const PLANNING_FINISHED_STATUSES = new Set(['proposed', 'approved', 'pending', 'running', 'completed', 'blocked']);
+
+/**
+ * Check whether planning has reached the "proposed" state for this workspace.
+ *
+ * Returns true ONLY when `plan.status === 'proposed'`. Used to gate the
+ * dashboard Done button which should hide once the user has approved the plan
+ * (status moves out of 'proposed').
+ *
+ * Pass either a workspace root (helper looks in `<root>/.pan/`) or a direct
+ * `.pan/` directory path via `planningDir`.
+ */
+export function isPlanningProposed(workspacePath: string, planningDir?: string): boolean {
+  return checkPlanStatus(workspacePath, planningDir, status => status === 'proposed');
+}
+
+/**
+ * Check whether planning has finished for this workspace — i.e., beads have
+ * been generated and the agent can (or already did) start work.
+ *
+ * Returns true when `plan.status` is any of: 'proposed', 'approved', 'pending',
+ * 'running', 'completed', or 'blocked'.
+ *
+ * Pass either a workspace root (helper looks in `<root>/.pan/`) or a direct
+ * `.pan/` directory path via `planningDir`.
+ */
+export function isPlanningComplete(workspacePath: string, planningDir?: string): boolean {
+  return checkPlanStatus(workspacePath, planningDir, status => PLANNING_FINISHED_STATUSES.has(status));
+}
+
+function checkPlanStatus(
+  workspacePath: string,
+  planningDir: string | undefined,
+  matchStatus: (status: string) => boolean,
+): boolean {
+  const candidatePlanPaths = planningDir
+    ? [join(planningDir, PAN_SPEC_FILENAME)]
+    : [join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME)];
+
+  for (const planPath of candidatePlanPaths) {
+    if (!existsSync(planPath)) continue;
+    try {
+      const doc = readPlan(planPath);
+      const status = doc.plan?.status;
+      if (status && matchStatus(status)) return true;
+      if (status) return false;
+    } catch {
+      // Corrupt / unreadable plan — keep checking fallbacks.
+    }
+  }
+
+  return false;
+}
+
 
 /**
  * Updates the status of a specific item in plan.vbrief.json.

@@ -353,12 +353,12 @@ describe('doneCommand preflight failure paths', () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
-  it('does NOT exit(1) when only .planning/plan.vbrief.json is dirty (stale from prior run)', async () => {
+  it('does NOT exit(1) when only .pan/spec.vbrief.json is dirty (stale from prior run)', async () => {
     mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
     mockShouldSkipTrackerUpdate.mockResolvedValue(true);
     mockUpdateShadowState.mockResolvedValue(undefined);
 
-    // Simulate stale plan.vbrief.json: dirty before the pre-preflight commit fires,
+    // Simulate stale spec.vbrief.json: dirty before the pre-preflight commit fires,
     // clean afterward (all other git status checks pass).
     let planCommitted = false;
     const capturedCmds: string[] = [];
@@ -367,11 +367,11 @@ describe('doneCommand preflight failure paths', () => {
       if (cmd.includes('bd list')) {
         cb(null, { stdout: '[]', stderr: '' });
       } else if (
-        cmd.includes('git status --porcelain .planning/') &&
+        cmd.includes('git status --porcelain .pan/') &&
         !planCommitted
       ) {
         // First check: stale file from prior run
-        cb(null, { stdout: ' M .planning/plan.vbrief.json\n', stderr: '' });
+        cb(null, { stdout: ' M .pan/spec.vbrief.json\n', stderr: '' });
       } else if (cmd.includes('git commit')) {
         planCommitted = true;
         cb(null, { stdout: '', stderr: '' });
@@ -384,13 +384,13 @@ describe('doneCommand preflight failure paths', () => {
     const { doneCommand } = await import('../../../../src/cli/commands/done.js');
     await doneCommand('PAN-714');
 
-    // Pre-flight must NOT block on the stale plan.vbrief.json
+    // Pre-flight must NOT block on the stale spec.vbrief.json
     expect(exitSpy).not.toHaveBeenCalledWith(1);
     // The stale file must have been committed before preflight ran
     expect(capturedCmds.some((c) => c.includes('git commit'))).toBe(true);
   });
 
-  it('does NOT exit(1) when stale .planning/STATE.md is dirty (other managed planning artifact)', async () => {
+  it('does NOT exit(1) when stale .pan/continue.json is dirty (other managed planning artifact)', async () => {
     mockGetAgentState.mockReturnValue(makeAgentState(tempDir));
     mockShouldSkipTrackerUpdate.mockResolvedValue(true);
     mockUpdateShadowState.mockResolvedValue(undefined);
@@ -402,11 +402,11 @@ describe('doneCommand preflight failure paths', () => {
       if (cmd.includes('bd list')) {
         cb(null, { stdout: '[]', stderr: '' });
       } else if (
-        cmd.includes('git status --porcelain .planning/') &&
+        cmd.includes('git status --porcelain .pan/') &&
         !planningCommitted
       ) {
-        // Stale STATE.md from a prior interrupted run
-        cb(null, { stdout: ' M .planning/STATE.md\n', stderr: '' });
+        // Stale continue.json from a prior interrupted run
+        cb(null, { stdout: ' M .pan/continue.json\n', stderr: '' });
       } else if (cmd.includes('git commit')) {
         planningCommitted = true;
         cb(null, { stdout: '', stderr: '' });

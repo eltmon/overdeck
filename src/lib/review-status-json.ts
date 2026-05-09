@@ -77,15 +77,19 @@ export function setReviewStatus(
   }
   while (history.length > 10) history.shift();
 
-  const readyForMerge = update.readyForMerge !== undefined
-    ? update.readyForMerge
-    : (
-        merged.reviewStatus === 'passed' &&
-        merged.testStatus === 'passed' &&
-        merged.mergeStatus !== 'merged' &&
-        merged.mergeStatus !== 'failed' &&
-        (merged.uatStatus === undefined || merged.uatStatus === 'passed')
-      );
+  // PAN-905: GitHub-native blockers always override readyForMerge to false.
+  const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
+  const readyForMerge = hasBlockers
+    ? false
+    : (update.readyForMerge !== undefined
+        ? update.readyForMerge
+        : (
+            merged.reviewStatus === 'passed' &&
+            merged.testStatus === 'passed' &&
+            merged.mergeStatus !== 'merged' &&
+            merged.mergeStatus !== 'failed' &&
+            (merged.uatStatus === undefined || merged.uatStatus === 'passed')
+          ));
 
   const updated: ReviewStatus = normalizeReviewStatus({
     ...merged,

@@ -22,15 +22,18 @@
 |----------|-------------|
 | [AGENTS.md](./AGENTS.md) | Agent directory structure, naming patterns, standard contents, and cleanup |
 | [Architecture Diagram](./diagrams/panopticon-architecture.png) | Visual overview of Panopticon system architecture (UI → Core → Agents → Infrastructure → Pipeline)
+| [Specialist Pipeline Diagram](./diagrams/panopticon-specialist-pipeline.png) | Visual overview of the work-agent → verification gate → specialist handoff flow |
 | [AGENT_TYPES_INDEX.md](./AGENT_TYPES_INDEX.md) | Newcomer-friendly map of Panopticon agent roles, categories, and where they appear in the workflow |
 | [SPECIALIST_WORKFLOW.md](./SPECIALIST_WORKFLOW.md) | Deeper workflow guide for how the work agent and specialist agents interact |
 | [REVIEW-AGENT-ARCHITECTURE.md](./REVIEW-AGENT-ARCHITECTURE.md) | End-to-end code review architecture: work-agent-as-orchestrator, dashboard-as-view, `pan review run` CLI, prompt primitives, synthesis as the judgment layer |
 | [SKILL-DISTRIBUTION-ANALYSIS.md](./SKILL-DISTRIBUTION-ANALYSIS.md) | Skill distribution architecture: Claude Code precedence, symlink issues, proposed changes |
-| [REPO-ARTIFACTS.md](./REPO-ARTIFACTS.md) | What lives in a project's repo: `.pan/`, skills hierarchy, VBRIEFs, STATE.md, multi-tool sync |
+| [REPO-ARTIFACTS.md](./REPO-ARTIFACTS.md) | What lives in a project's repo: `.pan/`, skills hierarchy, `vbrief/` lifecycle dirs, PRD vs vBRIEF, multi-tool sync |
+| [VISION.md](./VISION.md) | Product vision and deployment model roadmap (local → shared → SaaS) |
 | [PRD.md](./PRD.md) | Product requirements document for Panopticon |
 | [PRD-CLOISTER.md](./PRD-CLOISTER.md) | Cloister lifecycle manager requirements (historical — see DEACON doc for current state) |
 | [DEACON-HEALTH-MONITORING.md](./DEACON-HEALTH-MONITORING.md) | Deacon health monitoring: all 10 stuck detection mechanisms, thresholds, escalation, recovery |
 | [PRD-REMOTE-WORKSPACES.md](./PRD-REMOTE-WORKSPACES.md) | Remote workspace requirements |
+| [VBRIEF.md](./VBRIEF.md) | vBRIEF plan format, lifecycle directories, continue state, `pan scope` commands |
 | [HIERARCHICAL-PLANNING.md](./HIERARCHICAL-PLANNING.md) | vBRIEF planning, DAG scheduling, acceptance criteria pipeline |
 | [FIX-ALL-PRD.md](./FIX-ALL-PRD.md) | Fix-All Flywheel PRD: continuous, self-improving mass pan-oversee with `main` always clean |
 | [OPERATION-FIX-ALL.md](./OPERATION-FIX-ALL.md) | Operational manual for mass pan-oversee: phases, classification, bug log template |
@@ -66,7 +69,6 @@
 | [cost-tracking.md](./cost-tracking.md) | Cost tracking: live recording, reconciler, session-to-agent mapping, SQLite schema |
 | [TLDR.md](./TLDR.md) | TLDR code analysis — architecture, hooks, index lifecycle, API |
 | [CONFIGURATION.md § External Services](./CONFIGURATION.md#external-service-integrations) | Cloudflare tunnels, Hume EVI, and adding new integrations |
-| [VBRIEF.md](./VBRIEF.md) | vBRIEF plan format — spec reference, Panopticon extensions, field reference |
 | [FORKS.md](./FORKS.md) | Conversation forking: summary fork vs plain fork, options, thinking block handling, model switching |
 
 ---
@@ -151,7 +153,7 @@
 - **"session ID"** / **"session persistence"** → SPECIALIST_WORKFLOW.md (Session Persistence & Memory)
 - **"deterministic UUID"** → SPECIALIST_WORKFLOW.md (Session Persistence & Memory)
 - **"merge"** / **"merge validation"** → PRD-CLOISTER.md (Merge Validation Pipeline section)
-- **"vBRIEF"** / **"DAG"** / **"acceptance criteria"** / **"planning"** → HIERARCHICAL-PLANNING.md, SPECIALIST_WORKFLOW.md
+- **"vBRIEF"** / **"DAG"** / **"acceptance criteria"** / **"planning"** → VBRIEF.md, HIERARCHICAL-PLANNING.md, SPECIALIST_WORKFLOW.md
 - **"beads conversion"** / **"createBeadsFromVBrief"** → HIERARCHICAL-PLANNING.md
 - **"sync with main"** / **"sync-main"** → SPECIALIST_WORKFLOW.md (Sync with Main section)
 - **"deacon"** / **"health monitor"** / **"health"** / **"patrol"** → DEACON-HEALTH-MONITORING.md
@@ -216,7 +218,9 @@
 ### Development
 - **"skills"** → README.md, CLAUDE.md, REPO-ARTIFACTS.md
 - **".pan"** / **".pan.yaml"** / **"repo artifacts"** → REPO-ARTIFACTS.md
-- **"STATE.md archive"** / **"vBRIEF archive"** / **"planning artifacts"** → REPO-ARTIFACTS.md, VBRIEF.md
+- **"STATE.md archive"** / **"vBRIEF archive"** / **"planning artifacts"** / **"continue state"** → REPO-ARTIFACTS.md, VBRIEF.md
+- **"lifecycle"** / **"vbrief lifecycle"** / **"proposed"** / **"active"** / **"completed"** / **"cancelled"** → VBRIEF.md, REPO-ARTIFACTS.md
+- **"pan scope"** / **"scope list"** / **"scope approve"** / **"scope restore"** → VBRIEF.md
 - **"also_sync"** / **"multi-tool sync"** / **"cursor sync"** / **"codex sync"** → REPO-ARTIFACTS.md
 - **"commit"** / **"git commit"** → CLAUDE.md
 - **"messaging"** / **"messageAgent"** → CLAUDE.md

@@ -94,3 +94,12 @@ describe('pan done <id> — option parsing', () => {
     expect(stdout).toMatch(/-c, --comment <message>/);
   });
 });
+
+describe('pan swarm <id> — option parsing', () => {
+  it('registers both --auto-advance and --no-auto-advance', () => {
+    const { stdout, status } = runCli(['swarm', '--help']);
+    expect(status).toBe(0);
+    expect(stdout).toMatch(/--auto-advance/);
+    expect(stdout).toMatch(/--no-auto-advance/);
+  });
+});

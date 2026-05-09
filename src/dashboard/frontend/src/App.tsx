@@ -9,6 +9,7 @@ import { SkillsList } from './components/SkillsList';
 import { ActivityPanel } from './components/ActivityPanel';
 import { AwaitingMergePage } from './components/AwaitingMergePage';
 import { ConfirmationDialog, ConfirmationRequest } from './components/ConfirmationDialog';
+import { ChannelPermissionDialog } from './components/ChannelPermissionDialog';
 import { EventRouter } from './components/EventRouter';
 import { MetricsSummaryRow } from './components/MetricsSummaryRow';
 import { MetricsPage } from './components/MetricsPage';
@@ -26,16 +27,19 @@ import { KanbanSkeleton } from './components/skeletons/KanbanSkeleton';
 import { AgentListSkeleton } from './components/skeletons/AgentListSkeleton';
 import { GodViewSkeleton } from './components/skeletons/GodViewSkeleton';
 import { DetailPanelLayout } from './components/DetailPanelLayout';
-import { UpgradeAnnouncement } from './components/upgrade-announcement/UpgradeAnnouncement';
+
 import { StandaloneTerminal } from './components/StandaloneTerminal';
 import { DeaconPauseBanner } from './components/DeaconPauseToggle';
 import { StoppedAgentsBanner } from './components/StoppedAgentsBanner';
 import { CodexAuthBanner } from './components/CodexAuthBanner';
 import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { SystemHealthPill } from './components/SystemHealthPill';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { CostWarningStyles } from './components/shared/costWarning';
+import { AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Agent, Issue } from './types';
-import { useDashboardStore, selectAgentList, selectIssues, selectDashboardLifecycle } from './lib/store';
+import { useDashboardStore, selectAgentList, selectChannelPermissionRequests, selectIssues, selectDashboardLifecycle } from './lib/store';
+import { refreshDashboardState } from './lib/refresh-dashboard-state';
+import type { ClaudeChannelPermissionBehavior } from '@panctl/contracts';
 import type { ViewMode as ConversationViewMode } from './components/chat/ConversationPanel';
 
 interface TrackerStatusItem {
@@ -74,7 +78,7 @@ const PATH_TO_TAB: Record<string, Tab> = Object.fromEntries(
 function getTabFromPath(): Tab {
   const path = window.location.pathname;
   if (path.startsWith('/conv/')) return 'command-deck';
-  return PATH_TO_TAB[path] || 'kanban';
+  return PATH_TO_TAB[path] || 'command-deck';
 }
 
 export function getConversationViewModeFromSearch(search = window.location.search): ConversationViewMode {
@@ -161,10 +165,16 @@ export function buildConversationUrl(
   return query ? `/conv/${id}?${query}` : `/conv/${id}`;
 }
 
+// Cached supervisor URL — populated by successful /api/version polls.
+// Used as a final fallback for Force Restart when the dashboard is dead.
+let cachedSupervisorUrl: string | null = null;
+
 async function fetchBackendHealth(): Promise<{ version: string }> {
   const res = await fetch('/api/version');
   if (!res.ok) throw new Error(`Backend returned ${res.status}`);
-  return res.json();
+  const data = await res.json();
+  if (data.supervisorUrl) cachedSupervisorUrl = data.supervisorUrl;
+  return data;
 }
 
 async function fetchTrackerStatus(): Promise<TrackerStatus> {
@@ -186,6 +196,27 @@ async function respondToConfirmation(id: string, confirmed: boolean): Promise<vo
     body: JSON.stringify({ confirmed }),
   });
   if (!res.ok) throw new Error('Failed to respond to confirmation');
+}
+
+async function respondToChannelPermission(
+  agentId: string,
+  requestId: string,
+  behavior: ClaudeChannelPermissionBehavior,
+): Promise<void> {
+  const res = await fetch(`/api/agents/${encodeURIComponent(agentId)}/permissions/${encodeURIComponent(requestId)}/respond`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ behavior }),
+  });
+  if (res.ok) return;
+  let message = `Failed to respond to permission request (${res.status})`;
+  try {
+    const body = await res.json() as { error?: string };
+    if (body?.error) message = body.error;
+  } catch {
+    // Ignore invalid JSON bodies and fall back to the generic message.
+  }
+  throw new Error(message);
 }
 
 interface CliproxyStatus {
@@ -291,7 +322,9 @@ export default function App() {
   useEffect(() => {
     if (!selectedIssue) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSelectedIssue(null);
+      if (event.key === 'Escape') {
+        setSelectedIssue(null);
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
@@ -310,8 +343,35 @@ export default function App() {
     retryDelay: 1000,
     staleTime: 0,
   });
-  // Only show banner after 2 consecutive failures to avoid flicker on transient errors
-  const showBackendBanner = backendDown && backendFailureCount >= 2;
+  // Banner state machine for the backend health indicator.
+  //   'down'        — red banner, retrying, force-restart available
+  //   'recovering'  — yellow banner, "back up", auto-hides after a short pause
+  //   null          — hidden (steady state)
+  // The "down" entry threshold is still 2 failed polls so a single hiccup
+  // doesn't latch the banner. Recovery is one success — but rather than
+  // snapping closed we transition to a yellow confirmation that fades on a
+  // timer, so the user gets explicit feedback that things are back instead
+  // of having the banner just disappear.
+  const recoveryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [bannerState, setBannerState] = useState<'down' | 'recovering' | null>(null);
+  useEffect(() => {
+    if (backendDown) {
+      if (recoveryTimerRef.current) {
+        clearTimeout(recoveryTimerRef.current);
+        recoveryTimerRef.current = null;
+      }
+      if (backendFailureCount >= 2) setBannerState('down');
+    } else if (bannerState === 'down') {
+      setBannerState('recovering');
+      recoveryTimerRef.current = setTimeout(() => {
+        setBannerState(null);
+        recoveryTimerRef.current = null;
+      }, 2500);
+    }
+  }, [backendDown, backendFailureCount, bannerState]);
+  useEffect(() => () => {
+    if (recoveryTimerRef.current) clearTimeout(recoveryTimerRef.current);
+  }, []);
   // Restart banner: shown when dashboard is in a planned restart (lifecycle active)
   const showRestartBanner = dashboardLifecycle.active;
 
@@ -349,6 +409,49 @@ export default function App() {
     },
   });
 
+  // Force Restart for the dashboard backend. Three-layer fallback chain:
+  // 1. Electron bridge — most direct, available only in desktop app
+  // 2. Dashboard's own endpoint — works when dashboard is wedged but responding
+  // 3. Supervisor sidecar — works even when dashboard is fully dead; URL was
+  //    cached from the last healthy /api/version poll.
+  const restartBackendMutation = useMutation({
+    mutationFn: async () => {
+      const bridge = window.panopticonBridge;
+      if (bridge?.restartDashboard) {
+        await bridge.restartDashboard();
+        return;
+      }
+
+      // Layer 2 — try dashboard endpoint (short timeout since it may hang if wedged)
+      try {
+        const res = await fetch('/api/system/restart-dashboard', {
+          method: 'POST',
+          signal: AbortSignal.timeout(3000),
+        });
+        if (res.ok) return;
+      } catch {
+        // Fall through to supervisor
+      }
+
+      // Layer 3 — supervisor sidecar, independent of dashboard process
+      const supervisorUrl = cachedSupervisorUrl;
+      if (!supervisorUrl) {
+        throw new Error('Dashboard is unreachable and supervisor URL is unknown — try restarting from the CLI.');
+      }
+      const res = await fetch(`${supervisorUrl}/restart-dashboard`, {
+        method: 'POST',
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) throw new Error(`Supervisor returned ${res.status}`);
+    },
+    onSuccess: () => {
+      toast.success('Restart requested — reconnecting…');
+    },
+    onError: (err: Error) => {
+      toast.error('Restart failed: ' + err.message);
+    },
+  });
+
   // URL-synced tab navigation
   const setActiveTab = useCallback((tab: Tab) => {
     setActiveTabState(tab);
@@ -374,9 +477,34 @@ export default function App() {
   // Agents from Zustand store (event-sourced — no polling)
   // Cast to Agent[] since AgentSnapshot is a compatible subset for the fields used here
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
+  const channelPermissionRequests = useDashboardStore(selectChannelPermissionRequests);
+  const [optimisticallyResolvedChannelPermissionRequestIds, setOptimisticallyResolvedChannelPermissionRequestIds] =
+    useState<Set<string>>(new Set());
 
   // Issues from Zustand store (event-sourced via snapshot — no polling)
   const issues = useDashboardStore(selectIssues) as unknown as Issue[];
+  const visibleChannelPermissionRequests = channelPermissionRequests.filter(
+    (request) => !optimisticallyResolvedChannelPermissionRequestIds.has(request.requestId)
+  );
+  const currentChannelPermissionRequest = visibleChannelPermissionRequests[0] ?? null;
+  const currentChannelPermissionIssueId = currentChannelPermissionRequest?.issueId
+    ?? agents.find((agent) => agent.id === currentChannelPermissionRequest?.agentId)?.issueId;
+
+  useEffect(() => {
+    setOptimisticallyResolvedChannelPermissionRequestIds((prev) => {
+      const next = new Set<string>();
+      const visibleRequestIds = new Set(channelPermissionRequests.map((request) => request.requestId));
+      for (const requestId of prev) {
+        if (visibleRequestIds.has(requestId)) {
+          next.add(requestId);
+        }
+      }
+      if (next.size === prev.size && Array.from(next).every((requestId) => prev.has(requestId))) {
+        return prev;
+      }
+      return next;
+    });
+  }, [channelPermissionRequests]);
 
   // Poll for pending confirmations
   const { data: confirmations = [] } = useQuery({
@@ -434,6 +562,44 @@ export default function App() {
     : null;
 
 
+  const channelPermissionResponseMutation = useMutation({
+    mutationFn: ({
+      agentId,
+      requestId,
+      behavior,
+    }: {
+      agentId: string;
+      requestId: string;
+      behavior: ClaudeChannelPermissionBehavior;
+    }) => respondToChannelPermission(agentId, requestId, behavior),
+    onMutate: async (variables) => {
+      setOptimisticallyResolvedChannelPermissionRequestIds((prev) => {
+        const next = new Set(prev);
+        next.add(variables.requestId);
+        return next;
+      });
+    },
+    onSuccess: async (_data, variables) => {
+      await refreshDashboardState(queryClient);
+      toast.success(
+        variables.behavior === 'allow'
+          ? `Allowed ${variables.agentId} to continue`
+          : `Denied permission request for ${variables.agentId}`,
+      );
+    },
+    onError: (error: Error, variables) => {
+      setOptimisticallyResolvedChannelPermissionRequestIds((prev) => {
+        if (!prev.has(variables.requestId)) {
+          return prev;
+        }
+        const next = new Set(prev);
+        next.delete(variables.requestId);
+        return next;
+      });
+      toast.error(`Permission response failed: ${error.message}`);
+    },
+  });
+
   const handleConfirm = useCallback(async () => {
     if (!currentConfirmation) return;
     try {
@@ -453,6 +619,24 @@ export default function App() {
       console.error('Failed to deny:', error);
     }
   }, [currentConfirmation]);
+
+  const handleAllowChannelPermission = useCallback(() => {
+    if (!currentChannelPermissionRequest) return;
+    channelPermissionResponseMutation.mutate({
+      agentId: currentChannelPermissionRequest.agentId,
+      requestId: currentChannelPermissionRequest.requestId,
+      behavior: 'allow',
+    });
+  }, [channelPermissionResponseMutation, currentChannelPermissionRequest]);
+
+  const handleDenyChannelPermission = useCallback(() => {
+    if (!currentChannelPermissionRequest) return;
+    channelPermissionResponseMutation.mutate({
+      agentId: currentChannelPermissionRequest.agentId,
+      requestId: currentChannelPermissionRequest.requestId,
+      behavior: 'deny',
+    });
+  }, [channelPermissionResponseMutation, currentChannelPermissionRequest]);
 
   const handleCloseConfirmation = useCallback(() => {
     setCurrentConfirmation(null);
@@ -533,6 +717,9 @@ export default function App() {
       {/* Event-sourced state: connects WsTransport → DashboardStore (PAN-428 B4) */}
       <EventRouter />
 
+      {/* Mounts @keyframes for the pulsing extreme-tier cost warning badge */}
+      <CostWarningStyles />
+
       {/* Collapsible sidebar navigation */}
       <Sidebar
         activeTab={activeTab}
@@ -542,9 +729,6 @@ export default function App() {
 
       {/* Main content area */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Upgrade Announcement — shown once after upgrading to 0.7.0 */}
-        <UpgradeAnnouncement />
-
         {/* Deacon Frozen Banner — shown whenever the global patrol pause flag is set */}
         <DeaconPauseBanner />
 
@@ -556,7 +740,7 @@ export default function App() {
 
         {/* Dashboard Restart Banner — shown during a planned restart (post-merge deploy, pan restart) */}
         {showRestartBanner && (
-          <div className="bg-primary/15 border-b-2 border-primary/40 px-4 py-3 flex items-center gap-3 shrink-0">
+          <div className="bg-primary/15 border-b-2 border-primary/40 px-4 py-3 flex items-center gap-3 shrink-0 overflow-hidden animate-slide-down-banner">
             <RefreshCw className="w-5 h-5 text-primary shrink-0 animate-spin" />
             <p className="text-primary text-sm font-semibold flex-1">
               Dashboard is restarting
@@ -572,13 +756,30 @@ export default function App() {
         )}
 
         {/* Backend Offline Banner — shown when /api/version fails repeatedly AND not in a planned restart */}
-        {showBackendBanner && !showRestartBanner && (
-          <div className="bg-destructive/15 border-b-2 border-destructive/50 px-4 py-3 flex items-center gap-3 shrink-0">
+        {bannerState === 'down' && !showRestartBanner && (
+          <div className="bg-destructive/15 border-b-2 border-destructive/50 px-4 py-3 flex items-center gap-3 shrink-0 overflow-hidden animate-slide-down-banner">
             <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
             <p className="text-destructive text-sm font-semibold flex-1">
-              Backend is unreachable — dashboard data is stale. Check that <code className="font-mono bg-destructive/20 px-1 rounded">pan up</code> is running.
+              Backend is unreachable — waiting for it to come back.
             </p>
             <span className="text-destructive/60 text-xs shrink-0 animate-pulse">● Retrying…</span>
+            <button
+              onClick={() => restartBackendMutation.mutate()}
+              disabled={restartBackendMutation.isPending}
+              className="px-4 py-1.5 bg-destructive/20 hover:bg-destructive/30 text-destructive text-sm font-bold rounded-md border border-destructive/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+            >
+              {restartBackendMutation.isPending ? 'Restarting…' : 'Force Restart'}
+            </button>
+          </div>
+        )}
+
+        {/* Backend Recovered Banner — yellow confirmation, auto-hides */}
+        {bannerState === 'recovering' && !showRestartBanner && (
+          <div className="bg-warning/15 border-b-2 border-warning/50 px-4 py-3 flex items-center gap-3 shrink-0 overflow-hidden animate-slide-down-banner">
+            <CheckCircle2 className="w-5 h-5 text-warning-foreground shrink-0" />
+            <p className="text-warning-foreground text-sm font-semibold flex-1">
+              Backend is back up.
+            </p>
           </div>
         )}
 
@@ -627,11 +828,9 @@ export default function App() {
           </div>
         )}
 
-        <div className="relative z-[200] border-b border-border bg-background/95 px-4 py-2 backdrop-blur shrink-0">
+        <div className="relative border-b border-border bg-background px-3 py-1 shrink-0">
           <div className="flex items-center justify-end">
-            <div className="w-full max-w-xs">
-              <SystemHealthPill />
-            </div>
+            <SystemHealthPill />
           </div>
         </div>
 
@@ -761,6 +960,15 @@ export default function App() {
         )}
         </main>
       </div>
+
+      <ChannelPermissionDialog
+        request={currentChannelPermissionRequest}
+        issueId={currentChannelPermissionIssueId}
+        isOpen={!!currentChannelPermissionRequest}
+        isSubmitting={channelPermissionResponseMutation.isPending}
+        onAllow={handleAllowChannelPermission}
+        onDeny={handleDenyChannelPermission}
+      />
 
       {/* Confirmation Dialog */}
       <ConfirmationDialog

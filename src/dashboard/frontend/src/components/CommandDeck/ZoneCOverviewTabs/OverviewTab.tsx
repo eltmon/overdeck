@@ -15,6 +15,7 @@
  */
 
 import { useMemo, useState } from 'react';
+import { getHarness } from '@panctl/contracts';
 import type { Issue, Agent } from '../../../types';
 import { LiveCounter } from '../LiveCounter';
 import { ActivitySparkline } from '../ActivitySparkline';
@@ -34,7 +35,15 @@ import { refreshDashboardState } from '../../../lib/refresh-dashboard-state';
 import { isReviewPipelineStuck } from '../../../lib/pipeline-state';
 import { useConfirm } from '../../DialogProvider';
 import { useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
+import { ContainerSection } from '../../inspector/ContainerSection';
+import { ReviewPipelineSection } from '../../inspector/ReviewPipelineSection';
+import type { ContainerMenuState } from '../../inspector/types';
+import { SwitchModelModal } from '../../SwitchModelModal';
+import { useSwitchModel } from '../../../hooks/useSwitchModel';
 import { GitPullRequest, CheckCircle2, XCircle, Clock, AlertCircle, Copy, Box, Link2, Terminal, Play, Pause, ExternalLink, Code2, Loader2, RotateCcw } from 'lucide-react';
+import { PlanDAGViewer } from '../../PlanDAG.js';
+import { getFriendlyModelName } from '../../inspector/utils';
 
 interface OverviewTabProps {
   issueId: string;
@@ -129,7 +138,7 @@ function Tile({
       data-testid={testid}
       style={{
         background: 'var(--card)',
-        border: '1px solid var(--mc-border, var(--border))',
+        border: '1px solid var(--border)',
         borderRadius: 8,
         padding: 12,
         display: 'flex',
@@ -145,7 +154,7 @@ function Tile({
           gap: 6,
           fontSize: 11,
           fontWeight: 600,
-          color: 'var(--mc-text-muted, var(--muted-foreground))',
+          color: 'var(--muted-foreground)',
           textTransform: 'uppercase',
           letterSpacing: '0.04em',
         }}
@@ -171,7 +180,7 @@ function Section({
     <section
       style={{
         background: 'var(--card)',
-        border: '1px solid var(--mc-border, var(--border))',
+        border: '1px solid var(--border)',
         borderRadius: 8,
         padding: 12,
         display: 'flex',
@@ -186,7 +195,7 @@ function Section({
           justifyContent: 'space-between',
           fontSize: 12,
           fontWeight: 600,
-          color: 'var(--mc-text-muted, var(--muted-foreground))',
+          color: 'var(--muted-foreground)',
           textTransform: 'uppercase',
           letterSpacing: '0.04em',
         }}
@@ -208,11 +217,54 @@ function formatRuntime(startedAt: string): string {
   return `${mins}m`;
 }
 
+function fmtTokens(tokens: number): string {
+  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(2)}M`;
+  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
+  return `${tokens}`;
+}
+
 export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabProps) {
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const [isRecoverPending, setIsRecoverPending] = useState(false);
   const [isSpawnPending, setIsSpawnPending] = useState(false);
+  const [containerMenu, setContainerMenu] = useState<ContainerMenuState | null>(null);
+  const [showSwitchModel, setShowSwitchModel] = useState(false);
+  const { switchMutation, isPending: isSwitchingModel } = useSwitchModel(agent?.id, issueId);
+
+  const containerControlMutation = useMutation({
+    mutationFn: async ({ containerName, action }: { containerName: string; action: 'start' | 'stop' | 'restart' }) => {
+      const res = await fetch(`/api/workspaces/${issueId}/containers/${containerName}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || `Failed to ${action} container`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setContainerMenu(null);
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['workspace', issueId] }), 2000);
+    },
+  });
+
+  const refreshDbMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}/refresh-db`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to refresh database');
+      }
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['workspace', issueId] }),
+  });
+
   const planning = usePlanningSummaryQuery(issueId);
   const activity = useActivityQuery(issueId);
   const costs = useIssueCostsQuery(issueId);
@@ -257,6 +309,11 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
   const isRecoverable = isReviewPipelineStuck(reviewStatus.data ?? undefined);
   const recentEvents = useMemo(() => sections.slice(-10).reverse(), [sections]);
 
+  const handleContainerContextMenu = (e: React.MouseEvent, containerName: string, isRunning: boolean) => {
+    e.preventDefault();
+    setContainerMenu({ x: e.clientX, y: e.clientY, containerName, isRunning });
+  };
+
   return (
     <div
       data-testid="overview-tab"
@@ -278,7 +335,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
           borderRadius: 10,
           background:
             'linear-gradient(135deg, color-mix(in srgb, var(--primary) 8%, transparent), transparent)',
-          border: '1px solid var(--mc-border, var(--border))',
+          border: '1px solid var(--border)',
           display: 'flex',
           flexDirection: 'column',
           gap: 10,
@@ -337,15 +394,15 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   fontWeight: 600,
                   padding: '2px 8px',
                   borderRadius: 999,
-                  background: 'var(--mc-surface-2, color-mix(in srgb, var(--foreground) 5%, transparent))',
-                  color: 'var(--mc-text-muted, var(--muted-foreground))',
+                  background: 'color-mix(in srgb, var(--foreground) 5%, transparent)',
+                  color: 'var(--muted-foreground)',
                   textTransform: 'uppercase',
                   letterSpacing: '0.03em',
                 }}
               >
                 {stage}
               </span>
-              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+              <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
                 {issueId}
               </span>
             </div>
@@ -368,7 +425,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   ? null
                   : <LiveCounter value={totalCost} unit="$" precision={2} pulseOnIncrement />}
             </span>
-            <span style={{ fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+            <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
               cost to date
             </span>
           </div>
@@ -381,7 +438,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
             alignItems: 'center',
             gap: 16,
             fontSize: 12,
-            color: 'var(--mc-text-muted, var(--muted-foreground))',
+            color: 'var(--muted-foreground)',
             flexWrap: 'wrap',
           }}
         >
@@ -411,7 +468,21 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         </div>
       </section>
 
-      {/* 2. Tile grid */}
+      {/* 2. Directive DAG — front-loaded plan visualization */}
+      <section
+        data-testid="overview-dag"
+        style={{
+          borderRadius: 10,
+          border: '1px solid var(--border)',
+          overflow: 'hidden',
+          height: 520,
+          background: '#111827',
+        }}
+      >
+        <PlanDAGViewer issueId={issueId} reviewStatus={reviewStatus.data ?? undefined} />
+      </section>
+
+      {/* 3. Tile grid */}
       <div
         data-testid="overview-tile-grid"
         style={{
@@ -424,27 +495,33 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         <Tile title="Agent" icon={<Box size={14} />} testid="overview-tile-agent">
           {agent ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
-              <span><strong>Model:</strong> {agent.model}</span>
-              <span><strong>Runtime:</strong> {formatRuntime(agent.startedAt)}</span>
+              <span><strong>Model:</strong> {getFriendlyModelName(agent.model)}</span>
+              <span><strong>Runtime:</strong> {getHarness(agent)}</span>
+              <span><strong>Uptime:</strong> {formatRuntime(agent.startedAt)}</span>
               <span><strong>Status:</strong> {agent.status}</span>
+              {agent.workspace && (
+                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted-foreground)' }} title={agent.workspace}>
+                  {agent.workspace}
+                </span>
+              )}
               {workspace.data?.agentSessionId && (
-                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted-foreground)' }}>
                   {workspace.data.agentSessionId}
                 </span>
               )}
             </div>
           ) : workspace.data?.hasAgent ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
-              <span><strong>Model:</strong> {workspace.data.agentModelFull || workspace.data.agentModel || 'unknown'}</span>
+              <span><strong>Model:</strong> {getFriendlyModelName(workspace.data.agentModelFull || workspace.data.agentModel)}</span>
               {workspace.data.agentSessionId && (
-                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted-foreground)' }}>
                   {workspace.data.agentSessionId}
                 </span>
               )}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No active agent</span>
+              <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No active agent</span>
               <button
                 type="button"
                 disabled={isSpawnPending}
@@ -467,8 +544,8 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   padding: '6px 10px',
                   borderRadius: 6,
                   border: 'none',
-                  background: 'var(--mc-primary, var(--primary))',
-                  color: 'var(--mc-primary-foreground, var(--primary-foreground))',
+                  background: 'var(--primary)',
+                  color: 'var(--primary-foreground)',
                   fontSize: 12,
                   fontWeight: 500,
                   cursor: isSpawnPending ? 'wait' : 'pointer',
@@ -492,13 +569,25 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   ? null
                   : <LiveCounter value={totalCost} unit="$" precision={2} />}
             </div>
+            {costs.data && (costs.data.inputTokens !== undefined || costs.data.outputTokens !== undefined) && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 11 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--muted-foreground)' }}>Input tokens</span>
+                  <span>{fmtTokens(costs.data.inputTokens ?? 0)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--muted-foreground)' }}>Output tokens</span>
+                  <span>{fmtTokens(costs.data.outputTokens ?? 0)}</span>
+                </div>
+              </div>
+            )}
             {costs.data?.byModel && Object.keys(costs.data.byModel).length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {Object.entries(costs.data.byModel)
                   .sort((a, b) => b[1].cost - a[1].cost)
                   .map(([model, v]) => (
                     <div key={model} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                      <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))' }}>{model}</span>
+                      <span style={{ color: 'var(--muted-foreground)' }}>{model}</span>
                       <span>${v.cost.toFixed(2)}</span>
                     </div>
                   ))}
@@ -515,13 +604,13 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                 .sort((a, b) => b[1].cost - a[1].cost)
                 .map(([stageName, v]) => (
                   <div key={stageName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
-                    <span style={{ textTransform: 'capitalize', color: 'var(--mc-text-muted, var(--muted-foreground))' }}>{stageName}</span>
+                    <span style={{ textTransform: 'capitalize', color: 'var(--muted-foreground)' }}>{stageName}</span>
                     <span>${v.cost.toFixed(2)}</span>
                   </div>
                 ))}
             </div>
           ) : (
-            <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No stage data yet</span>
+            <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No stage data yet</span>
           )}
         </Tile>
 
@@ -542,7 +631,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                       alignItems: 'center',
                       gap: 6,
                       fontSize: 12,
-                      color: 'var(--mc-primary, var(--primary))',
+                      color: 'var(--primary)',
                       textDecoration: 'none',
                     }}
                   >
@@ -556,7 +645,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                     href={workspace.data.frontendUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ fontSize: 12, color: 'var(--mc-primary, var(--primary))', textDecoration: 'none' }}
+                    style={{ fontSize: 12, color: 'var(--primary)', textDecoration: 'none' }}
                   >
                     Frontend ↗
                   </a>
@@ -566,7 +655,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                     href={workspace.data.apiUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ fontSize: 12, color: 'var(--mc-primary, var(--primary))', textDecoration: 'none' }}
+                    style={{ fontSize: 12, color: 'var(--primary)', textDecoration: 'none' }}
                   >
                     API ↗
                   </a>
@@ -574,7 +663,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               </>
             )}
             {!workspace.data?.frontendUrl && !workspace.data?.apiUrl && !workspace.data?.services?.length && (
-              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No services configured</span>
+              <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No services configured</span>
             )}
           </div>
         </Tile>
@@ -588,7 +677,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   fontFamily: 'monospace',
                   fontSize: 11,
                   padding: '6px 8px',
-                  background: 'var(--mc-surface-2, color-mix(in srgb, var(--foreground) 3%, transparent))',
+                  background: 'color-mix(in srgb, var(--foreground) 3%, transparent)',
                   borderRadius: 4,
                   display: 'flex',
                   alignItems: 'center',
@@ -609,7 +698,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                     border: 'none',
                     background: 'transparent',
                     cursor: 'pointer',
-                    color: 'var(--mc-text-muted, var(--muted-foreground))',
+                    color: 'var(--muted-foreground)',
                     flexShrink: 0,
                   }}
                   title="Copy command"
@@ -619,7 +708,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               </div>
             </div>
           ) : (
-            <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No active session</span>
+            <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No active session</span>
           )}
         </Tile>
 
@@ -639,7 +728,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               style={{
                 padding: '5px 10px',
                 borderRadius: 6,
-                border: '1px solid var(--mc-border, var(--border))',
+                border: '1px solid var(--border)',
                 background: 'transparent',
                 fontSize: 11,
                 cursor: 'pointer',
@@ -680,7 +769,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                 style={{
                   padding: '5px 10px',
                   borderRadius: 6,
-                  border: '1px solid var(--mc-border, var(--border))',
+                  border: '1px solid var(--border)',
                   background: 'transparent',
                   fontSize: 11,
                   cursor: 'pointer',
@@ -703,7 +792,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               style={{
                 padding: '5px 10px',
                 borderRadius: 6,
-                border: '1px solid var(--mc-border, var(--border))',
+                border: '1px solid var(--border)',
                 background: 'transparent',
                 fontSize: 11,
                 cursor: 'pointer',
@@ -721,14 +810,33 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                 style={{
                   padding: '5px 10px',
                   borderRadius: 6,
-                  border: '1px solid var(--mc-error, #ef4444)',
+                  border: '1px solid var(--destructive)',
                   background: 'transparent',
-                  color: 'var(--mc-error, #ef4444)',
+                  color: 'var(--destructive)',
                   fontSize: 11,
                   cursor: 'pointer',
                 }}
               >
                 Stop
+              </button>
+            )}
+            {agent && (
+              <button
+                type="button"
+                data-testid="overview-action-switch-model"
+                onClick={() => setShowSwitchModel(true)}
+                disabled={isSwitchingModel}
+                style={{
+                  padding: '5px 10px',
+                  borderRadius: 6,
+                  border: '1px solid var(--border)',
+                  background: 'transparent',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  opacity: isSwitchingModel ? 0.5 : 1,
+                }}
+              >
+                Switch Model
               </button>
             )}
           </div>
@@ -737,23 +845,10 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         {/* WORKSPACE tile */}
         <Tile title="Workspace" icon={<Box size={14} />} testid="overview-tile-workspace">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {workspace.data?.containers && workspace.data.containers.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {workspace.data.containers.map((c) => (
-                  <div key={c.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-                    <span
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: '50%',
-                        background: c.status === 'running' ? 'var(--mc-success, #22c55e)' : 'var(--mc-error, #ef4444)',
-                      }}
-                    />
-                    <span>{c.name}</span>
-                    <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))', marginLeft: 'auto' }}>{c.status}</span>
-                  </div>
-                ))}
-              </div>
+            {workspace.data?.path && (
+              <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--muted-foreground)' }} title={workspace.data.path}>
+                {workspace.data.path}
+              </span>
             )}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {workspace.data?.hasDocker && (
@@ -765,7 +860,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   style={{
                     padding: '5px 10px',
                     borderRadius: 6,
-                    border: '1px solid var(--mc-border, var(--border))',
+                    border: '1px solid var(--border)',
                     background: 'transparent',
                     fontSize: 11,
                     cursor: 'pointer',
@@ -783,7 +878,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   style={{
                     padding: '5px 10px',
                     borderRadius: 6,
-                    border: '1px solid var(--mc-border, var(--border))',
+                    border: '1px solid var(--border)',
                     background: 'transparent',
                     fontSize: 11,
                     cursor: 'pointer',
@@ -797,7 +892,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   <ExternalLink size={12} /> Open VS Code
                 </a>
               )}
-              {workspace.data?.canContainerize && (
+              {workspace.data?.canContainerize && !workspace.data?.hasAgent && (
                 <button
                   type="button"
                   onClick={() => {
@@ -806,7 +901,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   style={{
                     padding: '5px 10px',
                     borderRadius: 6,
-                    border: '1px solid var(--mc-border, var(--border))',
+                    border: '1px solid var(--border)',
                     background: 'transparent',
                     fontSize: 11,
                     cursor: 'pointer',
@@ -815,12 +910,12 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                     gap: 4,
                   }}
                 >
-                  <Play size={12} /> Start Containers
+                  <Box size={12} /> Containerize
                 </button>
               )}
             </div>
             {!workspace.data?.hasDocker && !workspace.data?.canContainerize && (
-              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No containers</span>
+              <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No containers</span>
             )}
           </div>
         </Tile>
@@ -833,7 +928,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                 href={issue.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ fontSize: 12, color: 'var(--mc-primary, var(--primary))', textDecoration: 'none' }}
+                style={{ fontSize: 12, color: 'var(--primary)', textDecoration: 'none' }}
               >
                 {issue.source === 'linear' ? 'Linear' : 'GitHub Issue'} ↗
               </a>
@@ -847,7 +942,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   padding: 0,
                   border: 'none',
                   background: 'transparent',
-                  color: 'var(--mc-primary, var(--primary))',
+                  color: 'var(--primary)',
                   cursor: 'pointer',
                   textAlign: 'left',
                 }}
@@ -856,13 +951,44 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               </button>
             )}
             {!issue?.url && !planning.data?.hasPrd && (
-              <span style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No links available</span>
+              <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No links available</span>
             )}
           </div>
         </Tile>
       </div>
 
-      {/* 3. Reviewer summary */}
+      {/* 3. Containers */}
+      {workspace.data?.containers && Object.keys(workspace.data.containers).length > 0 && (
+        <Section title="Containers" rightSlot={<span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>right-click</span>}>
+          <ContainerSection
+            containers={workspace.data.containers}
+            startPending={false}
+            containersStarting={false}
+            containerControlPending={containerControlMutation.isPending}
+            controllingContainer={containerMenu?.containerName}
+            containerMenu={containerMenu}
+            onContainerContextMenu={handleContainerContextMenu}
+            onSetContainerMenu={setContainerMenu}
+            onContainerControl={(name, action) => containerControlMutation.mutate({ containerName: name, action })}
+            onRefreshDb={() => refreshDbMutation.mutate()}
+            refreshDbPending={refreshDbMutation.isPending}
+            confirm={confirm}
+          />
+        </Section>
+      )}
+
+      {/* 4. Pipeline stepper */}
+      {reviewStatus.data && (
+        <Section title="Pipeline">
+          <ReviewPipelineSection
+            reviewStatus={reviewStatus.data}
+            issueId={issueId}
+            onViewLog={() => onSwitchTab?.('prdiff')}
+          />
+        </Section>
+      )}
+
+      {/* 5. Reviewer summary */}
       {reviewerSections.length > 0 && (
         <Section title="Reviewer summary">
           <div
@@ -898,9 +1024,9 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                         width: '100%',
                         padding: '8px 10px',
                         borderRadius: 8,
-                        border: '1px dashed var(--mc-border, var(--border))',
+                        border: '1px dashed var(--border)',
                         fontSize: 11,
-                        color: 'var(--mc-text-muted, var(--muted-foreground))',
+                        color: 'var(--muted-foreground)',
                       }}
                     >
                       no rounds yet
@@ -916,39 +1042,39 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
       {/* 3. Test summary (PAN-847) */}
       <Section title="Tests">
         {reviewStatus.isLoading ? (
-          <div style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>Loading…</div>
+          <div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>Loading…</div>
         ) : (
           <div data-testid="overview-tests" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
               {reviewStatus.data?.testStatus === 'passed' || reviewStatus.data?.verificationStatus === 'passed' ? (
                 <>
-                  <CheckCircle2 size={14} style={{ color: 'var(--mc-success, #22c55e)' }} />
-                  <span style={{ color: 'var(--mc-success, #22c55e)', fontWeight: 600 }}>Tests passed</span>
+                  <CheckCircle2 size={14} style={{ color: 'var(--success)' }} />
+                  <span style={{ color: 'var(--success)', fontWeight: 600 }}>Tests passed</span>
                 </>
               ) : reviewStatus.data?.testStatus === 'failed' || reviewStatus.data?.verificationStatus === 'failed' ? (
                 <>
-                  <XCircle size={14} style={{ color: 'var(--mc-error, #ef4444)' }} />
-                  <span style={{ color: 'var(--mc-error, #ef4444)', fontWeight: 600 }}>Tests failed</span>
+                  <XCircle size={14} style={{ color: 'var(--destructive)' }} />
+                  <span style={{ color: 'var(--destructive)', fontWeight: 600 }}>Tests failed</span>
                 </>
               ) : reviewStatus.data?.testStatus === 'testing' || reviewStatus.data?.verificationStatus === 'running' ? (
                 <>
-                  <Clock size={14} style={{ color: 'var(--mc-warning, #f97316)' }} />
-                  <span style={{ color: 'var(--mc-warning, #f97316)', fontWeight: 600 }}>Tests running…</span>
+                  <Clock size={14} style={{ color: 'var(--warning)' }} />
+                  <span style={{ color: 'var(--warning)', fontWeight: 600 }}>Tests running…</span>
                 </>
               ) : (
                 <>
-                  <AlertCircle size={14} style={{ color: 'var(--mc-text-muted, var(--muted-foreground))' }} />
-                  <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))' }}>No test results yet</span>
+                  <AlertCircle size={14} style={{ color: 'var(--muted-foreground)' }} />
+                  <span style={{ color: 'var(--muted-foreground)' }}>No test results yet</span>
                 </>
               )}
               {reviewStatus.data?.verificationCycleCount !== undefined && reviewStatus.data?.verificationMaxCycles !== undefined && (
-                <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))', marginLeft: 'auto' }}>
+                <span style={{ color: 'var(--muted-foreground)', marginLeft: 'auto' }}>
                   cycle {reviewStatus.data.verificationCycleCount}/{reviewStatus.data.verificationMaxCycles}
                 </span>
               )}
             </div>
             {(reviewStatus.data?.testNotes || reviewStatus.data?.verificationNotes) && (
-              <div style={{ fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))', padding: '4px 8px', background: 'var(--mc-surface-2, color-mix(in srgb, var(--foreground) 3%, transparent))', borderRadius: 4 }}>
+              <div style={{ fontSize: 11, color: 'var(--muted-foreground)', padding: '4px 8px', background: 'color-mix(in srgb, var(--foreground) 3%, transparent)', borderRadius: 4 }}>
                 {reviewStatus.data.testNotes || reviewStatus.data.verificationNotes}
               </div>
             )}
@@ -959,19 +1085,19 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
       {/* 4. PR summary (PAN-847) */}
       <Section title="Pull request">
         {pr.isLoading ? (
-          <div style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>Loading…</div>
+          <div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>Loading…</div>
         ) : pr.data?.pr ? (
           <div data-testid="overview-pr" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-              <GitPullRequest size={14} style={{ color: 'var(--mc-primary, var(--primary))' }} />
-              <a href={pr.data.pr.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mc-primary, var(--primary))', fontWeight: 600 }}>
+              <GitPullRequest size={14} style={{ color: 'var(--primary)' }} />
+              <a href={pr.data.pr.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', fontWeight: 600 }}>
                 #{pr.data.pr.number} {pr.data.pr.title}
               </a>
-              <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))', marginLeft: 'auto' }}>
+              <span style={{ color: 'var(--muted-foreground)', marginLeft: 'auto' }}>
                 {pr.data.pr.state}
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11, color: 'var(--muted-foreground)' }}>
               <span>+{pr.data.pr.additions} -{pr.data.pr.deletions}</span>
               <span>{pr.data.pr.changedFiles} file{pr.data.pr.changedFiles === 1 ? '' : 's'}</span>
               {pr.data.pr.reviewDecision && (
@@ -985,9 +1111,9 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                   fontSize: 11,
                   padding: '2px 8px',
                   borderRadius: 6,
-                  border: '1px solid var(--mc-border, var(--border))',
+                  border: '1px solid var(--border)',
                   background: 'transparent',
-                  color: 'var(--mc-text-muted, var(--muted-foreground))',
+                  color: 'var(--muted-foreground)',
                   cursor: 'pointer',
                   marginLeft: 'auto',
                 }}
@@ -997,7 +1123,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
             </div>
           </div>
         ) : (
-          <div data-testid="overview-pr" style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+          <div data-testid="overview-pr" style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>
             No PR found for this issue.
           </div>
         )}
@@ -1015,9 +1141,9 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               fontSize: 11,
               padding: '2px 8px',
               borderRadius: 6,
-              border: '1px solid var(--mc-border, var(--border))',
+              border: '1px solid var(--border)',
               background: 'transparent',
-              color: 'var(--mc-text-muted, var(--muted-foreground))',
+              color: 'var(--muted-foreground)',
               cursor: 'pointer',
             }}
           >
@@ -1030,7 +1156,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
           style={{ display: 'flex', alignItems: 'center', gap: 12 }}
         >
           <ActivitySparkline events={costSparklineEvents} ariaLabel="Cost trend across recent sessions" />
-          <span style={{ fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}>
+          <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
             {costSparklineEvents.length} billed session{costSparklineEvents.length === 1 ? '' : 's'}
           </span>
         </div>
@@ -1041,7 +1167,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
         {recentEvents.length === 0 ? (
           <div
             data-testid="overview-activity-empty"
-            style={{ fontSize: 12, color: 'var(--mc-text-muted, var(--muted-foreground))' }}
+            style={{ fontSize: 12, color: 'var(--muted-foreground)' }}
           >
             No activity yet — sessions will appear here as they start.
           </div>
@@ -1069,14 +1195,14 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                     fontWeight: 600,
-                    color: 'var(--mc-text-muted, var(--muted-foreground))',
+                    color: 'var(--muted-foreground)',
                     minWidth: 64,
                   }}
                 >
                   {s.role ?? s.type}
                 </span>
                 <span style={{ flex: 1, color: 'var(--foreground)' }}>{s.model || s.sessionId}</span>
-                <span style={{ color: 'var(--mc-text-muted, var(--muted-foreground))', fontSize: 11 }}>
+                <span style={{ color: 'var(--muted-foreground)', fontSize: 11 }}>
                   {s.status}
                 </span>
               </li>
@@ -1097,8 +1223,6 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
       >
         {(
           [
-            ['prd', 'View PRD'],
-            ['vbrief', 'View vBRIEF'],
             ['beads', 'View Beads'],
             ['costs', 'View Costs'],
             ['activity', 'View Activity'],
@@ -1113,7 +1237,7 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
               fontSize: 11,
               padding: '4px 10px',
               borderRadius: 999,
-              border: '1px solid var(--mc-border, var(--border))',
+              border: '1px solid var(--border)',
               background: 'transparent',
               color: 'var(--foreground)',
               cursor: 'pointer',
@@ -1127,10 +1251,27 @@ export function OverviewTab({ issueId, onSwitchTab, issue, agent }: OverviewTabP
       {planning.isLoading && (
         <div
           data-testid="overview-planning-loading"
-          style={{ fontSize: 11, color: 'var(--mc-text-muted, var(--muted-foreground))' }}
+          style={{ fontSize: 11, color: 'var(--muted-foreground)' }}
         >
           Loading planning context…
         </div>
+      )}
+
+      {showSwitchModel && agent && (
+        <SwitchModelModal
+          currentModel={agent.model}
+          agentId={agent.id}
+          issueId={issueId}
+          agentStatus={agent.status}
+          hasResumableSession={agent.hasSession ?? false}
+          onClose={() => setShowSwitchModel(false)}
+          onSwitch={(model, message) => {
+            switchMutation.mutate({ model, message }, {
+              onSuccess: () => setShowSwitchModel(false),
+            });
+          }}
+          isPending={isSwitchingModel}
+        />
       )}
     </div>
   );

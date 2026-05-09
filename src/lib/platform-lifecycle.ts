@@ -268,18 +268,34 @@ export async function restartDashboard(
  *
  * Takes the cliproxy module as an argument so tests can substitute mocks
  * without touching real files/binaries.
+ *
+ * `opts.force` triggers a binary reinstall before starting — required after
+ * bumping CLIPROXY_RELEASE_VERSION because installCliproxy() skips download
+ * when a binary already exists on disk.
  */
 export async function restartCliproxy(
   cliproxy: {
     stopCliproxy: () => void;
     startCliproxy: () => void;
     isCliproxyRunning: () => boolean;
+    installCliproxy?: (force?: boolean) => void;
   },
-  opts: { verifyTimeoutMs?: number } = {},
+  opts: { verifyTimeoutMs?: number; force?: boolean } = {},
 ): Promise<void> {
   cliproxy.stopCliproxy();
   // Small wait so the port releases before we re-bind.
   await sleep(200);
+
+  if (opts.force) {
+    if (!cliproxy.installCliproxy) {
+      throw new StageError({
+        stage: 'cliproxy',
+        reason: 'force=true was requested but cliproxy module does not export installCliproxy',
+      });
+    }
+    cliproxy.installCliproxy(true);
+  }
+
   cliproxy.startCliproxy();
 
   const timeoutMs = opts.verifyTimeoutMs ?? 5000;

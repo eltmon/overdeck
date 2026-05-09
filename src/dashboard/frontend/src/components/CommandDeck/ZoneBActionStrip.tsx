@@ -14,6 +14,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Square, Loader2, Terminal, Pause, Play, MoreHorizontal,
   FolderOpen, FileText, Trash2, RotateCcw, Download, History,
+  BookText, Copy, ClipboardCopy,
 } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@panctl/contracts';
 import { useConfirm } from '../DialogProvider';
@@ -220,12 +221,39 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
   }, [session.sessionId, session.roundMetadata]);
 
   const handleReplay = useCallback(() => {
-    // Replay opens the live terminal view, which is the closest thing to
-    // replaying an active session from the dashboard. Falls back to a no-op
-    // when terminal viewing is unavailable.
     onViewTerminal?.();
     setOverflowOpen(false);
   }, [onViewTerminal]);
+
+  const handleViewState = useCallback(() => {
+    const path = `~/.panopticon/agents/${session.sessionId}/`;
+    navigator.clipboard?.writeText(path).catch(() => { /* ignore */ });
+    toast.success('State dir path copied');
+    setOverflowOpen(false);
+  }, [session.sessionId]);
+
+  const handleViewVbrief = useCallback(() => {
+    if (issueId) {
+      const path = `workspaces/feature-${issueId.toLowerCase()}/.pan/spec.vbrief.json`;
+      navigator.clipboard?.writeText(path).catch(() => { /* ignore */ });
+      toast.success('vBRIEF path copied');
+    }
+    setOverflowOpen(false);
+  }, [issueId]);
+
+  const handleCopySessionId = useCallback(() => {
+    navigator.clipboard?.writeText(session.sessionId).catch(() => { /* ignore */ });
+    toast.success('Session ID copied');
+    setOverflowOpen(false);
+  }, [session.sessionId]);
+
+  const handleCopyTmuxCommand = useCallback(() => {
+    if (session.tmuxSession) {
+      navigator.clipboard?.writeText(`tmux attach-session -t ${session.tmuxSession}`).catch(() => { /* ignore */ });
+      toast.success('tmux command copied');
+    }
+    setOverflowOpen(false);
+  }, [session.tmuxSession]);
 
   const canStop = session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended';
   const canPause = session.presence === 'active';
@@ -316,7 +344,7 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
               marginTop: 4,
               zIndex: 1000,
               background: 'var(--card)',
-              border: '1px solid var(--mc-border, var(--border))',
+              border: '1px solid var(--border)',
               borderRadius: 6,
               boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
               padding: '4px 0',
@@ -341,6 +369,30 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
               icon={<FolderOpen className="w-3 h-3" />}
               onClick={handleOpenStateDir}
             />
+            <OverflowItem
+              label="View State.md"
+              icon={<FileText className="w-3 h-3" />}
+              onClick={handleViewState}
+            />
+            {issueId && (
+              <OverflowItem
+                label="View vBRIEF"
+                icon={<BookText className="w-3 h-3" />}
+                onClick={handleViewVbrief}
+              />
+            )}
+            <OverflowItem
+              label="Copy Session ID"
+              icon={<Copy className="w-3 h-3" />}
+              onClick={handleCopySessionId}
+            />
+            {session.tmuxSession && (
+              <OverflowItem
+                label="Copy tmux command"
+                icon={<ClipboardCopy className="w-3 h-3" />}
+                onClick={handleCopyTmuxCommand}
+              />
+            )}
             {session.hasJsonl && (
               <>
                 <OverflowItem
@@ -385,7 +437,7 @@ function MenuDivider() {
     <div
       style={{
         height: 1,
-        background: 'var(--mc-border, var(--border))',
+        background: 'var(--border)',
         margin: '4px 8px',
       }}
     />
@@ -415,7 +467,7 @@ function OverflowItem({
         background: 'none',
         textAlign: 'left',
         cursor: 'pointer',
-        color: variant === 'danger' ? 'var(--mc-error, #ef4444)' : 'var(--foreground)',
+        color: variant === 'danger' ? 'var(--destructive)' : 'var(--foreground)',
         fontSize: 12,
       }}
       onMouseEnter={(e) => {

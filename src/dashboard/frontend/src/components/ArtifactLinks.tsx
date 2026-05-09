@@ -5,7 +5,8 @@ import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 interface ArtifactLinksProps {
   issueId: string;
   hasPlan: boolean;
-  beadsCount: number;
+  hasBeads: boolean;
+  beadsCount?: number;  // Deprecated — use hasBeads
   onViewBeads: () => void;
   onViewVBrief: () => void;
   variant: 'card' | 'inspector';
@@ -14,13 +15,13 @@ interface ArtifactLinksProps {
 export function ArtifactLinks({
   issueId,
   hasPlan,
-  beadsCount,
+  hasBeads,
   onViewBeads,
   onViewVBrief,
   variant,
 }: ArtifactLinksProps) {
   const queryClient = useQueryClient();
-  const needsTaskGeneration = hasPlan && beadsCount === 0;
+  const needsTaskGeneration = hasPlan && !hasBeads;
 
   const generateTasksMutation = useMutation({
     mutationFn: async () => {
@@ -54,7 +55,7 @@ export function ArtifactLinks({
   if (variant === 'inspector') {
     return (
       <>
-        {(beadsCount > 0 || needsTaskGeneration) && (
+        {(hasBeads || needsTaskGeneration) && (
           <button
             onClick={() => handleTasksClick()}
             disabled={generateTasksMutation.isPending}
@@ -84,7 +85,7 @@ export function ArtifactLinks({
   // card variant — compact chips
   return (
     <>
-      {(beadsCount > 0 || needsTaskGeneration) && (
+      {(hasBeads || needsTaskGeneration) && (
         <button
           onClick={(e) => handleTasksClick(e)}
           disabled={generateTasksMutation.isPending}

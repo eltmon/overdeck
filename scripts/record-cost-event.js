@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createRequire } from "node:module";
-import { appendFileSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, writeFileSync } from "fs";
+import { appendFileSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, statSync, writeFileSync } from "fs";
 import { exec, execFileSync } from "child_process";
 import { dirname, join } from "path";
 import { homedir } from "os";
@@ -234,7 +234,7 @@ const DEFAULT_PRICING = [
 	},
 	{
 		provider: "google",
-		model: "gemini-3-flash",
+		model: "gemini-3-flash-preview",
 		inputPer1k: 15e-5,
 		outputPer1k: 6e-4,
 		currency: "USD"
@@ -389,6 +389,9 @@ function initSchema(db) {
       auto_requeue_count    INTEGER DEFAULT 0,
       merge_retry_count     INTEGER DEFAULT 0,
       pr_url                TEXT,
+      -- PAN-905: tracked PR identity for webhook correlation
+      pr_head_sha           TEXT,
+      pr_number             INTEGER,
       -- PAN-653: persistent stuck state (set when main diverges mid-approve)
       stuck                 INTEGER NOT NULL DEFAULT 0,
       stuck_reason          TEXT,
@@ -407,7 +410,13 @@ function initSchema(db) {
       -- Human-requested deacon ignore: when set, patrol skips this issue entirely
       deacon_ignored          INTEGER NOT NULL DEFAULT 0,
       deacon_ignored_at       TEXT,
-      deacon_ignored_reason   TEXT
+      deacon_ignored_reason   TEXT,
+      -- PAN-905: GitHub-native merge blocker reasons (JSON array)
+      blocker_reasons         TEXT,
+      -- PAN-938: pre-review verification gate commit SHA
+      last_verified_commit    TEXT,
+      -- PAN-938: current merge pipeline step
+      merge_step              TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -628,7 +637,7 @@ function initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_git_ops_op_ts
       ON git_operations(operation, ts);
   `);
-	db.pragma(`user_version = 29`);
+	db.pragma(`user_version = 32`);
 }
 /**
 * Run schema migrations if the database version is older than SCHEMA_VERSION.
@@ -636,7 +645,7 @@ function initSchema(db) {
 */
 function runMigrations(db) {
 	const currentVersion = db.pragma("user_version", { simple: true });
-	if (currentVersion === 29) return;
+	if (currentVersion === 32) return;
 	if (currentVersion === 0) {
 		initSchema(db);
 		return;
@@ -930,7 +939,26 @@ function runMigrations(db) {
           ON conversations(status, archived_at, created_at)
       `);
 	} catch {}
-	db.pragma(`user_version = 29`);
+	if (currentVersion < 30) try {
+		db.exec(`ALTER TABLE review_status ADD COLUMN blocker_reasons TEXT`);
+	} catch {}
+	if (currentVersion < 31) {
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN pr_head_sha TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN pr_number INTEGER`);
+		} catch {}
+	}
+	if (currentVersion < 32) {
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN last_verified_commit TEXT`);
+		} catch {}
+		try {
+			db.exec(`ALTER TABLE review_status ADD COLUMN merge_step TEXT`);
+		} catch {}
+	}
+	db.pragma(`user_version = 32`);
 }
 //#endregion
 //#region ../src/lib/database/index.ts
@@ -969,7 +997,27 @@ function getDatabase() {
 	_db.pragma("journal_mode = WAL");
 	_db.pragma("foreign_keys = ON");
 	_db.pragma("synchronous = NORMAL");
+	_db.pragma("journal_size_limit = 67108864");
 	runMigrations(_db);
+	const currentVacuum = _db.pragma("auto_vacuum", { simple: true });
+	if (currentVacuum !== 2) {
+		const sizeBefore = _db.pragma("page_count", { simple: true });
+		const pageSize = _db.pragma("page_size", { simple: true });
+		const mbBefore = (sizeBefore * pageSize / 1024 / 1024).toFixed(1);
+		console.log(`[db] Migrating SQLite to incremental_vacuum (current=${currentVacuum}, size=${mbBefore}MB) — one-time, may take ~30s on a large DB...`);
+		const t0 = Date.now();
+		_db.pragma("auto_vacuum = INCREMENTAL");
+		_db.exec("VACUUM");
+		const mbAfter = (_db.pragma("page_count", { simple: true }) * pageSize / 1024 / 1024).toFixed(1);
+		console.log(`[db] Migration complete in ${Date.now() - t0}ms (${mbBefore}MB → ${mbAfter}MB)`);
+	}
+	setInterval(() => {
+		if (!_db) return;
+		try {
+			const free = _db.pragma("freelist_count", { simple: true });
+			if (free > 256) _db.pragma(`incremental_vacuum(${Math.min(free, 1e4)})`);
+		} catch {}
+	}, 900 * 1e3).unref();
 	return _db;
 }
 //#endregion
@@ -7655,13 +7703,18 @@ function extractPrefix(issueId) {
 * Maps Linear team prefixes and labels to project paths for workspace creation.
 */
 const PROJECTS_CONFIG_FILE = join(PANOPTICON_HOME, "projects.yaml");
-/**
-* Load projects configuration from ~/.panopticon/projects.yaml
-*/
+let _projectsCache = null;
 function loadProjectsConfig() {
 	if (!existsSync(PROJECTS_CONFIG_FILE)) return { projects: {} };
 	try {
-		return (0, import_dist.parse)(readFileSync(PROJECTS_CONFIG_FILE, "utf-8")) || { projects: {} };
+		const mtime = statSync(PROJECTS_CONFIG_FILE).mtimeMs;
+		if (_projectsCache && _projectsCache.mtime === mtime) return _projectsCache.config;
+		const config = (0, import_dist.parse)(readFileSync(PROJECTS_CONFIG_FILE, "utf-8")) || { projects: {} };
+		_projectsCache = {
+			mtime,
+			config
+		};
+		return config;
 	} catch (error) {
 		console.error(`Failed to parse projects.yaml: ${error.message}`);
 		return { projects: {} };

@@ -29,7 +29,7 @@ export function BulkActionBar({ count, onCloseOut, onCancel }: BulkActionBarProp
         <div className="w-px h-5 bg-border" />
         <button
           onClick={onCloseOut}
-          className="inline-flex items-center gap-1.5 h-9 rounded-lg bg-destructive px-3 text-sm font-medium text-white transition-shadow duration-200 hover:shadow-xs/5 focus-visible:ring-[3px] focus-visible:ring-ring/24 focus-visible:ring-offset-1"
+          className="inline-flex items-center gap-1.5 h-9 rounded-lg bg-destructive px-3 text-sm font-medium text-destructive-foreground transition-shadow duration-200 hover:shadow-xs/5 focus-visible:ring-[3px] focus-visible:ring-ring/24 focus-visible:ring-offset-1"
         >
           <Trash2 className="w-[18px] h-[18px] -mx-0.5" />
           Close Out

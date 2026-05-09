@@ -16,8 +16,8 @@
  */
 
 import chalk from 'chalk';
-import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync, readdirSync } from 'fs';
+import { basename, join } from 'path';
 import { promisify } from 'util';
 import { exec } from 'child_process';
 import {
@@ -27,6 +27,8 @@ import {
   type ReviewContext,
 } from '../../lib/cloister/review-agent.js';
 import { setReviewStatus } from '../../lib/review-status.js';
+import { findProjectByPath } from '../../lib/projects.js';
+import { getDashboardApiUrl } from '../../lib/config.js';
 
 const execAsync = promisify(exec);
 
@@ -35,6 +37,36 @@ interface ReviewRunOptions {
   prUrl?: string;
   branch?: string;
   filesChanged?: string;
+  model?: string;
+}
+
+function resolvePolyrepoGitDirs(workspacePath: string): string[] {
+  const gitDirs: string[] = [];
+  try {
+    const entries = readdirSync(workspacePath, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && !entry.name.startsWith('.') && existsSync(join(workspacePath, entry.name, '.git'))) {
+        gitDirs.push(join(workspacePath, entry.name));
+      }
+    }
+  } catch {}
+  return gitDirs;
+}
+
+async function detectPrUrlForRepo(repoDir: string): Promise<string | null> {
+  // Try GitHub
+  try {
+    const { stdout } = await execAsync('gh pr view --json url -q .url', { cwd: repoDir });
+    if (stdout.trim()) return stdout.trim();
+  } catch {}
+
+  // Try GitLab
+  try {
+    const { stdout } = await execAsync("glab mr view --output json | jq -r '.web_url'", { cwd: repoDir });
+    if (stdout.trim() && stdout.trim() !== 'null') return stdout.trim();
+  } catch {}
+
+  return null;
 }
 
 export async function reviewRunCommand(
@@ -42,36 +74,87 @@ export async function reviewRunCommand(
   opts: ReviewRunOptions = {},
 ): Promise<void> {
   const issueId = id.toUpperCase();
-  const cwd = opts.cwd ?? process.cwd();
-
-  if (!existsSync(join(cwd, '.git'))) {
-    console.error(chalk.red(`\nError: ${cwd} is not a git repo.`));
-    console.error(chalk.dim('`pan review run` must be invoked inside the workspace directory.'));
-    process.exit(2);
+  if (opts.model) {
+    process.env.PANOPTICON_REVIEW_MODEL_OVERRIDE = opts.model;
   }
+  const cwd = opts.cwd ?? process.cwd();
+  const projectConfig = findProjectByPath(cwd);
+  const isPolyrepo = projectConfig?.workspace?.type === 'polyrepo';
 
   console.log(chalk.cyan(`\n▶ pan review run ${issueId}`));
   console.log(chalk.dim(`  workspace: ${cwd}`));
+  if (isPolyrepo) console.log(chalk.dim(`  type:      polyrepo`));
 
-  const branch = opts.branch ?? (await detectBranch(cwd));
-  if (!branch) {
-    console.error(chalk.red('\nError: could not detect current git branch.'));
-    process.exit(2);
+  let branch: string | null;
+  let prUrl: string | null;
+  let filesChanged: string[];
+
+  if (isPolyrepo) {
+    const gitDirs = resolvePolyrepoGitDirs(cwd);
+    if (gitDirs.length === 0) {
+      console.error(chalk.red('\nError: polyrepo workspace has no code repos with .git'));
+      process.exit(2);
+    }
+
+    branch = opts.branch ?? (await detectBranch(gitDirs[0]));
+    if (!branch) {
+      console.error(chalk.red('\nError: could not detect git branch from code repos.'));
+      process.exit(2);
+    }
+    console.log(chalk.dim(`  branch:    ${branch}`));
+
+    prUrl = opts.prUrl ?? null;
+    if (!prUrl) {
+      for (const dir of gitDirs) {
+        prUrl = await detectPrUrlForRepo(dir);
+        if (prUrl) break;
+      }
+    }
+    if (!prUrl) {
+      console.error(chalk.red('\nError: could not detect PR/MR URL from any code repo.'));
+      console.error(chalk.dim('Open a PR/MR first, then retry.'));
+      process.exit(2);
+    }
+    console.log(chalk.dim(`  PR:        ${prUrl}`));
+
+    if (opts.filesChanged) {
+      filesChanged = opts.filesChanged.split(',').map(s => s.trim()).filter(Boolean);
+    } else {
+      filesChanged = [];
+      for (const dir of gitDirs) {
+        const repoFiles = await detectFilesChanged(dir);
+        const repoName = basename(dir);
+        filesChanged.push(...repoFiles.map(f => `${repoName}/${f}`));
+      }
+    }
+    console.log(chalk.dim(`  files:     ${filesChanged.length} changed across ${gitDirs.length} repos`));
+  } else {
+    if (!existsSync(join(cwd, '.git'))) {
+      console.error(chalk.red(`\nError: ${cwd} is not a git repo.`));
+      console.error(chalk.dim('`pan review run` must be invoked inside the workspace directory.'));
+      process.exit(2);
+    }
+
+    branch = opts.branch ?? (await detectBranch(cwd));
+    if (!branch) {
+      console.error(chalk.red('\nError: could not detect current git branch.'));
+      process.exit(2);
+    }
+    console.log(chalk.dim(`  branch:    ${branch}`));
+
+    prUrl = opts.prUrl ?? (await detectPrUrl(cwd));
+    if (!prUrl) {
+      console.error(chalk.red('\nError: could not detect PR URL for the current branch.'));
+      console.error(chalk.dim('Open a PR first (gh pr create), then retry.'));
+      process.exit(2);
+    }
+    console.log(chalk.dim(`  PR:        ${prUrl}`));
+
+    filesChanged = opts.filesChanged
+      ? opts.filesChanged.split(',').map(s => s.trim()).filter(Boolean)
+      : await detectFilesChanged(cwd);
+    console.log(chalk.dim(`  files:     ${filesChanged.length} changed`));
   }
-  console.log(chalk.dim(`  branch:    ${branch}`));
-
-  const prUrl = opts.prUrl ?? (await detectPrUrl(cwd));
-  if (!prUrl) {
-    console.error(chalk.red('\nError: could not detect PR URL for the current branch.'));
-    console.error(chalk.dim('Open a PR first (gh pr create), then retry.'));
-    process.exit(2);
-  }
-  console.log(chalk.dim(`  PR:        ${prUrl}`));
-
-  const filesChanged = opts.filesChanged
-    ? opts.filesChanged.split(',').map(s => s.trim()).filter(Boolean)
-    : await detectFilesChanged(cwd);
-  console.log(chalk.dim(`  files:     ${filesChanged.length} changed`));
 
   const agents = getReviewAgents();
   console.log(chalk.dim(`  reviewers: ${agents.map(a => a.name).join(', ')}`));
@@ -127,18 +210,41 @@ export async function reviewRunCommand(
 
   const exitCode = mapToExitCode(result.reviewResult, verdict, result.success);
 
-  // Persist the terminal review status. The dashboard reads this from the DB
-  // on next observation — no server API needed.
+  // Persist the terminal review status via the dashboard API so the test-agent
+  // dispatch (async IIFE in setReviewStatus) runs in the dashboard server's
+  // event loop — not in this CLI process which exits immediately after.
+  // Fall back to direct setReviewStatus for resilience if the API is unreachable.
   try {
     const mapped = reviewResultToReviewStatus(result);
-    setReviewStatus(issueId, {
-      reviewStatus: mapped,
-      reviewNotes: result.notes,
-      reviewRetryCount: 0,
-      recoveryStartedAt: undefined,
+    const dashboardUrl = getDashboardApiUrl();
+    const apiRes = await fetch(`${dashboardUrl}/api/review/${issueId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewStatus: mapped,
+        reviewNotes: result.notes,
+        reviewRetryCount: 0,
+        recoveryStartedAt: null,
+      }),
     });
-  } catch (err) {
-    console.warn(chalk.yellow(`[review-run] setReviewStatus(terminal) failed: ${err instanceof Error ? err.message : String(err)}`));
+    if (!apiRes.ok) {
+      console.warn(chalk.yellow(`[review-run] API status update failed (${apiRes.status}), falling back to direct setReviewStatus`));
+      throw new Error(`API ${apiRes.status}`);
+    }
+  } catch (apiErr) {
+    // Fallback: write directly to SQLite. The test-agent dispatch IIFE still won't
+    // run (process exits), but at least the status is persisted for the next patrol.
+    console.warn(chalk.yellow(`[review-run] API status update failed: ${apiErr instanceof Error ? apiErr.message : String(apiErr)}`));
+    try {
+      setReviewStatus(issueId, {
+        reviewStatus: reviewResultToReviewStatus(result),
+        reviewNotes: result.notes,
+        reviewRetryCount: 0,
+        recoveryStartedAt: undefined,
+      });
+    } catch (setErr) {
+      console.warn(chalk.yellow(`[review-run] setReviewStatus(terminal) failed: ${setErr instanceof Error ? setErr.message : String(setErr)}`));
+    }
   }
 
   if (exitCode === 0) {

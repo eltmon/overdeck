@@ -28,6 +28,7 @@ import {
   selectCompletedReviewers,
   resolveTemplatePath,
   runParallelReview,
+  killAllReviewSessions,
   type ReviewResult,
 } from '../../../src/lib/cloister/review-agent.js';
 
@@ -58,7 +59,7 @@ vi.mock('../../../src/lib/cloister/config.js', () => ({
   loadCloisterConfig: mockLoadCloisterConfig,
 }));
 
-const { mockKillSessionAsync, mockResolveProjectFromIssue, mockListStashes, mockCreateNamedStash, mockDropStash, mockIsPaneDeadAsync } = vi.hoisted(() => ({
+const { mockKillSessionAsync, mockResolveProjectFromIssue, mockListStashes, mockCreateNamedStash, mockDropStash, mockIsPaneDeadAsync, mockListPaneValuesAsync } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockResolveProjectFromIssue: vi.fn().mockReturnValue({
     projectKey: 'panopticon-cli',
@@ -70,6 +71,7 @@ const { mockKillSessionAsync, mockResolveProjectFromIssue, mockListStashes, mock
   mockCreateNamedStash: vi.fn().mockResolvedValue(null),
   mockDropStash: vi.fn().mockResolvedValue(undefined),
   mockIsPaneDeadAsync: vi.fn().mockResolvedValue(false),
+  mockListPaneValuesAsync: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../../src/lib/projects.js', () => ({
@@ -85,6 +87,7 @@ vi.mock('../../../src/lib/tmux.js', async () => {
     killSessionAsync: mockKillSessionAsync,
     setOptionAsync: vi.fn().mockResolvedValue(undefined),
     isPaneDeadAsync: mockIsPaneDeadAsync,
+    listPaneValuesAsync: mockListPaneValuesAsync,
   };
 });
 
@@ -193,6 +196,224 @@ describe('dispatchParallelReview', () => {
       c => c[1].reviewStatus === 'passed' || c[1].reviewStatus === 'blocked' || c[1].reviewStatus === 'failed',
     );
     expect(terminalCalls.length).toBe(0);
+  });
+});
+
+// ── killAllReviewSessions ─────────────────────────────────────────────────────
+// PAN-931: pan down must kill review sessions so they don't survive dashboard
+// restart and block new review dispatch.
+
+describe('killAllReviewSessions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('kills coordinator sessions', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'review-coordinator-PAN-999-1234567890000',
+      'review-coordinator-PAN-888-1234567890001',
+      'agent-pan-999',
+    ]);
+
+    const result = await killAllReviewSessions();
+
+    expect(result.killed).toContain('review-coordinator-PAN-999-1234567890000');
+    expect(result.killed).toContain('review-coordinator-PAN-888-1234567890001');
+    expect(result.killed).toHaveLength(2);
+    expect(mockKillSessionAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('kills canonical reviewer sessions (PAN-830 naming)', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'specialist-panopticon-cli-PAN-999-review-correctness',
+      'specialist-panopticon-cli-PAN-999-review-security',
+      'agent-pan-999',
+    ]);
+
+    const result = await killAllReviewSessions();
+
+    expect(result.killed).toContain('specialist-panopticon-cli-PAN-999-review-correctness');
+    expect(result.killed).toContain('specialist-panopticon-cli-PAN-999-review-security');
+    expect(result.killed).toHaveLength(2);
+  });
+
+  it('kills legacy timestamp-based reviewer sessions', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'review-PAN-999-1713456789000-correctness',
+      'review-PAN-999-1713456789000-security',
+    ]);
+
+    const result = await killAllReviewSessions();
+
+    expect(result.killed).toContain('review-PAN-999-1713456789000-correctness');
+    expect(result.killed).toContain('review-PAN-999-1713456789000-security');
+    expect(result.killed).toHaveLength(2);
+  });
+
+  it('returns empty when no review sessions exist', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'agent-pan-999',
+      'panopticon-dashboard',
+    ]);
+
+    const result = await killAllReviewSessions();
+
+    expect(result.killed).toHaveLength(0);
+    expect(result.failed).toHaveLength(0);
+    expect(mockKillSessionAsync).not.toHaveBeenCalled();
+  });
+
+  it('reports failed kills without throwing', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'review-coordinator-PAN-999-1234567890000',
+    ]);
+    mockKillSessionAsync.mockRejectedValueOnce(new Error('session not found'));
+
+    const result = await killAllReviewSessions();
+
+    expect(result.killed).toHaveLength(0);
+    expect(result.failed).toContain('review-coordinator-PAN-999-1234567890000');
+  });
+});
+
+// ── pan down integration (PAN-931) ────────────────────────────────────────────
+// Regression: verifies that `pan down` imports and calls killAllReviewSessions
+// so review sessions are cleaned up during dashboard shutdown.
+
+describe('pan down integration (PAN-931)', () => {
+  it('src/cli/index.ts imports killAllReviewSessions from review-agent.js', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const src = readFileSync(
+      resolve(import.meta.dirname, '../../../src/cli/index.ts'),
+      'utf-8',
+    );
+    expect(src).toContain('killAllReviewSessions');
+    expect(src).toContain("import('../lib/cloister/review-agent.js')");
+  });
+
+  it('src/cli/index.ts calls killAllReviewSessions inside the down command handler', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const src = readFileSync(
+      resolve(import.meta.dirname, '../../../src/cli/index.ts'),
+      'utf-8',
+    );
+    // Isolate the down command block: from `.command('down')` to the next `.command(`
+    const downBlockMatch = src.match(/\.command\(['"]down['"]\)[\s\S]*?\.command\(/);
+    expect(downBlockMatch).not.toBeNull();
+    const downBlock = downBlockMatch![0];
+    expect(downBlock).toContain('killAllReviewSessions');
+    expect(downBlock).toContain('killed');
+    expect(downBlock).toContain('failed');
+  });
+
+  it('pan down calls killAllReviewSessions after dashboard stop and before Traefik stop', async () => {
+    const { readFileSync } = await import('fs');
+    const { resolve } = await import('path');
+    const src = readFileSync(
+      resolve(import.meta.dirname, '../../../src/cli/index.ts'),
+      'utf-8',
+    );
+    const downBlockMatch = src.match(/\.command\(['"]down['"]\)[\s\S]*?\.command\(/);
+    expect(downBlockMatch).not.toBeNull();
+    const downBlock = downBlockMatch![0];
+
+    // Dashboard stop comes before review session cleanup
+    const dashboardStopIdx = downBlock.indexOf('stopDashboard');
+    const reviewCleanupIdx = downBlock.indexOf('killAllReviewSessions');
+    const traefikStopIdx = downBlock.indexOf('docker compose down');
+
+    expect(dashboardStopIdx).toBeGreaterThanOrEqual(0);
+    expect(reviewCleanupIdx).toBeGreaterThanOrEqual(0);
+    expect(traefikStopIdx).toBeGreaterThanOrEqual(0);
+    expect(reviewCleanupIdx).toBeGreaterThan(dashboardStopIdx);
+    expect(reviewCleanupIdx).toBeLessThan(traefikStopIdx);
+  });
+});
+
+// ── dispatchParallelReview idempotency guard (PAN-931) ────────────────────────
+
+describe('dispatchParallelReview idempotency guard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
+      const callback = (typeof _opts === 'function' ? _opts : cb)!;
+      if (cmd === 'git status --porcelain') return callback(null, { stdout: '', stderr: '' });
+      callback(new Error(`unexpected command: ${cmd}`));
+    });
+    mockListStashes.mockResolvedValue([]);
+    mockCreateNamedStash.mockResolvedValue(null);
+    mockDropStash.mockResolvedValue(undefined);
+  });
+
+  const baseOpts = {
+    issueId: 'PAN-999',
+    workspace: '/workspaces/feature-pan-999',
+    branch: 'feature/pan-999',
+    prUrl: 'https://github.com/org/repo/pull/1',
+  };
+
+  it('kills stale coordinator and proceeds when pane is dead (PAN-912)', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'review-coordinator-PAN-999-1234567890000',
+    ]);
+    mockIsPaneDeadAsync.mockResolvedValue(true);
+    const coordinatorSpawnFn = vi.fn().mockResolvedValue({ sessionName: 'review-coordinator-PAN-999-new' });
+
+    const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
+
+    expect(mockKillSessionAsync).toHaveBeenCalledWith('review-coordinator-PAN-999-1234567890000');
+    expect(coordinatorSpawnFn).toHaveBeenCalledOnce();
+    expect(ret.success).toBe(true);
+  });
+
+  it('kills zombie coordinator when pane_dead=0 but process PID is gone (PAN-931)', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'review-coordinator-PAN-999-1234567890000',
+    ]);
+    mockIsPaneDeadAsync.mockResolvedValue(false);
+    // Simulate a pane PID that no longer exists in the process table
+    mockListPaneValuesAsync.mockResolvedValue(['999999']);
+    const coordinatorSpawnFn = vi.fn().mockResolvedValue({ sessionName: 'review-coordinator-PAN-999-new' });
+
+    const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
+
+    expect(mockKillSessionAsync).toHaveBeenCalledWith('review-coordinator-PAN-999-1234567890000');
+    expect(coordinatorSpawnFn).toHaveBeenCalledOnce();
+    expect(ret.success).toBe(true);
+  });
+
+  it('skips dispatch when coordinator pane and process are both alive', async () => {
+    const { listSessionNamesAsync } = await import('../../../src/lib/tmux.js');
+    vi.mocked(listSessionNamesAsync).mockResolvedValue([
+      'review-coordinator-PAN-999-1234567890000',
+    ]);
+    mockIsPaneDeadAsync.mockResolvedValue(false);
+    // Simulate a real live PID
+    mockListPaneValuesAsync.mockResolvedValue(['1']);
+    // process.kill(1, 0) may throw EPERM in restricted test environments;
+    // mock it to succeed so the alive-path is deterministic.
+    const killSpy = vi.spyOn(process, 'kill').mockReturnValue(undefined as never);
+    const coordinatorSpawnFn = vi.fn().mockResolvedValue({ sessionName: 'review-coordinator-PAN-999-new' });
+
+    try {
+      const ret = await dispatchParallelReview(baseOpts, { coordinatorSpawnFn });
+
+      expect(mockKillSessionAsync).not.toHaveBeenCalled();
+      expect(coordinatorSpawnFn).not.toHaveBeenCalled();
+      expect(ret.success).toBe(true);
+      expect(ret.message).toContain('Review already in progress');
+    } finally {
+      killSpy.mockRestore();
+    }
   });
 });
 
@@ -307,7 +528,7 @@ describe('waitForReviewer', () => {
       sessionExists, fileExists, killSession,
     });
 
-    expect(result).toBe('completed');
+    expect(result).toEqual({ status: 'completed' });
     expect(fileExists).toHaveBeenCalledWith('/tmp/out.md');
     expect(killSession).not.toHaveBeenCalled();
   });
@@ -321,13 +542,13 @@ describe('waitForReviewer', () => {
       sessionExists, fileExists, killSession,
     });
 
-    expect(result).toBe('completed');
+    expect(result).toEqual({ status: 'completed' });
     expect(fileExists).toHaveBeenCalledWith('/tmp/out.md');
     // Session is kept alive post-completion for dashboard visibility; no killSession call
     expect(killSession).not.toHaveBeenCalled();
   });
 
-  it('returns failed when session exits without output file', async () => {
+  it('returns failed (session_exited) when session exits without output file', async () => {
     const sessionExists = vi.fn().mockResolvedValue(false);
     const fileExists = vi.fn().mockReturnValue(false);
     const killSession = vi.fn().mockResolvedValue(undefined);
@@ -336,11 +557,11 @@ describe('waitForReviewer', () => {
       sessionExists, fileExists, killSession,
     });
 
-    expect(result).toBe('failed');
+    expect(result).toEqual({ status: 'failed', reason: 'session_exited' });
     expect(killSession).not.toHaveBeenCalled();
   });
 
-  it('kills session and returns failed on timeout', async () => {
+  it('kills session and returns failed (timeout) on timeout', async () => {
     const sessionExists = vi.fn().mockResolvedValue(true); // session always running
     const fileExists = vi.fn().mockReturnValue(false);
     const killSession = vi.fn().mockResolvedValue(undefined);
@@ -350,12 +571,12 @@ describe('waitForReviewer', () => {
       sessionExists, fileExists, killSession,
     });
 
-    expect(result).toBe('failed');
+    expect(result).toEqual({ status: 'failed', reason: 'timeout' });
     expect(sessionExists).not.toHaveBeenCalled(); // never entered loop
     expect(killSession).toHaveBeenCalledWith('review-PAN-999-ts-correctness');
   });
 
-  it('returns failed immediately when pane is dead (remain-on-exit keeps session alive)', async () => {
+  it('returns failed (pane_dead) immediately when pane is dead', async () => {
     mockIsPaneDeadAsync.mockResolvedValueOnce(true);
     const sessionExists = vi.fn().mockResolvedValue(true); // session still alive due to remain-on-exit
     const fileExists = vi.fn().mockReturnValue(false);
@@ -366,10 +587,57 @@ describe('waitForReviewer', () => {
       sessionExists, fileExists, killSession, capturePane,
     });
 
-    expect(result).toBe('failed');
+    expect(result).toEqual({ status: 'failed', reason: 'pane_dead' });
     expect(sessionExists).toHaveBeenCalled();
     expect(capturePane).toHaveBeenCalledWith('review-PAN-999-ts-correctness');
     expect(killSession).not.toHaveBeenCalled();
+  });
+
+  it('fails fast with terminal_api_error + structured TerminalApiError when reviewer hits a 403 quota error', async () => {
+    // Repro of the PAN-1015 silent-30-min-timeout: Kimi quota exhausted, the
+    // pane stays alive at the prompt because Claude Code doesn't exit on API
+    // errors — it just prints the message and waits for input. Without
+    // detection this would hit the 30-minute timeout.
+    const sessionExists = vi.fn().mockResolvedValue(true);
+    const fileExists = vi.fn().mockReturnValue(false);
+    const killSession = vi.fn().mockResolvedValue(undefined);
+    const capturePane = vi.fn().mockResolvedValue([
+      '  Please run /login · API Error: 403',
+      '  {"error":{"type":"permission_error","message":"You\'ve reached your usage',
+      '  limit for this billing cycle. Your quota will be refreshed in the next',
+      '  cycle. Upgrade to get more: https://www.kimi.com/code/console"}}',
+      '❯ ',
+    ].join('\n'));
+
+    const result = await waitForReviewer('review-PAN-999-ts-correctness', '/tmp/out.md', 5000, {
+      sessionExists, fileExists, killSession, capturePane,
+    });
+
+    expect(result.status).toBe('failed');
+    if (result.status === 'failed') {
+      expect(result.reason).toBe('terminal_api_error');
+      expect(result.apiError).toBeDefined();
+      expect(result.apiError!.kind).toBe('quota_exhausted');
+      expect(result.apiError!.summary).toMatch(/quota|usage limit/i);
+    }
+    expect(killSession).toHaveBeenCalledWith('review-PAN-999-ts-correctness');
+  });
+
+  it('detects login_required terminal error from "Please run /login" pattern when no quota line is present', async () => {
+    const sessionExists = vi.fn().mockResolvedValue(true);
+    const fileExists = vi.fn().mockReturnValue(false);
+    const killSession = vi.fn().mockResolvedValue(undefined);
+    const capturePane = vi.fn().mockResolvedValue('  Please run /login\n❯ ');
+
+    const result = await waitForReviewer('review-PAN-999-ts-correctness', '/tmp/out.md', 5000, {
+      sessionExists, fileExists, killSession, capturePane,
+    });
+
+    expect(result.status).toBe('failed');
+    if (result.status === 'failed') {
+      expect(result.reason).toBe('terminal_api_error');
+      expect(result.apiError!.kind).toBe('login_required');
+    }
   });
 });
 
@@ -530,7 +798,7 @@ describe('resolveReviewerModel', () => {
   // Template frontmatter uses "haiku"/"sonnet"/"opus" as shorthand. Aliases must
   // be resolved through the work-type router (getModelId) — NOT hard-coded to
   // Anthropic model IDs — so the returned ID is provider-correct when using
-  // claudish, OpenAI, or other providers.
+  // OpenAI, Gemini, or other routed providers.
   it('resolves "haiku" alias via work-type router (not passed through verbatim)', () => {
     const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'haiku');
     expect(model).not.toBe('haiku');
@@ -960,8 +1228,8 @@ describe('runParallelReview', () => {
 
   it('happy path: all reviewers succeed → synthesis runs → result returned', async () => {
     const spawnFn = vi.fn().mockResolvedValue(undefined);
-    const waitFn = vi.fn().mockResolvedValue('completed');
-    const waitSynthesisFn = vi.fn().mockResolvedValue('completed');
+    const waitFn = vi.fn().mockResolvedValue({ status: 'completed' });
+    const waitSynthesisFn = vi.fn().mockResolvedValue({ status: 'completed' });
     const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
     const parseSynthesisFn = vi.fn().mockResolvedValue(approvedResult);
     const postReviewFn = vi.fn().mockResolvedValue(undefined);
@@ -984,7 +1252,7 @@ describe('runParallelReview', () => {
 
   it('failure path: reviewer failure aborts synthesis → COMMENTED returned', async () => {
     const spawnFn = vi.fn().mockResolvedValue(undefined);
-    const waitFn = vi.fn().mockResolvedValue('failed'); // all reviewers fail
+    const waitFn = vi.fn().mockResolvedValue({ status: 'failed', reason: 'timeout' }); // all reviewers fail
     const parseSynthesisFn = vi.fn();
     const postReviewFn = vi.fn();
     const resolvePromptTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
@@ -1012,8 +1280,8 @@ describe('runParallelReview', () => {
     mockKillSessionAsync.mockClear();
 
     const spawnFn = vi.fn().mockResolvedValue(undefined);
-    const waitFn = vi.fn().mockResolvedValue('completed');
-    const waitSynthesisFn = vi.fn().mockResolvedValue('completed');
+    const waitFn = vi.fn().mockResolvedValue({ status: 'completed' });
+    const waitSynthesisFn = vi.fn().mockResolvedValue({ status: 'completed' });
     const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
     const parseSynthesisFn = vi.fn().mockResolvedValue(approvedResult);
     const postReviewFn = vi.fn().mockResolvedValue(undefined);
@@ -1043,7 +1311,7 @@ describe('runParallelReview', () => {
     mockKillSessionAsync.mockClear();
 
     const spawnFn = vi.fn().mockResolvedValue(undefined);
-    const waitFn = vi.fn().mockResolvedValue('failed');
+    const waitFn = vi.fn().mockResolvedValue({ status: 'failed', reason: 'timeout' });
     const parseSynthesisFn = vi.fn();
     const postReviewFn = vi.fn();
     const resolvePromptTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
@@ -1105,22 +1373,22 @@ describe('dispatch failure reviewStatus regression', () => {
   });
 });
 
-// ── spawnReviewer claudish routing regression (PAN-540) ───────────────────────
-// Verifies that spawnReviewer uses getAgentRuntimeBaseCommand() so claudish
-// providers (OpenAI, Google) get routed correctly instead of using the old
-// hardcoded `claude --model` which only works for direct Anthropic-compatible providers.
+// ── spawnReviewer provider-routing regression (PAN-540) ───────────────────────
+// Verifies that spawnReviewer uses getAgentRuntimeBaseCommand() so routed
+// providers (OpenAI, Google, direct Anthropic-compatible providers) get the same
+// command construction as work agents instead of using a hardcoded `claude --model`.
 describe('spawnReviewer runtime command routing regression', () => {
-  it('review-agent.ts imports getAgentRuntimeBaseCommand from agents.js', async () => {
+  it('review-agent.ts imports resolveSpecialistBaseCommand from router.js (PAN-636: harness-aware routing)', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const src = readFileSync(
       resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
       'utf-8',
     );
-    expect(src).toMatch(/import\s*\{[^}]*getAgentRuntimeBaseCommand[^}]*\}\s*from\s*['"]\.\.\/agents\.js['"]/);
+    expect(src).toMatch(/import\s*\{[^}]*resolveSpecialistBaseCommand[^}]*\}\s*from\s*['"]\.\/router\.js['"]/);
   });
 
-  it('spawnReviewer body uses getAgentRuntimeBaseCommand, not a hardcoded claude --model string', async () => {
+  it('spawnReviewer body uses resolveSpecialistBaseCommand, not a hardcoded claude --model string', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const src = readFileSync(
@@ -1129,20 +1397,17 @@ describe('spawnReviewer runtime command routing regression', () => {
     );
 
     // Isolate the spawnReviewer function body
-    const spawnReviewerMatch = src.match(/async function spawnReviewer[\s\S]*?^}/m);
+    const spawnReviewerMatch = src.match(/async function spawnSingleReviewer[\s\S]*?^}/m);
     expect(spawnReviewerMatch).not.toBeNull();
     const fn = spawnReviewerMatch![0];
 
-    // Must use the routing helper — not a bare `claude --model` string
-    expect(fn).toContain('getAgentRuntimeBaseCommand(');
+    // Must use the harness-aware routing helper — not a bare `claude --model` string.
+    // resolveSpecialistBaseCommand wraps getAgentRuntimeBaseCommand and adds harness/ToS routing.
+    expect(fn).toContain('resolveSpecialistBaseCommand(');
     expect(fn).not.toMatch(/`claude\s+--(?:dangerously-skip-permissions|model)/);
   });
 
-  it('review-agent.ts imports getProviderExportsForModel (not getProviderEnvForModel)', async () => {
-    // getProviderExportsForModel always emits `unset ANTHROPIC_BASE_URL` lines,
-    // preventing stale parent-session env from leaking into reviewer processes.
-    // getProviderEnvForModel returns {} for Anthropic models, so tmux -e flags
-    // would add nothing and the parent ANTHROPIC_BASE_URL would not be cleared.
+  it('review-agent.ts uses launcher exports for provider env isolation', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const src = readFileSync(
@@ -1150,7 +1415,8 @@ describe('spawnReviewer runtime command routing regression', () => {
       'utf-8',
     );
     expect(src).toMatch(/getProviderExportsForModel/);
-    expect(src).not.toMatch(/getProviderEnvForModel/);
+    expect(src).toMatch(/generateLauncherScript/);
+    expect(src).toMatch(/BLANKED_PROVIDER_ENV/);
   });
 
   it('spawnReviewer uses a bash launcher script, not tmux -e env flags', async () => {
@@ -1161,18 +1427,18 @@ describe('spawnReviewer runtime command routing regression', () => {
       'utf-8',
     );
 
-    const spawnReviewerMatch = src.match(/async function spawnReviewer[\s\S]*?^}/m);
+    const spawnReviewerMatch = src.match(/async function spawnSingleReviewer[\s\S]*?^}/m);
     expect(spawnReviewerMatch).not.toBeNull();
     const fn = spawnReviewerMatch![0];
 
     // Must write a launcher script file and run it via bash
     expect(fn).toContain('getProviderExportsForModel(');
+    expect(fn).toContain('generateLauncherScript(');
     expect(fn).toContain('writeFile(');
     expect(fn).toMatch(/bash\s+.*launcherPath/);
 
-    // Must NOT pass provider env via tmux -e flags (old pattern that fails for Anthropic models).
-    // Panopticon identity vars may be passed as empty strings to prevent inherited env leakage.
-    expect(fn).not.toContain('getProviderEnvForModel(');
+    // Provider env flows through launcher exports — must avoid old tmux `-e KEY=value` transport.
+    expect(fn).not.toMatch(/createSessionAsync\([\s\S]*-e\s/);
     const envMatch = fn.match(/\{\s*env\s*:[\s\S]*?\}/);
     if (envMatch) {
       expect(envMatch[0]).not.toMatch(/ANTHROPIC_BASE_URL|OPENAI_API_KEY|providerEnv/);

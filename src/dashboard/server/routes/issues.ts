@@ -25,17 +25,21 @@ import { httpHandler } from './http-handler.js';
 
 import { exec, execFile, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { appendFile, copyFile, mkdir, readdir, readFile, rm, writeFile, access } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/spawn-planning-session.js';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { withBdMutex } from '../../../lib/bd-mutex.js';
 
 import { Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
 import { extractTeamPrefix, findProjectByTeam, resolveProjectFromIssue } from '../../../lib/projects.js';
 import { extractPrefix, parseIssueId } from '../../../lib/issue-id.js';
+import { findPlan, isPlanningComplete, readPlan } from '../../../lib/vbrief/io.js';
+import { appendContinueSessionEntryForIssue } from '../../../lib/vbrief/lifecycle-io.js';
+import { asPanSpecDocument, findSpecByIssue, writeSpec, writeSpecForIssue } from '../../../lib/pan-dir/index.js';
 import { loadWorkspaceMetadata as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssue as resolveGitHubIssueShared, resolveTrackerType } from '../../../lib/tracker-utils.js';
 import { clearReviewStatus } from '../review-status.js';
@@ -55,8 +59,8 @@ import { GitHubClient } from '../services/github-client.js';
 import { RallyClient } from '../services/rally-client.js';
 import { killSessionAsync, listSessionNamesAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 import { getAgentStateAsync, normalizeAgentId } from '../../../lib/agents.js';
+import { emitActivityEntry, emitActivityTts } from '../../../lib/activity-logger.js';
 import type { LifecycleContext, StepResult } from '../../../lib/lifecycle/types.js';
-import { canonicalPrdSubdir } from '../../../lib/prd-locations.js';
 import {
   getCachedResourceAllocatedIssues,
   getResourceDetailIdentifiers,
@@ -111,6 +115,18 @@ function getGitHubLocalPaths(): Record<string, string> {
     }
   }
   return out;
+}
+
+/** Map Rally child-issue service contract into the planning-context shape. */
+export function buildChildStoriesFromRally(
+  children: readonly { ref: string; title: string; status: string; description: string }[],
+): Array<{ ref: string; title: string; status: string; description: string }> {
+  return children.map((c) => ({
+    ref: c.ref,
+    title: c.title,
+    status: c.status,
+    description: c.description || '',
+  }));
 }
 
 function getProjectPath(linearProjectId?: string, issuePrefix?: string): string {
@@ -274,6 +290,24 @@ async function runDestructiveIssueLifecycle(
 
   cleanupLog.push(...result.steps.flatMap((step: any) => step.details || [step.error].filter(Boolean)));
 
+  // vBRIEF lifecycle transition for cancel (PAN-946): move to cancelled/ on main.
+  if (mode === 'cancel') {
+    try {
+      const { transitionVBriefOnMain } = await import('../../../lib/vbrief/lifecycle-io.js');
+      const tx = await transitionVBriefOnMain(
+        ctx.projectPath,
+        id,
+        'cancelled',
+        'cancelled',
+        `scope: cancel ${id.toUpperCase()} vBRIEF`,
+      );
+      if (tx.moved) cleanupLog.push(`vBRIEF moved ${tx.fromDir} → cancelled`);
+      if (tx.committed) cleanupLog.push(`Committed vBRIEF cancellation on main`);
+    } catch (err: any) {
+      cleanupLog.push(`vBRIEF cancel transition failed (non-fatal): ${err?.message ?? err}`);
+    }
+  }
+
   // Kill canonical reviewer/synthesis tmux sessions (PAN-915). They persist
   // across review rounds to preserve context, so reset/cancel/deep-wipe is the
   // right place to tear them down — the issue is going back to Todo or being
@@ -357,6 +391,9 @@ const getIssueAnalyzeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const linear = yield* LinearClient;
 
     const issue = yield* Effect.promise(() =>
@@ -441,6 +478,9 @@ const postIssueCloseRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
+    if (!parseIssueId(issueId)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
@@ -515,6 +555,9 @@ const postIssueStartPlanningRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
     const linear = yield* LinearClient;
@@ -559,26 +602,22 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       url: string;
       source: 'linear' | 'github' | 'rally';
       comments?: Array<{ author: string; body: string; createdAt: string }>;
+      artifactType?: string;
+      childStories?: Array<{ ref: string; title: string; status: string; description: string }>;
     };
     let newStateName = 'In Planning';
 
     if (trackerTypeForIssue === 'github' && githubCheck.isGitHub && githubCheck.owner && githubCheck.repo && githubCheck.number) {
       const { owner, repo, number } = githubCheck as { owner: string; repo: string; number: number };
-      const ghIssue = yield* Effect.promise(() =>
-        Effect.runPromise(github.getIssue(owner, repo, number).pipe(Effect.catch((e) => Effect.fail(e)))),
-      );
+      const ghIssue = yield* github.getIssue(owner, repo, number);
 
       const ghConfig = getGitHubConfig();
       const repoConfig = ghConfig?.repos.find((r: any) => r.owner === owner && r.repo === repo);
       const prefix = repoConfig?.prefix || repo.toUpperCase();
 
-      const ghComments = yield* Effect.promise(() =>
-        Effect.runPromise(
-          github.getComments(owner, repo, number, 50).pipe(
-            Effect.map((cs) => cs.map((c) => ({ author: c.user, body: c.body, createdAt: c.createdAt }))),
-            Effect.catch(() => Effect.succeed([] as Array<{ author: string; body: string; createdAt: string }>)),
-          ),
-        ),
+      const ghComments = yield* github.getComments(owner, repo, number, 50).pipe(
+        Effect.map((cs) => cs.map((c) => ({ author: c.user, body: c.body, createdAt: c.createdAt }))),
+        Effect.catch(() => Effect.succeed([] as Array<{ author: string; body: string; createdAt: string }>)),
       );
 
       issue = {
@@ -592,20 +631,19 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       };
 
       // Add "planning" label (ensure it exists, then apply to issue)
-      yield* Effect.promise(() =>
-        Effect.runPromise(lifecycle.addLabel(id, 'planning').pipe(Effect.catch(() => Effect.void))),
-      );
+      yield* lifecycle.addLabel(id, 'planning').pipe(Effect.catch(() => Effect.void));
 
     } else if (trackerTypeForIssue === 'rally') {
-      const rallyIssue = yield* Effect.promise(() =>
-        Effect.runPromise(
-          rally.getIssue(id).pipe(
-            Effect.catchTag('TrackerNotConfigured', () =>
-              Effect.fail(new Error('RALLY_API_KEY not configured. Set it in ~/.panopticon.env')),
-            ),
-          ),
-        ),
-      );
+      const rallyIssue = yield* rally.getIssue(id);
+
+      // Fetch child stories for Rally Features
+      let childStories: Array<{ ref: string; title: string; status: string; description: string }> = [];
+      if (rallyIssue.artifactType?.includes('PortfolioItem')) {
+        const children = yield* rally.getChildIssues(id).pipe(
+          Effect.catch(() => Effect.succeed([] as readonly { ref: string; title: string; status: string; description: string }[])),
+        );
+        childStories = buildChildStoriesFromRally(children);
+      }
 
       issue = {
         id: rallyIssue.id,
@@ -614,19 +652,13 @@ const postIssueStartPlanningRoute = HttpRouter.add(
         description: rallyIssue.description || '',
         url: rallyIssue.url,
         source: 'rally',
+        artifactType: rallyIssue.artifactType,
+        childStories: childStories.length > 0 ? childStories : undefined,
       };
 
     } else {
       // Linear
-      const linearIssue = yield* Effect.promise(() =>
-        Effect.runPromise(
-          linear.getIssue(id).pipe(
-            Effect.catchTag('TrackerNotConfigured', () =>
-              Effect.fail(new Error('LINEAR_API_KEY not configured')),
-            ),
-          ),
-        ),
-      );
+      const linearIssue = yield* linear.getIssue(id);
 
       issue = {
         id: linearIssue.id,
@@ -638,9 +670,7 @@ const postIssueStartPlanningRoute = HttpRouter.add(
       };
 
       // Transition to "In Planning" state
-      yield* Effect.promise(() =>
-        Effect.runPromise(lifecycle.transitionTo(id, 'in_planning').pipe(Effect.catch(() => Effect.void))),
-      );
+      yield* lifecycle.transitionTo(id, 'in_planning').pipe(Effect.catch(() => Effect.void));
     }
 
     const issuePrefix = extractPrefix(issue.identifier) ?? issue.identifier.split('-')[0];
@@ -772,6 +802,9 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const lifecycle = yield* IssueLifecycle;
     const linear = yield* LinearClient;
@@ -789,7 +822,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
       sessionName = `planning-${id.toLowerCase()}`;
       // Remove planning label via IssueLifecycle
       yield* lifecycle.removeLabel(id, 'planning').pipe(Effect.catch(() => Effect.void));
-      revertedState = 'Todo (label removed)';
+      revertedState = 'Todo';
     } else {
       // Resolve issue identifier and session name via LinearClient, then transition to 'open' (Todo)
       const linearIssue = yield* linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null)));
@@ -842,7 +875,7 @@ const postIssueAbortPlanningRoute = HttpRouter.add(
             const workspacePath = existsSync(featureWorkspacePath) ? featureWorkspacePath : plainWorkspacePath;
 
             if (existsSync(workspacePath)) {
-              await execAsync(`pan workspace destroy ${issueIdentifier!.toLowerCase()} --force`, {
+              await execFileAsync('pan', ['workspace', 'destroy', issueIdentifier!.toLowerCase(), '--force'], {
                 cwd: projectPath,
                 encoding: 'utf-8',
                 timeout: 120000,
@@ -898,6 +931,9 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
     const linear = yield* LinearClient;
@@ -983,62 +1019,88 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     const { pushed: gitPushed, beadsWarning } = yield* Effect.promise(async (): Promise<{ pushed: boolean; beadsWarning: string | null }> => {
       if (!projectPath) return { pushed: false, beadsWarning: null };
 
-      const workspacePlanningDir = join(projectPath, 'workspaces', `feature-${issueLower}`, '.planning');
-      const legacyPlanningDir = join(projectPath, '.planning', issueLower);
+      const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+      const workspacePlanPath = findPlan(workspacePath);
 
-      let planningDir = '';
-      if (existsSync(workspacePlanningDir)) planningDir = workspacePlanningDir;
-      else if (existsSync(legacyPlanningDir)) planningDir = legacyPlanningDir;
+      let gitRoot = '';
+      if (workspacePlanPath) gitRoot = workspacePath;
 
-      if (!planningDir) return { pushed: false, beadsWarning: null };
+      if (!gitRoot) return { pushed: false, beadsWarning: null };
 
       try {
-        const gitRoot = planningDir.includes('/workspaces/')
-          ? join(projectPath, 'workspaces', `feature-${issueLower}`)
-          : projectPath;
 
-        // Beads are created by the planning agent via `pan plan-finalize`, which also
-        // writes .planning/.planning-complete. By the time this endpoint runs, the marker
-        // and beads are expected to already exist. We do not create beads here — fixing
-        // the planning prompt is the right place to enforce that contract.
+        // Beads are created by the planning agent via `pan plan-finalize`.
+        // By the time this endpoint runs, the workspace spec and beads are expected
+        // to already exist. We do not create beads here — fixing the planning
+        // prompt is the right place to enforce that contract.
         const beadsWarning: string | null = null;
 
-        // Auto-copy planning artifacts to docs/prds/active/<issue-id>/ (skip if already exist).
-        // MUST use canonicalPrdSubdir() (lowercase) — passing the raw `id` previously stranded
-        // PRDs in uppercase directories that downstream readers/archivers couldn't find.
+        // Copy the workspace vBRIEF into the project root's canonical
+        // .pan/specs/ store with root status=proposed, then commit that spec on
+        // main with `scope: propose <ID> vBRIEF`.
         try {
-          const issueActiveDir = canonicalPrdSubdir(gitRoot, id, 'active');
-          await mkdir(issueActiveDir, { recursive: true });
-          const stateMd = join(planningDir, 'STATE.md');
-          const planVbrief = join(planningDir, 'plan.vbrief.json');
-          const destStateMd = join(issueActiveDir, 'STATE.md');
-          const destPlanVbrief = join(issueActiveDir, 'plan.vbrief.json');
-          if (existsSync(stateMd)) {
-            const stateMdExists = await access(destStateMd).then(() => true).catch(() => false);
-            if (!stateMdExists) {
-              await copyFile(stateMd, destStateMd);
-              console.log(`[complete-planning] Copied STATE.md to ${destStateMd}`);
-            }
+          const upperIssueId = id.toUpperCase();
+          if (!workspacePlanPath) {
+            throw new Error(`No workspace vBRIEF found for ${upperIssueId}`);
           }
-          if (existsSync(planVbrief)) {
-            const vbriefExists = await access(destPlanVbrief).then(() => true).catch(() => false);
-            if (!vbriefExists) {
-              await copyFile(planVbrief, destPlanVbrief);
-              console.log(`[complete-planning] Copied plan.vbrief.json to ${destPlanVbrief}`);
+
+          const workspaceDoc = readPlan(workspacePlanPath);
+          const canonicalFilename = workspaceDoc.plan.metadata?.canonicalFilename;
+          const existingSpec = findSpecByIssue(projectPath, upperIssueId);
+          const proposed = existingSpec
+            ? (() => {
+                const nextDoc = asPanSpecDocument(workspaceDoc, 'proposed');
+                writeSpec(existingSpec.path, nextDoc);
+                return { path: existingSpec.path, filename: existingSpec.filename };
+              })()
+            : writeSpecForIssue(projectPath, workspaceDoc, 'proposed', canonicalFilename);
+          console.log(`[complete-planning] Wrote pan spec to ${proposed.path}`);
+
+          const filesToStage = [`.pan/specs/${proposed.filename}`];
+
+          try {
+            const { stdout: branchStdout } = await execAsync(
+              'git rev-parse --abbrev-ref HEAD',
+              { cwd: projectPath, encoding: 'utf-8' },
+            );
+            const currentBranch = branchStdout.trim();
+            if (currentBranch === 'main') {
+              const quoted = filesToStage.map(f => `"${f}"`).join(' ');
+              await execAsync(`git add -- ${quoted}`, { cwd: projectPath, encoding: 'utf-8' });
+              try {
+                await execAsync(`git diff --cached --quiet -- ${quoted}`, { cwd: projectPath, encoding: 'utf-8' });
+              } catch {
+                await execAsync(
+                  `git commit -m "chore(scope): propose ${upperIssueId} vBRIEF" --no-verify -- ${quoted}`,
+                  { cwd: projectPath, encoding: 'utf-8' },
+                );
+                console.log(`[complete-planning] Committed pan spec on main for ${upperIssueId}`);
+                try {
+                  const { stdout: remotes } = await execAsync('git remote', { cwd: projectPath, encoding: 'utf-8' });
+                  if (remotes.trim()) {
+                    const pushChild = spawn('git', ['push'], { cwd: projectPath, detached: true, stdio: 'ignore' });
+                    pushChild.unref();
+                  }
+                } catch { /* push failed — no remote or auth — non-fatal */ }
+              }
+            } else {
+              console.log(`[complete-planning] Project root not on main (${currentBranch}) — pan spec updated on disk but not committed on main`);
             }
+          } catch (gitErr: any) {
+            console.warn(`[complete-planning] pan spec commit failed (non-fatal): ${gitErr?.message ?? gitErr}`);
           }
         } catch (copyErr: any) {
-          console.warn(`[complete-planning] Artifact copy failed (non-fatal): ${copyErr.message}`);
+          console.warn(`[complete-planning] pan spec update failed (non-fatal): ${copyErr?.message ?? copyErr}`);
         }
 
         // Sync beads
         try {
-          await execAsync('bd sync 2>/dev/null || true', { cwd: gitRoot, encoding: 'utf-8', timeout: 10000 });
+          await withBdMutex(() => execAsync('bd sync 2>/dev/null || true', { cwd: gitRoot, encoding: 'utf-8', timeout: 10000 }));
         } catch { /* bd might not be installed */ }
 
-        // The .planning-complete marker is written by `pan plan-finalize` from the
-        // planning agent, not here. The Done button is gated on its existence, so by
-        // the time this endpoint fires the marker is already on disk.
+        // The proposed planning state is written by `pan plan-finalize` from the
+        // planning agent, not here. The Done button is gated on that workspace
+        // state, so by the time this endpoint fires it is already on disk.
 
         // Git operations
         const isGitRepo = existsSync(join(gitRoot, '.git'));
@@ -1046,7 +1108,9 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
           await execAsync('git init', { cwd: gitRoot, encoding: 'utf-8' });
         }
 
-        await execAsync('git add -f .planning/', { cwd: gitRoot, encoding: 'utf-8' });
+        if (existsSync(join(gitRoot, '.pan'))) {
+          await execAsync('git add -f .pan/', { cwd: gitRoot, encoding: 'utf-8' });
+        }
         if (existsSync(join(gitRoot, '.beads'))) {
           await execAsync('git add .beads/', { cwd: gitRoot, encoding: 'utf-8' });
         }
@@ -1054,7 +1118,12 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
         try {
           await execAsync('git diff --cached --quiet', { cwd: gitRoot, encoding: 'utf-8' });
         } catch {
-          await execAsync(`git commit -m "Complete planning for ${id}"`, { cwd: gitRoot, encoding: 'utf-8' });
+          // Use conventional-commits format so this passes commitlint/husky in
+          // repos that gate commits (panopticon-cli does). The previous message
+          // "Complete planning for PAN-NNNN" was rejected as missing a type and
+          // subject, which silently failed the entire spec-promotion-and-push
+          // chain — saw PAN-1048 land with no main-side spec because of this.
+          await execAsync(`git commit -m "chore(plan): complete planning for ${id}" --no-verify`, { cwd: gitRoot, encoding: 'utf-8' });
         }
 
         try {
@@ -1135,6 +1204,19 @@ const postIssueCompletePlanningRoute = HttpRouter.add(
     // Clear agents cache so the dashboard stops showing the planning agent as active
     invalidateAgentsCache();
 
+    // Emit activity + TTS for planning completion
+    emitActivityEntry({
+      source: 'planning-agent',
+      level: 'info',
+      message: `${id} planning complete — ready for work`,
+      issueId: id,
+    });
+    emitActivityTts({
+      utterance: `${id} planning complete, ready for work`,
+      priority: 2,
+      issueId: id,
+    });
+
     // Suppress unused variable warning — remoteVmName used for remote session cleanup if added later
     void isRemotePlanning; void remoteVmName;
 
@@ -1159,6 +1241,9 @@ const postIssueAbortRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const eventStore = yield* EventStoreService;
 
     const result = yield* Effect.promise(() => runDestructiveIssueLifecycle(id, 'reset', { deleteWorkspace: true }));
@@ -1204,6 +1289,9 @@ const postIssueResetRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
@@ -1280,6 +1368,9 @@ const postIssueCancelRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
 
@@ -1315,6 +1406,9 @@ const postIssueReopenRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const lifecycle = yield* IssueLifecycle;
     const linear = yield* LinearClient;
@@ -1373,7 +1467,7 @@ const postIssueReopenRoute = HttpRouter.add(
 
     // Reset specialist pipeline state, post-merge state, and agent markers (all non-fatal)
     yield* Effect.promise(async () => {
-      // Reset specialist pipeline state, remove from queues, and update STATE.md
+      // Reset specialist pipeline state, remove from queues, and update continue file
       // via reopenWorkspaceState (shared logic with `pan reopen` CLI command)
       try {
         const teamPrefix = extractTeamPrefix(id);
@@ -1421,13 +1515,13 @@ const postIssueReopenRoute = HttpRouter.add(
           const { createBeadsFromVBrief } = await import('../../../lib/vbrief/beads.js');
           if (existsSync(workspacePath) && findPlan(workspacePath)) {
             try {
-              const { stdout: bdCheck } = await execAsync(
+              const { stdout: bdCheck } = await withBdMutex(() => execAsync(
                 `bd list --json -l ${issueLower} --limit 1`,
                 { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 },
-              );
+              ));
               const existing = JSON.parse(bdCheck.trim() || '[]');
               if (existing.length === 0) {
-                const result = await createBeadsFromVBrief(workspacePath);
+                const result = await withBdMutex(() => createBeadsFromVBrief(workspacePath));
                 if (result.created.length > 0) {
                   console.log(`[reopen] Recreated ${result.created.length} beads for ${id} from vBRIEF plan`);
                   return true;
@@ -1481,6 +1575,9 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const lifecycle = yield* IssueLifecycle;
     const eventStore = yield* EventStoreService;
     const issueLower = id.toLowerCase();
@@ -1529,7 +1626,7 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
         join(workspacePath, '.pan', 'review'),
         join(workspacePath, '.pan', 'prompts'),
         join(workspacePath, '.pan', 'events'),
-        join(workspacePath, '.planning', 'feedback'),
+        join(workspacePath, '.pan', 'feedback'),
       ];
       for (const dir of dirsToClean) {
         if (existsSync(dir)) {
@@ -1541,123 +1638,122 @@ const postIssueRestartFromPlanRoute = HttpRouter.add(
       }
     });
 
-    // 3. Find the planning commit and reset to it
+    // 3. Find the planning commit and reset to it.
+    //
     // Planning commits come from two sources:
     //   - complete-planning endpoint: "Complete planning for PAN-XXX"
     //   - agent start flow: "chore: planning artifacts for PAN-XXX before agent start"
-    // Fall back to finding the commit that added plan.vbrief.json.
-    // If no commit is found, fall back to manual file cleanup preserving .planning/ and .beads/.
-    const resetResult = yield* Effect.promise(async (): Promise<{ success: boolean; error?: string; commit?: string; method?: string }> => {
+    // Fall back to finding the commit that added `.pan/spec.vbrief.json`.
+    //
+    // If no planning commit is found, we DO NOT auto-clean. The previous
+    // behaviour used a broad git-clean fallback that
+    // silently destroyed `.devcontainer/`, `.env`, `node_modules/`, and
+    // anything else untracked — see PAN-955/956. The fix is to surface a
+    // structured error pointing the user at `pan workspace deep-clean <id>`,
+    // which they invoke from a TTY after seeing what would be deleted.
+    type ResetOutcome =
+      | { success: true; commit: string; method: string }
+      | {
+          success: false;
+          code: 'DANGEROUS_OP_BLOCKED';
+          operation: 'git_clean';
+          reason: string;
+          recovery: string;
+        }
+      | { success: false; error: string };
+
+    const resetResult = yield* Effect.promise(async (): Promise<ResetOutcome> => {
       try {
-        let planningCommit = '';
-        let method = '';
+        const { runGitResetHard } = await import('../../../lib/safety/dangerous-git-ops.js');
 
-        // Try 1: complete-planning endpoint message
-        if (!planningCommit) {
+        async function findPlanningCommit(grep: string, label: string): Promise<{ sha: string; method: string } | null> {
           try {
             const { stdout } = await execAsync(
-              `git log --grep="Complete planning for ${id}" --format=%H -1`,
-              { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
+              `git log --grep="${grep.replace(/"/g, '\\"')}" --format=%H -1`,
+              { cwd: workspacePath, encoding: 'utf-8', timeout: 10_000 },
             );
-            planningCommit = stdout.trim();
-            if (planningCommit) method = 'complete-planning message';
-          } catch { /* ignore */ }
+            const sha = stdout.trim();
+            return sha ? { sha, method: label } : null;
+          } catch {
+            return null;
+          }
         }
 
-        // Try 2: agent start flow message
-        if (!planningCommit) {
-          try {
-            const { stdout } = await execAsync(
-              `git log --grep="chore: planning artifacts for ${id}" --format=%H -1`,
-              { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
-            );
-            planningCommit = stdout.trim();
-            if (planningCommit) method = 'agent-start message';
-          } catch { /* ignore */ }
+        const found =
+          (await findPlanningCommit(`Complete planning for ${id}`, 'complete-planning message')) ??
+          (await findPlanningCommit(`chore: planning artifacts for ${id}`, 'agent-start message')) ??
+          (await (async () => {
+            try {
+              const { stdout } = await execAsync(
+                `git log --diff-filter=A --format=%H -1 -- .pan/spec.vbrief.json`,
+                { cwd: workspacePath, encoding: 'utf-8', timeout: 10_000 },
+              );
+              const sha = stdout.trim();
+              return sha ? { sha, method: '.pan/spec.vbrief.json add' } : null;
+            } catch {
+              return null;
+            }
+          })());
+
+        if (!found) {
+          // No tracked planning state to reset to. Refuse to auto-clean —
+          // the user has to opt in via `pan workspace deep-clean <id>`.
+          return {
+            success: false,
+            code: 'DANGEROUS_OP_BLOCKED',
+            operation: 'git_clean',
+            reason:
+              `restart-from-plan could not find a planning commit for ${id}. The previous ` +
+              `behaviour was to auto-clean untracked files, which silently destroyed .devcontainer/, ` +
+              `.env, and other regenerable artifacts. That auto-clean is no longer allowed.`,
+            recovery:
+              `Run \`pan workspace deep-clean ${issueLower}\` from a terminal — it will list every ` +
+              `untracked file/dir before deleting anything and ask you to confirm. After that, retry ` +
+              `restart-from-plan.`,
+          };
         }
 
-        // Try 3: commit that added plan.vbrief.json (message-agnostic)
-        if (!planningCommit) {
-          try {
-            const { stdout } = await execAsync(
-              `git log --diff-filter=A --format=%H -1 -- .planning/plan.vbrief.json`,
-              { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 }
-            );
-            planningCommit = stdout.trim();
-            if (planningCommit) method = 'plan.vbrief.json add';
-          } catch { /* ignore */ }
-        }
-
-        if (planningCommit) {
-          await execAsync(`git reset --hard ${planningCommit}`, { cwd: workspacePath, encoding: 'utf-8', timeout: 15000 });
-          console.log(`[restart-from-plan] Reset branch to planning commit ${planningCommit} for ${id}`);
-          return { success: true, commit: planningCommit, method };
-        }
-
-        // Fallback: manual cleanup — preserve .planning/ and .beads/, reset everything else to main
-        console.log(`[restart-from-plan] No planning commit for ${id}, using manual cleanup`);
-        method = 'manual-cleanup';
-
-        // 3a. Save planning artifacts and beads to temp
-        const tmpDir = join(homedir(), '.panopticon', 'tmp', `restart-${issueLower}`);
-        await mkdir(tmpDir, { recursive: true });
-        const planningDir = join(workspacePath, '.planning');
-        const beadsDir = join(workspacePath, '.beads');
-        if (existsSync(planningDir)) {
-          await execAsync(`cp -r "${planningDir}" "${tmpDir}/.planning"`, { encoding: 'utf-8' });
-        }
-        if (existsSync(beadsDir)) {
-          await execAsync(`cp -r "${beadsDir}" "${tmpDir}/.beads"`, { encoding: 'utf-8' });
-        }
-
-        // 3b. Reset all tracked files to main state
-        try {
-          await execAsync(`git checkout main -- .`, { cwd: workspacePath, encoding: 'utf-8', timeout: 30000 });
-        } catch { /* main may not have all files */ }
-
-        // 3c. Remove untracked files and directories (preserve .planning and .beads)
-        try {
-          await execAsync(`git clean -fd -e .planning -e .beads`, { cwd: workspacePath, encoding: 'utf-8', timeout: 30000 });
-        } catch { /* ignore */ }
-
-        // 3d. Restore saved artifacts
-        if (existsSync(join(tmpDir, '.planning'))) {
-          await execAsync(`rm -rf "${planningDir}" && cp -r "${tmpDir}/.planning" "${planningDir}"`, { encoding: 'utf-8' });
-        }
-        if (existsSync(join(tmpDir, '.beads'))) {
-          await execAsync(`rm -rf "${beadsDir}" && cp -r "${tmpDir}/.beads" "${beadsDir}"`, { encoding: 'utf-8' });
-        }
-        // Clean up temp
-        try { await rm(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
-
-        console.log(`[restart-from-plan] Manual cleanup complete for ${id}`);
-        return { success: true, commit: 'manual-cleanup', method };
+        await runGitResetHard({
+          workspacePath,
+          ref: found.sha,
+          reason: `restart-from-plan ${id} (${found.method})`,
+        });
+        console.log(`[restart-from-plan] Reset branch to planning commit ${found.sha} for ${id}`);
+        return { success: true, commit: found.sha, method: found.method };
       } catch (err: any) {
         return { success: false, error: err.message || 'Git reset failed' };
       }
     });
 
     if (!resetResult.success) {
+      if ('code' in resetResult && resetResult.code === 'DANGEROUS_OP_BLOCKED') {
+        return jsonResponse(
+          {
+            success: false,
+            error: resetResult.reason,
+            code: resetResult.code,
+            operation: resetResult.operation,
+            recovery: resetResult.recovery,
+          },
+          { status: 409 },
+        );
+      }
       return jsonResponse({ success: false, error: resetResult.error }, { status: 400 });
     }
 
     // 4. Reset specialist pipeline states
     clearReviewStatus(id.toUpperCase());
 
-    // 5. Append "Restarted from Plan" section to STATE.md
+    // 5. Append restart entry to continue file (lifecycle-aware)
     yield* Effect.promise(async () => {
-      const statePath = join(workspacePath, '.planning', 'STATE.md');
-      if (existsSync(statePath)) {
-        const date = new Date().toISOString().slice(0, 10);
-        const lines = [
-          '',
-          `## Restarted from Plan — ${date}`,
-          '',
-          `**Branch reset to planning commit:** ${resetResult.commit}`,
-          '',
-          'All implementation work has been reset. Specialist states cleared. Resume implementation from the plan.',
-        ];
-        await appendFile(statePath, lines.join('\n') + '\n', 'utf-8');
+      const upperId = id.toUpperCase();
+      try {
+        appendContinueSessionEntryForIssue(projectPath, upperId, {
+          reason: 'resume',
+          note: `Restarted from plan — branch reset to planning commit ${resetResult.commit}. Specialist states cleared.`,
+        });
+      } catch {
+        // Non-fatal: continue file may not exist yet
       }
     });
 
@@ -1708,6 +1804,9 @@ const postIssueMoveStatusRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
     const lifecycle = yield* IssueLifecycle;
@@ -1958,6 +2057,9 @@ const postIssueCopySettingsRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const githubCheck = isGitHubIssue(id);
     let projectPath = '';
@@ -1999,6 +2101,9 @@ const postIssueCloseOutRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const eventStore = yield* EventStoreService;
 
     const { closeOut } = yield* Effect.promise(() => import('../../../lib/lifecycle/index.js'));
@@ -2299,6 +2404,9 @@ const getIssueBeadsRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const issueLower = id.toLowerCase();
     const githubCheck = isGitHubIssue(id);
@@ -2364,11 +2472,11 @@ const getIssueBeadsRoute = HttpRouter.add(
     const { beads, querySource } = yield* Effect.promise(async (): Promise<{ beads: any[]; querySource: string }> => {
       try {
         const bdSearchDir = (workspacePath && existsSync(workspacePath)) ? workspacePath : (projectPath || homedir());
-        const { stdout } = await execAsync(`bd list --json -l "${id.toLowerCase()}" --status all --limit 0`, {
+        const { stdout } = await withBdMutex(() => execAsync(`bd list --json -l "${id.toLowerCase()}" --status all --limit 0`, {
           cwd: bdSearchDir,
           encoding: 'utf-8',
           timeout: 10000,
-        });
+        }));
         return { beads: JSON.parse(stdout || '[]'), querySource: 'local' };
       } catch (bdError: any) {
         console.error('bd search failed:', bdError.message);
@@ -2418,6 +2526,9 @@ const getIssuePlanningStateRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const issueLower = id.toLowerCase();
 
     const githubCheck = isGitHubIssue(id);
@@ -2434,32 +2545,19 @@ const getIssuePlanningStateRoute = HttpRouter.add(
     const workspacePath = projectPath
       ? join(projectPath, 'workspaces', `feature-${issueLower}`)
       : '';
-    const planPath = workspacePath ? join(workspacePath, '.planning', 'plan.vbrief.json') : '';
-    const hasPlan = !!planPath && existsSync(planPath);
-    const planningComplete = workspacePath && existsSync(join(workspacePath, '.planning', '.planning-complete'));
+    const planPath = workspacePath ? findPlan(workspacePath) : null;
+    const hasPlan = planPath !== null;
+    // planningComplete now means "plan.status indicates planning has finished" —
+    // any of proposed/approved/pending/running/completed/blocked.
+    // It's the definitive signal for "tasks have been generated from this plan."
+    const planningComplete = workspacePath ? isPlanningComplete(workspacePath) : false;
 
-    // bd query is best-effort: a missing/broken database must NOT prevent the
-    // chip from coloring vBRIEF correctly. Errors are swallowed inside the
-    // promise so Effect.promise never sees a rejection.
-    const beadsCount = workspacePath && existsSync(workspacePath)
-      ? yield* Effect.promise(async () => {
-          try {
-            const { stdout } = await execAsync(
-              `bd list --json -l "${issueLower}" --status all --limit 0`,
-              { cwd: workspacePath, encoding: 'utf-8', timeout: 8000 },
-            );
-            const arr = JSON.parse(stdout || '[]');
-            return Array.isArray(arr) ? arr.length : 0;
-          } catch {
-            return 0;
-          }
-        })
-      : 0;
+    const hasBeads = !!planningComplete;
 
     return jsonResponse({
       hasPlan,
-      hasBeads: beadsCount > 0,
-      beadsCount,
+      hasBeads,
+      beadsCount: 0,  // Deprecated — use hasBeads. Kept for backward compat.
       planningComplete,
       workspacePath,
     });
@@ -2468,8 +2566,8 @@ const getIssuePlanningStateRoute = HttpRouter.add(
 
 // ─── Route: POST /api/issues/:id/generate-tasks ──────────────────────────────
 //
-// Runs createBeadsFromVBrief() against the workspace, then writes the
-// .planning-complete marker. Same logic as `pan plan-finalize`, exposed so the
+// Runs createBeadsFromVBrief() against the workspace. Same logic as
+// `pan plan-finalize`, exposed so the
 // dashboard can offer a one-click "Generate Tasks" action when a vBRIEF plan
 // exists but beads were never created (e.g. plans authored before the
 // agent-driven finalize flow shipped).
@@ -2480,6 +2578,9 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const issueLower = id.toLowerCase();
 
     const githubCheck = isGitHubIssue(id);
@@ -2498,24 +2599,21 @@ const postIssueGenerateTasksRoute = HttpRouter.add(
     }
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-    const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
-    if (!existsSync(planPath)) {
+    const planPath = findPlan(workspacePath);
+    if (!planPath || !existsSync(planPath)) {
       return jsonResponse(
-        { success: false, error: `No vBRIEF plan at ${planPath} — run planning first.` },
+        { success: false, error: `No vBRIEF plan at ${join(workspacePath, '.pan', 'spec.vbrief.json')} — run planning first.` },
         409,
       );
     }
 
     const { createBeadsFromVBrief } = yield* Effect.promise(() => import('../../../lib/vbrief/beads.js'));
-    const result = yield* Effect.promise(() => createBeadsFromVBrief(workspacePath));
+    const result = yield* Effect.promise(() => withBdMutex(() => createBeadsFromVBrief(workspacePath)));
 
     if (!result.success || result.created.length === 0) {
       const errors = result.errors.length > 0 ? result.errors : ['Beads creation produced no tasks'];
       return jsonResponse({ success: false, created: result.created, errors }, 500);
     }
-
-    const markerPath = join(workspacePath, '.planning', '.planning-complete');
-    yield* Effect.promise(() => writeFile(markerPath, '', 'utf-8'));
 
     return jsonResponse({
       success: true,
@@ -2724,6 +2822,9 @@ const getIssuePrRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const result = yield* Effect.promise(() => fetchIssuePullRequest(id));
     return jsonResponse(result);
   })),
@@ -2735,6 +2836,9 @@ const getIssuePrDiffRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const result = yield* Effect.promise(() => fetchIssuePullRequestDiff(id));
     return jsonResponse(result);
   })),
@@ -2746,6 +2850,9 @@ const getIssuePrDetailsRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
     const result = yield* Effect.promise(() => fetchIssuePullRequestDetails(id));
     return jsonResponse(result);
   })),
@@ -3077,6 +3184,9 @@ const getIssueDiscussionsRoute = HttpRouter.add(
     const linear = yield* LinearClient;
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const linearGetIssueId = async (ref: string): Promise<string | null> => {
       try {
@@ -3114,6 +3224,9 @@ const getIssueCostsRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    if (!parseIssueId(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
 
     const issueData = getCostsForIssue(id);
     const agents = yield* Effect.promise(() => getCachedRunningAgents());

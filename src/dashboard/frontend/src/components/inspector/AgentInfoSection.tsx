@@ -1,8 +1,10 @@
-import { GitBranch, GitMerge, Folder, Cloud, Monitor, Loader2 } from 'lucide-react';
+import { GitBranch, GitMerge, Folder, Cloud, Monitor, Loader2, ExternalLink } from 'lucide-react';
 import { Agent } from '../../types';
 import type { WorkspaceInfo } from './types';
 import { getFriendlyModelName } from './utils';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
+import { getHarness } from '@panctl/contracts';
+import { PanOpenInPicker } from '../PanOpenInPicker';
 
 interface AgentInfoSectionProps {
   agent: Agent;
@@ -23,7 +25,7 @@ export function AgentInfoSection({ agent, duration, workspace, syncMainPending, 
         <div className="space-y-1.5">
           {[
             { label: 'Model', value: getFriendlyModelName(agent.model) },
-            { label: 'Runtime', value: agent.runtime },
+            { label: 'Runtime', value: getHarness(agent) },
             { label: 'Uptime', value: duration },
           ].map(({ label, value }) => (
             <div key={label} className="flex items-center justify-between">
@@ -71,9 +73,18 @@ export function AgentInfoSection({ agent, duration, workspace, syncMainPending, 
         <div className="px-3 py-2 border-b border-border text-xs">
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Folder className="w-3 h-3 shrink-0" />
-            <span className="font-mono truncate text-[10px]" title={agent.workspace}>
+            <span className="font-mono truncate text-[10px] flex-1" title={agent.workspace}>
               {agent.workspace}
             </span>
+            <a
+              href={`vscode://file/${agent.workspace}`}
+              className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded bg-card text-primary hover:text-primary/80 border border-border"
+              title="Open in VS Code"
+            >
+              <ExternalLink className="w-2.5 h-2.5" />
+              VS Code
+            </a>
+            <PanOpenInPicker cwd={agent.workspace} />
           </div>
         </div>
       )}

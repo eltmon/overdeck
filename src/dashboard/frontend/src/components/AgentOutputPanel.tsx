@@ -28,12 +28,12 @@ function parseSpecialistSession(agentId: string): { projectKey: string; issueId:
   return { projectKey: match[1], issueId: match[2], type: match[3] };
 }
 
-// Derive issueId for work and planning agents: agent-pan-505 → PAN-505, planning-pan-503 → PAN-503
+// Derive issueId for work and planning agents: agent-pan-505 → PAN-505, agent-pan-505-2 → PAN-505
 export function deriveAgentIssueId(agentId: string, agentIssueId?: string): string | null {
   if (agentIssueId) return agentIssueId;
-  const match = agentId.match(/^(?:agent|planning)-([a-z]+)-(\d+)$/i);
-  if (match) return `${match[1].toUpperCase()}-${match[2]}`;
-  return null;
+  const issuePattern = '((?:[a-z]+-\\d+|(?:f|us|de|ta|tc)\\d+))';
+  const match = agentId.match(new RegExp(`^(?:agent|planning)-${issuePattern}(?:-\\d+)?$`, 'i'));
+  return match ? match[1]!.toUpperCase() : null;
 }
 
 export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
@@ -125,7 +125,7 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
               />
             ) : specialistConversation ? (
               // Down specialist → show JSONL conversation (same as Command Deck)
-              <ConversationPanel conversation={specialistConversation} />
+              <ConversationPanel conversation={specialistConversation} agentId={agentId} />
             ) : null
           ) : workAgentIssueId ? (
             <ActivityView issueId={workAgentIssueId} />

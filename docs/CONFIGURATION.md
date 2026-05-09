@@ -6,6 +6,7 @@ Complete guide to configuring Panopticon's multi-model routing system.
 
 - [Quick Start](#quick-start)
 - [Configuration Files](#configuration-files)
+- [Permission Mode](#permission-mode)
 - [Presets](#presets)
 - [Per-Work-Type Overrides](#per-work-type-overrides)
 - [Provider Management](#provider-management)
@@ -75,6 +76,14 @@ models:
     issue-agent:exploration: minimal
     issue-agent:planning: high
     review:performance: high
+
+# Permission mode for spawned Claude Code agents.
+# 'auto' (default) — Claude Code's classifier blocks destructive ops
+# 'bypass'         — legacy --dangerously-skip-permissions behavior
+# See the "Permission Mode" section for details and the required
+# ~/.claude/settings.json prereq when using auto.
+claude:
+  permissionMode: auto
 ```
 
 ### Per-Project Configuration: `.panopticon.yaml`
@@ -135,6 +144,94 @@ HUME_API_KEY=your-hume-api-key
 **Note**: Direct-compatible providers (Kimi, GLM) don't need claude-code-router. Only OpenAI and Gemini require the router.
 
 **Note**: `HUME_API_KEY` is only needed if your project uses Hume EVI integration (see [External Service Integrations](#external-service-integrations) below).
+
+---
+
+## Permission Mode
+
+Every Claude Code agent Panopticon spawns runs autonomously — no human is sitting at the
+prompt to click "approve" on each tool call. To make that work, every spawn site passes
+permission flags to `claude`. Panopticon ships with two modes for those flags:
+
+| Mode | Flags passed | Behavior |
+|------|--------------|----------|
+| `auto` (**default since 0.8.16**) | `--permission-mode auto` | Claude Code's built-in classifier auto-approves safe tool calls and **blocks destructive ones** — force pushes, exfiltration, `rm -rf`, writes outside the workspace, etc. |
+| `bypass` | `--dangerously-skip-permissions --permission-mode bypassPermissions` | Historical Panopticon behavior: every tool call auto-approved, no classifier. Use when you genuinely want zero gating, or when an agent runs against a non-Anthropic backend that rejects the `auto` flag. |
+
+### Prereq for `auto` mode
+
+Each user must have **`skipAutoPermissionPrompt: true`** in their own `~/.claude/settings.json`.
+Without it, fresh tmux-spawned agents hang on the one-time auto-mode opt-in dialog (Claude
+Code waits for keyboard confirmation that no autonomous agent will ever provide).
+
+```json
+{
+  "skipDangerousModePermissionPrompt": true,
+  "skipAutoPermissionPrompt": true
+}
+```
+
+`auto` is also gated by Anthropic plan tier — it's available on Max, Team, Enterprise, and
+direct API plans. Pro / Bedrock / Vertex / Foundry users may need to explicitly switch to
+`bypass` (see Override below).
+
+### Setting the mode
+
+**1. Dashboard Settings → Permissions** (easiest). Two radio options: Auto / Bypass.
+Saves to `~/.panopticon/config.yaml` automatically.
+
+**2. Persist directly in `~/.panopticon/config.yaml`:**
+
+```yaml
+claude:
+  permissionMode: auto    # or 'bypass'
+```
+
+`.panopticon.yaml` (per-project) accepts the same key and overrides the global setting for
+that project only.
+
+**2. Override per-invocation with `--yolo` or `PAN_YOLO`:**
+
+```bash
+pan up                     # uses config (default: auto)
+pan up --yolo=false        # force auto for this invocation
+pan up --yolo              # force bypass (yolo mode!)
+pan up --yolo=true         # same as --yolo
+pan up --no-yolo           # force auto
+
+PAN_YOLO=false pan up      # env-var equivalent (works for child processes)
+PAN_YOLO=true pan up       # env-var equivalent
+```
+
+The flag works in **any argv position** relative to the subcommand:
+
+```bash
+pan --yolo=false up        # before subcommand
+pan up --yolo=false        # after subcommand
+pan up agent-foo --yolo=no # after positional args
+```
+
+### Precedence
+
+Highest wins:
+
+1. **`PAN_YOLO` env var** (`true`/`yes`/`on`/`1` → bypass; `false`/`no`/`off`/`0` → auto)
+2. **`--yolo` CLI flag** (normalized into `PAN_YOLO` before commander parses)
+3. **`claude.permissionMode` in config** (`~/.panopticon/config.yaml`, then `.panopticon.yaml`)
+4. **Default**: `auto`
+
+### Caveats
+
+- **`claudish`-routed providers** (Kimi, MiniMax, GLM, OpenRouter, Mimo, OpenAI non-subscription, Google CodeAssist) are **always pinned to `bypass`**, regardless of config. `auto` is a Claude Code research-preview feature that doesn't translate through claudish to the upstream provider. Tracked in [#1015](https://github.com/eltmon/panopticon-cli/issues/1015) — once claudish is fully replaced by CLIProxy, every provider will honor the config.
+- **CLIProxy-routed OpenAI subscription** does honor the config — `claude` is still the binary, only `ANTHROPIC_BASE_URL` points at the local sidecar.
+- Settings on **`~/.claude/settings.json`** are per-user, not per-project. Each developer needs `skipAutoPermissionPrompt: true` on their own machine. Panopticon doesn't write this for you.
+
+### When to switch back to `bypass`
+
+- Running an Anthropic plan that doesn't include the auto-mode preview
+- Using Bedrock / Vertex / Foundry routing where the `auto` flag is rejected
+- Doing intentionally destructive automation (data migration, bulk file rewrites, etc.) where the classifier is just adding latency
+- Reproducing pre-0.8.16 behavior for a regression hunt
 
 ---
 

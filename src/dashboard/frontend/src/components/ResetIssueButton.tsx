@@ -10,7 +10,7 @@ interface ResetIssueButtonProps {
 }
 
 const TOOLTIP =
-  'Reset Issue: stops any running agent, deletes the workspace and feature branch (including STATE.md), clears all beads and vBRIEF, and moves the issue back to Todo. Use when the current approach is completely wrong and you want to start over from planning.';
+  'Reset Issue: stops any running agent, deletes the workspace and feature branch (including the continue file), clears all beads and vBRIEF, and moves the issue back to Todo. Use when the current approach is completely wrong and you want to start over from planning.';
 
 export function ResetIssueButton({ issueId, variant, issue, onClick }: ResetIssueButtonProps) {
   const { confirmAndReset, isPending } = useResetIssue(issueId);
@@ -36,7 +36,7 @@ export function ResetIssueButton({ issueId, variant, issue, onClick }: ResetIssu
       <div className="min-w-0">
         <div className="text-xs font-medium text-foreground">Reset Issue</div>
         <div className="text-[11px] text-muted-foreground mt-0.5" title={TOOLTIP}>
-          Deletes the workspace, branch, STATE.md, beads, and vBRIEF. Moves the issue back to Todo. Start over from planning.
+          Deletes the workspace, branch, continue file, beads, and vBRIEF. Moves the issue back to Todo. Start over from planning.
         </div>
         <button
           onClick={handleClick}

@@ -12,6 +12,7 @@ import {
   selectSpecialistList,
   selectReviewStatus,
   selectAgentOutput,
+  selectChannelPermissionRequests,
   selectIsBootstrapped,
   selectResources,
   selectIssues,
@@ -45,6 +46,7 @@ const baseSpec: SpecialistSnapshot = {
 
 const emptyState: DashboardState = {
   bootstrapComplete: false,
+  snapshotTimestamp: null,
   sequence: 0,
   agentsById: {},
   agentRuntimeById: {},
@@ -54,7 +56,23 @@ const emptyState: DashboardState = {
   agentOutputById: {},
   issuesRaw: [],
   recentActivity: [],
+  detailedActivity: [],
+  ttsActivity: [],
   shadowInferenceByIssueId: {},
+  turnDiffSummariesByAgentId: {},
+  channelPermissionRequestsById: {},
+  dashboardLifecycle: {
+    active: false,
+    reason: null,
+    issueId: null,
+    trigger: null,
+    startedAt: null,
+    completedAt: null,
+    failedAt: null,
+    error: null,
+  },
+  conversationsCompactingByName: {},
+  conversationsAwaitingPermissionByName: {},
 }
 
 function makeSnapshot(seq = 5): DashboardSnapshot {
@@ -63,6 +81,8 @@ function makeSnapshot(seq = 5): DashboardSnapshot {
     agents: [baseAgent],
     specialists: [baseSpec],
     reviewStatuses: [],
+    issues: [],
+    channelPermissionRequests: [],
     timestamp: '2026-01-01T00:00:00Z',
   }
 }
@@ -141,6 +161,66 @@ describe('applyEventReducer — agent events', () => {
     const event = makeEvent('agent.output_received', 7, { agentId: 'a1', lines: ['x', 'y'] })
     const next = applyEventReducer(state, event)
     expect(next.agentOutputById['a1']!.length).toBe(200)
+  })
+})
+
+// ─── Runtime reducers ─────────────────────────────────────────────────────────
+
+describe('applyEventReducer — runtime events', () => {
+  it('agent.channel_reply stores structured reply in runtime snapshot', () => {
+    const event = makeEvent('agent.channel_reply', 8, {
+      agentId: 'agent-1',
+      reply: {
+        kind: 'done',
+        summary: 'Implementation complete',
+        artifactRefs: [{ uri: 'file:///tmp/report.txt', label: 'report' }],
+      },
+    })
+    const next = applyEventReducer(emptyState, event)
+    expect(next.agentRuntimeById['agent-1']?.channelReply).toMatchObject({
+      kind: 'done',
+      summary: 'Implementation complete',
+      artifactRefs: [{ uri: 'file:///tmp/report.txt', label: 'report' }],
+    })
+    expect(next.agentRuntimeById['agent-1']?.resolution).toBe('done')
+  })
+
+  it('agent.message_received clears stale channel reply on new inbound message', () => {
+    const withReply = applyEventReducer(
+      emptyState,
+      makeEvent('agent.channel_reply', 9, {
+        agentId: 'agent-1',
+        reply: { kind: 'needs_input', summary: 'Need answer', artifactRefs: [] },
+      }),
+    )
+    const next = applyEventReducer(
+      withReply,
+      makeEvent('agent.message_received', 10, {
+        agentId: 'agent-1',
+        direction: 'to_agent',
+        source: 'user',
+      }),
+    )
+    expect(next.agentRuntimeById['agent-1']?.channelReply).toBeUndefined()
+  })
+
+  it('agent.stopped clears stale channel reply for restarted agents', () => {
+    const withReply = applyEventReducer(
+      emptyState,
+      makeEvent('agent.channel_reply', 11, {
+        agentId: 'agent-1',
+        reply: { kind: 'done', summary: 'Implementation complete', artifactRefs: [] },
+      }),
+    )
+    const next = applyEventReducer(
+      withReply,
+      makeEvent('agent.stopped', 12, {
+        agentId: 'agent-1',
+        issueId: 'PAN-1',
+      }),
+    )
+    expect(next.agentRuntimeById['agent-1']?.activity).toBe('stopped')
+    expect(next.agentRuntimeById['agent-1']?.channelReply).toBeUndefined()
   })
 })
 
@@ -250,6 +330,37 @@ describe('selectors', () => {
 
   it('selectResources returns resource stats', () => {
     expect(selectResources(state)).toEqual({ containers: 5, networks: 3 })
+  })
+
+  it('selectChannelPermissionRequests returns pending requests oldest first', () => {
+    const withPermissions: DashboardState = {
+      ...state,
+      channelPermissionRequestsById: {
+        'perm-2': {
+          requestId: 'perm-2',
+          agentId: 'agent-2',
+          issueId: 'PAN-2',
+          toolName: 'Bash',
+          description: 'Run npm test',
+          inputPreview: '{"command":"npm test"}',
+          createdAt: '2026-05-07T18:31:00.000Z',
+        },
+        'perm-1': {
+          requestId: 'perm-1',
+          agentId: 'agent-1',
+          issueId: 'PAN-1',
+          toolName: 'Read',
+          description: 'Read continue file',
+          inputPreview: '{"file":".pan/continue.json"}',
+          createdAt: '2026-05-07T18:30:00.000Z',
+        },
+      },
+    }
+
+    expect(selectChannelPermissionRequests(withPermissions).map((request) => request.requestId)).toEqual([
+      'perm-1',
+      'perm-2',
+    ])
   })
 })
 

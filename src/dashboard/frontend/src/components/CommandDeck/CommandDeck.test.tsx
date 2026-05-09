@@ -123,10 +123,6 @@ vi.mock('../chat/ConversationPanel', () => ({
   ConversationPanel: () => <div data-testid="conversation-panel" />,
 }));
 
-vi.mock('../chat/DraftConversationPanel', () => ({
-  DraftConversationPanel: () => <div data-testid="draft-panel" />,
-}));
-
 vi.mock('../chat/ModelPicker', () => ({
   ModelPicker: ({ value, onChange }: any) => (
     <select data-testid="model-picker" value={value} onChange={(e) => onChange?.(e.target.value)}>
@@ -202,6 +198,15 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
                 dockerContainerCount: 0,
               },
             },
+          ],
+        };
+      }
+      if (url === '/api/registered-projects') {
+        return {
+          ok: true,
+          json: async () => [
+            { key: 'test-project', name: 'test-project', path: '/path/to/test-project' },
+            { key: 'other-project', name: 'other-project', path: '/path/to/other-project' },
           ],
         };
       }
@@ -325,7 +330,7 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     renderCommandDeck();
 
     // Projects are visible by default — wait for project node to render
-    await screen.findByTestId('project-node');
+    await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
 
     // Wait for session tree hydration, then click the session
     fireEvent.click(await screen.findByTestId('session-agent-pan-821'));
@@ -343,7 +348,7 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
   it('opens the session pane on the first session click when no feature is already selected', async () => {
     renderCommandDeck();
 
-    await screen.findByTestId('project-node');
+    await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
     expect(screen.queryByTestId('issue-workbench')).not.toBeInTheDocument();
 
     fireEvent.click(await screen.findByTestId('session-agent-pan-821'));
@@ -357,7 +362,7 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
   it('keeps the same session pane on a second click of the same session row', async () => {
     renderCommandDeck();
 
-    await screen.findByTestId('project-node');
+    await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
 
     const sessionButton = await screen.findByTestId('session-agent-pan-821');
     fireEvent.click(sessionButton);
@@ -375,7 +380,7 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
   it('uses issue-local unified cost data for the issue header instead of global costs-by-issue', async () => {
     renderCommandDeck();
 
-    await screen.findByTestId('project-node');
+    await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
     fireEvent.click(await screen.findByTestId('session-agent-pan-821'));
 
     expect(screen.getByTestId('issue-header')).toHaveAttribute('data-issue', 'PAN-821');
@@ -385,7 +390,7 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     renderCommandDeck();
 
     // Projects are visible by default
-    await screen.findByTestId('project-node');
+    await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
 
     // Click feature row — should auto-select the active session
     fireEvent.click(screen.getByTestId('feature-PAN-821'));
@@ -404,14 +409,13 @@ describe('CommandDeck — project-selected session view (PAN-821)', () => {
     renderCommandDeck();
 
     // Select a session (projects are visible by default)
-    await screen.findByTestId('project-node');
+    await screen.findAllByTestId('project-node').then(nodes => nodes[0]);
     fireEvent.click(await screen.findByTestId('session-agent-pan-821'));
 
     // Verify session view is shown
     expect(screen.getByTestId('session-panel')).toBeInTheDocument();
 
-    // Switch sidebar to conversations mode, then click a conversation
-    fireEvent.click(screen.getByText('Conversations'));
+    // Conversations section is expanded by default — click a conversation
     fireEvent.click(screen.getByTestId('conv-test'));
 
     // Session view should be gone and conversation view should render

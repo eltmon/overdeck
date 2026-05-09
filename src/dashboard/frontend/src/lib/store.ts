@@ -9,6 +9,7 @@
 import { create } from 'zustand'
 import type {
   AgentSnapshot,
+  ChannelPermissionRequestSnapshot,
   DashboardSnapshot,
   DomainEvent,
   ResourceStats,
@@ -123,6 +124,18 @@ export const selectReviewStatus =
   (s: DashboardState): ReviewStatusSnapshot | undefined =>
     s.reviewStatusByIssueId[issueId]
 
+export const selectChannelPermissionRequests = memoizeArraySelector<
+  DashboardState,
+  'channelPermissionRequestsById',
+  ChannelPermissionRequestSnapshot[]
+>(
+  'channelPermissionRequestsById',
+  (requestsById) =>
+    Object.values(requestsById).sort((a, b) =>
+      a.createdAt === b.createdAt ? a.requestId.localeCompare(b.requestId) : a.createdAt.localeCompare(b.createdAt),
+    ),
+)
+
 /**
  * Issues currently awaiting a human merge click — `readyForMerge: true`
  * and not already merged. Sorted oldest-ready first (FIFO) so issues
@@ -134,7 +147,44 @@ export const selectAwaitingMerge = memoizeArraySelector<DashboardState, 'reviewS
     Object.values(rsMap)
       .filter(
         (rs): rs is ReviewStatusSnapshot =>
-          rs?.readyForMerge === true && rs.mergeStatus !== 'merged',
+          rs?.readyForMerge === true &&
+          rs.mergeStatus !== 'merged' &&
+          (rs.blockerReasons?.length ?? 0) === 0,
+      )
+      .sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')),
+)
+
+/**
+ * Issues blocked from merge by GitHub-native blockers.
+ * Shows issues with blockerReasons that haven't been merged yet.
+ */
+export const selectBlockedFromMerge = memoizeArraySelector<DashboardState, 'reviewStatusByIssueId', ReviewStatusSnapshot[]>(
+  'reviewStatusByIssueId',
+  (rsMap) =>
+    Object.values(rsMap)
+      .filter(
+        (rs): rs is ReviewStatusSnapshot =>
+          (rs?.blockerReasons?.length ?? 0) > 0 &&
+          rs.mergeStatus !== 'merged' &&
+          rs.reviewStatus === 'passed' &&
+          (rs.testStatus === 'passed' || rs.testStatus === 'skipped'),
+      )
+      .sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')),
+)
+
+/**
+ * Open merge requests — PR/MR exists but not yet readyForMerge.
+ * Shown on the Awaiting Merge page so the user can approve/review early.
+ */
+export const selectOpenMergeRequests = memoizeArraySelector<DashboardState, 'reviewStatusByIssueId', ReviewStatusSnapshot[]>(
+  'reviewStatusByIssueId',
+  (rsMap) =>
+    Object.values(rsMap)
+      .filter(
+        (rs): rs is ReviewStatusSnapshot =>
+          !!rs?.prUrl &&
+          rs.readyForMerge !== true &&
+          rs.mergeStatus !== 'merged',
       )
       .sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')),
 )

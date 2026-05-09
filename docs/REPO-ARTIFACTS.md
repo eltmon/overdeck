@@ -129,69 +129,83 @@ developer configured globally.
 
 ---
 
-## Planning Artifacts — `.planning/`
+## vBRIEF Lifecycle — `.pan/specs/`
+
+Scope vBRIEFs are durable, first-class source-of-truth artifacts. They live in `.pan/specs/`
+on main and **do not move between directories** — status is tracked via the `plan.status`
+field inside each JSON file. See [VBRIEF.md](./VBRIEF.md) for the full format and lifecycle
+reference.
 
 ```
-project-repo/
-└── .planning/
-    ├── STATE.md             Narrative: decisions made, approach taken, remaining work
-    ├── plan.vbrief.json     Machine-readable work plan (vBRIEF v0.5)
-    ├── PRD.md               Discovered/created requirements (copied from docs/prds/)
-    ├── PLANNING_PROMPT.md   Planning agent instructions (deleted after planning)
-    ├── beads/
-    │   └── issues.jsonl     Task tracking (derived from vBRIEF items)
-    └── feedback/            Specialist feedback (review-agent, test-agent)
+project-repo/  (main branch)
+└── .pan/
+    ├── specs/
+    │   ├── 2026-05-01-PAN-960-foo.vbrief.json     (status: "proposed")
+    │   ├── 2026-04-28-PAN-714-bar.vbrief.json     (status: "active")
+    │   └── 2026-04-20-MIN-846-baz.vbrief.json     (status: "completed")
+    └── drafts/
+        └── PAN-970-next-thing.md                   PRD being refined
 ```
 
-`.planning/` is **committed to git** in the feature branch worktree. It is not gitignored.
-This means the entire planning context travels with the branch and is visible in PRs.
+**Key points:**
+- Filenames are issue-keyed: `YYYY-MM-DD-<ISSUE-ID>-<slug>.vbrief.json`
+- The date prefix is the immutable creation date (UTC)
+- Files never move — `plan.status` field transitions: `draft → proposed → active → completed` (or `cancelled`)
+- Continue state lives in the workspace at `.pan/continue.json`, not alongside the spec on main
 
-### STATE.md — Final Decision
+### PRDs vs vBRIEFs
 
-STATE.md lives in the repo, committed. It is not ephemeral.
+These are complementary, not competing artifacts:
 
-**Why**: STATE.md is the narrative bridge between the issue tracker and the code changes.
-It captures *why* decisions were made — information that is not recoverable from git
-history alone. Future agents working in the same area need this context. Future developers
-debugging a regression need this context.
+| Artifact | Author | Format | Location | Purpose |
+|----------|--------|--------|----------|---------|
+| **PRD** | Human | Markdown | `docs/prds/` | Requirements, intent, context — input to planning |
+| **vBRIEF** | Agent (Opus) | JSON | `.pan/specs/` | Structured operational plan — output of planning |
 
-**Active** (during work): `.planning/STATE.md` — updated as work progresses, committed
-to the feature branch.
+PRDs are human-authored Product Requirement Definitions that describe *what* to build and
+*why*. They live in `docs/prds/{planned,active,completed}/` and are not touched by the
+lifecycle system.
 
-**Archived** (after issue closes): `docs/prds/active/<issue-id>/STATE.md` — permanent
-record on the main branch.
+vBRIEFs are machine-readable operational artifacts that describe *how* to build it — with
+acceptance criteria, dependency DAGs, and status tracking. They live in `.pan/specs/` on
+main with field-based status transitions (files never move between directories).
 
-### VBRIEFs — Final Decision
-
-VBRIEFs live in the repo, always.
-
-**Active** (during work): `.planning/plan.vbrief.json` — committed to the feature branch,
-updated by the work agent as items complete.
-
-**Archived** (after issue closes): `docs/prds/active/<issue-id>/plan.vbrief.json` —
-permanent record on the main branch.
+The planning agent reads the PRD (if one exists) as input and produces a vBRIEF plan as output.
 
 ---
 
-## Archive Structure — `docs/prds/active/`
-
-After an issue closes, both the vBRIEF and STATE.md are archived together in a
-**subdirectory per issue**:
+## Workspace Orchestration — `.pan/` (feature branch)
 
 ```
-docs/prds/active/
-└── <issue-id>/
-    ├── plan.vbrief.json     Archived vBRIEF
-    └── STATE.md             Archived narrative
+project-repo/  (feature branch workspace)
+└── .pan/
+    ├── spec.vbrief.json     Machine-readable work plan (copied from main at branch creation)
+    ├── continue.json        Structured session state (resume point, decisions, hazards)
+    ├── prd.md               Discovered/created requirements (copied from docs/prds/)
+    ├── context.md           Workspace context for agents
+    ├── sessions.jsonl       Append-only session history
+    └── review/              Specialist feedback (review-agent, test-agent)
 ```
 
-**Note**: This is a breaking change from the previous flat layout
-(`docs/prds/active/<ID>-plan.vbrief.json`). The subdirectory structure is cleaner when
-both files coexist and makes it easier to add additional artifacts (PRD snapshots,
-feedback summaries) in the future.
+`.pan/` is **committed to git** in the feature branch worktree. It is not gitignored.
+This means the entire planning/orchestration context travels with the branch and is visible in PRs.
 
-Migration: existing flat archives remain valid. New closures always use the subdirectory
-format.
+Beads (task tracking) live at `.beads/` — a separate dot-directory, not inside `.pan/`.
+
+During planning, the vBRIEF spec is created in `.pan/specs/` on main with
+`plan.status: "proposed"`. When work starts, it is copied to the workspace as
+`.pan/spec.vbrief.json`.
+
+### Continue State (replaces STATE.md)
+
+The structured continuation state file (`continue.json`) replaces the
+free-form `STATE.md`. It contains git state, decisions, hazards, resume points, beads
+mapping, agent model, and session history — all machine-parseable.
+
+**During work**: Written to `.pan/continue.json` in the workspace.
+**After merge**: Archived with the completed spec on main.
+
+See [VBRIEF.md § Continue State](./VBRIEF.md#continue-state--structured-session-history) for the full schema.
 
 ---
 
@@ -226,13 +240,14 @@ project-repo/
 │   ├── agents/<name>/AGENT.md     Project-specific agent overrides
 │   └── rules/<name>.md            Project-specific rules
 ├── .pan.yaml                      Per-project config (committed)
-├── .planning/                     Active workspace artifacts (committed to feature branch)
-│   ├── STATE.md
-│   ├── plan.vbrief.json
-│   ├── PRD.md
-│   ├── PLANNING_PROMPT.md
-│   ├── beads/issues.jsonl
-│   └── feedback/
+├── .pan/specs/                    vBRIEF specs (committed to main, field-based status)
+│   └── YYYY-MM-DD-ID-slug.vbrief.json
+├── .pan/drafts/                   PRDs being refined (committed to main)
+├── .pan/spec.vbrief.json          Workspace scope plan (on feature branch)
+├── .pan/continue.json             Workspace session state (on feature branch)
+├── .pan/prd.md                    Workspace PRD copy (on feature branch)
+├── .pan/review/                   Specialist feedback (on feature branch)
+├── .beads/                        Task tracking beads (on feature branch)
 ├── .claude/                       Claude Code tool directories (committed)
 │   ├── skills/                    ← .pan/skills/ synced here; user-owned skills NOT overwritten
 │   ├── agents/
@@ -245,10 +260,9 @@ project-repo/
 ├── CLAUDE.md                      Generated by Panopticon (committed)
 ├── docs/
 │   └── prds/
-│       ├── active/<issue-id>/     Archived planning artifacts (committed to main)
-│       │   ├── plan.vbrief.json
-│       │   └── STATE.md
-│       └── planned/               Pre-work PRDs
+│       ├── active/                Human-authored PRDs for active work
+│       ├── planned/               Pre-work PRDs
+│       └── completed/             Archived PRDs
 └── .gitignore                     Must include .pan/events/, .pan/review/, .pan/prompts/
 ```
 
@@ -295,7 +309,7 @@ If yes → root. If no → find or create the appropriate `docs/` subdirectory.
 | Global skills cache | `~/.panopticon/skills/` | Machine-local, refreshed by `pan sync` |
 | Agent state dirs | `~/.panopticon/agents/<id>/` | Runtime state, not portable. Includes `state.json`, `health.json`, `lifecycle.log`, `spawn.log`, `output.log`, launcher scripts, and saved Claude session metadata. |
 | Specialist sessions | `~/.panopticon/specialists/` | Runtime state |
-| Issue archives | `~/.panopticon/archives/<issue>/` | Closed-issue state backup |
+| Issue archives (runtime) | `~/.panopticon/archives/<issue>/` | Closed-issue runtime state backup (agent dirs, logs). Scope vBRIEFs remain in `.pan/specs/` with `status: "completed"`. |
 | Traefik config | `~/.panopticon/traefik/` | Infrastructure, not project content |
 | Cost database | `~/.panopticon/panopticon.db` | Aggregated across all projects |
 | Shadow state | `~/.panopticon/shadow-state/` | Derived from tracker, not authoritative |

@@ -18,87 +18,39 @@ Specialist agents are ephemeral Claude Code sessions that handle specific tasks:
 
 ### Full Pipeline
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  DURING IMPLEMENTATION (per-bead)                               │
-│                                                                 │
-│  Agent finishes bead                                            │
-│       │                                                         │
-│       │ pan inspect <issueId> --bead <beadId>                   │
-│       ▼                                                         │
-│  ┌──────────────────────────┐                                   │
-│  │  inspect-agent (Sonnet)  │                                   │
-│  │  - Spec fidelity check   │──── BLOCKED ──→ Agent fixes       │
-│  │  - Constraint compliance │                  and re-requests   │
-│  │  - Compile + smoke       │                                   │
-│  └──────────┬───────────────┘                                   │
-│             │ PASS                                               │
-│             │ (checkpoint saved)                                 │
-│             ▼                                                    │
-│       Agent continues to next bead                              │
-│       ... repeat for each bead ...                              │
-└─────────────────────────────────────────────────────────────────┘
+![Panopticon Specialist Pipeline](./diagrams/panopticon-specialist-pipeline.png)
 
-┌─────────────────────────────────────────────────────────────────┐
-│  AFTER ALL BEADS COMPLETE                                       │
-│                                                                 │
-│  Agent signals completion → Verification Gate                   │
-│       │                                                         │
-│       ▼                                                         │
-│  ┌──────────────────────────┐                                   │
-│  │  review-agent (Sonnet)   │                                   │
-│  │  - Full MR code review   │──── CHANGES_REQUESTED ──→ Agent   │
-│  │  - Security + perf       │                                   │
-│  │  - Test coverage         │                                   │
-│  └──────────┬───────────────┘                                   │
-│             │ APPROVED                                           │
-│             ▼                                                    │
-│  ┌──────────────────────────┐                                   │
-│  │  test-agent (Haiku)      │                                   │
-│  │  - Run test suite        │──── FAILED ──→ Agent fixes        │
-│  │  - Analyze failures      │                                   │
-│  └──────────┬───────────────┘                                   │
-│             │ PASSED                                             │
-│             ▼                                                    │
-│  ┌──────────────────────────┐                                   │
-│  │  uat-agent (Sonnet)      │                                   │
-│  │  - Real browser (PW)     │──── BLOCKED ──→ Agent fixes       │
-│  │  - CORS verification     │                                   │
-│  │  - Visual quality audit  │                                   │
-│  │  - Requirement check     │                                   │
-│  └──────────┬───────────────┘                                   │
-│             │ PASSED                                             │
-│             ▼                                                    │
-│  ┌──────────────────────────┐                                   │
-│  │  merge-agent (Sonnet)    │                                   │
-│  │  - Resolve conflicts     │                                   │
-│  │  - Validate + push       │                                   │
-│  │  - Post-merge cleanup    │                                   │
-│  └──────────────────────────┘                                   │
-└─────────────────────────────────────────────────────────────────┘
-```
+Source: [`docs/diagrams/panopticon-specialist-pipeline.excalidraw`](./diagrams/panopticon-specialist-pipeline.excalidraw)
 
 ## Inspect Specialist (PAN-382)
 
-The inspect specialist runs **during** implementation, after each bead. It catches architectural deviations early — before they cascade through subsequent beads.
+The inspect specialist runs **during** implementation — but only on beads the planning agent flagged with `metadata.requiresInspection: true`. It catches architectural deviations early on the foundational beads where downstream work could cascade off a wrong choice (the MIN-796 failure mode).
 
-**Jidoka principle: never pass a defect downstream.**
+**Jidoka principle (applied selectively): never pass a foundation-class defect downstream.**
+
+> **Per-bead opt-in (2026-05-08 design revision).** The original PAN-382 design made inspection mandatory after every `bd close`. In practice that turned mechanical refactors into per-step interviews and added compounding stall risk on the inspect-dispatch path. Inspection is now a planning-time decision recorded as `metadata.requiresInspection: true|false` on each plan item. See [PAN-382 PRD](prds/planned/PAN-382-inspect-specialist.md) and the planning prompt's "Inspection Requirement" section for the criteria the planning agent uses.
 
 ### Agent Workflow
 
-After completing each bead, agents must request inspection:
+After closing a bead, the work agent reads `metadata.requiresInspection` from `.pan/spec.vbrief.json`:
 
 ```bash
 # After closing a bead
 bd close <beadId> --reason="Implemented X"
 
-# Request inspection before starting next bead
+# Branch on the bead's flag:
+#   requiresInspection: false → continue straight to the next bead (default for most beads)
+#   requiresInspection: true  → run pan inspect and wait
+
+# When required:
 pan inspect <issueId> --bead <beadId>
 
 # Wait for result — delivered via pan tell
 # INSPECTION PASSED → proceed to next bead
 # INSPECTION BLOCKED → fix issues, then re-request
 ```
+
+`pan inspect` is an explicit command the agent runs only for flagged beads. There is no auto-trigger from `bd close`.
 
 ### What Inspect Checks
 
@@ -168,31 +120,29 @@ When a user clicks **Start Agent** in the dashboard (`POST /api/agents`), the sy
 
 ```
 1. Planning agent writes:
-   .planning/
-   ├── STATE.md              # Decisions, approach, remaining work
-   ├── PLANNING_PROMPT.md    # Planning agent's instructions (DO NOT READ during implementation)
-   ├── discussions/           # Discovery conversation transcripts
-   ├── notes/                 # Research notes
-   └── transcripts/           # Session transcripts
+   .pan/
+   ├── spec.vbrief.json      # Machine-readable work plan (scope vBRIEF)
+   ├── continue.json         # Session state (decisions, approach, resume point)
+   ├── prd.md                # Discovered/copied PRD
+   └── context.md            # Workspace context for agents
 
 2. User clicks "Start Agent" → POST /api/agents
 
 3. Dashboard server:
    a. Stops planning agent (marks state as 'stopped', stoppedReason: 'work-agent-started')
-   b. Commits .planning/ artifacts to git
-   c. Archives PLANNING_PROMPT.md → PLANNING_PROMPT.md.archived (PAN-250)
-   d. Determines phase: .planning/ exists → 'implementation', otherwise → 'exploration'
-   e. Evaluates work-agent lifecycle truth: real resumable stopped agent ⇒ resume path, orphaned placeholder/stale record ⇒ fresh start path
-   f. Shells out via detached `pan start <ID> --local --phase implementation` and records exact lifecycle + spawn output in `~/.panopticon/agents/agent-<id>/lifecycle.log` and `spawn.log`
+   b. Commits .pan/ artifacts to git
+   c. Determines phase: .pan/spec.vbrief.json exists → 'implementation', otherwise → 'exploration'
+   d. Evaluates work-agent lifecycle truth: real resumable stopped agent ⇒ resume path, orphaned placeholder/stale record ⇒ fresh start path
+   e. Shells out via detached `pan start <ID> --local --phase implementation` and records exact lifecycle + spawn output in `~/.panopticon/agents/agent-<id>/lifecycle.log` and `spawn.log`
 
 4. Dashboard UI shows `Starting...` / `Resuming...` immediately, then switches to the normal running controls once the work agent is actually live
 
-5. Work agent reads .planning/STATE.md and implements remaining work
+5. Work agent reads .pan/continue.json and .pan/spec.vbrief.json and implements remaining work
 ```
 
 ### Beads Prerequisite
 
-Beads are a hard prerequisite for starting work agents. The `POST /api/agents` endpoint returns **422** if `.beads/issues.jsonl` does not exist in the workspace. Cloister automatically creates beads from the vBRIEF plan via `createBeadsFromVBrief()` when the planning agent touches the `.planning-complete` marker. Manual `bd create` is no longer needed.
+Beads are a hard prerequisite for starting work agents. The `POST /api/agents` endpoint returns **422** if `.beads/issues.jsonl` does not exist in the workspace. Cloister automatically creates beads from the vBRIEF plan via `createBeadsFromVBrief()` when planning completes. Manual `bd create` is no longer needed.
 
 ### DAG-Aware Task Scheduling
 
@@ -214,7 +164,7 @@ Each vBRIEF item can have `subItems` with `metadata.kind: "acceptance_criterion"
 
 A PRD may already exist in `docs/prds/active/` or `docs/prds/drafts/` before the planning agent runs — e.g., written manually or by a previous session. The planning agent handles three cases:
 
-1. **PRD with `<task>` XML tags** (execution-ready): Skip discovery. Use existing tasks directly to create `.planning/STATE.md`, beads, and `config.json`.
+1. **PRD with `<task>` XML tags** (execution-ready): Skip discovery. Use existing tasks directly to create `.pan/spec.vbrief.json`, beads, and continue state.
 
 2. **Prose PRD** (architecture decisions, requirements, no `<task>` tags): Use as foundation — do NOT redo decisions already made. Run abbreviated discovery to fill gaps, then convert prose into executable `<task>` XML structure. The PRD provides the "what and why"; planning creates the "how and in what order."
 
@@ -600,8 +550,8 @@ Agent runs `pan done` (Bash command)
         → APPROVED → queues test-agent
           → test-agent runs tests
             → PASS → marks ready for merge (human clicks MERGE or merge-agent handles)
-            → FAIL → feedback to .planning/feedback/ → agent fixes → re-requests review
-        → CHANGES REQUESTED → feedback to .planning/feedback/ → agent fixes → re-requests review
+            → FAIL → feedback to .pan/review/ → agent fixes → re-requests review
+        → CHANGES REQUESTED → feedback to .pan/review/ → agent fixes → re-requests review
           → This cycle repeats up to 3 times before circuit breaker trips
 ```
 

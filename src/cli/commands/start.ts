@@ -13,6 +13,7 @@ import { resolveProjectFromIssue, hasProjects, listProjects, ProjectConfig } fro
 import { hasPRDDraft, getPRDDraftPath } from '../../lib/prd-draft.js';
 import { isGitHubIssue, resolveGitHubIssue } from '../../lib/tracker-utils.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
+import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -76,6 +77,8 @@ import { assertCanStartFresh } from '../../lib/work-agent-lifecycle.js';
 
 interface IssueOptions {
   model: string;
+  /** PAN-636 — coding-agent harness override. Defaults to claude-code. */
+  harness?: 'claude-code' | 'pi';
   dryRun?: boolean;
   shadow?: boolean;
   remote?: boolean;
@@ -286,7 +289,7 @@ async function handleRemoteWorkspace(
   // Build prompt for remote agent
   spinner.text = 'Building agent prompt...';
   const projectRoot = findProjectRoot(issueId);
-  const prompt = buildWorkAgentPrompt({ issueId, env: 'REMOTE', workspacePath: '/workspace', skipDynamicContext: true });
+  const prompt = await buildWorkAgentPrompt({ issueId, env: 'REMOTE', workspacePath: '/workspace', skipDynamicContext: true });
 
   // Sync all credentials before spawning (tokens may have expired)
   spinner.text = 'Syncing credentials (Claude, GitHub)...';
@@ -306,6 +309,10 @@ async function handleRemoteWorkspace(
     const remoteAgent = await spawnRemoteAgent({
       issueId,
       workspace: remoteMetadata,
+      // harness flows in once the remote-spawn path supports it; the front-end
+      // gate still rejects invalid combos before we reach this call so the
+      // remote agent will see harness=claude-code today (Pi is local-only
+      // until the Fly worker image bundles the pi binary — tracked separately).
       model: options.model,
       prompt,
     });
@@ -473,12 +480,12 @@ export function hasBeadsTasks(workspacePath: string): boolean {
 }
 
 /**
- * Validate that plan.vbrief.json belongs to the current issue.
- * If the plan is for a different issue, the workspace contains stale planning
+ * Validate that the workspace vBRIEF belongs to the current issue.
+ * If the spec is for a different issue, the workspace contains stale planning
  * artifacts and should not be used for work until planning is re-run.
  */
 function validatePlanMatchesIssue(workspacePath: string, issueId: string): { valid: boolean; wrongIssue?: string } {
-  const planPath = join(workspacePath, '.planning', 'plan.vbrief.json');
+  const planPath = getWorkspacePanPaths(workspacePath).specPath;
 
   if (!existsSync(planPath)) {
     return { valid: true };
@@ -500,50 +507,60 @@ function validatePlanMatchesIssue(workspacePath: string, issueId: string): { val
 }
 
 /**
- * Validate that STATE.md belongs to the current issue.
- * If the STATE.md is for a different issue (cross-contamination from git merge),
+ * Validate that the continue file belongs to the current issue.
+ * If the continue file is for a different issue (cross-contamination from git merge),
  * remove it to prevent the agent from working on the wrong issue.
  *
- * Returns true if STATE.md is valid (matches issue or doesn't exist).
+ * Returns valid:true if the continue file matches the current issue or doesn't exist.
  */
 function validateAndCleanStateFile(workspacePath: string, issueId: string): { valid: boolean; removed: boolean; wrongIssue?: string } {
-  const statePath = join(workspacePath, '.planning', 'STATE.md');
+  const upperId = issueId.toUpperCase();
+  const { continuePath } = getWorkspacePanPaths(workspacePath);
 
-  if (!existsSync(statePath)) {
+  if (!existsSync(continuePath)) {
     return { valid: true, removed: false };
   }
 
   try {
-    const content = readFileSync(statePath, 'utf-8');
-    const firstLine = content.split('\n')[0] || '';
-
-    // Extract issue ID from first line (format: "# ISSUE-ID: Title" or "# ISSUE-ID - Title")
-    const issueMatch = firstLine.match(/^#\s*([A-Z]+-\d+)/i);
-
-    if (issueMatch) {
-      const stateIssueId = issueMatch[1].toUpperCase();
-      const currentIssueId = issueId.toUpperCase();
-
-      if (stateIssueId !== currentIssueId) {
-        // Cross-contamination detected! Remove the stale STATE.md
-        const { unlinkSync } = require('fs');
-        unlinkSync(statePath);
-
-        console.warn(chalk.yellow(`⚠️  Removed stale STATE.md (was for ${stateIssueId}, not ${currentIssueId})`));
+    const { unlinkSync } = require('fs');
+    const raw = readFileSync(continuePath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (parsed.issueId && typeof parsed.issueId === 'string') {
+      const recordedId = parsed.issueId.toUpperCase();
+      if (recordedId !== upperId) {
+        try { unlinkSync(continuePath); } catch { /* ignore */ }
+        console.warn(chalk.yellow(`⚠️  Removed stale continue file (was for ${recordedId}, not ${upperId})`));
         console.warn(chalk.dim('   This can happen when branches are merged. The agent will start fresh.'));
-
-        return { valid: false, removed: true, wrongIssue: stateIssueId };
+        return { valid: false, removed: true, wrongIssue: recordedId };
       }
     }
-
     return { valid: true, removed: false };
-  } catch (error) {
-    // If we can't read/parse the file, leave it alone
+  } catch {
     return { valid: true, removed: false };
   }
 }
 
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
+  // PAN-636 — validate --harness up front. canUseHarness gates the
+  // {harness, model, authMode} combination; invalid combos exit non-zero
+  // with the human-readable reason text on stderr (no spinner, no
+  // workspace setup) so callers don't get a half-prepared workspace
+  // when they pick something the gate refuses.
+  const requestedHarness: 'claude-code' | 'pi' = options.harness ?? 'claude-code';
+  if (requestedHarness !== 'claude-code' && requestedHarness !== 'pi') {
+    process.stderr.write(`Invalid --harness value: ${options.harness}. Expected 'claude-code' or 'pi'.\n`);
+    process.exit(1);
+  }
+  if (options.model) {
+    const { canUseHarness } = await import('../../lib/harness-policy.js');
+    const { getProviderAuthMode } = await import('../../lib/agents.js');
+    const decision = canUseHarness(requestedHarness, options.model, await getProviderAuthMode(options.model));
+    if (!decision.allowed) {
+      process.stderr.write(`${decision.reason}\n`);
+      process.exit(1);
+    }
+  }
+
   const spinner = ora(`Preparing workspace for ${id}...`).start();
 
   try {
@@ -681,11 +698,11 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
       // Show what context would be included
       const planningContext = readPlanningContext(workspace);
-      const beadsTasks = readBeadsTasks(workspace, projectRoot, id);
+      const beadsTasks = await readBeadsTasks(workspace, projectRoot, id);
       const hasPreWorkspacePRD = hasPRDDraft(id);
       console.log('');
       console.log(chalk.bold('Context:'));
-      console.log(`  Planning:   ${planningContext ? 'Found (.planning/STATE.md)' : 'None'}`);
+      console.log(`  Planning:   ${planningContext ? 'Found (.pan/continue.json)' : 'None'}`);
       console.log(`  Beads:      ${beadsTasks.length} tasks`);
       if (hasPreWorkspacePRD) {
         console.log(`  Pre-workspace PRD: ${chalk.green('✓')} ${getPRDDraftPath(id)}`);
@@ -693,14 +710,14 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       return;
     }
 
-    // Validate STATE.md belongs to this issue (prevent cross-contamination from git merges)
+    // Validate continue file belongs to this issue (prevent cross-contamination from git merges)
     spinner.text = 'Validating workspace state...';
     const stateValidation = validateAndCleanStateFile(workspace, id);
     if (stateValidation.removed) {
       spinner.warn(`Cleaned stale planning state from ${stateValidation.wrongIssue}`);
     }
 
-    // Validate plan.vbrief.json belongs to this issue (prevent stale .planning-complete from wrong issue)
+    // Validate spec.vbrief.json belongs to this issue (prevent stale workspace plan state from the wrong issue)
     const planValidation = validatePlanMatchesIssue(workspace, id);
     if (!planValidation.valid) {
       spinner.fail(`Workspace planning artifacts are for ${planValidation.wrongIssue}, not ${id}`);
@@ -709,7 +726,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       console.log(chalk.dim(`This can happen when a workspace is reused or a branch is repurposed.`));
       console.log('');
       console.log(chalk.bold('To fix this:'));
-      console.log(`  ${chalk.cyan(`1. Clean the workspace .planning/ directory`)}`);
+      console.log(`  ${chalk.cyan(`1. Clean the workspace planning artifacts`)}`);
       console.log(`  ${chalk.cyan(`2. Run planning again: pan plan ${id}`)}`);
       process.exit(1);
     }
@@ -717,8 +734,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // SAFEGUARD: Require beads tasks before work begins (matches dashboard start-agent enforcement)
     if (!hasBeadsTasks(workspace)) {
       // If no planning was done, this is a simple issue — auto-create a bead so the agent can start
-      const hasPlanningDir = existsSync(join(workspace, '.planning'));
-      if (!hasPlanningDir) {
+      const hasPlanningState = existsSync(getWorkspacePanPaths(workspace).specPath);
+      if (!hasPlanningState) {
         spinner.text = `Auto-creating bead for simple issue ${id}...`;
         try {
           const { execSync } = require('child_process');
@@ -766,13 +783,14 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     spinner.text = 'Building agent prompt with planning context...';
     const trackerContext = await getTrackerContext(id, workspace);
-    const prompt = buildWorkAgentPrompt({ issueId: id, env: 'LOCAL', workspacePath: workspace, projectRoot, trackerContext });
+    const prompt = await buildWorkAgentPrompt({ issueId: id, env: 'LOCAL', workspacePath: workspace, projectRoot, trackerContext });
 
     spinner.text = 'Spawning agent...';
 
     const agent = await spawnAgent({
       issueId: id,
       workspace,
+      harness: requestedHarness,
       model: options.model,
       phase: (options.phase || 'implementation') as SpawnOptions['phase'],
       prompt,
@@ -800,11 +818,11 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     // Show context info
     const planningContext = readPlanningContext(workspace);
-    const beadsTasks = readBeadsTasks(workspace, projectRoot, id);
+    const beadsTasks = await readBeadsTasks(workspace, projectRoot, id);
     if (planningContext || beadsTasks.length > 0) {
       console.log('');
       console.log(chalk.bold('Context Loaded:'));
-      if (planningContext) console.log(`  Planning:   ${chalk.green('✓')} STATE.md`);
+      if (planningContext) console.log(`  Planning:   ${chalk.green('✓')} continue.json`);
       if (beadsTasks.length > 0) console.log(`  Beads:      ${chalk.green('✓')} ${beadsTasks.length} tasks`);
     }
 

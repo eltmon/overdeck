@@ -8,7 +8,8 @@
 
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, chmodSync } from 'fs';
+import { readFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'path';
 import { readWorkspacePlan, updateItemStatus, updateSubItemStatus } from './io.js';
 import { extractACFromDocument } from './acceptance-criteria.js';
@@ -299,50 +300,44 @@ export async function createBeadsFromVBrief(workspacePath: string): Promise<Crea
 }
 
 /**
- * Syncs a closed bead's status to the corresponding vBRIEF item.
- *
- * Reads the bead title from .beads/issues.jsonl, strips the issue prefix
- * (e.g. "PAN-388: Wire createBeadsFromVBrief()" → "Wire createBeadsFromVBrief()"),
- * finds the matching item in plan.vbrief.json, and calls updateItemStatus().
- *
- * No-ops gracefully when:
- * - No plan.vbrief.json exists (legacy workspace)
- * - Bead ID not found in issues.jsonl
- * - No matching vBRIEF item found
- */
-/**
+ * Syncs a bead's status to the corresponding vBRIEF item.
  * Returns the vBRIEF item ID that was updated, or null if no match was found.
+ * Callers must provide knownTitle (from bd list/show output).
  */
-export function syncBeadStatusToVBrief(
+/** Read a bead title from .beads/issues.jsonl by bead ID. */
+async function readBeadTitleFromJsonl(beadId: string, workspacePath: string): Promise<string | null> {
+  try {
+    const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
+    if (!existsSync(jsonlPath)) return null;
+    const raw = await readFile(jsonlPath, 'utf-8');
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const entry = JSON.parse(line);
+        if (entry.id === beadId && typeof entry.title === 'string') {
+          return entry.title;
+        }
+      } catch { /* skip malformed lines */ }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function syncBeadStatusToVBrief(
   beadId: string,
   workspacePath: string,
   status: VBriefItemStatus = 'completed',
-  /** Optional: bead title from caller (e.g. bd list --json output). Falls back to .beads/issues.jsonl lookup. */
   knownTitle?: string
-): string | null {
+): Promise<string | null> {
   try {
     const doc = readWorkspacePlan(workspacePath);
     if (!doc) return null;
 
     let beadTitle: string | null = knownTitle ?? null;
-
-    // Fallback: read bead title from .beads/issues.jsonl (legacy flat-file beads)
     if (!beadTitle) {
-      const beadsFile = join(workspacePath, '.beads', 'issues.jsonl');
-      if (existsSync(beadsFile)) {
-        const lines = readFileSync(beadsFile, 'utf-8').split('\n').filter(Boolean);
-        for (const line of lines) {
-          try {
-            const bead = JSON.parse(line);
-            if (bead.id === beadId && bead.title) {
-              beadTitle = bead.title as string;
-              break;
-            }
-          } catch {
-            // skip malformed lines
-          }
-        }
-      }
+      beadTitle = await readBeadTitleFromJsonl(beadId, workspacePath);
     }
 
     if (!beadTitle) return null;

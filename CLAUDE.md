@@ -75,6 +75,12 @@ These block the Node.js event loop, freezing all HTTP requests, WebSocket connec
 - CLI commands only: sync calls are acceptable since they run in their own process
 - `sleep` via `execSync('sleep 0.3')` is NEVER acceptable in server code — use `await new Promise(r => setTimeout(r, 300))`
 
+## Harnesses
+
+Panopticon supports two coding-agent harnesses: `claude-code` (default) and `pi` (alternative, multi-provider). The harness is picked per spawn at plan kickoff, work agent start, and the conversation panel; specialists read per-role defaults from Settings. Pi + Anthropic + subscription auth is the only blocked combination (ToS gate in `src/lib/harness-policy.ts`).
+
+See [docs/HARNESSES.md](docs/HARNESSES.md) for installation, picker locations, ToS rules, and troubleshooting.
+
 ## Project Structure
 
 - **Stack**: TypeScript, Node.js 22+, React dashboard, SQLite, Effect.js
@@ -111,6 +117,21 @@ nearly instant (~2s). It correctly resolves `@panctl/contracts` to the worktree'
 - `npm run lint` — ESLint
 - `npm test` — Vitest (root + frontend)
 
+## tmux Socket — CRITICAL
+
+**Panopticon agents run under a separate tmux socket named `panopticon`.** Always use `-L panopticon` when inspecting agent sessions:
+
+```bash
+# List all agent sessions
+tmux -L panopticon list-sessions
+
+# Attach or capture a specific agent
+tmux -L panopticon capture-pane -t agent-min-846 -p -S -50
+tmux -L panopticon attach -t agent-min-846
+```
+
+The default tmux socket (`/tmp/tmux-1000/default`) is NOT used by agents. Plain `tmux list-sessions` will show "no server running" or list unrelated sessions. This is a common source of false "agent not found" errors.
+
 ## tmux Message Delivery
 
 Use `load-buffer` + `paste-buffer` pattern (NOT raw `send-keys` for text):
@@ -124,6 +145,51 @@ await execAsync(`tmux send-keys -t ${session} C-m`);  // Enter
 ```
 
 Raw `tmux send-keys "text"` followed immediately by `C-m` is unreliable — Enter arrives before text is processed.
+
+## Claude Code Channels (experimental)
+
+Reference: https://code.claude.com/docs/en/channels
+
+Claude Code Channels is a research-preview MCP capability that delivers
+orchestrator-to-agent messages over a stdio JSON-RPC transport instead of
+tmux send-keys. It exists because tmux paste-buffer delivery has a long
+tail of failure modes (paste before render, dropped Enter, partial text)
+that surface as silently-unanswered prompts; Channels removes the timing
+race entirely.
+
+The integration in this repo is **opt-in and off by default**, gated
+behind a single experimental flag in the dashboard Settings page
+(`experimental.claudeCodeChannels`). Eligibility is narrow on purpose:
+the path engages only for **work agents** running the **Claude Code**
+runtime with **Anthropic auth** (claude.ai OAuth or Console API key) on
+**non-Docker workspaces**. Codex, Cursor, Gemini, Cliproxy-routed-GPT,
+Bedrock, Vertex, Foundry, and Docker workspaces all stay on tmux send-keys
+unconditionally.
+
+**Architecture:**
+
+- `src/lib/channels/panopticon-bridge.ts` — per-agent Bun stdio MCP server.
+  Spawned by `claude --dangerously-load-development-channels server:panopticon-bridge`
+  using a workspace-local `.pan/agent-mcp.json`. Listens on
+  `${PANOPTICON_HOME}/sockets/agent-<id>.sock` (mode 0o600), accepts POSTs
+  of `{ content, meta? }`, and forwards each as a
+  `notifications/claude/channel` MCP frame.
+- `deliverAgentMessage(agentId, message, caller?)` in `src/lib/agents.ts`
+  is the **single delivery primitive** — eligibility check, socket POST
+  with 2s timeout, automatic tmux fallback on any failure mode (state
+  missing, socket missing, ENOENT, ECONNREFUSED, EPIPE, non-2xx, write
+  timeout). Callers stay caller-agnostic; the primitive owns the policy.
+- The dev-channels confirmation TUI dialog (`WARNING: Loading development
+  channels`) is dismissed automatically at agent startup via one
+  `sendRawKeystrokeAsync(C-m)` call, gated on `state.channelsEnabled`.
+
+**Scope:** only the work-agent prompt-delivery sites in `src/lib/agents.ts`
+migrate. The following intentionally stay on `sendKeysAsync`:
+`src/lib/cloister/` (specialists, deacon, review, merge), `src/lib/runtimes/`
+(non-Claude-Code runtimes), `src/dashboard/server/routes/conversations.ts`,
+and `src/dashboard/server/routes/misc.ts`. Bidirectional reply tools and
+dashboard-routed permission relay are out of scope and tracked as separate
+follow-up issues.
 
 ## Dashboard Server Architecture (Effect + Raw WebSocket)
 
@@ -237,14 +303,13 @@ The deep-wipe endpoint (`POST /api/agents/:id/deep-wipe`) with `deleteWorkspace:
 1. **tmux sessions** — all agent sessions killed
 2. **Agent state directories** — `~/.panopticon/agents/<id>/` removed
 3. **Entire workspace directory** — this includes:
-   - `.planning/STATE.md` — planning progress and status
-   - `.planning/plan.vbrief.json` — the **workspace-specific vBRIEF plan** with items, acceptance criteria, and dependencies (generated during planning)
-   - `.planning/beads/` — all task tracking beads
+   - `.pan/spec.vbrief.json` — the **workspace-specific vBRIEF plan**
+   - `.beads/` — all task tracking beads
    - Any implementation work in progress
 4. **Git branches** — both local AND remote `feature/<issue-id>` branches deleted
 5. **Linear/GitHub status** — issue status reset to Todo/Open
 
-**The docs-level PRD** (e.g., `myn/docs/prds/planned/MIN-XXX-*.md`) survives because it's committed to the docs repo, but it is NOT the same as the workspace vBRIEF plan generated during planning. The two workspace planning artifacts are `plan.vbrief.json` (structured plan with acceptance criteria) and `STATE.md` (narrative context and current status).
+**The scope vBRIEF** in `.pan/specs/` on main survives deep-wipe — it's committed to the project repo independently of the workspace. The docs-level PRD (e.g., `myn/docs/prds/planned/MIN-XXX-*.md`) also survives. The workspace `.pan/` directory (spec, continue state) and `.beads/` are destroyed.
 
 **Rules:**
 - **NEVER call deep-wipe programmatically** without the user explicitly requesting it
@@ -285,32 +350,62 @@ When TLDR is available, you'll have these MCP tools:
 
 **Use TLDR liberally to maximize your session effectiveness.**
 
-## vBRIEF Plans
+## vBRIEF Plans & Lifecycle
 
-Panopticon uses **vBRIEF v0.5** for machine-readable work plans. Key references:
+Panopticon uses **vBRIEF v0.5** for machine-readable work plans with a filesystem-as-state lifecycle model. Key references:
 
 - **Canonical spec:** [github.com/deftai/vBRIEF](https://github.com/deftai/vBRIEF)
 - **Our fork:** [github.com/eltmon/vBRIEF](https://github.com/eltmon/vBRIEF)
 - **Extension proposal:** [deftai/vBRIEF#1](https://github.com/deftai/vBRIEF/issues/1)
 - **Panopticon docs:** [docs/VBRIEF.md](docs/VBRIEF.md)
 
-### v0.5 Fields Implemented
+### Lifecycle Directories
 
-`vBRIEFInfo`: `author` (tool identifier), `description`
+Scope vBRIEFs live in `vbrief/` at the project root and move between directories as work progresses:
 
-`plan`: `uid` (UUID v4), `author` (agent model), `sequence` (write counter), `references` (issue URL + PRDs), `created`, `updated`
+- `vbrief/proposed/` — planning complete, awaiting approval
+- `vbrief/active/` — agent is working on it
+- `vbrief/completed/` — merged/closed
+- `vbrief/cancelled/` — abandoned
 
-`items`/`subItems`: `created`, `completed` (set on status → completed)
+Filenames are issue-keyed: `YYYY-MM-DD-<ISSUE-ID>-<slug>.vbrief.json`
+
+### Continue State
+
+`continue-<issueId>.vbrief.json` replaces STATE.md as the structured session history. Lives alongside the scope vBRIEF in the same lifecycle directory. Contains git state, decisions, hazards, resume point, beads mapping, agent model, and session history.
 
 ### Auto-Behaviors
 
 - `io.ts` (`updateItemStatus`/`updateSubItemStatus`) auto-increments `plan.sequence` and sets `updated` timestamps on every write
-- `complete-planning` copies `STATE.md` and `plan.vbrief.json` to `docs/prds/active/<issue-id>/` (skip if exists)
-- `start-planning` discovers PRDs from `docs/prds/planned/` and `docs/prds/active/` matching the issue ID and copies to `.planning/prd.md`
+- `complete-planning` promotes vBRIEF to `vbrief/proposed/` on main with an issue-keyed filename
+- `start-agent` transitions vBRIEF from `proposed/` to `active/` and sets `plan.status` to `approved`/`running`
+- `postMergeLifecycle` transitions vBRIEF from `active/` to `completed/` on main
+- `start-planning` discovers PRDs from `docs/prds/planned/` and `docs/prds/active/` matching the issue ID and copies to `.pan/prd.md`
+- `findPlan()` resolves vBRIEFs from `.pan/specs/` on main first, falling back to workspace `.pan/spec.vbrief.json`
 
 ### Dashboard Viewer
 
 VBriefViewer components at `src/dashboard/frontend/src/components/vbrief/`:
 - Accessible via **vBRIEF button** on kanban issue cards and InspectorPanel
 - List / DAG / Raw JSON tabs
-- Fetches from `GET /api/workspaces/:issueId/plan`
+- Fetches from `GET /api/workspaces/:issueId/plan` (resolves from lifecycle dirs first, then workspace)
+
+## Issue Creation from PRDs
+
+When creating a Linear or GitHub issue from a PRD, **always reference the PRD at the very top of the issue description** -- before any other content. Use a bold label with a repo-relative path and a clickable link:
+
+```
+**PRD:** [`path/to/prd.md`](https link to the file in the repo)
+```
+
+The issue body should then contain a tight summary (vision, motivation, design goals, key capabilities, phases) -- NOT a full copy of the PRD. The PRD is the source of truth for data models, architecture, code samples, and implementation details. Duplicating that content into the issue creates drift.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with community structure and cross-file relationships.
+
+Rules:
+- At task start, read graphify-out/GRAPH_SUMMARY.md (~700 tokens) for orientation — do NOT read the full GRAPH_REPORT.md (35K tokens) unless you need the complete community listing.
+- For cross-module questions, use the CLI instead of reading files: `graphify query "<question>"`, `graphify path "<A>" "<B>"`, `graphify explain "<concept>"` — these traverse EXTRACTED + INFERRED edges and return only relevant nodes.
+- Only read source files once you know exactly which ones to read (from graphify output or the summary).
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

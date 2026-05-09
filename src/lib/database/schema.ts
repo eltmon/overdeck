@@ -10,7 +10,7 @@ import { existsSync } from 'fs';
 import { encodeClaudeProjectDir } from '../paths.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 29;
+export const SCHEMA_VERSION = 32;
 
 /**
  * Initialize the complete database schema.
@@ -78,6 +78,9 @@ export function initSchema(db: Database.Database): void {
       auto_requeue_count    INTEGER DEFAULT 0,
       merge_retry_count     INTEGER DEFAULT 0,
       pr_url                TEXT,
+      -- PAN-905: tracked PR identity for webhook correlation
+      pr_head_sha           TEXT,
+      pr_number             INTEGER,
       -- PAN-653: persistent stuck state (set when main diverges mid-approve)
       stuck                 INTEGER NOT NULL DEFAULT 0,
       stuck_reason          TEXT,
@@ -96,7 +99,13 @@ export function initSchema(db: Database.Database): void {
       -- Human-requested deacon ignore: when set, patrol skips this issue entirely
       deacon_ignored          INTEGER NOT NULL DEFAULT 0,
       deacon_ignored_at       TEXT,
-      deacon_ignored_reason   TEXT
+      deacon_ignored_reason   TEXT,
+      -- PAN-905: GitHub-native merge blocker reasons (JSON array)
+      blocker_reasons         TEXT,
+      -- PAN-938: pre-review verification gate commit SHA
+      last_verified_commit    TEXT,
+      -- PAN-938: current merge pipeline step
+      merge_step              TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_review_status_updated
@@ -744,6 +753,23 @@ export function runMigrations(db: Database.Database): void {
           ON conversations(status, archived_at, created_at)
       `);
     } catch { /* already exists */ }
+  }
+
+  // v29 → v30: add blocker_reasons column to review_status (PAN-905)
+  if (currentVersion < 30) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN blocker_reasons TEXT`); } catch { /* already exists */ }
+  }
+
+  // v30 → v31: add pr_head_sha and pr_number for webhook PR identity validation (PAN-905)
+  if (currentVersion < 31) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN pr_head_sha TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN pr_number INTEGER`); } catch { /* already exists */ }
+  }
+
+  // v31 → v32: add last_verified_commit and merge_step to review_status
+  if (currentVersion < 32) {
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN last_verified_commit TEXT`); } catch { /* already exists */ }
+    try { db.exec(`ALTER TABLE review_status ADD COLUMN merge_step TEXT`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version

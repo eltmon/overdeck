@@ -6,7 +6,7 @@ import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
 import { bridgeCodexAuthToCliproxyAsync } from '../../../lib/cliproxy.js';
-import { createSessionAsync, sessionExistsAsync } from '../../../lib/tmux.js';
+import { createSessionAsync, sessionExistsAsync, listSessionNamesAsync } from '../../../lib/tmux.js';
 
 // ─── Re-auth session registry ──────────────────────────────────────────────────
 
@@ -55,6 +55,10 @@ export function getReauthSessionToken(sessionName: string): string | undefined {
   return session.token;
 }
 
+export function invalidateReauthToken(sessionName: string): void {
+  reauthSessions.delete(sessionName);
+}
+
 // ─── Route: GET /api/settings/codex-auth ───────────────────────────────────────
 
 const getCodexAuthRoute = HttpRouter.add(
@@ -70,12 +74,31 @@ const getCodexAuthRoute = HttpRouter.add(
 
 // ─── Route: POST /api/settings/codex-reauth ────────────────────────────────────
 
+async function findExistingLiveReauthSession(): Promise<{ sessionName: string; token: string } | null> {
+  cleanupExpiredReauthSessions();
+  const sessions = await listSessionNamesAsync();
+  for (const [name, session] of reauthSessions.entries()) {
+    if (sessions.includes(name)) {
+      return { sessionName: name, token: session.token };
+    }
+  }
+  return null;
+}
+
 const postCodexReauthRoute = HttpRouter.add(
   'POST',
   '/api/settings/codex-reauth',
   httpHandler(
     Effect.gen(function* () {
-      cleanupExpiredReauthSessions();
+      const existing = yield* Effect.promise(() => findExistingLiveReauthSession());
+      if (existing) {
+        return jsonResponse({
+          sessionName: existing.sessionName,
+          token: existing.token,
+          headless: !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY,
+        });
+      }
+
       const { sessionName, token } = generateReauthSession();
 
       const headless = !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
@@ -105,6 +128,11 @@ const getCodexReauthStatusRoute = HttpRouter.add(
         ? urlOpt.value.searchParams
         : new URLSearchParams();
       const sessionName = searchParams.get('session') ?? '';
+      const token = searchParams.get('token') ?? '';
+
+      if (!validateReauthToken(sessionName, token)) {
+        return jsonResponse({ completed: false });
+      }
 
       const exists = yield* Effect.promise(() => sessionExistsAsync(sessionName));
       if (exists) {

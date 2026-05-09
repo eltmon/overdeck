@@ -13,7 +13,7 @@ import type { SubscriptionPlan } from './subscription-types.js';
 /**
  * AI model provider types
  */
-export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai';
+export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'kimi' | 'minimax' | 'openrouter' | 'zai' | 'mimo';
 
 /**
  * Map of model ID to provider
@@ -46,12 +46,11 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
 
   // Google models (current)
   'gemini-3.1-pro-preview': 'google',
-  'gemini-3-flash': 'google',
+  'gemini-3-flash-preview': 'google',
   'gemini-3.1-flash-lite-preview': 'google',
 
   // Google legacy
   'gemini-3-pro-preview': 'google',
-  'gemini-3-flash-preview': 'google',
   'gemini-2.5-pro': 'google',
   'gemini-2.5-flash': 'google',
 
@@ -69,6 +68,10 @@ const MODEL_PROVIDERS: Record<ModelId, ModelProvider> = {
   'glm-5.1': 'zai',
   'glm-4.7': 'zai',
   'glm-4.7-flash': 'zai',
+
+  // MiMo models
+  'mimo-v2.5-pro': 'mimo',
+  'mimo-v2.5': 'mimo',
 } as Record<ModelId | string, ModelProvider>;
 
 /**
@@ -104,11 +107,10 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
 
   // Google → Anthropic
   'gemini-3.1-pro-preview': 'claude-sonnet-4-6', // Flagship → Sonnet
-  'gemini-3-flash': 'claude-haiku-4-5', // Fast model → Haiku
+  'gemini-3-flash-preview': 'claude-haiku-4-5', // Fast model → Haiku
   'gemini-3.1-flash-lite-preview': 'claude-haiku-4-5', // Budget model → Haiku
   // Deprecated Google IDs
   'gemini-3-pro-preview': 'claude-sonnet-4-6',
-  'gemini-3-flash-preview': 'claude-haiku-4-5',
   'gemini-2.5-pro': 'claude-sonnet-4-6',
   'gemini-2.5-flash': 'claude-haiku-4-5',
 
@@ -129,6 +131,10 @@ const FALLBACK_MAP: Record<string, AnthropicModel> = {
   // and direct FALLBACK_MAP lookup; explicit entries make the result deterministic).
   'glm-4.7': 'claude-sonnet-4-6', // strong-tier → Sonnet
   'glm-4.7-flash': 'claude-haiku-4-5', // economy-tier → Haiku
+
+  // MiMo → Anthropic
+  'mimo-v2.5-pro': 'claude-sonnet-4-6', // Flagship reasoning → Sonnet
+  'mimo-v2.5': 'claude-sonnet-4-6', // Multimodal → Sonnet
 };
 
 /**
@@ -189,6 +195,7 @@ export function getModelProvider(modelId: ModelId | string): ModelProvider {
   if (modelId.startsWith('gemini-')) return 'google';
   if (modelId.startsWith('kimi-')) return 'kimi';
   if (modelId.toLowerCase().startsWith('minimax')) return 'minimax';
+  if (modelId.startsWith('mimo-')) return 'mimo';
   return 'anthropic';
 }
 

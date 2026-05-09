@@ -1,4 +1,6 @@
 import { jsonResponse } from "../http-helpers.js";
+import { buildChildEnv, buildChildEnvWithoutTmux, BLANKED_PROVIDER_ENV } from '../../../lib/child-env.js';
+import { getClaudePermissionFlagsString, resolvePermissionMode } from '../../../lib/claude-permissions.js';
 /**
  * Conversations route module — Effect HttpRouter.Layer (PAN-416)
  *
@@ -22,6 +24,16 @@ import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
 import { resolveClaudeSessionId } from './jsonl-resolver.js';
+import { validateOrigin } from './origin-validation.js';
+import { getProject } from '../../../lib/projects.js';
+import {
+  findCommitAtTime,
+  diffSinceCommit,
+  diffFilesAgainstHead,
+  diffPatchSinceCommit,
+  diffPatchFilesAgainstHead,
+  type TurnDiffFileChange,
+} from '../../../lib/checkpoint/checkpoint-manager.js';
 
 import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -50,6 +62,8 @@ import {
 } from '../../../lib/database/conversations-db.js';
 import {
   sendKeysAsync,
+  sendRawKeystrokeAsync,
+  MessageDeliveryFailed,
   capturePaneAsync,
   sessionExistsAsync,
   killSessionAsync,
@@ -61,19 +75,22 @@ import {
 import {
   getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
+  getProviderEnvForModel,
 } from '../../../lib/agents.js';
 import { generateLauncherScript } from '../../../lib/launcher-generator.js';
 import {
   parseConversationMessages,
   parseFromLastCompactBoundary,
+  summarizeConversationActivity,
   type ParseState,
 } from '../services/conversation-service.js';
 import {
   maybeCompactBeforeRespawn,
   compactConversationNative,
   shouldInterceptManualCompact,
+  isCompacting,
 } from '../services/conversation-compaction.js';
-import { sessionFilePath, sessionIdFromFile, encodeClaudeProjectDir } from '../../../lib/paths.js';
+import { sessionFilePath, encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { generateSummaryForFork, generateFallbackSummary, reserveSummaryForkSession, copySessionFromCompactBoundary } from '../../../lib/conversations/summary-fork.js';
 import {
   ensureConversationAttachmentDir,
@@ -96,7 +113,7 @@ function shellQuote(str: string): string {
   return "'" + str.replace(/'/g, "'\"'\"'") + "'";
 }
 
-const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.-]+$/;
+const SAFE_MODEL_PATTERN = /^[a-zA-Z0-9_.:\/-]+$/;
 const SAFE_EFFORT_PATTERN = /^(low|medium|high)$/;
 const SAFE_PROJECT_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const SAFE_ISSUE_ID_PATTERN = /^[A-Z0-9]+-[0-9]+$/;
@@ -110,6 +127,15 @@ const uploadRateLimit = new Map<string, { count: number; resetAt: number }>();
 
 function isLoopbackAddress(addr: string): boolean {
   return addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
+}
+
+function getHeader(
+  request: HttpServerRequest.HttpServerRequest,
+  name: string,
+): string | undefined {
+  const value = (request.headers as Record<string, string | string[] | undefined>)[name];
+  if (Array.isArray(value)) return value[0];
+  return value;
 }
 
 function getClientIp(request: HttpServerRequest.HttpServerRequest): string {
@@ -185,7 +211,7 @@ async function getCachedMessages(
   const fileStats = await stat(sessionFile);
   const cacheKey = `${sessionFile}:${isSpecialist}`;
   const cached = messagesCache.get(cacheKey);
-  if (cached && cached.mtimeMs === fileStats.mtimeMs && cached.size === fileStats.size) {
+  if (cached && cached.mtimeMs === fileStats.mtimeMs && cached.size === fileStats.size && cached.byteOffset >= fileStats.size) {
     return cached.result;
   }
 
@@ -222,6 +248,20 @@ async function getCachedMessages(
         unresolvedResults: incremental.unresolvedResults,
         lastSequence: incremental.lastSequence,
         mtimeMs: incremental.mtimeMs,
+        proposedPlan: incremental.proposedPlan ?? cachedResult.proposedPlan,
+        get compactBoundaries() {
+          return cachedResult.compactBoundaries.concat(incremental.compactBoundaries);
+        },
+        planToolUseIds: incremental.planToolUseIds,
+        permissionMode: incremental.permissionMode ?? cachedResult.permissionMode,
+        get fileEditsByAssistantId() {
+          const merged = new Map(cachedResult.fileEditsByAssistantId);
+          for (const [k, v] of incremental.fileEditsByAssistantId) {
+            const existing = merged.get(k);
+            merged.set(k, existing ? [...existing, ...v] : v);
+          }
+          return merged;
+        },
       };
     }
   } else {
@@ -238,6 +278,9 @@ async function getCachedMessages(
       pendingToolUse: result.pendingToolUse,
       unresolvedResults: result.unresolvedResults,
       lastSequence: result.lastSequence,
+      planToolUseIds: result.planToolUseIds,
+      proposedPlan: result.proposedPlan,
+      permissionMode: result.permissionMode,
     },
   });
   if (messagesCache.size > MESSAGES_CACHE_MAX) {
@@ -264,79 +307,11 @@ function getCachedFavoritedIds(): Set<string> {
   return ids;
 }
 
+function invalidateFavoritesCache(): void {
+  favoritesCache = null;
+}
+
 // ─── CSRF / Origin validation ────────────────────────────────────────────────
-
-let cachedTrustedOrigins: string[] | undefined;
-
-function getTrustedOrigins(): string[] {
-  if (cachedTrustedOrigins !== undefined) {
-    return cachedTrustedOrigins;
-  }
-  const port = parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
-  const dashboardUrl = process.env['DASHBOARD_URL'] ?? `http://localhost:${port}`;
-  const origins = new Set<string>();
-  origins.add(dashboardUrl);
-  // Only trust local development origins in development mode
-  if (process.env['NODE_ENV'] === 'development') {
-    origins.add('http://localhost:3011');
-    origins.add('http://localhost:3000');
-    origins.add('http://127.0.0.1:3011');
-    origins.add('http://127.0.0.1:3000');
-  }
-  cachedTrustedOrigins = Array.from(origins);
-  return cachedTrustedOrigins;
-}
-
-function normalizeOrigin(origin: string): string | null {
-  try {
-    const url = new URL(origin);
-    return `${url.protocol}//${url.host}`;
-  } catch {
-    return null;
-  }
-}
-
-function getHeader(
-  request: HttpServerRequest.HttpServerRequest,
-  name: string,
-): string | undefined {
-  const value = (request.headers as Record<string, string | string[] | undefined>)[name];
-  if (Array.isArray(value)) return value[0];
-  return value;
-}
-
-function validateOrigin(request: HttpServerRequest.HttpServerRequest): { ok: true } | { ok: false; error: string } {
-  const origin = getHeader(request, 'origin');
-  const referer = getHeader(request, 'referer');
-  const trusted = getTrustedOrigins();
-
-  // Safe reads can omit both Origin and Referer on same-origin fetches.
-  // Enforce origin checks only when a caller supplies one, or when the
-  // request method can mutate state.
-  if (!origin && !referer) {
-    const method = request.method.toUpperCase();
-    if (method === 'GET' || method === 'HEAD') {
-      return { ok: true };
-    }
-    return { ok: false, error: 'Missing origin' };
-  }
-
-  // If Origin is present, it must exactly match a trusted origin
-  if (origin) {
-    const normalized = normalizeOrigin(origin);
-    if (normalized && trusted.includes(normalized)) {
-      return { ok: true };
-    }
-    return { ok: false, error: 'Invalid origin' };
-  }
-
-  // If no Origin but Referer is present, normalize and check it
-  const normalized = normalizeOrigin(referer);
-  if (normalized && trusted.includes(normalized)) {
-    return { ok: true };
-  }
-  return { ok: false, error: 'Invalid referer' };
-}
 
 /** Validate a caller-supplied cwd is an existing directory under the user's home. */
 async function validateCwdContainment(cwd: string): Promise<boolean> {
@@ -401,14 +376,11 @@ async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   console.warn(`[conversations] Timed out waiting for Claude Code prompt in ${tmuxSession}`);
 }
 
-/** Resolve the JSONL session file path for a conversation.
- *  Prefers the stored claudeSessionId (computed on demand); falls back to
- *  the legacy sessionFile column for rows created before the migration. */
 function resolveSessionFile(conv: Conversation): string | null {
   if (conv.claudeSessionId) {
     return sessionFilePath(conv.cwd, conv.claudeSessionId);
   }
-  return conv.sessionFile; // legacy fallback
+  return null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -533,10 +505,11 @@ export async function handleConversationMessage(
   }
 
   if (shouldInterceptManualCompact(message)) {
-    if (!conv.sessionFile || !existsSync(conv.sessionFile)) {
+    const compactSessionFile = resolveSessionFile(conv);
+    if (!compactSessionFile || !existsSync(compactSessionFile)) {
       return jsonResponse({ error: `No session file found for conversation ${conv.name}` }, { status: 400 });
     }
-    const result = await compactConversationNative(conv.sessionFile);
+    const result = await compactConversationNative(compactSessionFile, conv.name);
     return jsonResponse({ ok: true, compacted: true, mode: 'panopticon-native', model: result.model });
   }
 
@@ -558,6 +531,15 @@ export async function handleConversationMessage(
   }
 
   await deliverMessage(conv.tmuxSession, message, 'conversation-message');
+
+  // Generate AI title for conversations created via instant-start (no message at creation)
+  if (conv.titleSource === 'default') {
+    void generateAiTitle(name, message).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[TITLE-GEN-FAILED] AI title generation FAILED for "${name}" — NO RETRY, NO FALLBACK:`, msg);
+    });
+  }
+
   return jsonResponse({ ok: true });
 }
 
@@ -683,24 +665,46 @@ async function spawnConversationSession(
 
   const launcherScript = join(stateDir, 'launcher.sh');
 
-  const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
+  const permissionFlags = getClaudePermissionFlagsString();
   let runtimeCommand = `claude ${permissionFlags}`;
-  const providerEnvExports: string[] = [];
+  let providerExportsStr = '';
+  let providerEnv: Record<string, string> = {};
   if (model) {
     if (!SAFE_MODEL_PATTERN.test(model)) {
       throw new Error('Invalid model name');
     }
-    runtimeCommand = getAgentRuntimeBaseCommand(model);
-    if (!runtimeCommand.includes('--dangerously-skip-permissions')) {
-      runtimeCommand = `${runtimeCommand} --dangerously-skip-permissions`;
+    runtimeCommand = await getAgentRuntimeBaseCommand(model);
+    // Defensive permission-flag injection.
+    // getAgentRuntimeBaseCommand already emits the correct flags for every code path
+    // (direct/CLIProxy/--agent/claudish), so in a healthy build the appends below are
+    // no-ops. They exist as a belt-and-braces guard for future code paths that might
+    // forget to thread the resolved mode through. The critical safety property:
+    // NEVER add --dangerously-skip-permissions when the resolved mode is 'auto'.
+    // Enterprise users rely on Auto being honored; a silent escalation to bypass is
+    // a P0 trust violation.
+    const mode = resolvePermissionMode();
+    if (mode === 'auto') {
+      if (!runtimeCommand.includes('--permission-mode')) {
+        runtimeCommand = `${runtimeCommand} --permission-mode auto`;
+      }
+      // Refuse to run with mixed signals: if the base command already contains DSP
+      // while the user explicitly chose Auto, that is a substrate bug that must
+      // surface, not be silently downgraded.
+      if (runtimeCommand.includes('--dangerously-skip-permissions')) {
+        throw new Error(
+          `Refusing to spawn ${tmuxSession}: resolved mode is 'auto' but base command for model "${model}" contains --dangerously-skip-permissions. This is a substrate bug; do not silently bypass user Settings.`,
+        );
+      }
+    } else {
+      if (!runtimeCommand.includes('--dangerously-skip-permissions')) {
+        runtimeCommand = `${runtimeCommand} --dangerously-skip-permissions`;
+      }
+      if (!runtimeCommand.includes('--permission-mode')) {
+        runtimeCommand = `${runtimeCommand} --permission-mode bypassPermissions`;
+      }
     }
-    if (!runtimeCommand.includes('--permission-mode')) {
-      runtimeCommand = `${runtimeCommand} --permission-mode bypassPermissions`;
-    }
-    const providerExports = getProviderExportsForModel(model).trim();
-    if (providerExports) {
-      providerEnvExports.push(...providerExports.split('\n').filter(Boolean));
-    }
+    providerExportsStr = (await getProviderExportsForModel(model)).trim();
+    providerEnv = await getProviderEnvForModel(model);
   }
 
   if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
@@ -713,8 +717,9 @@ async function spawnConversationSession(
       agentType: 'conversation',
       workingDir: cwd,
       setTerminalEnv: true,
+      unsetProviderEnv: true,
       panopticonEnv: issueId ? { issueId } : undefined,
-      extraEnvExports: providerEnvExports,
+      providerExports: providerExportsStr || undefined,
       trapHup: true,
       baseCommand: runtimeCommand,
       resumeSessionId: resume ? claudeSessionId : undefined,
@@ -733,12 +738,28 @@ async function spawnConversationSession(
     // ignore missing stale session
   }
 
-  // Spawn the session
-  await createSessionAsync(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
-    env: {
-      TERM: 'xterm-256color',
-    },
-  });
+  console.log(`[claude-invoke] purpose=conversation-session | model=${model || 'default'} | source=conversations.ts:spawnConversationSession | session=${tmuxSession} | resume=${resume} | command="${runtimeCommand}"`);
+
+  // Spawn the session — blank out provider env vars (ANTHROPIC_BASE_URL,
+  // ANTHROPIC_API_KEY, etc.) via tmux -e flags so the launcher script's
+  // exports are the sole source of provider configuration. The tmux server
+  // inherits the parent's env and -e can only SET, not UNSET, so we set
+  // provider vars to empty strings to override stale inherited values.
+  try {
+    await createSessionAsync(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
+      env: {
+        ...BLANKED_PROVIDER_ENV,
+        TERM: 'xterm-256color',
+      },
+    });
+  } catch (err) {
+    if ((err as { code?: string })?.code === 'ENOENT') {
+      throw new Error(
+        'tmux is not installed. Install it with: brew install tmux (macOS) or sudo apt-get install tmux (Linux)',
+      );
+    }
+    throw err;
+  }
 
   // Keep session alive when clients disconnect
   await setOptionAsync(tmuxSession, 'destroy-unattached', 'off');
@@ -749,10 +770,18 @@ async function spawnConversationSession(
  * Generate an AI title for a conversation using Claude CLI (T3Code pattern).
  * Runs `claude -p --output-format json --json-schema ...` with the first message
  * as input, then updates the conversation title if it hasn't been manually renamed.
+ *
+ * Uses the hardcoded haiku model for fast, cheap title generation. No fallback —
+ * if generation fails the error is logged and the existing title is kept.
  */
 async function generateAiTitle(conversationName: string, firstMessage: string): Promise<void> {
   const conv = getConversationByName(conversationName);
-  if (!conv || !canReplaceTitle(conv)) return;
+  if (!conv || !canReplaceTitle(conv)) {
+    return;
+  }
+
+  const titleModel = 'claude-haiku-4-5-20251001';
+  console.log(`[claude-invoke] purpose=conversation-title | model=${titleModel} | source=conversations.ts:generateAiTitle | conversation=${conversationName} | promptChars=${firstMessage.length}`);
 
   const schema = JSON.stringify({
     type: 'object',
@@ -769,6 +798,10 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
     firstMessage,
   ].join('\n');
 
+  // Build provider-env for the title model (same routing as conversation sessions)
+  const providerEnv = await getProviderEnvForModel(titleModel);
+  const childEnv = { ...buildChildEnv(), ...providerEnv };
+
   const stdout = await new Promise<string>((resolve, reject) => {
     const child = spawn(
       'claude',
@@ -776,9 +809,9 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
         '-p',
         '--output-format', 'json',
         '--json-schema', schema,
-        '--model', 'claude-haiku-4-5-20251001',
+        '--model', titleModel,
       ],
-      { env: { ...process.env, PATH: process.env.PATH } },
+      { env: childEnv },
     );
     let out = '';
     let errOut = '';
@@ -814,10 +847,12 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
 
   // Claude CLI returns { structured_output: { title: "..." }, ... } or { result: "..." }
   const parsed = JSON.parse(stdout.trim());
-  const aiTitle: string | undefined =
-    parsed?.structured_output?.title ?? parsed?.title;
+  const aiTitle = parsed?.structured_output?.title ?? parsed?.title;
 
-  if (!aiTitle || !aiTitle.trim()) return;
+  if (!aiTitle || !aiTitle.trim()) {
+    console.warn(`[generateAiTitle] Model returned empty title for "${conversationName}"`);
+    return;
+  }
 
   // Sanitize: strip quotes, normalize whitespace, take first line only
   const sanitized = aiTitle
@@ -828,14 +863,20 @@ async function generateAiTitle(conversationName: string, firstMessage: string): 
     .trim()
     .replace(/\s+/g, ' ');
 
-  if (!sanitized) return;
+  if (!sanitized) {
+    console.warn(`[generateAiTitle] Sanitized title is empty for "${conversationName}"`);
+    return;
+  }
 
   // Re-check eligibility (may have been renamed while we waited)
   const freshConv = getConversationByName(conversationName);
-  if (!freshConv || !canReplaceTitle(freshConv)) return;
+  if (!freshConv || !canReplaceTitle(freshConv)) {
+    console.log(`[generateAiTitle] Conversation "${conversationName}" was renamed while generating title; skipping update`);
+    return;
+  }
 
   updateConversationTitle(conversationName, sanitized, 'ai');
-  console.log(`[conversations] AI title for "${conversationName}": ${sanitized}`);
+  console.log(`[claude-invoke] SUCCESS purpose=conversation-title | model=${titleModel} | conversation=${conversationName} | outputChars=${sanitized.length}`);
 }
 
 // ─── Route: GET /api/conversations ───────────────────────────────────────────
@@ -860,21 +901,32 @@ const getConversationsRoute = HttpRouter.add(
         const favoritedNames = getCachedFavoritedIds();
 
         // Enrich with live tmux status
-        // Grace period: treat recently-created active conversations as alive (tmux may not have
-        // started yet — spawn is async). After 30s we fall back to the actual tmux check.
-        const SPAWN_GRACE_MS = 30_000;
+        // Grace period removed (PAN-826): POST /api/conversations now waits for
+        // Claude to be ready before returning 201, so newly-created conversations
+        // are always live by the time they appear in the list.
         const liveSessionNames = new Set(await listSessionNamesAsync());
-        const now = Date.now();
-        const graceThreshold = now - SPAWN_GRACE_MS;
-        const enriched = conversations.map((conv) => {
-          const withinGrace =
-            conv.status === 'active' &&
-            !conv.endedAt &&
-            new Date(conv.createdAt).getTime() > graceThreshold;
-          const sessionAlive = !conv.forkStatus && (withinGrace || liveSessionNames.has(conv.tmuxSession));
+        const enriched = await Promise.all(conversations.map(async (conv) => {
+          const sessionAlive = !conv.forkStatus && liveSessionNames.has(conv.tmuxSession);
+          let isWorking = false;
+          let currentTool: string | null = null;
 
-          return { ...conv, sessionAlive, isWorking: false, currentTool: null, isFavorited: favoritedNames.has(conv.name) };
-        });
+          if (sessionAlive) {
+            const sf = resolveSessionFile(conv);
+            if (sf && existsSync(sf)) {
+              try {
+                const summary = await summarizeConversationActivity(sf);
+                isWorking = summary.isWorking;
+                currentTool = summary.currentTool;
+              } catch {
+                // JSONL parse failure — fall back to defaults
+              }
+            }
+          }
+
+          const convSf = resolveSessionFile(conv);
+          const compacting = convSf ? isCompacting(convSf) : false;
+          return { ...conv, sessionAlive, isWorking, currentTool, isFavorited: favoritedNames.has(conv.name), compacting };
+        }));
 
         return jsonResponse(enriched);
       }    catch (error: unknown) {
@@ -934,12 +986,23 @@ const postConversationRoute = HttpRouter.add(
       return jsonResponse({ error: originCheck.error }, { status: 403 });
     }
     const body = yield* readJsonBody;
+
+    // Log request origin to trace who is creating conversations
+    const reqOrigin = getHeader(request, 'origin') ?? 'none';
+    const reqReferer = getHeader(request, 'referer') ?? 'none';
+    const reqUserAgent = getHeader(request, 'user-agent') ?? 'none';
+    const reqXff = getHeader(request, 'x-forwarded-for') ?? 'none';
+    const reqIp = request.headers['x-real-ip'] ?? 'local';
+    console.log(`[conversations] POST /api/conversations origin=${reqOrigin} referer=${reqReferer} ua=${reqUserAgent.slice(0, 80)} xff=${reqXff} ip=${reqIp}`);
+
     return yield* Effect.promise(async () => {
       try {
         const message = typeof body['message'] === 'string' ? body['message'].trim() : '';
         const model = typeof body['model'] === 'string' ? body['model'].trim() : undefined;
         const effort = typeof body['effort'] === 'string' ? body['effort'].trim() : undefined;
         const issueId = typeof body['issueId'] === 'string' ? body['issueId'] : undefined;
+        const projectKey = typeof body['projectKey'] === 'string' ? body['projectKey'].trim() : undefined;
+        const applyProviderOverride = body['applyProviderOverride'] === true;
         if (issueId && !SAFE_ISSUE_ID_PATTERN.test(issueId)) {
           return jsonResponse({ error: 'Invalid issueId' }, { status: 400 });
         }
@@ -949,12 +1012,17 @@ const postConversationRoute = HttpRouter.add(
         if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
           return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
         }
-        const cwd = join(homedir(), 'Projects');
-
-        if (!message) {
-          return jsonResponse({ error: 'message is required' }, { status: 400 });
+        let cwd = join(homedir(), 'Projects');
+        if (projectKey) {
+          const projectConfig = getProject(projectKey);
+          if (projectConfig?.path && existsSync(projectConfig.path)) {
+            cwd = projectConfig.path;
+          } else {
+            return jsonResponse({ error: `Unknown project: ${projectKey}` }, { status: 400 });
+          }
         }
-        if (message.length > MAX_MESSAGE_LENGTH) {
+
+        if (message && message.length > MAX_MESSAGE_LENGTH) {
           return jsonResponse(
             { error: `message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters` },
             { status: 400 },
@@ -970,15 +1038,27 @@ const postConversationRoute = HttpRouter.add(
         const tmuxSession = `conv-${name}`;
         const claudeSessionId = randomUUID();
 
-        console.log(`[conversations] Creating conversation "${name}" with model=${model ?? 'default'} effort=${effort ?? 'default'}`);
+        console.log(`[conversations] Creating conversation "${name}" with model=${model ?? 'default'} effort=${effort ?? 'default'} cwd=${cwd}`);
 
         // Spawn tmux session with model + effort + deterministic session ID
         await spawnConversationSession(tmuxSession, cwd, claudeSessionId, model, effort, issueId);
         console.log(`[conversations] tmux session ${tmuxSession} spawned, sessionId: ${claudeSessionId}`);
 
-        // Title = truncated first message (T3Code pattern)
+        // Wait for Claude Code to reach its prompt before returning.
+        // Bounded by waitForClaudeReady's existing 30s timeout.
+        await waitForClaudeReady(tmuxSession);
+        console.log(`[conversations] Claude ready in ${tmuxSession}`);
+
+        // If a message was provided (legacy callers), send it now
+        if (message) {
+          await sendKeysAsync(tmuxSession, message, 'conversation-message');
+        }
+
+        // Title = truncated first message (T3Code pattern), or default
         const MAX_TITLE_LEN = 60;
-        const title = message.slice(0, MAX_TITLE_LEN) + (message.length > MAX_TITLE_LEN ? '…' : '');
+        const title = message
+          ? message.slice(0, MAX_TITLE_LEN) + (message.length > MAX_TITLE_LEN ? '…' : '')
+          : 'New conversation';
 
         // Create DB record
         const conv = createConversation({
@@ -988,31 +1068,25 @@ const postConversationRoute = HttpRouter.add(
           issueId,
           claudeSessionId,
           title,
-          titleSource: 'auto',
+          titleSource: message ? 'auto' : 'default',
           titleSeed: title,
           model,
           effort,
         });
 
-        // Wait for Claude Code to be ready, send message, and generate title — all async.
-        // Don't block the HTTP response; the frontend will poll for messages.
-        void (async () => {
-          try {
-            await waitForClaudeReady(tmuxSession);
-            await sendKeysAsync(tmuxSession, message, 'conversation-message');
-            void generateAiTitle(name, message).catch((err: unknown) => {
-              console.error(`[conversations] AI title generation failed for "${name}":`, err);
-            });
-          } catch (err) {
-            console.error(`[conversations] Failed to send first message to ${tmuxSession}:`, err);
-          }
-        })();
+        // Generate AI title in background (non-blocking)
+        if (message) {
+          void generateAiTitle(name, message).catch((err: unknown) => {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[TITLE-GEN-FAILED] AI title generation FAILED for "${name}" — NO RETRY, NO FALLBACK:`, msg);
+          });
+        }
 
         return jsonResponse({ ...conv, sessionAlive: true }, { status: 201 });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] create conversation failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+        return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
       }
     });
   }),
@@ -1104,7 +1178,7 @@ const postConversationResumeRoute = HttpRouter.add(
         // Respawn: resume the previous Claude Code session using --resume
         // Resume must never mutate the JSONL — `claude --resume` loads the full raw
         // transcript. Auto-compaction here would fork the conversation (PAN-802).
-        const oldSessionId = conv.claudeSessionId ?? sessionIdFromFile(conv.sessionFile);
+        const oldSessionId = conv.claudeSessionId;
         const modelChanged = !!model && model !== conv.model;
 
         if (!(await validateCwdContainment(conv.cwd))) {
@@ -1128,7 +1202,7 @@ const postConversationResumeRoute = HttpRouter.add(
       }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] resume conversation failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+        return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
         }})
   }),
 );
@@ -1178,7 +1252,7 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         if (model) setConversationModel(name, model);
 
         // Extract the session UUID from the existing session file path
-        const oldSessionId = conv.claudeSessionId ?? sessionIdFromFile(conv.sessionFile);
+        const oldSessionId = conv.claudeSessionId;
 
         // Compact (if needed) then respawn with the new model before reporting success.
         const sessionFile = resolveSessionFile(conv);
@@ -1187,7 +1261,11 @@ const postConversationSwitchModelRoute = HttpRouter.add(
         const effort = conv.effort ?? undefined;
         const issueId = conv.issueId ?? undefined;
         await maybeCompactBeforeRespawn({ sessionFile, cwd, modelChanged: true });
-        await spawnConversationSession(tmuxSession, cwd, oldSessionId ?? randomUUID(), model, effort, issueId, !!oldSessionId);
+        // Only resume if the session JSONL actually exists — Claude Code's --resume
+        // fails with "No conversation found" if the file is missing (e.g., first
+        // model switch on a fresh conversation or cross-provider switch).
+        const canResume = !!oldSessionId && !!sessionFile && existsSync(sessionFile);
+        await spawnConversationSession(tmuxSession, cwd, oldSessionId ?? randomUUID(), model, effort, issueId, canResume);
         await waitForTmuxSession(tmuxSession);
         await waitForClaudePrompt(tmuxSession, 30000).catch(() => false);
 
@@ -1196,18 +1274,30 @@ const postConversationSwitchModelRoute = HttpRouter.add(
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] switch model failed:', msg);
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+        return jsonResponse({ error: msg || 'Internal server error' }, { status: 500 });
       }
     });
   }),
 );
 
 // Cache specialist session file lookups to avoid O(n) directory scans.
-const specialistSessionFileCache = new Map<string, string>();
+// TTL ensures restarted sessions (new UUID → new JSONL) don't serve stale data.
+const SPECIALIST_SESSION_CACHE_TTL_MS = 10_000;
+const specialistSessionFileCache = new Map<string, { path: string; timestamp: number }>();
 const SPECIALIST_SESSION_CACHE_MAX = 50;
 
+function getSpecialistSessionCache(name: string): string | undefined {
+  const entry = specialistSessionFileCache.get(name);
+  if (!entry) return undefined;
+  if (Date.now() - entry.timestamp > SPECIALIST_SESSION_CACHE_TTL_MS) {
+    specialistSessionFileCache.delete(name);
+    return undefined;
+  }
+  return entry.path;
+}
+
 function setSpecialistSessionCache(name: string, sessionFile: string): void {
-  specialistSessionFileCache.set(name, sessionFile);
+  specialistSessionFileCache.set(name, { path: sessionFile, timestamp: Date.now() });
   if (specialistSessionFileCache.size > SPECIALIST_SESSION_CACHE_MAX) {
     const firstKey = specialistSessionFileCache.keys().next().value;
     if (firstKey !== undefined) {
@@ -1237,7 +1327,7 @@ const getConversationMessagesRoute = HttpRouter.add(
         // (e.g. specialist-panopticon-cli-merge-agent) and not in the conversations DB.
         let sessionFile: string | null | undefined = conv ? resolveSessionFile(conv) : undefined;
         if (!conv) {
-          const cached = specialistSessionFileCache.get(name);
+          const cached = getSpecialistSessionCache(name);
           if (cached) {
             sessionFile = cached;
           } else if (/^(specialist-|agent-|planning-)/.test(name)) {
@@ -1289,10 +1379,10 @@ const getConversationMessagesRoute = HttpRouter.add(
         }
 
         try {
-          // Specialists: parse only from the last compact_boundary so the display
-          // shows only the current context window, not the full 30-day history.
-          const isSpecialist = !conv && /^specialist-/.test(name);
-          const result = await getCachedMessages(sessionFile, isSpecialist);
+          // Always parse the full file — compact boundaries render as visual
+          // dividers in MessagesTimeline; truncating at them hides the actual
+          // conversation content (root cause of empty reviewer Conversation tab).
+          const result = await getCachedMessages(sessionFile, false);
 
           // Cache cost in DB so the conversation list can show it without re-parsing
           if (result.totalCost > 0 && conv) {
@@ -1304,6 +1394,9 @@ const getConversationMessagesRoute = HttpRouter.add(
             workLog: result.workLog,
             streaming: result.streaming,
             totalCost: result.totalCost,
+            proposedPlan: result.proposedPlan,
+            compactBoundaries: result.compactBoundaries.length > 0 ? result.compactBoundaries : undefined,
+            compacting: isCompacting(sessionFile) || undefined,
           });
         } catch (parseErr: unknown) {
           // File may not exist yet — Claude Code is still starting up.
@@ -1447,6 +1540,14 @@ const postConversationMessageRoute = HttpRouter.add(
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error('[conversations] send message failed:', msg);
+        // MessageDeliveryFailed includes a pane snapshot for debugging
+        if (error instanceof Error && error.name === 'MessageDeliveryFailed') {
+          return jsonResponse({
+            error: 'Message delivery failed — text did not reach the terminal',
+            deliveryFailed: true,
+            details: msg,
+          }, { status: 504 });
+        }
         return jsonResponse({ error: 'Internal server error' }, { status: 500 });
       }
     });
@@ -1529,9 +1630,11 @@ const postConversationArchiveRoute = HttpRouter.add(
         // Kill tmux session if still alive
         await killSessionAsync(conv.tmuxSession).catch(() => {});
 
-        // Mark as ended and archived
+        // Mark as ended and archived, unfavorite if starred
         markConversationEnded(name);
         archiveConversation(name);
+        removeFavorite('conversation', name);
+        invalidateFavoritesCache();
         // Unconditionally remove all attachments — archiving is permanent and
         // unsent paste uploads should not leak.
         await cleanupConversationAttachments(name);
@@ -1610,7 +1713,9 @@ const postConversationRestartAllRoute = HttpRouter.add(
             await killSessionAsync(conv.tmuxSession).catch(() => {});
 
             // Re-spawn with stored model
-            const oldSessionId = conv.claudeSessionId ?? sessionIdFromFile(conv.sessionFile);
+            const oldSessionId = conv.claudeSessionId;
+            const sessionFileForResume = resolveSessionFile(conv);
+            const canResume = !!oldSessionId && !!sessionFileForResume && existsSync(sessionFileForResume);
             await spawnConversationSession(
               conv.tmuxSession,
               conv.cwd,
@@ -1618,7 +1723,7 @@ const postConversationRestartAllRoute = HttpRouter.add(
               conv.model ?? undefined,
               conv.effort ?? undefined,
               conv.issueId ?? undefined,
-              !!oldSessionId,
+              canResume,
             );
             markConversationActive(conv.name);
             results.push({ name: conv.name, model: conv.model, status: 'restarted' });
@@ -1658,6 +1763,7 @@ const postConversationFavoriteRoute = HttpRouter.add(
         const conv = getConversationByName(name);
         if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         setFavorite('conversation', name);
+        invalidateFavoritesCache();
         return jsonResponse({ favorited: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -1686,6 +1792,7 @@ const deleteConversationFavoriteRoute = HttpRouter.add(
         const conv = getConversationByName(name);
         if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         removeFavorite('conversation', name);
+        invalidateFavoritesCache();
         return jsonResponse({ favorited: false });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -1804,6 +1911,7 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const plain = body['plain'] === true;
         const localSummaryOnly = body['localSummaryOnly'] === true;
         const includeThinkingInSummary = body['includeThinkingInSummary'] === true;
+        const customTitle = typeof body['title'] === 'string' ? body['title'].trim() : undefined;
 
         if (cwd && !(await validateCwdContainment(cwd))) {
           return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
@@ -1830,15 +1938,16 @@ const postConversationSummaryForkRoute = HttpRouter.add(
         const newName = `${timestamp}-${suffix}`;
         const newTmux = `conv-${newName}`;
         const launchModel = model || conv.model;
+        const defaultTitle = plain
+          ? `Fork: ${conv.title || conv.name}`
+          : `Summary Fork: ${conv.title || conv.name}`;
 
         const newConv = createConversation({
           name: newName,
           tmuxSession: newTmux,
           cwd: cwd || conv.cwd || process.cwd(),
           issueId: conv.issueId ?? undefined,
-          title: plain
-            ? `Fork: ${conv.title || conv.name}`
-            : `Summary Fork: ${conv.title || conv.name}`,
+          title: customTitle || defaultTitle,
           titleSource: 'manual',
           titleSeed: plain
             ? `Fork of ${conv.name}`
@@ -1868,6 +1977,361 @@ const postConversationSummaryForkRoute = HttpRouter.add(
   }),
 );
 
+// ─── Route: POST /api/conversations/:name/plan-action ────────────────────────
+
+const PLAN_ACTION_KEYSTROKES: Record<string, string> = {
+  'approve-auto': '1',
+  'approve-manual': '2',
+  'reject-ultraplan': '3',
+};
+
+const postConversationPlanActionRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:name/plan-action',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+
+        const action = typeof body['action'] === 'string' ? body['action'] : '';
+        const feedback = typeof body['feedback'] === 'string' ? body['feedback'].trim() : '';
+
+        if (action === 'reject-feedback') {
+          await sendRawKeystrokeAsync(conv.tmuxSession, '4', 'plan-action-reject');
+          if (feedback) {
+            await new Promise(r => setTimeout(r, 300));
+            await sendKeysAsync(conv.tmuxSession, feedback, 'plan-action-feedback');
+          }
+          return jsonResponse({ ok: true });
+        }
+
+        const keystroke = PLAN_ACTION_KEYSTROKES[action];
+        if (!keystroke) {
+          return jsonResponse({ error: `Invalid action: ${action}` }, { status: 400 });
+        }
+
+        await sendRawKeystrokeAsync(conv.tmuxSession, keystroke, `plan-action-${action}`);
+        return jsonResponse({ ok: true });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] plan action failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
+// ─── Route: GET /api/conversations/:name/diffs ──────────────────────────────
+
+const getConversationDiffsRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/:name/diffs',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) {
+          return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+        }
+
+        const sessionFile = resolveSessionFile(conv);
+        if (!sessionFile || !existsSync(sessionFile)) {
+          return jsonResponse({ summaries: [] });
+        }
+
+        const cwd = conv.cwd;
+        const isInRepo = existsSync(join(cwd, '.git'));
+
+        if (isInRepo) {
+          // Option B: standalone conversation in a git repo — single diff since conversation start
+          const baseCommit = await findCommitAtTime(cwd, conv.createdAt);
+          if (!baseCommit) {
+            return jsonResponse({ summaries: [] });
+          }
+          const files = await diffSinceCommit(cwd, baseCommit);
+          if (files.length === 0) {
+            return jsonResponse({ summaries: [] });
+          }
+          return jsonResponse({
+            summaries: [{
+              turnId: 'conversation-diff',
+              completedAt: new Date().toISOString(),
+              status: 'completed',
+              files,
+            }],
+          });
+        }
+
+        // Option A: devroot conversation — parse JSONL for file-modifying tool_use per turn
+        const parsed = await getCachedMessages(sessionFile, false);
+        const { fileEditsByAssistantId } = parsed;
+        if (!fileEditsByAssistantId || fileEditsByAssistantId.size === 0) {
+          return jsonResponse({ summaries: [] });
+        }
+
+        // Group file paths by git repo root, then compute per-file diffs
+        const summaries: Array<{
+          turnId: string;
+          completedAt: string;
+          status: string;
+          files: TurnDiffFileChange[];
+          assistantMessageId: string;
+        }> = [];
+
+        // Build a set of assistant messages for timestamp lookup
+        const assistantMessages = parsed.messages.filter(m => m.role === 'assistant');
+        const assistantById = new Map(assistantMessages.map(m => [m.id, m]));
+
+        // Cache git repo root lookups
+        const repoRootCache = new Map<string, string | null>();
+
+        for (const [assistantId, edits] of fileEditsByAssistantId) {
+          const asstMsg = assistantById.get(assistantId);
+          const completedAt = asstMsg?.completedAt ?? asstMsg?.createdAt ?? new Date().toISOString();
+
+          // Group files by their git repo
+          const filesByRepo = new Map<string, string[]>();
+
+          for (const edit of edits) {
+            const filePath = edit.filePath;
+            // Find git repo root for this file
+            const dir = filePath.substring(0, filePath.lastIndexOf('/')) || filePath;
+            let repoRoot = repoRootCache.get(dir);
+            if (repoRoot === undefined) {
+              try {
+                const { stdout } = await promisify(exec)(
+                  'git rev-parse --show-toplevel',
+                  { cwd: dir, encoding: 'utf-8' },
+                );
+                repoRoot = stdout.trim();
+              } catch {
+                repoRoot = null;
+              }
+              repoRootCache.set(dir, repoRoot);
+            }
+            if (!repoRoot) continue;
+
+            // Convert absolute path to repo-relative
+            const relativePath = filePath.startsWith(repoRoot + '/')
+              ? filePath.slice(repoRoot.length + 1)
+              : filePath;
+
+            let repoFiles = filesByRepo.get(repoRoot);
+            if (!repoFiles) {
+              repoFiles = [];
+              filesByRepo.set(repoRoot, repoFiles);
+            }
+            if (!repoFiles.includes(relativePath)) {
+              repoFiles.push(relativePath);
+            }
+          }
+
+          // Compute diffs per repo and merge
+          const allFiles: TurnDiffFileChange[] = [];
+          for (const [repoRoot, filePaths] of filesByRepo) {
+            try {
+              const diffs = await diffFilesAgainstHead(repoRoot, filePaths);
+              allFiles.push(...diffs);
+            } catch {
+              // git diff failed — file may have been committed already, skip
+            }
+          }
+
+          if (allFiles.length > 0) {
+            summaries.push({
+              turnId: `conv-turn-${assistantId}`,
+              completedAt,
+              status: 'completed',
+              files: allFiles,
+              assistantMessageId: assistantId,
+            });
+          }
+        }
+
+        return jsonResponse({ summaries });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] diffs failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
+// ─── Route: GET /api/conversations/:name/diffs/full ─────────────────────────
+
+const getConversationDiffFullRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/:name/diffs/full',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+
+        const cwd = conv.cwd;
+        const isInRepo = existsSync(join(cwd, '.git'));
+
+        if (isInRepo) {
+          const baseCommit = await findCommitAtTime(cwd, conv.createdAt);
+          if (!baseCommit) return jsonResponse({ diff: '' });
+          const diff = await diffPatchSinceCommit(cwd, baseCommit);
+          return jsonResponse({ diff });
+        }
+
+        // Devroot: aggregate all file edits across all turns
+        const sessionFile = resolveSessionFile(conv);
+        if (!sessionFile || !existsSync(sessionFile)) return jsonResponse({ diff: '' });
+
+        const parsed = await getCachedMessages(sessionFile, false);
+        const { fileEditsByAssistantId } = parsed;
+        if (!fileEditsByAssistantId || fileEditsByAssistantId.size === 0) return jsonResponse({ diff: '' });
+
+        const repoRootCache = new Map<string, string | null>();
+        const filesByRepo = new Map<string, string[]>();
+
+        for (const [, edits] of fileEditsByAssistantId) {
+          for (const edit of edits) {
+            const dir = edit.filePath.substring(0, edit.filePath.lastIndexOf('/')) || edit.filePath;
+            let repoRoot = repoRootCache.get(dir);
+            if (repoRoot === undefined) {
+              try {
+                const { stdout } = await promisify(exec)('git rev-parse --show-toplevel', { cwd: dir, encoding: 'utf-8' });
+                repoRoot = stdout.trim();
+              } catch { repoRoot = null; }
+              repoRootCache.set(dir, repoRoot);
+            }
+            if (!repoRoot) continue;
+            const relativePath = edit.filePath.startsWith(repoRoot + '/') ? edit.filePath.slice(repoRoot.length + 1) : edit.filePath;
+            let repoFiles = filesByRepo.get(repoRoot);
+            if (!repoFiles) { repoFiles = []; filesByRepo.set(repoRoot, repoFiles); }
+            if (!repoFiles.includes(relativePath)) repoFiles.push(relativePath);
+          }
+        }
+
+        const patches: string[] = [];
+        for (const [repoRoot, filePaths] of filesByRepo) {
+          try {
+            const patch = await diffPatchFilesAgainstHead(repoRoot, filePaths);
+            if (patch) patches.push(patch);
+          } catch { /* file may have been committed */ }
+        }
+
+        return jsonResponse({ diff: patches.join('\n') });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] diff full failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
+// ─── Route: GET /api/conversations/:name/diffs/:turnId ──────────────────────
+
+const getConversationDiffTurnRoute = HttpRouter.add(
+  'GET',
+  '/api/conversations/:name/diffs/:turnId',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = params['name'] ?? '';
+    const turnId = params['turnId'] ?? '';
+    const reqUrl = new URL(request.url, 'http://localhost');
+    const fileFilter = reqUrl.searchParams.get('file') ?? undefined;
+    return yield* Effect.promise(async () => {
+      try {
+        const conv = getConversationByName(name);
+        if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
+
+        const cwd = conv.cwd;
+        const isInRepo = existsSync(join(cwd, '.git'));
+
+        if (isInRepo) {
+          // For in-repo conversations, the single summary has turnId='conversation-diff'
+          const baseCommit = await findCommitAtTime(cwd, conv.createdAt);
+          if (!baseCommit) return jsonResponse({ diff: '' });
+          const diff = await diffPatchSinceCommit(cwd, baseCommit, fileFilter);
+          return jsonResponse({ turnId, diff });
+        }
+
+        // Devroot: extract assistant ID from turnId (format: conv-turn-<assistantId>)
+        const assistantId = turnId.startsWith('conv-turn-') ? turnId.slice('conv-turn-'.length) : turnId;
+        const sessionFile = resolveSessionFile(conv);
+        if (!sessionFile || !existsSync(sessionFile)) return jsonResponse({ diff: '' });
+
+        const parsed = await getCachedMessages(sessionFile, false);
+        const edits = parsed.fileEditsByAssistantId?.get(assistantId);
+        if (!edits || edits.length === 0) return jsonResponse({ diff: '' });
+
+        const repoRootCache = new Map<string, string | null>();
+        const filesByRepo = new Map<string, string[]>();
+
+        for (const edit of edits) {
+          const dir = edit.filePath.substring(0, edit.filePath.lastIndexOf('/')) || edit.filePath;
+          let repoRoot = repoRootCache.get(dir);
+          if (repoRoot === undefined) {
+            try {
+              const { stdout } = await promisify(exec)('git rev-parse --show-toplevel', { cwd: dir, encoding: 'utf-8' });
+              repoRoot = stdout.trim();
+            } catch { repoRoot = null; }
+            repoRootCache.set(dir, repoRoot);
+          }
+          if (!repoRoot) continue;
+          const relativePath = edit.filePath.startsWith(repoRoot + '/') ? edit.filePath.slice(repoRoot.length + 1) : edit.filePath;
+          if (fileFilter && relativePath !== fileFilter) continue;
+          let repoFiles = filesByRepo.get(repoRoot);
+          if (!repoFiles) { repoFiles = []; filesByRepo.set(repoRoot, repoFiles); }
+          if (!repoFiles.includes(relativePath)) repoFiles.push(relativePath);
+        }
+
+        const patches: string[] = [];
+        for (const [repoRoot, filePaths] of filesByRepo) {
+          try {
+            const patch = await diffPatchFilesAgainstHead(repoRoot, filePaths);
+            if (patch) patches.push(patch);
+          } catch { /* file may have been committed */ }
+        }
+
+        return jsonResponse({ turnId, diff: patches.join('\n') });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] diff turn failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
+
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const conversationsRouteLayer = Layer.mergeAll(
@@ -1888,6 +2352,10 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationFavoriteRoute,
   deleteConversationFavoriteRoute,
   postConversationSummaryForkRoute,
+  postConversationPlanActionRoute,
+  getConversationDiffsRoute,
+  getConversationDiffFullRoute,
+  getConversationDiffTurnRoute,
 );
 
 export default conversationsRouteLayer;

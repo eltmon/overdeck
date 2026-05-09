@@ -79,7 +79,7 @@ export function toVerificationStatus(v: unknown): VerificationStatusValue | unde
   return v && VALID_VERIFICATION_STATUSES.has(v as VerificationStatusValue) ? v as VerificationStatusValue : undefined;
 }
 
-export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails' | 'reviewedAtCommit' | 'reviewSpawnedAt' | 'testRetryCount' | 'reviewRetryCount' | 'recoveryStartedAt' | 'deaconIgnored' | 'deaconIgnoredAt' | 'deaconIgnoredReason'> & { reviewCoordinatorSessionName?: string; reviewSessionNames?: string[]; reviewSubStatuses?: Record<string, 'running' | 'done'> }): ReviewStatusSnapshot {
+export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl' | 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails' | 'reviewedAtCommit' | 'reviewSpawnedAt' | 'testRetryCount' | 'reviewRetryCount' | 'recoveryStartedAt' | 'deaconIgnored' | 'deaconIgnoredAt' | 'deaconIgnoredReason' | 'blockerReasons' | 'queuePosition' | 'mergeRetryCount' | 'mergeNotes' | 'autoRequeueCount'> & { reviewCoordinatorSessionName?: string; reviewSessionNames?: string[]; reviewSubStatuses?: Record<string, 'running' | 'done'>; activeSpecialist?: string }): ReviewStatusSnapshot {
   return {
     issueId: status.issueId,
     reviewStatus: toReviewStatus(status.reviewStatus),
@@ -106,6 +106,12 @@ export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'r
     reviewCoordinatorSessionName: status.reviewCoordinatorSessionName || undefined,
     reviewSessionNames: status.reviewSessionNames && status.reviewSessionNames.length > 0 ? status.reviewSessionNames : undefined,
     reviewSubStatuses: status.reviewSubStatuses,
+    queuePosition: typeof status.queuePosition === 'number' ? status.queuePosition : undefined,
+    activeSpecialist: status.activeSpecialist || undefined,
+    mergeRetryCount: typeof status.mergeRetryCount === 'number' ? status.mergeRetryCount : undefined,
+    mergeNotes: status.mergeNotes || undefined,
+    blockerReasons: status.blockerReasons && status.blockerReasons.length > 0 ? status.blockerReasons : undefined,
+    autoRequeueCount: typeof status.autoRequeueCount === 'number' ? status.autoRequeueCount : undefined,
   };
 }
 
@@ -114,6 +120,14 @@ export function toReviewStatusSnapshot(status: Pick<ReviewStatus, 'issueId' | 'r
 export interface ReadModelServiceShape {
   /** Return the current read model state as a DashboardSnapshot. */
   readonly getSnapshot: Effect.Effect<DashboardSnapshot>;
+  /** Return a single pending channel permission request without rebuilding a full snapshot. */
+  readonly getChannelPermissionRequest: (
+    requestId: string,
+  ) => Effect.Effect<import('@panctl/contracts').ChannelPermissionRequestSnapshot | null>;
+  /** Return a recent resolved channel permission decision for safe delivery retries. */
+  readonly getResolvedChannelPermissionDecision: (
+    requestId: string,
+  ) => Effect.Effect<import('@panctl/contracts').ResolvedChannelPermissionDecision | null>;
   /** Apply a domain event to the read model (called by event store on append). */
   readonly applyEvent: (event: DomainEvent) => void;
   /** Bootstrap the read model from existing lib module state. */
@@ -135,12 +149,38 @@ export const ReadModelServiceLive = Layer.effect(
     // Reference to projection cache — set during bootstrap once the event store initializes it
     let projectionCache: import('./services/projection-cache.js').ProjectionCache | null = null;
 
+    function sanitizeTurnDiffs(
+      raw: ReadModelState['turnDiffSummariesByAgentId'],
+    ): DashboardSnapshot['turnDiffSummariesByAgentId'] {
+      const out: Record<string, Array<{ turnId: string; completedAt: string; status?: string; files: any[]; checkpointRef?: string; assistantMessageId?: string; checkpointTurnCount?: number }>> = {};
+      for (const [agentId, summaries] of Object.entries(raw)) {
+        out[agentId] = summaries.map(s => ({
+          ...s,
+          assistantMessageId: s.assistantMessageId ?? undefined,
+          checkpointRef: s.checkpointRef ?? undefined,
+        }));
+      }
+      return out;
+    }
+
     function buildSnapshot(): DashboardSnapshot {
+      // turnDiffSummariesByAgentId is intentionally excluded from the snapshot.
+      //
+      // Per-agent checkpoint history can grow to thousands of turns × hundreds
+      // of files; in production we measured 484 MB across 44 agents, which the
+      // browser's WebSocket client rejects as "Max payload size exceeded" and
+      // closes the socket with code 1006 — leaving the kanban and command deck
+      // perpetually empty. The data is still maintained in `state` and served
+      // on-demand via GET /api/agents/:id/diffs, so chat-timeline components
+      // fetch it only for the agent the user is actually viewing.
       return {
         sequence: state.sequence,
         agents: Object.values(state.agentsById),
         specialists: Object.values(state.specialistsByName),
         reviewStatuses: Object.values(state.reviewStatusByIssueId),
+        turnDiffSummariesByAgentId: {},
+        agentRuntimeById: state.agentRuntimeById,
+        channelPermissionRequests: Object.values(state.channelPermissionRequestsById),
         issues: state.issuesRaw,
         resources: state.resources ?? undefined,
         timestamp: new Date().toISOString(),
@@ -154,43 +194,6 @@ export const ReadModelServiceLive = Layer.effect(
     };
 
     const getSnapshot: Effect.Effect<DashboardSnapshot> = Effect.gen(function* () {
-      // Refresh review statuses from DB before building snapshot.
-      // Defensive: the event-driven path should keep these in sync, but if an
-      // event is lost (e.g. pipeline notifier throws silently) the read model
-      // can drift. Reloading from SQLite guarantees the snapshot is authoritative.
-      try {
-        const { loadReviewStatuses: loadStatuses } = yield* Effect.promise(
-          () => import('../../lib/review-status.js'),
-        );
-        const { enrichReviewStatusFromSessions } = yield* Effect.promise(
-          () => import('../../lib/review-status-enrichment.js'),
-        );
-        const { listSessionNamesAsync } = yield* Effect.promise(
-          () => import('../../lib/tmux.js'),
-        );
-        const statusMap = loadStatuses();
-        // One tmux call for all issues — O(1) tmux cost per snapshot build.
-        // Keep tmux failures non-fatal; Effect's static catchAll is not available
-        // in the dashboard runtime version.
-        let allSessions: string[] = [];
-        try {
-          allSessions = yield* Effect.promise(() => listSessionNamesAsync());
-        } catch {
-          allSessions = [];
-        }
-        state = {
-          ...state,
-          reviewStatusByIssueId: Object.fromEntries(
-            Object.values(statusMap).map((status) => {
-              const enriched = enrichReviewStatusFromSessions(status.issueId, status, allSessions);
-              return [status.issueId, toReviewStatusSnapshot(enriched)];
-            }),
-          ),
-        };
-      } catch (err) {
-        console.error('[ReadModel] Failed to refresh review statuses for snapshot:', err);
-      }
-
       // Refresh issues from the shared issue service before building snapshot.
       // IssueDataService polls trackers in the background; its cached issues are
       // the freshest available without blocking on API calls.
@@ -209,6 +212,16 @@ export const ReadModelServiceLive = Layer.effect(
 
       return buildSnapshot();
     });
+
+    const getChannelPermissionRequest = (
+      requestId: string,
+    ): Effect.Effect<import('@panctl/contracts').ChannelPermissionRequestSnapshot | null> =>
+      Effect.succeed(state.channelPermissionRequestsById[requestId] ?? null);
+
+    const getResolvedChannelPermissionDecision = (
+      requestId: string,
+    ): Effect.Effect<import('@panctl/contracts').ResolvedChannelPermissionDecision | null> =>
+      Effect.succeed(state.resolvedChannelPermissionDecisionsById[requestId] ?? null);
 
     // ── Bootstrap inline during layer construction ───────────────────────────
     yield* Effect.gen(function* () {
@@ -266,15 +279,65 @@ export const ReadModelServiceLive = Layer.effect(
           }
 
           const allAgents = [...validAgents, ...newAgents];
+
+          // Reconcile cached agent statuses against ground truth (state.json + tmux).
+          // The projection cache may be stale if an agent's tmux session died while
+          // the server was down — the cache still says 'running' but state.json says
+          // 'stopped'. Without this step the dashboard shows incorrect action buttons.
+          const { listRunningAgentsAsync: listRunningForReconcile } = yield* Effect.promise(
+            () => import('../../lib/agents.js'),
+          );
+          const groundTruthAgents = yield* Effect.promise(() => listRunningForReconcile());
+          const cachedAgentById = new Map(allAgents.map((a: any) => [a.id, a]));
+          const agentsById: Record<string, AgentSnapshot> = {};
+          for (const a of groundTruthAgents) {
+            const cachedAgent = cachedAgentById.get(a.id);
+            let reconciled = a.status as AgentStatus | string;
+            if (a.tmuxActive && a.status === 'stopped') {
+              reconciled = 'running';
+              logDeaconEvent(`readModel cache-reconcile: ${a.id} stopped→running (tmux session alive, resumed outside API)`);
+            } else if (!a.tmuxActive && a.status === 'running') {
+              reconciled = 'stopped';
+              logDeaconEvent(`readModel cache-reconcile: ${a.id} running→stopped (tmux session dead, likely reboot/crash)`);
+            }
+            if (cachedAgent && cachedAgent.status !== toAgentStatus(reconciled)) {
+              console.log(`[ReadModel] Reconciled ${a.id}: ${cachedAgent.status} → ${reconciled} (tmux=${a.tmuxActive}, state=${a.status})`);
+            }
+            agentsById[a.id] = {
+              ...cachedAgent,
+              id: a.id,
+              issueId: a.issueId,
+              workspace: a.workspace || undefined,
+              runtime: a.runtime || undefined,
+              model: a.model || undefined,
+              status: toAgentStatus(reconciled),
+              startedAt: a.startedAt || undefined,
+              lastActivity: a.lastActivity || undefined,
+              branch: a.branch || undefined,
+              costSoFar: a.costSoFar,
+              sessionId: a.sessionId || undefined,
+              phase: toAgentPhase(a.phase),
+              runtimeState: cachedAgent?.runtimeState,
+              agentPhase: cachedAgent?.agentPhase,
+              hasPendingQuestion: cachedAgent?.hasPendingQuestion,
+              pendingQuestionCount: cachedAgent?.pendingQuestionCount,
+              pendingQuestionPrompt: cachedAgent?.pendingQuestionPrompt,
+              pendingQuestionReason: cachedAgent?.pendingQuestionReason,
+              resolution: cachedAgent?.resolution,
+              resolutionCount: cachedAgent?.resolutionCount,
+            };
+          }
+
           const statusMap = loadReviewStatuses();
           state = {
             ...INITIAL_READ_MODEL_STATE,
             sequence: cached.sequence,
-            agentsById: Object.fromEntries(allAgents.map((a: any) => [a.id, a])),
+            agentsById,
             specialistsByName: Object.fromEntries((cached.specialists ?? []).map((s) => [s.name, s])),
             reviewStatusByIssueId: Object.fromEntries(
               Object.values(statusMap).map((status) => [status.issueId, toReviewStatusSnapshot(status)]),
             ),
+            turnDiffSummariesByAgentId: (cached as any).turnDiffSummariesByAgentId ?? {},
             issuesRaw: cached.issues ?? [],
             resources: cached.resources,
           };
@@ -365,6 +428,8 @@ export const ReadModelServiceLive = Layer.effect(
             agentPhase: enrichment ? toAgentPhase(enrichment.agentPhase) : undefined,
             hasPendingQuestion: enrichment?.hasPendingQuestion,
             pendingQuestionCount: enrichment?.pendingQuestionCount,
+            pendingQuestionPrompt: enrichment?.pendingQuestionPrompt,
+            pendingQuestionReason: enrichment?.pendingQuestionReason,
             resolution: enrichment ? toAgentResolution(enrichment.resolution) : undefined,
             resolutionCount: enrichment?.resolutionCount,
           };
@@ -421,6 +486,76 @@ export const ReadModelServiceLive = Layer.effect(
         );
       }
 
+      // ── Checkpoint reconciliation (deferred — non-blocking) ──────────────────
+      // Fire-and-forget: scan workspaces for git checkpoints in the background
+      // so the ReadModel layer resolves immediately and the dashboard starts fast.
+      void (async () => {
+        try {
+          const { listCheckpoints, diffCheckpointFiles, getCheckpointTimestamp } = await import('../../lib/checkpoint/checkpoint-manager.js');
+
+          const agents = Object.values(state.agentsById);
+          let reconciled = 0;
+          for (const agent of agents) {
+            const workspace = (agent as any).workspace as string | undefined;
+            if (!workspace) continue;
+
+            const existingSummaries = state.turnDiffSummariesByAgentId[(agent as any).id];
+            if (existingSummaries && existingSummaries.length > 0) continue;
+
+            try {
+              const checkpoints = await listCheckpoints(workspace);
+              if (checkpoints.length === 0) continue;
+
+              const summaries: Array<{
+                turnId: string;
+                completedAt: string;
+                files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }>;
+                checkpointRef?: string;
+                assistantMessageId?: string;
+                checkpointTurnCount?: number;
+              }> = [];
+
+              for (let i = 0; i < checkpoints.length; i++) {
+                const turnId = checkpoints[i];
+                const prevTurnId = i > 0 ? checkpoints[i - 1] : null;
+                let files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }> = [];
+                if (prevTurnId) {
+                  try {
+                    files = await diffCheckpointFiles(workspace, prevTurnId, turnId);
+                  } catch { /* checkpoint might be stale */ }
+                }
+                const completedAt = await getCheckpointTimestamp(workspace, turnId);
+                summaries.push({
+                  turnId,
+                  completedAt,
+                  files,
+                  checkpointRef: `refs/pan/turn/${turnId}`,
+                  checkpointTurnCount: i + 1,
+                });
+              }
+
+              if (summaries.length > 0) {
+                state = {
+                  ...state,
+                  turnDiffSummariesByAgentId: {
+                    ...state.turnDiffSummariesByAgentId,
+                    [(agent as any).id]: summaries,
+                  },
+                };
+                reconciled++;
+              }
+            } catch { /* agent workspace may not be a git repo */ }
+          }
+
+          if (reconciled > 0) {
+            console.log(`[ReadModel] Reconciled checkpoints for ${reconciled} agent(s)`);
+            projectionCache?.save(buildSnapshot());
+          }
+        } catch (err) {
+          console.warn('[ReadModel] Checkpoint reconciliation failed:', err);
+        }
+      })();
+
       // ── Issue listener (always) ──────────────────────────────────────────────
       // Issues come from external trackers (Linear/GitHub) with unpredictable shapes.
       // JSON round-trip strips undefined values that can't be serialized over WebSocket.
@@ -476,6 +611,12 @@ export const ReadModelServiceLive = Layer.effect(
       }
     });
 
-    return { getSnapshot, applyEvent, bootstrap: Effect.void };
+    return {
+      getSnapshot,
+      getChannelPermissionRequest,
+      getResolvedChannelPermissionDecision,
+      applyEvent,
+      bootstrap: Effect.void,
+    };
   }),
 );

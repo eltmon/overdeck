@@ -350,26 +350,45 @@ export const GitHubClientLive = Layer.effect(
   }),
 );
 
+let _githubClientImpl: GitHubClientShape | null = null;
+let _githubClientToken: string | null = null;
+
+function getGitHubClient(): GitHubClientShape {
+  const config = getGitHubConfig();
+  if (!config) {
+    const fail = Effect.fail(new TrackerNotConfigured({ tracker: 'github' }));
+    return {
+      getIssue: () => fail,
+      closeIssue: () => fail,
+      reopenIssue: () => fail,
+      addLabel: () => fail,
+      removeLabel: () => fail,
+      ensureLabel: () => fail,
+      addComment: () => fail,
+      getComments: () => fail,
+    };
+  }
+  if (_githubClientToken !== config.token) {
+    _githubClientToken = config.token;
+    _githubClientImpl = makeGitHubClientImpl(config.token);
+  }
+  return _githubClientImpl;
+}
+
 /**
- * Layer that provides a no-op GitHubClient when GitHub is not configured.
+ * Layer that provides a GitHubClient which dynamically checks configuration on each call.
+ * This avoids caching a no-op client if the config wasn't ready at layer construction time.
  */
 export const GitHubClientOptionalLive = Layer.effect(
   GitHubClient,
-  Effect.gen(function* () {
-    const config = getGitHubConfig();
-    if (!config) {
-      const fail = Effect.fail(new TrackerNotConfigured({ tracker: 'github' }));
-      return {
-        getIssue: () => fail,
-        closeIssue: () => fail,
-        reopenIssue: () => fail,
-        addLabel: () => fail,
-        removeLabel: () => fail,
-        ensureLabel: () => fail,
-        addComment: () => fail,
-        getComments: () => fail,
-      } as GitHubClientShape;
-    }
-    return makeGitHubClientImpl(config.token);
-  }),
+  Effect.succeed({
+    getIssue: (...args) => getGitHubClient().getIssue(...args),
+    closeIssue: (...args) => getGitHubClient().closeIssue(...args),
+    reopenIssue: (...args) => getGitHubClient().reopenIssue(...args),
+    addLabel: (...args) => getGitHubClient().addLabel(...args),
+    removeLabel: (...args) => getGitHubClient().removeLabel(...args),
+    ensureLabel: (...args) => getGitHubClient().ensureLabel(...args),
+    addComment: (...args) => getGitHubClient().addComment(...args),
+    getComments: (...args) => getGitHubClient().getComments(...args),
+  } as GitHubClientShape),
 );

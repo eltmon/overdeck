@@ -18,10 +18,11 @@ const PROVIDER_INFO: Record<
   anthropic: { displayName: 'Anthropic', icon: 'auto_awesome', iconColor: '#D97757', compatibility: 'direct' },
   openai: { displayName: 'OpenAI', icon: 'bolt', iconColor: '#10a37f', compatibility: 'router' },
   google: { displayName: 'Google Vertex AI', icon: 'google', iconColor: '#4285F4', compatibility: 'router' },
-  minimax: { displayName: 'MiniMax', icon: 'api', iconColor: '#94a3b8', compatibility: 'direct' },
-  zai: { displayName: 'Z.AI', icon: 'api', iconColor: '#22c55e', compatibility: 'direct' },
-  kimi: { displayName: 'Kimi (Moonshot)', icon: 'rocket_launch', iconColor: '#6366f1', compatibility: 'direct' },
-  openrouter: { displayName: 'OpenRouter', icon: 'hub', iconColor: '#6B7F8E', compatibility: 'direct' },
+  minimax: { displayName: 'MiniMax', icon: 'api', iconColor: '#94a3b8', compatibility: 'router' },
+  zai: { displayName: 'Z.AI', icon: 'api', iconColor: '#22c55e', compatibility: 'router' },
+  kimi: { displayName: 'Kimi (Moonshot)', icon: 'rocket_launch', iconColor: '#6366f1', compatibility: 'router' },
+  mimo: { displayName: 'Xiaomi MiMo', icon: 'smart_toy', iconColor: '#FF6900', compatibility: 'router' },
+  openrouter: { displayName: 'OpenRouter', icon: 'hub', iconColor: '#6B7F8E', compatibility: 'router' },
 };
 
 export function ProviderPanel({
@@ -33,7 +34,7 @@ export function ProviderPanel({
   onThinkingLevelChange,
   onTestConnection,
 }: ProviderPanelProps) {
-  const providerList: Provider[] = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'openrouter'];
+  const providerList: Provider[] = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter'];
 
   const getApiKey = (provider: Provider): string | undefined => {
     if (provider === 'anthropic') {

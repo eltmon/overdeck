@@ -17,6 +17,7 @@ import type {
 } from './interface.js';
 import { CLAUDE_FEATURES } from './interface.js';
 import { generateLauncherScript } from '../launcher-generator.js';
+import { getClaudePermissionFlags } from '../claude-permissions.js';
 
 const CLAUDE_DIR = join(homedir(), '.claude');
 
@@ -40,8 +41,10 @@ export function createClaudeAdapter(): RuntimeAdapter {
       try {
         const { execa } = await import('execa');
         const result = await execa('which', ['claude']);
+        console.log(`[claude-invoke] purpose=runtime-check | model=n/a | source=runtime/claude.ts:isAvailable | command="which claude" | available=${result.exitCode === 0}`);
         return result.exitCode === 0;
       } catch {
+        console.log(`[claude-invoke] purpose=runtime-check | model=n/a | source=runtime/claude.ts:isAvailable | command="which claude" | available=false`);
         return false;
       }
     },
@@ -50,8 +53,11 @@ export function createClaudeAdapter(): RuntimeAdapter {
       try {
         const { execa } = await import('execa');
         const result = await execa('claude', ['--version']);
-        return result.stdout.trim();
+        const version = result.stdout.trim();
+        console.log(`[claude-invoke] purpose=runtime-check | model=n/a | source=runtime/claude.ts:getVersion | command="claude --version" | version="${version}"`);
+        return version;
       } catch {
+        console.log(`[claude-invoke] purpose=runtime-check | model=n/a | source=runtime/claude.ts:getVersion | command="claude --version" | version=null`);
         return null;
       }
     },
@@ -77,8 +83,8 @@ export function createClaudeAdapter(): RuntimeAdapter {
           args.push('--model', options.model);
         }
 
-        // Add permission bypass flags for autonomous agents
-        args.push('--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions');
+        // Add permission flags for autonomous agents (auto by default; bypass via config/--yolo)
+        args.push(...getClaudePermissionFlags());
 
         // Spawn in tmux session using a launcher script (safer for prompts with special chars)
         const sessionName = `agent-${id}`;
@@ -96,6 +102,7 @@ export function createClaudeAdapter(): RuntimeAdapter {
           generateLauncherScript({
             agentType: 'runtime',
             workingDir: options.workingDir,
+            setTerminalEnv: true,
             promptFile,
             baseCommand: 'claude',
             extraArgs: args.length > 0 ? args.join(' ') : undefined,

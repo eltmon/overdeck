@@ -1,15 +1,14 @@
-import { useState, useMemo } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { ListTodo, FileText, RefreshCw, ExternalLink, AlertTriangle, ShieldCheck, Package } from 'lucide-react';
-import { useAlert } from '../../DialogProvider';
+import { useMemo } from 'react';
+import {
+  ExternalLink, AlertTriangle, ShieldCheck, Package,
+  CheckCircle2, Loader2, AlertCircle, CircleDot,
+} from 'lucide-react';
 import { isReviewPipelineStuck } from '../../../lib/pipeline-state';
 import { ActivitySparkline, type SparklineEvent } from '../ActivitySparkline';
 import {
   useActivityQuery,
   usePlanningSummaryWithOverridesQuery,
   useReviewStatusQuery,
-  type PlanningResponse,
-  type PlanningArtifact,
   type PlanningSummaryResponse,
   type ReviewStatusData,
 } from '../ZoneCOverviewTabs/queries';
@@ -22,37 +21,67 @@ interface IssueHeaderProps {
   title: string;
   source?: string;
   url?: string;
-  onOpenBeads?: () => void;
 }
 
 type StageStatus = 'done' | 'current' | 'pending' | 'failed' | 'running';
 
-interface StageDotProps {
+interface StagePillProps {
   label: string;
   stage: StageStatus;
+  isLast?: boolean;
 }
 
-function StageDot({ label, stage }: StageDotProps) {
-  const color =
-    stage === 'done'
-      ? 'var(--mc-success, #22c55e)'
-      : stage === 'current' || stage === 'running'
-        ? 'var(--mc-warning, #f97316)'
-        : stage === 'failed'
-          ? 'var(--mc-error, #ef4444)'
-          : 'var(--mc-border, var(--border))';
+const STAGE_CONFIG: Record<StageStatus, { bg: string; border: string; text: string; icon: React.ElementType; glow?: string }> = {
+  done:    { bg: 'color-mix(in srgb, var(--success) 12%, transparent)', border: 'var(--success)', text: 'var(--success)', icon: CheckCircle2 },
+  current: { bg: 'color-mix(in srgb, var(--warning) 15%, transparent)', border: 'var(--warning)', text: 'var(--warning)', icon: Loader2, glow: '0 0 12px color-mix(in srgb, var(--warning) 40%, transparent)' },
+  running: { bg: 'color-mix(in srgb, var(--primary) 15%, transparent)', border: 'var(--primary)', text: 'var(--primary)', icon: Loader2, glow: '0 0 12px color-mix(in srgb, var(--primary) 40%, transparent)' },
+  failed:  { bg: 'color-mix(in srgb, var(--destructive) 12%, transparent)', border: 'var(--destructive)', text: 'var(--destructive)', icon: AlertCircle },
+  pending: { bg: 'transparent', border: 'var(--border)', text: 'var(--muted-foreground)', icon: CircleDot },
+};
+
+function StagePill({ label, stage, isLast }: StagePillProps) {
+  const cfg = STAGE_CONFIG[stage];
+  const Icon = cfg.icon;
+  const isActive = stage === 'current' || stage === 'running';
 
   return (
-    <span className={styles.pipelineDotGroup} title={`${label}: ${stage}`}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
       <span
-        className={styles.pipelineDot}
+        title={`${label}: ${stage}`}
         style={{
-          background: color,
-          boxShadow: stage === 'current' ? `0 0 0 2px ${color}40` : undefined,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 5,
+          padding: '5px 10px',
+          borderRadius: 999,
+          border: `1.5px solid ${cfg.border}`,
+          background: cfg.bg,
+          color: cfg.text,
+          fontSize: 11,
+          fontWeight: 600,
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+          boxShadow: isActive ? cfg.glow : undefined,
+          whiteSpace: 'nowrap',
+          transition: 'all 0.2s ease',
         }}
-      />
-      <span className={styles.pipelineDotLabel}>{label}</span>
-    </span>
+      >
+        <Icon size={13} className={isActive ? 'animate-spin' : undefined} style={{ flexShrink: 0 }} />
+        {label}
+      </span>
+      {!isLast && (
+        <span
+          style={{
+            display: 'inline-block',
+            width: 16,
+            height: 2,
+            background: stage === 'done' ? 'var(--success)' : 'var(--border)',
+            margin: '0 4px',
+            flexShrink: 0,
+          }}
+        />
+      )}
+    </div>
   );
 }
 
@@ -132,35 +161,7 @@ function formatCost(cost: number): string {
   return `$${cost.toFixed(2)}`;
 }
 
-function formatArtifactDate(value?: string): string {
-  if (!value) return 'unknown time';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'unknown time';
-  return date.toLocaleString();
-}
-
-function formatArtifactCollection(
-  title: string,
-  artifacts: PlanningArtifact[] | undefined,
-  emptyLabel: string,
-): string {
-  if (!artifacts || artifacts.length === 0) {
-    return emptyLabel;
-  }
-
-  return `${title} (${artifacts.length})\n\n${artifacts
-    .map((artifact) => {
-      const timestamp = artifact.uploadedAt ?? artifact.syncedAt;
-      const metaLine = timestamp ? `\n_Last updated: ${formatArtifactDate(timestamp)}_\n` : '';
-      return `## ${artifact.filename ?? title}${metaLine}\n${artifact.content ?? ''}`;
-    })
-    .join('\n\n---\n\n')}`;
-}
-
-export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderProps) {
-  const [syncing, setSyncing] = useState(false);
-  const queryClient = useQueryClient();
-  const showAlert = useAlert();
+export function IssueHeader({ issueId, title, url }: IssueHeaderProps) {
 
   const planningSummary = usePlanningSummaryWithOverridesQuery(issueId, {
     staleTime: 30_000,
@@ -170,54 +171,6 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
 
   const reviewStatus = reviewStatusQuery.data;
   const activity = activityQuery.data;
-
-  const handleSync = async () => {
-    setSyncing(true);
-    try {
-      await fetch(`/api/command-deck/planning/${issueId}/sync-discussions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tracker: 'github' }),
-      });
-    } catch (e) {
-      console.error('Sync failed:', e);
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const showPlanningArtifact = async (
-    title: string,
-    renderMessage: (planning: PlanningResponse) => string,
-    emptyMessage: string,
-  ) => {
-    try {
-      const planning = await queryClient.fetchQuery({
-        queryKey: ['command-deck-planning', issueId, 'full'],
-        queryFn: async () => {
-          const response = await fetch(`/api/command-deck/planning/${issueId}`);
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status} ${response.statusText}`);
-          }
-          return response.json() as Promise<PlanningResponse>;
-        },
-        staleTime: 30_000,
-      });
-
-      const message = renderMessage(planning);
-      await showAlert({
-        title,
-        message: message || emptyMessage,
-      });
-    } catch (error) {
-      console.error(`Failed to load ${title}:`, error);
-      await showAlert({
-        title: `Unable to load ${title}`,
-        message: emptyMessage,
-        variant: 'error',
-      });
-    }
-  };
 
   const planningForStageStatus = planningSummary.data;
 
@@ -256,16 +209,16 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
   const qgStatus = reviewStatus?.verificationStatus;
   const qgColor =
     qgStatus === 'passed'
-      ? 'var(--mc-success, #22c55e)'
+      ? 'var(--success)'
       : qgStatus === 'failed'
-        ? 'var(--mc-error, #ef4444)'
+        ? 'var(--destructive)'
         : qgStatus === 'running'
-          ? 'var(--mc-warning, #f97316)'
+          ? 'var(--warning)'
           : undefined;
 
   return (
     <div className={styles.issueHeader} data-testid="issue-header" data-issue={issueId}>
-      {/* Row 1: ID + title + pipeline + cost + sparkline */}
+      {/* Row 1: ID + title + metadata */}
       <div className={styles.issueHeaderRow}>
         <div className={styles.issueHeaderLeft}>
           {url ? (
@@ -284,12 +237,6 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
           <span className={styles.issueHeaderTitle}>{title}</span>
         </div>
         <div className={styles.issueHeaderRight}>
-          {/* Six stage dots (PAN-830 high-2) */}
-          <div className={styles.pipelineDots}>
-            {stageStatuses.map((s) => (
-              <StageDot key={s.label} label={s.label} stage={s.stage} />
-            ))}
-          </div>
           {/* Quality-gate mini-badge (PAN-847) */}
           {qgColor && (
             <span
@@ -325,7 +272,7 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
                 gap: 4,
                 fontSize: 10,
                 fontWeight: 600,
-                color: ac.percent === 100 ? 'var(--mc-success, #22c55e)' : 'var(--mc-text-muted, var(--muted-foreground))',
+                color: ac.percent === 100 ? 'var(--success)' : 'var(--muted-foreground)',
               }}
             >
               <span
@@ -334,7 +281,7 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
                   width: 32,
                   height: 4,
                   borderRadius: 2,
-                  background: 'var(--mc-border, var(--border))',
+                  background: 'var(--border)',
                   overflow: 'hidden',
                 }}
               >
@@ -343,7 +290,7 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
                     display: 'block',
                     width: `${ac.percent}%`,
                     height: '100%',
-                    background: ac.percent === 100 ? 'var(--mc-success, #22c55e)' : 'var(--mc-primary, var(--primary))',
+                    background: ac.percent === 100 ? 'var(--success)' : 'var(--primary)',
                     borderRadius: 2,
                     transition: 'width 0.3s ease',
                   }}
@@ -368,6 +315,22 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
         </div>
       </div>
 
+      {/* Row 2: Prominent pipeline progress tracker */}
+      <div
+        data-testid="issue-pipeline"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0,
+          padding: '8px 0',
+          overflowX: 'auto',
+        }}
+      >
+        {stageStatuses.map((s, i) => (
+          <StagePill key={s.label} label={s.label} stage={s.stage} isLast={i === stageStatuses.length - 1} />
+        ))}
+      </div>
+
       {/* Stuck warning ribbon (PAN-830 high-2) */}
       {stuck && (
         <div
@@ -377,9 +340,9 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
             gap: 6,
             padding: '3px 12px',
             fontSize: 11,
-            color: 'var(--mc-error, #ef4444)',
-            background: 'color-mix(in srgb, var(--mc-error) 8%, transparent)',
-            borderBottom: '1px dashed var(--mc-border, var(--border))',
+            color: 'var(--destructive)',
+            background: 'color-mix(in srgb, var(--destructive) 8%, transparent)',
+            borderBottom: '1px dashed var(--border)',
           }}
         >
           <AlertTriangle size={12} />
@@ -397,9 +360,9 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
             gap: 6,
             padding: '3px 12px',
             fontSize: 11,
-            color: 'var(--mc-warning, #f97316)',
-            background: 'color-mix(in srgb, var(--mc-warning) 8%, transparent)',
-            borderBottom: '1px dashed var(--mc-border, var(--border))',
+            color: 'var(--warning)',
+            background: 'color-mix(in srgb, var(--warning) 8%, transparent)',
+            borderBottom: '1px dashed var(--border)',
           }}
         >
           <Package size={12} />
@@ -407,100 +370,6 @@ export function IssueHeader({ issueId, title, url, onOpenBeads }: IssueHeaderPro
         </div>
       )}
 
-      {/* Row 2: Compact action buttons */}
-      <div className={styles.issueHeaderActions}>
-        <button className={styles.issueHeaderBtn} onClick={onOpenBeads} title="View beads tasks">
-          <ListTodo size={11} />
-          Tasks
-        </button>
-
-        {/* Density rule: suppress default-value badges (PAN-847 pan-35kn) */}
-        {planningSummary.data?.hasState && (
-          <button
-            className={styles.issueHeaderBtn}
-            onClick={() => {
-              void showPlanningArtifact(
-                'STATE.md',
-                (planning) => planning.state ? `STATE.md\n\n${planning.state}` : '',
-                'No STATE.md recorded for this issue.',
-              );
-            }}
-            title="View STATE.md"
-          >
-            <FileText size={11} />
-            STATE
-          </button>
-        )}
-
-        {planningSummary.data?.hasPrd && (
-          <button
-            className={styles.issueHeaderBtn}
-            onClick={() => {
-              void showPlanningArtifact(
-                'PRD',
-                (planning) => planning.prd ? `PRD\n\n${planning.prd}` : '',
-                'No PRD recorded for this issue.',
-              );
-            }}
-            title="View PRD"
-          >
-            <FileText size={11} />
-            PRD
-          </button>
-        )}
-
-        {(planningSummary.data?.discussionCount ?? 0) > 0 && (
-          <button
-            className={styles.issueHeaderBtn}
-            onClick={() => {
-              void showPlanningArtifact(
-                'Discussions',
-                (planning) => formatArtifactCollection(
-                  'Discussions',
-                  planning.discussions,
-                  'No discussions recorded for this issue.',
-                ),
-                'No discussions recorded for this issue.',
-              );
-            }}
-            title="View discussions"
-          >
-            Discussions
-            <span className={styles.issueHeaderBadge}>{planningSummary.data?.discussionCount ?? 0}</span>
-          </button>
-        )}
-
-        {(planningSummary.data?.transcriptCount ?? 0) > 0 && (
-          <button
-            className={styles.issueHeaderBtn}
-            onClick={() => {
-              void showPlanningArtifact(
-                'Transcripts',
-                (planning) => formatArtifactCollection(
-                  'Transcripts',
-                  planning.transcripts,
-                  'No transcripts recorded for this issue.',
-                ),
-                'No transcripts recorded for this issue.',
-              );
-            }}
-            title="View transcripts"
-          >
-            Transcripts
-            <span className={styles.issueHeaderBadge}>{planningSummary.data?.transcriptCount ?? 0}</span>
-          </button>
-        )}
-
-        <button
-          className={styles.issueHeaderBtn}
-          onClick={handleSync}
-          disabled={syncing}
-          title="Sync discussions"
-        >
-          <RefreshCw size={11} className={syncing ? styles.spinning : ''} />
-          {syncing ? 'Syncing...' : 'Sync'}
-        </button>
-      </div>
     </div>
   );
 }

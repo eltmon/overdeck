@@ -63,15 +63,15 @@ function makeFullSpecDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBrie
 }
 
 function writePlanDoc(workspacePath: string, doc: VBriefDocument): string {
-  const planDir = join(workspacePath, '.planning');
-  mkdirSync(planDir, { recursive: true });
-  const planPath = join(planDir, 'plan.vbrief.json');
+  const panDir = join(workspacePath, '.pan');
+  mkdirSync(panDir, { recursive: true });
+  const planPath = join(panDir, 'spec.vbrief.json');
   writeFileSync(planPath, JSON.stringify(doc, null, 2));
   return planPath;
 }
 
 function readPlanFromWorkspace(workspacePath: string): VBriefDocument {
-  return readPlan(join(workspacePath, '.planning', 'plan.vbrief.json'));
+  return readPlan(join(workspacePath, '.pan', 'spec.vbrief.json'));
 }
 
 beforeEach(() => {
@@ -305,7 +305,7 @@ describe('Planning prompt includes v0.5 field placeholders', () => {
   it('includes vBRIEFInfo.author in prompt template', async () => {
     const { buildPlanningPrompt } = await import('../../src/lib/planning/spawn-planning-session.js') as any;
 
-    const prompt = buildPlanningPrompt(
+    const prompt = await buildPlanningPrompt(
       {
         identifier: 'PAN-999',
         title: 'Test Issue',
@@ -337,7 +337,7 @@ describe('PRD discovery scans docs/prds/ for issue-matching files', () => {
 
     const { buildPlanningPrompt } = await import('../../src/lib/planning/spawn-planning-session.js') as any;
 
-    const prompt = buildPlanningPrompt(
+    const prompt = await buildPlanningPrompt(
       {
         identifier: 'PAN-999',
         title: 'Test Issue',
@@ -356,7 +356,7 @@ describe('PRD discovery scans docs/prds/ for issue-matching files', () => {
     const { buildPlanningPrompt } = await import('../../src/lib/planning/spawn-planning-session.js') as any;
 
     // No PRD files in TEST_DIR — should not throw
-    expect(() => buildPlanningPrompt(
+    await expect(buildPlanningPrompt(
       {
         identifier: 'PAN-000',
         title: 'No PRD Issue',
@@ -366,6 +366,6 @@ describe('PRD discovery scans docs/prds/ for issue-matching files', () => {
       },
       TEST_DIR,
       'claude-opus-4-6'
-    )).not.toThrow();
+    )).resolves.toBeDefined();
   });
 });

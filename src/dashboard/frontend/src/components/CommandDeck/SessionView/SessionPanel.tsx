@@ -7,6 +7,8 @@ import { ChatMarkdown } from '../../chat/ChatMarkdown';
 import { XTerminal } from '../../XTerminal';
 import { RoundCard } from '../RoundCard';
 import type { RoundData, RoundVerdict } from '../RoundCard';
+import { ReviewSummary } from './ReviewSummary';
+import { useResolvedModels, resolveWorkTypeKey } from '../../../lib/useResolvedModels';
 import styles from '../styles/command-deck.module.css';
 
 interface SessionPanelProps {
@@ -14,6 +16,8 @@ interface SessionPanelProps {
   issueId?: string;
   /** Optional review-round dividers passed through to the conversation timeline. */
   roundMarkers?: ReadonlyArray<RoundMarker>;
+  /** Reviewer sessions — passed when session.type === 'review' to show ReviewSummary. */
+  reviewers?: readonly SessionNodeType[];
 }
 
 function getViewKey(sessionId: string): string {
@@ -66,10 +70,15 @@ function deriveRoundData(metadata: SessionNodeType['roundMetadata']): RoundData[
   }));
 }
 
-export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelProps) {
-  const [view, setView] = useState<PanelView>(() =>
-    readView(session.sessionId),
-  );
+export function SessionPanel({ session, issueId, roundMarkers, reviewers }: SessionPanelProps) {
+  const isReviewSession = session.type === 'review';
+  const resolvedModels = useResolvedModels();
+  const [view, setView] = useState<PanelView>(() => {
+    const stored = readView(session.sessionId);
+    // Default review sessions to summary tab
+    if (isReviewSession && stored === 'conversation') return 'findings';
+    return stored;
+  });
 
   const handleSetView = (v: PanelView) => {
     setView(v);
@@ -78,6 +87,12 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
 
   const synthesizedConversation = useMemo<Conversation | null>(() => {
     if (!session.hasJsonl) return null;
+    const actualModel = session.model && session.model !== 'unknown' && session.model !== 'specialist'
+      ? session.model
+      : undefined;
+    const fallbackModel = !actualModel
+      ? (resolvedModels[resolveWorkTypeKey(session) ?? ''] ?? undefined)
+      : undefined;
     return {
       id: -1,
       name: session.sessionId,
@@ -90,8 +105,9 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
       lastAttachedAt: null,
       sessionAlive: session.presence !== 'ended',
       sessionFile: session.sessionId,
+      model: actualModel ?? fallbackModel,
     };
-  }, [session, issueId]);
+  }, [session, issueId, resolvedModels]);
 
   const hasJsonl = !!session.hasJsonl;
   const hasTranscript = !!session.transcript;
@@ -110,13 +126,22 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
       {/* View toggle — slim tab bar (info already shown in ZoneB) */}
       <div className={styles.sessionPanelHeader}>
         <div className={styles.sessionPanelToggle}>
-          <button
-            className={`${styles.sessionPanelToggleBtn} ${view === 'conversation' ? styles.sessionPanelToggleBtnActive : ''}`}
-            onClick={() => handleSetView('conversation')}
-          >
-            Conversation
-          </button>
-          {hasFindings && (
+          {isReviewSession ? (
+            <button
+              className={`${styles.sessionPanelToggleBtn} ${view === 'findings' ? styles.sessionPanelToggleBtnActive : ''}`}
+              onClick={() => handleSetView('findings')}
+            >
+              Summary
+            </button>
+          ) : (
+            <button
+              className={`${styles.sessionPanelToggleBtn} ${view === 'conversation' ? styles.sessionPanelToggleBtnActive : ''}`}
+              onClick={() => handleSetView('conversation')}
+            >
+              Conversation
+            </button>
+          )}
+          {!isReviewSession && hasFindings && (
             <button
               className={`${styles.sessionPanelToggleBtn} ${view === 'findings' ? styles.sessionPanelToggleBtnActive : ''}`}
               onClick={() => handleSetView('findings')}
@@ -143,6 +168,7 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
               roundMarkers={roundMarkers}
               roundMetadata={session.roundMetadata}
               embedded
+              agentId={session.sessionId}
             />
           ) : hasTranscript ? (
             <div className={styles.sessionPanelTranscript}>
@@ -155,13 +181,21 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
           )
         )}
 
-        {view === 'findings' && (
+        {view === 'findings' && isReviewSession && (
+          <ReviewSummary
+            session={session}
+            reviewers={reviewers ?? []}
+            roundData={roundData}
+          />
+        )}
+
+        {view === 'findings' && !isReviewSession && (
           <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
             {roundData.length === 0 ? (
               <div className={styles.sessionPanelEmpty}>No review rounds recorded.</div>
             ) : (
               <>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--mc-text-muted, var(--muted-foreground))', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   Review rounds
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
@@ -171,8 +205,8 @@ export function SessionPanel({ session, issueId, roundMarkers }: SessionPanelPro
                 </div>
                 {/* Show synthesis summaries for each round */}
                 {session.roundMetadata?.history.map((r) => r.summary ? (
-                  <div key={`summary-${r.round}`} style={{ borderTop: '1px solid var(--mc-border, var(--border))', paddingTop: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--mc-text-muted, var(--muted-foreground))', marginBottom: 6 }}>
+                  <div key={`summary-${r.round}`} style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>
                       Round {r.round} — {r.status}
                     </div>
                     <ChatMarkdown text={r.summary} isStreaming={false} />

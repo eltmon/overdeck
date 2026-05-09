@@ -8,11 +8,18 @@ import { join } from 'path';
 
 // Test fixtures directory
 export const FIXTURES_DIR = join(__dirname, 'fixtures');
-export const TEMP_DIR = join(__dirname, '.temp');
+const TEMP_ROOT_DIR = join(__dirname, '.temp');
+const TEMP_WORKER_ID = process.env.VITEST_POOL_ID ?? String(process.pid);
+export const TEMP_DIR = join(TEMP_ROOT_DIR, `worker-${TEMP_WORKER_ID}`);
 
 // Collapse merge-agent polling intervals in tests so syncMainIntoWorkspace
 // conflict tests finish in milliseconds instead of 5s each. See merge-agent.ts.
 process.env.PANOPTICON_TEST_POLL_MS = '10';
+
+// Don't pin PAN_YOLO globally — tests should exercise the production default
+// (auto mode). Test files that assert on the legacy bypass strings opt in
+// locally with `process.env.PAN_YOLO = 'true'` in their beforeEach.
+delete process.env.PAN_YOLO;
 
 // Clean up temp directory before each test
 beforeEach(() => {

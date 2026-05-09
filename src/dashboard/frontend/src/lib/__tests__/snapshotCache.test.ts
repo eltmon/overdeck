@@ -65,21 +65,107 @@ describe('saveSnapshotToCache', () => {
     expect(loaded!.agents).toEqual([])
   })
 
-  it('strips issues when serialized size exceeds 2MB', () => {
-    // 120,000 issue entries ≈ 2.5MB serialized — triggers the size limit strip
+  it('strips issues when localStorage throws QuotaExceededError', () => {
+    const originalSetItem = Storage.prototype.setItem
+    let calls = 0
+    Storage.prototype.setItem = function (key: string, value: string) {
+      calls++
+      if (calls === 1) {
+        const err = new DOMException('Quota exceeded', 'QuotaExceededError')
+        throw err
+      }
+      return originalSetItem.call(this, key, value)
+    }
+
+    try {
+      const bigSnapshot = makeSnapshot(1, 120_000)
+      saveSnapshotToCache(bigSnapshot)
+
+      const loaded = loadSnapshotFromCache()
+      expect(loaded).not.toBeNull()
+      // Issues should be stripped to empty array after QuotaExceededError fallback
+      expect(loaded!.issues).toEqual([])
+      expect(calls).toBe(2)
+    } finally {
+      Storage.prototype.setItem = originalSetItem
+    }
+  })
+
+  it('preserves full snapshot when it fits within localStorage quota', () => {
+    // 120,000 issue entries ≈ 2.5MB serialized — should fit in jsdom's
+    // unbounded localStorage without triggering QuotaExceededError
     const bigSnapshot = makeSnapshot(1, 120_000)
     saveSnapshotToCache(bigSnapshot)
 
     const loaded = loadSnapshotFromCache()
     expect(loaded).not.toBeNull()
-    // Issues should be stripped to empty array to fit within size limit
-    expect(loaded!.issues).toEqual([])
+    expect(loaded!.issues.length).toBe(120_000)
   })
 
   it('overwrites a previous entry on re-save', () => {
     saveSnapshotToCache(makeSnapshot(1))
     saveSnapshotToCache(makeSnapshot(2))
     expect(loadSnapshotFromCache()!.sequence).toBe(2)
+  })
+
+  it('silently ignores non-quota setItem errors (no fallback attempted)', () => {
+    const originalSetItem = Storage.prototype.setItem
+    let calls = 0
+    Storage.prototype.setItem = function (key: string, value: string) {
+      calls++
+      throw new TypeError('localStorage is disabled')
+    }
+
+    try {
+      saveSnapshotToCache(makeSnapshot(1, 10))
+      expect(calls).toBe(1)
+      expect(loadSnapshotFromCache()).toBeNull()
+    } finally {
+      Storage.prototype.setItem = originalSetItem
+    }
+  })
+
+  it('silently ignores when fallback write also fails', () => {
+    const originalSetItem = Storage.prototype.setItem
+    let calls = 0
+    Storage.prototype.setItem = function (key: string, value: string) {
+      calls++
+      const err = new DOMException('Quota exceeded', 'QuotaExceededError')
+      throw err
+    }
+
+    try {
+      saveSnapshotToCache(makeSnapshot(1, 10))
+      expect(calls).toBe(2)
+      expect(loadSnapshotFromCache()).toBeNull()
+    } finally {
+      Storage.prototype.setItem = originalSetItem
+    }
+  })
+
+  it('preserves all non-issue fields after QuotaExceededError fallback', () => {
+    const originalSetItem = Storage.prototype.setItem
+    let calls = 0
+    Storage.prototype.setItem = function (key: string, value: string) {
+      calls++
+      if (calls === 1) {
+        throw new DOMException('Quota exceeded', 'QuotaExceededError')
+      }
+      return originalSetItem.call(this, key, value)
+    }
+
+    try {
+      const snapshot = makeSnapshot(42, 120_000)
+      saveSnapshotToCache(snapshot)
+
+      const loaded = loadSnapshotFromCache()
+      expect(loaded).not.toBeNull()
+      expect(loaded!.sequence).toBe(42)
+      expect(loaded!.agents).toEqual([])
+      expect(loaded!.issues).toEqual([])
+    } finally {
+      Storage.prototype.setItem = originalSetItem
+    }
   })
 })
 

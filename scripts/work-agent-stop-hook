@@ -9,6 +9,7 @@
 # Escalation tiers:
 #   working   — default while tool activity is recent
 #   done      — STATE.md marked complete AND branch pushed
+#   api_error — transient provider error detected (auto-retry nudge)
 #   needs_input — LLM verdict STOPPED_FOR_INPUT
 #   stuck     — 2+ consecutive UNCLEAR LLM verdicts
 #
@@ -97,6 +98,22 @@ fi
 # that can silently fail under load and reset the ratchet to count=1.
 RESOLUTION_CACHE="$AGENT_STATE_DIR/last-resolution.tsv"
 RESOLUTION_LOCK="$AGENT_STATE_DIR/last-resolution.lock"
+MAX_CHANNEL_REPLY_SUMMARY_LENGTH=4096
+
+normalize_log_text() {
+  python3 - "$1" "$MAX_CHANNEL_REPLY_SUMMARY_LENGTH" <<'PY'
+import re
+import sys
+
+text = sys.argv[1]
+limit = int(sys.argv[2])
+text = text.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+text = re.sub(r'\x1B\[[0-?]*[ -/]*[@-~]', '', text)
+text = ''.join(ch for ch in text if ch >= ' ')
+text = re.sub(r'\s+', ' ', text).strip()
+print(text[:limit], end='')
+PY
+}
 
 # Read last-emitted resolution from local cache. Echoes "resolution count"
 # (space-separated) or empty string if cache missing/unreadable.
@@ -129,6 +146,7 @@ write_cached_resolution() {
 # dashboard only if no local cache exists (first emit for this agent).
 emit_resolution() {
   local resolution="$1"
+  local bootstrap_snapshot="${2:-}"
   local prev_resolution="" prev_count=0 prev_source=""
   local cached
   cached=$(read_cached_resolution)
@@ -137,13 +155,18 @@ emit_resolution() {
     prev_count=$(echo "$cached" | awk '{print $2}')
     prev_source="cache"
   else
-    # No local cache — bootstrap from dashboard snapshot if available.
-    local snap
-    snap=$(curl -s -m 0.5 "$PAN_DASHBOARD_URL/api/agents/$AGENT_ID/runtime" 2>/dev/null || echo "")
+    # No local cache — bootstrap from structured reply snapshot when available,
+    # otherwise fall back to the dashboard snapshot.
+    local snap="$bootstrap_snapshot"
+    if [ -z "$snap" ]; then
+      snap=$(curl -s -m 0.5 "$PAN_DASHBOARD_URL/api/agents/$AGENT_ID/runtime" 2>/dev/null || echo "")
+      prev_source="dashboard"
+    else
+      prev_source="structured_snapshot"
+    fi
     if [ -n "$snap" ] && command -v jq >/dev/null 2>&1; then
       prev_resolution=$(echo "$snap" | jq -r '.snapshot.resolution // ""' 2>/dev/null || echo "")
       prev_count=$(echo "$snap" | jq -r '.snapshot.resolutionCount // 0' 2>/dev/null || echo "0")
-      prev_source="dashboard"
     else
       prev_source="none"
     fi
@@ -217,6 +240,47 @@ if [ "$STATE_MD_COMPLETE" = "true" ] && [ "$BRANCH_PUSHED" = "false" ]; then
   exit 0
 fi
 
+handle_structured_channel_reply() {
+  command -v jq >/dev/null 2>&1 || return 1
+  local snap
+  snap=$(curl -s -m 0.5 "$PAN_DASHBOARD_URL/api/agents/$AGENT_ID/runtime" 2>/dev/null || echo "")
+  [ -z "$snap" ] && return 1
+
+  local reply_kind reply_summary normalized_reply_summary
+  reply_kind=$(echo "$snap" | jq -r '.snapshot.channelReply.kind // ""' 2>/dev/null || echo "")
+  [ -z "$reply_kind" ] && return 1
+  reply_summary=$(echo "$snap" | jq -r '.snapshot.channelReply.summary // ""' 2>/dev/null || echo "")
+  normalized_reply_summary=$(normalize_log_text "$reply_summary")
+
+  case "$reply_kind" in
+    done)
+      echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID using structured channel_reply kind=done summary=$normalized_reply_summary" \
+        >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+      emit_resolution "done" "$snap"
+      date +%s > "$NUDGE_FILE" 2>/dev/null || true
+      nudge_agent "You reported completion via channel_reply. If your implementation is complete, you MUST run this command now:
+
+pan work done $ISSUE_ID -c \"Implementation complete\"
+
+If you still have remaining tasks, continue working on them. Do NOT stop until all work is done AND you have called pan work done."
+      return 0
+      ;;
+    needs_input)
+      echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID using structured channel_reply kind=needs_input summary=$normalized_reply_summary" \
+        >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+      emit_resolution "needs_input" "$snap"
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+if handle_structured_channel_reply; then
+  exit 0
+fi
+
 # ── Phase 2: pane heuristic before the LLM call ──────────────────────────
 # Capture 200 lines to give the LLM enough context (a short summary in the
 # final chunk alongside earlier tool output is often the key disambiguator).
@@ -225,6 +289,52 @@ fi
 OUTPUT=$(tmux capture-pane -t "$AGENT_ID" -p -S -200 2>/dev/null || echo "")
 [ -z "$OUTPUT" ] && exit 0
 echo "$OUTPUT" | tail -20 | grep -qE '(^❯|Worked for|Sautéed|Cooking|Thinking for)' || exit 0
+
+# ── Phase 2.5: API error detection (auto-retry) ─────────────────────────
+# If the agent stopped because of a transient API error, nudge it to retry
+# instead of burning an LLM call on completion analysis. The agent was doing
+# work and got cut off by infrastructure — it should just continue.
+API_ERROR_PATTERNS=(
+  "API Error: The server had an error while processing your request"
+  "API Error: Overloaded"
+  "API Error: Rate limit"
+  "API Error: Request was aborted"
+  "API Error: Timed out"
+  "529 Overloaded"
+  "502 Bad Gateway"
+  "503 Service Unavailable"
+)
+
+API_ERROR_DETECTED=false
+for pattern in "${API_ERROR_PATTERNS[@]}"; do
+  if echo "$OUTPUT" | grep -qF "$pattern"; then
+    API_ERROR_DETECTED=true
+    break
+  fi
+done
+
+if [ "$API_ERROR_DETECTED" = "true" ]; then
+  # Cooldown: don't retry more than once per 5 minutes for API errors.
+  API_ERROR_NUDGE_FILE="$AGENT_STATE_DIR/.last-api-error-nudge"
+  if [ -f "$API_ERROR_NUDGE_FILE" ]; then
+    LAST_API_NUDGE=$(cat "$API_ERROR_NUDGE_FILE" 2>/dev/null || echo "0")
+    NOW=$(date +%s)
+    if [ $(( NOW - LAST_API_NUDGE )) -lt 300 ]; then
+      echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID api_error detected but cooldown active" \
+        >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+      exit 0
+    fi
+  fi
+
+  emit_resolution "api_error"
+  date +%s > "$API_ERROR_NUDGE_FILE" 2>/dev/null || true
+
+  echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID api_error detected — nudging retry" \
+    >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+
+  nudge_agent "You stopped due to a transient API error. This is a temporary server issue, not a problem with your code. Continue your work from where you left off. Do NOT start over — pick up exactly where you stopped."
+  exit 0
+fi
 
 # ── Phase 3: LLM fallback ────────────────────────────────────────────────
 COMPLETION_MODEL="${PANOPTICON_COMPLETION_CHECK_MODEL:-}"

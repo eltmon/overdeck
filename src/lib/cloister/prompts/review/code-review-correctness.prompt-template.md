@@ -98,19 +98,34 @@ Only review files that were changed in this PR (listed in **Files changed** in t
 - If a pattern is missing in unchanged files that were not part of this PR, do NOT flag it as a blocker.
 - Blocker severity (`!`) is reserved for issues introduced BY this PR.
 
-## Review Process
+## Review Process (Multi-Pass)
 
-1. **Read the files to review** - Use Glob/Grep to find changed files
-2. **Analyze each file systematically**:
-   - Read the full file for context
-   - Identify logic errors and edge cases
-   - Check error handling
-   - Verify type safety
-3. **Completeness checks**:
-   - If a pattern is applied in some files, Grep for similar files that may be missing it
-   - If `.planning/plan.vbrief.json` exists, read the `items` array and check each AC against the diff
+You MUST complete 3 review passes. Each pass deepens your analysis. This catches issues that a single pass misses.
+
+### Pass 1: Broad sweep
+1. Use Glob/Grep to find all changed files
+2. Read each changed file for context
+3. Find your **top 3 most critical findings** — logic errors, null handling, edge cases
+4. Write them to the output file immediately (don't wait until the end)
+
+### Pass 2: Pattern-adjacent search
+1. For each finding from Pass 1, **grep for the same pattern in OTHER changed files** — if you found an unhandled JSON.parse, search for all JSON.parse calls in changed files; if you found a missing null check on a field, check if other handlers also access that field without checking
+2. Re-read files you found issues in — trace the data flow one level deeper than you did in Pass 1
+3. Find **3 more findings** and append to your output
+
+### Pass 3: Edge case deep dive
+1. Pick the 3 most complex changed files and **re-read them line by line**
+2. Focus specifically on: error handling paths, boundary conditions, missing switch/if branches, async error propagation, type narrowing gaps
+3. Check completeness:
+   - If `.pan/spec.vbrief.json` exists, read the `items` array and check each AC against the diff
    - If `.beads/issues.jsonl` exists, scan closed beads and verify their described changes are present
-4. **Document findings** - Write to the path specified in `**Output file**` in the Review Context
+   - If a pattern is applied in some files, Grep for similar files that may be missing it
+4. Append any remaining findings to your output
+
+### Consolidate
+- Re-read your complete output file
+- Remove duplicates, adjust severities based on the full picture
+- Finalize the output
 
 ## Output Format
 
@@ -168,7 +183,7 @@ Best practices and code quality improvements.
 
 ### 6. Consistency and Completeness
 - **Inconsistent pattern application** — if a pattern (e.g., a wrapper function, decorator, middleware) is applied to some files in a directory but not others that logically need it, flag the missing ones. Example: `httpHandler()` wrapping applied to 9/13 route files but missing from 4.
-- **Acceptance criteria coverage** — if a `.planning/` directory exists in the workspace, check `plan.vbrief.json` for acceptance criteria. Verify each AC is addressed by the changed files. Flag any AC that appears unimplemented.
+- **Acceptance criteria coverage** — if a `.pan/spec.vbrief.json` file exists in the workspace, check it for acceptance criteria. Verify each AC is addressed by the changed files. Flag any AC that appears unimplemented.
 - **Bead task coverage** — if `.beads/issues.jsonl` exists, check whether the closed beads' descriptions reference files that were actually modified. Flag beads that claim to change a file but show no diff for it.
 - **Partial implementations** — if a refactor touches most but not all callers/implementations, flag the missed ones. Use Grep to find all usages of the old pattern.
 
@@ -222,6 +237,6 @@ return user?.email ?? null;
 
 After writing your review:
 1. Confirm the file was written successfully.
-2. **Display the full review markdown in this conversation.** Read the file you just wrote and paste its entire contents back as a fenced markdown block in your final response. This is required — it lets the work agent, dashboard conversation viewer, and tmux pane history show the findings without anyone having to open the file. Don't summarize; render the whole thing.
+2. **Display the full review markdown in this conversation.** Read the file you just wrote and paste its entire contents back **as plain markdown directly in your response — do NOT wrap it in a fenced code block** (no ```markdown ... ```). The dashboard renders your message as markdown, so the headings, lists, and code blocks inside your review render properly only when they aren't nested inside a code fence. This is required — it lets the work agent, dashboard conversation viewer, and tmux pane history show the findings without anyone having to open the file. Don't summarize; render the whole thing.
 3. Report completion status.
 4. Wait for synthesis agent to combine all reviews.

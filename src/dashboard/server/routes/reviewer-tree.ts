@@ -27,6 +27,26 @@ import {
   type ReviewerRole,
 } from '../../../lib/cloister/specialists.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
+import { capturePaneAsync } from '../../../lib/tmux.js';
+
+const API_ERROR_PATTERNS = [
+  /attempt\s+\d+\/\d+/i,
+  /502\s+unknown\s+provider/i,
+  /api\s+error/i,
+  /rate\s+limit/i,
+  /connection\s+refused/i,
+  /ECONNREFUSED/,
+  /overloaded/i,
+];
+
+async function detectApiError(sessionId: string): Promise<boolean> {
+  try {
+    const pane = await capturePaneAsync(sessionId, 15);
+    return API_ERROR_PATTERNS.some(p => p.test(pane));
+  } catch {
+    return false;
+  }
+}
 
 export interface ReviewerRoundSummary {
   round: number;
@@ -195,6 +215,7 @@ export async function readReviewerRounds(
     roundCount: history.length,
     latestRound: latest.round,
     latestStatus: latest.status,
+    latestReviewResult: latest.reviewResult,
     history,
   };
 }
@@ -265,9 +286,10 @@ export async function buildReviewerNodes(
       const sessionId = getReviewerSessionName(role, opts.projectKey, opts.issueId);
       const isLive = opts.tmuxSessionNames.has(sessionId);
       const roundMetadata = await readReviewerRounds(sessionId, agentsRoot);
-      // Reviewer sessions are spawned from the project root, not the workspace,
-      // so JSONL resolution must use the project path (PAN-830 review high-7).
-      const jsonlCwd = opts.projectPath ?? opts.workspacePath;
+      // Reviewers run inside the workspace (pan review run sets cwd to workspace),
+      // so JSONL files land in the workspace-encoded Claude projects dir.
+      // Fall back to projectPath only if workspacePath is unavailable.
+      const jsonlCwd = opts.workspacePath ?? opts.projectPath;
       const jsonlPath = await resolveJsonlPath(sessionId, jsonlCwd, {
         agentsDirOverride: opts.agentsDirOverride,
       });
@@ -289,8 +311,13 @@ export async function buildReviewerNodes(
         || roundMetadata?.latestStatus === 'failed';
       const isZombie = isLive && latestRoundDone && !inProgressThisRound;
 
+      // Detect API errors in live sessions (e.g. 502 unknown provider, retry exhaustion)
+      const hasApiError = (isLive && !isZombie) ? await detectApiError(sessionId) : false;
+
       let presence: SessionNodePresence;
-      if (isLive && !isZombie) {
+      if (hasApiError) {
+        presence = 'idle';
+      } else if (isLive && !isZombie) {
         presence = (opts.status === 'running' || inProgressThisRound) ? 'active' : 'idle';
       } else {
         // Zombie or dead — treat as ended so terminal won't try to connect
@@ -298,13 +325,18 @@ export async function buildReviewerNodes(
       }
 
       // Per-role status:
+      //   - live AND has API error → error
       //   - live AND running this round → running
       //   - live AND not zombie (parent says running) → running
       //   - zombie → use the archived round status (completed/failed)
-      //   - dead → use the archived round status or parent status
-      const rawStatus = (isLive && !isZombie)
-        ? 'running'
-        : (roundMetadata?.latestStatus ?? opts.status);
+      //   - dead with round metadata → use archived round status
+      //   - dead without round metadata but has JSONL → completed (ran but no round artifact)
+      //   - dead without round metadata or JSONL → parent status fallback
+      const rawStatus = hasApiError
+        ? 'error'
+        : (isLive && !isZombie)
+          ? 'running'
+          : (roundMetadata?.latestStatus ?? (jsonlPath ? 'completed' : opts.status));
       const status = normalizeAgentStatus(rawStatus);
 
       const node: ReviewerNode = {

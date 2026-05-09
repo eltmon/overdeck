@@ -50,9 +50,6 @@ export type ActionKey =
   | 'copySettings'
   // Issue artifact / planning surface
   | 'beads'
-  | 'vbrief'
-  | 'state'
-  | 'prd'
   | 'inference'
   | 'discussions'
   | 'transcripts'
@@ -62,12 +59,17 @@ export type ActionKey =
   | 'statusReview'
   // Danger zone
   | 'reopen'
+  | 'restartAgent'
   | 'restartFromPlan'
   | 'resetIssue'
   | 'cancel'
   // Session-scoped actions (Zone B)
   | 'stopSession'
-  | 'viewTerminal';
+  | 'viewTerminal'
+  | 'viewState'
+  | 'viewVbrief'
+  | 'copySessionId'
+  | 'copyTmuxCommand';
 
 /** Partitioned action lists. `primary` always renders inline; `overflow` folds. */
 export interface ActionLayout {
@@ -84,7 +86,8 @@ export interface ZoneAInput {
   lifecycle?: Pick<WorkAgentLifecycle, 'canResumeSession'> | null;
   workspace?: Pick<WorkspaceInfo, 'exists'> | null;
   hasPlan: boolean;
-  beadsCount: number;
+  hasBeads: boolean;
+  beadsCount?: number;  // Deprecated — use hasBeads
   hasInference: boolean;
   hasTranscripts: boolean;
   hasDiscussions: boolean;
@@ -196,33 +199,63 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
       break;
     case 'verification_failing':
       primary.push('reviewTest', 'recover');
-      if (agentRunning) primary.push('stopAgent');
+      if (agentRunning) {
+        primary.push('stopAgent');
+      } else if (noAgentOrStopped) {
+        primary.push(isResume ? 'resumeSession' : 'startAgent');
+        if (isResume) secondary.push('resetSession');
+      }
       break;
     case 'in_review_reviewers_running':
       if (agentRunning) primary.push('stopAgent');
       break;
     case 'in_review_changes_requested':
       primary.push('reviewTest', 'recover');
-      if (agentRunning) primary.push('stopAgent');
+      if (agentRunning) {
+        primary.push('stopAgent');
+      } else if (noAgentOrStopped) {
+        primary.push(isResume ? 'resumeSession' : 'startAgent');
+        if (isResume) secondary.push('resetSession');
+      }
       break;
     case 'in_review_approved':
       primary.push('reviewTest');
       if (readyForMerge) primary.push('merge');
-      if (agentRunning) primary.push('stopAgent');
+      if (agentRunning) {
+        primary.push('stopAgent');
+      } else if (noAgentOrStopped) {
+        primary.push(isResume ? 'resumeSession' : 'startAgent');
+        if (isResume) secondary.push('resetSession');
+      }
       break;
     case 'testing_running':
       if (agentRunning) primary.push('stopAgent');
       break;
     case 'testing_failures':
       primary.push('reviewTest', 'recover');
-      if (agentRunning) primary.push('stopAgent');
+      if (agentRunning) {
+        primary.push('stopAgent');
+      } else if (noAgentOrStopped) {
+        primary.push(isResume ? 'resumeSession' : 'startAgent');
+        if (isResume) secondary.push('resetSession');
+      }
       break;
     case 'ready_to_merge':
       primary.push('merge', 'reviewTest');
-      if (agentRunning) primary.push('stopAgent');
+      if (agentRunning) {
+        primary.push('stopAgent');
+      } else if (noAgentOrStopped) {
+        primary.push(isResume ? 'resumeSession' : 'startAgent');
+        if (isResume) secondary.push('resetSession');
+      }
       break;
     case 'merging':
-      if (agentRunning) primary.push('stopAgent');
+      if (agentRunning) {
+        primary.push('stopAgent');
+      } else if (noAgentOrStopped) {
+        primary.push(isResume ? 'resumeSession' : 'startAgent');
+        if (isResume) secondary.push('resetSession');
+      }
       break;
     case 'merged':
       break;
@@ -266,9 +299,7 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
   }
 
   // ── Artifacts / planning (always present, demoted to secondary) ───────────
-  if (input.beadsCount > 0 || input.hasPlan) secondary.push('beads');
-  if (input.hasPlan) secondary.push('vbrief');
-  secondary.push('state', 'prd');
+  if (input.hasBeads || input.hasPlan) secondary.push('beads');
   if (input.hasInference) secondary.push('inference');
   if (input.hasDiscussions) secondary.push('discussions');
   if (input.hasTranscripts) secondary.push('transcripts');
@@ -277,6 +308,9 @@ export function getZoneAActions(input: ZoneAInput): ActionLayout {
 
   // ── Danger zone (always overflow — shown via "…" menu) ────────────────────
   if (!merged && state !== 'merged' && state !== 'done' && state !== 'canceled') {
+    if (agent && agent.status !== 'failed' && agent.status !== 'dead') {
+      overflow.push('restartAgent');
+    }
     overflow.push('restartFromPlan');
     if (input.issueCanonicalState !== 'done' && input.issueCanonicalState !== 'canceled') {
       overflow.push('resetIssue');
@@ -305,6 +339,11 @@ export function getZoneBActions(input: ZoneBInput): ActionLayout {
   }
   if (input.hasTerminal) {
     secondary.push('viewTerminal');
+  }
+
+  overflow.push('viewState', 'viewVbrief', 'copySessionId');
+  if (input.hasTerminal) {
+    overflow.push('copyTmuxCommand');
   }
 
   return { primary, secondary, overflow };

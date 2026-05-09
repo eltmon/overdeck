@@ -4,10 +4,16 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
+import {
+  PAN_CONTINUE_FILENAME,
+  PAN_DIRNAME,
+  PAN_SPEC_FILENAME,
+} from '../../../lib/pan-dir/index.js';
 import { listProjects, resolveProjectFromIssue, type ResolvedProject } from '../../../lib/projects.js';
 import { listSessionNamesAsync } from '../../../lib/tmux.js';
 import { getReviewStatus } from '../review-status.js';
 import { getGitHubConfig } from './tracker-config.js';
+import { parseIssueIdFromText } from '../../../lib/resource-utils.js';
 
 const execFileAsync = promisify(execFile);
 const RESOURCE_DISCOVERY_TTL_MS = 30_000;
@@ -145,11 +151,6 @@ interface ResourceDiscoveryCacheEntry {
 let cachedResourceIssues: ResourceDiscoveryCacheEntry | null = null;
 let cachedDetailedResourceIssues: InternalDiscoveredIssue[] | null = null;
 let resourceIssuesRefreshPromise: Promise<ResourceAllocatedIssue[]> | null = null;
-
-function parseIssueIdFromText(value: string): string | null {
-  const match = value.match(/\b([A-Za-z]+-\d+|F\d+|US\d+|DE\d+|TA\d+|TC\d+)\b/i);
-  return match ? match[1]!.toUpperCase() : null;
-}
 
 function projectPrefixes(project: ProjectRef): string[] {
   const prefixes = new Set<string>();
@@ -334,26 +335,31 @@ interface WorkspaceScanResult {
   hasPrd: boolean;
   hasState: boolean;
   hasVbrief: boolean;
+  vbriefPath: string | null;
   hasBeads: boolean;
 }
 
 async function scanWorkspace(workspacesDir: string, workspaceName: string): Promise<WorkspaceScanResult> {
   const workspacePath = join(workspacesDir, workspaceName);
   const workspaceEntries = new Set(await readdir(workspacePath).catch(() => [] as string[]));
-  const planningEntries = workspaceEntries.has('.planning')
-    ? new Set(await readdir(join(workspacePath, '.planning')).catch(() => [] as string[]))
+  const panEntries = workspaceEntries.has(PAN_DIRNAME)
+    ? new Set(await readdir(join(workspacePath, PAN_DIRNAME)).catch(() => [] as string[]))
     : new Set<string>();
   const beadsEntries = workspaceEntries.has('.beads')
     ? new Set(await readdir(join(workspacePath, '.beads')).catch(() => [] as string[]))
     : new Set<string>();
+  const vbriefPath = panEntries.has(PAN_SPEC_FILENAME)
+    ? join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME)
+    : null;
 
   return {
     workspacePath,
-    hasPlanning: workspaceEntries.has('.planning'),
-    hasPrd: planningEntries.has('PLANNING_PROMPT.md'),
-    hasState: planningEntries.has('STATE.md'),
-    hasVbrief: planningEntries.has('plan.vbrief.json'),
-    hasBeads: beadsEntries.has('issues.jsonl'),
+    hasPlanning: workspaceEntries.has(PAN_DIRNAME),
+    hasPrd: panEntries.has('prd.md'),
+    hasState: panEntries.has(PAN_CONTINUE_FILENAME),
+    hasVbrief: vbriefPath !== null,
+    vbriefPath,
+    hasBeads: beadsEntries.has('issues.jsonl') || beadsEntries.has('redirect'),
   };
 }
 
@@ -477,22 +483,18 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       const issue = ensureIssue(issueId, project);
       if (!issue) return;
       const workspace = await scanWorkspace(workspacesDir, entry.name);
-      const planningDir = join(workspace.workspacePath, '.planning');
-      const planPath = join(planningDir, 'plan.vbrief.json');
-      const beadsPath = join(workspace.workspacePath, '.beads', 'issues.jsonl');
-
       issue.resourceSources.add('workspace');
       issue.resourceDetails.workspacePath = workspace.workspacePath;
       issue.hasPlanning = workspace.hasPlanning;
       issue.hasPrd = workspace.hasPrd;
       issue.hasState = workspace.hasState;
-      if (workspace.hasVbrief) {
+      if (workspace.vbriefPath) {
         issue.resourceSources.add('vbrief');
-        issue.resourceDetails.vbriefPath = planPath;
+        issue.resourceDetails.vbriefPath = workspace.vbriefPath;
       }
       if (workspace.hasBeads) {
         issue.resourceSources.add('beads');
-        issue.resourceDetails.beadsPath = beadsPath;
+        issue.resourceDetails.beadsPath = join(workspace.workspacePath, '.beads');
       }
     }));
 

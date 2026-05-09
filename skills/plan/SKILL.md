@@ -2,8 +2,8 @@
 name: plan
 description: >
   Opus-driven planning for issues before Sonnet implementation. Creates workspace,
-  STATE.md, plan.vbrief.json with beads, and updates issue tracker. Ensures
-  strategic decisions are made by Opus, not cheaper models.
+  .pan/continue.json, .pan/spec.vbrief.json with beads, and updates issue tracker.
+  Ensures strategic decisions are made by Opus, not cheaper models.
 triggers:
   - plan
   - /plan
@@ -50,8 +50,8 @@ Do NOT leave any decisions for the implementation agent. Every architectural cho
 cd <project>
 pan workspace <issue-id>   # Creates workspaces/feature-<id>/ with feature branch
 
-# Then create planning directory inside the workspace
-mkdir -p workspaces/feature-<issue-id-lowercase>/.planning
+# Then create the canonical Panopticon workspace directory
+mkdir -p workspaces/feature-<issue-id-lowercase>/.pan
 ```
 
 **IMPORTANT:** The `pan workspace` command creates a git worktree on a feature branch.
@@ -85,50 +85,35 @@ Read the FULL issue. Understand what's being asked.
    - Files to delete (cleanup)
    - Tests to write/update
 
-### Step 4: Write STATE.md
+### Step 4: Write `.pan/continue.json`
 
-Create `.planning/STATE.md` with COMPLETE planning context:
+Create `.pan/continue.json` with COMPLETE planning context:
 
-```markdown
-# <issue-id>: <Title>
-
-**Status:** Plan Approved
-**Planned by:** Claude Opus 4.6
-**Date:** <date>
-
----
-
-## Discovery Summary
-<What you learned - specific file paths, patterns, gotchas>
-
-## Key Architectural Decisions
-
-### D1: <Topic>
-**Decision:** <What we're doing>
-**Rationale:** <Why this choice, not alternatives>
-
-### D2: ...
-
-## Architecture
-
-### What's Being Changed
-<Table of components, files, and what changes>
-
-### Key Touch Points
-<Specific file:line references for important changes>
-
-## Service URLs (if applicable)
-<If this issue involves services with URLs, list them here:>
-Frontend: https://...
-API: https://...
-
-## Remaining Work
-See plan.vbrief.json for the complete bead breakdown.
+```json
+{
+  "version": "1",
+  "issueId": "<ISSUE-ID>",
+  "created": "<ISO timestamp>",
+  "updated": "<ISO timestamp>",
+  "gitState": { "branch": "<branch>", "sha": "<short sha>", "dirty": false },
+  "decisions": [
+    { "id": "D1", "summary": "<decision and why>", "recordedAt": "<ISO timestamp>" }
+  ],
+  "hazards": [
+    { "id": "H1", "summary": "<risk/edge case>", "mitigation": "<how to handle it>" }
+  ],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "plan",
+  "sessionHistory": [
+    { "timestamp": "<ISO timestamp>", "reason": "planning", "note": "Initial planning session", "agentModel": "plan" }
+  ]
+}
 ```
 
-### Step 5: Produce plan.vbrief.json
+### Step 5: Produce `.pan/spec.vbrief.json`
 
-Create `.planning/plan.vbrief.json` following the vBRIEF schema. This replaces the manual `bd create` loop — the Panopticon complete-planning pipeline reads this file and creates beads automatically.
+Create `.pan/spec.vbrief.json` following the vBRIEF schema. This replaces the manual `bd create` loop — `pan plan-finalize` reads this file and creates beads automatically.
 
 ```json
 {
@@ -203,18 +188,18 @@ Create `.planning/plan.vbrief.json` following the vBRIEF schema. This replaces t
 
 **After writing the JSON file:**
 ```bash
-# Mark planning complete so the pipeline picks it up
-touch workspaces/feature-<issue-id-lowercase>/.planning/.planning-complete
+# Materialize beads and mark the workspace spec proposed
+pan plan-finalize
 ```
 
-**Cloister hand-off:** When the `.planning-complete` marker is created, Cloister automatically:
-1. Reads `plan.vbrief.json` from the workspace
+**Cloister hand-off:** When `pan plan-finalize` runs, it automatically:
+1. Reads `.pan/spec.vbrief.json` from the workspace
 2. Calls `createBeadsFromVBrief()` to convert vBRIEF items into beads tasks
 3. Preserves dependency relationships from `edges` (blocking order)
 4. Includes acceptance criteria in bead descriptions
-5. Starts the work agent with the beads ready for implementation
+5. Marks `plan.status` as `proposed` so the dashboard shows Done
 
-You do NOT need to run `bd create` manually — Cloister handles the full conversion.
+You do NOT need to run `bd create` manually — `pan plan-finalize` handles the full conversion.
 
 ### Step 6: Stitch Integration (UI Work)
 
@@ -231,7 +216,7 @@ mcp__stitch__create_project name="<issue-id>-design"
 mcp__stitch__generate_screen_from_text ...
 ```
 
-Document all designs in `.planning/STITCH_DESIGNS.md`.
+Document all designs in `.pan/STITCH_DESIGNS.md`.
 
 ### Step 7: Update Issue Tracker
 
@@ -247,7 +232,7 @@ gh issue comment <number> --body "## Planning Complete
 **Planned by:** Claude Opus 4.6
 **Workspace:** workspaces/feature-<issue-id>/
 
-### Beads: <N> items in plan.vbrief.json
+### Beads: <N> items in .pan/spec.vbrief.json
 ### Next: /work-issue <ISSUE-ID>"
 ```
 
@@ -257,8 +242,8 @@ gh issue comment <number> --body "## Planning Complete
 ## Planning Complete for <ISSUE-ID>
 
 **Workspace:** <path>
-**STATE.md:** decisions log, architecture, key touch points
-**plan.vbrief.json:** <N> items, <M> edges
+**.pan/continue.json:** decisions, hazards, and planning context
+**.pan/spec.vbrief.json:** <N> items, <M> edges
 
 **Unblocked Items:**
 1. <item-id>: <title> [P<n>]
@@ -327,10 +312,10 @@ Items:
 
 Before completing /plan, verify:
 
-- [ ] STATE.md has complete discovery, decisions, and architecture
-- [ ] plan.vbrief.json is valid JSON with all required fields
+- [ ] `.pan/continue.json` has complete planning context
+- [ ] `.pan/spec.vbrief.json` is valid JSON with all required fields
 - [ ] Each item has exact file paths in Action field
 - [ ] Dependencies (edges) are set correctly
-- [ ] .planning-complete marker created
+- [ ] `pan plan-finalize` run successfully
 - [ ] Issue tracker updated
 - [ ] No decisions left for implementation agent

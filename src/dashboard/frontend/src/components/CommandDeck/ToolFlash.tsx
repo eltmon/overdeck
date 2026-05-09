@@ -46,7 +46,7 @@ export function ToolFlash({ currentTool, className }: ToolFlashProps) {
         display: 'inline-flex',
         alignItems: 'center',
         gap: 4,
-        fontFamily: 'var(--mc-font-mono, ui-monospace, monospace)',
+        fontFamily: 'var(--font-mono, ui-monospace, monospace)',
         fontSize: 12,
         color: 'var(--muted-foreground)',
         minWidth: 0,

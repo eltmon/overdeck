@@ -62,13 +62,13 @@ function timeAgo(iso: string | undefined): string {
 }
 
 function specialistStatusColor(health: SpecialistHealthState): string {
-  if (health.consecutiveFailures >= 3) return 'var(--mc-error)';
-  if (health.consecutiveFailures > 0) return 'var(--mc-warning)';
+  if (health.consecutiveFailures >= 3) return 'var(--destructive)';
+  if (health.consecutiveFailures > 0) return 'var(--warning)';
   if (health.lastForceKillTime) {
     const killAge = Date.now() - new Date(health.lastForceKillTime).getTime();
-    if (killAge < 5 * 60 * 1000) return 'var(--mc-warning)';
+    if (killAge < 5 * 60 * 1000) return 'var(--warning)';
   }
-  return 'var(--mc-success)';
+  return 'var(--success)';
 }
 
 function formatSpecialistName(name: string): string {
@@ -84,10 +84,10 @@ function formatLogTime(iso: string): string {
 }
 
 const LOG_LEVEL_COLORS: Record<string, string> = {
-  info: 'var(--mc-text-muted)',
-  warn: 'var(--mc-warning)',
-  action: 'var(--mc-accent)',
-  error: 'var(--mc-error)',
+  info: 'var(--muted-foreground)',
+  warn: 'var(--warning)',
+  action: 'var(--primary)',
+  error: 'var(--destructive)',
 };
 
 const LOG_LEVEL_LABELS: Record<string, string> = {
@@ -132,7 +132,7 @@ export function DeaconStatus() {
   return (
     <div className={styles.deaconPanel}>
       <div className={styles.deaconHeader} onClick={() => setExpanded(!expanded)}>
-        <Shield size={12} style={{ color: status.isRunning ? 'var(--mc-success)' : 'var(--mc-text-muted)', flexShrink: 0 }} />
+        <Shield size={12} style={{ color: status.isRunning ? 'var(--success)' : 'var(--muted-foreground)', flexShrink: 0 }} />
         <span className={styles.deaconTitle}>Deacon</span>
         <span className={styles.deaconMeta}>
           {status.isRunning ? timeAgo(status.state.lastPatrol) : 'stopped'}
@@ -141,9 +141,9 @@ export function DeaconStatus() {
           <span className={styles.deaconActionCount}>{actions.length}</span>
         )}
         {expanded ? (
-          <ChevronDown size={12} style={{ color: 'var(--mc-text-muted)', flexShrink: 0 }} />
+          <ChevronDown size={12} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
         ) : (
-          <ChevronRight size={12} style={{ color: 'var(--mc-text-muted)', flexShrink: 0 }} />
+          <ChevronRight size={12} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
         )}
       </div>
 
@@ -186,7 +186,7 @@ export function DeaconStatus() {
             className={styles.deaconLogToggle}
             onClick={(e) => { e.stopPropagation(); setShowLogs(!showLogs); }}
           >
-            <ScrollText size={10} style={{ color: 'var(--mc-text-muted)', flexShrink: 0 }} />
+            <ScrollText size={10} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
             <span>{showLogs ? 'Hide logs' : 'Show logs'}</span>
           </div>
 
@@ -203,7 +203,7 @@ export function DeaconStatus() {
                     </span>
                     <span
                       className={styles.deaconLogLevel}
-                      style={{ color: LOG_LEVEL_COLORS[entry.level] || 'var(--mc-text-muted)' }}
+                      style={{ color: LOG_LEVEL_COLORS[entry.level] || 'var(--muted-foreground)' }}
                     >
                       {LOG_LEVEL_LABELS[entry.level] || entry.level}
                     </span>

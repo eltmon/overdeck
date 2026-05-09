@@ -1,0 +1,25 @@
+{
+  "version": "1",
+  "issueId": "PAN-457",
+  "created": "2026-05-06T02:00:42.665Z",
+  "updated": "2026-05-07T08:22:28.488Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "kimi-k2.6",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-06T02:00:42.665Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-07T08:22:28.488Z"
+    }
+  ],
+  "feedback": []
+}

@@ -11,8 +11,10 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
-import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync, isPaneDeadAsync } from '../tmux.js';
-import { getProviderExportsForModel, getAgentRuntimeBaseCommand } from '../agents.js';
+import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync, isPaneDeadAsync, listPaneValuesAsync, detectTerminalApiError, type TerminalApiError, buildTmuxCommandString } from '../tmux.js';
+import { BLANKED_PROVIDER_ENV } from '../child-env.js';
+import { getProviderExportsForModel } from '../agents.js';
+import { resolveSpecialistBaseCommand } from './router.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { getModelId, hasOverride } from '../work-type-router.js';
 import { AGENTS_DIR, CACHE_AGENTS_DIR, CACHE_REVIEW_PROMPTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
@@ -72,6 +74,20 @@ interface ReviewHistoryEntry {
  * Performance reviewers of large PRs can need 20+ minutes of analysis time.
  */
 const REVIEW_TIMEOUT_MS = 30 * 60 * 1000;
+const MAX_REVIEWER_TIMEOUT_RETRIES = 2;
+const REVIEWER_TIMEOUT_RETRY_BACKOFF_MS = [2_000, 5_000];
+
+function reviewerRetryBackoffMs(attempt: number): number {
+  return REVIEWER_TIMEOUT_RETRY_BACKOFF_MS[Math.min(attempt - 1, REVIEWER_TIMEOUT_RETRY_BACKOFF_MS.length - 1)] ?? 5_000;
+}
+
+function isRetryableReviewerFailure(reason?: ReviewerFailureReason): boolean {
+  return reason === 'timeout' || reason === 'pane_dead';
+}
+
+async function delay(ms: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, ms));
+}
 
 /**
  * Default reviewer agents used when specialists.review_agents is not configured.
@@ -106,6 +122,24 @@ export function getActiveParallelReviewIssues(sessionNames: string[]): Set<strin
 }
 
 async function ensureReviewTempStash(issueId: string, workspace: string): Promise<{ ref: string; message: string; sequence: number } | null> {
+  // Drop any prior cycle's review-temp stash before creating a new one. Without
+  // this, accumulated stashes from previous rounds leak — PAN-1030 left ten
+  // review-temp:PAN-1030:1..10 stashes behind because each round's cleanup
+  // drops the *current* ref but `setReviewStatus` overwrites the ref before
+  // cleanup runs, so the prior round's ref gets orphaned. Drop-then-create is
+  // the only ordering that guarantees no orphans.
+  const priorStatus = getReviewStatus(issueId);
+  if (priorStatus?.reviewTempStashRef) {
+    try {
+      await dropStash(workspace, priorStatus.reviewTempStashRef);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!/not found|does not exist/i.test(message)) {
+        console.error(`[review-agent] Failed to drop prior review-temp stash for ${issueId} (non-fatal):`, err);
+      }
+    }
+  }
+
   const { stdout } = await execAsync('git status --porcelain', {
     cwd: workspace,
     encoding: 'utf-8',
@@ -269,8 +303,8 @@ function parseAgentOutput(output: string): ReviewResult {
 
 /**
  * Send review feedback to the work agent.
- * Writes feedback to .planning/feedback/ in the workspace, updates STATE.md,
- * and sends a short reference via tmux.
+ * Writes feedback to .pan/feedback/ in the workspace, appends a breadcrumb
+ * to the continue file, and sends a short reference via tmux.
  */
 /**
  * Builds the markdown body for the feedback file written to the work agent.
@@ -494,7 +528,10 @@ function reviewRoleToWorkType(role: string): Parameters<typeof getModelId>[0] | 
 /** Resolve the model to use for a reviewer, preferring agent-level override then work-type routing */
 export function resolveReviewerModel(agent: ReviewAgentConfig, defaultModel: string): string {
   let model: string;
-  if (agent.model) {
+  const envOverride = process.env.PANOPTICON_REVIEW_MODEL_OVERRIDE;
+  if (envOverride) {
+    model = envOverride;
+  } else if (agent.model) {
     model = agent.model;
   } else {
     const workType = reviewRoleToWorkType(agent.name);
@@ -523,18 +560,22 @@ export function resolveReviewerModel(agent: ReviewAgentConfig, defaultModel: str
 }
 
 /** Spawn a single reviewer tmux session and send its prompt.
- *  Runs from the main Panopticon codebase (packageRoot), not the workspace,
- *  so reviewers use main's .claude/rules/ and CLAUDE.md instead of the workspace's.
- *  The workspace path is passed in the prompt so the reviewer knows where to read files.
+ *  Runs from the workspace (projectPath) so relative paths and git commands
+ *  resolve to the correct checkout. The workspace is a git worktree, so it
+ *  shares .claude/rules/ and CLAUDE.md with the main repo.
  */
-async function spawnReviewer(
+export async function spawnSingleReviewer(
   sessionName: string,
   model: string,
   promptFile: string,
   projectPath: string,
 ): Promise<void> {
-  const claudeCmd = getAgentRuntimeBaseCommand(model);
-  const providerExports = getProviderExportsForModel(model);
+  // PAN-982 + PAN-636: emit 'claude --agent pan-review-agent --name <sessionName>'
+  // on the claude-code path, or fall back to Pi when configured. The harness
+  // routing + ToS gate live inside resolveSpecialistBaseCommand so a stale
+  // Settings selection cannot bypass the gate.
+  const claudeCmd = await resolveSpecialistBaseCommand('review-agent', model, sessionName);
+  const providerExports = await getProviderExportsForModel(model);
 
   // Pre-generate the Claude session UUID and persist it to the canonical reviewer
   // agent directory BEFORE Claude starts. Without this, jsonl-resolver has nothing
@@ -564,8 +605,9 @@ async function spawnReviewer(
   const launcherPath = join(tmpdir(), `pan-reviewer-${sessionName}.sh`);
   const launcherContent = generateLauncherScript({
     agentType: 'review',
-    workingDir: packageRoot,
+    workingDir: projectPath,
     setPipefail: true,
+    setTerminalEnv: true,
     unsetPanopticonEnv: true,
     panopticonEnv: { agentId: sessionName },
     providerExports: providerExports.trimEnd(),
@@ -574,19 +616,47 @@ async function spawnReviewer(
   });
   await writeFile(launcherPath, launcherContent, { mode: 0o755 });
 
-  console.log(`[review-agent] Spawning reviewer ${sessionName}: model=${model}, claudeSessionId=${claudeSessionId}, launcher=${launcherPath}`);
+  console.log(`[claude-invoke] purpose=review-agent | model=${model} | source=review-agent.ts:spawnReviewer | session=${sessionName} | claudeSessionId=${claudeSessionId} | launcher=${launcherPath}`);
   console.log(`[review-agent] Launcher content:\n${launcherContent}`);
 
-  await createSessionAsync(sessionName, packageRoot, `bash ${launcherPath}`, {
-    env: {
-      // Mirror the launcher's PANOPTICON_AGENT_ID into the tmux session env so
-      // the value is visible to processes that inspect the env-from-tmux path
-      // (not just the launcher exec chain).
-      PANOPTICON_AGENT_ID: sessionName,
-      PANOPTICON_ISSUE_ID: '',
-      PANOPTICON_SESSION_TYPE: '',
-    },
-  });
+  // Build the same env that createSessionAsync would have passed
+  const sessionEnv = {
+    ...BLANKED_PROVIDER_ENV,
+    TERM: 'xterm-256color',
+    PANOPTICON_AGENT_ID: sessionName,
+    PANOPTICON_ISSUE_ID: '',
+    PANOPTICON_SESSION_TYPE: '',
+  };
+
+  // Build tmux -e flags for environment variables (same logic as specialists.ts buildTmuxEnvFlags)
+  let envFlags = '';
+  for (const [key, value] of Object.entries(sessionEnv)) {
+    envFlags += ` -e ${key}="${value.replace(/"/g, '\\"')}"`;
+  }
+
+  // Kill stale session first to prevent "duplicate session" error (matches dispatchSpecialist pattern)
+  await killSessionAsync(sessionName).catch(() => {});
+  // Use the same atomic spawn pattern as dispatchSpecialist: new-session + bash launcher in one execAsync call.
+  // createSessionAsync only created the session — it never executed the launcher, so the bash/claude
+  // process never started and sendKeysAsync had no process to deliver keys to (PAN-1034).
+  await execAsync(
+    `${buildTmuxCommandString(['new-session', '-d', '-s', sessionName, '-c', projectPath])}${envFlags} "bash '${launcherPath}'"`,
+    { encoding: 'utf-8' }
+  );
+
+  // Pin remain-on-exit IMMEDIATELY after new-session, before claude has a chance
+  // to exit. Without this, a fast-failing launcher (auth error, model unreachable,
+  // OOM) makes the session vanish in <100ms, which manifests downstream as
+  // "exited without output after Nms" and aborts the entire review even though
+  // the specialist's claude process briefly ran and logged thousands of lines.
+  // The caller used to set this much later in runParallelReview — too late.
+  // PAN-1030 reproduced this: all 4 specialists vanished in 16s while their
+  // claude logs grew to 1.7k–2.3k lines.
+  try {
+    await setOptionAsync(sessionName, 'remain-on-exit', 'on');
+  } catch (err) {
+    console.warn(`[review-agent] Failed to pin remain-on-exit on ${sessionName}: ${err instanceof Error ? err.message : err}`);
+  }
 
   // Pipe all pane output to a log file so connection errors and Claude output are
   // captured even after the session exits.
@@ -606,12 +676,35 @@ async function spawnReviewer(
 }
 
 /**
+ * Failure reasons for a reviewer wait. `terminal_api_error` means the upstream
+ * provider returned a non-recoverable error (quota exhausted, login required,
+ * 401/403) — auto-respawn won't help. The other three are existing legacy modes.
+ */
+export type ReviewerFailureReason =
+  | 'session_exited'
+  | 'pane_dead'
+  | 'timeout'
+  | 'terminal_api_error';
+
+export type ReviewerWaitResult =
+  | { status: 'completed' }
+  | { status: 'failed'; reason: ReviewerFailureReason; apiError?: TerminalApiError };
+
+/**
  * Poll until the output file is written (or the session exits), then kill the session.
  *
  * For synthesis sessions: a `requireMarker` predicate may be passed to defeat a race
  * where the agent writes synthesis.md in two stages (body first, tail markers appended
  * seconds later). Without the predicate, parser fires on the incomplete first write
  * and rejects valid output as "did not report result in expected format".
+ *
+ * On every poll cycle we also scan the pane for terminal upstream-API errors
+ * (quota exhausted, auth failed, login required). Without this check, an API
+ * 403 from the reviewer's model provider sits silently at the prompt for the
+ * full 30-minute timeout — Claude Code doesn't exit on API errors, it just
+ * prints the error and returns to the input prompt, so sessionExists and
+ * pane_dead both keep returning true. Detecting via pane content is the only
+ * reliable signal for this failure mode.
  */
 export async function waitForReviewer(
   sessionName: string,
@@ -630,12 +723,22 @@ export async function waitForReviewer(
     capturePane?: (sessionName: string) => Promise<string>;
     requireMarker?: string;
   } = {},
-): Promise<'completed' | 'failed'> {
+): Promise<ReviewerWaitResult> {
   const outputDir = dirname(outputFile);
   const role = sessionName.split('-').pop() ?? 'unknown';
   const tmuxLogFile = join(outputDir, `${role}-tmux.log`);
+  const errorFile = join(outputDir, `${role}-error.json`);
   const startedAt = Date.now();
   const deadline = startedAt + timeoutMs;
+
+  const writePaneCapture = async (label: string, pane: string): Promise<void> => {
+    try {
+      if (pane) await writeFile(tmuxLogFile, pane, { flag: 'a' });
+      console.error(`[review-agent] ${label} capture written to ${tmuxLogFile}`);
+    } catch (err) {
+      console.error(`[review-agent] Failed to write pane capture for ${sessionName}:`, err);
+    }
+  };
 
   while (Date.now() < deadline) {
     // Output file is the primary completion signal — Claude sessions don't auto-exit.
@@ -646,7 +749,7 @@ export async function waitForReviewer(
           const content = await readFile(outputFile, 'utf-8');
           if (content.includes(requireMarker)) {
             console.log(`[review-agent] Reviewer ${sessionName} completed (marker '${requireMarker}' present) in ${Date.now() - startedAt}ms`);
-            return 'completed';
+            return { status: 'completed' };
           }
           // File exists but marker not yet written — keep polling.
         } catch (err) {
@@ -654,7 +757,7 @@ export async function waitForReviewer(
         }
       } else {
         console.log(`[review-agent] Reviewer ${sessionName} completed in ${Date.now() - startedAt}ms`);
-        return 'completed';
+        return { status: 'completed' };
       }
     }
     if (!await sessionExists(sessionName)) {
@@ -663,12 +766,34 @@ export async function waitForReviewer(
       console.error(`[review-agent] Reviewer ${sessionName} exited without output after ${elapsed}ms — capturing pane`);
       try {
         const pane = await capturePane(sessionName);
-        if (pane) await writeFile(tmuxLogFile, pane, { flag: 'a' });
-        console.error(`[review-agent] Pane capture written to ${tmuxLogFile}`);
+        await writePaneCapture('Pane', pane);
       } catch (err) {
         console.error(`[review-agent] Failed to capture pane for ${sessionName}:`, err);
       }
-      return 'failed';
+      return { status: 'failed', reason: 'session_exited' };
+    }
+
+    // Capture pane once per cycle so we can run BOTH the pane-dead check and
+    // the terminal API error scan from the same capture — half the tmux forks.
+    let pane = '';
+    try { pane = await capturePane(sessionName); } catch { /* non-fatal */ }
+
+    // Terminal upstream-API error (quota exhausted / auth / login required).
+    // Pane stays alive after these because Claude Code returns to its prompt;
+    // without this check we'd burn the full timeout on a failure that's
+    // already permanent.
+    const apiError = detectTerminalApiError(pane);
+    if (apiError) {
+      const elapsed = Date.now() - startedAt;
+      console.error(`[review-agent] Reviewer ${sessionName} hit terminal API error after ${elapsed}ms: ${apiError.summary}`);
+      await writePaneCapture('Terminal-API-error', pane);
+      try {
+        await writeFile(errorFile, JSON.stringify({ sessionName, apiError, detectedAt: new Date().toISOString() }, null, 2));
+      } catch (err) {
+        console.error(`[review-agent] Failed to write error file ${errorFile}:`, err);
+      }
+      try { await killSession(sessionName); } catch { /* non-fatal */ }
+      return { status: 'failed', reason: 'terminal_api_error', apiError };
     }
 
     // PAN-912 follow-up: detect dead panes even when remain-on-exit keeps the session alive.
@@ -677,14 +802,8 @@ export async function waitForReviewer(
     if (await isPaneDeadAsync(sessionName)) {
       const elapsed = Date.now() - startedAt;
       console.error(`[review-agent] Reviewer ${sessionName} pane is dead after ${elapsed}ms — capturing pane`);
-      try {
-        const pane = await capturePane(sessionName);
-        if (pane) await writeFile(tmuxLogFile, pane, { flag: 'a' });
-        console.error(`[review-agent] Dead-pane capture written to ${tmuxLogFile}`);
-      } catch (err) {
-        console.error(`[review-agent] Failed to capture pane for dead ${sessionName}:`, err);
-      }
-      return 'failed';
+      await writePaneCapture('Dead-pane', pane);
+      return { status: 'failed', reason: 'pane_dead' };
     }
 
     await new Promise(resolve => setTimeout(resolve, 2000));
@@ -695,15 +814,14 @@ export async function waitForReviewer(
   console.error(`[review-agent] Reviewer ${sessionName} timed out after ${elapsed}ms — capturing pane`);
   try {
     const pane = await capturePane(sessionName);
-    if (pane) await writeFile(tmuxLogFile, pane, { flag: 'a' });
-    console.error(`[review-agent] Pane capture written to ${tmuxLogFile}`);
+    await writePaneCapture('Pane', pane);
   } catch (err) {
     console.error(`[review-agent] Failed to capture pane for ${sessionName}:`, err);
   }
   try { await killSession(sessionName); } catch (err) {
     console.error(`[review-agent] Failed to kill timed-out reviewer session ${sessionName}:`, err);
   }
-  return 'failed';
+  return { status: 'failed', reason: 'timeout' };
 }
 
 /**
@@ -743,7 +861,113 @@ export async function killAllReviewerSessions(
   return { killed, failed };
 }
 
-type ReviewerOutcome = { role: string; status: 'completed' | 'failed'; outputFile: string; sessionName?: string };
+/**
+ * Check whether a review coordinator session is actually alive (not just a tmux
+ * pane kept open by remain-on-exit). Gets the pane PID and verifies the process
+ * still exists in the process table. This catches the case where the underlying
+ * bash process has exited but tmux reports pane_dead=0 because a child process
+ * or tmux itself is keeping the pane alive.
+ */
+async function isCoordinatorAliveAsync(sessionName: string): Promise<boolean> {
+  try {
+    const pids = await listPaneValuesAsync(sessionName, '#{pane_pid}');
+    if (pids.length === 0) return false;
+    const pid = parseInt(pids[0], 10);
+    if (!Number.isFinite(pid) || pid <= 0) return false;
+    // kill -0 checks if the process exists and we have permission to signal it.
+    // This is a fast syscall — comparable to existsSync — and does not block on I/O.
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function coordinatorExitStatus(opts: { workspace: string; sessionName: string }): Promise<number | null> {
+  try {
+    const exitPath = join(opts.workspace, '.pan', 'review', 'coordinator', `${opts.sessionName}.exit`);
+    if (!existsSync(exitPath)) return null;
+    const raw = await readFile(exitPath, 'utf-8');
+    const parsed = Number.parseInt(raw.trim(), 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function emitCoordinatorDied(issueId: string, sessionName: string, reason: string): Promise<void> {
+  try {
+    const { notifyPipeline } = await import('../pipeline-notifier.js');
+    notifyPipeline({ type: 'coordinator_died', issueId, sessionName, reason });
+  } catch {
+    // Non-fatal: event emission is best-effort.
+  }
+}
+
+/**
+ * Kill ALL review-related tmux sessions on the panopticon socket.
+ *
+ * Called by `pan down` to prevent stale coordinator/reviewer sessions from
+ * surviving a dashboard restart and blocking new review dispatch (PAN-931).
+ *
+ * Targets:
+ *   - review-coordinator-<issueId>-<timestamp>
+ *   - specialist-<projectKey>-<issueId>-review-<role> (canonical PAN-830)
+ *   - review-<issueId>-<timestamp>-<role> (legacy PAN-821)
+ *
+ * Returns the list of sessions killed and any that failed to kill.
+ */
+export async function killAllReviewSessions(): Promise<{ killed: string[]; failed: string[] }> {
+  const killed: string[] = [];
+  const failed: string[] = [];
+
+  let allSessions: string[];
+  try {
+    allSessions = await listSessionNamesAsync();
+  } catch (err) {
+    console.warn('[review-agent] Failed to list tmux sessions during review cleanup:', err instanceof Error ? err.message : String(err));
+    return { killed, failed };
+  }
+
+  const reviewPatterns = [
+    /^review-coordinator-/,
+    /^specialist-.+-review-/,
+    /^review-[A-Z0-9]+-\d+-\d+/, // legacy: review-PAN-999-1713456789000-correctness
+  ];
+
+  const sessionsToKill = allSessions.filter(s => reviewPatterns.some(p => p.test(s)));
+  if (sessionsToKill.length === 0) {
+    return { killed, failed };
+  }
+
+  console.log(`[review-agent] Killing ${sessionsToKill.length} review session(s) during shutdown`);
+
+  await Promise.all(
+    sessionsToKill.map(async (sessionName) => {
+      try {
+        await killSessionAsync(sessionName);
+        console.log(`[review-agent] Killed review session ${sessionName}`);
+        killed.push(sessionName);
+      } catch (err) {
+        console.log(`[review-agent] Session ${sessionName} already gone or failed to kill: ${err instanceof Error ? err.message : String(err)}`);
+        failed.push(sessionName);
+      }
+    }),
+  );
+
+  return { killed, failed };
+}
+
+type ReviewerOutcome = {
+  role: string;
+  status: 'completed' | 'failed';
+  outputFile: string;
+  sessionName?: string;
+  /** Why the reviewer failed; only set when status === 'failed'. */
+  failureReason?: ReviewerFailureReason;
+  /** Specific upstream-API failure surfaced from the pane, if any. */
+  apiError?: TerminalApiError;
+};
 
 /**
  * Returns completed reviewer outputs, or null if any reviewer failed.
@@ -783,8 +1007,8 @@ export const resolveTemplatePath = resolvePromptTemplatePath;
 
 type RunParallelReviewDeps = {
   spawnFn?: (session: string, model: string, promptFile: string, cwd: string) => Promise<void>;
-  waitFn?: (session: string, outputFile: string, timeoutMs: number) => Promise<'completed' | 'failed'>;
-  waitSynthesisFn?: (session: string, outputFile: string, timeoutMs: number) => Promise<'completed' | 'failed'>;
+  waitFn?: (session: string, outputFile: string, timeoutMs: number) => Promise<ReviewerWaitResult>;
+  waitSynthesisFn?: (session: string, outputFile: string, timeoutMs: number) => Promise<ReviewerWaitResult>;
   parseSynthesisFn?: typeof parseReviewSynthesis;
   postReviewFn?: typeof postGitHubPRReview;
   /** Injectable prompt-template resolver (see resolvePromptTemplatePath). */
@@ -805,7 +1029,7 @@ export async function runParallelReview(
   filesChanged: string[],
   agents: ReviewAgentConfig[],
   {
-    spawnFn = spawnReviewer,
+    spawnFn = spawnSingleReviewer,
     waitFn = (session, outputFile, timeoutMs) => waitForReviewer(session, outputFile, timeoutMs),
     waitSynthesisFn = (session, outputFile, timeoutMs) => waitForReviewer(session, outputFile, timeoutMs, { requireMarker: 'REVIEW_RESULT:' }),
     parseSynthesisFn = parseReviewSynthesis,
@@ -910,6 +1134,7 @@ export async function runParallelReview(
     `**Issue ID**: ${context.issueId}`,
     `**Workspace Path**: ${context.projectPath}`,
     absoluteFilesChanged.length > 0 ? `**Files changed**: ${absoluteFilesChanged.join(', ')}` : '',
+    `> **CRITICAL: Re-read every file listed above before analyzing it. Sessions are resumed across review rounds, so you may have stale cached file contents. Do NOT rely on memory — open each file with the Read tool before commenting on it.**`,
   ].filter(Boolean).join('\n');
 
   const reviewerSessions: Array<{ sessionName: string; outputFile: string; role: string }> = [];
@@ -940,11 +1165,20 @@ export async function runParallelReview(
     // previous round, inject the new round's prompt directly. Otherwise
     // spawn fresh and pin `remain-on-exit on` so the pane survives across
     // rounds for Command Deck history.
-    if (await sessionExistsAsync(sessionName)) {
+    // PAN-1034 follow-on: also check pane_dead — a session can exist but have a dead
+    // pane (e.g. specialist crashed). In that case, kill it and fall through to spawn.
+    const paneDead = await isPaneDeadAsync(sessionName);
+    if (await sessionExistsAsync(sessionName) && !paneDead) {
+      // Session exists and pane is alive — resume it
       console.log(`[review-agent] Resuming reviewer ${sessionName} for new round`);
       await sendKeysAsync(sessionName, prompt, 'runParallelReview-resume');
       resumedCount++;
     } else {
+      // Session doesn't exist or pane is dead — kill and respawn
+      if (paneDead) {
+        console.log(`[review-agent] Reviewer ${sessionName} pane is dead — killing and respawning`);
+        await killSessionAsync(sessionName).catch(() => {});
+      }
       await spawnFn(sessionName, model, promptFile, context.projectPath);
       try {
         await setOptionAsync(sessionName, 'remain-on-exit', 'on');
@@ -984,48 +1218,89 @@ export async function runParallelReview(
       // Non-fatal: event emission is best-effort
     }
   };
-  let reviewerResults = await Promise.all(
-    reviewerSessions.map(({ sessionName, outputFile, role }) =>
+  const emitReviewerTimedOut = async (outcome: ReviewerOutcome, attempt: number, willRetry: boolean) => {
+    if (outcome.status !== 'failed' || outcome.failureReason !== 'timeout' || !outcome.sessionName) return;
+    try {
+      const { notifyPipeline } = await import('../pipeline-notifier.js');
+      notifyPipeline({
+        type: 'reviewer_timed_out',
+        issueId: context.issueId,
+        role: outcome.role,
+        sessionName: outcome.sessionName,
+        attempt,
+        maxRetries: MAX_REVIEWER_TIMEOUT_RETRIES,
+        willRetry,
+      });
+    } catch {
+      // Non-fatal: event emission is best-effort
+    }
+  };
+  const waitForReviewerSessions = async (
+    sessions: Array<{ sessionName: string; outputFile: string; role: string }>,
+  ): Promise<ReviewerOutcome[]> => Promise.all(
+    sessions.map(({ sessionName, outputFile, role }) =>
       waitFn(sessionName, outputFile, REVIEW_TIMEOUT_MS)
-        .then(async status => {
-          if (status === 'completed') await emitReviewerCompleted(role);
-          return { role, status, outputFile, sessionName };
+        .then(async (waitResult): Promise<ReviewerOutcome> => {
+          if (waitResult.status === 'completed') {
+            await emitReviewerCompleted(role);
+            return { role, status: 'completed', outputFile, sessionName };
+          }
+          return {
+            role,
+            status: 'failed',
+            outputFile,
+            sessionName,
+            failureReason: waitResult.reason,
+            apiError: waitResult.apiError,
+          };
         }),
     ),
   );
 
-  // ── Phase 2b: One auto-respawn for reviewers that failed with a dead pane.
-  // Transient failures (e.g. 503 auth_unavailable that kills the pane) recover
-  // on respawn ~90% of the time. We retry once to avoid burning a full review
-  // cycle for a blip. We ONLY retry when the pane is dead — if the session is
-  // gone entirely or the pane is still alive, the failure is either legitimate
-  // (timeout, missing output) or the reviewer is still working.
-  const failedReviewerResults = reviewerResults.filter(r => r.status === 'failed');
-  if (failedReviewerResults.length > 0) {
-    const retryable: typeof failedReviewerResults = [];
-    for (const failed of failedReviewerResults) {
-      const paneDead = await isPaneDeadAsync(failed.sessionName);
-      if (!paneDead) continue;
+  let reviewerResults: ReviewerOutcome[] = await waitForReviewerSessions(reviewerSessions);
 
+  // ── Phase 2b: Auto-respawn reviewers that fail from retryable transient states.
+  // Timeouts were previously terminal and stranded issues with review=pending until
+  // a human manually restarted the review. Retry the specific timed-out/dead-pane
+  // reviewer only, with a capped two-retry backoff, while still skipping terminal
+  // provider errors because the same auth/quota/login problem would recur.
+  for (let attempt = 1; attempt <= MAX_REVIEWER_TIMEOUT_RETRIES; attempt++) {
+    const failedReviewerResults = reviewerResults.filter(r => r.status === 'failed');
+    const retryable = failedReviewerResults.filter(r => isRetryableReviewerFailure(r.failureReason));
+    for (const failed of failedReviewerResults) {
+      await emitReviewerTimedOut(failed, attempt, retryable.includes(failed));
+      if (failed.failureReason === 'terminal_api_error') {
+        console.log(`[review-agent] Skipping respawn for ${failed.sessionName} — terminal API error: ${failed.apiError?.summary ?? 'unknown'}`);
+      }
+    }
+    if (retryable.length === 0) break;
+
+    await delay(reviewerRetryBackoffMs(attempt));
+
+    const retrySessions: Array<{ sessionName: string; outputFile: string; role: string }> = [];
+    for (const failed of retryable) {
       const agent = agents.find(a => a.name === failed.role);
-      if (!agent) continue;
+      if (!agent || !failed.sessionName) continue;
       const promptName = `code-review-${agent.name}`;
       const promptTemplatePath = resolvePromptTemplateFn(promptName, context.projectPath);
       const template = await parseReviewerTemplate(promptTemplatePath);
       const model = resolveReviewerModel(agent, template.model);
       const promptFile = join(outputDir, `${agent.name}-prompt.md`);
 
-      console.log(`[review-agent] Auto-respawning dead reviewer ${failed.sessionName} for retry`);
-      emitActivityEntry({ source: 'review-specialist', level: 'warn', message: `${context.issueId} — auto-respawning dead reviewer ${failed.role}`, issueId: context.issueId });
+      console.log(`[review-agent] Auto-respawning reviewer ${failed.sessionName} after ${failed.failureReason} (attempt ${attempt}/${MAX_REVIEWER_TIMEOUT_RETRIES})`);
+      emitActivityEntry({
+        source: 'review-specialist',
+        level: 'warn',
+        message: `${context.issueId} — auto-respawning ${failed.role} reviewer after ${failed.failureReason} (attempt ${attempt}/${MAX_REVIEWER_TIMEOUT_RETRIES})`,
+        issueId: context.issueId,
+      });
 
-      // Kill stale session (if any) and respawn fresh
       try { await killSessionAsync(failed.sessionName); } catch { /* ignore */ }
       try { await spawnFn(failed.sessionName, model, promptFile, context.projectPath); } catch (err) {
         console.error(`[review-agent] Respawn of ${failed.sessionName} failed:`, err);
         continue;
       }
       try { await setOptionAsync(failed.sessionName, 'remain-on-exit', 'on'); } catch { /* ignore */ }
-      // PAN-915 — respawned reviewer is running again
       try {
         const { notifyPipeline } = await import('../pipeline-notifier.js');
         notifyPipeline({
@@ -1035,43 +1310,51 @@ export async function runParallelReview(
           sessionName: failed.sessionName,
         });
       } catch { /* non-fatal */ }
-      retryable.push(failed);
+      retrySessions.push({ sessionName: failed.sessionName, outputFile: failed.outputFile, role: failed.role });
     }
 
-    if (retryable.length > 0) {
-      const retryResults = await Promise.all(
-        retryable.map(({ sessionName, outputFile, role }) =>
-          waitFn(sessionName, outputFile, REVIEW_TIMEOUT_MS)
-            .then(async status => {
-              if (status === 'completed') await emitReviewerCompleted(role);
-              return { role, status, outputFile, sessionName };
-            }),
-        ),
-      );
-      // Merge retry results back into the main result set
-      const retryMap = new Map(retryResults.map(r => [r.role, r]));
-      reviewerResults = reviewerResults.map(r => (r.status === 'failed' && retryMap.has(r.role) ? retryMap.get(r.role)! : r));
-    }
+    if (retrySessions.length === 0) break;
+    const retryResults = await waitForReviewerSessions(retrySessions);
+    const retryMap = new Map(retryResults.map(r => [r.role, r]));
+    reviewerResults = reviewerResults.map(r => (r.status === 'failed' && retryMap.has(r.role) ? retryMap.get(r.role)! : r));
+  }
+  for (const failed of reviewerResults.filter(r => r.status === 'failed' && r.failureReason === 'timeout')) {
+    await emitReviewerTimedOut(failed, MAX_REVIEWER_TIMEOUT_RETRIES + 1, false);
   }
 
   // ── Phase 3: Synthesis ────────────────────────────────────────────────────
   const completedReviewers = selectCompletedReviewers(reviewerResults);
   if (!completedReviewers) {
-    const failed = reviewerResults.filter(r => r.status === 'failed').map(r => r.role);
-    console.warn(`[review-agent] Aborting synthesis — reviewer(s) failed or timed out: ${failed.join(', ')}`);
-    emitActivityEntry({ source: 'review-specialist', level: 'error', message: `${context.issueId} — review aborted: ${failed.join(', ')} failed`, issueId: context.issueId });
-    emitActivityTts({ utterance: `${context.issueId} review aborted, ${failed.join(', ')} failed`, priority: 0, issueId: context.issueId });
+    const failedOutcomes = reviewerResults.filter(r => r.status === 'failed');
+    const failedRoles = failedOutcomes.map(r => r.role);
+    const apiErrors = failedOutcomes.filter(r => r.failureReason === 'terminal_api_error' && r.apiError);
+    // Build a notes message that distinguishes provider-side terminal errors
+    // (quota, login, auth) from generic timeouts so the dashboard surfaces
+    // something the operator can act on. Without this every failure looked
+    // identical to a transient timeout, and "Resubmit to retry" was misleading
+    // when the real fix is "top up the provider quota / re-login".
+    let notes: string;
+    if (apiErrors.length > 0) {
+      const summaries = Array.from(new Set(apiErrors.map(r => `${r.role}: ${r.apiError!.summary}`)));
+      const otherFailed = failedRoles.filter(r => !apiErrors.some(e => e.role === r));
+      const tail = otherFailed.length > 0 ? ` Additional reviewer failures (timeout/dead): ${otherFailed.join(', ')}.` : '';
+      notes = `Review blocked by upstream provider error — ${summaries.join('; ')}.${tail} Fix the provider issue and resubmit; auto-respawn was skipped because the same error would recur.`;
+    } else {
+      notes = `Review aborted: reviewer(s) failed or timed out (${failedRoles.join(', ')}). Resubmit to retry.`;
+    }
+    console.warn(`[review-agent] Aborting synthesis — reviewer(s) failed: ${failedRoles.join(', ')}${apiErrors.length > 0 ? ` (terminal API errors: ${apiErrors.length})` : ''}`);
+    emitActivityEntry({ source: 'review-specialist', level: 'error', message: `${context.issueId} — review aborted: ${failedRoles.join(', ')} failed${apiErrors.length > 0 ? ` (${apiErrors[0]!.apiError!.summary})` : ''}`, issueId: context.issueId });
+    emitActivityTts({ utterance: apiErrors.length > 0 ? `${context.issueId} review blocked, ${apiErrors[0]!.apiError!.summary}` : `${context.issueId} review aborted, ${failedRoles.join(', ')} failed`, priority: 0, issueId: context.issueId });
     const abortResult: ReviewResult = {
       success: false,
       reviewResult: 'COMMENTED',
-      notes: `Review aborted: reviewer(s) failed or timed out (${failed.join(', ')}). Resubmit to retry.`,
+      notes,
       output: `Review ${reviewId}`,
     };
-    try {
-      await sendFeedbackToWorkAgent(context, abortResult);
-    } catch (err) {
-      console.error(`[review-agent] Failed to send abort feedback to work agent for ${context.issueId} (non-fatal):`, err);
-    }
+    // PAN-918: Do NOT send feedback to the work agent on abort — there are no
+    // actual review findings, only infrastructure failures. Sending "fix ALL
+    // issues" with an empty feedback file causes the work agent to make random
+    // changes. The deacon will re-trigger the review automatically.
     return { result: abortResult, reviewId };
   }
 
@@ -1393,7 +1676,7 @@ export function reviewResultToReviewStatus(
  * status (passed/failed) directly via `setReviewStatus` when the CLI exits.
  */
 export async function dispatchParallelReview(
-  opts: { issueId: string; workspace: string; branch: string; prUrl?: string },
+  opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string },
   {
     coordinatorSpawnFn = spawnReviewCoordinatorSession,
   }: {
@@ -1403,7 +1686,7 @@ export async function dispatchParallelReview(
      * (spawnReviewCoordinatorSession).
      */
     coordinatorSpawnFn?: (
-      opts: { issueId: string; workspace: string },
+      opts: { issueId: string; workspace: string; model?: string },
     ) => Promise<{ sessionName: string }>;
   } = {},
 ): Promise<{ success: boolean; message: string; error?: string }> {
@@ -1414,14 +1697,25 @@ export async function dispatchParallelReview(
   // reviewer agents — doubling or tripling the cost.
   // PAN-912 follow-up: also check pane_dead — remain-on-exit keeps the session
   // alive after the coordinator dies, so sessionExists alone is not enough.
+  // PAN-931 follow-up: also verify the pane PID is still alive in the process
+  // table. A child process can keep tmux from reporting pane_dead=1 even when
+  // the coordinator bash script has exited, so pane_dead alone is not enough.
   try {
     const sessions = await listSessionNamesAsync();
     const existingCoordinator = sessions.find(
       (s) => s.startsWith(`review-coordinator-${opts.issueId}-`),
     );
     if (existingCoordinator) {
-      if (await isPaneDeadAsync(existingCoordinator)) {
-        console.log(`[review-agent] Idempotency guard: coordinator ${existingCoordinator} pane is dead — killing stale session and proceeding with dispatch`);
+      const exitStatus = await coordinatorExitStatus({ workspace: opts.workspace, sessionName: existingCoordinator });
+      const paneDead = await isPaneDeadAsync(existingCoordinator);
+      const actuallyAlive = !paneDead && (await isCoordinatorAliveAsync(existingCoordinator));
+      if (exitStatus !== null) {
+        console.log(`[review-agent] Idempotency guard: coordinator ${existingCoordinator} already exited with status ${exitStatus} — killing inspectable session and proceeding with dispatch`);
+        await killSessionAsync(existingCoordinator).catch(() => {});
+      } else if (paneDead || !actuallyAlive) {
+        const reason = paneDead ? 'pane_dead' : 'process_not_alive';
+        console.log(`[review-agent] Idempotency guard: coordinator ${existingCoordinator} died unexpectedly (${reason}; alive=${actuallyAlive}) — killing stale session and proceeding with dispatch`);
+        await emitCoordinatorDied(opts.issueId, existingCoordinator, reason);
         await killSessionAsync(existingCoordinator).catch(() => {});
       } else {
         console.log(`[review-agent] Idempotency guard: coordinator ${existingCoordinator} already running for ${opts.issueId} — skipping dispatch`);
@@ -1436,8 +1730,8 @@ export async function dispatchParallelReview(
     console.warn(`[review-agent] Idempotency check failed for ${opts.issueId}, proceeding:`, err);
   }
 
-  // Archive feedback from any previous review cycle so the work agent only
-  // sees current-cycle feedback when it reads .planning/feedback/.
+  // Clear feedback from any previous review cycle so the work agent only
+  // sees current-cycle feedback when it reads .pan/feedback/.
   try {
     const { archiveFeedbackFiles } = await import('./feedback-writer.js');
     await archiveFeedbackFiles(opts.workspace);
@@ -1497,6 +1791,7 @@ export async function dispatchParallelReview(
     const { sessionName } = await coordinatorSpawnFn({
       issueId: opts.issueId,
       workspace: opts.workspace,
+      model: opts.model,
     });
     console.log(`[review-agent] Review coordinator spawned for ${opts.issueId}: ${sessionName}`);
     emitActivityEntry({ source: 'review-specialist', level: 'info', message: `Review coordinator spawned for ${opts.issueId}: ${sessionName}`, issueId: opts.issueId });
@@ -1537,21 +1832,30 @@ export async function dispatchParallelReview(
 export async function spawnReviewCoordinatorSession(opts: {
   issueId: string;
   workspace: string;
+  model?: string;
 }): Promise<{ sessionName: string }> {
-  const sessionName = `review-coordinator-${opts.issueId}-${Date.now()}`;
+  const runId = Date.now();
+  const sessionName = `review-coordinator-${opts.issueId}-${runId}`;
   const logDir = join(opts.workspace, '.pan', 'review', 'coordinator');
   await mkdir(logDir, { recursive: true });
-  const logStem = `${opts.issueId}-${Date.now()}`;
+  const logStem = sessionName;
   const logFile = join(logDir, `${logStem}.log`);
   const exitCodeFile = join(logDir, `${logStem}.exit`);
-  const command = `bash -lc 'set -o pipefail; pan review run ${opts.issueId} 2>&1 | tee -a "${logFile}"; status=\${PIPESTATUS[0]}; printf "%s\\n" "$status" > "${exitCodeFile}"; printf "\\n[pan review run exit %s at %s]\\n" "$status" "$(date -Is)" >> "${logFile}"; exit "$status"'`;
-  await createSessionAsync(sessionName, opts.workspace, command, {
-    env: {
-      PANOPTICON_AGENT_ID: '',
-      PANOPTICON_ISSUE_ID: '',
-      PANOPTICON_SESSION_TYPE: '',
-    },
-  });
+  const panBin = join(dirname(process.execPath), 'pan');
+  // bash -lc does NOT inherit tmux's -c working directory — it starts in $HOME.
+  // Prepend cd so the coordinator runs from the correct workspace.
+  const wsEsc = opts.workspace.replace(/'/g, "'\"'\"'");
+  const command = `bash -lc 'cd "${wsEsc}" && set -o pipefail; ${panBin} review run ${opts.issueId} 2>&1 | tee -a "${logFile}"; status=\${PIPESTATUS[0]}; printf "%s\\n" "$status" > "${exitCodeFile}"; printf "\\n[pan review run exit %s at %s]\\n" "$status" "$(date -Is)" >> "${logFile}"; if [ "$status" -lt 2 ]; then exit "$status"; fi; printf "\\n[coordinator preserved after failed review exit %s at %s]\\n" "$status" "$(date -Is)" | tee -a "${logFile}"; printf "Inspect the log above, then re-request review from the dashboard or run: pan review request ${opts.issueId} -m \\\"Retry review\\\"\\n"; exec bash -li'`;
+  const env: Record<string, string> = {
+    ...BLANKED_PROVIDER_ENV,
+    PANOPTICON_AGENT_ID: '',
+    PANOPTICON_ISSUE_ID: '',
+    PANOPTICON_SESSION_TYPE: '',
+  };
+  if (opts.model) {
+    env.PANOPTICON_REVIEW_MODEL_OVERRIDE = opts.model;
+  }
+  await createSessionAsync(sessionName, opts.workspace, command, { env });
   try {
     await setOptionAsync(sessionName, 'remain-on-exit', 'on');
   } catch (err) {

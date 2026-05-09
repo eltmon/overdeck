@@ -1,20 +1,183 @@
-# vBRIEF Plan Format
+# vBRIEF Plan Format & Lifecycle
 
-Panopticon uses [vBRIEF v0.5](https://github.com/deftai/vBRIEF) for machine-readable work plans.
+Panopticon uses [vBRIEF v0.5](https://github.com/deftai/vBRIEF) for machine-readable work plans with a unified `.pan/` directory model (PAN-967).
 
 ## Specification
 
 The canonical vBRIEF specification is maintained at **[github.com/deftai/vBRIEF](https://github.com/deftai/vBRIEF)**.
 
-Panopticon's plan files (`plan.vbrief.json`) conform to this spec with metadata extensions for issue tracking and difficulty estimation.
+Panopticon's vBRIEF files conform to the v0.5 spec with metadata extensions for issue tracking and difficulty estimation. We also maintain a [fork of the spec](https://github.com/eltmon/vBRIEF) and have an open [extension proposal](https://github.com/deftai/vBRIEF/issues/1).
 
-## File Location
+---
 
-Plans live at `.planning/plan.vbrief.json` within each workspace (git worktree). They are workspace-specific and intentionally gitignored — they travel with the workspace, not the main branch.
+## Lifecycle Model
+
+### Directory Structure
+
+All Panopticon orchestration state lives under `.pan/` — a single dot-directory at the project root (same convention as `.git/`, `.github/`, `.beads/`).
+
+#### On main (project root):
+
+```
+.pan/
+  specs/
+    2026-05-01-PAN-950-feature-x.vbrief.json     (status: "completed")
+    2026-05-03-PAN-960-feature-y.vbrief.json     (status: "active")
+    2026-05-05-PAN-969-directive-flow.vbrief.json (status: "proposed")
+  drafts/
+    PAN-970-next-thing.md                         (PRD being refined)
+```
+
+#### On feature branch (workspace):
+
+```
+.pan/
+  spec.vbrief.json          ← this issue's scope vBRIEF (copied from main at branch creation)
+  continue.json             ← session state (resume point, decisions, hazards)
+  sessions.jsonl            ← append-only session history
+  feedback/
+    001-review-changes-requested.md
+    002-test-failures.md
+  context.md                ← FEATURE-CONTEXT for Rally story agents
+```
+
+### PRD → Spec Lifecycle
+
+PRDs and vBRIEFs are distinct artifacts that flow through the same pipeline:
+
+1. **PRD drafted** — human or planning agent writes a markdown PRD to `.pan/drafts/` on main
+2. **Planning completes** — planning agent converts the PRD into a machine-readable vBRIEF spec in `.pan/specs/` with `status: "proposed"`
+3. **Work starts** — `pan start` updates the spec's `status` field to `"active"` and copies it to the workspace as `.pan/spec.vbrief.json`
+4. **Work completes** — after merge, `status` updated to `"completed"` on main
+
+### Status Transitions (field-based)
+
+Status is a JSON field inside the vBRIEF — files never move between directories. All transitions are single atomic commits on main.
+
+```
+draft ──► proposed ──► active ──► completed
+                 │                    │
+                 └──► cancelled ◄─────┘
+```
+
+| Transition | Trigger | What happens |
+|-----------|---------|--------------|
+| (new) → draft | `pan plan` starts | PRD written to `.pan/drafts/` on main |
+| draft → proposed | Planning completes | vBRIEF created in `.pan/specs/` with `status: "proposed"` |
+| proposed → active | `pan start` | Status field updated to `"active"`, spec copied to workspace `.pan/spec.vbrief.json` |
+| active → completed | PR merges | Status field updated to `"completed"` on main |
+| active → cancelled | Issue closed | Status field updated to `"cancelled"` on main |
+
+### Issue-Keyed Filenames
+
+Format: `YYYY-MM-DD-<ISSUE-ID>-<slug>.vbrief.json`
+
+Example: `2026-04-28-MIN-846-fizzy-master.vbrief.json`
+
+| Component | Source | Immutable? |
+|-----------|--------|------------|
+| Date (`YYYY-MM-DD`) | UTC creation date | Yes — never changes |
+| Issue ID | From `plan.id` (e.g. `PAN-946`, `MIN-846`) | Yes |
+| Slug | `slugify(plan.title)` — lowercase, dashes, max readability | Yes |
+
+The filename regex: `^(\d{4}-\d{2}-\d{2})-([A-Za-z][A-Za-z0-9]*-\d+)-([a-z0-9-]+)\.vbrief\.json$`
+
+If `slugify()` receives an empty or all-special-character title, it returns `'plan'` as the slug.
+
+### Workspace Spec
+
+On the feature branch, the spec is a single file: `.pan/spec.vbrief.json`. This is a copy of the canonical spec from `.pan/specs/` on main, made at branch creation time. The agent reads and updates item statuses in this file during work. It never needs to know the issue-keyed filename — that's a main-branch concern.
+
+### Concurrency Model
+
+| Resource | Writer | Readers | Contention |
+|----------|--------|---------|------------|
+| `.pan/specs/<file>` on main | Pipeline only | Dashboard, agents (via prompt injection) | None — single writer |
+| `.pan/spec.vbrief.json` on branch | Work agent (one per issue) | Pipeline, dashboard | None — one agent per workspace |
+| `.pan/continue.json` on branch | Pipeline only | Agent (injected into prompt at session start) | None — single writer |
+| `.pan/sessions.jsonl` on branch | Pipeline appends | Dashboard, post-mortems | Minimal — append-only |
+| `.pan/feedback/*.md` on branch | Pipeline only | Agent (injected into prompt) | None — single writer |
+| Beads (`.beads/`) | Each agent via `bd update` | Pipeline, dashboard | Serialized by Dolt mutex |
+
+For N parallel agents on N different issues: each has its own feature branch with its own `.pan/` directory. Zero cross-agent contention. Beads writes serialize through the Dolt mutex but target different bead IDs.
+
+---
+
+## Continue State — Structured Session History
+
+The continue file is the machine-readable operational state for in-progress work. It lives on the feature branch at `.pan/continue.json`.
+
+### Schema
+
+```json
+{
+  "version": "1",
+  "issueId": "PAN-714",
+  "created": "2026-04-28T12:00:00Z",
+  "updated": "2026-04-29T18:30:00Z",
+  "gitState": {
+    "branch": "feature/pan-714",
+    "sha": "a1b2c3d",
+    "dirty": false
+  },
+  "decisions": [
+    {
+      "id": "D1",
+      "summary": "Use Effect.js for route handlers instead of raw Express",
+      "recordedAt": "2026-04-28T14:00:00Z"
+    }
+  ],
+  "hazards": [
+    {
+      "id": "H1",
+      "summary": "Circular ESM imports between health-filtering and cloister/config",
+      "mitigation": "Bundle with tsdown to resolve at build time"
+    }
+  ],
+  "resumePoint": {
+    "description": "Implement the WebSocket reconnection logic in ws-rpc.ts",
+    "beadId": "ws-reconnect",
+    "filesToRead": ["src/dashboard/server/ws-rpc.ts"]
+  },
+  "beadsMapping": {
+    "ws-reconnect": ["bead-42"],
+    "ws-reconnect.ac1": ["bead-42"]
+  },
+  "agentModel": "claude-opus-4-6",
+  "sessionHistory": [
+    { "timestamp": "2026-04-28T12:00:00Z", "reason": "planning", "agentModel": "claude-opus-4-7" },
+    { "timestamp": "2026-04-28T14:00:00Z", "reason": "start", "agentModel": "claude-opus-4-6" },
+    { "timestamp": "2026-04-28T18:00:00Z", "reason": "end" },
+    { "timestamp": "2026-04-29T10:00:00Z", "reason": "resume", "agentModel": "claude-opus-4-6" }
+  ]
+}
+```
+
+### Session Reasons
+
+| Reason | When |
+|--------|------|
+| `planning` | Initial write during planning phase |
+| `start` | Agent session begins |
+| `end` | Agent signals done (`pan work done`) |
+| `resume` | Agent resumes after restart |
+| `crash-recovery` | Deacon recovers a stuck agent |
+| `feedback` | Specialist sends feedback |
+| `manual` | User manually updates |
+
+### Functions
+
+| Function | Module | Description |
+|----------|--------|-------------|
+| `writeContinueState()` | `continue-state.ts` | Atomic write via temp-file + rename |
+| `readContinueState()` | `continue-state.ts` | Read + validate, returns null if missing |
+| `appendSessionEntry()` | `continue-state.ts` | Append to sessionHistory, creates fresh state if missing |
+
+---
 
 ## Required Format
 
-Every `plan.vbrief.json` MUST have exactly two top-level keys per the vBRIEF spec:
+Every vBRIEF has exactly two top-level keys per the vBRIEF spec:
 
 ```json
 {
@@ -73,6 +236,8 @@ Every `plan.vbrief.json` MUST have exactly two top-level keys per the vBRIEF spe
 }
 ```
 
+---
+
 ## Field Reference
 
 ### Top-Level (vBRIEF standard)
@@ -105,6 +270,21 @@ Every `plan.vbrief.json` MUST have exactly two top-level keys per the vBRIEF spe
 | `plan.tags` | NO | Tags for categorization |
 | `plan.narratives` | NO | Problem/Proposal/Constraint/Risk narratives |
 
+#### `plan.status` Enum
+
+The `plan.status` field drives lifecycle transitions:
+
+| Status | Location | Meaning |
+|--------|----------|---------|
+| `draft` | `.pan/drafts/` (PRD stage) | Planning in progress |
+| `proposed` | `.pan/specs/` | Planning done, awaiting approval |
+| `approved` | `.pan/specs/` + workspace `.pan/spec.vbrief.json` | User approved, ready to start |
+| `pending` | `.pan/specs/` | Queued, waiting for resources |
+| `running` | `.pan/specs/` | Agent is executing |
+| `completed` | `.pan/specs/` | Work done, merged |
+| `blocked` | `.pan/specs/` | Waiting on external dependency |
+| `cancelled` | `.pan/specs/` | Abandoned |
+
 #### References
 
 `plan.references` is an array of `VBriefReference` objects:
@@ -114,14 +294,6 @@ Every `plan.vbrief.json` MUST have exactly two top-level keys per the vBRIEF spe
 | `uri` | YES | URL or path to the referenced resource |
 | `label` | NO | Human-readable label (e.g., `"PAN-436"`) |
 | `type` | NO | Resource type: `"issue"`, `"prd"`, `"spec"`, `"doc"` |
-
-Example:
-```json
-"references": [
-  { "uri": "https://github.com/org/repo/issues/436", "label": "PAN-436", "type": "issue" },
-  { "uri": "docs/prds/active/PAN-436-plan.md", "label": "PAN-436-plan.md", "type": "prd" }
-]
-```
 
 ### Items (vBRIEF standard)
 
@@ -136,12 +308,21 @@ Example:
 | `narrative` | NO | `{ "Action": "what to do" }` |
 | `subItems` | NO | Child items (used for acceptance criteria) |
 
-#### SubItem timestamps
+### Edges (dependency graph)
 
-| Field | Description |
-|-------|-------------|
-| `subItem.created` | ISO 8601 timestamp — when the subItem was created |
-| `subItem.completed` | ISO 8601 timestamp — set automatically when status → `completed` |
+| Field | Required | Description |
+|-------|----------|-------------|
+| `from` | YES | Source item ID |
+| `to` | YES | Target item ID |
+| `type` | YES | Edge type: `blocks`, `informs`, `invalidates`, `suggests` |
+
+Edge semantics:
+- `blocks` — `to` cannot start until `from` completes (hard dependency)
+- `informs` — `to` should consider decisions from `from` (soft dependency)
+- `invalidates` — `from` invalidates assumptions made by `to`
+- `suggests` — `from` gives guidance to `to`
+
+Only `blocks` edges are used for critical path computation and bead scheduling (`bd ready`).
 
 ### Panopticon Extensions (via `metadata`)
 
@@ -152,14 +333,71 @@ The vBRIEF spec supports arbitrary `metadata` on items and subItems. Panopticon 
 | `metadata.difficulty` | items | `trivial`, `simple`, `medium`, `complex`, `expert` — used for model routing |
 | `metadata.issueLabel` | items | Issue ID for beads label filtering (e.g., `"pan-436"`) |
 | `metadata.kind` | subItems | `"acceptance_criterion"` — marks subItem as an AC for verification gate |
+| `metadata.canonicalFilename` | plan | Preserves the immutable filename across re-finalizations |
 
-These extensions are NOT part of the vBRIEF core spec. We've opened a feature request to standardize them as first-class fields:
+These extensions are NOT part of the vBRIEF core spec. We've opened a feature request to standardize them: **[deftai/vBRIEF#1](https://github.com/deftai/vBRIEF/issues/1)**.
 
-**[deftai/vBRIEF#1: Proposal: add difficulty, issueRef, and kind fields to PlanItem](https://github.com/deftai/vBRIEF/issues/1)**
+---
 
-If you use Panopticon and want these fields standardized in the vBRIEF spec, please comment on that issue. Until they're accepted, we use `metadata` as the workaround per vBRIEF Section 2.1's unknown-field preservation rule.
+## `pan scope` Commands
 
-We also maintain a [fork of the vBRIEF spec](https://github.com/eltmon/vBRIEF) in case we need to extend the schema before upstream adoption.
+Manual lifecycle transition overrides for vBRIEFs. All commands resolve the project from the issue ID and update the status field in `.pan/specs/` on main.
+
+| Command | Effect |
+|---------|--------|
+| `pan scope list` | Scan `.pan/specs/` across all projects, print issue ID / title / status |
+| `pan scope show <issueId>` | Display title, status, sequence, file path, item count |
+| `pan scope propose <issueId>` | Set `plan.status` to `proposed` |
+| `pan scope approve <issueId>` | Set `plan.status` to `approved` |
+| `pan scope complete <issueId>` | Set `plan.status` to `completed` |
+| `pan scope cancel <issueId>` | Set `plan.status` to `cancelled` |
+| `pan scope restore <issueId>` | Set `plan.status` to `approved` (from completed or cancelled) |
+
+### Planned (PAN-958)
+
+- `pan scope ingest` — Import an existing vBRIEF or PRD into the lifecycle as a `proposed` scope
+- `pan scope reconcile` — Detect and fix state disagreements between vBRIEFs, tracker, and workspaces
+
+---
+
+## `pan sync` vBRIEF Disagreement Detection
+
+`pan sync` detects state disagreements between the vBRIEF lifecycle, issue tracker, and workspace state:
+
+| Check | Meaning | Suggested Fix |
+|-------|---------|---------------|
+| Active vBRIEF but GitHub issue is closed | Work artifact out of sync with tracker | `pan scope complete <ID>` or `pan scope cancel <ID>` |
+| Completed vBRIEF but workspace still exists | Stale workspace after merge | Clean up workspace |
+| Workspace exists but no active vBRIEF | Missing lifecycle entry | `pan scope approve <ID>` |
+
+---
+
+## How Panopticon Uses vBRIEF
+
+1. **PRD authored** — human or planning agent writes a PRD to `.pan/drafts/` on main.
+2. **Planning agent** converts the PRD into a vBRIEF spec during the discovery session. Creates `plan.vbrief.json` in the workspace `.pan/` directory.
+3. **`complete-planning`** promotes the vBRIEF to `.pan/specs/` on main with an issue-keyed filename and sets `plan.status` to `proposed`.
+4. **`pan start`** updates `plan.status` to `active` on main and copies the spec to the workspace as `.pan/spec.vbrief.json`.
+5. **Work agent** works through beads in DAG dependency order (`bd ready -l <issue>`). Updates item/subItem statuses in `.pan/spec.vbrief.json` as beads are completed. Each write increments `plan.sequence` and updates timestamps.
+6. **Verification gate** checks all subItems with `metadata.kind: "acceptance_criterion"` are `completed` before allowing review.
+7. **`postMergeLifecycle`** updates `plan.status` to `completed` in `.pan/specs/` on main.
+8. **Dashboard** renders the plan via the Directive Flow (DAG visualization) and vBRIEF viewer (List/DAG/Raw JSON tabs).
+
+### Plan Resolution
+
+`findSpec()` resolves vBRIEFs with this priority:
+
+1. Check `.pan/specs/` on project root (filter by issue ID from filename)
+2. Fall back to workspace `.pan/spec.vbrief.json` (for in-progress work)
+
+### Backward Compatibility
+
+During migration from the old `vbrief/` directory structure:
+- All read operations check `.pan/specs/` first, fall back to `vbrief/` then `.planning/`
+- All write operations target `.pan/` only
+- Existing workspaces on feature branches continue to work
+
+---
 
 ## Common Mistakes
 
@@ -189,21 +427,30 @@ We also maintain a [fork of the vBRIEF spec](https://github.com/eltmon/vBRIEF) i
 }
 ```
 
-## How Panopticon Uses vBRIEF
-
-1. **Planning agent** creates `plan.vbrief.json` during the discovery session. The planning prompt injects `vBRIEFInfo.author` (tool identifier), `plan.uid` (UUID v4), `plan.author` (agent model), `plan.sequence: 1`, and `plan.references` (issue URL + discovered PRDs).
-2. **`complete-planning`** reads the plan and creates beads tasks from items. Copies `STATE.md` and `plan.vbrief.json` to `docs/prds/active/` (skip if exists).
-3. **Work agent** works through beads, updating item/subItem statuses to `completed`. Each write increments `plan.sequence` and updates `vBRIEFInfo.updated` and `plan.updated`.
-4. **Verification gate** checks all subItems with `metadata.kind: "acceptance_criterion"` are `completed` before allowing review.
-5. **Dashboard vBRIEF viewer** (`VBriefViewer`) renders the plan with List/DAG/Raw JSON tabs — accessible via the vBRIEF button on kanban cards and in InspectorPanel.
-6. **Dashboard DAG viewer** renders the plan as a dependency graph (PlanDAG component).
-7. **Dashboard Tasks panel** shows beads with status from the plan.
+---
 
 ## Resilience
 
-The `readPlan()` function in `src/lib/vbrief/io.ts` normalizes flat format plans to the canonical nested format for backwards compatibility. However, planning agents SHOULD always produce the canonical format. The normalizer handles:
+The `readPlan()` function in `src/lib/vbrief/io.ts` normalizes flat format plans to the canonical nested format for backwards compatibility. The normalizer handles:
 
 - `issue`, `issueId`, `issue_id`, `id` → `plan.id`
 - `description` → `narrative.Action`
 - `difficulty` → `metadata.difficulty`
 - `acceptance[]` (string array) → `subItems[]` with `metadata.kind: "acceptance_criterion"`
+
+---
+
+## Divergence from deft
+
+Panopticon adapts deft's lifecycle model for multi-agent, multi-issue orchestration:
+
+| deft Constraint | Panopticon Divergence |
+|-----------------|----------------------|
+| One `plan.vbrief.json` per project | N concurrent vBRIEFs per project (one per issue) |
+| Serialized changes | N agents on N issues in parallel, each in its own workspace |
+| `history/changes/` folder structure | Issue-keyed filenames in `.pan/specs/` |
+| Status = directory location | Status = JSON field (files never move) |
+| `specification.vbrief.json` required | Optional (exists in repo but not enforced) |
+| `playbook-{name}.vbrief.json` | Panopticon uses skills for this |
+
+The vBRIEF format itself works without modification — it's the single-plan-per-project constraint that Panopticon relaxes.

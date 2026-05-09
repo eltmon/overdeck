@@ -43,7 +43,9 @@ export async function resetReviewCommand(id: string, options: ResetReviewOptions
     }
 
     if (options.session) {
-      await resetSessionCommand(id);
+      console.error(chalk.red('\nError: Claude sessions must never be reset. Sessions are sacred — use "pan resume" to continue the existing session.'));
+      process.exit(1);
+      // Hidden override (future use): await resetSessionCommand(id);
     }
 
   } catch (error: any) {

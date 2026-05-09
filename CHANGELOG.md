@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- OpenAI model routing now requires Codex/ChatGPT subscription auth through CLIProxy; direct OpenAI API-key fallback is deprecated because api.openai.com is not Anthropic-compatible.
+- Kimi models now launch through Claude Code directly, selecting the Kimi coding or Moonshot Anthropic endpoint from the configured key prefix.
+- Z.AI / GLM models now launch through Claude Code directly against Z.AI's Anthropic-compatible endpoint.
+- MiniMax models now launch through Claude Code directly against MiniMax's Anthropic-compatible endpoint.
+- Mimo models now launch through Claude Code directly against Xiaomi MiMo's Anthropic-compatible endpoint.
+- OpenRouter models now launch through Claude Code directly against OpenRouter's Anthropic-compatible endpoint while preserving slash-containing model IDs.
+- `pan install`, `pan sync`, and lazy prerequisite checks no longer install or require `claudish`.
+- Provider compatibility is now direct-only; claudish provider helpers and inspector badges have been removed.
+
 ## [0.7.0] — Command Taxonomy Reorganization
 
 ### Breaking Changes

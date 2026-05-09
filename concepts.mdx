@@ -5,33 +5,45 @@ description: Understanding the key concepts behind Panopticon's architecture
 
 # Core Concepts
 
-Learn the fundamental concepts that power Panopticon's multi-agent orchestration.
+Learn the fundamental concepts that power Panopticon.
 
-## Mission Control
+## Command Deck
 
-The default dashboard view. Project tree on the left, activity timeline on the right. Click a feature to see its full pipeline: planning, work, review, test results, and merge status. The badge bar gives quick access to PRDs, state files, beads, discussions, and transcripts.
+The live development surface where you and your agents work together. Command Deck is organized into three zones that update in real time:
 
-## Cloister
+- **Issue Header** — always visible. Shows issue identity, pipeline stage, live cost tracking, activity sparkline, and quality gate rollup.
+- **Agent Context** — changes when you select an agent session. Displays the agent's role, status, current tool, thinking/waiting state, round history, and per-session costs.
+- **Conversation + Composer** — the primary working area. Shows the full conversation timeline with composer when an agent is selected, or a tabbed dashboard when viewing the issue itself.
 
-The lifecycle manager. Cloister routes tasks to models based on capabilities, detects stuck agents, triggers specialist handoffs, and tracks costs. It runs a patrol loop that checks agent health and manages the specialist queue. Supports multi-provider routing across Anthropic, OpenAI, Google, Kimi, and Zhipu.
+Everything is alive — no refresh buttons. Domain events trigger small, informative UI motion: cost increments animate, tool names fade in and out, status dots pulse, round dividers slide in.
 
-## PRD-Driven Workflow
+### What You Can Do From Command Deck
 
-Opus writes a PRD before implementation starts. Agents are blocked from starting without a PRD — this ensures strategic decisions are made by Opus, not cheaper models. PRDs are auto-committed to the workspace after planning.
+- **Review diffs as they land** — every file change appears inline as the agent works. Open the diff panel for a turn-by-turn view, or hit "vs main" to see the full picture.
+- **Talk to agents** — type in the composer to steer an agent mid-task. Point it at the right file, correct its approach, or tell it to rethink.
+- **Hot-swap models** — open the model picker and switch from Sonnet to Opus (or Kimi, GPT, Gemini) without losing the conversation.
+- **Branch to explore** — fork any conversation to try a different approach. Keep the original intact, compare both.
+- **Roll back with checkpoints** — Command Deck snapshots agent state as work progresses. Go sideways? Roll back instead of starting over.
+- **See the plan** — vBRIEF work plans render as interactive DAGs with dependencies, acceptance criteria, and live status tracking.
 
 ## Agents
 
-Agents are autonomous AI coding assistants that work independently on tasks. Panopticon spawns agents in tmux sessions, allowing you to:
-
-- **Monitor them in real-time** via the dashboard activity timeline
-- **Send messages** to provide feedback or guidance as they work
-- **Manage multiple agents** simultaneously on different issues
-- **Track costs** per issue, per stage, with model-level breakdowns
+Agents are AI coding assistants that work on the tasks you assign. You direct them from Command Deck — watch them code in real time, send messages to steer their approach, swap their model when the task shifts, fork the conversation to try something different, and review their diffs inline as they go.
 
 Agent types:
 - **Implementation agents** — Work on features, bugs, refactoring in isolated worktrees
 - **Planning agents** — Explore codebases and create PRDs with Opus
 - **Specialist agents** — Dedicated review, test, inspect, UAT, and merge agents triggered by Cloister
+
+You can manage agents via Command Deck, the CLI, or the REST API.
+
+## Cloister
+
+The lifecycle manager. Cloister routes tasks to models based on capabilities, detects stuck agents, triggers specialist handoffs, and tracks costs. It runs a patrol loop that checks agent health and manages the specialist queue. Supports multi-provider routing across Anthropic, OpenAI, Google, Kimi, MiniMax, and OpenRouter.
+
+## PRD-Driven Workflow
+
+Opus writes a PRD before implementation starts. Agents are blocked from starting without a PRD — this ensures strategic decisions are made by the strongest model, not cheaper ones. PRDs are auto-committed to the workspace after planning.
 
 ## Workspaces
 
@@ -49,7 +61,7 @@ Workspaces support both local execution and remote execution via Fly.io for clou
 
 ### Main Project Branch Convention
 
-The main project directory should **always** stay on the `main` branch. All feature work happens in workspaces (git worktrees), never in the main project. This ensures specialists (review-agent, test-agent) always find the correct code, and merge operations have a clean target.
+The main project directory should **always** stay on the `main` branch. All feature work happens in workspaces (git worktrees), never in the main project. This ensures specialists always find the correct code, and merge operations have a clean target.
 
 ### Docker Integration
 
@@ -57,15 +69,26 @@ Workspaces can include Docker containers for full development environments. Supp
 
 ## Specialists
 
-Dedicated agents for code review, testing, inspection, UAT, and merging. Triggered automatically by Cloister when an agent signals completion. The pipeline is fully automated:
+When you want to go hands-off, the specialist pipeline takes over. Five dedicated agents handle the quality lifecycle automatically:
 
-1. **Review Agent** — Performs comprehensive code review (correctness, security, performance)
+1. **Review Agent** — Comprehensive code review (correctness, security, performance)
 2. **Test Agent** — Runs tests and validates functionality
 3. **Inspect Agent** — Per-step verification after each bead, ensuring implementation matches the spec
 4. **UAT Agent** — Browser-based requirement verification using Playwright after tests pass
 5. **Merge Agent** — Handles PR/MR creation and merging
 
 The only manual step is clicking **MERGE** when you're satisfied with the results.
+
+## Multi-Model Routing
+
+Panopticon routes tasks to the right model automatically based on task type, capability, and budget:
+
+- **Planning** — Opus-class models for strategic decisions
+- **Implementation** — Cost-effective models (Kimi, Sonnet, GPT) for writing code
+- **Review** — Strong models for code review judgment
+- **Helpers** — Fast models (Haiku) for quick commands
+
+Override any routing decision from Command Deck's model picker or the Settings page.
 
 ## Skills
 
@@ -96,7 +119,7 @@ Panopticon integrates with 4 issue trackers:
 - **GitLab Issues** — Issue tracking and MR management
 - **Rally (CA Agile Central)** — Enterprise issue tracking
 
-The dashboard displays issues from all configured trackers in a unified Kanban board with cost badges, agent status indicators, and workspace controls.
+The dashboard displays issues from all configured trackers in a unified kanban board with cost badges, agent status indicators, and workspace controls.
 
 ## Cost Tracking
 

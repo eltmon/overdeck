@@ -1,0 +1,10 @@
+{
+  "built_at": "2026-05-09T05:50:29.537229Z",
+  "commit": "9fa858de6",
+  "root": "/home/eltmon/Projects/panopticon-cli",
+  "nodes": 8830,
+  "edges": 20525,
+  "communities": 404,
+  "semantic_chunks": 30,
+  "model": "claude-sonnet-4-6 (subscription)"
+}

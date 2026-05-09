@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   getZoneAActions,
@@ -24,7 +24,7 @@ const ALL_ACTION_KEYS: readonly ActionKey[] = [
   'merge', 'reviewTest', 'recover', 'stopAgent',
   'startAgent', 'resumeSession', 'resetSession',
   'createWorkspace', 'copySettings',
-  'beads', 'vbrief', 'state', 'prd', 'inference',
+  'beads', 'inference',
   'discussions', 'transcripts', 'upload', 'syncDiscussions', 'syncMain', 'statusReview',
   'reopen', 'restartFromPlan', 'resetIssue', 'cancel',
   'stopSession', 'viewTerminal',
@@ -58,7 +58,13 @@ const failedAgentNoWorkspace = {
 };
 
 const surfaceFiles = Object.fromEntries(
-  COMMAND_DECK_PARITY_SURFACES.map(({ surface, file }) => [surface, resolve(process.cwd(), file)])
+  COMMAND_DECK_PARITY_SURFACES.map(({ surface, file }) => {
+    const fromCwd = resolve(process.cwd(), file);
+    // When tests run from the frontend workspace, cwd is src/dashboard/frontend
+    // and the file paths already include src/dashboard/frontend/ — try repo root too
+    const fromRepoRoot = resolve(process.cwd(), '../../..', file);
+    return [surface, existsSync(fromCwd) ? fromCwd : fromRepoRoot];
+  })
 ) as Record<(typeof COMMAND_DECK_PARITY_SURFACES)[number]['surface'], string>;
 
 function getSourceActions(): ActionKey[] {
@@ -238,20 +244,17 @@ describe('getZoneAActions', () => {
     expect(layout.secondary).toContain('createWorkspace');
   });
 
-  it('hasPlan + beadsCount surfaces beads + vbrief', () => {
+  it('hasPlan + beadsCount surfaces beads', () => {
     const layout = getZoneAActions({
       ...baseZoneA,
       hasPlan: true,
       beadsCount: 5,
     });
     expect(layout.secondary).toContain('beads');
-    expect(layout.secondary).toContain('vbrief');
   });
 
-  it('always surfaces planning artifact buttons (state, prd, status, sync, upload)', () => {
+  it('always surfaces planning artifact buttons (status, sync, upload)', () => {
     const layout = getZoneAActions(baseZoneA);
-    expect(layout.secondary).toContain('state');
-    expect(layout.secondary).toContain('prd');
     expect(layout.secondary).toContain('statusReview');
     expect(layout.secondary).toContain('syncDiscussions');
     expect(layout.secondary).toContain('upload');

@@ -1,0 +1,1239 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "created": "2026-05-09T02:00:00.000Z",
+    "author": "panopticon-cli/0.0.0",
+    "description": "Plan for PAN-829: TTS: Built-in settings, lifecycle management, and coverage",
+    "updated": "2026-05-09T01:23:19.809Z"
+  },
+  "plan": {
+    "id": "pan-829",
+    "title": "TTS: Built-in settings, lifecycle management, and coverage",
+    "status": "proposed",
+    "uid": "4917865d-21a9-46b0-90e8-064edf16721f",
+    "author": "agent:claude-sonnet-4-6",
+    "sequence": 2,
+    "created": "2026-05-09T02:00:00.000Z",
+    "updated": "2026-05-09T01:23:19.809Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/panopticon-cli/issues/829",
+        "label": "PAN-829",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "tts",
+      "settings",
+      "lifecycle",
+      "voice",
+      "audio",
+      "dashboard",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "TTS is currently an external sidecar (pan-tts) that the user must manually start/stop. There is no dashboard integration, no settings UI, voice selection is missing (per-utterance VoiceDesign generation causes a different voice each time — a bug), and coverage is spotty across pipeline transitions.",
+      "Proposal": "Bring TTS fully into Panopticon. Add a config section (tts.*) and a voice library (~/.panopticon/tts-voices.json) for stable voice management. Build a TtsPlaybackService in the dashboard server that subscribes to activity.tts events and calls the Qwen3-TTS daemon at port 8787 with the resolved voice embedding — eliminating per-utterance VoiceDesign randomness. Expose a /api/tts/* route layer (speak proxy, health, voices CRUD) so the frontend and CLI can trigger speech and manage voices. Build a full Settings UI (tab system mirroring voice-sampler.html: CustomVoice presets, VoiceDesign + Clone-to-Embedding, My Saved Voices, per-event voice mapping). Fill coverage gaps (queued, merging, verifying, testing, skipped, dispatch_failed). Add CLI surface (pan tts voices *, pan tts test). Add play buttons in the TTS Activity tab and a health badge in the status bar."
+    },
+    "items": [
+      {
+        "id": "config-tts-daemon",
+        "title": "Extend config-yaml.ts with tts daemon config section",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-829",
+          "requiresInspection": true
+        },
+        "narrative": {
+          "Action": "Add a comprehensive tts section to YamlConfig in src/lib/config-yaml.ts and the corresponding NormalizedConfig fields. The new YAML shape under `tts:` (not `tts.summarizer` which already exists): enabled (boolean, default false), voice (string, default ''), statusVoice (string, optional — second voice slot for routine events), volume (number 0.0–1.0, default 1.0), rate (number, default 1.0), maxChars (number, default 140), dropInfoWhenFull (boolean, default true), daemonPort (number, default 8787), daemonHost (string, default '127.0.0.1'), voiceMap (Record<string,string> — pipeline event key to voice ID), mutedSources (string[] — ActivitySource values to silence), utteranceTemplates (Record<string,string> — event key to text template with {issueId} substitution), mutedIssues (string[] — issue IDs to silence). Normalize all into a `config.tts` accessor on NormalizedConfig with defaults applied. The existing `tts.summarizer` remains under `ttsSummarizer` — do not merge or rename it."
+        },
+        "subItems": [
+          {
+            "id": "config-tts-daemon.ac1",
+            "title": "YamlConfig.tts accepts all listed fields without TypeScript errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-tts-daemon.ac2",
+            "title": "loadConfig() returns config.tts with defaults when no tts section in YAML",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-tts-daemon.ac3",
+            "title": "loadConfig() merges user-provided tts fields over defaults correctly",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "config-tts-daemon.ac4",
+            "title": "Existing tts.summarizer (ttsSummarizer) is unaffected — no regressions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "voice-library-store",
+        "title": "Voice library CRUD module (tts-voices.ts)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-829",
+          "requiresInspection": true
+        },
+        "narrative": {
+          "Action": "Create src/lib/tts-voices.ts. Define and export: TtsVoiceKind = 'preset' | 'design' | 'clone'; TtsVoice interface with fields id (UUID), name (string), kind (TtsVoiceKind), createdAt (ISO string), presetName? (string — Qwen3 preset id like 'vivian'), description? (string — natural language voice description), instruct? (string — speaking style), embedding? (number[] — extracted speaker embedding for clone voices). Export functions: loadVoices() → TtsVoice[] (reads ~/.panopticon/tts-voices.json, returns [] if missing); saveVoices(voices: TtsVoice[]) → Promise<void>; addVoice(voice: Omit<TtsVoice,'id'|'createdAt'>) → Promise<TtsVoice>; deleteVoice(id: string) → Promise<boolean>; findVoiceById(id: string) → TtsVoice | undefined; findVoiceByName(name: string) → TtsVoice | undefined. Use fs/promises (no sync). Embeddings are number[] arrays (float32 values) stored as JSON — they can be large (thousands of floats) but stay in a separate file from config.yaml to keep YAML human-readable."
+        },
+        "subItems": [
+          {
+            "id": "voice-library-store.ac1",
+            "title": "loadVoices() returns [] when tts-voices.json is missing, never throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voice-library-store.ac2",
+            "title": "addVoice() persists a new voice with generated UUID and returns it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voice-library-store.ac3",
+            "title": "deleteVoice() removes by id and returns true; returns false for unknown id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "voice-library-store.ac4",
+            "title": "findVoiceById and findVoiceByName work correctly after addVoice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-api-tts",
+        "title": "Add tts section to ApiSettingsConfig + loadSettingsApi/saveSettingsApi",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In src/lib/settings-api.ts: add tts?: { enabled?: boolean, voice?: string, statusVoice?: string, volume?: number, rate?: number, maxChars?: number, dropInfoWhenFull?: boolean, voiceMap?: Record<string,string>, mutedSources?: string[], utteranceTemplates?: Record<string,string>, mutedIssues?: string[] } to ApiSettingsConfig. Update loadSettingsApi() to read config.tts and populate this field. Update saveSettingsApi() to write the tts section back to YAML via the existing yaml-write path. Validate that volume is 0–1, rate > 0, maxChars > 0 in validateSettingsApi()."
+        },
+        "subItems": [
+          {
+            "id": "settings-api-tts.ac1",
+            "title": "GET /api/settings returns tts section with current values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-tts.ac2",
+            "title": "PUT /api/settings with tts payload persists and GET returns updated values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "emit-tts-context",
+        "title": "Extend activity.tts events with source and eventType context",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In src/lib/activity-logger.ts: add source?: ActivitySource and eventType?: string to EmitTtsOptions. Update emitActivityTts() to include these in the activity.tts event payload. In packages/contracts/src/events.ts: extend the ActivityTtsEvent Schema.Struct payload to include source: Schema.optional(Schema.String) and eventType: Schema.optional(Schema.String) — optional so existing emitters are backwards-compatible. Update emitActivityTts() call sites in: deacon.ts (setReviewStatus) to pass source:'cloister' and eventType like 'reviewStatus.passed', 'testStatus.failed', 'mergeStatus.merged' etc.; review-agent.ts to pass source:'review-specialist'; merge-agent.ts to pass source:'merge-agent'; agents.ts to pass source:'work-agent'; other call sites similarly. Rebuild packages/contracts after the schema change. Do NOT break existing consumers that read only utterance/priority/issueId."
+        },
+        "subItems": [
+          {
+            "id": "emit-tts-context.ac1",
+            "title": "activity.tts events from deacon.ts include source='cloister' and correct eventType",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-tts-context.ac2",
+            "title": "contracts package builds without errors after schema extension",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-tts-context.ac3",
+            "title": "Existing consumers that only read utterance/priority/issueId are unaffected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tts-coverage-merge-states",
+        "title": "Add TTS for queued / merging / verifying merge states",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In src/lib/review-status.ts (or deacon.ts — wherever setReviewStatus lives), in the mMap merge status block: add tts field to queued ('queued for merge', priority 2), merging ('merge in progress', priority 2), and verifying ('post-merge verification running', priority 2). Use the updated emitActivityTts with source:'merge-agent' and eventType:'mergeStatus.<state>'. These were silent before; now every merge state transition produces speech."
+        },
+        "subItems": [
+          {
+            "id": "tts-coverage-merge-states.ac1",
+            "title": "emitActivityTts called when mergeStatus transitions to 'queued'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tts-coverage-merge-states.ac2",
+            "title": "emitActivityTts called when mergeStatus transitions to 'merging'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tts-coverage-merge-states.ac3",
+            "title": "emitActivityTts called when mergeStatus transitions to 'verifying'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tts-coverage-test-states",
+        "title": "Add TTS for testing / skipped / dispatch_failed test states",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In the same setReviewStatus block, in the tMap test status block: add tts field to testing ('tests running', priority 2), skipped ('tests skipped', priority 2), and dispatch_failed ('test dispatch failed', priority 1). Source:'test-specialist', eventType:'testStatus.<state>'. Also add tts to verificationStatus.skipped ('verification skipped', priority 2). These were all silent before."
+        },
+        "subItems": [
+          {
+            "id": "tts-coverage-test-states.ac1",
+            "title": "emitActivityTts called when testStatus transitions to 'testing'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tts-coverage-test-states.ac2",
+            "title": "emitActivityTts called when testStatus transitions to 'skipped'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tts-coverage-test-states.ac3",
+            "title": "emitActivityTts called when testStatus transitions to 'dispatch_failed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tts-coverage-test-states.ac4",
+            "title": "emitActivityTts called when verificationStatus transitions to 'skipped'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-tts-speak-resolve",
+        "title": "POST /api/tts/speak — voice-resolving proxy to Qwen3-TTS daemon",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-829",
+          "requiresInspection": true
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/tts.ts and a shared resolver src/lib/tts-speak.ts. The resolver function resolveAndSpeak({ text, source?, eventType?, issueId? }): Promise<'spoken'|'muted'|'daemon-unavailable'|'no-voice'> implements: (1) mute check — if source in config.tts.mutedSources, return 'muted'; (2) issue mute check — if issueId in config.tts.mutedIssues, return 'muted'; (3) template override — if utteranceTemplates[eventType] exists, substitute {issueId} and replace text; (4) voice resolution — look up voiceMap[eventType] first, fall back to config.tts.voice (for priority<2 events) or config.tts.statusVoice (for priority=2 routine events), if neither set return 'no-voice'; (5) load voice from tts-voices.json; (6) build speak payload: preset→{voice:presetName,instruct:instruct??'',mode:'custom'}, design→{voice:description,instruct:instruct,mode:'design'}, clone→{voice:'clone',mode:'clone',embedding:embedding}; (7) POST to http://{daemonHost}:{daemonPort}/speak; (8) on ECONNREFUSED/timeout return 'daemon-unavailable'. The HTTP route POST /api/tts/speak calls resolveAndSpeak with body fields; returns 200 with {spoken,result} or 503 if daemon unavailable. Register the route in server.ts."
+        },
+        "subItems": [
+          {
+            "id": "api-tts-speak-resolve.ac1",
+            "title": "POST /api/tts/speak with a preset voice sends correct {voice,instruct,mode:'custom'} to port 8787",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-tts-speak-resolve.ac2",
+            "title": "POST /api/tts/speak with a clone voice sends {mode:'clone',embedding:[...]} to port 8787",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-tts-speak-resolve.ac3",
+            "title": "Muted source returns 200 {result:'muted'} — no call to port 8787",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-tts-speak-resolve.ac4",
+            "title": "utteranceTemplates substitution replaces text before speaking",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-tts-speak-resolve.ac5",
+            "title": "Returns 503 with {error} when port 8787 is unreachable (ECONNREFUSED)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-tts-health-proxy",
+        "title": "GET /api/tts/health — proxy Qwen3-TTS daemon health",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/tts.ts: add GET /api/tts/health. Fetch GET http://127.0.0.1:8787/health with a 2-second timeout. On success: return {ok:true, queue, model} from daemon response. On any error (ECONNREFUSED, timeout): return {ok:false, error:'daemon unreachable'}. Response is always HTTP 200 (never 503) so frontend polling doesn't need special error handling."
+        },
+        "subItems": [
+          {
+            "id": "api-tts-health-proxy.ac1",
+            "title": "Returns {ok:true,queue,model} when daemon is running",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-tts-health-proxy.ac2",
+            "title": "Returns {ok:false,error} (HTTP 200) when daemon is unreachable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-tts-extract-embedding",
+        "title": "POST /api/tts/extract-embedding — proxy to Qwen3-TTS daemon",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In tts.ts: add POST /api/tts/extract-embedding. Accept body {design:string, text:string}, forward to http://127.0.0.1:8787/extract-embedding, return response as-is. Use a 60-second timeout (embedding extraction is slow — generates audio, extracts speaker vector). Return 503 if daemon unreachable. This endpoint is called by the VoiceDesign Clone flow in the frontend."
+        },
+        "subItems": [
+          {
+            "id": "api-tts-extract-embedding.ac1",
+            "title": "Proxies to port 8787 and returns {embedding:[...]} on success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-tts-extract-embedding.ac2",
+            "title": "Uses 60-second timeout (not the default 2s)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-tts-voices-crud",
+        "title": "GET/POST/DELETE /api/tts/voices — voice library CRUD endpoints",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In tts.ts: add three routes. GET /api/tts/voices → calls loadVoices(), returns array (excludes embedding field to keep response compact — embedding is fetched only when speaking). POST /api/tts/voices → body: {name,kind,presetName?,description?,instruct?,embedding?} → calls addVoice(), returns new voice record. DELETE /api/tts/voices/:id → calls deleteVoice(id), returns {deleted:true} or 404. Note: GET intentionally omits the full embedding array from list responses for payload size; the full voice record including embedding is only accessed server-side via findVoiceById."
+        },
+        "subItems": [
+          {
+            "id": "api-tts-voices-crud.ac1",
+            "title": "GET /api/tts/voices returns voice list without embedding field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-tts-voices-crud.ac2",
+            "title": "POST /api/tts/voices creates and persists a new voice record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-tts-voices-crud.ac3",
+            "title": "DELETE /api/tts/voices/:id removes voice and returns 404 for unknown id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tts-playback-service",
+        "title": "TtsPlaybackService — dashboard-internal TTS speaker",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "issueLabel": "pan-829",
+          "requiresInspection": true
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/tts-playback.ts. The service subscribes to the event store and calls resolveAndSpeak() (from src/lib/tts-speak.ts) directly for each activity.tts event — no HTTP round-trip. Export startTtsPlayback() and stopTtsPlayback() following the same pattern as the existing tts-summarizer.ts. startTtsPlayback(): check config.tts.enabled, if false log and return; get event store, subscribe to activity.tts events, call resolveAndSpeak({text:event.payload.utterance, source:event.payload.source, eventType:event.payload.eventType, issueId:event.payload.issueId}). On 'daemon-unavailable' result: log warning, do not crash. On 'muted' or 'no-voice': silent skip. stopTtsPlayback(): unsubscribe from event store. Guard against double-start (idempotent). Note: This service replaces the pan-tts SSE consumer as the primary playback path when the dashboard is running."
+        },
+        "subItems": [
+          {
+            "id": "tts-playback-service.ac1",
+            "title": "Does not start when config.tts.enabled is false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tts-playback-service.ac2",
+            "title": "Calls resolveAndSpeak() for each activity.tts event when enabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tts-playback-service.ac3",
+            "title": "startTtsPlayback() is idempotent — calling twice does not double-subscribe",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tts-playback-service.ac4",
+            "title": "Does not crash on 'daemon-unavailable' — logs and continues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-lifecycle-tts",
+        "title": "Wire TtsPlaybackService into dashboard server startup/shutdown",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/main.ts: import startTtsPlayback and stopTtsPlayback from the tts-playback service. Call startTtsPlayback() near the existing startTtsSummarizer() call (after server starts, not before). Call stopTtsPlayback() in the SIGTERM/SIGINT handler alongside existing cleanup. Also update the pan-tts skill doc (skills/pan-tts/SKILL.md) to note that Panopticon now has built-in TTS playback when the dashboard is running — the external pan-tts sidecar is now optional for users who want SSE-based external TTS on a different machine."
+        },
+        "subItems": [
+          {
+            "id": "dashboard-lifecycle-tts.ac1",
+            "title": "TTS plays when dashboard starts with tts.enabled=true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-lifecycle-tts.ac2",
+            "title": "TtsPlaybackService stops cleanly on SIGTERM without blocking shutdown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-lifecycle-tts.ac3",
+            "title": "skills/pan-tts/SKILL.md updated to reflect built-in playback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-tts-nav-toggle",
+        "title": "TTS section in Settings: sidebar nav + enable/volume/rate controls",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Settings/SettingsPage.tsx: add {id:'tts',label:'TTS'} to the sidebar nav items list. Add a <section id='tts'> with: TTS enabled/disabled toggle (maps to tts.enabled), Volume slider (0.0–1.0, maps to tts.volume), Rate input (float, maps to tts.rate), Max Chars input (integer, maps to tts.maxChars), Drop info when queue full checkbox (maps to tts.dropInfoWhenFull). All controls call PUT /api/settings with the tts section. Use the existing SettingsRow/SettingsSection primitives. The section header should include a 'Daemon status' note (online/offline) fetched from GET /api/tts/health — just a small text indicator, not the full health badge (that's the tts-health-indicator bead)."
+        },
+        "subItems": [
+          {
+            "id": "settings-tts-nav-toggle.ac1",
+            "title": "TTS section appears in Settings sidebar nav and scrolls to the section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-tts-nav-toggle.ac2",
+            "title": "Enable toggle, volume slider, rate, maxChars, dropInfoWhenFull all save via PUT /api/settings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-tts-voice-picker",
+        "title": "Settings TTS: system voice picker with play and set-default",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In the TTS settings section: add a 'System Voice' subsection. Fetch GET /api/tts/voices to populate a list of saved voices. For each voice show: name, kind badge (Preset/Design/Clone), play button (POST /api/tts/speak with test text), and a 'Set as system voice' button that calls PUT /api/settings with tts.voice=voiceId. Add a second 'Status Voice' subsection (same pattern but maps to tts.statusVoice). Show 'No voices saved yet — add voices in the Voice Library below' when library is empty."
+        },
+        "subItems": [
+          {
+            "id": "settings-tts-voice-picker.ac1",
+            "title": "Saved voices listed with kind badge and play button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-tts-voice-picker.ac2",
+            "title": "Play button speaks test text using the selected voice via POST /api/tts/speak",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-tts-voice-picker.ac3",
+            "title": "Set as system voice updates tts.voice in config and reflects in picker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-tts-preset-tab",
+        "title": "Settings TTS Voice Library: CustomVoice presets tab",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In the TTS settings section, below voice picker: add a 'Voice Library' tab group. Tab 1: CustomVoice Presets. New component VoicePresetsTab.tsx. Show 9 Qwen3-TTS-CustomVoice presets: Aiden (M), Dylan (M), Eric (M), Ono Anna (F), Ryan (M), Serena (F), Sohee (F), Uncle Fu (M), Vivian (F). Each preset card: name, gender icon, play button (POST /api/tts/speak with voice:presetName mode:'custom'), selection highlight. Volume slider (0.0–1.0) applies to all preview plays. 'Play All Presets' button plays each in sequence. 'Save Selected Preset...' prompts for a name and POSTs to POST /api/tts/voices with kind:'preset', presetName:<presetId>. Refetch voice list after save."
+        },
+        "subItems": [
+          {
+            "id": "settings-tts-preset-tab.ac1",
+            "title": "All 9 preset cards shown with play button and gender icon",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-tts-preset-tab.ac2",
+            "title": "Play button sends {voice:presetName,mode:'custom'} to POST /api/tts/speak",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-tts-preset-tab.ac3",
+            "title": "Save Selected Preset creates a voice record in the library with kind:'preset'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-tts-voice-design-tab",
+        "title": "Settings TTS Voice Library: VoiceDesign tab (describe + preview + save)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Tab 2: VoiceDesign. New component VoiceDesignTab.tsx. Fields: voice description textarea (natural language, e.g. 'A calm, measured female voice with a subtle synthetic quality'), instruct prompt textarea (speaking style). Test text input (default: 'The quick brown fox jumps over the lazy dog. Panopticon dashboard is now online.'). 'Speak with Design Voice' button: POST /api/tts/speak with {text, voice:description, instruct, mode:'design'}. 'Save This Design...' button: prompt for name, POST /api/tts/voices with kind:'design', description, instruct (no embedding). Refetch voice list after save. The Clone-to-Embedding flow is a separate bead (settings-tts-clone-flow) that adds a button to this same component."
+        },
+        "subItems": [
+          {
+            "id": "settings-tts-voice-design-tab.ac1",
+            "title": "Preview uses mode:'design' with description and instruct fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-tts-voice-design-tab.ac2",
+            "title": "Save This Design creates a voice record with kind:'design' and no embedding",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-tts-clone-flow",
+        "title": "Settings TTS VoiceDesign: Clone to Exact Voice (embedding extraction)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In VoiceDesignTab.tsx: add a 'Clone to Exact Voice...' button (below 'Save This Design'). On click: show loading state ('Extracting speaker embedding... this takes ~30s'). Call POST /api/tts/extract-embedding with {design:description, text:testText}. On success: prompt for a name, call POST /api/tts/voices with kind:'clone', description, instruct, embedding:data.embedding. On error (503/timeout): show error toast. The clone button is disabled if description textarea is empty. After successful clone, refetch voice list. The key UX: a cloned voice produces byte-for-byte identical audio every time (uses the extracted speaker embedding), unlike 'Save This Design' which re-generates from the text description on each speak and may drift slightly."
+        },
+        "subItems": [
+          {
+            "id": "settings-tts-clone-flow.ac1",
+            "title": "Clone flow calls /api/tts/extract-embedding and stores embedding in voice record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-tts-clone-flow.ac2",
+            "title": "Loading state shown during extraction (can take ~30s)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-tts-clone-flow.ac3",
+            "title": "Resulting voice record has kind:'clone' and a non-empty embedding array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-tts-saved-voices-tab",
+        "title": "Settings TTS Voice Library: My Saved Voices tab",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Tab 3: My Saved Voices. New component SavedVoicesTab.tsx. Card grid layout. Each card: voice name, kind badge (Preset in blue, Design in yellow, Clone in purple), play button (POST /api/tts/speak with text:testText — backend resolves voice from library by id), delete button (DELETE /api/tts/voices/:id). 'Clear All Saved' button with confirmation dialog (calls DELETE for each, or add a bulk DELETE endpoint). Empty state: 'No voices saved yet'. Refetch list after delete."
+        },
+        "subItems": [
+          {
+            "id": "settings-tts-saved-voices-tab.ac1",
+            "title": "All saved voices shown with name, kind badge, play and delete buttons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-tts-saved-voices-tab.ac2",
+            "title": "Delete removes voice from library and card disappears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-tts-saved-voices-tab.ac3",
+            "title": "Clear All Saved shows confirmation dialog before deleting all",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-tts-voice-map-ui",
+        "title": "Settings TTS: per-event voice mapping, muted sources, utterance templates",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In the TTS settings section: add an 'Advanced' subsection with three sub-features. (1) Voice Map: a table of pipeline event keys (reviewStatus.passed, reviewStatus.failed, reviewStatus.blocked, mergeStatus.merged, mergeStatus.failed, testStatus.passed, testStatus.failed, readyForMerge, etc.) each with a voice selector dropdown (populated from GET /api/tts/voices, plus 'Use default'). Saves to tts.voiceMap. (2) Muted Sources: checkbox list for ActivitySource values (merge-agent, review-specialist, test-specialist, cloister, work-agent, planning-agent, dashboard, deploy-script). Saves to tts.mutedSources. (3) Utterance Templates: a list of editable key-value pairs, event key → text (with {issueId} hint). Add/remove rows. Saves to tts.utteranceTemplates. All save via PUT /api/settings."
+        },
+        "subItems": [
+          {
+            "id": "settings-tts-voice-map-ui.ac1",
+            "title": "Voice map dropdowns populated from voice library, save to tts.voiceMap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-tts-voice-map-ui.ac2",
+            "title": "Muted sources checkboxes save to tts.mutedSources array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-tts-voice-map-ui.ac3",
+            "title": "Utterance templates save to tts.utteranceTemplates Record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-tts-per-issue-mute",
+        "title": "Per-issue TTS mute/unmute (kanban card + inspector panel)",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Add TTS mute toggle to two locations: (1) Kanban card context menu or card overlay — small 🔇 icon button that toggles the issue's mute state; (2) InspectorPanel — a 'Mute TTS for this issue' toggle in the issue detail view. Muted: adds issueId to config.tts.mutedIssues via PUT /api/settings. Unmuted: removes it. Button state reflects whether the current issueId is in config.tts.mutedIssues (read from GET /api/settings). The resolveAndSpeak() function already checks mutedIssues — this is just the UI layer."
+        },
+        "subItems": [
+          {
+            "id": "settings-tts-per-issue-mute.ac1",
+            "title": "Mute button visible on kanban card and InspectorPanel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-tts-per-issue-mute.ac2",
+            "title": "Toggling mute adds/removes issueId from config.tts.mutedIssues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-tts-per-issue-mute.ac3",
+            "title": "Muted issues produce no speech via TtsPlaybackService",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-tts-voices-list",
+        "title": "CLI: pan tts voices list/show commands",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/tts.ts. Register a 'tts' command in src/cli/index.ts with a 'voices' sub-command group. Implement: `pan tts voices` and `pan tts voices list` → load tts-voices.json, print table with columns NAME, KIND, MODEL/SOURCE. KIND column: preset/design/clone. MODEL/SOURCE column: for preset shows presetName, for design shows first 40 chars of description, for clone shows 'embedding (designed from <description[:30]>)'. `pan tts voices show <name>` → find by name, print full record (exclude raw embedding array, show embedding size as '[N floats]')."
+        },
+        "subItems": [
+          {
+            "id": "cli-tts-voices-list.ac1",
+            "title": "`pan tts voices` prints table of all saved voices",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-tts-voices-list.ac2",
+            "title": "`pan tts voices show <name>` prints full detail without raw embedding",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-tts-voices-list.ac3",
+            "title": "Empty library prints 'No voices saved yet'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-tts-voices-ops",
+        "title": "CLI: pan tts voices play/delete/set-default/map operations",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In tts.ts: add remaining voices sub-commands. `pan tts voices play <name> [text]`: load voice by name, construct speak payload (same logic as resolveAndSpeak), POST directly to http://127.0.0.1:8787/speak (not via dashboard — CLI may run when dashboard is down), use default test text if not provided. Print success or error. `pan tts voices delete <name>`: call deleteVoice, print confirmation. `pan tts voices set-default <name>`: load config YAML, set tts.voice=voice.id, write YAML. Print 'Set <name> as system voice'. `pan tts voices map <event> <name>`: load config YAML, set tts.voiceMap[event]=voice.id, write YAML. Print 'Mapped <event> → <name>'."
+        },
+        "subItems": [
+          {
+            "id": "cli-tts-voices-ops.ac1",
+            "title": "`pan tts voices play <name>` speaks via port 8787 directly (no dashboard needed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-tts-voices-ops.ac2",
+            "title": "`pan tts voices set-default <name>` persists tts.voice to config.yaml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-tts-voices-ops.ac3",
+            "title": "`pan tts voices map <event> <name>` persists tts.voiceMap[event] to config.yaml",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-tts-test",
+        "title": "CLI: pan tts test — speak test phrase in default voice",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In tts.ts: add `pan tts test [text]` sub-command. Default text: 'The quick brown fox jumps over the lazy dog. Panopticon dashboard is now online.' Load config.tts.voice, find voice in tts-voices.json, build speak payload, POST to 127.0.0.1:8787/speak directly. Print success or 'Daemon not running at 127.0.0.1:8787' error. If no voice configured: print 'No system voice set — use pan tts voices set-default <name>'."
+        },
+        "subItems": [
+          {
+            "id": "cli-tts-test.ac1",
+            "title": "`pan tts test` speaks default phrase using configured system voice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-tts-test.ac2",
+            "title": "Prints actionable error if daemon is down or no voice configured",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "activity-panel-tts-play",
+        "title": "Activity Panel TTS tab: play button per utterance",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/ActivityPanel.tsx, in the TTS tab rendering block: add a ▶ (play) button to each utterance row. On click: call POST /api/tts/speak with {text:entry.utterance} (no eventType — uses default voice). Show a brief loading state on the button while speaking. Disable the button while in-flight. The play button is for replaying historical utterances, so it bypasses mute logic (always speaks regardless of source/issue mute state — this is intentional on-demand replay). If daemon is unavailable, show a toast error."
+        },
+        "subItems": [
+          {
+            "id": "activity-panel-tts-play.ac1",
+            "title": "▶ button appears on each row in the TTS tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-panel-tts-play.ac2",
+            "title": "Clicking play calls POST /api/tts/speak and speaks the utterance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tts-health-indicator",
+        "title": "TTS health badge in CloisterStatusBar",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-05-09T02:00:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "issueLabel": "pan-829",
+          "requiresInspection": false
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CloisterStatusBar.tsx: add a TTS health indicator. Only shown when tts.enabled is true (read from dashboard settings state). Polls GET /api/tts/health every 10 seconds. States: green dot + 'TTS' when ok:true; gray dot + 'TTS' when ok:false (daemon not running); red dot + 'TTS' on fetch error. Tooltip shows daemon details (model name, queue depth) on hover. The indicator is small and non-intrusive — same visual style as existing status indicators in the bar."
+        },
+        "subItems": [
+          {
+            "id": "tts-health-indicator.ac1",
+            "title": "Health badge appears in CloisterStatusBar when tts.enabled=true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tts-health-indicator.ac2",
+            "title": "Badge shows green when daemon is running, gray when offline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tts-health-indicator.ac3",
+            "title": "Badge is hidden when tts.enabled=false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "config-tts-daemon",
+        "to": "voice-library-store",
+        "type": "blocks"
+      },
+      {
+        "from": "config-tts-daemon",
+        "to": "settings-api-tts",
+        "type": "blocks"
+      },
+      {
+        "from": "config-tts-daemon",
+        "to": "emit-tts-context",
+        "type": "blocks"
+      },
+      {
+        "from": "config-tts-daemon",
+        "to": "api-tts-speak-resolve",
+        "type": "blocks"
+      },
+      {
+        "from": "config-tts-daemon",
+        "to": "tts-playback-service",
+        "type": "blocks"
+      },
+      {
+        "from": "config-tts-daemon",
+        "to": "cli-tts-test",
+        "type": "blocks"
+      },
+      {
+        "from": "voice-library-store",
+        "to": "api-tts-speak-resolve",
+        "type": "blocks"
+      },
+      {
+        "from": "voice-library-store",
+        "to": "api-tts-voices-crud",
+        "type": "blocks"
+      },
+      {
+        "from": "voice-library-store",
+        "to": "tts-playback-service",
+        "type": "blocks"
+      },
+      {
+        "from": "voice-library-store",
+        "to": "cli-tts-voices-list",
+        "type": "blocks"
+      },
+      {
+        "from": "voice-library-store",
+        "to": "cli-tts-voices-ops",
+        "type": "blocks"
+      },
+      {
+        "from": "voice-library-store",
+        "to": "cli-tts-test",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-api-tts",
+        "to": "settings-tts-nav-toggle",
+        "type": "blocks"
+      },
+      {
+        "from": "emit-tts-context",
+        "to": "tts-coverage-merge-states",
+        "type": "blocks"
+      },
+      {
+        "from": "emit-tts-context",
+        "to": "tts-coverage-test-states",
+        "type": "blocks"
+      },
+      {
+        "from": "api-tts-speak-resolve",
+        "to": "tts-playback-service",
+        "type": "blocks"
+      },
+      {
+        "from": "api-tts-speak-resolve",
+        "to": "settings-tts-voice-picker",
+        "type": "blocks"
+      },
+      {
+        "from": "api-tts-speak-resolve",
+        "to": "settings-tts-preset-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "api-tts-speak-resolve",
+        "to": "settings-tts-voice-design-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "api-tts-speak-resolve",
+        "to": "activity-panel-tts-play",
+        "type": "blocks"
+      },
+      {
+        "from": "api-tts-health-proxy",
+        "to": "tts-health-indicator",
+        "type": "blocks"
+      },
+      {
+        "from": "api-tts-extract-embedding",
+        "to": "settings-tts-clone-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "api-tts-voices-crud",
+        "to": "settings-tts-voice-picker",
+        "type": "blocks"
+      },
+      {
+        "from": "api-tts-voices-crud",
+        "to": "settings-tts-saved-voices-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "api-tts-voices-crud",
+        "to": "settings-tts-voice-map-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "api-tts-voices-crud",
+        "to": "cli-tts-voices-list",
+        "type": "informs"
+      },
+      {
+        "from": "tts-playback-service",
+        "to": "dashboard-lifecycle-tts",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-tts-nav-toggle",
+        "to": "settings-tts-voice-picker",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-tts-nav-toggle",
+        "to": "settings-tts-preset-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-tts-nav-toggle",
+        "to": "settings-tts-voice-design-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-tts-nav-toggle",
+        "to": "settings-tts-saved-voices-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-tts-nav-toggle",
+        "to": "settings-tts-voice-map-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-tts-nav-toggle",
+        "to": "settings-tts-per-issue-mute",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-tts-voice-design-tab",
+        "to": "settings-tts-clone-flow",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-tts-voices-list",
+        "to": "cli-tts-voices-ops",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-05-09-PAN-829-tts-built-in-settings-lifecycle-management-and-coverage.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}

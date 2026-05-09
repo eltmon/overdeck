@@ -62,6 +62,10 @@ describe('deriveAgentIssueId', () => {
     expect(deriveAgentIssueId('agent-PAN-123')).toBe('PAN-123');
   });
 
+  it('derives parent issueId from swarm slot work agent id', () => {
+    expect(deriveAgentIssueId('agent-pan-505-2')).toBe('PAN-505');
+  });
+
   it('returns agentIssueId directly when provided (work agent)', () => {
     expect(deriveAgentIssueId('agent-pan-505', 'PAN-505')).toBe('PAN-505');
   });
@@ -104,6 +108,14 @@ describe('AgentOutputPanel — planning agent rendering (AC4)', () => {
 
   it('renders ActivityView for planning agent with derivable issueId', () => {
     renderPanel('planning-pan-503');
+
+    expect(screen.getByTestId('activity-view')).toBeInTheDocument();
+    expect(screen.getByTestId('activity-view')).toHaveAttribute('data-issue', 'PAN-503');
+    expect(screen.queryByTestId('xterm')).not.toBeInTheDocument();
+  });
+
+  it('renders ActivityView for slot work agent with parent issueId', () => {
+    renderPanel('agent-pan-503-2');
 
     expect(screen.getByTestId('activity-view')).toBeInTheDocument();
     expect(screen.getByTestId('activity-view')).toHaveAttribute('data-issue', 'PAN-503');

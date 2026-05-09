@@ -441,40 +441,19 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       };
     }
 
-    // Write queue: serialize writes to avoid race conditions in xterm.js.
-    // Smart auto-scroll: only snap to bottom after a write if the user hasn't scrolled up.
-    const writeQueue: string[] = [];
-    let isWriting = false;
-
-    const processWriteQueue = () => {
-      if (isWriting || writeQueue.length === 0 || !term) return;
-
-      isWriting = true;
-      const data = writeQueue.shift()!;
-
+    // Write live PTY data directly to xterm.js — its internal WriteBuffer
+    // handles pacing (yields ~every 12ms so the browser can process keystrokes
+    // and other events between parse chunks). The previous approach gated writes
+    // behind an `isWriting` flag, creating a snowball: data accumulated while
+    // xterm.js parsed the current batch, producing an ever-larger next batch
+    // that blocked the main thread and caused multi-second typing lag.
+    const queueLiveData = (data: string) => {
+      reconnectAttempts.current = 0;
+      if (!term) return;
       if (DEBUG_TERMINAL) {
         console.log(`XTerminal-debug: WRITE len=${data.length}`);
       }
-
-      // Use write callback to know when this write completes
-      term.write(data, () => {
-        // With tmux-managed history, keep the viewport pinned to the live bottom.
-        // Local xterm scrollback is disabled, so scrolling is delegated to tmux.
-        term!.scrollToBottom();
-
-        isWriting = false;
-        // Process next item in queue
-        if (writeQueue.length > 0) {
-          // Use setTimeout(0) to avoid deep recursion
-          setTimeout(processWriteQueue, 0);
-        }
-      });
-    };
-
-    const queueLiveData = (data: string) => {
-      reconnectAttempts.current = 0;
-      writeQueue.push(data);
-      processWriteQueue();
+      term.write(data);
     };
 
     ws.onmessage = (event) => {
@@ -509,8 +488,6 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
           remoteSize.current = { cols: control.cols, rows: control.rows };
           requestedSize.current = { cols: control.cols, rows: control.rows };
           readyForLiveData.current = false;
-          writeQueue.length = 0;
-          isWriting = false;
 
           const resettable = term as Terminal & { reset?: () => void };
           resettable.reset?.();
@@ -521,10 +498,10 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
           term!.write(control.data, () => {
             term!.scrollToBottom();
             readyForLiveData.current = true;
+            sendResizeIfNeeded();
           });
           reconnectAttempts.current = 0;
           ws.send(JSON.stringify({ type: 'ready' }));
-          sendResizeIfNeeded();
           return;
         }
 

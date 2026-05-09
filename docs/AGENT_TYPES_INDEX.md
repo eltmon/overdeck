@@ -28,7 +28,7 @@ These are the agent types a new Panopticon user is most likely to care about fir
 |---|---|---|---|---|
 | `planning-agent` | primary | Active | Runs when Panopticon is turning an issue or request into an execution plan | Uses planning instructions, project context, and planning artifacts to produce a vBRIEF-backed plan |
 | `work-agent` | primary | Active | Runs when actual issue work begins and code needs to be implemented | Uses the main work prompt plus the current phase context, issue context, and workspace state |
-| `inspect-agent` | specialist | Active | Runs during implementation when a bead is explicitly inspected before work continues | Uses per-bead inspection instructions focused on spec fidelity, constraints, and quick verification |
+| `inspect-agent` | specialist | Active | Runs during implementation **only on beads flagged `metadata.requiresInspection: true`** in the vBRIEF — Jidoka gate for foundational beads (PAN-382, revised 2026-05-08) | Uses per-bead inspection instructions focused on spec fidelity, constraints, and quick verification |
 | `review-agent` | specialist | Active | Runs after implementation is submitted for review | Uses review instructions focused on code quality, correctness, security, and change coverage |
 | `test-agent` | specialist | Active | Runs after review approval to verify the work through tests | Uses test-focused instructions for running checks, interpreting failures, and reporting test status |
 | `uat-agent` | specialist | Active | Runs after tests pass when Panopticon wants real-browser validation | Uses browser/UAT instructions for requirement verification, visual checks, auth flows, and real-user behavior |
@@ -49,7 +49,7 @@ If you are trying to understand the normal day-to-day Panopticon workflow, start
 
 These are quality gates and validation stages around the main implementation flow.
 
-- **inspect-agent** checks work incrementally during implementation.
+- **inspect-agent** checks work incrementally during implementation — but only on the foundational beads the planning agent flagged with `metadata.requiresInspection: true`. Mechanical beads skip this gate.
 - **review-agent** performs a dedicated review pass.
 - **test-agent** verifies the work through automated checks.
 - **uat-agent** validates the result in a real browser from a user perspective.
@@ -72,7 +72,7 @@ A newcomer-friendly way to think about the normal flow is:
 
 1. **planning-agent** turns the issue into a plan.
 2. **work-agent** implements the planned work.
-3. **inspect-agent** may verify progress bead by bead during implementation.
+3. **inspect-agent** verifies progress on flagged beads during implementation (only beads with `metadata.requiresInspection: true`).
 4. **review-agent** performs a dedicated review pass.
 5. **test-agent** verifies the work through tests.
 6. **uat-agent** checks the result in a real browser.

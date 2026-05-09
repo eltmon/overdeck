@@ -48,6 +48,10 @@ function resolvePort(): number {
 // ─── Start / Stop ─────────────────────────────────────────────────────────────
 
 export function startServer(onReady: (port: number, wsUrl: string) => void): void {
+  // Reset quit flag so manual restarts (after stopServer) can re-spawn.
+  // The app-quit path sets isQuitting in main.ts before stopServer, so this
+  // only un-latches the flag when the caller intends a real restart.
+  quitting = false;
   onReadyCallback = onReady;
   spawnServer();
 }

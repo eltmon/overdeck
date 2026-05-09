@@ -8,15 +8,89 @@
 
 set +e
 
+# Log first-thing so we have empirical evidence the hook fired, regardless of
+# whether anything downstream succeeded. Silent failures in pan_resolve_agent_id
+# used to leave zero trace, making "did the Stop hook even fire?" impossible to
+# answer post-hoc.
+LOG_DIR="$HOME/.panopticon/logs"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+echo "[$(date -Iseconds)] stop-hook: invoked CLAUDE_SESSION_ID=${CLAUDE_SESSION_ID:-unset} PANOPTICON_AGENT_ID=${PANOPTICON_AGENT_ID:-unset} cwd=$(pwd)" \
+  >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=pan-hook-lib.sh
-. "$SCRIPT_DIR/pan-hook-lib.sh" 2>/dev/null || exit 0
+. "$SCRIPT_DIR/pan-hook-lib.sh" 2>/dev/null || {
+  echo "[$(date -Iseconds)] stop-hook: pan-hook-lib.sh source failed — exiting" \
+    >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+  exit 0
+}
 
-pan_resolve_agent_id || exit 0
+if ! pan_resolve_agent_id; then
+  echo "[$(date -Iseconds)] stop-hook: pan_resolve_agent_id failed (CLAUDE_SESSION_ID=${CLAUDE_SESSION_ID:-unset} cwd=$(pwd)) — exiting" \
+    >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+  exit 0
+fi
+
+echo "[$(date -Iseconds)] stop-hook: resolved AGENT_ID=$AGENT_ID — proceeding" \
+  >> "$LOG_DIR/hooks.log" 2>/dev/null || true
 
 TS=$(date -Iseconds)
 BODY="{\"kind\":\"activity\",\"activity\":\"idle\",\"timestamp\":\"$TS\"}"
 pan_emit_event "$AGENT_ID" "$BODY"
+
+# ── API error detection (all agent types) ────────────────────────────────
+# If the agent stopped because of a transient API error, nudge it to retry.
+# This runs before chaining to specialist/work-agent hooks because it
+# applies universally. 5-minute cooldown per agent.
+LOG_DIR="$HOME/.panopticon/logs"
+mkdir -p "$LOG_DIR"
+API_ERROR_NUDGE_FILE="$HOME/.panopticon/agents/$AGENT_ID/.last-api-error-nudge"
+
+OUTPUT=$(tmux capture-pane -t "$AGENT_ID" -p -S -100 2>/dev/null || echo "")
+if [ -n "$OUTPUT" ]; then
+  API_ERROR_DETECTED=false
+  for pattern in \
+    "API Error: The server had an error while processing your request" \
+    "API Error: Overloaded" \
+    "API Error: Rate limit" \
+    "API Error: Request was aborted" \
+    "API Error: Timed out" \
+    "529 Overloaded" \
+    "502 Bad Gateway" \
+    "503 Service Unavailable"; do
+    if echo "$OUTPUT" | grep -qF "$pattern"; then
+      API_ERROR_DETECTED=true
+      break
+    fi
+  done
+
+  if [ "$API_ERROR_DETECTED" = "true" ]; then
+    SHOULD_NUDGE=true
+    if [ -f "$API_ERROR_NUDGE_FILE" ]; then
+      LAST_API_NUDGE=$(cat "$API_ERROR_NUDGE_FILE" 2>/dev/null || echo "0")
+      NOW=$(date +%s)
+      if [ $(( NOW - LAST_API_NUDGE )) -lt 300 ]; then
+        SHOULD_NUDGE=false
+      fi
+    fi
+
+    if [ "$SHOULD_NUDGE" = "true" ]; then
+      mkdir -p "$(dirname "$API_ERROR_NUDGE_FILE")"
+      date +%s > "$API_ERROR_NUDGE_FILE" 2>/dev/null || true
+
+      echo "[$(date -Iseconds)] stop-hook: $AGENT_ID api_error detected — nudging retry" \
+        >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+
+      tmpfile=$(mktemp)
+      echo "You stopped due to a transient API error. This is a temporary server issue, not a problem with your work. Continue from where you left off. Do NOT start over — pick up exactly where you stopped." > "$tmpfile"
+      tmux load-buffer "$tmpfile" 2>/dev/null
+      tmux paste-buffer -t "$AGENT_ID" 2>/dev/null
+      sleep 0.3
+      tmux send-keys -t "$AGENT_ID" C-m 2>/dev/null
+      rm -f "$tmpfile"
+    fi
+  fi
+fi
 
 # Chain to specialist-specific hook (auto-completion detection).
 SPECIALIST_HOOK="$HOME/.panopticon/bin/specialist-stop-hook"

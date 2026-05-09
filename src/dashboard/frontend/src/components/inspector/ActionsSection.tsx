@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import {
-  XCircle, RefreshCw, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X, Send, ChevronRight, Box, Tag, LayoutGrid,
+  XCircle, RefreshCw, CheckCircle, Play, FolderPlus, Check, Loader2, RotateCcw, X, Send, ChevronRight, ChevronDown, Box, Tag, LayoutGrid,
 } from 'lucide-react';
 import type { UseMutationResult } from '@tanstack/react-query';
-import { Agent, WorkAgentLifecycle } from '../../types';
+import { Agent, WorkAgentLifecycle, STATUS_LABELS } from '../../types';
 import type { ReviewStatus, WorkspaceInfo } from './types';
 import { ReviewPipelineSection } from './ReviewPipelineSection';
-import { isReviewPipelineStuck } from '../../lib/pipeline-state';
+import { isPendingReviewStranded, isReviewPipelineStuck } from '../../lib/pipeline-state';
 import { ResetIssueButton } from '../ResetIssueButton';
 import { StopAgentButton } from '../StopAgentButton';
 import { MergeButton } from '../MergeButton';
@@ -14,6 +14,9 @@ import { RecoverButton } from '../RecoverButton';
 import { RestartFromPlanButton } from '../RestartFromPlanButton';
 import { ArtifactLinks } from '../ArtifactLinks';
 import { COMMAND_DECK_SURFACE_REGISTRY } from '../../lib/commandDeckSurfaceRegistry';
+import { FileText } from 'lucide-react';
+import { useAvailableModels } from '../shared/ModelPicker/ModelPicker';
+import { useSwitchModel } from '../../hooks/useSwitchModel';
 
 // Convenience alias — most mutations use void variables and unknown data
 type AnyMutation = UseMutationResult<unknown, Error, void, unknown>;
@@ -27,7 +30,8 @@ interface ActionsSectionProps {
   reviewStatusLoading?: boolean;
   workspace?: WorkspaceInfo;
   hasPlan: boolean;
-  beadsCount: number;
+  hasBeads: boolean;
+  beadsCount?: number;  // Deprecated — use hasBeads
   reviewMutation: AnyMutation;
   cancelMutation: AnyMutation;
   startAgentMutation: UseMutationResult<unknown, Error, string | undefined, unknown>;
@@ -47,8 +51,13 @@ interface ActionsSectionProps {
   onKillSuccess?: () => void;
   onViewBeads: () => void;
   onViewVBrief: () => void;
+  onViewLog?: () => void;
+  onSwitchModel?: () => void;
   lifecycle?: WorkAgentLifecycle;
   agentLaunchState?: 'starting' | 'resuming' | null;
+  isFeature?: boolean;
+  issueStatus?: string;
+  onPlan?: () => void;
 }
 
 void COMMAND_DECK_SURFACE_REGISTRY;
@@ -60,6 +69,7 @@ export function ActionsSection({
   reviewStatusLoading,
   workspace,
   hasPlan,
+  hasBeads,
   beadsCount,
   reviewMutation,
   cancelMutation,
@@ -80,8 +90,13 @@ export function ActionsSection({
   onKillSuccess,
   onViewBeads,
   onViewVBrief,
+  onViewLog,
+  onSwitchModel,
   lifecycle,
   agentLaunchState,
+  isFeature,
+  issueStatus,
+  onPlan,
 }: ActionsSectionProps) {
   const [showResumeInput, setShowResumeInput] = useState(false);
   const [resumeMessage, setResumeMessage] = useState('');
@@ -90,16 +105,29 @@ export function ActionsSection({
   const isLaunching = agentLaunchState === 'starting' || agentLaunchState === 'resuming';
   const launchLabel = agentLaunchState === 'resuming' ? 'Resuming...' : 'Starting...';
 
+  const [showResumeModelDropdown, setShowResumeModelDropdown] = useState(false);
+  const { groups } = useAvailableModels();
+  const { switchMutation, isPending: isSwitchingModel } = useSwitchModel(agent?.id, issueId);
+
   const isPipelineStuck = isReviewPipelineStuck(reviewStatus);
+  const pendingReviewStranded = isPendingReviewStranded(reviewStatus);
   const hasVerificationState = !!reviewStatus?.verificationStatus && reviewStatus.verificationStatus !== 'pending';
   const showPipelineStatus = !!reviewStatus && (
-    reviewStatus.reviewStatus !== 'pending'
+    pendingReviewStranded
+    || reviewStatus.reviewStatus !== 'pending'
     || reviewStatus.testStatus !== 'pending'
     || hasVerificationState
   );
   const isReReview = reviewStatus?.readyForMerge
     || (reviewStatus?.reviewStatus === 'passed' && reviewStatus?.testStatus === 'passed' && reviewStatus?.mergeStatus === 'failed');
   const reviewActionHint = !reviewStatus ? null : (() => {
+    if (pendingReviewStranded) {
+      return {
+        label: 'Next: Re-request Review',
+        detail: 'Pending review has exceeded the reviewer timeout recovery window.',
+        title: 'Review is pending with no queued or active specialist — re-request review to restart the pipeline.',
+      };
+    }
     if (reviewStatus.verificationStatus === 'failed') {
       return {
         label: 'Fix build gate errors, then re-run',
@@ -168,7 +196,7 @@ export function ActionsSection({
 
       {/* Review status */}
       {showPipelineStatus && reviewStatus && (
-        <ReviewPipelineSection reviewStatus={reviewStatus} />
+        <ReviewPipelineSection reviewStatus={reviewStatus} issueId={issueId} onViewLog={onViewLog} />
       )}
       {reviewActionHint && (
         <div
@@ -211,11 +239,11 @@ export function ActionsSection({
           >
             {(reviewMutation.isPending || reviewStatus?.reviewStatus === 'reviewing' || reviewStatus?.testStatus === 'testing') ?
               <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-            {isReReview ? 'Re-Review' : 'Review & Test'}
+            {pendingReviewStranded ? 'Re-request Review' : isReReview ? 'Re-Review' : 'Review & Test'}
           </button>
 
-          {/* Stop Agent */}
-          {agent && agent.status !== 'stopped' && (
+          {/* Stop Agent — hidden for features (features are planned, not executed) */}
+          {agent && agent.status !== 'stopped' && !isFeature && (
             <div className="flex items-center gap-1">
               <StopAgentButton
                 agentId={agent?.id}
@@ -227,6 +255,19 @@ export function ActionsSection({
                 <LayoutGrid className="w-3 h-3 text-muted-foreground opacity-40 self-center" />
               </span>
             </div>
+          )}
+
+          {/* Switch Model — only for work agents with an active/stopped agent */}
+          {agent && onSwitchModel && !isFeature && (
+            <button
+              onClick={onSwitchModel}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent"
+              title="Restart agent with a different model"
+              data-testid="inspector-switch-model"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Switch Model
+            </button>
           )}
 
           {/* Recover failed review/test/merge pipeline */}
@@ -244,29 +285,82 @@ export function ActionsSection({
             </div>
           )}
 
-          {/* Start/Resume Agent when no agent or stopped */}
-          {(!agent || agent.status === 'stopped') && (
+          {/* Start/Resume Agent when no agent or stopped — hidden for features */}
+          {(!agent || agent.status === 'stopped') && !isFeature && (
             <>
-              <button
-                onClick={() => {
-                  if (isResume) {
-                    setShowResumeInput(true);
-                  } else {
-                    onStartAgent();
-                  }
-                }}
-                disabled={isLaunching || showResumeInput || isLifecycleUnresolved}
-                className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-60 ${
-                  isLifecycleUnresolved
-                    ? 'text-destructive cursor-not-allowed'
-                    : 'text-primary hover:text-primary/80'
-                }`}
-                title={isLifecycleUnresolved ? 'Checking for resumable session…' : undefined}
-                data-testid={isResume ? 'inspector-resume-session' : 'inspector-start-agent'}
-              >
-                {(isLaunching || isLifecycleUnresolved) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
-                <span>{isLaunching ? launchLabel : isLifecycleUnresolved ? 'Checking…' : (isResume ? 'Resume Session' : 'Start Agent')}</span>
-              </button>
+              <div className="flex items-center relative">
+                <button
+                  onClick={() => {
+                    if (isResume) {
+                      setShowResumeInput(true);
+                    } else {
+                      onStartAgent();
+                    }
+                  }}
+                  disabled={isLaunching || showResumeInput || isLifecycleUnresolved || isSwitchingModel}
+                  className={`flex items-center gap-1 text-xs transition-colors disabled:opacity-60 ${
+                    isLifecycleUnresolved
+                      ? 'text-destructive cursor-not-allowed'
+                      : 'text-primary hover:text-primary/80'
+                  }`}
+                  title={isLifecycleUnresolved ? 'Checking for resumable session…' : undefined}
+                  data-testid={isResume ? 'inspector-resume-session' : 'inspector-start-agent'}
+                >
+                  {(isLaunching || isLifecycleUnresolved || isSwitchingModel) ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
+                  <span>{isLaunching ? launchLabel : isLifecycleUnresolved ? 'Checking…' : isSwitchingModel ? 'Switching…' : (isResume ? 'Resume Session' : 'Start Agent')}</span>
+                </button>
+                {isResume && (
+                  <>
+                    <button
+                      data-testid="inspector-resume-model-dropdown"
+                      onClick={() => setShowResumeModelDropdown(v => !v)}
+                      disabled={isLaunching || isSwitchingModel}
+                      className="flex items-center px-1 py-0.5 text-xs text-primary hover:text-primary/80 disabled:opacity-60 ml-0.5"
+                      title="Resume with a different model"
+                    >
+                      <ChevronDown className="w-3 h-3" />
+                    </button>
+                    {showResumeModelDropdown && (
+                      <>
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setShowResumeModelDropdown(false)}
+                        />
+                        <div
+                          className="absolute left-0 top-full mt-1 min-w-[200px] bg-popover border border-border rounded-md shadow-lg z-50 max-h-64 overflow-y-auto"
+                        >
+                          <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Resume with model…
+                          </div>
+                          {groups.map((group) => (
+                            <div key={group.provider}>
+                              <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground/80 border-t border-border">
+                                {group.label}
+                              </div>
+                              {group.models.map((m) => (
+                                <button
+                                  key={m.id}
+                                  className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent flex items-center justify-between"
+                                  onClick={() => {
+                                    setShowResumeModelDropdown(false);
+                                    switchMutation.mutate({ model: m.id, message: resumeMessage || undefined });
+                                  }}
+                                  disabled={isSwitchingModel}
+                                >
+                                  <span>{m.label}</span>
+                                  {m.costDisplay && (
+                                    <span className="text-[10px] opacity-50 ml-2">{m.costDisplay}</span>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
               {/* Reset Session — only when resuming (has a saved session) */}
               {isResume && (
                 <button
@@ -304,6 +398,22 @@ export function ActionsSection({
                )}
              </>
            )}
+           {/* Feature-only actions: Plan button (features are planned, not executed) */}
+           {isFeature && onPlan && STATUS_LABELS[issueStatus ?? ''] !== 'done' && STATUS_LABELS[issueStatus ?? ''] !== 'canceled' && (
+             <button
+               onClick={onPlan}
+               className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+                 hasPlan
+                   ? 'text-success hover:text-success/80'
+                   : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+               }`}
+               title={hasPlan ? 'See plan / continue planning' : 'Plan'}
+               data-testid="inspector-plan-feature"
+             >
+               <FileText className="w-3 h-3" />
+               {hasPlan ? 'See Plan' : 'Plan'}
+             </button>
+           )}
          </div>
       </div>
 
@@ -320,7 +430,7 @@ export function ActionsSection({
           <textarea
             value={resumeMessage}
             onChange={(e) => setResumeMessage(e.target.value)}
-            placeholder="Tell the agent what to do, e.g. 'Address the PR feedback about error handling' or leave empty to let it pick up from STATE.md"
+            placeholder="Tell the agent what to do, e.g. 'Address the PR feedback about error handling' or leave empty to let it pick up from the continue file"
             className="w-full px-2 py-1.5 text-xs bg-card border border-border rounded resize-none text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
             rows={3}
             autoFocus
@@ -404,6 +514,7 @@ export function ActionsSection({
             <ArtifactLinks
               issueId={issueId}
               hasPlan={hasPlan}
+              hasBeads={hasBeads}
               beadsCount={beadsCount}
               onViewBeads={onViewBeads}
               onViewVBrief={onViewVBrief}
@@ -427,14 +538,14 @@ export function ActionsSection({
               {onReopen && (
                 <div className="min-w-0">
                   <div className="text-xs font-medium text-foreground">Reopen for more work</div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5" title="Moves the issue back to In Progress so the work agent can continue. Keeps the workspace, branch, PR, STATE.md, and all planning artifacts intact.">
-                    Moves the issue back to In Progress. The workspace, branch, PR, STATE.md, and all planning artifacts are preserved.
+                  <div className="text-[11px] text-muted-foreground mt-0.5" title="Moves the issue back to In Progress so the work agent can continue. Keeps the workspace, branch, PR, continue file, and all planning artifacts intact.">
+                    Moves the issue back to In Progress. The workspace, branch, PR, continue file, and all planning artifacts are preserved.
                   </div>
                   <button
                     onClick={onReopen}
                     disabled={reopenMutation?.isPending}
                     className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-warning/40 text-warning hover:bg-warning hover:text-warning-foreground transition-colors disabled:opacity-50"
-                    title="Reopen: moves issue to In Progress, keeps workspace + branch + PR + STATE.md + beads"
+                    title="Reopen: moves issue to In Progress, keeps workspace + branch + PR + continue file + beads"
                     data-testid="inspector-reopen"
                   >
                     {reopenMutation?.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
@@ -446,8 +557,8 @@ export function ActionsSection({
               {/* Restart from Plan */}
               <div className="min-w-0">
                 <div className="text-xs font-medium text-foreground">Restart from Plan</div>
-                <div className="text-[11px] text-muted-foreground mt-0.5" title="Stops any running agent, resets the feature branch to the post-planning commit, clears session state. Keeps vBRIEF, beads, STATE.md, and PRD. Moves to In Progress.">
-                  Stops agent, resets branch to post-planning commit, clears session state. Keeps vBRIEF, beads, STATE.md, and PRD. Moves to In Progress.
+                <div className="text-[11px] text-muted-foreground mt-0.5" title="Stops any running agent, resets the feature branch to the post-planning commit, clears session state. Keeps vBRIEF, beads, continue file, and PRD. Moves to In Progress.">
+                  Stops agent, resets branch to post-planning commit, clears session state. Keeps vBRIEF, beads, continue file, and PRD. Moves to In Progress.
                 </div>
                 <RestartFromPlanButton issueId={issueId} />
               </div>
@@ -458,14 +569,14 @@ export function ActionsSection({
               {/* Cancel Issue */}
               <div className="min-w-0">
                 <div className="text-xs font-medium text-foreground">Cancel this issue</div>
-                <div className="text-[11px] text-muted-foreground mt-0.5" title="Permanently stops the agent, deletes the workspace and branch (including STATE.md), closes the PR, removes beads, and moves the issue to Canceled. This cannot be undone.">
-                  Permanently stops the agent, deletes the workspace and branch (including STATE.md), closes the PR, and moves the issue to Canceled. This cannot be undone.
+                <div className="text-[11px] text-muted-foreground mt-0.5" title="Permanently stops the agent, deletes the workspace and branch (including the continue file), closes the PR, removes beads, and moves the issue to Canceled. This cannot be undone.">
+                  Permanently stops the agent, deletes the workspace and branch (including the continue file), closes the PR, and moves the issue to Canceled. This cannot be undone.
                 </div>
                 <button
                   onClick={onCancel}
                   disabled={cancelMutation.isPending}
                   className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded border border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50"
-                  title="Cancel Issue: permanent — stops agent, deletes workspace + branch + STATE.md, closes PR, moves to Canceled"
+                  title="Cancel Issue: permanent — stops agent, deletes workspace + branch + continue file, closes PR, moves to Canceled"
                   data-testid="inspector-cancel-issue"
                 >
                   {cancelMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}

@@ -2,52 +2,44 @@ import { create } from 'zustand';
 
 type Theme = 'light' | 'dark';
 
-interface ThemeState {
-  theme: Theme;
-  toggleTheme: () => void;
-  initTheme: () => void;
+const STORAGE_KEY = 'panopticon.ui.theme';
+
+function getStoredTheme(): Theme {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  return stored === 'light' ? 'light' : 'dark';
 }
 
-function applyTheme(theme: Theme) {
+function applyTheme(theme: Theme, suppressTransitions = false) {
   const html = document.documentElement;
-  // Suppress transitions during theme switch to prevent flash
-  html.classList.add('no-transitions');
-  if (theme === 'dark') {
-    html.classList.add('dark');
-  } else {
-    html.classList.remove('dark');
+  if (suppressTransitions) {
+    html.classList.add('no-transitions');
   }
-  // Remove no-transitions after two animation frames (allows repaint)
-  requestAnimationFrame(() => {
+  html.classList.toggle('dark', theme === 'dark');
+  if (suppressTransitions) {
     requestAnimationFrame(() => {
-      html.classList.remove('no-transitions');
+      requestAnimationFrame(() => {
+        html.classList.remove('no-transitions');
+      });
     });
-  });
+  }
+}
+
+applyTheme(getStoredTheme());
+
+interface ThemeState {
+  theme: Theme;
+  resolvedTheme: 'light' | 'dark';
+  toggleTheme: () => void;
 }
 
 export const useTheme = create<ThemeState>((set, get) => ({
-  theme: 'dark', // Default, will be overridden by initTheme()
+  theme: getStoredTheme(),
+  resolvedTheme: getStoredTheme(),
 
   toggleTheme: () => {
     const newTheme = get().theme === 'dark' ? 'light' : 'dark';
-    applyTheme(newTheme);
-    localStorage.setItem('panopticon.ui.theme', newTheme);
-    set({ theme: newTheme });
-  },
-
-  initTheme: () => {
-    const stored = localStorage.getItem('panopticon.ui.theme');
-    const validStored: Theme | null = stored === 'light' || stored === 'dark' ? stored : null;
-    const theme = validStored || 'dark';
-    if (!validStored) {
-      localStorage.setItem('panopticon.ui.theme', theme);
-    }
-    // Flash prevention script already set the class, but sync state with DOM
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    set({ theme });
+    applyTheme(newTheme, true);
+    localStorage.setItem(STORAGE_KEY, newTheme);
+    set({ theme: newTheme, resolvedTheme: newTheme });
   },
 }));

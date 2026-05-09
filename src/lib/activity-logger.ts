@@ -18,7 +18,7 @@ import { getEventStore } from '../dashboard/server/event-store.js';
 import type { DomainEvent } from '@panctl/contracts';
 
 export type ActivityLevel = 'info' | 'warn' | 'error' | 'success';
-export type ActivitySource = 'merge-agent' | 'cloister' | 'review-specialist' | 'test-specialist' | 'dashboard' | 'deploy-script';
+export type ActivitySource = 'merge-agent' | 'cloister' | 'review-specialist' | 'test-specialist' | 'dashboard' | 'deploy-script' | 'planning-agent' | 'work-agent';
 
 export interface EmitActivityOptions {
   source: ActivitySource;
@@ -97,6 +97,12 @@ export function emitActivityDetailed(options: EmitDetailedOptions): void {
   }
 }
 
+function normalizeForSpeech(utterance: string): string {
+  return utterance.replace(/\b([A-Z]{2,})-(\d+)/g, (_match, prefix, num) =>
+    `${prefix.toLowerCase()} ${num}`
+  );
+}
+
 /**
  * Emit a TTS activity log entry — upleveled utterance for text-to-speech.
  * Keep utterances short (<140 chars), human-friendly, and speakable.
@@ -109,7 +115,7 @@ export function emitActivityTts(options: EmitTtsOptions): void {
       timestamp: new Date().toISOString(),
       payload: {
         id: randomUUID(),
-        utterance: options.utterance,
+        utterance: normalizeForSpeech(options.utterance),
         priority: options.priority ?? 2,
         issueId: options.issueId,
       },

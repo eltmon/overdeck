@@ -7,6 +7,7 @@ import { tmpdir } from 'os';
 import { randomUUID } from 'node:crypto';
 import { getPanopticonHome } from './paths.js';
 import { loadConfig, type TmuxConfigMode } from './config-yaml.js';
+import { buildChildEnv } from './child-env.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -79,7 +80,12 @@ async function ensureManagedTmuxDirAsync(): Promise<void> {
 
 function reloadManagedTmuxConfigSync(): void {
   try {
-    execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { stdio: 'ignore' });
+    // Strip provider env vars (ANTHROPIC_BASE_URL, ANTHROPIC_API_KEY, etc.) so
+    // the tmux server doesn't inherit stale provider config. Without this,
+    // every session spawned by the server inherits the parent's env — and tmux
+    // -e can only override, not unset, so stale vars leak through.
+    const cleanEnv = buildChildEnv();
+    execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { stdio: 'ignore', env: cleanEnv });
     execFileSync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { stdio: 'ignore' });
   } catch {
     // If tmux isn't available or the server can't be started yet, callers will
@@ -89,7 +95,8 @@ function reloadManagedTmuxConfigSync(): void {
 
 async function reloadManagedTmuxConfigAsync(): Promise<void> {
   try {
-    await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { encoding: 'utf-8' });
+    const cleanEnv = buildChildEnv();
+    await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'start-server'], { encoding: 'utf-8', env: cleanEnv });
     await execFileAsync('tmux', ['-L', getManagedTmuxSocketName(), 'source-file', getManagedTmuxConfigPath()], { encoding: 'utf-8' });
   } catch {
     // If tmux isn't available or the server can't be started yet, callers will
@@ -407,42 +414,107 @@ export async function resizeWindowAsync(target: string, cols: number, rows: numb
 }
 
 /**
+ * Error raised when message delivery to a tmux session fails verification.
+ */
+export class MessageDeliveryFailed extends Error {
+  constructor(
+    message: string,
+    public readonly sessionName: string,
+    public readonly paneSnapshot: string,
+  ) {
+    super(message);
+    this.name = 'MessageDeliveryFailed';
+  }
+}
+
+/**
+ * Send a raw keystroke to a tmux session — no load-buffer, no Enter.
+ * Used for Ink TUI interactions (e.g. plan approval digit selection)
+ * where the application consumes single keystrokes directly.
+ */
+export async function sendRawKeystrokeAsync(sessionName: string, key: string, caller?: string): Promise<void> {
+  validateSessionName(sessionName);
+  logSendKeys(sessionName, key, caller ?? 'raw-keystroke');
+  await tmuxExecAsync(['send-keys', '-t', sessionName, key], { encoding: 'utf-8' });
+}
+
+/**
  * Send keys to a tmux session (async, non-blocking).
- * Uses load-buffer + paste-buffer for reliable delivery, with a delay before Enter.
+ * Uses load-buffer + paste-buffer with capture-pane verification.
  * MUST be used from the dashboard server and any async context.
  */
 export async function sendKeysAsync(sessionName: string, keys: string, caller?: string): Promise<void> {
   validateSessionName(sessionName);
   logSendKeys(sessionName, keys, caller);
 
-  // Mirror the sync `sendKeys` pattern: one temp file, one load-buffer, one
-  // paste-buffer, one Enter. Splitting by line and pasting line-by-line
-  // (the previous implementation) cost ~5 tmux spawns and 50 ms of sleep
-  // per line, which made large prompts take seconds (PAN-785).
-  // `paste-buffer -d` drops the buffer in the same call so we don't need a
-  // separate delete-buffer round-trip.
   const sendId = randomUUID();
   const tmpFile = join(tmpdir(), `pan-sendkeys-${sendId}.txt`);
-  // Use a named tmux buffer so concurrent sendKeysAsync calls (e.g. spawning
-  // 4 parallel reviewers) don't race on the global unnamed buffer.
   const bufferName = `pan-${sendId}`;
 
   try {
     await writeFile(tmpFile, keys, 'utf-8');
     await tmuxExecAsync(['load-buffer', '-b', bufferName, tmpFile], { encoding: 'utf-8' });
-    await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-t', sessionName], { encoding: 'utf-8' });
-    // Explicitly delete the named buffer — paste-buffer -d only drops the default buffer.
+    await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
     await tmuxExecAsync(['delete-buffer', '-b', bufferName], { encoding: 'utf-8' }).catch(() => {});
-    // Scale delay with prompt size — large pastes need more time to render before
-    // Enter arrives. Hybrid formula: 15ms/line + 50ms per 1000 chars, minimum 600ms.
-    // (PAN-699: 300ms was insufficient for small messages when Claude Code shows
-    // warning banners; 600ms provides headroom for TUI render latency.)
-    const lineDelay = keys.split('\n').length * 15;
-    const lengthDelay = Math.floor(keys.length / 1000) * 50;
-    const delayMs = Math.max(600, Math.min(3000, lineDelay + lengthDelay));
-    await new Promise(r => setTimeout(r, delayMs));
+
+    // Verify paste arrived: poll capture-pane until the last non-empty line of
+    // the pasted text is visible. Using the last line instead of the first
+    // because large messages scroll the first line out of the capture window.
+    const lines = keys.split('\n');
+    const verifyLine = ([...lines].reverse().find(l => l.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? '';
+    const VERIFY_TIMEOUT_MS = 3_000;
+    const VERIFY_INTERVAL_MS = 50;
+    const deadline = Date.now() + VERIFY_TIMEOUT_MS;
+    let pasteVerified = false;
+
+    if (verifyLine.length >= 3) {
+      const verifyStart = Date.now();
+      while (Date.now() < deadline) {
+        const pane = await capturePaneAsync(sessionName, 10);
+        if (pane.includes(verifyLine.slice(0, 40))) {
+          pasteVerified = true;
+          // Ensure a minimum paste-to-Enter delay so Claude Code's TUI finishes
+          // processing the bracketed paste before Enter arrives. (PAN-699 follow-up)
+          const elapsed = Date.now() - verifyStart;
+          const minDelay = 600;
+          if (elapsed < minDelay) {
+            await new Promise(r => setTimeout(r, minDelay - elapsed));
+          }
+          break;
+        }
+        await new Promise(r => setTimeout(r, VERIFY_INTERVAL_MS));
+      }
+    } else {
+      // Very short text — use the old delay-based approach
+      const delayMs = Math.max(600, Math.min(3000, keys.split('\n').length * 15 + Math.floor(keys.length / 1000) * 50));
+      await new Promise(r => setTimeout(r, delayMs));
+      pasteVerified = true;
+    }
+
+    if (!pasteVerified) {
+      const snapshot = await capturePaneAsync(sessionName, 30);
+      console.warn(`[tmux] Paste verification failed for ${sessionName} — text not visible after ${VERIFY_TIMEOUT_MS}ms. Sending Enter anyway to avoid orphaned input. Snapshot:\n${snapshot.slice(0, 500)}`);
+    }
+
+    // Send Enter — even if verification failed, the buffer was pasted; leaving
+    // orphaned text in the input is worse than a possibly-redundant Enter.
     await tmuxExecAsync(['send-keys', '-t', sessionName, 'C-m'], { encoding: 'utf-8' });
-    logSendKeys(sessionName, '[Enter sent]', caller);
+    logSendKeys(sessionName, pasteVerified ? '[Enter sent]' : '[Enter sent (unverified paste)]', caller);
+
+    // Verify Enter submitted: poll until the pasted text is no longer in the
+    // input region (last 3 lines of the pane). This confirms the message was
+    // submitted rather than just sitting in the input box.
+    if (verifyLine.length >= 3) {
+      const SUBMIT_TIMEOUT_MS = 2_000;
+      const submitDeadline = Date.now() + SUBMIT_TIMEOUT_MS;
+      while (Date.now() < submitDeadline) {
+        const pane = await capturePaneAsync(sessionName, 5);
+        if (!pane.includes(verifyLine.slice(0, 40))) {
+          break; // Text moved out of input — submitted
+        }
+        await new Promise(r => setTimeout(r, VERIFY_INTERVAL_MS));
+      }
+    }
   } finally {
     await unlink(tmpFile).catch(() => {});
   }
@@ -533,6 +605,84 @@ export async function isPaneDeadAsync(sessionName: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/**
+ * Categorizes an API failure surfaced inside an interactive Claude Code pane.
+ *
+ * "Terminal" here means the upstream provider returned an error that won't be
+ * fixed by waiting or retrying the same request — quota exhausted, auth/login
+ * required, permission denied. The CLI prints the error and returns to the
+ * input prompt, which means session-alive and pane-alive checks both pass:
+ * callers polling for completion will sit idle until their timeout fires.
+ * Detecting these in pane content is the only reliable signal.
+ *
+ * Distinct from the transient family the deacon already handles
+ * (Overloaded / Rate limit / 5xx / Timed out), which are nudge-to-retry.
+ */
+export type TerminalApiErrorKind =
+  | 'quota_exhausted'
+  | 'auth_failed'
+  | 'permission_denied'
+  | 'login_required';
+
+export interface TerminalApiError {
+  kind: TerminalApiErrorKind;
+  /** Short, user-facing summary suitable for review_notes / dashboard text. */
+  summary: string;
+  /** First matching line from the pane, for diagnostics. */
+  raw: string;
+}
+
+const TERMINAL_API_ERROR_PATTERNS: Array<{
+  re: RegExp;
+  kind: TerminalApiErrorKind;
+  summary: string;
+}> = [
+  // Order matters: more specific quota/usage messages first so we surface the
+  // most actionable summary even when both a 403 and a quota line are present.
+  { re: /usage limit for this billing cycle/i, kind: 'quota_exhausted', summary: 'Provider quota exhausted (billing cycle limit reached)' },
+  { re: /reached your usage limit/i,           kind: 'quota_exhausted', summary: 'Provider quota exhausted (usage limit reached)' },
+  { re: /(?:^|[^a-z])quota[^a-z].{0,40}(?:exceeded|exhausted|reached)/i, kind: 'quota_exhausted', summary: 'Provider quota exhausted' },
+  { re: /You've hit your limit/i,              kind: 'quota_exhausted', summary: 'Provider usage limit reached' },
+  { re: /credit balance is too low/i,          kind: 'quota_exhausted', summary: 'Provider credit balance too low' },
+  { re: /Please run \/login/i,                 kind: 'login_required',  summary: 'Provider login required' },
+  { re: /authentication_error/i,               kind: 'auth_failed',     summary: 'Provider authentication failed' },
+  { re: /API Error:\s*401\b/i,                 kind: 'auth_failed',     summary: 'Provider rejected request (401 unauthorized)' },
+  { re: /permission_error/i,                   kind: 'permission_denied', summary: 'Provider returned permission_error' },
+  { re: /API Error:\s*403\b/i,                 kind: 'permission_denied', summary: 'Provider rejected request (403 forbidden)' },
+];
+
+/**
+ * Scan a captured tmux pane for terminal upstream-API failures.
+ * Returns the first match, or null if none. Safe to call frequently — pure
+ * regex, no I/O.
+ *
+ * Why we collapse whitespace: real tmux captures wrap long error messages at
+ * the pane width, so a phrase like "usage limit for this billing cycle" can
+ * land across two or three lines. Matching against the raw capture would miss
+ * those. We normalize a copy to a single-spaced string for matching, then
+ * preserve the original for the `raw` diagnostics field.
+ */
+export function detectTerminalApiError(paneOutput: string): TerminalApiError | null {
+  if (!paneOutput) return null;
+  const normalized = paneOutput.replace(/\s+/g, ' ');
+  for (const entry of TERMINAL_API_ERROR_PATTERNS) {
+    const match = normalized.match(entry.re);
+    if (match) {
+      // For raw, find the original line that contained the start of the
+      // match. Approximate: match.index in normalized doesn't map 1:1 to
+      // paneOutput, so just grab the first 240 chars around any line in
+      // paneOutput that contains the matched substring.
+      const matchedText = match[0];
+      const rawIdx = paneOutput.indexOf(matchedText.split(' ')[0] ?? matchedText);
+      const lineStart = rawIdx >= 0 ? paneOutput.lastIndexOf('\n', rawIdx) + 1 : 0;
+      const lineEnd = rawIdx >= 0 ? paneOutput.indexOf('\n', rawIdx) : -1;
+      const raw = paneOutput.slice(lineStart, lineEnd === -1 ? undefined : lineEnd).trim().slice(0, 240);
+      return { kind: entry.kind, summary: entry.summary, raw };
+    }
+  }
+  return null;
 }
 
 /**

@@ -7,7 +7,7 @@
 
 import { writeFile } from 'fs/promises';
 import yaml from 'js-yaml';
-import { loadConfig, getGlobalConfigPath, YamlConfig } from './config-yaml.js';
+import { loadConfig, getGlobalConfigPath, YamlConfig, clearConfigCache } from './config-yaml.js';
 import { WorkTypeId } from './work-types.js';
 import { ModelId } from './settings.js';
 import { MODEL_CAPABILITIES, getModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
@@ -17,17 +17,17 @@ import { reloadGlobalRouter } from './work-type-router.js';
  * Optimal model defaults — multi-provider distribution (see docs/research/)
  * - Kimi K2.6: Exploration, testing, docs, UAT, general-purpose subagent
  * - GLM-5.1: Implementation, review-response (SWE-Bench Pro #1)
- * - GPT-5.4: Specialist review agent (high-stakes code review)
+ * - GPT-5.5: Specialist review agent (high-stakes code review)
  * - MiniMax M2.7: Procedural specialists — test, merge, inspect
  * - Claude Opus/Sonnet: All parallel review agents (security, correctness, etc.)
- * - GPT-5.4 Nano/Mini: Subagents and CLI (fastest, cheapest, strong tool use)
+ * - GPT-5.5 Nano/Mini: Subagents and CLI (fastest, cheapest, strong tool use)
  *
  * NOTE: All model IDs are automatically resolved through deprecation mapping
  * to ensure this function never returns deprecated models.
  */
 export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
   const rawDefaults: Partial<Record<WorkTypeId, string>> = {
-    // Planning & high-stakes review — GPT-5.4
+    // Planning & high-stakes review — GPT-5.5
     'issue-agent:exploration': 'kimi-k2.6',
 
     // Implementation — GLM-5.1 (SWE-Bench Pro #1, 8-hour autonomous sessions)
@@ -37,7 +37,7 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'issue-agent:review-response': 'glm-5.1',
 
     // Specialist agents
-    'specialist-review-agent': 'gpt-5.4',
+    'specialist-review-agent': 'gpt-5.5',
     'specialist-test-agent': 'minimax-m2.7',
     'specialist-merge-agent': 'minimax-m2.7',
     'specialist-inspect-agent': 'minimax-m2.7-highspeed',
@@ -50,18 +50,18 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
     'review:requirements': 'claude-sonnet-4-6',
     'review:synthesis': 'claude-sonnet-4-6',
 
-    // Subagents — GPT-5.4 Nano (155 tok/s, Tau2-Bench 92.5% tool use)
-    'subagent:explore': 'gpt-5.4-nano',
-    'subagent:plan': 'gpt-5.4-nano',
-    'subagent:bash': 'gpt-5.4-nano',
+    // Subagents — GPT-5.5 Nano (fastest, cheapest, strong tool use)
+    'subagent:explore': 'gpt-5.5-nano',
+    'subagent:plan': 'gpt-5.5-nano',
+    'subagent:bash': 'gpt-5.5-nano',
     'subagent:general-purpose': 'kimi-k2.6',
 
     // Workflow jobs
-    'status-review': 'gpt-5.4-nano',
+    'status-review': 'gpt-5.5-nano',
 
     // CLI modes
-    'cli:interactive': 'gpt-5.4-mini',
-    'cli:quick-command': 'gpt-5.4-nano',
+    'cli:interactive': 'gpt-5.5-mini',
+    'cli:quick-command': 'gpt-5.5-nano',
   };
 
   // Apply deprecation resolution to all model IDs
@@ -94,6 +94,7 @@ export interface ApiSettingsConfig {
       minimax: boolean;
       zai: boolean;
       kimi: boolean;
+      mimo: boolean;
       openrouter: boolean;
     };
     overrides: Partial<Record<WorkTypeId, ModelId>>;
@@ -104,6 +105,7 @@ export interface ApiSettingsConfig {
     compaction_model?: ModelId;
     manual_compact_mode?: 'claude-code' | 'panopticon-native';
     rich_compaction?: boolean;
+    title_model?: ModelId;
   };
   api_keys: {
     openai?: string;
@@ -111,6 +113,7 @@ export interface ApiSettingsConfig {
     minimax?: string;
     zai?: string;
     kimi?: string;
+    mimo?: string;
     openrouter?: string;
   };
   openrouter?: {
@@ -125,6 +128,22 @@ export interface ApiSettingsConfig {
     gitlab?: string;
     rally?: string;
   };
+  experimental?: {
+    /** Use Claude Code Channels for prompt delivery to eligible work agents. */
+    claudeCodeChannels?: boolean;
+  };
+  /**
+   * Permission mode for spawned Claude Code agents.
+   *
+   * 'auto' (default) → --permission-mode auto (classifier blocks destructive ops)
+   * 'bypass'         → --dangerously-skip-permissions --permission-mode bypassPermissions
+   *
+   * Persisted under `claude.permissionMode` in `~/.panopticon/config.yaml`.
+   * Override per-invocation with `--yolo` / `--no-yolo` / `PAN_YOLO`.
+   */
+  claude?: {
+    permissionMode?: 'auto' | 'bypass';
+  };
   deprecation_warnings?: ApiDeprecationWarning[];
 }
 
@@ -138,11 +157,12 @@ export function getDefaultConversationModelApi(): ModelId {
 
   if (config.defaultConversationModel) return resolveModelId(config.defaultConversationModel);
 
-  if (config.enabledProviders.has('openai')) return resolveModelId('gpt-5.4');
+  if (config.enabledProviders.has('openai')) return resolveModelId('gpt-5.5');
   if (config.enabledProviders.has('minimax')) return resolveModelId('minimax-m2.7-highspeed');
   if (config.enabledProviders.has('google')) return resolveModelId('gemini-3.1-pro-preview');
   if (config.enabledProviders.has('kimi')) return resolveModelId('kimi-k2.5');
   if (config.enabledProviders.has('zai')) return resolveModelId('glm-5.1');
+  if (config.enabledProviders.has('mimo')) return resolveModelId('mimo-v2.5-pro');
   if (config.enabledProviders.has('openrouter')) {
     const fav = config.openrouterFavorites[0];
     if (fav) return resolveModelId(fav);
@@ -193,6 +213,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
         minimax: config.enabledProviders.has('minimax'),
         zai: config.enabledProviders.has('zai'),
         kimi: config.enabledProviders.has('kimi'),
+        mimo: config.enabledProviders.has('mimo'),
         openrouter: config.enabledProviders.has('openrouter'),
       },
       overrides: migratedOverrides,
@@ -210,8 +231,17 @@ export function loadSettingsApi(): ApiSettingsConfig {
       compaction_model: config.conversations.compactionModel,
       manual_compact_mode: config.conversations.manualCompactMode,
       rich_compaction: config.conversations.richCompaction,
+      title_model: config.conversations.titleModel,
     },
     tracker_keys: config.trackerKeys,
+    experimental: {
+      claudeCodeChannels: config.experimental?.claudeCodeChannels ?? false,
+    },
+    claude: {
+      // Defensive — older test mocks of loadConfig may not include `claude`;
+      // production loader always populates it via DEFAULT_CONFIG.
+      permissionMode: config.claude?.permissionMode ?? 'auto',
+    },
     deprecation_warnings: deprecationWarnings.length > 0 ? deprecationWarnings : undefined,
   };
 }
@@ -246,6 +276,7 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
         minimax: settings.models.providers.minimax,
         zai: settings.models.providers.zai,
         kimi: settings.models.providers.kimi,
+        mimo: settings.models.providers.mimo,
         openrouter: settings.models.providers.openrouter,
       },
       overrides: settings.models.overrides,
@@ -258,12 +289,19 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
       minimax: settings.api_keys.minimax,
       zai: settings.api_keys.zai,
       kimi: settings.api_keys.kimi,
+      mimo: settings.api_keys.mimo,
       openrouter: settings.api_keys.openrouter,
     },
     openrouter: settings.openrouter,
     tmux: settings.tmux,
     conversations: settings.conversations,
     tracker_keys: settings.tracker_keys,
+    experimental: settings.experimental
+      ? { claudeCodeChannels: settings.experimental.claudeCodeChannels }
+      : undefined,
+    claude: settings.claude?.permissionMode
+      ? { permissionMode: settings.claude.permissionMode }
+      : undefined,
   };
 
   // Write to YAML file
@@ -280,6 +318,10 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
   // saved via PUT /api/settings don't take effect until the dashboard restarts,
   // and smart-model-selector fallback can pick an unexpected model (e.g. a
   // non-Anthropic top scorer that the runtime can't resolve).
+  //
+  // We also clear the config-yaml cache because mtime-based invalidation can
+  // miss rapid writes (same-millisecond) or coarse filesystem mtime resolution.
+  clearConfigCache();
   reloadGlobalRouter();
 }
 
@@ -323,6 +365,14 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
       ...current.tracker_keys,
       ...updates.tracker_keys,
     },
+    experimental: {
+      ...current.experimental,
+      ...updates.experimental,
+    },
+    claude: {
+      ...current.claude,
+      ...updates.claude,
+    },
   };
 
   // Save and return
@@ -331,7 +381,7 @@ export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Pr
 }
 
 export async function updateProviderApiKey(
-  provider: 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'openrouter',
+  provider: 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter',
   apiKey?: string
 ): Promise<ApiSettingsConfig> {
   return updateSettingsApi({
@@ -397,6 +447,18 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     }
   }
 
+  // Validate experimental flags — every flag must be a boolean if present.
+  if (settings.experimental !== undefined) {
+    if (typeof settings.experimental !== 'object' || settings.experimental === null) {
+      errors.push('experimental must be an object');
+    } else {
+      const ccc = (settings.experimental as { claudeCodeChannels?: unknown }).claudeCodeChannels;
+      if (ccc !== undefined && typeof ccc !== 'boolean') {
+        errors.push('experimental.claudeCodeChannels must be a boolean');
+      }
+    }
+  }
+
   return {
     valid: errors.length === 0,
     errors,
@@ -414,6 +476,7 @@ export function getAvailableModelsApi(): {
   minimax: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+  mimo: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
 } {
   const result: {
@@ -423,6 +486,7 @@ export function getAvailableModelsApi(): {
     minimax: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     zai: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     kimi: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
+    mimo: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
     openrouter: Array<{ id: ModelId; name: string; costPer1MTokens: number }>;
   } = {
     anthropic: [],
@@ -431,6 +495,7 @@ export function getAvailableModelsApi(): {
     minimax: [],
     zai: [],
     kimi: [],
+    mimo: [],
     openrouter: [],
   };
 
@@ -455,6 +520,9 @@ export function getAvailableModelsApi(): {
       case 'zai':
         result.zai.push(entry);
         break;
+      case 'mimo':
+        result.mimo.push(entry);
+        break;
       case 'openrouter':
         result.openrouter.push(entry);
         break;
@@ -477,6 +545,7 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         minimax: false,
         zai: false,
         kimi: true, // Kimi K2.6 (K2.6-code-preview) used for exploration, testing, and documentation
+        mimo: false,
         openrouter: false,
       },
       overrides: getOptimalModelDefaults(),
@@ -500,6 +569,7 @@ export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
         zai: false,
         kimi: false,
         minimax: true,
+        mimo: false,
         openrouter: false,
       },
       overrides: getMiniMaxModelDefaults(),

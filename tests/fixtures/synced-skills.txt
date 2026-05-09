@@ -51,6 +51,7 @@ pan-quickstart
 pan-release
 pan-reload
 pan-reopen
+pan-resources
 pan-restart
 pan-review
 pan-show
@@ -67,6 +68,7 @@ pan-tts
 pan-up
 pan-wipe
 pan-workspace-config
+pipeline-status
 plan
 react-best-practices
 refactor

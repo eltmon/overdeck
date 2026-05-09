@@ -1,9 +1,8 @@
 /**
  * Close-Out Ceremony — Human-gated verification and cleanup after merge.
  *
- * Verifies PRD is preserved, branch is merged, then archives workspace
- * artifacts, cleans up agent state, closes the issue on the tracker,
- * and applies a `closed-out` label.
+ * Verifies PRD is preserved, branch is merged, then cleans up agent state,
+ * closes the issue on the tracker, and applies a `closed-out` label.
  */
 
 import { existsSync, mkdirSync, cpSync, rmSync, readFileSync } from 'fs';
@@ -13,7 +12,6 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import {
   PANOPTICON_HOME,
-  ARCHIVES_DIR,
   AGENTS_DIR,
   PROJECT_DOCS_SUBDIR,
   PROJECT_PRDS_SUBDIR,
@@ -241,63 +239,7 @@ export async function executeCloseOut(ctx: CloseOutContext): Promise<CloseOutRes
     return { success: false, issueId: ctx.issueId, steps, error: 'Could not verify branch merge status' };
   }
 
-  // Step 3: Archive workspace artifacts
-  try {
-    const workspacePath = findWorkspacePath(ctx.projectPath, issueLower);
-
-    if (workspacePath && existsSync(workspacePath)) {
-      // If a previous archive exists, rotate it to a versioned name to prevent overwrite
-      let archiveDir = join(ARCHIVES_DIR, issueLower);
-      if (existsSync(archiveDir)) {
-        let version = 1;
-        while (existsSync(`${archiveDir}.${version}`)) {
-          version++;
-        }
-        const rotatedDir = `${archiveDir}.${version}`;
-        cpSync(archiveDir, rotatedDir, { recursive: true });
-        rmSync(archiveDir, { recursive: true, force: true });
-        steps.push({ name: 'Rotate previous archive', status: 'passed', message: `Previous archive preserved at ${rotatedDir}` });
-      }
-
-      mkdirSync(archiveDir, { recursive: true });
-
-      // Archive .planning/feedback/
-      const feedbackDir = join(workspacePath, '.planning', 'feedback');
-      if (existsSync(feedbackDir)) {
-        cpSync(feedbackDir, join(archiveDir, 'feedback'), { recursive: true });
-      }
-
-      // Archive STATE.md
-      const stateMd = join(workspacePath, '.planning', 'STATE.md');
-      if (existsSync(stateMd)) {
-        cpSync(stateMd, join(archiveDir, 'STATE.md'));
-      }
-
-      // Archive beads/
-      const beadsDir = join(workspacePath, '.planning', 'beads');
-      if (existsSync(beadsDir)) {
-        cpSync(beadsDir, join(archiveDir, 'beads'), { recursive: true });
-      }
-
-      // Archive PRD.md (workspace copy — the docs/prds/ copy is canonical,
-      // but this preserves the workspace-specific version with any agent annotations)
-      const prdMd = join(workspacePath, '.planning', 'PRD.md');
-      if (existsSync(prdMd)) {
-        cpSync(prdMd, join(archiveDir, 'PRD.md'));
-      }
-
-      steps.push({ name: 'Archive workspace artifacts', status: 'passed', message: `Archived to ${archiveDir}` });
-    } else {
-      steps.push({ name: 'Archive workspace artifacts', status: 'skipped', message: 'No workspace found to archive' });
-    }
-  } catch (err) {
-    // Archive failure should block workspace deletion — we'd rather leave the
-    // workspace intact than destroy unarchived artifacts
-    steps.push({ name: 'Archive workspace artifacts', status: 'failed', message: `Failed to archive: ${(err as Error).message}` });
-    return { success: false, issueId: ctx.issueId, steps, error: 'Cannot proceed with cleanup — archiving failed' };
-  }
-
-  // Step 4: Clean up workspace
+  // Step 3: Clean up workspace
   try {
     const workspacePath = findWorkspacePath(ctx.projectPath, issueLower);
     const agentSession = `agent-${issueLower}`;

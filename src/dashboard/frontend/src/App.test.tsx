@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App, {
   buildConversationUrl,
@@ -10,6 +10,25 @@ import App, {
   parseConversationViewModes,
   serializeConversationViewModes,
 } from './App';
+
+const {
+  mockDashboardState,
+  mockRefreshDashboardState,
+  mockToastError,
+  mockToastInfo,
+  mockToastSuccess,
+} = vi.hoisted(() => ({
+  mockDashboardState: {
+    agents: [],
+    issues: [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }],
+    dashboardLifecycle: { active: false },
+    channelPermissionRequestsById: {},
+  },
+  mockRefreshDashboardState: vi.fn().mockResolvedValue(undefined),
+  mockToastError: vi.fn(),
+  mockToastInfo: vi.fn(),
+  mockToastSuccess: vi.fn(),
+}))
 
 vi.mock('./components/KanbanBoard', () => ({
   KanbanBoard: ({ onSelectIssue }: { onSelectIssue?: (issueId: string | null) => void }) => (
@@ -24,6 +43,20 @@ vi.mock('./components/ActivityPanel', () => ({ ActivityPanel: () => null }));
 vi.mock('./components/AwaitingMergePage', () => ({ AwaitingMergePage: () => null }));
 vi.mock('./components/ConfirmationDialog', () => ({
   ConfirmationDialog: () => null,
+}));
+vi.mock('./components/ChannelPermissionDialog', () => ({
+  ChannelPermissionDialog: ({ request, isOpen, onAllow, onDeny }: {
+    request: { requestId: string; toolName: string } | null;
+    isOpen: boolean;
+    onAllow: () => void;
+    onDeny: () => void;
+  }) => isOpen && request ? (
+    <div>
+      <div data-testid="channel-permission-request">{request.requestId}:{request.toolName}</div>
+      <button onClick={onAllow}>Allow channel permission</button>
+      <button onClick={onDeny}>Deny channel permission</button>
+    </div>
+  ) : null,
 }));
 vi.mock('./components/EventRouter', () => ({ EventRouter: () => null }));
 vi.mock('./components/MetricsSummaryRow', () => ({ MetricsSummaryRow: () => null }));
@@ -43,23 +76,33 @@ vi.mock('./components/DetailPanelLayout', () => ({
   DetailPanelLayout: ({ inline }: { inline?: boolean }) => <div data-testid="detail-panel-layout" data-inline={inline ? 'true' : 'false'} />,
 }));
 vi.mock('./components/StandaloneTerminal', () => ({ StandaloneTerminal: () => null }));
+vi.mock('./hooks/useCodexAutoRetry', () => ({ useCodexAutoRetry: () => null }));
+vi.mock('./components/SystemHealthPill', () => ({ SystemHealthPill: () => null }));
 vi.mock('lucide-react', () => ({ AlertTriangle: () => null, RefreshCw: () => null, X: () => null, ArrowRight: () => null, Loader2: () => null, ChevronDown: () => null, Cpu: () => null, MemoryStick: () => null, Skull: () => null }));
 vi.mock('./components/upgrade-announcement/UpgradeAnnouncement', () => ({ UpgradeAnnouncement: () => null }));
-vi.mock('sonner', () => ({ Toaster: () => null, toast: { info: vi.fn() } }));
+vi.mock('sonner', () => ({
+  Toaster: () => null,
+  toast: {
+    error: mockToastError,
+    info: mockToastInfo,
+    success: mockToastSuccess,
+  },
+}));
 vi.mock('./lib/store', () => ({
   useDashboardStore: vi.fn((selector?: unknown) => {
     if (typeof selector === 'function') {
-      return selector({
-        agents: [],
-        issues: [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }],
-        dashboardLifecycle: { active: false },
-      });
+      return selector(mockDashboardState);
     }
     return [];
   }),
   selectAgentList: (state: { agents: unknown[] }) => state.agents,
+  selectChannelPermissionRequests: (state: { channelPermissionRequestsById?: Record<string, unknown> }) =>
+    Object.values(state.channelPermissionRequestsById ?? {}),
   selectIssues: (state: { issues: unknown[] }) => state.issues,
   selectDashboardLifecycle: (state: { dashboardLifecycle: { active: boolean } }) => state.dashboardLifecycle,
+}));
+vi.mock('./lib/refresh-dashboard-state', () => ({
+  refreshDashboardState: mockRefreshDashboardState,
 }));
 vi.mock('./components/CommandDeck', () => ({
   CommandDeck: ({ conversationViewMode, onConversationViewModeChange }: {
@@ -88,6 +131,17 @@ function renderApp() {
     </QueryClientProvider>,
   );
 }
+
+beforeEach(() => {
+  mockDashboardState.agents = []
+  mockDashboardState.issues = [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }]
+  mockDashboardState.dashboardLifecycle = { active: false }
+  mockDashboardState.channelPermissionRequestsById = {}
+  mockRefreshDashboardState.mockClear()
+  mockToastError.mockClear()
+  mockToastInfo.mockClear()
+  mockToastSuccess.mockClear()
+})
 
 describe('conversation route helpers', () => {
   beforeEach(() => {
@@ -218,3 +272,74 @@ describe('App kanban issue details', () => {
     expect(screen.getByTestId('detail-panel-layout')).toHaveAttribute('data-inline', 'true');
   });
 });
+
+describe('App channel permission requests', () => {
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/');
+    mockDashboardState.agents = [{ id: 'agent-987', issueId: 'PAN-987' }]
+    mockDashboardState.channelPermissionRequestsById = {
+      'perm-123': {
+        requestId: 'perm-123',
+        agentId: 'agent-987',
+        issueId: 'PAN-987',
+        toolName: 'Bash',
+        description: 'Run npm test',
+        inputPreview: '{"command":"npm test"}',
+        createdAt: '2026-05-07T18:30:00.000Z',
+      },
+    }
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/api/version') {
+        return new Response(JSON.stringify({ version: '0.5.0' }), { status: 200 })
+      }
+      if (url === '/api/tracker-status') {
+        return new Response(JSON.stringify({ primary: 'github', configured: [] }), { status: 200 })
+      }
+      if (url === '/api/confirmations') {
+        return new Response(JSON.stringify([]), { status: 200 })
+      }
+      if (url === '/api/agents/agent-987/permissions/perm-123/respond') {
+        return new Response(JSON.stringify({ ok: true }), { status: 200 })
+      }
+      return new Response(JSON.stringify([]), { status: 200 })
+    }))
+  })
+
+  it('submits allow decisions for pending channel permission requests', async () => {
+    renderApp()
+
+    expect(screen.getByTestId('channel-permission-request')).toHaveTextContent('perm-123:Bash')
+    fireEvent.click(screen.getByText('Allow channel permission'))
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/agents/agent-987/permissions/perm-123/respond',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ behavior: 'allow' }),
+        }),
+      )
+    })
+    expect(screen.queryByTestId('channel-permission-request')).toBeNull()
+    expect(mockRefreshDashboardState).toHaveBeenCalledTimes(1)
+    expect(mockToastSuccess).toHaveBeenCalledWith('Allowed agent-987 to continue')
+  })
+
+  it('submits deny decisions for pending channel permission requests', async () => {
+    renderApp()
+
+    fireEvent.click(screen.getByText('Deny channel permission'))
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/agents/agent-987/permissions/perm-123/respond',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ behavior: 'deny' }),
+        }),
+      )
+    })
+    expect(mockToastSuccess).toHaveBeenCalledWith('Denied permission request for agent-987')
+  })
+})

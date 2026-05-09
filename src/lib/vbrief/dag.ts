@@ -1,8 +1,105 @@
 /**
- * vBRIEF DAG utilities — critical path and graph analysis
+ * vBRIEF DAG utilities — critical path, graph analysis, wave scheduling
  */
 
-import type { VBriefDocument } from './types.js';
+import type { VBriefDocument, VBriefItem } from './types.js';
+
+export interface WaveItem {
+  id: string;
+  title: string;
+  difficulty?: string;
+  blockedBy: string[];
+}
+
+export interface Wave {
+  index: number;
+  items: WaveItem[];
+}
+
+/**
+ * Groups actionable vBRIEF items into dependency waves using Kahn's algorithm.
+ *
+ * Wave 0 = items with no unresolved blockers (ready to start).
+ * Wave N = items whose blockers all resolve in waves < N.
+ * Completed/cancelled items are excluded from waves but their edges are honored
+ * (a completed blocker does not hold back its dependents).
+ *
+ * Returns waves in ascending order. Items within a wave are independent and
+ * can execute in parallel.
+ */
+export function groupItemsByWave(doc: VBriefDocument): Wave[] {
+  const skipStatuses = new Set(['completed', 'cancelled']);
+  const actionable = doc.plan.items.filter(i => !skipStatuses.has(i.status));
+  if (actionable.length === 0) return [];
+
+  const actionableIds = new Set(actionable.map(i => i.id));
+  const allItemIds = new Set(doc.plan.items.map(i => i.id));
+  const completedIds = new Set(
+    doc.plan.items.filter(i => skipStatuses.has(i.status)).map(i => i.id),
+  );
+
+  const blockEdges = doc.plan.edges.filter(
+    e => e.type === 'blocks' && allItemIds.has(e.from) && allItemIds.has(e.to),
+  );
+
+  // Build in-degree for actionable items only.
+  // Edges from completed items don't contribute — those blockers are resolved.
+  const inDegree = new Map<string, number>();
+  const outgoing = new Map<string, string[]>();
+  const incomingFrom = new Map<string, string[]>();
+
+  for (const id of actionableIds) {
+    inDegree.set(id, 0);
+    outgoing.set(id, []);
+    incomingFrom.set(id, []);
+  }
+
+  for (const edge of blockEdges) {
+    if (!actionableIds.has(edge.to)) continue;
+    if (completedIds.has(edge.from)) continue;
+    if (!actionableIds.has(edge.from)) continue;
+
+    inDegree.set(edge.to, (inDegree.get(edge.to) ?? 0) + 1);
+    outgoing.get(edge.from)?.push(edge.to);
+    incomingFrom.get(edge.to)?.push(edge.from);
+  }
+
+  const itemById = new Map<string, VBriefItem>(doc.plan.items.map(i => [i.id, i]));
+  const waves: Wave[] = [];
+
+  let currentLayer = Array.from(actionableIds).filter(id => (inDegree.get(id) ?? 0) === 0);
+  let waveIndex = 0;
+
+  while (currentLayer.length > 0) {
+    const waveItems: WaveItem[] = currentLayer.map(id => {
+      const item = itemById.get(id)!;
+      return {
+        id,
+        title: item.title,
+        difficulty: item.metadata?.difficulty,
+        blockedBy: incomingFrom.get(id) ?? [],
+      };
+    });
+
+    waves.push({ index: waveIndex, items: waveItems });
+
+    const nextLayer: string[] = [];
+    for (const id of currentLayer) {
+      for (const dep of outgoing.get(id) ?? []) {
+        const newDeg = (inDegree.get(dep) ?? 1) - 1;
+        inDegree.set(dep, newDeg);
+        if (newDeg === 0) {
+          nextLayer.push(dep);
+        }
+      }
+    }
+
+    currentLayer = nextLayer;
+    waveIndex++;
+  }
+
+  return waves;
+}
 
 /**
  * Computes the critical path of a vBRIEF plan using the longest-path

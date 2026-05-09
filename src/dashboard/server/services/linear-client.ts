@@ -304,30 +304,45 @@ export const LinearClientLive = Layer.effect(
   }),
 );
 
+let _linearClientImpl: LinearClientShape | null = null;
+let _linearClientApiKey: string | null = null;
+
+function getLinearClient(): LinearClientShape {
+  const apiKey = getLinearApiKey();
+  if (!apiKey) {
+    const fail = Effect.fail(new TrackerNotConfigured({ tracker: 'linear' }));
+    return {
+      getIssue: () => fail,
+      getTeamStates: () => fail,
+      updateState: () => fail,
+      addComment: () => fail,
+      findOrCreateLabel: () => fail,
+      addLabel: () => fail,
+      removeLabel: () => fail,
+      getComments: () => fail,
+    };
+  }
+  if (_linearClientApiKey !== apiKey) {
+    _linearClientApiKey = apiKey;
+    _linearClientImpl = makeLinearClientImpl(new LinearSdkClient({ apiKey }));
+  }
+  return _linearClientImpl;
+}
+
 /**
- * Layer that provides a no-op LinearClient when Linear is not configured.
- * Route handlers should prefer LinearClientLive and handle TrackerNotConfigured,
- * but this layer is useful for contexts where Linear is optional.
+ * Layer that provides a LinearClient which dynamically checks configuration on each call.
+ * This avoids caching a no-op client if the config wasn't ready at layer construction time.
  */
 export const LinearClientOptionalLive = Layer.effect(
   LinearClient,
-  Effect.gen(function* () {
-    const apiKey = getLinearApiKey();
-    if (!apiKey) {
-      // Return a stub that always fails with TrackerNotConfigured
-      const fail = Effect.fail(new TrackerNotConfigured({ tracker: 'linear' }));
-      return {
-        getIssue: () => fail,
-        getTeamStates: () => fail,
-        updateState: () => fail,
-        addComment: () => fail,
-        findOrCreateLabel: () => fail,
-        addLabel: () => fail,
-        removeLabel: () => fail,
-        getComments: () => fail,
-      } as LinearClientShape;
-    }
-    const sdk = new LinearSdkClient({ apiKey });
-    return makeLinearClientImpl(sdk);
-  }),
+  Effect.succeed({
+    getIssue: (...args) => getLinearClient().getIssue(...args),
+    getTeamStates: (...args) => getLinearClient().getTeamStates(...args),
+    updateState: (...args) => getLinearClient().updateState(...args),
+    addComment: (...args) => getLinearClient().addComment(...args),
+    findOrCreateLabel: (...args) => getLinearClient().findOrCreateLabel(...args),
+    addLabel: (...args) => getLinearClient().addLabel(...args),
+    removeLabel: (...args) => getLinearClient().removeLabel(...args),
+    getComments: (...args) => getLinearClient().getComments(...args),
+  } as LinearClientShape),
 );

@@ -14,6 +14,7 @@
  */
 
 import { useState } from 'react';
+import type { Agent, Issue } from '../../types';
 import { OverviewTab } from './ZoneCOverviewTabs/OverviewTab';
 import { ActivityTab } from './ZoneCOverviewTabs/ActivityTab';
 import { CostsTab } from './ZoneCOverviewTabs/CostsTab';
@@ -59,12 +60,18 @@ interface ZoneCOverviewProps {
   /** Optional controlled active tab; defaults to 'overview'. */
   activeTab?: OverviewTab;
   onTabChange?: (tab: OverviewTab) => void;
+  /** Work agent for this issue — forwarded to OverviewTab. */
+  agent?: Agent;
+  /** Full issue record — forwarded to OverviewTab. */
+  issue?: Issue;
 }
 
 export function ZoneCOverview({
   issueId,
   activeTab,
   onTabChange,
+  agent,
+  issue,
 }: ZoneCOverviewProps) {
   const [internalTab, setInternalTab] = useState<OverviewTab>('overview');
   const tab = activeTab ?? internalTab;
@@ -89,7 +96,7 @@ export function ZoneCOverview({
         flexDirection: 'column',
         flex: 1,
         minHeight: 0,
-        background: 'var(--mc-surface, var(--background))',
+        background: 'var(--background)',
       }}
     >
       <div
@@ -99,7 +106,7 @@ export function ZoneCOverview({
           display: 'flex',
           gap: 4,
           padding: '6px 12px',
-          borderBottom: '1px solid var(--mc-border, var(--border))',
+          borderBottom: '1px solid var(--border)',
           overflowX: 'auto',
           flexShrink: 0,
         }}
@@ -118,8 +125,8 @@ export function ZoneCOverview({
                 fontSize: 12,
                 fontWeight: active ? 600 : 500,
                 color: active
-                  ? 'var(--mc-text, var(--foreground))'
-                  : 'var(--mc-text-muted, var(--muted-foreground))',
+                  ? 'var(--foreground)'
+                  : 'var(--muted-foreground)',
                 background: active
                   ? 'color-mix(in srgb, var(--primary) 8%, transparent)'
                   : 'transparent',
@@ -146,7 +153,7 @@ export function ZoneCOverview({
           overflow: 'auto',
         }}
       >
-        {tab === 'overview' && <OverviewTab issueId={issueId} onSwitchTab={handleTabClick} />}
+        {tab === 'overview' && <OverviewTab issueId={issueId} onSwitchTab={handleTabClick} agent={agent} issue={issue} />}
         {tab === 'activity' && <ActivityTab issueId={issueId} />}
         {tab === 'costs' && <CostsTab issueId={issueId} />}
         {tab === 'prd' && (
@@ -160,7 +167,7 @@ export function ZoneCOverview({
           <MarkdownTab
             body={planning.data?.state}
             isLoading={planning.isLoading}
-            emptyLabel="No STATE.md recorded for this issue."
+            emptyLabel="No continue file recorded for this issue."
           />
         )}
         {tab === 'inference' && (

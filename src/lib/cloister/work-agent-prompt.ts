@@ -1,13 +1,16 @@
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import type { ContinueFeedbackEntry } from '../vbrief/continue-state.js';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeam } from '../projects.js';
-import { readWorkspacePlan } from '../vbrief/io.js';
+import { getWorkspacePanPaths, readWorkspaceContext, readFeedback, readWorkspaceContinue, writeWorkspaceContext } from '../pan-dir/index.js';
+import { findPlan, readWorkspacePlan, readPlan } from '../vbrief/io.js';
 import { extractACFromDocument } from '../vbrief/acceptance-criteria.js';
 import { loadConfig } from '../config.js';
 import { createTrackerFromConfig } from '../tracker/factory.js';
 import { NotImplementedError } from '../tracker/interface.js';
 import type { TrackerType } from '../tracker/interface.js';
+import { queryBeadsForIssue } from '../beads-query.js';
 
 export interface WorkAgentPromptContext {
   issueId: string;
@@ -20,16 +23,18 @@ export interface WorkAgentPromptContext {
   trackerContext?: string;
 }
 
-export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
+export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise<string> {
   let beadsTasksStr = '';
   let stitchDesignsStr = '';
+  let featureContextStr = '';
   let polyrepoContextStr = '';
   let pendingFeedbackStr = '';
 
   if (!ctx.skipDynamicContext && ctx.projectRoot) {
     const planningContent = readPlanningContext(ctx.workspacePath);
+    const featureContext = await readFeatureContext(ctx.workspacePath, ctx.issueId);
 
-    const beadsTasks = readBeadsTasks(ctx.workspacePath, ctx.projectRoot, ctx.issueId);
+    const beadsTasks = await readBeadsTasks(ctx.workspacePath, ctx.projectRoot, ctx.issueId);
     if (beadsTasks.length > 0) {
       beadsTasksStr = beadsTasks.join('\n');
     }
@@ -37,6 +42,10 @@ export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
     const stitchDesigns = extractStitchDesigns(planningContent);
     if (stitchDesigns) {
       stitchDesignsStr = stitchDesigns;
+    }
+
+    if (featureContext) {
+      featureContextStr = featureContext;
     }
 
     polyrepoContextStr = buildPolyrepoContext(ctx.issueId, ctx.workspacePath);
@@ -54,6 +63,7 @@ export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
       PROJECT_ROOT: ctx.projectRoot || '',
       BEADS_TASKS: beadsTasksStr,
       STITCH_DESIGNS: stitchDesignsStr,
+      FEATURE_CONTEXT: featureContextStr,
       POLYREPO_CONTEXT: polyrepoContextStr,
       PENDING_FEEDBACK: pendingFeedbackStr,
       NEW_TRACKER_CONTEXT: ctx.trackerContext || '',
@@ -62,49 +72,84 @@ export function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): string {
 }
 
 /**
- * Read pending specialist feedback from .planning/feedback/.
- * Returns a summary of the latest feedback file(s) for injection into the prompt.
+ * Read pending specialist feedback.
+ * Primary source: workspace `.pan/continue.json` feedback[] plus `.pan/feedback/`.
  */
 function readPendingFeedback(workspacePath: string): string {
-  const feedbackDir = join(workspacePath, '.planning', 'feedback');
-  if (!existsSync(feedbackDir)) return '';
+  const issueId = inferIssueIdFromWorkspace(workspacePath);
+  const projectRoot = join(workspacePath, '..', '..');
 
+  const continueEntries: ContinueFeedbackEntry[] = [];
+  if (issueId) {
+    try {
+      const cont = readWorkspaceContinue(workspacePath)
+      if (cont?.feedback?.length) {
+        continueEntries.push(...cont.feedback)
+      }
+    } catch { /* ignore */ }
+  }
+
+  // --- Backward compat: filesystem files not already in continue file ---
+  const seqsInContinue = new Set(continueEntries.map(e => e.seq));
+  const legacyFilePaths: string[] = [];
   try {
-    const files = readdirSync(feedbackDir)
-      .filter(f => f.endsWith('.md'))
-      .sort(); // NNN-prefixed, so sort gives chronological order
+    for (const file of readFeedback(workspacePath)) {
+      const match = file.filename.match(/^(\d{3})-/);
+      const seq = match ? parseInt(match[1], 10) : -1;
+      if (!seqsInContinue.has(seq)) {
+        legacyFilePaths.push(file.path);
+      }
+    }
+  } catch { /* ignore */ }
 
-    if (files.length === 0) return '';
+  if (continueEntries.length === 0 && legacyFilePaths.length === 0) return '';
 
-    // Show the latest feedback file path (agent will read it)
-    const latest = files[files.length - 1];
-    const latestPath = join(feedbackDir, latest);
-    const lines: string[] = [
-      `**${files.length} feedback file(s):**`,
-      '',
-    ];
+  const lines: string[] = [];
+  const total = continueEntries.length + legacyFilePaths.length;
 
-    // List all files (most recent last)
-    for (const file of files) {
-      const filePath = join(feedbackDir, file);
-      const marker = file === latest ? ' ← **latest, read this first**' : '';
+  // Format continue file entries inline (agent reads them directly from prompt)
+  if (continueEntries.length > 0) {
+    lines.push(`**${total} feedback item(s) from specialist pipeline:**`);
+    lines.push('');
+    for (const entry of continueEntries) {
+      const seqStr = String(entry.seq).padStart(3, '0');
+      lines.push(`### ${seqStr} — ${entry.specialist}: ${entry.outcome.toUpperCase()} (${entry.timestamp})`);
+      lines.push('');
+      lines.push(entry.markdownBody);
+      lines.push('');
+      lines.push('---');
+      lines.push('');
+    }
+  }
+
+  // Format legacy filesystem entries as file paths (agent must Read them)
+  if (legacyFilePaths.length > 0) {
+    if (continueEntries.length === 0) {
+      lines.push(`**${total} feedback file(s):**`);
+      lines.push('');
+    } else {
+      lines.push(`**${legacyFilePaths.length} legacy feedback file(s) (pre-migration, read these too):**`);
+      lines.push('');
+    }
+    const latestLegacy = legacyFilePaths[legacyFilePaths.length - 1];
+    for (const filePath of legacyFilePaths) {
+      const marker = filePath === latestLegacy && continueEntries.length === 0 ? ' ← **latest, read this first**' : '';
       lines.push(`- \`${filePath}\`${marker}`);
     }
-
-    lines.push('');
-    lines.push(`Use your Read tool to open \`${latestPath}\`, read every line, then address any issues before continuing other work.`);
-
-    return lines.join('\n');
-  } catch {
-    return '';
+    if (continueEntries.length === 0) {
+      lines.push('');
+      lines.push(`Use your Read tool to open \`${latestLegacy}\`, read every line, then address any issues before continuing other work.`);
+    }
   }
+
+  return lines.join('\n');
 }
 
 const COMMENT_BODY_LIMIT = 500;
 const TOTAL_CONTEXT_LIMIT = 2000;
 
 /**
- * Fetch tracker context (new comments + issue status) since STATE.md was last modified.
+ * Fetch tracker context (new comments + issue status) since continue file was last modified.
  * Returns a formatted markdown string for injection into the work agent prompt.
  */
 export async function getTrackerContext(
@@ -112,14 +157,14 @@ export async function getTrackerContext(
   workspacePath: string
 ): Promise<string> {
   let stateMtime: Date | null = null;
-  const statePath = join(workspacePath, '.planning', 'STATE.md');
-  if (existsSync(statePath)) {
-    try {
-      stateMtime = statSync(statePath).mtime;
-    } catch {
-      // Ignore stat errors
+
+  // Find continue file mtime via workspace `.pan/continue.json` first, then migration fallbacks.
+  try {
+    const workspaceContinuePath = getWorkspacePanPaths(workspacePath).continuePath
+    if (existsSync(workspaceContinuePath)) {
+      stateMtime = statSync(workspaceContinuePath).mtime
     }
-  }
+  } catch { /* ignore */ }
 
   let config: ReturnType<typeof loadConfig>;
   try {
@@ -153,12 +198,12 @@ export async function getTrackerContext(
         }),
       ]);
 
-      // Filter to comments newer than STATE.md mtime
+      // Filter to comments newer than continue file mtime
       const newComments = stateMtime
         ? allComments.filter((c) => new Date(c.createdAt) > stateMtime!)
         : allComments;
 
-      // Detect reopened: STATE.md exists (has completion history) but issue is open
+      // Detect reopened: continue file exists (has completion history) but issue is open
       const isReopened =
         stateMtime !== null &&
         (issue.state === 'open' || issue.state === 'in_progress');
@@ -180,7 +225,7 @@ export async function getTrackerContext(
 
       if (newComments.length > 0) {
         const sinceLabel = stateMtime
-          ? `since STATE.md was last updated (${stateMtime.toISOString().slice(0, 10)})`
+          ? `since continue file was last updated (${stateMtime.toISOString().slice(0, 10)})`
           : 'all comments';
         lines.push('');
         lines.push(`**New comments ${sinceLabel}:**`);
@@ -220,7 +265,7 @@ export async function getTrackerContext(
         }
       } else if (stateMtime) {
         lines.push('');
-        lines.push('_No new comments since last STATE.md update._');
+        lines.push('_No new comments since last continue file update._');
       }
 
       const result = lines.join('\n').trim();
@@ -249,24 +294,173 @@ export async function getTrackerContext(
 }
 
 /**
- * Read planning artifacts for an issue (STATE.md, etc.)
+ * Read planning artifacts for an issue from workspace `.pan/continue.json`.
  */
 export function readPlanningContext(workspacePath: string): string | null {
-  const statePath = join(workspacePath, '.planning', 'STATE.md');
-  if (existsSync(statePath)) {
-    return readFileSync(statePath, 'utf-8');
+  const issueId = inferIssueIdFromWorkspace(workspacePath);
+  if (!issueId) return null;
+
+  try {
+    const workspaceContinue = readWorkspaceContinue(workspacePath)
+    if (workspaceContinue) {
+      return JSON.stringify(workspaceContinue, null, 2)
+    }
+  } catch { /* ignore */ }
+
+  return null;
+}
+
+function inferIssueIdFromWorkspace(workspacePath: string): string | null {
+  const base = workspacePath.split('/').pop() || '';
+  const match = base.match(/^feature-([a-z]+-\d+)$/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+/**
+ * Read workspace `.pan/context.md` for Rally Features so story agents receive
+ * feature-level context (child stories, description, URL).
+ * Falls back to a deterministic tracker-based parent workspace lookup.
+ */
+export async function readFeatureContext(workspacePath: string, issueId: string): Promise<string | null> {
+  const panContext = readWorkspaceContext(workspacePath)
+  if (panContext) {
+    return panContext
   }
+
+  // Deterministic O(1) lookup: query tracker for parentRef, then load directly
+  try {
+    const config = loadConfig();
+    const trackersConfig = config.trackers;
+    if (!trackersConfig) return null;
+
+    const trackerTypes: TrackerType[] = [trackersConfig.primary];
+    if (trackersConfig.secondary) trackerTypes.push(trackersConfig.secondary);
+
+    for (const trackerType of trackerTypes) {
+      try {
+        const tracker = createTrackerFromConfig(trackersConfig, trackerType);
+        const issue = await tracker.getIssue(issueId);
+        if (issue.parentRef) {
+          const projectRoot = dirname(dirname(workspacePath));
+          const parentWorkspace = join(projectRoot, 'workspaces', `feature-${issue.parentRef.toLowerCase()}`);
+          const parentPanContext = readWorkspaceContext(parentWorkspace)
+          if (parentPanContext) {
+            return parentPanContext
+          }
+        }
+      } catch {
+        continue;
+      }
+    }
+  } catch {
+    // tracker unavailable
+  }
+
   return null;
 }
 
 /**
- * Check if STATE.md contains Stitch design information.
+ * Synthesize and write feature context into a story workspace before
+ * work-agent startup. Loads the parent feature workspace spec, extracts
+ * narratives and cross-story dependency edges, and writes synthesized
+ * context so the story agent has deterministic O(1) access.
+ */
+export async function writeStoryFeatureContext(workspacePath: string, issueId: string): Promise<void> {
+  if (readWorkspaceContext(workspacePath)) return;
+
+  try {
+    const config = loadConfig();
+    const trackersConfig = config.trackers;
+    if (!trackersConfig) return;
+
+    const trackerTypes: TrackerType[] = [trackersConfig.primary];
+    if (trackersConfig.secondary) trackerTypes.push(trackersConfig.secondary);
+
+    for (const trackerType of trackerTypes) {
+      try {
+        const tracker = createTrackerFromConfig(trackersConfig, trackerType);
+        const issue = await tracker.getIssue(issueId);
+        if (!issue.parentRef) return;
+
+        // Load parent feature title for richer context
+        let parentTitle = issue.parentRef;
+        try {
+          const parentIssue = await tracker.getIssue(issue.parentRef);
+          if (parentIssue.title) parentTitle = parentIssue.title;
+        } catch {
+          // fallback to ref
+        }
+
+        const projectRoot = dirname(dirname(workspacePath));
+        const parentWorkspace = join(projectRoot, 'workspaces', `feature-${issue.parentRef.toLowerCase()}`);
+        const parentPlanPath = findPlan(parentWorkspace);
+
+        let contextContent = '';
+
+        if (parentPlanPath) {
+          try {
+            const parentDoc = readPlan(parentPlanPath);
+            const plan = parentDoc.plan;
+
+            const narratives = plan.narratives;
+            const narrativeSection = narratives
+              ? Object.entries(narratives)
+                  .filter(([, v]) => v)
+                  .map(([k, v]) => `### ${k}\n${v}`)
+                  .join('\n\n')
+              : '';
+
+            const edgesSection = plan.edges?.length > 0
+              ? plan.edges.map(e => `- **${e.from}** ${e.type} **${e.to}**`).join('\n')
+              : '';
+
+            const storyItems = plan.items.filter(item =>
+              item.title.toLowerCase().includes(issueId.toLowerCase()) ||
+              item.id.toLowerCase().includes(issueId.toLowerCase()),
+            );
+            const itemsSection = storyItems.map(item => {
+              const subItems = item.subItems?.map(s => `  - ${s.title} (${s.status})`).join('\n') || '';
+              return `- **${item.id}**: ${item.title} (${item.status})${item.narrative?.Action ? `\n  - Action: ${item.narrative.Action}` : ''}${subItems ? `\n${subItems}` : ''}`;
+            }).join('\n');
+
+            contextContent = `# Feature Context for ${issueId}\n\n` +
+              `**Parent Feature:** ${parentTitle} (${issue.parentRef})\n\n` +
+              `## Plan Narratives\n${narrativeSection || '_No narratives found._'}\n\n` +
+              `## Cross-Story Dependencies\n${edgesSection || '_No dependency edges found._'}\n\n` +
+              `## Related Plan Items\n${itemsSection || '_No plan items found for this story._'}\n\n` +
+              `---\n*Synthesized from parent feature workspace vBRIEF*\n`;
+          } catch (planErr) {
+            console.warn(`[writeStoryFeatureContext] Could not read parent workspace vBRIEF: ${planErr instanceof Error ? planErr.message : String(planErr)}`);
+          }
+        }
+
+        const parentPanContext = readWorkspaceContext(parentWorkspace)
+        if (parentPanContext && !contextContent) {
+          contextContent = parentPanContext
+        }
+
+        if (contextContent) {
+          writeWorkspaceContext(workspacePath, contextContent)
+        }
+
+        return;
+      } catch {
+        continue;
+      }
+    }
+  } catch {
+    // tracker unavailable
+  }
+}
+
+/**
+ * Check if planning content contains Stitch design information.
  * Returns the Stitch section if found, null otherwise.
  */
 export function extractStitchDesigns(stateContent: string | null): string | null {
   if (!stateContent) return null;
 
-  // Look for Stitch-related sections in STATE.md
+  // Look for Stitch-related sections in planning content
   const stitchPatterns = [
     /## UI Designs[\s\S]*?(?=\n## |$)/i,
     /### Stitch Assets[\s\S]*?(?=\n### |\n## |$)/i,
@@ -310,7 +504,7 @@ export function extractStitchDesigns(stateContent: string | null): string | null
 }
 
 /**
- * Extract beads IDs from STATE.md content.
+ * Extract beads IDs from planning content.
  * Looks for patterns like `panopticon-1dg` in backticks or tables.
  */
 export function extractBeadsIdsFromState(stateContent: string): string[] {
@@ -328,65 +522,30 @@ export function extractBeadsIdsFromState(stateContent: string): string[] {
 }
 
 /**
- * Read beads tasks for an issue from both workspace and project root.
- * Uses STATE.md to find the associated beads IDs.
+ * Read beads tasks for an issue from the live Dolt database via `bd list`.
+ * Falls back to `.beads/issues.jsonl` in workspacePath, then projectRoot.
  */
-export function readBeadsTasks(
+export async function readBeadsTasks(
   workspacePath: string,
   projectRoot: string,
   issueId: string
-): string[] {
+): Promise<string[]> {
   const tasks: string[] = [];
-  const normalizedId = issueId.toLowerCase();
 
-  const stateContent = readPlanningContext(workspacePath);
-  const beadsIds = stateContent ? extractBeadsIdsFromState(stateContent) : [];
-
-  // Load vBRIEF AC indexed by item title (lowercase) for per-bead injection
   const acByTitle = buildACLookupByTitle(workspacePath);
 
-  const beadsPaths = [
-    join(workspacePath, '.beads', 'issues.jsonl'),
-    join(projectRoot, '.beads', 'issues.jsonl'),
-  ];
+  let beads = await queryBeadsForIssue(workspacePath, issueId);
+  if (beads.length === 0) {
+    beads = await queryBeadsForIssue(projectRoot, issueId);
+  }
 
-  const seenIds = new Set<string>();
+  for (const bead of beads) {
+    tasks.push(`- [${bead.status || 'open'}] ${bead.title} (${bead.id})`);
 
-  for (const beadsPath of beadsPaths) {
-    if (!existsSync(beadsPath)) continue;
-
-    try {
-      const content = readFileSync(beadsPath, 'utf-8');
-      const lines = content.split('\n').filter((line) => line.trim());
-
-      for (const line of lines) {
-        try {
-          const task = JSON.parse(line);
-          if (seenIds.has(task.id)) continue;
-
-          const labels = task.labels || task.tags || [];
-          const isMatch =
-            beadsIds.includes(task.id) ||
-            labels.some((t: string) => t.toLowerCase().includes(normalizedId)) ||
-            task.title?.toLowerCase().includes(normalizedId);
-
-          if (isMatch) {
-            seenIds.add(task.id);
-            tasks.push(`- [${task.status || 'open'}] ${task.title} (${task.id})`);
-
-            // Inject per-bead AC from vBRIEF plan
-            const beadAC = matchBeadToAC(task.title, acByTitle);
-            for (const ac of beadAC) {
-              const check = ac.status === 'completed' ? 'x' : ' ';
-              tasks.push(`  - [${check}] AC: ${ac.title}`);
-            }
-          }
-        } catch {
-          // Skip malformed lines
-        }
-      }
-    } catch {
-      // Skip unreadable files
+    const beadAC = matchBeadToAC(bead.title, acByTitle);
+    for (const ac of beadAC) {
+      const check = ac.status === 'completed' ? 'x' : ' ';
+      tasks.push(`  - [${check}] AC: ${ac.title}`);
     }
   }
 
@@ -458,7 +617,7 @@ export function buildPolyrepoContext(issueId: string, workspacePath: string): st
     // Check which repos actually exist in the workspace
     const existingRepos = readdirSync(workspacePath).filter(f => {
       const fullPath = join(workspacePath, f);
-      return f !== '.planning' && f !== '.claude' && f !== '.pan' && f !== '.beads' && existsSync(fullPath);
+      return f !== '.claude' && f !== '.pan' && f !== '.beads' && existsSync(fullPath);
     });
     visibleRepos = repos.filter(r => existingRepos.includes(r.name));
   }

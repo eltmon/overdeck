@@ -70,6 +70,10 @@ export function createRecoveryCoordinator(): RecoveryCoordinator {
   }
 
   function classifyDomainEvent(sequence: number): EventClassification {
+    // In-memory-only events (sequence === -1, emitted via emitOnly()) are
+    // ephemeral and not part of the persistent log — always apply immediately.
+    if (sequence === -1) return 'apply'
+
     // Track the highest sequence seen
     if (sequence > state.highestObservedSequence) {
       state = { ...state, highestObservedSequence: sequence }

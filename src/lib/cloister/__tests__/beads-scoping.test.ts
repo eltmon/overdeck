@@ -12,7 +12,7 @@ beforeEach(() => {
   TEST_DIR = join(tmpdir(), `pan-419-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   WORKSPACE_DIR = join(TEST_DIR, 'workspaces', 'feature-pan-412');
   PROJECT_ROOT = TEST_DIR;
-  mkdirSync(join(WORKSPACE_DIR, '.planning'), { recursive: true });
+  mkdirSync(join(WORKSPACE_DIR, '.pan'), { recursive: true });
   mkdirSync(join(PROJECT_ROOT, '.beads'), { recursive: true });
 });
 
@@ -31,7 +31,7 @@ function writeBeadsJsonl(dir: string, beads: Array<{ id: string; title: string; 
 }
 
 describe('readBeadsTasks label scoping', () => {
-  it('filters beads by issue label, excluding other issues', () => {
+  it('filters beads by issue label, excluding other issues', async () => {
     writeBeadsJsonl(PROJECT_ROOT, [
       { id: 'pan-001', title: 'PAN-412: Implement feature A', labels: ['pan-412', 'difficulty:simple'] },
       { id: 'pan-002', title: 'PAN-412: Implement feature B', labels: ['pan-412', 'difficulty:medium'] },
@@ -40,33 +40,33 @@ describe('readBeadsTasks label scoping', () => {
       { id: 'pan-005', title: 'PAN-414: Yet another', labels: ['pan-414', 'difficulty:complex'] },
     ]);
 
-    const tasks = readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-412');
+    const tasks = await readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-412');
 
     expect(tasks).toHaveLength(2);
     expect(tasks[0]).toContain('PAN-412: Implement feature A');
     expect(tasks[1]).toContain('PAN-412: Implement feature B');
   });
 
-  it('matches beads using labels field (not just tags)', () => {
+  it('matches beads using labels field (not just tags)', async () => {
     writeBeadsJsonl(PROJECT_ROOT, [
       { id: 'pan-010', title: 'Some generic title', labels: ['pan-419'] },
       { id: 'pan-011', title: 'Another generic title', labels: ['pan-420'] },
     ]);
 
-    const tasks = readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-419');
+    const tasks = await readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-419');
 
     expect(tasks).toHaveLength(1);
     expect(tasks[0]).toContain('Some generic title');
   });
 
-  it('handles legacy workspace: prefixed labels', () => {
+  it('handles legacy workspace: prefixed labels', async () => {
     writeBeadsJsonl(PROJECT_ROOT, [
       { id: 'pan-020', title: 'PAN-412: Implementation', labels: ['workspace:pan-412'] },
       { id: 'pan-021', title: 'PAN-412: Feature', labels: ['pan-412'] },
       { id: 'pan-022', title: 'PAN-158: Other', labels: ['workspace:pan-158'] },
     ]);
 
-    const tasks = readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-412');
+    const tasks = await readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-412');
 
     // Should match both workspace: prefixed and bare labels containing pan-412
     expect(tasks).toHaveLength(2);
@@ -74,7 +74,7 @@ describe('readBeadsTasks label scoping', () => {
     expect(tasks.some(t => t.includes('Feature'))).toBe(true);
   });
 
-  it('deduplicates beads found in both workspace and project root', () => {
+  it('deduplicates beads found in both workspace and project root', async () => {
     // Same bead in both locations
     writeBeadsJsonl(PROJECT_ROOT, [
       { id: 'pan-030', title: 'PAN-412: Shared bead', labels: ['pan-412'] },
@@ -84,7 +84,7 @@ describe('readBeadsTasks label scoping', () => {
       { id: 'pan-030', title: 'PAN-412: Shared bead', labels: ['pan-412'] },
     ]);
 
-    const tasks = readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-412');
+    const tasks = await readBeadsTasks(WORKSPACE_DIR, PROJECT_ROOT, 'PAN-412');
 
     expect(tasks).toHaveLength(1);
   });

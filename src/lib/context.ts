@@ -2,28 +2,17 @@
  * Context Engineering System
  *
  * Implements GSD-Plus patterns for structured context management:
- * - STATE.md: Agent state that survives compaction
  * - WORKSPACE.md: Project context
  * - SUMMARY.md: Work artifacts
  * - Queryable history files
+ *
+ * Workspace-level orchestration state lives in `<workspace>/.pan/continue.json`,
+ * not here.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, readdirSync } from 'fs';
-import { join, basename } from 'path';
+import { join } from 'path';
 import { AGENTS_DIR } from './paths.js';
-
-export interface AgentStateContext {
-  issueId: string;
-  status: string;
-  lastActivity: string;
-  lastCheckpoint?: string;
-  resumePoint?: string;
-  contextRefs: {
-    workspace?: string;
-    prd?: string;
-    beads?: string;
-  };
-}
 
 export interface SummaryEntry {
   title: string;
@@ -32,135 +21,6 @@ export interface SummaryEntry {
   whatWasDone: string[];
   keyInsights?: string[];
   filesModified?: string[];
-}
-
-// ============== STATE.md ==============
-
-function getStateFile(agentId: string): string {
-  return join(AGENTS_DIR, agentId, 'STATE.md');
-}
-
-/**
- * Read current STATE.md for an agent
- */
-export function readAgentState(agentId: string): AgentStateContext | null {
-  const stateFile = getStateFile(agentId);
-  if (!existsSync(stateFile)) return null;
-
-  try {
-    const content = readFileSync(stateFile, 'utf-8');
-    return parseStateMd(content);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Write STATE.md for an agent
- */
-export function writeAgentState(agentId: string, state: AgentStateContext): void {
-  const dir = join(AGENTS_DIR, agentId);
-  mkdirSync(dir, { recursive: true });
-
-  const content = generateStateMd(state);
-  writeFileSync(getStateFile(agentId), content);
-}
-
-/**
- * Update checkpoint in STATE.md
- */
-export function updateCheckpoint(agentId: string, checkpoint: string, resumePoint?: string): void {
-  const state = readAgentState(agentId);
-  if (!state) return;
-
-  state.lastActivity = new Date().toISOString();
-  state.lastCheckpoint = checkpoint;
-  if (resumePoint) {
-    state.resumePoint = resumePoint;
-  }
-
-  writeAgentState(agentId, state);
-}
-
-function generateStateMd(state: AgentStateContext): string {
-  const lines: string[] = [
-    `# Agent State: ${state.issueId}`,
-    '',
-    '## Current Position',
-    '',
-    `Issue: ${state.issueId}`,
-    `Status: ${state.status}`,
-    `Last activity: ${state.lastActivity}`,
-    '',
-  ];
-
-  if (state.lastCheckpoint) {
-    lines.push('## Session Continuity');
-    lines.push('');
-    lines.push(`Last checkpoint: "${state.lastCheckpoint}"`);
-    if (state.resumePoint) {
-      lines.push(`Resume point: "${state.resumePoint}"`);
-    }
-    lines.push('');
-  }
-
-  if (state.contextRefs.workspace || state.contextRefs.prd || state.contextRefs.beads) {
-    lines.push('## Context References');
-    lines.push('');
-    if (state.contextRefs.workspace) {
-      lines.push(`- Workspace: ${state.contextRefs.workspace}`);
-    }
-    if (state.contextRefs.prd) {
-      lines.push(`- PRD: ${state.contextRefs.prd}`);
-    }
-    if (state.contextRefs.beads) {
-      lines.push(`- Beads: ${state.contextRefs.beads}`);
-    }
-    lines.push('');
-  }
-
-  return lines.join('\n');
-}
-
-function parseStateMd(content: string): AgentStateContext {
-  const state: AgentStateContext = {
-    issueId: '',
-    status: '',
-    lastActivity: '',
-    contextRefs: {},
-  };
-
-  // Parse issue ID from title
-  const titleMatch = content.match(/# Agent State: (.+)/);
-  if (titleMatch) state.issueId = titleMatch[1].trim();
-
-  // Parse status
-  const statusMatch = content.match(/Status: (.+)/);
-  if (statusMatch) state.status = statusMatch[1].trim();
-
-  // Parse last activity
-  const activityMatch = content.match(/Last activity: (.+)/);
-  if (activityMatch) state.lastActivity = activityMatch[1].trim();
-
-  // Parse checkpoint
-  const checkpointMatch = content.match(/Last checkpoint: "(.+)"/);
-  if (checkpointMatch) state.lastCheckpoint = checkpointMatch[1];
-
-  // Parse resume point
-  const resumeMatch = content.match(/Resume point: "(.+)"/);
-  if (resumeMatch) state.resumePoint = resumeMatch[1];
-
-  // Parse context refs
-  const workspaceMatch = content.match(/- Workspace: (.+)/);
-  if (workspaceMatch) state.contextRefs.workspace = workspaceMatch[1].trim();
-
-  const prdMatch = content.match(/- PRD: (.+)/);
-  if (prdMatch) state.contextRefs.prd = prdMatch[1].trim();
-
-  const beadsMatch = content.match(/- Beads: (.+)/);
-  if (beadsMatch) state.contextRefs.beads = beadsMatch[1].trim();
-
-  return state;
 }
 
 // ============== SUMMARY.md ==============

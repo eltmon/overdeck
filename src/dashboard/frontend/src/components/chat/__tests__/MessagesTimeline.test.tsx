@@ -190,4 +190,48 @@ describe('MessagesTimeline — roundMarkers', () => {
     expect(divider).toHaveAttribute('role', 'separator');
     expect(divider).toHaveAttribute('aria-label', 'Round 7 — Failed');
   });
+
+  it('collapses tool-only work groups when hideToolCalls is true', () => {
+    const messages: ChatMessage[] = [
+      makeMessage('u1', 'user', 0),
+      makeMessage('a1', 'assistant', 5_000),
+    ];
+    const workLog = [
+      { id: 'w1', createdAt: new Date(1_700_000_005_000).toISOString(), label: 'Bash', tone: 'tool' as const },
+      { id: 'w2', createdAt: new Date(1_700_000_006_000).toISOString(), label: 'Read', tone: 'tool' as const },
+    ];
+    render(
+      <MessagesTimeline
+        messages={messages}
+        workLog={workLog}
+        streaming={false}
+        hideToolCalls
+      />,
+    );
+    expect(screen.getByText('2 tool calls were made')).toBeInTheDocument();
+    expect(screen.queryByText('Bash')).not.toBeInTheDocument();
+    expect(screen.queryByText('Read')).not.toBeInTheDocument();
+  });
+
+  it('does not collapse mixed-tone work groups even when hideToolCalls is true', () => {
+    const messages: ChatMessage[] = [
+      makeMessage('u1', 'user', 0),
+      makeMessage('a1', 'assistant', 5_000),
+    ];
+    const workLog = [
+      { id: 'w1', createdAt: new Date(1_700_000_005_000).toISOString(), label: 'Bash', tone: 'tool' as const },
+      { id: 'w2', createdAt: new Date(1_700_000_006_000).toISOString(), label: 'Context compacted', tone: 'info' as const },
+    ];
+    render(
+      <MessagesTimeline
+        messages={messages}
+        workLog={workLog}
+        streaming={false}
+        hideToolCalls
+      />,
+    );
+    expect(screen.queryByText(/tool calls were made/)).not.toBeInTheDocument();
+    expect(screen.getByText('Bash')).toBeInTheDocument();
+    expect(screen.getByText('Context compacted')).toBeInTheDocument();
+  });
 });

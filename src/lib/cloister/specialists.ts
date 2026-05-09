@@ -13,6 +13,7 @@ import { promisify } from 'util';
 import { randomUUID, createHash } from 'crypto';
 import { PANOPTICON_HOME } from '../paths.js';
 import { getDevrootPath } from '../config.js';
+import { getClaudePermissionFlagsString } from '../claude-permissions.js';
 import { getProject } from '../projects.js';
 import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
 import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
@@ -24,6 +25,7 @@ import { getModelId, WorkTypeId } from '../work-type-router.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { getProviderEnvForModel } from '../agents.js';
 import { generateLauncherScript, generateLauncherWrapper } from '../launcher-generator.js';
+import { resolveSpecialistBaseCommand } from './router.js';
 import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery, createSessionAsync, killSessionAsync, buildTmuxCommandString, listPaneValuesAsync, listSessionNamesAsync, sessionExistsAsync } from '../tmux.js';
 import { notifyPipeline } from '../pipeline-notifier.js';
 import { isTaskReady } from './task-readiness.js';
@@ -202,7 +204,7 @@ export interface SpecialistStatus extends SpecialistMetadata {
  * One step in the model resolution trace (PAN-754)
  */
 export interface ResolutionStep {
-  source: 'work-type-router' | 'cloister-config' | 'fallback';
+  source: 'explicit-param' | 'work-type-router' | 'cloister-config' | 'fallback';
   workTypeId?: string;
   configKey?: string;
   resolvedAlias?: string;
@@ -800,6 +802,7 @@ export async function spawnEphemeralSpecialist(
     prUrl?: string;
     context?: TaskContext;
     promptOverride?: string; // Use this prompt instead of building from template
+    model?: string;
   }
 ): Promise<{
   success: boolean;
@@ -948,13 +951,18 @@ ${basePrompt}`;
 
   try {
     // Determine model for this specialist
-    // Priority: work-type-router (respects config.yaml overrides) > cloister config defaults > fallback
-    // PAN-754: work-type-router MUST be checked first so user's models.overrides.specialist-X config wins.
+    // Priority: explicit param > work-type-router (config.yaml overrides) > cloister config defaults > fallback
     const fallbackModel = 'claude-sonnet-4-6';
     let model: string | undefined;
     const resolutionTrace: ResolutionStep[] = [];
 
-    try {
+    if (task.model) {
+      model = task.model;
+      resolutionTrace.push({ source: 'explicit-param', resolvedModel: task.model, matched: true });
+      console.log(`[specialist] Using explicit model "${model}" for ${specialistType}`);
+    }
+
+    if (!model) try {
       const workTypeId: WorkTypeId = `specialist-${specialistType}` as WorkTypeId;
       const resolved = getModelId(workTypeId);
       if (resolved) {
@@ -1003,7 +1011,7 @@ ${basePrompt}`;
     });
 
     // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
-    const providerEnv = getProviderEnvForModel(model);
+    const providerEnv = await getProviderEnvForModel(model);
     // Add Panopticon cost attribution env vars so heartbeat hook records correct stage/issue
     const sessionTypeLabel = specialistType.replace('-agent', ''); // review-agent → review
     const panopticonEnv: Record<string, string> = {
@@ -1022,8 +1030,8 @@ ${basePrompt}`;
       clearCredentialFileAuth(cwd);
     }
 
-    // All autonomous specialists need full permission bypass to avoid interactive prompts
-    const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
+    // Permission flags resolved from config / --yolo / PAN_YOLO (default: auto)
+    const permissionFlags = getClaudePermissionFlagsString();
 
     // Write task prompt to file to avoid shell escaping issues
     const agentDir = join(homedir(), '.panopticon', 'agents', tmuxSession);
@@ -1082,20 +1090,31 @@ ${basePrompt}`;
     );
 
     const providerExportLines = buildProviderExportLines(providerEnv);
+    // PAN-982: Each specialist now has a matching .claude/agents/pan-<specialistType>.md
+    // definition (pan-review-agent, pan-test-agent, pan-inspect-agent, pan-uat-agent,
+    // pan-merge-agent) that declares model, permissionMode, tools, and per-agent hooks.
+    // SpecialistType already ends in '-agent' (e.g. 'review-agent') so we just prepend 'pan-'.
+    const specialistAgentName = `pan-${specialistType}`;
     writeFileSync(
       innerScript,
       generateLauncherScript({
         agentType: 'specialist-dispatch',
         workingDir: cwd,
         setPipefail: true,
+        setTerminalEnv: true,
         unsetProviderEnv: true,
         providerExports: providerExportLines,
         setCi: true,
         panopticonEnv: { agentId: tmuxSession, issueId: task.issueId, sessionType: sessionTypeLabel },
         cavemanExports: specialistCavemanExports,
         promptFile,
-        baseCommand: 'claude',
-        permissionFlags: permissionFlags.split(' '),
+        // PAN-982: emit `claude --agent ${specialistAgentName}` on the claude-code
+        // path (the agent frontmatter declares model/permissions/tools/hooks, so
+        // we drop --model and --permission flags entirely). PAN-636 routes through
+        // resolveSpecialistBaseCommand so a Pi-configured specialist gets a
+        // `pi --mode rpc --model <model>` line instead, with the ToS gate falling
+        // back to claude-code for the blocked Pi+Anthropic+subscription cell.
+        baseCommand: await resolveSpecialistBaseCommand(specialistType, model),
         sessionId,
         model,
       }),
@@ -1144,7 +1163,7 @@ ${basePrompt}`;
       currentIssue: task.issueId,
     });
 
-    console.log(`[specialist] Spawned ${specialistType} for ${projectKey}/${task.issueId} (run: ${runId})`);
+    console.log(`[claude-invoke] SUCCESS purpose=specialist-dispatch | model=${model} | source=specialists.ts:dispatchSpecialist | session=${tmuxSession} | specialist=${specialistType} | issue=${task.issueId} | run=${runId}`);
 
 
     return {
@@ -1557,7 +1576,7 @@ export function findActiveRegistryKey(projectKey: string, specialistType: Specia
  * @param result - Task result
  * @param issueId - Optional: issue being handled (used to compute compound registry key)
  */
-export function signalSpecialistCompletion(
+export async function signalSpecialistCompletion(
   projectKey: string,
   specialistType: SpecialistType,
   result: {
@@ -1565,7 +1584,7 @@ export function signalSpecialistCompletion(
     notes?: string;
   },
   issueId?: string
-): void {
+): Promise<void> {
   const registryKey = issueId
     ? makeSpecialistRegistryKey(specialistType, issueId)
     : (findActiveRegistryKey(projectKey, specialistType) ?? specialistType);
@@ -1579,9 +1598,8 @@ export function signalSpecialistCompletion(
 
   // Finalize log if there's a current run
   if (metadata.currentRun) {
-    const { finalizeRunLog } = require('./specialist-logs.js');
-
     try {
+      const { finalizeRunLog } = await import('./specialist-logs.js');
       finalizeRunLog(projectKey, specialistType, metadata.currentRun, {
         status: result.status,
         notes: result.notes,
@@ -2277,7 +2295,7 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
 
   try {
     // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
-    const providerEnv = getProviderEnvForModel(model);
+    const providerEnv = await getProviderEnvForModel(model);
     const envFlags = buildTmuxEnvFlags(providerEnv);
 
     // For credential-file providers (e.g. Kimi), configure apiKeyHelper for token refresh.
@@ -2299,6 +2317,9 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
     writeFileSync(promptFile, identityPrompt);
     const newSessionId = randomUUID();
     const initProviderExportLines = buildProviderExportLines(providerEnv);
+    // PAN-982: --agent pan-<specialistType> selects the matching .claude/agents/pan-*.md
+    // definition. SpecialistType already ends in '-agent' so we just prepend 'pan-'.
+    const specialistAgentName = `pan-${name}`;
     writeFileSync(
       launcherScript,
       generateLauncherScript({
@@ -2307,8 +2328,10 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
         unsetProviderEnv: true,
         providerExports: initProviderExportLines,
         promptFile,
-        baseCommand: 'claude',
-        permissionFlags: ['--dangerously-skip-permissions', '--permission-mode', 'bypassPermissions'],
+        // Same PAN-982 + PAN-636 handling as the dispatch path above —
+        // resolveSpecialistBaseCommand emits the --agent form on claude-code and
+        // a pi --mode rpc line when the role is configured for Pi.
+        baseCommand: await resolveSpecialistBaseCommand(name, model),
         sessionId: newSessionId,
         model,
       }),
@@ -2507,7 +2530,7 @@ export async function wakeSpecialist(
       const modelFlag = `--model ${model}`;
 
       // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
-      const providerEnv = getProviderEnvForModel(model);
+      const providerEnv = await getProviderEnvForModel(model);
       // Add Panopticon cost attribution env vars
       const wakeSessionType = name.replace('-agent', ''); // review-agent → review
       const wakePanEnv: Record<string, string> = {
@@ -2517,7 +2540,13 @@ export async function wakeSpecialist(
       if (issueId) {
         wakePanEnv.PANOPTICON_ISSUE_ID = issueId;
       }
-      const envFlags = buildTmuxEnvFlags({ ...providerEnv, ...wakePanEnv });
+      const terminalEnv: Record<string, string> = {
+        TERM: 'xterm-256color',
+        COLORTERM: 'truecolor',
+        LANG: 'C.UTF-8',
+        LC_ALL: 'C.UTF-8',
+      };
+      const envFlags = buildTmuxEnvFlags({ ...terminalEnv, ...providerEnv, ...wakePanEnv });
 
       // For credential-file providers (e.g. Kimi), configure apiKeyHelper for token refresh.
       // For all other providers, clear stale apiKeyHelper from previous runs.
@@ -2528,8 +2557,8 @@ export async function wakeSpecialist(
         clearCredentialFileAuth(cwd);
       }
 
-      // All autonomous specialists need full permission bypass to avoid interactive prompts
-      const permissionFlags = '--dangerously-skip-permissions --permission-mode bypassPermissions';
+      // Permission flags resolved from config / --yolo / PAN_YOLO (default: auto)
+      const permissionFlags = getClaudePermissionFlagsString();
 
       // Start with --resume if we have a session, otherwise generate a new session ID
       // Always start fresh — no --resume. Context compaction corrupts thinking block
@@ -2540,7 +2569,8 @@ export async function wakeSpecialist(
         .map(([k, v]) => `export ${k}="${v}"`)
         .join('; ');
       const providerSetupCmd = providerExportCmd ? `${providerExportCmd}; ` : '';
-      const claudeCmd = `${PROVIDER_UNSET_CMD}; ${providerSetupCmd}exec claude --session-id "${effectiveSessionId}" ${modelFlag} ${permissionFlags}`;
+      const claudeCmd = `${PROVIDER_UNSET_CMD}; ${providerSetupCmd}export TERM=xterm-256color; export COLORTERM=truecolor; exec claude --session-id "${effectiveSessionId}" ${modelFlag} ${permissionFlags}`;
+      console.log(`[claude-invoke] purpose=specialist-wake | model=${model} | source=specialists.ts:wakeSpecialist | session=${tmuxSession} | specialist=${name} | command="exec claude ..."`);
 
       // Kill stale session first to prevent "duplicate session" error (PAN-430)
       await killSessionAsync(tmuxSession).catch(() => { /* no stale session */ });

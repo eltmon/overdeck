@@ -1,0 +1,29 @@
+{
+  "version": "1",
+  "issueId": "PAN-964",
+  "created": "2026-05-07T08:23:59.937Z",
+  "updated": "2026-05-07T10:31:14.180Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "beadsMapping": {},
+  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-05-07T08:23Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-05-07T08:23:59.938Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.6",
+      "timestamp": "2026-05-07T08:23:59.965Z"
+    },
+    {
+      "reason": "resume",
+      "note": "Reopened on 2026-05-07; review: blocked → pending; test: pending → pending; merge: merged → pending",
+      "timestamp": "2026-05-07T08:56:17.391Z"
+    }
+  ]
+}

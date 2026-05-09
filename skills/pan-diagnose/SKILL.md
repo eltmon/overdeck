@@ -164,7 +164,8 @@ tmux has-session -t agent-ISSUE-123 2>/dev/null && echo "Running" || echo "Not r
 
 # If dead, check workspace for clues
 cd /path/to/workspaces/ISSUE-123
-cat .planning/STATE.md
+cat .pan/context.md
+cat .pan/continue.json
 
 # Resume with new agent
 pan start ISSUE-123

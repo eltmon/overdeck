@@ -21,8 +21,10 @@ const LEAKED_ENV_KEYS = new Set([
 
 /** Provider-specific keys that must be cleared before re-routing a child. */
 const PROVIDER_ENV_KEYS = new Set([
+  'ANTHROPIC_API_KEY',
   'ANTHROPIC_BASE_URL',
   'ANTHROPIC_AUTH_TOKEN',
+  'ANTHROPIC_DEFAULT_HAIKU_MODEL',
   'OPENAI_API_KEY',
   'GEMINI_API_KEY',
   'API_TIMEOUT_MS',
@@ -56,6 +58,19 @@ export function buildChildEnv(
   }
   return out;
 }
+
+/**
+ * Provider env vars set to empty strings — for tmux -e overrides.
+ *
+ * tmux -e can only SET vars, not UNSET inherited ones. The tmux server
+ * inherits the parent's env (including stale provider vars like
+ * ANTHROPIC_BASE_URL). Passing these as empty via -e overrides the
+ * server's inherited values. The launcher script's `unset` + `export`
+ * then sets the correct values for the child process.
+ */
+export const BLANKED_PROVIDER_ENV: Record<string, string> = Object.fromEntries(
+  [...PROVIDER_ENV_KEYS].map(k => [k, '']),
+);
 
 /**
  * Variant that strips ONLY tmux/screen artifacts (not provider keys).

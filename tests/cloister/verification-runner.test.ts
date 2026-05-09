@@ -16,6 +16,7 @@ const {
   writeFeedbackFileMock,
   messageAgentMock,
   findProjectByPathMock,
+  existsSyncMock,
 } = vi.hoisted(() => ({
   execMock: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>()
     .mockResolvedValue({ stdout: 'Already up to date\n', stderr: '' }),
@@ -25,6 +26,7 @@ const {
   writeFeedbackFileMock: vi.fn(),
   messageAgentMock: vi.fn(),
   findProjectByPathMock: vi.fn(),
+  existsSyncMock: vi.fn(),
 }));
 
 vi.mock('child_process', () => {
@@ -52,6 +54,10 @@ vi.mock('child_process', () => {
   return { exec, execFile };
 });
 
+vi.mock('fs', () => ({
+  existsSync: existsSyncMock,
+}));
+
 vi.mock('../../src/lib/review-status.js', () => ({
   getReviewStatus: getReviewStatusMock,
   setReviewStatus: setReviewStatusMock,
@@ -75,6 +81,18 @@ vi.mock('../../src/lib/agents.js', () => ({
 
 vi.mock('../../src/lib/projects.js', () => ({
   findProjectByPath: findProjectByPathMock,
+}));
+
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal() as any;
+  return {
+    ...actual,
+    existsSync: vi.fn().mockReturnValue(true),
+  };
+});
+
+vi.mock('../../src/lib/vbrief/beads.js', () => ({
+  getVBriefACStatus: vi.fn().mockReturnValue({ allCompleted: true, totalPending: 0, totalCount: 0, items: [] }),
 }));
 
 // Import under test after mocks
@@ -111,9 +129,10 @@ describe('runVerificationForIssue', () => {
     execMock.mockResolvedValue({ stdout: 'Already up to date\n', stderr: '' });
     getReviewStatusMock.mockReturnValue(null); // no existing status → 0 cycles
     runQualityGatesMock.mockResolvedValue(makePassedResults());
-    writeFeedbackFileMock.mockResolvedValue({ success: true, relativePath: '.planning/feedback/001-verification-failed.md' });
+    writeFeedbackFileMock.mockResolvedValue({ success: true, relativePath: '.pan/feedback/001-verification-failed.md' });
     messageAgentMock.mockResolvedValue(undefined);
     findProjectByPathMock.mockReturnValue(null); // no project config → DEFAULT_GATES
+    existsSyncMock.mockImplementation((p: string) => p.endsWith('/.git'));
   });
 
   describe('circuit breaker', () => {
@@ -219,7 +238,7 @@ describe('runVerificationForIssue', () => {
           workspacePath,
           specialist: 'verification-gate',
           outcome: 'failed',
-          summary: expect.stringContaining('Sync with main FAILED'),
+          summary: expect.stringContaining('Sync FAILED'),
           markdownBody: expect.stringContaining('fatal: Not possible to fast-forward, aborting.'),
         })
       );

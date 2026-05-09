@@ -47,11 +47,24 @@ export interface CommentOnArtifactInput extends ReviewArtifactRef {
   repository?: string;
 }
 
+export interface ApproveReviewArtifactInput extends ReviewArtifactRef {
+  cwd?: string;
+  repository?: string;
+}
+
+export interface DiscoverArtifactInput {
+  sourceBranch: string;
+  cwd?: string;
+  repository?: string;
+}
+
 export interface ForgeAdapter {
   readonly forge: ForgeType;
   createReviewArtifact(input: CreateReviewArtifactInput): Promise<CreateReviewArtifactResult>;
   mergeReviewArtifact(input: MergeReviewArtifactInput): Promise<void>;
   commentOnArtifact(input: CommentOnArtifactInput): Promise<void>;
+  approveReviewArtifact(input: ApproveReviewArtifactInput): Promise<void>;
+  discoverArtifact(input: DiscoverArtifactInput): Promise<CreateReviewArtifactResult | null>;
 }
 
 async function withBodyFile<T>(body: string | undefined, prefix: string, fn: (bodyFile?: string) => Promise<T>): Promise<T> {
@@ -244,6 +257,18 @@ const githubForgeAdapter: ForgeAdapter = {
       );
     });
   },
+
+  async approveReviewArtifact(input) {
+    const target = buildGitHubReviewTarget(input);
+    await execAsync(
+      `gh pr review ${target} --approve${buildRepositoryFlag(input.repository)}`,
+      { cwd: input.cwd, encoding: 'utf-8' }
+    );
+  },
+
+  async discoverArtifact(input) {
+    return getExistingGitHubArtifact(input.sourceBranch, input.cwd, input.repository);
+  },
 };
 
 const gitlabForgeAdapter: ForgeAdapter = {
@@ -253,21 +278,20 @@ const gitlabForgeAdapter: ForgeAdapter = {
     const existing = await getExistingGitLabArtifact(input.sourceBranch, input.cwd, input.repository);
     if (existing) return existing;
 
-    return withBodyFile(input.body, 'pan-gl-mr-body', async (bodyFile) => {
-      const bodyFlag = bodyFile ? ` --description-file "${bodyFile}"` : '';
-      const { stdout } = await execAsync(
-        `glab mr create --source-branch ${input.sourceBranch} --target-branch ${input.targetBranch} --title "${input.title}"${bodyFlag}${buildRepositoryFlag(input.repository)}`,
-        { cwd: input.cwd, encoding: 'utf-8' }
-      );
-      const url = stdout.trim().split('\n').pop()?.trim() || stdout.trim();
-      const created = await getExistingGitLabArtifact(input.sourceBranch, input.cwd, input.repository);
-      return {
-        forge: 'gitlab',
-        created: true,
-        url,
-        id: created?.id,
-      };
-    });
+    const bodyEnv = input.body ? { PAN_MR_BODY: input.body } : {};
+    const bodyFlag = input.body ? ' --description "$PAN_MR_BODY"' : '';
+    const { stdout } = await execAsync(
+      `glab mr create --source-branch ${input.sourceBranch} --target-branch ${input.targetBranch} --title "${input.title}"${bodyFlag}${buildRepositoryFlag(input.repository)}`,
+      { cwd: input.cwd, encoding: 'utf-8', env: { ...process.env, ...bodyEnv }, shell: '/bin/bash' }
+    );
+    const url = stdout.trim().split('\n').pop()?.trim() || stdout.trim();
+    const created = await getExistingGitLabArtifact(input.sourceBranch, input.cwd, input.repository);
+    return {
+      forge: 'gitlab',
+      created: true,
+      url,
+      id: created?.id,
+    };
   },
 
   async mergeReviewArtifact(input) {
@@ -288,6 +312,18 @@ const gitlabForgeAdapter: ForgeAdapter = {
         { cwd: input.cwd, encoding: 'utf-8' }
       );
     });
+  },
+
+  async approveReviewArtifact(input) {
+    const target = buildGitLabReviewTarget(input);
+    await execAsync(
+      `glab mr approve ${target}${buildRepositoryFlag(input.repository)}`,
+      { cwd: input.cwd, encoding: 'utf-8' }
+    );
+  },
+
+  async discoverArtifact(input) {
+    return getExistingGitLabArtifact(input.sourceBranch, input.cwd, input.repository);
   },
 };
 

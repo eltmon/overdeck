@@ -13,6 +13,7 @@ import {
   Star,
 } from 'lucide-react';
 import { WorkTypeId, ModelId } from '../types';
+import { CostWarningBadge, costWarningLevel } from '../../shared/costWarning';
 
 // Model capabilities that can be matched to work types
 export type Capability = 'reasoning' | 'code' | 'vision' | 'fast' | 'cost-efficient' | 'large-context' | 'complex-math' | 'efficiency' | 'agentic';
@@ -24,6 +25,12 @@ export interface ModelDef {
   tier?: 'premium' | 'balanced' | 'fast';
   capabilities: Capability[];
   description?: string;
+  /**
+   * Blended $/1M tokens. Used to flag expensive models with a scary warning
+   * badge so users don't accidentally pick gpt-5.5-pro ($119) when they meant
+   * gpt-5.5 ($10).
+   */
+  costPer1MTokens?: number;
 }
 
 interface ProviderDef {
@@ -46,52 +53,62 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   anthropic: {
     name: 'Anthropic',
     models: [
-      { id: 'claude-opus-4-7' as ModelId, name: 'Claude Opus 4.7', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Most capable — xhigh/max effort, deepest reasoning' },
-      { id: 'claude-opus-4-6' as ModelId, name: 'Claude Opus 4.6', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous Opus, strong reasoning and planning' },
-      { id: 'claude-sonnet-4-6' as ModelId, name: 'Claude Sonnet 4.6', icon: Sparkles, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Latest Sonnet — fast, capable, great for implementation' },
-      { id: 'claude-haiku-4-5' as ModelId, name: 'Claude Haiku 4.5', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fastest, ideal for simple tasks' },
+      { id: 'claude-opus-4-7' as ModelId, name: 'Claude Opus 4.7', icon: Gem, tier: 'premium', costPer1MTokens: 45, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Most capable — xhigh/max effort, deepest reasoning' },
+      { id: 'claude-opus-4-6' as ModelId, name: 'Claude Opus 4.6', icon: Gem, tier: 'premium', costPer1MTokens: 45, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Previous Opus, strong reasoning and planning' },
+      { id: 'claude-sonnet-4-6' as ModelId, name: 'Claude Sonnet 4.6', icon: Sparkles, tier: 'balanced', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'vision', 'agentic'], description: 'Latest Sonnet — fast, capable, great for implementation' },
+      { id: 'claude-haiku-4-5' as ModelId, name: 'Claude Haiku 4.5', icon: Zap, tier: 'fast', costPer1MTokens: 1, capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fastest, ideal for simple tasks' },
     ],
   },
   openai: {
     name: 'OpenAI',
     models: [
-      { id: 'gpt-5.4-pro' as ModelId, name: 'GPT-5.4 Pro', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Most advanced OpenAI model. Pro subscribers only.' },
-      { id: 'gpt-5.4' as ModelId, name: 'GPT-5.4', icon: Sparkles, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'OpenAI flagship. 1.05M context, strong coding.' },
-      { id: 'gpt-5.4-mini' as ModelId, name: 'GPT-5.4 Mini', icon: FlaskConical, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fast and efficient. 400K context.' },
-      { id: 'gpt-5.4-nano' as ModelId, name: 'GPT-5.4 Nano', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient'], description: 'Fastest OpenAI model. API-only.' },
-      { id: 'o3' as ModelId, name: 'O3', icon: Gem, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic'], description: 'Deep reasoning. Best for debugging and complex analysis.' },
-      { id: 'o4-mini' as ModelId, name: 'O4 Mini', icon: Sparkles, tier: 'balanced', capabilities: ['reasoning', 'code', 'fast'], description: 'Compact reasoning model. Fast, cost-efficient.' },
-      { id: 'gpt-4o' as ModelId, name: 'GPT-4o', icon: FlaskConical, tier: 'balanced', capabilities: ['reasoning', 'code', 'vision'], description: 'Versatile multimodal model' },
-      { id: 'gpt-4o-mini' as ModelId, name: 'GPT-4o Mini', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient'], description: 'Budget option for simple tasks' },
+      { id: 'gpt-5.5-pro' as ModelId, name: 'GPT-5.5 Pro', icon: Gem, tier: 'premium', costPer1MTokens: 119, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Most advanced GPT-5.5 model. EXTREMELY expensive — only for hardest problems.' },
+      { id: 'gpt-5.5' as ModelId, name: 'GPT-5.5', icon: Gem, tier: 'premium', costPer1MTokens: 10.5, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Latest OpenAI flagship. Enhanced reasoning and coding.' },
+      { id: 'gpt-5.5-mini' as ModelId, name: 'GPT-5.5 Mini', icon: FlaskConical, tier: 'fast', costPer1MTokens: 1.25, capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fast GPT-5.5 variant.' },
+      { id: 'gpt-5.5-nano' as ModelId, name: 'GPT-5.5 Nano', icon: Zap, tier: 'fast', costPer1MTokens: 0.875, capabilities: ['fast', 'cost-efficient'], description: 'Most efficient GPT-5.5 variant.' },
+      { id: 'gpt-5.4-pro' as ModelId, name: 'GPT-5.4 Pro', icon: Gem, tier: 'premium', costPer1MTokens: 105, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'Most advanced GPT-5.4 model. Pro subscribers only.' },
+      { id: 'gpt-5.4' as ModelId, name: 'GPT-5.4', icon: Sparkles, tier: 'balanced', costPer1MTokens: 8.75, capabilities: ['reasoning', 'code', 'vision', 'agentic', 'large-context'], description: 'OpenAI flagship. 1.05M context, strong coding.' },
+      { id: 'gpt-5.4-mini' as ModelId, name: 'GPT-5.4 Mini', icon: FlaskConical, tier: 'fast', costPer1MTokens: 1, capabilities: ['fast', 'cost-efficient', 'code'], description: 'Fast and efficient. 400K context.' },
+      { id: 'gpt-5.4-nano' as ModelId, name: 'GPT-5.4 Nano', icon: Zap, tier: 'fast', costPer1MTokens: 0.7, capabilities: ['fast', 'cost-efficient'], description: 'Fastest GPT-5.4 model. API-only.' },
+      { id: 'o3' as ModelId, name: 'O3', icon: Gem, tier: 'premium', costPer1MTokens: 5, capabilities: ['reasoning', 'code', 'agentic'], description: 'Deep reasoning. Best for debugging and complex analysis.' },
+      { id: 'o4-mini' as ModelId, name: 'O4 Mini', icon: Sparkles, tier: 'balanced', costPer1MTokens: 2.75, capabilities: ['reasoning', 'code', 'fast'], description: 'Compact reasoning model. Fast, cost-efficient.' },
+      { id: 'gpt-4o' as ModelId, name: 'GPT-4o', icon: FlaskConical, tier: 'balanced', costPer1MTokens: 7.5, capabilities: ['reasoning', 'code', 'vision'], description: 'Versatile multimodal model' },
+      { id: 'gpt-4o-mini' as ModelId, name: 'GPT-4o Mini', icon: Zap, tier: 'fast', costPer1MTokens: 0.6, capabilities: ['fast', 'cost-efficient'], description: 'Budget option for simple tasks' },
     ],
   },
   google: {
     name: 'Google',
     models: [
-      { id: 'gemini-3.1-pro-preview' as ModelId, name: 'Gemini 3.1 Pro', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'large-context', 'code'], description: 'Google flagship, 1M context, strong agentic coding' },
-      { id: 'gemini-3-flash' as ModelId, name: 'Gemini 3 Flash', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Fast and cheap with 1M context' },
-      { id: 'gemini-3.1-flash-lite-preview' as ModelId, name: 'Gemini 3.1 Flash Lite', icon: Zap, tier: 'fast', capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Most cost-efficient Google model' },
+      { id: 'gemini-3.1-pro-preview' as ModelId, name: 'Gemini 3.1 Pro', icon: Layers, tier: 'premium', costPer1MTokens: 7, capabilities: ['reasoning', 'large-context', 'code'], description: 'Google flagship, 1M context, strong agentic coding' },
+      { id: 'gemini-3.1-flash-lite-preview' as ModelId, name: 'Gemini 3.1 Flash Lite', icon: Zap, tier: 'fast', costPer1MTokens: 0.9, capabilities: ['fast', 'cost-efficient', 'large-context'], description: 'Most cost-efficient Google model' },
     ],
   },
   kimi: {
     name: 'Kimi (Moonshot)',
     models: [
-      { id: 'kimi-k2.6' as ModelId, name: 'Kimi K2.6', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi smartest model (April 2026). Native multimodal, superior agentic coding.' },
-      { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: Layers, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best open-source coding, 256K context, 76.8% SWE-bench' },
-      { id: 'K2.6-code-preview' as ModelId, name: 'K2.6-code-preview', icon: FlaskConical, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi coding preview model.' },
+      { id: 'kimi-k2.6' as ModelId, name: 'Kimi K2.6', icon: Layers, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi smartest model (April 2026). Native multimodal, superior agentic coding.' },
+      { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: Layers, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best open-source coding, 256K context, 76.8% SWE-bench' },
+      { id: 'K2.6-code-preview' as ModelId, name: 'K2.6-code-preview', icon: FlaskConical, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi coding preview model.' },
     ],
   },
   zai: {
     name: 'Zhipu (GLM)',
     models: [
-      { id: 'glm-5.1' as ModelId, name: 'GLM-5.1', icon: Network, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Z.AI flagship, 128K context, strong agentic coding' },
+      { id: 'glm-5.1' as ModelId, name: 'GLM-5.1', icon: Network, tier: 'premium', costPer1MTokens: 2, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Z.AI flagship, 128K context, strong agentic coding' },
     ],
   },
   minimax: {
     name: 'MiniMax',
     models: [
-      { id: 'minimax-m2.7-highspeed' as ModelId, name: 'M2.7 Highspeed', icon: Zap, tier: 'premium', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 100 tps, 204K context, $0.06/M blended' },
-      { id: 'minimax-m2.7' as ModelId, name: 'M2.7', icon: Layers, tier: 'balanced', capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 10B active params, 204K context' },
+      { id: 'minimax-m2.7-highspeed' as ModelId, name: 'M2.7 Highspeed', icon: Zap, tier: 'premium', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 100 tps, 204K context, $0.06/M blended' },
+      { id: 'minimax-m2.7' as ModelId, name: 'M2.7', icon: Layers, tier: 'balanced', costPer1MTokens: 1.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: '56.22% SWE-Pro, 10B active params, 204K context' },
+    ],
+  },
+  mimo: {
+    name: 'Xiaomi MiMo',
+    models: [
+      { id: 'mimo-v2.5-pro' as ModelId, name: 'MiMo V2.5 Pro', icon: Layers, tier: 'premium', costPer1MTokens: 2, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Flagship reasoning model, 1M context, enhanced agent efficiency' },
+      { id: 'mimo-v2.5' as ModelId, name: 'MiMo V2.5', icon: Zap, tier: 'balanced', costPer1MTokens: 1, capabilities: ['code', 'agentic', 'fast'], description: 'Multimodal model, 262K context, strong agentic coding' },
     ],
   },
 };
@@ -168,59 +185,9 @@ export function getAllModels(): ModelDef[] {
   return Object.values(MODELS_BY_PROVIDER).flatMap(p => p.models);
 }
 
-// Helper to find model by ID (with fuzzy matching for backend compatibility)
 export function getModelById(id: ModelId): ModelDef | undefined {
   const models = getAllModels();
-
-  // First try exact match
-  const exact = models.find(m => m.id === id);
-  if (exact) return exact;
-
-  // Fuzzy matching for backend model ID variations
-  const idLower = id.toLowerCase();
-
-  // Anthropic models
-  if (idLower.includes('opus') && idLower.includes('4')) return models.find(m => m.id === 'claude-opus-4-6');
-  if (idLower.includes('sonnet') && idLower.includes('4')) return models.find(m => m.id === 'claude-sonnet-4-6');
-  if (idLower.includes('haiku')) return models.find(m => m.id === 'claude-haiku-4-5');
-  if (idLower.includes('claude') && !idLower.includes('opus') && !idLower.includes('haiku')) return models.find(m => m.id === 'claude-sonnet-4-6');
-
-  // OpenAI models — order matters: specific patterns before broad ones
-  if (idLower.includes('gpt-5.4-pro')) return models.find(m => m.id === 'gpt-5.4-pro');
-  if (idLower.includes('gpt-5.4-nano')) return models.find(m => m.id === 'gpt-5.4-nano');
-  if (idLower.includes('gpt-5.4-mini')) return models.find(m => m.id === 'gpt-5.4-mini');
-  if (idLower.includes('gpt-5') || idLower.includes('codex')) return models.find(m => m.id === 'gpt-5.4');
-  if (idLower.includes('gpt-4o') || idLower === 'gpt4o') return models.find(m => m.id === 'gpt-4o');
-  if (idLower.includes('o4-mini')) return models.find(m => m.id === 'o4-mini');
-  if (idLower.includes('o3') || idLower === 'o1') return models.find(m => m.id === 'o3');
-
-  // Google models
-  if (idLower.includes('gemini') && idLower.includes('flash')) return models.find(m => m.id === 'gemini-3-flash');
-  if (idLower.includes('gemini')) return models.find(m => m.id === 'gemini-3.1-pro-preview');
-
-  // Kimi models — order matters: specific patterns before broad ones
-  if (idLower.includes('k2.6-code-preview') || idLower.includes('k2.6-code')) {
-    return models.find(m => m.id === 'K2.6-code-preview');
-  }
-  if (idLower.includes('kimi-k2.6') || idLower.includes('k2.6')) {
-    return models.find(m => m.id === 'kimi-k2.6');
-  }
-  if (idLower.includes('kimi') || idLower.includes('moonshot')) {
-    return models.find(m => m.id === 'kimi-k2.5');
-  }
-
-  // GLM models
-  if (idLower.includes('glm') || idLower.includes('zhipu') || idLower.includes('chatglm')) {
-    return models.find(m => m.id === 'glm-5.1');
-  }
-
-  // MiniMax models
-  if (idLower.includes('minimax')) {
-    if (idLower.includes('highspeed')) return models.find(m => m.id === 'minimax-m2.7-highspeed');
-    return models.find(m => m.id === 'minimax-m2.7');
-  }
-
-  return undefined;
+  return models.find(m => m.id === id);
 }
 
 // Helper to calculate capability match score
@@ -428,6 +395,10 @@ export function ModelOverrideModal({
                         <p className={`text-foreground text-sm ${isSelected ? 'font-bold' : 'font-medium'} truncate`}>
                           {model.name}
                         </p>
+                        {(() => {
+                          const lvl = costWarningLevel(model.costPer1MTokens);
+                          return lvl ? <CostWarningBadge level={lvl} costPer1MTokens={model.costPer1MTokens} /> : null;
+                        })()}
                         {isFavorite && !isRecommended && (
                           <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-amber-500/20 text-[9px] text-amber-400 font-bold uppercase tracking-tight shrink-0">
                             <Star className="w-2.5 h-2.5 fill-amber-400" />

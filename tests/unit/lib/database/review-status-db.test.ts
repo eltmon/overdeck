@@ -326,3 +326,54 @@ describe('getAllReviewStatusesFromDb', () => {
     expect(all['PAN-A-3'].history).toHaveLength(1);
   });
 });
+
+// ============== PAN-905: blockerReasons round-trip ==============
+
+describe('blockerReasons', () => {
+  it('persists blockerReasons through upsert→get', () => {
+    const blockers = [
+      { type: 'failing_checks' as const, summary: '2/5 checks failed', detectedAt: '2026-04-28T10:00:00Z' },
+      { type: 'merge_conflict' as const, summary: 'Merge conflict with main', detectedAt: '2026-04-28T10:01:00Z' },
+    ];
+    upsertReviewStatus(makeStatus({
+      issueId: 'PAN-BR-1',
+      blockerReasons: blockers,
+    }));
+
+    const result = getReviewStatusFromDb('PAN-BR-1');
+    expect(result).not.toBeNull();
+    expect(result!.blockerReasons).toHaveLength(2);
+    expect(result!.blockerReasons![0].type).toBe('failing_checks');
+    expect(result!.blockerReasons![1].type).toBe('merge_conflict');
+  });
+
+  it('returns undefined blockerReasons when not set', () => {
+    upsertReviewStatus(makeStatus({ issueId: 'PAN-BR-2' }));
+    const result = getReviewStatusFromDb('PAN-BR-2');
+    expect(result!.blockerReasons).toBeUndefined();
+  });
+
+  it('clears blockerReasons when explicitly set to undefined', () => {
+    upsertReviewStatus(makeStatus({
+      issueId: 'PAN-BR-3',
+      blockerReasons: [{ type: 'draft_pr' as const, summary: 'PR is draft', detectedAt: '2026-04-28T10:00:00Z' }],
+    }));
+    upsertReviewStatus(makeStatus({ issueId: 'PAN-BR-3', blockerReasons: undefined }));
+
+    const result = getReviewStatusFromDb('PAN-BR-3');
+    expect(result!.blockerReasons).toBeUndefined();
+  });
+
+  it('normalizes readyForMerge to false when blockerReasons is non-empty', () => {
+    upsertReviewStatus(makeStatus({
+      issueId: 'PAN-BR-4',
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      readyForMerge: true,
+      blockerReasons: [{ type: 'failing_checks' as const, summary: 'CI failed', detectedAt: '2026-04-28T10:00:00Z' }],
+    }));
+
+    const result = getReviewStatusFromDb('PAN-BR-4');
+    expect(result!.readyForMerge).toBe(false);
+  });
+});

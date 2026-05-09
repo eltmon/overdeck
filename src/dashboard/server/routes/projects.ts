@@ -19,14 +19,17 @@ import { extractPrefix } from '../../../lib/issue-id.js';
 import { listSessionNamesAsync } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
-import type { SessionNode, SessionNodePresence, SessionNodeType } from '@panctl/contracts';
+import { ReadModelService } from '../read-model.js';
+import type { AgentSnapshot, SessionNode, SessionNodePresence, SessionNodeType } from '@panctl/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
+import { detectAwaitingInputForAgent, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { getReviewStatus } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, type ReviewerRoundMetadata } from './reviewer-tree.js';
+import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../../lib/pan-dir/index.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
@@ -66,12 +69,26 @@ function sanitizeDisplayTitle(title: string): string {
 interface ActivityContext {
   tmuxSessionNames?: Set<string>;
   issueTitles?: ReadonlyMap<string, string>;
+  agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>;
+}
+
+function awaitingInputFromProjection(
+  agentId: string,
+  agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>,
+): AwaitingInputDetection | null | undefined {
+  const agent = agentSnapshotsById?.get(agentId);
+  if (!agent) return undefined;
+  if (agent.hasPendingQuestion !== true) return null;
+  return {
+    reason: (agent.pendingQuestionReason as AwaitingInputDetection['reason'] | undefined) ?? 'other',
+    prompt: agent.pendingQuestionPrompt || 'Agent is waiting for human input',
+  };
 }
 
 const LEGACY_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 /** Hide stopped legacy sessions older than 24h from the Command Deck tree.
- *  These are typically synthetic STATE.md planning placeholders or stale
+ *  These are typically synthetic planning placeholders or stale
  *  timestamp-named tmux sessions that no longer carry live context. */
 function isStaleLegacySession(s: SessionNode): boolean {
   if (s.type !== 'legacy') return false;
@@ -84,6 +101,50 @@ function isStaleLegacySession(s: SessionNode): boolean {
 
 interface SessionTreeContext {
   tmuxSessionNames: Set<string>;
+  agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function getSlotWorkSessionPattern(issueLower: string): RegExp {
+  return new RegExp(`^agent-${escapeRegExp(issueLower)}-(\\d+)$`, 'i');
+}
+
+export function getSlotWorkSessionNumber(sessionId: string, issueLower: string): number | null {
+  const match = sessionId.match(getSlotWorkSessionPattern(issueLower));
+  if (!match) return null;
+  return Number.parseInt(match[1]!, 10);
+}
+
+export function getSessionTreeWorkspacePath(
+  issueLower: string,
+  baseWorkspacePath: string,
+  projectPath: string,
+  sessionId: string,
+): string {
+  const slotNumber = getSlotWorkSessionNumber(sessionId, issueLower);
+  if (slotNumber === null) return baseWorkspacePath;
+  return join(projectPath, 'workspaces', `feature-${issueLower}-slot-${slotNumber}`);
+}
+
+export function compareSessionTreeSessionIds(a: string, b: string, issueLower: string): number {
+  const planningAgentId = `planning-${issueLower}`;
+  const workAgentId = `agent-${issueLower}`;
+  const rank = (sessionId: string): [number, number, string] => {
+    if (sessionId === planningAgentId) return [0, 0, sessionId];
+    if (sessionId === workAgentId) return [1, 0, sessionId];
+    const slotNumber = getSlotWorkSessionNumber(sessionId, issueLower);
+    if (slotNumber !== null) return [2, slotNumber, sessionId];
+    return [3, 0, sessionId];
+  };
+
+  const [aRank, aSlot, aId] = rank(a);
+  const [bRank, bSlot, bId] = rank(b);
+  if (aRank !== bRank) return aRank - bRank;
+  if (aSlot !== bSlot) return aSlot - bSlot;
+  return aId.localeCompare(bId);
 }
 
 async function collectSessionTreeNodes(
@@ -97,10 +158,27 @@ async function collectSessionTreeNodes(
   const agentsDir = join(homedir(), '.panopticon', 'agents');
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
+  const slotWorkSessionPattern = getSlotWorkSessionPattern(issueLower);
   const sections: SessionNode[] = [];
   let hasPlanningSection = false;
 
-  for (const checkId of [planningAgentId, agentId]) {
+  const candidateSessionIds = new Set<string>([planningAgentId, agentId]);
+  const agentEntries = await readdir(agentsDir, { withFileTypes: true }).catch(() => []);
+
+  for (const entry of agentEntries) {
+    if (!entry.isDirectory()) continue;
+    if (slotWorkSessionPattern.test(entry.name)) {
+      candidateSessionIds.add(entry.name);
+    }
+  }
+
+  for (const sessionName of context.tmuxSessionNames) {
+    if (slotWorkSessionPattern.test(sessionName)) {
+      candidateSessionIds.add(sessionName);
+    }
+  }
+
+  for (const checkId of [...candidateSessionIds].sort((a, b) => compareSessionTreeSessionIds(a, b, issueLower))) {
     const agentDir = join(agentsDir, checkId);
     if (!await pathExists(agentDir)) continue;
     const stateText = await readOptional(join(agentDir, 'state.json'));
@@ -113,7 +191,14 @@ async function collectSessionTreeNodes(
       if (isPlanning) hasPlanningSection = true;
       const rtState = await getAgentRuntimeStateAsync(checkId);
       const presence = await deriveSessionPresence(checkId, rtState, context.tmuxSessionNames);
-      const jsonlPath = await resolveJsonlPath(checkId, workspacePath);
+      const projectedAwaitingInput = awaitingInputFromProjection(checkId, context.agentSnapshotsById);
+      const awaitingInput = projectedAwaitingInput !== undefined
+        ? projectedAwaitingInput
+        : context.tmuxSessionNames.has(checkId)
+          ? await detectAwaitingInputForAgent(checkId, { isPlanning })
+          : null;
+      const sessionWorkspacePath = getSessionTreeWorkspacePath(issueLower, workspacePath, projectPath, checkId);
+      const jsonlPath = await resolveJsonlPath(checkId, sessionWorkspacePath);
       sections.push({
         type: sectionType,
         sessionId: checkId,
@@ -135,6 +220,9 @@ async function collectSessionTreeNodes(
               : (state.status || 'completed'),
         ),
         presence,
+        awaitingInput: awaitingInput !== null,
+        awaitingInputPrompt: awaitingInput?.prompt,
+        awaitingInputReason: awaitingInput?.reason,
         hasJsonl: !!jsonlPath,
       });
     } catch {
@@ -143,13 +231,14 @@ async function collectSessionTreeNodes(
   }
 
   if (!hasPlanningSection) {
-    const planningDir = join(workspacePath, '.planning');
-    if (await pathExists(planningDir)) {
-      const planningStatePath = join(planningDir, 'STATE.md');
-      const planningPromptPath = join(planningDir, 'PLANNING_PROMPT.md');
-      const planningPathForTimestamp = await pathExists(planningStatePath)
-        ? planningStatePath
-        : planningPromptPath;
+    const panContinuePath = join(workspacePath, PAN_DIRNAME, PAN_CONTINUE_FILENAME);
+    const panSpecPath = join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME);
+    const planningPathForTimestamp = await pathExists(panContinuePath)
+      ? panContinuePath
+      : await pathExists(panSpecPath)
+        ? panSpecPath
+        : null;
+    if (planningPathForTimestamp) {
       const planningStat = await stat(planningPathForTimestamp).catch(() => null);
       const sessionId = `planning-${issueLower}-state`;
       const jsonlPath = await resolveJsonlPath(sessionId, workspacePath);
@@ -215,17 +304,17 @@ async function resolveFeatureTitle(
     return mappedTitle;
   }
 
-  // Fall back to PLANNING_PROMPT.md first line
   if (project) {
     try {
       const projectPath = (project.config as { path: string }).path;
       const workspaceConfig = (project.config as { workspace?: { workspaces_dir?: string } }).workspace;
       const workspacesDir = join(projectPath, workspaceConfig?.workspaces_dir || 'workspaces');
-      const planningDir = join(workspacesDir, `feature-${issueLower}`, '.planning');
-      const promptContent = await readOptional(join(planningDir, 'PLANNING_PROMPT.md'));
-      if (promptContent) {
-        const firstLine = promptContent.split('\n').find(l => l.trim().length > 0) || '';
-        const title = sanitizeDisplayTitle(firstLine.replace(/^#+\s*/, ''));
+      const specContent = await readOptional(
+        join(workspacesDir, `feature-${issueLower}`, PAN_DIRNAME, PAN_SPEC_FILENAME),
+      );
+      if (specContent) {
+        const parsed = JSON.parse(specContent) as { plan?: { title?: string } };
+        const title = sanitizeDisplayTitle(parsed.plan?.title ?? '');
         if (title) return title;
       }
     } catch { /* non-fatal */ }
@@ -241,10 +330,13 @@ const getProjectSessionTreeRoute = HttpRouter.add(
   '/api/projects/:projectKey/session-tree',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
+    const readModel = yield* ReadModelService;
     const projectKey = params['projectKey'] ?? '';
+    const snapshot = yield* readModel.getSnapshot;
+    const agentSnapshotsById = new Map(snapshot.agents.map((agent) => [agent.id, agent]));
 
     const result = yield* Effect.tryPromise({
-      try: () => fetchProjectSessionTree(projectKey),
+      try: () => fetchProjectSessionTree(projectKey, { agentSnapshotsById }),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
 
@@ -303,6 +395,7 @@ export async function fetchProjectSessionTree(
 
   const effectiveSharedContext: SessionTreeContext = {
     tmuxSessionNames: sharedTmuxSessionNames,
+    agentSnapshotsById: sharedContext?.agentSnapshotsById,
   };
 
   const features: Array<{
@@ -326,10 +419,10 @@ export async function fetchProjectSessionTree(
     const results = await withConcurrencyLimit(
       featureCandidates.map((c) => async () => {
         const agentDir = join(homedir(), '.panopticon', 'agents', `agent-${c.issueLower}`);
-        const planningDir = join(workspacesDir, c.name, '.planning');
+        const panDir = join(workspacesDir, c.name, PAN_DIRNAME);
         const [hasAgent, hasPlanning] = await Promise.all([
           pathExists(agentDir),
-          pathExists(planningDir),
+          pathExists(panDir),
         ]);
         if (!hasAgent && !hasPlanning) return null;
         try {
@@ -365,6 +458,9 @@ const getAllSessionTreesRoute = HttpRouter.add(
     const url = new URL(request.url, 'http://localhost');
     const projectsParam = url.searchParams.get('projects') ?? '';
     const projectKeys = projectsParam.split(',').filter(Boolean);
+    const readModel = yield* ReadModelService;
+    const snapshot = yield* readModel.getSnapshot;
+    const agentSnapshotsById = new Map(snapshot.agents.map((agent) => [agent.id, agent]));
 
     if (projectKeys.length === 0) {
       return jsonResponse({ trees: [] });
@@ -379,6 +475,7 @@ const getAllSessionTreesRoute = HttpRouter.add(
         const sharedContext: ActivityContext = {
           tmuxSessionNames: sharedTmuxSessionNames,
           issueTitles,
+          agentSnapshotsById,
         };
 
         return Promise.all(

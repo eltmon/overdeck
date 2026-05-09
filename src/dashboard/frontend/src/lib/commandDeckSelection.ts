@@ -15,6 +15,8 @@ export type SessionId = string
 export interface CommandDeckSelectionState {
   /** Map of issueId → selected sessionId. `null` (or absent) = issue-selected mode. */
   selectedSessionByIssue: Record<IssueId, SessionId | null>
+  /** Map of issueId → composer draft text. Survives navigation, cleared on page refresh. */
+  draftTexts: Record<IssueId, string>
 }
 
 export interface CommandDeckSelectionStore extends CommandDeckSelectionState {
@@ -24,10 +26,15 @@ export interface CommandDeckSelectionStore extends CommandDeckSelectionState {
   clearIssue(issueId: IssueId): void
   /** Clear all per-issue selection state. */
   clearAll(): void
+  /** Set draft text for an issue's composer. */
+  setDraft(issueId: IssueId, text: string): void
+  /** Clear draft text for an issue (e.g. after successful send). */
+  clearDraft(issueId: IssueId): void
 }
 
 const initialState: CommandDeckSelectionState = {
   selectedSessionByIssue: {},
+  draftTexts: {},
 }
 
 export const useCommandDeckSelection = create<CommandDeckSelectionStore>((set) => ({
@@ -46,6 +53,18 @@ export const useCommandDeckSelection = create<CommandDeckSelectionStore>((set) =
     }),
 
   clearAll: () => set({ selectedSessionByIssue: {} }),
+
+  setDraft: (issueId, text) =>
+    set((state) => ({
+      draftTexts: { ...state.draftTexts, [issueId]: text },
+    })),
+
+  clearDraft: (issueId) =>
+    set((state) => {
+      if (!(issueId in state.draftTexts)) return state
+      const { [issueId]: _removed, ...rest } = state.draftTexts
+      return { draftTexts: rest }
+    }),
 }))
 
 // ─── Selectors ────────────────────────────────────────────────────────────────

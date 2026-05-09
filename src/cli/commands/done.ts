@@ -14,6 +14,8 @@ import { updateShadowState } from '../../lib/shadow-state.js';
 import { cleanupWorkflowLabels, getLinearStateName, findLinearStateByName } from '../../core/state-mapping.js';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumber, resolveIssueId } from '../../lib/issue-id.js';
+import { getWorkspacePanPaths, readWorkspaceContinue, writeWorkspaceContinue } from '../../lib/pan-dir/index.js';
+import { resolveProjectFromIssue } from '../../lib/projects.js';
 
 interface DoneOptions {
   comment?: string;
@@ -203,15 +205,16 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     const workspacePath = agentState?.workspace;
 
     if (workspacePath && existsSync(workspacePath)) {
-      // Commit any stale .planning/ artifacts from a previous interrupted pan done run
-      // so the uncommitted-changes gate in runPreflightChecks doesn't reject them.
+      // Commit any stale workspace orchestration artifacts from a previous interrupted
+      // pan done run so the uncommitted-changes gate in runPreflightChecks doesn't
+      // reject them.
       try {
         const { stdout: preDirty } = await execAsync(
-          'git status --porcelain .planning/',
+          'git status --porcelain .pan/',
           { cwd: workspacePath, encoding: 'utf-8' }
         );
         if (preDirty.trim()) {
-          await execAsync('git add .planning/', { cwd: workspacePath });
+          await execAsync('git add .pan/', { cwd: workspacePath });
           await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
         }
       } catch { /* non-fatal */ }
@@ -230,14 +233,14 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         process.exit(1);
       }
 
-      // Commit plan.vbrief.json dirtied by the bead→vBRIEF sync in this preflight run.
+      // Commit the workspace spec dirtied by the bead→vBRIEF sync in this preflight run.
       try {
         const { stdout: syncDirty } = await execAsync(
-          'git status --porcelain .planning/plan.vbrief.json',
+          'git status --porcelain .pan/spec.vbrief.json',
           { cwd: workspacePath, encoding: 'utf-8' }
         );
         if (syncDirty.trim()) {
-          await execAsync('git add .planning/plan.vbrief.json', { cwd: workspacePath });
+          await execAsync('git add .pan/spec.vbrief.json', { cwd: workspacePath });
           await execAsync('git commit -m "chore: sync planning artifacts"', { cwd: workspacePath });
         }
       } catch { /* non-fatal */ }
@@ -393,6 +396,27 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       trackerUpdated,
       comment: options.comment,
     }));
+
+    // Append 'end' session entry to workspace continue state.
+    try {
+      const continueState = readWorkspaceContinue(workspacePath);
+      if (continueState) {
+        const now = new Date().toISOString();
+        writeWorkspaceContinue(workspacePath, {
+          ...continueState,
+          sessionHistory: [
+            ...continueState.sessionHistory,
+            {
+              timestamp: now,
+              reason: 'end',
+              note: options.comment || 'Agent signaled work complete',
+            },
+          ],
+        });
+      }
+    } catch (continueErr: any) {
+      console.warn(`[pan done] Failed to append end entry to continue state (non-fatal): ${continueErr?.message ?? continueErr}`);
+    }
 
     // Step 4b: Guard against already-merged issues (e.g. merge completed in
     // background while agent was finishing up). If already merged, skip the

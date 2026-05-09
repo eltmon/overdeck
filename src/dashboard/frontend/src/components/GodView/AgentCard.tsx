@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useSharedTick } from '../../lib/useSharedTick';
+import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { motion } from 'framer-motion';
-import { Clock, GitBranch, Cpu, AlertTriangle, CheckCircle, XCircle, Minus } from 'lucide-react';
+import { Clock, GitBranch, Cpu, AlertTriangle, CheckCircle, XCircle, Minus, Radio } from 'lucide-react';
 import { CanvasTerminal } from './CanvasTerminal';
 import { selectGodViewAgentOutput, selectGodViewAgentStatuses } from '../../hooks/useGodViewSocket';
 import { useDashboardStore } from '../../lib/store';
@@ -54,6 +56,26 @@ function UptimeCounter({ startedAt }: { startedAt: string }) {
   return <span className="gv-mono text-[10px]" style={{ color: 'var(--gv-text-secondary)' }}>{elapsed}</span>;
 }
 
+function stalenessColor(ms: number): string {
+  if (ms < 2 * 60_000) return 'var(--gv-green)';
+  if (ms < 10 * 60_000) return 'var(--gv-amber)';
+  if (ms < 30 * 60_000) return 'var(--gv-orange)';
+  return 'var(--gv-pink)';
+}
+
+function LastHeardCounter({ lastActivity }: { lastActivity?: string }) {
+  const now = useSharedTick();
+  if (!lastActivity) return null;
+  const ms = now.getTime() - new Date(lastActivity).getTime();
+  if (ms < 1000) return null;
+  const label = formatRelativeTime(lastActivity, now);
+  return (
+    <span className="gv-mono text-[10px]" style={{ color: stalenessColor(ms) }}>
+      {label}
+    </span>
+  );
+}
+
 export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: AgentCardProps) {
   const agentOutput = useDashboardStore(selectGodViewAgentOutput);
   const agentStatuses = useDashboardStore(selectGodViewAgentStatuses);
@@ -61,6 +83,19 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
   const liveStatus = agentStatuses[agent.id] || agent.status;
 
   const phaseColor = agent.agentPhase ? PHASE_COLORS[agent.agentPhase] || 'var(--gv-blue)' : 'var(--gv-blue)';
+
+  const now = useSharedTick();
+  const lastHeardTooltip = (() => {
+    if (!agent.lastActivity) return '';
+    const ms = now.getTime() - new Date(agent.lastActivity).getTime();
+    if (ms < 1000) return '';
+    return `Last heard: ${formatRelativeTime(agent.lastActivity, now)}`;
+  })();
+  const cardTooltip = [
+    agent.issueId || agent.id,
+    agent.agentPhase ? `Phase: ${agent.agentPhase}` : '',
+    lastHeardTooltip,
+  ].filter(Boolean).join(' · ');
 
   return (
     <motion.div
@@ -72,6 +107,7 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
       whileHover={{ scale: 1.02, transition: { duration: 0.15 } }}
       transition={{ duration: 0.2 }}
       onClick={onClick}
+      title={cardTooltip}
       className={`gv-glass cursor-pointer p-3 flex flex-col gap-2 relative overflow-hidden ${STATUS_GLOW[liveStatus] || ''}`}
       style={{ borderColor: phaseColor + '44' }}
     >
@@ -132,7 +168,7 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
         </div>
       )}
 
-      {/* Bottom row: model, cost, uptime */}
+      {/* Bottom row: model, uptime, last heard */}
       <div className="flex items-center justify-between pl-2 mt-auto">
         <div className="flex items-center gap-1.5">
           <Cpu className="w-3 h-3" style={{ color: 'var(--gv-text-dim)' }} />
@@ -141,9 +177,17 @@ export function AgentCard({ agent, onClick, 'data-agent-id': dataAgentId }: Agen
           </span>
         </div>
 
-        <div className="flex items-center gap-1">
-          <Clock className="w-3 h-3" style={{ color: 'var(--gv-text-dim)' }} />
-          <UptimeCounter startedAt={agent.startedAt} />
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <Clock className="w-3 h-3" style={{ color: 'var(--gv-text-dim)' }} />
+            <UptimeCounter startedAt={agent.startedAt} />
+          </div>
+          {agent.lastActivity && (
+            <div className="flex items-center gap-1" title={lastHeardTooltip}>
+              <Radio className="w-3 h-3" style={{ color: 'var(--gv-text-dim)' }} />
+              <LastHeardCounter lastActivity={agent.lastActivity} />
+            </div>
+          )}
         </div>
       </div>
 
