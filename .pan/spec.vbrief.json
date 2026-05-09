@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T23:11:34.000Z"
+    "updated": "2026-05-09T23:33:20.935Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 26,
+    "sequence": 27,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T23:11:34.000Z",
+    "updated": "2026-05-09T23:33:20.935Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -1233,7 +1233,7 @@
       {
         "id": "d1-delete-work-types-and-router",
         "title": "Delete src/lib/work-types.ts and src/lib/work-type-router.ts",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -1248,36 +1248,41 @@
           {
             "id": "d1-delete-work-types-and-router.ac1",
             "title": "src/lib/work-types.ts and src/lib/work-type-router.ts deleted",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T23:33:20.935Z"
           },
           {
             "id": "d1-delete-work-types-and-router.ac2",
             "title": "All 167+ callsites migrated to resolveModel(role, subRole?) or removed; typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T23:33:20.935Z"
           },
           {
             "id": "d1-delete-work-types-and-router.ac3",
             "title": "src/lib/smart-model-selector.ts deleted if its only callers were inside WorkTypeRouter",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T23:33:20.935Z"
           },
           {
             "id": "d1-delete-work-types-and-router.ac4",
             "title": "Tests referencing WorkTypeId / WORK_TYPES updated or deleted; full test suite passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T23:33:20.935Z"
           }
-        ]
+        ],
+        "completed": "2026-05-09T23:33:20.935Z"
       },
       {
         "id": "e1-delete-panopticon-agent-type",

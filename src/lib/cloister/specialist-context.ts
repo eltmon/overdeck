@@ -15,7 +15,7 @@ import { getPanopticonHome } from '../paths.js';
 import { getClaudePermissionFlagsString } from '../claude-permissions.js';
 import type { RunLogEntry } from './specialist-logs.js';
 import { getProject } from '../projects.js';
-import { getModelId } from '../work-type-router.js';
+import { loadConfig as loadYamlConfig, resolveModel } from '../config-yaml.js';
 
 function execAsync(command: string, options: { encoding: 'utf-8'; maxBuffer: number; timeout: number }): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
@@ -104,6 +104,16 @@ function getContextRunsCount(projectKey: string): number {
  * @param specialistType - Specialist type
  * @returns Model ID to use
  */
+function roleForSpecialist(specialistType: string): { role: 'plan' | 'work' | 'review' | 'test' | 'ship'; subRole?: string } {
+  const normalized = specialistType.replace(/-agent$/, '');
+  if (normalized === 'inspect') return { role: 'work', subRole: 'inspect' };
+  if (normalized === 'review') return { role: 'review' };
+  if (normalized === 'test' || normalized === 'uat') return { role: 'test' };
+  if (normalized === 'merge' || normalized === 'ship') return { role: 'ship' };
+  if (normalized === 'planning' || normalized === 'plan') return { role: 'plan' };
+  return { role: 'work' };
+}
+
 function getDigestModel(projectKey: string, specialistType: string): string {
   const project = getProject(projectKey);
 
@@ -112,10 +122,9 @@ function getDigestModel(projectKey: string, specialistType: string): string {
     return project.specialists.digest_model;
   }
 
-  // Fall back to specialist's model
   try {
-    const workTypeId = `specialist-${specialistType}` as any;
-    return getModelId(workTypeId);
+    const { role, subRole } = roleForSpecialist(specialistType);
+    return resolveModel(role, subRole, loadYamlConfig().config);
   } catch (error) {
     // Default to Sonnet if can't resolve
     return 'claude-sonnet-4-6';

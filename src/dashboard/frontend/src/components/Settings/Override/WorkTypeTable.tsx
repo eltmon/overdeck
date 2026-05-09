@@ -1,13 +1,13 @@
-import { WorkTypeId, WorkTypeCategory, WORK_TYPE_CATEGORIES, ModelId } from '../types';
+import { ModelRouteId, WorkTypeCategory, WORK_TYPE_CATEGORIES, ModelId } from '../types';
 import { Badge } from '../Shared/Badge';
 import { Settings, X } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 
 export interface WorkTypeTableProps {
-  overrides: Partial<Record<WorkTypeId, ModelId>>;
-  presetModels: Partial<Record<WorkTypeId, ModelId>>;
-  onConfigureOverride: (workType: WorkTypeId) => void;
-  onRemoveOverride: (workType: WorkTypeId) => void;
+  overrides: Partial<Record<ModelRouteId, ModelId>>;
+  presetModels: Partial<Record<ModelRouteId, ModelId>>;
+  onConfigureOverride: (workType: ModelRouteId) => void;
+  onRemoveOverride: (workType: ModelRouteId) => void;
 }
 
 export function WorkTypeTable({ overrides, presetModels, onConfigureOverride, onRemoveOverride }: WorkTypeTableProps) {
@@ -23,11 +23,11 @@ export function WorkTypeTable({ overrides, presetModels, onConfigureOverride, on
     'workflow': 'Workflow',
   };
 
-  const getEffectiveModel = (workType: WorkTypeId): ModelId => {
+  const getEffectiveModel = (workType: ModelRouteId): ModelId => {
     return overrides[workType] || presetModels[workType] || 'claude-sonnet-4-5';
   };
 
-  const hasOverride = (workType: WorkTypeId): boolean => {
+  const hasOverride = (workType: ModelRouteId): boolean => {
     return workType in overrides;
   };
 

@@ -5,7 +5,6 @@ const mockResolveModelId = vi.fn((modelId: string) => modelId);
 const mockReadFile = vi.fn();
 const mockWriteFile = vi.fn();
 const mockClearConfigCache = vi.fn();
-const mockReloadGlobalRouter = vi.fn();
 const mockMergeConfigs = vi.fn(() => ({ config: {}, explicitlyDisabled: new Set() }));
 
 vi.mock('fs/promises', () => ({
@@ -55,9 +54,6 @@ vi.mock('../model-capabilities.js', () => ({
   resolveModelId: (modelId: string) => mockResolveModelId(modelId),
 }));
 
-vi.mock('../work-type-router.js', () => ({
-  reloadGlobalRouter: () => mockReloadGlobalRouter(),
-}));
 
 function baseConfig(overrides: Record<string, unknown> = {}) {
   return {
@@ -196,7 +192,6 @@ describe('saveSettingsApi', () => {
     expect(written).toContain('inspect:');
     expect(written).not.toContain('overrides:');
     expect(mockClearConfigCache).toHaveBeenCalledOnce();
-    expect(mockReloadGlobalRouter).toHaveBeenCalledOnce();
   });
 });
 

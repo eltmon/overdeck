@@ -770,16 +770,15 @@ describe('resolveReviewerModel', () => {
     expect(model).toBe('claude-opus-4-6');
   });
 
-  it('falls back to specialist-review-agent for unknown roles when no role-specific override', () => {
-    // New behavior (post-gpt-5.5 fix): unknown roles with no override use the
-    // specialist-review-agent work type, not the defaultModel. This prevents
-    // smart selection from picking unsupported models (e.g. gpt-5.5 without
-    // CLIProxy mapping). See resolveReviewerModel for rationale.
+  it('falls back to review role routing for unknown roles when no sub-role applies', () => {
+    // Unknown roles with no explicit model use the review role default rather
+    // than the caller's defaultModel. This keeps model selection centralized in
+    // role configuration. See resolveReviewerModel for rationale.
     const model = resolveReviewerModel(
       { name: 'unknown-role', focus: [] },
       'claude-haiku-4-5',
     );
-    // The returned model comes from the work-type router, not the defaultModel.
+    // The returned model comes from role routing, not the defaultModel.
     // Exact ID depends on user config but it MUST be a non-empty string.
     expect(typeof model).toBe('string');
     expect(model.length).toBeGreaterThan(0);
@@ -796,26 +795,25 @@ describe('resolveReviewerModel', () => {
 
   // Regression for alias → concrete model ID resolution:
   // Template frontmatter uses "haiku"/"sonnet"/"opus" as shorthand. Aliases must
-  // be resolved through the work-type router (getModelId) — NOT hard-coded to
-  // Anthropic model IDs — so the returned ID is provider-correct when using
-  // OpenAI, Gemini, or other routed providers.
-  it('resolves "haiku" alias via work-type router (not passed through verbatim)', () => {
+  // be resolved through review role model settings — NOT hard-coded to Anthropic
+  // model IDs — so the returned ID is provider-correct when using OpenAI,
+  // Gemini, or other routed providers.
+  it('resolves "haiku" alias via review role routing (not passed through verbatim)', () => {
     const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'haiku');
     expect(model).not.toBe('haiku');
     expect(model.length).toBeGreaterThan(0);
-    // haiku must route through a reviewer work type, not subagent:bash.
-    // subagent:bash defaults to gpt-5.4-nano; review:correctness defaults to claude-sonnet-4-6.
-    // Both change under user config but they must be different categories.
+    // haiku must route through the review role, not an unrelated subagent route.
+    // Defaults can change under user config but the alias must not leak through.
     expect(model).not.toBe('gpt-5.4-nano');
   });
 
-  it('resolves "sonnet" alias via work-type router (not passed through verbatim)', () => {
+  it('resolves "sonnet" alias via review role routing (not passed through verbatim)', () => {
     const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'sonnet');
     expect(model).not.toBe('sonnet');
     expect(model.length).toBeGreaterThan(0);
   });
 
-  it('resolves "opus" alias via work-type router (not passed through verbatim)', () => {
+  it('resolves "opus" alias via review role routing (not passed through verbatim)', () => {
     const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'opus');
     expect(model).not.toBe('opus');
     expect(model.length).toBeGreaterThan(0);

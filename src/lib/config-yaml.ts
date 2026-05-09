@@ -12,7 +12,6 @@ import { readFileSync, existsSync, writeFileSync, copyFileSync, statSync } from 
 import { join } from 'path';
 import { homedir } from 'os';
 import yaml from 'js-yaml';
-import { WorkTypeId } from './work-types.js';
 import { ModelId } from './settings.js';
 import { ModelProvider } from './model-fallback.js';
 import { MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
@@ -176,7 +175,7 @@ export interface YamlConfig {
     };
 
     /** Per-work-type overrides (explicit model for specific tasks) */
-    overrides?: Partial<Record<WorkTypeId, ModelId>>;
+    overrides?: Partial<Record<string, ModelId>>;
 
     /** Gemini thinking level (1-4) */
     gemini_thinking_level?: 1 | 2 | 3 | 4;
@@ -377,7 +376,7 @@ export interface NormalizedConfig {
   roles?: RolesConfig;
 
   /** Per-work-type overrides */
-  overrides: Partial<Record<WorkTypeId, ModelId>>;
+  overrides: Partial<Record<string, ModelId>>;
 
   /** Gemini thinking level */
   geminiThinkingLevel: 1 | 2 | 3 | 4;
@@ -466,7 +465,7 @@ export interface MigrationResult {
   /** List of migrated model IDs */
   migrated: Array<{
     /** Work type that was migrated */
-    workType: WorkTypeId;
+    workType: string;
     /** Old (deprecated) model ID */
     from: string;
     /** New (current) model ID */
@@ -1112,7 +1111,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 }
 
 /** Renamed work-type keys from the convoy→review migration */
-const CONVOY_KEY_MIGRATION: Record<string, WorkTypeId> = {
+const CONVOY_KEY_MIGRATION: Record<string, string> = {
   'convoy:security-reviewer': 'review:security',
   'convoy:performance-reviewer': 'review:performance',
   'convoy:correctness-reviewer': 'review:correctness',
@@ -1145,7 +1144,7 @@ function migrateConvoyKeys(config: YamlConfig): boolean {
  * Returns array of migrations to perform, or empty array if none found.
  */
 function detectDeprecatedModels(config: YamlConfig | null): Array<{
-  workType: WorkTypeId;
+  workType: string;
   from: string;
   to: string;
 }> {
@@ -1153,12 +1152,12 @@ function detectDeprecatedModels(config: YamlConfig | null): Array<{
     return [];
   }
 
-  const migrations: Array<{ workType: WorkTypeId; from: string; to: string }> = [];
+  const migrations: Array<{ workType: string; from: string; to: string }> = [];
 
   for (const [workType, modelId] of Object.entries(config.models.overrides)) {
     if (modelId && MODEL_DEPRECATIONS[modelId]) {
       migrations.push({
-        workType: workType as WorkTypeId,
+        workType,
         from: modelId,
         to: MODEL_DEPRECATIONS[modelId],
       });
@@ -1173,7 +1172,7 @@ function detectDeprecatedModels(config: YamlConfig | null): Array<{
  */
 function applyMigrations(
   config: YamlConfig,
-  migrations: Array<{ workType: WorkTypeId; from: string; to: string }>
+  migrations: Array<{ workType: string; from: string; to: string }>
 ): void {
   if (!config.models) {
     config.models = {};

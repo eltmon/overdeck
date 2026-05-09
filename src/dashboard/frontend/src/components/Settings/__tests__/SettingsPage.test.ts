@@ -66,8 +66,8 @@ describe('getEffectiveModelId', () => {
     expect(result).not.toBe(FALLBACK_DEFAULT_MODEL);
   });
 
-  it('returns FALLBACK_DEFAULT_MODEL only for work types with no backend default', () => {
-    // A work type unknown to the router should fall through to the generic fallback.
+  it('returns FALLBACK_DEFAULT_MODEL only for model routes with no backend default', () => {
+    // A model route unknown to the router should fall through to the generic fallback.
     const result = getEffectiveModelId('unknown-work-type' as never, {});
     expect(result).toBe(FALLBACK_DEFAULT_MODEL);
   });
@@ -139,8 +139,8 @@ describe('buildMiniMaxFormData', () => {
   });
 
   it('review:lightweight can be expressed as a model override in SettingsConfig', () => {
-    // review:lightweight is a real routable backend work type used by the haiku
-    // reviewer alias. The WorkTypeId type must include it so the settings form
+    // review:lightweight is a real routable backend model route used by the haiku
+    // reviewer alias. The ModelRouteId type must include it so the settings form
     // can represent and submit overrides — without this, config becomes lossy.
     const config: SettingsConfig = {
       ...MINIMAX_DEFAULTS,

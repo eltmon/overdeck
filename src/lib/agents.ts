@@ -14,7 +14,6 @@ import { startWork, completeWork, getAgentCV } from './cv.js';
 import type { ComplexityLevel } from './cloister/complexity.js';
 import { BLANKED_PROVIDER_ENV } from './child-env.js';
 import type { ModelId } from './settings.js';
-import type { WorkTypeId } from './work-type-router.js';
 import { getProviderForModel, getProviderEnv, setupCredentialFileAuth, clearCredentialFileAuth } from './providers.js';
 import { validateProviderHealth } from './provider-health.js';
 import { loadConfig as loadYamlConfig, isClaudeCodeChannelsEnabled, resolveModel } from './config-yaml.js';
@@ -452,7 +451,7 @@ export interface AgentState {
 
   // Work type system (PAN-118)
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning';
-  workType?: WorkTypeId; // Current work type ID
+  workType?: string; // Legacy model-routing key
 
   preSpawnStashRef?: string;
   preSpawnStashMessage?: string;
@@ -1226,7 +1225,7 @@ export interface SpawnOptions {
 
   // Legacy fields retained for old callers during migration. Work spawns ignore them.
   phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning';
-  workType?: WorkTypeId;
+  workType?: string;
 
   // Swarm slot support (PAN-970): when set, session name becomes agent-<issueId>-<slotId>
   // and the one-agent-per-issue uniqueness check is scoped to the slot.

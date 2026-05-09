@@ -12,10 +12,10 @@ import {
   CheckCircle2,
   Star,
 } from 'lucide-react';
-import { WorkTypeId, ModelId } from '../types';
+import { ModelRouteId, ModelId } from '../types';
 import { CostWarningBadge, costWarningLevel } from '../../shared/costWarning';
 
-// Model capabilities that can be matched to work types
+// Model capabilities that can be matched to model routes
 export type Capability = 'reasoning' | 'code' | 'vision' | 'fast' | 'cost-efficient' | 'large-context' | 'complex-math' | 'efficiency' | 'agentic';
 
 export interface ModelDef {
@@ -113,7 +113,7 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   },
 };
 
-// Work type to required capabilities mapping
+// Model route to required capabilities mapping
 export const WORK_TYPE_CAPABILITIES: Record<string, Capability[]> = {
   'issue-agent:exploration': ['reasoning', 'large-context'],
   'issue-agent:implementation': ['code', 'reasoning', 'agentic'],
@@ -140,7 +140,7 @@ export const WORK_TYPE_CAPABILITIES: Record<string, Capability[]> = {
   'cli:quick-command': ['fast'],
 };
 
-// Work type display names
+// Model route display names
 export const WORK_TYPE_NAMES: Record<string, string> = {
   'issue-agent:exploration': 'Exploration Phase',
   'issue-agent:implementation': 'Implementation Phase',
@@ -218,7 +218,7 @@ export type OpenRouterFavoriteModel = {
 };
 
 interface ModelOverrideModalProps {
-  workType: WorkTypeId;
+  workType: ModelRouteId;
   currentModel: ModelId;
   isOverride: boolean;
   enabledProviders: string[];

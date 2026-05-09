@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T23:11:34.000Z",
+  "updated": "2026-05-09T23:33:20.935Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "pending-c2",
+    "sha": "d9dd586cd774d77c486794e8c5d5424fd1dab1ec",
     "dirty": true
   },
   "decisions": [
@@ -163,16 +163,16 @@
     }
   ],
   "resumePoint": {
-    "description": "Z1 documentation bead implemented and verified: CLAUDE.md now documents the five-role taxonomy and sub-roles, docs/HARNESSES.md and dashboard/agent architecture docs describe role runs instead of specialist machinery, and src/lib/cloister/prompts/planning.md teaches planners the role taxonomy. npx tsc --noEmit, npx eslint . --max-warnings=0, full npm test, JSON validation, and graphify update pass. Next: stage exact docs plus vBRIEF/continue changes, commit, close workspace-jdu7, then continue with bd ready -l pan-1048.",
-    "beadId": "workspace-jdu7",
+    "description": "workspace-00df/D1 implementation and verification are complete: src/lib/work-types.ts and src/lib/work-type-router.ts were deleted; all source/packages/tests references to WorkTypeId, WORK_TYPES, work-type-router, work-types, getModelId, and WorkTypeRouter were migrated to role-based resolveModel(role, subRole?) or removed; smart-model-selector.ts remains only as a decoupled research utility because src/lib/model-research/test-selection.ts still calls it. Verification passed: npx tsc --noEmit, npx eslint . --max-warnings=0, npm test, graphify update ., and source/packages/tests grep for legacy symbols. Next: stage exact D1 files plus .pan updates, commit, close workspace-00df, then wait for inspection feedback.",
+    "beadId": "workspace-00df",
     "filesToRead": [
-      "CLAUDE.md",
-      "docs/HARNESSES.md",
-      "docs/AGENT_TYPES_INDEX.md",
-      "docs/AGENTS.md",
-      "docs/KANBAN-MODEL.md",
-      "docs/REVIEW-AGENT-ARCHITECTURE.md",
-      "src/lib/cloister/prompts/planning.md"
+      "src/lib/config-yaml.ts",
+      "src/lib/settings-api.ts",
+      "src/lib/cloister/review-agent.ts",
+      "src/lib/cloister/specialists.ts",
+      "src/lib/router-config.ts",
+      "tests/integration/config-precedence.test.ts",
+      "tests/lib/router-config.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -327,6 +327,12 @@
       "timestamp": "2026-05-09T23:11:34.000Z",
       "reason": "bead-complete",
       "note": "Implemented workspace-jdu7/Z1 docs: added the role taxonomy to CLAUDE.md, rewrote harness and agent architecture docs around plan/work/review/test/ship roles and sub-roles, updated kanban/review architecture language away from specialist machinery, and refreshed the planning prompt taxonomy so planners encode downstream requirements for roles rather than named specialists. Verified JSON artifacts, npx tsc --noEmit, npx eslint . --max-warnings=0, full npm test (383 passed/5 skipped test files; 4605 passed/62 skipped tests), and graphify update.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T23:33:20.935Z",
+      "reason": "bead-complete",
+      "note": "Implemented workspace-00df/D1: deleted WorkType registry/router modules and their direct tests, migrated backend/dashboard/settings/review/specialist/router-config callsites from WorkTypeId/WORK_TYPES/WorkTypeRouter/getModelId/hasOverride to role-based config-yaml resolveModel(role, subRole?) or opaque legacy model-route strings where compatibility surfaces remain, retained smart-model-selector.ts as a decoupled research utility because it has a non-router caller, rewrote config precedence coverage for role/workhorse resolution, and verified npx tsc --noEmit, npx eslint . --max-warnings=0, full npm test (381 passed/5 skipped test files; 4530 passed/62 skipped tests), source/packages/tests grep for legacy symbols, and graphify update.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

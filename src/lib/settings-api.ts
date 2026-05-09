@@ -21,11 +21,9 @@ import {
   type WorkhorsesConfig,
   type WorkhorseSlot,
 } from './config-yaml.js';
-import { WorkTypeId } from './work-types.js';
 import { ModelId } from './settings.js';
 import type { Role } from './agents.js';
 import { MODEL_CAPABILITIES, getModelCapability, MODEL_DEPRECATIONS, resolveModelId } from './model-capabilities.js';
-import { reloadGlobalRouter } from './work-type-router.js';
 
 /**
  * Optimal model defaults — multi-provider distribution (see docs/research/)
@@ -39,8 +37,8 @@ import { reloadGlobalRouter } from './work-type-router.js';
  * NOTE: All model IDs are automatically resolved through deprecation mapping
  * to ensure this function never returns deprecated models.
  */
-export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> {
-  const rawDefaults: Partial<Record<WorkTypeId, string>> = {
+export function getOptimalModelDefaults(): Partial<Record<string, ModelId>> {
+  const rawDefaults: Partial<Record<string, string>> = {
     // Planning & high-stakes review — GPT-5.5
     'issue-agent:exploration': 'kimi-k2.6',
 
@@ -79,9 +77,9 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
   };
 
   // Apply deprecation resolution to all model IDs
-  const resolved: Partial<Record<WorkTypeId, ModelId>> = {};
+  const resolved: Partial<Record<string, ModelId>> = {};
   for (const [workType, modelId] of Object.entries(rawDefaults)) {
-    resolved[workType as WorkTypeId] = resolveModelId(modelId);
+    if (modelId) resolved[workType] = resolveModelId(modelId);
   }
 
   return resolved;
@@ -91,7 +89,7 @@ export function getOptimalModelDefaults(): Partial<Record<WorkTypeId, ModelId>> 
  * Deprecation warning in API format
  */
 export interface ApiDeprecationWarning {
-  workType: WorkTypeId;
+  workType: string;
   from: string;
   to: string;
 }
@@ -113,8 +111,8 @@ export interface ApiSettingsConfig {
       mimo: boolean;
       openrouter: boolean;
     };
-    /** Legacy WorkTypeId overrides are no longer surfaced by GET /api/settings. */
-    overrides?: Partial<Record<WorkTypeId, ModelId>>;
+    /** Legacy model-route overrides are no longer surfaced by GET /api/settings. */
+    overrides?: Partial<Record<string, ModelId>>;
     gemini_thinking_level?: number;
     default_conversation_model?: ModelId;
   };
@@ -384,7 +382,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
   // Migrate convoy:* override keys to review:* equivalents (PAN-540)
   // Iterate convoy map first so convoy values win when both old+new keys exist,
   // matching original semantics.
-  const migratedOverrides: Record<string, string> = { ...config.overrides };
+  const migratedOverrides: Record<string, ModelId | undefined> = { ...config.overrides };
   for (const [oldKey, newKey] of Object.entries(CONVOY_TO_REVIEW_MAP)) {
     if (oldKey in migratedOverrides) {
       migratedOverrides[newKey] = migratedOverrides[oldKey]!;
@@ -397,7 +395,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
   for (const [workType, modelId] of Object.entries(migratedOverrides)) {
     if (modelId && MODEL_DEPRECATIONS[modelId]) {
       deprecationWarnings.push({
-        workType: workType as WorkTypeId,
+        workType,
         from: modelId,
         to: MODEL_DEPRECATIONS[modelId],
       });
@@ -564,16 +562,9 @@ export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void
 
   await writeYamlConfigPreservingComments(yamlConfig);
 
-  // Reload the global work-type router so in-memory overrides reflect the
-  // freshly-written config. Without this, planning-agent / specialist overrides
-  // saved via PUT /api/settings don't take effect until the dashboard restarts,
-  // and smart-model-selector fallback can pick an unexpected model (e.g. a
-  // non-Anthropic top scorer that the runtime can't resolve).
-  //
-  // We also clear the config-yaml cache because mtime-based invalidation can
-  // miss rapid writes (same-millisecond) or coarse filesystem mtime resolution.
+  // Clear the config-yaml cache because mtime-based invalidation can miss rapid
+  // writes (same-millisecond) or coarse filesystem mtime resolution.
   clearConfigCache();
-  reloadGlobalRouter();
 }
 
 /**

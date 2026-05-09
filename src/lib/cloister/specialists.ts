@@ -18,10 +18,9 @@ import { getProject } from '../projects.js';
 import { getAllSessionFiles, parseClaudeSession } from '../cost-parsers/jsonl-parser.js';
 import { createSpecialistHandoff, logSpecialistHandoff } from './specialist-handoff-logger.js';
 import type { ModelId } from '../settings.js';
-import { loadConfig as loadYamlConfig } from '../config-yaml.js';
+import { loadConfig as loadYamlConfig, resolveModel } from '../config-yaml.js';
 import { loadCloisterConfig } from './config.js';
 import { readCavemanVariant } from '../caveman/workspace.js';
-import { getModelId, WorkTypeId } from '../work-type-router.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { getProviderEnvForModel } from '../agents.js';
 import { generateLauncherScript, generateLauncherWrapper } from '../launcher-generator.js';
@@ -32,6 +31,25 @@ import { isTaskReady } from './task-readiness.js';
 import { renderPrompt } from './prompts.js';
 
 const execAsync = promisify(exec);
+
+function roleForSpecialistModel(specialistType: string): { role: 'plan' | 'work' | 'review' | 'test' | 'ship'; subRole?: string } {
+  const normalized = specialistType.replace(/-agent$/, '');
+  if (normalized === 'inspect') return { role: 'work', subRole: 'inspect' };
+  if (normalized === 'inspect-deep') return { role: 'work', subRole: 'inspect-deep' };
+  if (normalized === 'review') return { role: 'review' };
+  if (normalized === 'test' || normalized === 'uat') return { role: 'test' };
+  if (normalized === 'merge' || normalized === 'ship') return { role: 'ship' };
+  if (normalized === 'planning' || normalized === 'plan') return { role: 'plan' };
+  return { role: 'work' };
+}
+
+function resolveSpecialistRoleModel(specialistType: string): { model: string; route: string } {
+  const { role, subRole } = roleForSpecialistModel(specialistType);
+  return {
+    model: resolveModel(role, subRole, loadYamlConfig().config),
+    route: subRole ? `${role}.${subRole}` : role,
+  };
+}
 
 /**
  * Resolve git directories and branch name from a workspace path.
@@ -237,7 +255,7 @@ export interface SpecialistStatus extends SpecialistMetadata {
  * One step in the model resolution trace (PAN-754)
  */
 export interface ResolutionStep {
-  source: 'explicit-param' | 'work-type-router' | 'cloister-config' | 'fallback';
+  source: 'explicit-param' | 'role-config' | 'cloister-config' | 'fallback';
   workTypeId?: string;
   configKey?: string;
   resolvedAlias?: string;
@@ -877,7 +895,7 @@ ${basePrompt}`;
 
   try {
     // Determine model for this specialist
-    // Priority: explicit param > work-type-router (config.yaml overrides) > cloister config defaults > fallback
+    // Priority: explicit param > role config > cloister config defaults > fallback
     const fallbackModel = 'claude-sonnet-4-6';
     let model: string | undefined;
     const resolutionTrace: ResolutionStep[] = [];
@@ -889,15 +907,12 @@ ${basePrompt}`;
     }
 
     if (!model) try {
-      const workTypeId: WorkTypeId = `specialist-${specialistType}` as WorkTypeId;
-      const resolved = getModelId(workTypeId);
-      if (resolved) {
-        model = resolved;
-        resolutionTrace.push({ source: 'work-type-router', workTypeId, resolvedModel: resolved, matched: true });
-        console.log(`[specialist] Using model "${model}" for ${specialistType} (from work-type-router)`);
-      }
+      const resolved = resolveSpecialistRoleModel(specialistType);
+      model = resolved.model;
+      resolutionTrace.push({ source: 'role-config', workTypeId: resolved.route, resolvedModel: resolved.model, matched: true });
+      console.log(`[specialist] Using model "${model}" for ${specialistType} (from role config ${resolved.route})`);
     } catch {
-      resolutionTrace.push({ source: 'work-type-router', workTypeId: `specialist-${specialistType}`, resolvedModel: '', matched: false });
+      resolutionTrace.push({ source: 'role-config', workTypeId: specialistType, resolvedModel: '', matched: false });
     }
 
     if (!model) {
@@ -2176,12 +2191,10 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
   const tmuxSession = getTmuxSessionName(name);
   const cwd = getDevrootPath() || homedir();
 
-  // Determine model for this specialist using work type router
+  // Determine model for this specialist using role configuration
   let model = 'claude-sonnet-4-6'; // default fallback
   try {
-    // Map specialist name to work type ID
-    const workTypeId: WorkTypeId = `specialist-${name}` as WorkTypeId;
-    model = getModelId(workTypeId);
+    model = resolveSpecialistRoleModel(name).model;
   } catch (error) {
     console.warn(`Warning: Could not resolve model for ${name}, using default model`);
   }

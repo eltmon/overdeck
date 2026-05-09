@@ -1179,8 +1179,8 @@ Continue the PLANNING session. Do NOT implement anything.
         const { getAgentCommand } = await import('../../../lib/settings.js');
         let msgPlanningModel = 'claude-sonnet-4-6';
         try {
-          const { getModelId } = await import('../../../lib/work-type-router.js');
-          msgPlanningModel = getModelId('planning-agent');
+          const { loadConfig, resolveModel } = await import('../../../lib/config-yaml.js');
+          msgPlanningModel = resolveModel('plan', undefined, loadConfig().config);
         } catch { /* fall back to default */ }
         const msgAgentCmd = getAgentCommand(msgPlanningModel);
         const msgPermissionFlags = getClaudePermissionFlagsString();

@@ -16,7 +16,7 @@ import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { getAgentRuntimeBaseCommand, getProviderAuthMode, getProviderExportsForModel } from '../agents.js';
 import { getSpecialistHarness } from './router.js';
 import { generateLauncherScript } from '../launcher-generator.js';
-import { getModelId, hasOverride } from '../work-type-router.js';
+import { loadConfig as loadYamlConfig, resolveModel } from '../config-yaml.js';
 import { AGENTS_DIR, CACHE_AGENTS_DIR, CACHE_REVIEW_PROMPTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { emitActivityEntry, emitActivityTts } from '../activity-logger.js';
@@ -474,71 +474,40 @@ export async function parseReviewerTemplate(templatePath: string): Promise<Revie
 
 /**
  * Resolve shorthand aliases (opus/sonnet/haiku) that can appear in agent
- * template frontmatter to concrete model IDs via the work-type router.
- * Using getModelId ensures provider-correct routing (Anthropic, MiniMax, etc.)
- * rather than hard-coding Anthropic model IDs — if Anthropic is disabled,
- * aliases resolve to the best available model from enabled providers.
+ * definition frontmatter through the review role. The role model config is the
+ * single source of truth after the legacy WorkType router removal.
  */
-const CLAUDE_ALIAS_WORK_TYPE: Record<string, Parameters<typeof getModelId>[0]> = {
-  opus: 'specialist-review-agent',
-  sonnet: 'specialist-review-agent',
-  haiku: 'specialist-review-agent',
-};
-
 function resolveClaudeAlias(model: string): string {
-  const workType = CLAUDE_ALIAS_WORK_TYPE[model];
-  if (!workType) return model;
+  if (!['opus', 'sonnet', 'haiku'].includes(model)) return model;
   try {
-    return getModelId(workType);
+    return resolveModel('review', undefined, loadYamlConfig().config);
   } catch {
     return model;
   }
 }
 
-/** Map reviewer role name to the work-type ID used for model routing */
-function reviewRoleToWorkType(role: string): Parameters<typeof getModelId>[0] | null {
-  const map: Record<string, Parameters<typeof getModelId>[0]> = {
-    correctness: 'review:correctness',
-    security: 'review:security',
-    performance: 'review:performance',
-    requirements: 'review:requirements',
-    synthesis: 'review:synthesis',
+/** Map reviewer role name to the review sub-role used for model routing. */
+function reviewRoleToSubRole(role: string): string | undefined {
+  const map: Record<string, string> = {
+    correctness: 'correctness',
+    security: 'security',
+    performance: 'performance',
+    requirements: 'requirements',
   };
-  return map[role] ?? null;
+  return map[role];
 }
 
-/** Resolve the model to use for a reviewer, preferring agent-level override then work-type routing */
+/** Resolve the model to use for a reviewer, preferring agent-level override then role routing. */
 export function resolveReviewerModel(agent: ReviewAgentConfig, defaultModel: string): string {
-  let model: string;
   const envOverride = process.env.PANOPTICON_REVIEW_MODEL_OVERRIDE;
-  if (envOverride) {
-    model = envOverride;
-  } else if (agent.model) {
-    model = agent.model;
-  } else {
-    const workType = reviewRoleToWorkType(agent.name);
-    if (workType && hasOverride(workType)) {
-      // Only use role-specific work type when explicitly overridden in config.
-      // Without an override, smart selection can pick unsupported models (e.g. gpt-5.5
-      // when CLIProxy isn't configured for it), causing 502 errors in every reviewer.
-      try {
-        model = getModelId(workType);
-      } catch {
-        model = getModelId('specialist-review-agent');
-      }
-    } else {
-      // No role-specific override — fall back to specialist-review-agent which is
-      // always configured and uses a known-good model.
-      try {
-        model = getModelId('specialist-review-agent');
-      } catch {
-        model = defaultModel;
-      }
-    }
+  if (envOverride) return resolveClaudeAlias(envOverride);
+  if (agent.model) return resolveClaudeAlias(agent.model);
+
+  try {
+    return resolveModel('review', reviewRoleToSubRole(agent.name), loadYamlConfig().config);
+  } catch {
+    return defaultModel;
   }
-  // Resolve shorthand aliases (haiku/sonnet/opus) via the work-type router so
-  // provider-correct model IDs are used regardless of which providers are active.
-  return resolveClaudeAlias(model);
 }
 
 /** Spawn a single reviewer tmux session and send its prompt.

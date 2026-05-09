@@ -1,10 +1,10 @@
 /**
- * Integration tests for agent spawning with work types
+ * Integration tests for agent spawning with legacy model-routing keys
  *
- * Tests the end-to-end flow of spawning agents with work type routing:
- * 1. Agent spawns with correct model based on work type
+ * Tests the end-to-end flow of spawning agents with legacy model-routing key routing:
+ * 1. Agent spawns with correct model based on legacy model-routing key
  * 2. Phase-based routing works correctly
- * 3. Specialist agents use correct work types
+ * 3. Specialist agents use correct legacy model-routing keys
  * 4. Explicit model overrides take precedence
  */
 
@@ -13,7 +13,6 @@ import { mkdirSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { spawnAgent, getAgentState, type SpawnOptions, getAgentDir } from '../../src/lib/agents.js';
-import { WorkTypeId } from '../../src/lib/work-types.js';
 import type { NormalizedConfig } from '../../src/lib/config-yaml.js';
 
 // Mock tmux module to avoid actual session creation
@@ -72,7 +71,7 @@ vi.mock('../../src/lib/config-yaml.js', async (importOriginal) => {
 // FIXME(PAN-1015): tests use gpt-5.5-pro via OpenAI API key, which PAN-1015
 // deprecates in favor of Codex subscription auth. Skipped during PAN-1015
 // merge; rewrite to use a Codex-auth mock or a non-deprecated model.
-describe.skip('agent spawning with work types', () => {
+describe.skip('agent spawning with legacy model-routing keys', () => {
   let testPanopticonHome: string;
   let testAgentsDir: string;
   const originalPanopticonHome = process.env.PANOPTICON_HOME;
@@ -116,7 +115,7 @@ describe.skip('agent spawning with work types', () => {
   });
 
   describe('issue agent phases', () => {
-    it('should spawn exploration phase with correct work type', async () => {
+    it('should spawn exploration phase with correct legacy model-routing key', async () => {
       const options: SpawnOptions = {
         issueId: 'PAN-TEST-1',
         workspace: '/tmp/test-workspace',
@@ -132,7 +131,7 @@ describe.skip('agent spawning with work types', () => {
       expect(state.model).toMatch(/gemini|sonnet|haiku/i);
     });
 
-    it('should spawn implementation phase with correct work type', async () => {
+    it('should spawn implementation phase with correct legacy model-routing key', async () => {
       const options: SpawnOptions = {
         issueId: 'PAN-TEST-3',
         workspace: '/tmp/test-workspace',
@@ -146,7 +145,7 @@ describe.skip('agent spawning with work types', () => {
       expect(state.model).toBeDefined();
     });
 
-    it('should spawn testing phase with correct work type', async () => {
+    it('should spawn testing phase with correct legacy model-routing key', async () => {
       const options: SpawnOptions = {
         issueId: 'PAN-TEST-4',
         workspace: '/tmp/test-workspace',
@@ -162,7 +161,7 @@ describe.skip('agent spawning with work types', () => {
   });
 
   describe('specialist agents', () => {
-    it('should spawn review agent with correct work type', async () => {
+    it('should spawn review agent with correct legacy model-routing key', async () => {
       const options: SpawnOptions = {
         issueId: 'PAN-TEST-5',
         workspace: '/tmp/test-workspace',
@@ -177,7 +176,7 @@ describe.skip('agent spawning with work types', () => {
       expect(state.model).toMatch(/opus|pro|sonnet/i);
     });
 
-    it('should spawn test agent with correct work type', async () => {
+    it('should spawn test agent with correct legacy model-routing key', async () => {
       const options: SpawnOptions = {
         issueId: 'PAN-TEST-6',
         workspace: '/tmp/test-workspace',
@@ -190,7 +189,7 @@ describe.skip('agent spawning with work types', () => {
       expect(state.model).toBeDefined();
     });
 
-    it('should spawn merge agent with correct work type', async () => {
+    it('should spawn merge agent with correct legacy model-routing key', async () => {
       const options: SpawnOptions = {
         issueId: 'PAN-TEST-7',
         workspace: '/tmp/test-workspace',
@@ -205,7 +204,7 @@ describe.skip('agent spawning with work types', () => {
   });
 
   describe('explicit model override', () => {
-    it('should use explicitly provided model over work type routing', async () => {
+    it('should use explicitly provided model over legacy model-routing key routing', async () => {
       const options: SpawnOptions = {
         issueId: 'PAN-TEST-9',
         workspace: '/tmp/test-workspace',
@@ -221,12 +220,12 @@ describe.skip('agent spawning with work types', () => {
     });
   });
 
-  describe('explicit work type ID', () => {
-    it('should use explicit work type ID for routing', async () => {
+  describe('explicit legacy model-routing key ID', () => {
+    it('should use explicit legacy model-routing key ID for routing', async () => {
       const options: SpawnOptions = {
         issueId: 'PAN-TEST-10',
         workspace: '/tmp/test-workspace',
-        workType: 'dashboard:refactor' as WorkTypeId,
+        workType: 'dashboard:refactor',
       };
 
       const state = await spawnAgent(options);
@@ -263,7 +262,7 @@ describe.skip('agent spawning with work types', () => {
   });
 
   describe('legacy complexity routing', () => {
-    it('should fall back to complexity routing when no work type specified', async () => {
+    it('should fall back to complexity routing when no legacy model-routing key specified', async () => {
       // Mock settings to provide complexity-based routing
       vi.mock('../../src/lib/settings.js', () => ({
         loadSettings: vi.fn().mockReturnValue({

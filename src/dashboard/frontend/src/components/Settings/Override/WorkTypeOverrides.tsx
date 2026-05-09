@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { WorkTypeId, ModelId } from '../types';
+import { ModelRouteId, ModelId } from '../types';
 import { WorkTypeTable } from './WorkTypeTable';
 
 export interface WorkTypeOverridesProps {
-  overrides: Partial<Record<WorkTypeId, ModelId>>;
-  presetModels: Partial<Record<WorkTypeId, ModelId>>;
-  onConfigureOverride: (workType: WorkTypeId) => void;
-  onRemoveOverride: (workType: WorkTypeId) => void;
+  overrides: Partial<Record<ModelRouteId, ModelId>>;
+  presetModels: Partial<Record<ModelRouteId, ModelId>>;
+  onConfigureOverride: (workType: ModelRouteId) => void;
+  onRemoveOverride: (workType: ModelRouteId) => void;
 }
 
 export function WorkTypeOverrides({ overrides, presetModels, onConfigureOverride, onRemoveOverride }: WorkTypeOverridesProps) {

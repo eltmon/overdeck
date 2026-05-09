@@ -42,7 +42,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useAlert } from '../DialogProvider';
-import { SettingsConfig, Provider, WorkTypeId, ModelId } from './types';
+import { SettingsConfig, Provider, ModelRouteId, ModelId } from './types';
 import { useUIPreferences } from '../../hooks/useUIPreferences';
 import { useDiffPreferences } from '../../hooks/useDiffPreferences';
 import { useCodexAuthStatus } from '../../hooks/useCodexAuthStatus';
@@ -188,7 +188,7 @@ const TRACKERS: { id: TrackerType; name: string; icon: any; envVar: string; plac
 ];
 
 // Agent definitions organized by category
-interface AgentDef { id: WorkTypeId; name: string; icon: any; description: string; implemented: boolean }
+interface AgentDef { id: ModelRouteId; name: string; icon: any; description: string; implemented: boolean }
 interface AgentCategory { name: string; icon: any; agents: AgentDef[] }
 
 const AGENT_CATEGORIES: AgentCategory[] = [
@@ -196,65 +196,65 @@ const AGENT_CATEGORIES: AgentCategory[] = [
     name: 'Issue Agent Phases',
     icon: ClipboardList,
     agents: [
-      { id: 'issue-agent:exploration' as WorkTypeId, name: 'Exploration', icon: Search, description: 'Codebase discovery', implemented: true },
-      { id: 'issue-agent:implementation' as WorkTypeId, name: 'Implementation', icon: Code, description: 'Write the code', implemented: true },
-      { id: 'issue-agent:testing' as WorkTypeId, name: 'Testing', icon: Beaker, description: 'Write & run tests', implemented: true },
-      { id: 'issue-agent:documentation' as WorkTypeId, name: 'Documentation', icon: FileText, description: 'Update docs', implemented: true },
-      { id: 'issue-agent:review-response' as WorkTypeId, name: 'Review Response', icon: MessageSquare, description: 'Address PR feedback', implemented: true },
+      { id: 'issue-agent:exploration' as ModelRouteId, name: 'Exploration', icon: Search, description: 'Codebase discovery', implemented: true },
+      { id: 'issue-agent:implementation' as ModelRouteId, name: 'Implementation', icon: Code, description: 'Write the code', implemented: true },
+      { id: 'issue-agent:testing' as ModelRouteId, name: 'Testing', icon: Beaker, description: 'Write & run tests', implemented: true },
+      { id: 'issue-agent:documentation' as ModelRouteId, name: 'Documentation', icon: FileText, description: 'Update docs', implemented: true },
+      { id: 'issue-agent:review-response' as ModelRouteId, name: 'Review Response', icon: MessageSquare, description: 'Address PR feedback', implemented: true },
     ],
   },
   {
     name: 'Specialist Agents',
     icon: Brain,
     agents: [
-      { id: 'specialist-review-agent' as WorkTypeId, name: 'Review Agent', icon: Eye, description: 'Automated code reviews', implemented: true },
-      { id: 'specialist-test-agent' as WorkTypeId, name: 'Test Agent', icon: Beaker, description: 'Test generation', implemented: true },
-      { id: 'specialist-merge-agent' as WorkTypeId, name: 'Merge Agent', icon: GitMerge, description: 'Merge conflict resolution', implemented: true },
-      { id: 'specialist-inspect-agent' as WorkTypeId, name: 'Inspect Agent', icon: PageView, description: 'Per-bead diff inspection', implemented: true },
-      { id: 'specialist-uat-agent' as WorkTypeId, name: 'UAT Agent', icon: VerifiedUser, description: 'User acceptance testing', implemented: true },
+      { id: 'specialist-review-agent' as ModelRouteId, name: 'Review Agent', icon: Eye, description: 'Automated code reviews', implemented: true },
+      { id: 'specialist-test-agent' as ModelRouteId, name: 'Test Agent', icon: Beaker, description: 'Test generation', implemented: true },
+      { id: 'specialist-merge-agent' as ModelRouteId, name: 'Merge Agent', icon: GitMerge, description: 'Merge conflict resolution', implemented: true },
+      { id: 'specialist-inspect-agent' as ModelRouteId, name: 'Inspect Agent', icon: PageView, description: 'Per-bead diff inspection', implemented: true },
+      { id: 'specialist-uat-agent' as ModelRouteId, name: 'UAT Agent', icon: VerifiedUser, description: 'User acceptance testing', implemented: true },
     ],
   },
   {
     name: 'Review Agents',
     icon: SplitSquareVertical,
     agents: [
-      { id: 'review:security' as WorkTypeId, name: 'Security', icon: Shield, description: 'Security analysis', implemented: true },
-      { id: 'review:performance' as WorkTypeId, name: 'Performance', icon: Zap, description: 'Performance review', implemented: true },
-      { id: 'review:correctness' as WorkTypeId, name: 'Correctness', icon: CheckCircle, description: 'Logic validation', implemented: true },
-      { id: 'review:requirements' as WorkTypeId, name: 'Requirements', icon: ClipboardList, description: 'Requirements coverage vs issue + vBRIEF', implemented: true },
-      { id: 'review:synthesis' as WorkTypeId, name: 'Synthesis', icon: Merge, description: 'Combine reviews', implemented: true },
+      { id: 'review:security' as ModelRouteId, name: 'Security', icon: Shield, description: 'Security analysis', implemented: true },
+      { id: 'review:performance' as ModelRouteId, name: 'Performance', icon: Zap, description: 'Performance review', implemented: true },
+      { id: 'review:correctness' as ModelRouteId, name: 'Correctness', icon: CheckCircle, description: 'Logic validation', implemented: true },
+      { id: 'review:requirements' as ModelRouteId, name: 'Requirements', icon: ClipboardList, description: 'Requirements coverage vs issue + vBRIEF', implemented: true },
+      { id: 'review:synthesis' as ModelRouteId, name: 'Synthesis', icon: Merge, description: 'Combine reviews', implemented: true },
     ],
   },
   {
     name: 'Subagents',
     icon: User,
     agents: [
-      { id: 'subagent:explore' as WorkTypeId, name: 'Explore', icon: Globe, description: 'Codebase exploration', implemented: true },
-      { id: 'subagent:plan' as WorkTypeId, name: 'Plan', icon: Calendar, description: 'Task breakdown', implemented: true },
-      { id: 'subagent:bash' as WorkTypeId, name: 'Bash', icon: Terminal, description: 'CLI commands', implemented: true },
-      { id: 'subagent:general-purpose' as WorkTypeId, name: 'General', icon: Lightbulb, description: 'General tasks', implemented: true },
+      { id: 'subagent:explore' as ModelRouteId, name: 'Explore', icon: Globe, description: 'Codebase exploration', implemented: true },
+      { id: 'subagent:plan' as ModelRouteId, name: 'Plan', icon: Calendar, description: 'Task breakdown', implemented: true },
+      { id: 'subagent:bash' as ModelRouteId, name: 'Bash', icon: Terminal, description: 'CLI commands', implemented: true },
+      { id: 'subagent:general-purpose' as ModelRouteId, name: 'General', icon: Lightbulb, description: 'General tasks', implemented: true },
     ],
   },
   {
     name: 'Workflow Agents',
     icon: Route,
     agents: [
-      { id: 'status-review' as WorkTypeId, name: 'Status Review', icon: BarChart3, description: 'AI status reviews (executive-facing)', implemented: true },
+      { id: 'status-review' as ModelRouteId, name: 'Status Review', icon: BarChart3, description: 'AI status reviews (executive-facing)', implemented: true },
     ],
   },
   {
     name: 'Planning',
     icon: Brain,
     agents: [
-      { id: 'planning-agent' as WorkTypeId, name: 'Planning Agent', icon: BookMarked, description: 'vBRIEF plan generation', implemented: true },
+      { id: 'planning-agent' as ModelRouteId, name: 'Planning Agent', icon: BookMarked, description: 'vBRIEF plan generation', implemented: true },
     ],
   },
   {
     name: 'CLI Modes',
     icon: Terminal,
     agents: [
-      { id: 'cli:interactive' as WorkTypeId, name: 'Interactive', icon: MessageCircle, description: 'Conversation mode', implemented: true },
-      { id: 'cli:quick-command' as WorkTypeId, name: 'Quick Command', icon: Zap, description: 'One-shot queries', implemented: true },
+      { id: 'cli:interactive' as ModelRouteId, name: 'Interactive', icon: MessageCircle, description: 'Conversation mode', implemented: true },
+      { id: 'cli:quick-command' as ModelRouteId, name: 'Quick Command', icon: Zap, description: 'One-shot queries', implemented: true },
     ],
   },
 ];
@@ -294,7 +294,7 @@ export function SettingsPage() {
   const [formData, setFormData] = useState<SettingsConfig | null>(null);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
   const [showTrackerKey, setShowTrackerKey] = useState<Record<string, boolean>>({});
-  const [modalWorkType, setModalWorkType] = useState<WorkTypeId | null>(null);
+  const [modalWorkType, setModalWorkType] = useState<ModelRouteId | null>(null);
   const [testingProvider, setTestingProvider] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<Record<string, TestApiKeyResult | null>>({});
   const [modelsModalProvider, setModelsModalProvider] = useState<Provider | null>(null);
@@ -512,7 +512,7 @@ export function SettingsPage() {
   };
 
 
-  const handleSetOverride = (workType: WorkTypeId, model: ModelId) => {
+  const handleSetOverride = (workType: ModelRouteId, model: ModelId) => {
     setFormData({
       ...formData,
       models: {
@@ -525,7 +525,7 @@ export function SettingsPage() {
     });
   };
 
-  const handleRemoveOverride = (workType: WorkTypeId) => {
+  const handleRemoveOverride = (workType: ModelRouteId) => {
     const { [workType]: _removed, ...remainingOverrides } = formData.models.overrides;
     setFormData({
       ...formData,

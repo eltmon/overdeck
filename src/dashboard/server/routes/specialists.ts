@@ -1637,29 +1637,31 @@ const getModelsResolveRoute = HttpRouter.add(
   'GET',
   '/api/models/resolve',
   httpHandler(Effect.gen(function* () {
-    const { getModelId: getModel } = yield* Effect.promise(
-      () => import('../../../lib/work-type-router.js'),
+    const { loadConfig, resolveModel } = yield* Effect.promise(
+      () => import('../../../lib/config-yaml.js'),
     );
+    const config = loadConfig().config;
 
-    const workTypes = [
-      'planning-agent',
-      'issue-agent:implementation',
-      'specialist-review-agent',
-      'review:correctness',
-      'review:security',
-      'review:performance',
-      'review:requirements',
-      'review:synthesis',
-      'specialist-test-agent',
-      'specialist-merge-agent',
+    const routes = [
+      { key: 'role:plan', role: 'plan' },
+      { key: 'role:work', role: 'work' },
+      { key: 'role:work.inspect', role: 'work', subRole: 'inspect' },
+      { key: 'role:work.inspect-deep', role: 'work', subRole: 'inspect-deep' },
+      { key: 'role:review', role: 'review' },
+      { key: 'role:review.correctness', role: 'review', subRole: 'correctness' },
+      { key: 'role:review.security', role: 'review', subRole: 'security' },
+      { key: 'role:review.performance', role: 'review', subRole: 'performance' },
+      { key: 'role:review.requirements', role: 'review', subRole: 'requirements' },
+      { key: 'role:test', role: 'test' },
+      { key: 'role:ship', role: 'ship' },
     ] as const;
 
     const resolved: Record<string, string | null> = {};
-    for (const wt of workTypes) {
+    for (const route of routes) {
       try {
-        resolved[wt] = getModel(wt as any);
+        resolved[route.key] = resolveModel(route.role, route.subRole, config);
       } catch {
-        resolved[wt] = null;
+        resolved[route.key] = null;
       }
     }
 

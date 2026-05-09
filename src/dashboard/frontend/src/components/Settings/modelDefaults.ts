@@ -1,8 +1,8 @@
-import { ModelId, WorkTypeId } from './types';
+import { ModelId, ModelRouteId } from './types';
 
 export const FALLBACK_DEFAULT_MODEL: ModelId = 'gpt-4o-mini';
 
-export const DEFAULT_MODELS_BY_WORK_TYPE: Partial<Record<WorkTypeId, ModelId>> = {
+export const DEFAULT_MODELS_BY_WORK_TYPE: Partial<Record<ModelRouteId, ModelId>> = {
   'issue-agent:exploration': 'claude-opus-4-6',
   'issue-agent:implementation': 'kimi-k2.5',
   'issue-agent:testing': 'claude-sonnet-4-6',
@@ -30,8 +30,8 @@ export const DEFAULT_MODELS_BY_WORK_TYPE: Partial<Record<WorkTypeId, ModelId>> =
 };
 
 export function getEffectiveModelId(
-  workType: WorkTypeId,
-  overrides: Partial<Record<WorkTypeId, ModelId>>,
+  workType: ModelRouteId,
+  overrides: Partial<Record<ModelRouteId, ModelId>>,
 ): ModelId {
   return (overrides[workType] || DEFAULT_MODELS_BY_WORK_TYPE[workType] || FALLBACK_DEFAULT_MODEL) as ModelId;
 }

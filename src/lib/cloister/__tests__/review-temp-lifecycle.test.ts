@@ -88,7 +88,6 @@ vi.mock('../../tmux.js', () => ({
 }));
 vi.mock('../../agents.js', () => ({ getProviderExportsForModel: vi.fn(), getAgentRuntimeBaseCommand: vi.fn() }));
 vi.mock('../../launcher-generator.js', () => ({ generateLauncherScript: vi.fn() }));
-vi.mock('../../work-type-router.js', () => ({ getModelId: vi.fn(), hasOverride: vi.fn() }));
 vi.mock('../../paths.js', () => ({
   AGENTS_DIR: '/tmp/agents',
   CACHE_AGENTS_DIR: '/tmp/cache-agents',

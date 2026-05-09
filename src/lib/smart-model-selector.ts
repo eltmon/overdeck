@@ -10,7 +10,6 @@
  */
 
 import { ModelId } from './settings.js';
-import { WorkTypeId } from './work-types.js';
 import {
   MODEL_CAPABILITIES,
   SkillDimension,
@@ -42,7 +41,7 @@ export interface SkillRequirement {
  * Work type to skill mapping
  * Defines what skills each work type needs
  */
-export const WORK_TYPE_REQUIREMENTS: Record<WorkTypeId, SkillRequirement[]> = {
+export const WORK_TYPE_REQUIREMENTS: Record<string, SkillRequirement[]> = {
   // ═══════════════════════════════════════════════════════════════════════════
   // ISSUE AGENT PHASES
   // ═══════════════════════════════════════════════════════════════════════════
@@ -322,7 +321,7 @@ function isAccessibleAtTier(
  * Select the best model for a work type from available models
  */
 export function selectModel(
-  workType: WorkTypeId,
+  workType: string,
   availableModels: ModelId[],
   options: SelectionOptions = {}
 ): ModelSelectionResult {
@@ -431,12 +430,9 @@ export function selectModel(
 export function selectAllModels(
   availableModels: ModelId[],
   options: SelectionOptions = {}
-): Record<WorkTypeId, ModelSelectionResult> {
-  const workTypes = Object.keys(WORK_TYPE_REQUIREMENTS) as WorkTypeId[];
-  const results: Record<WorkTypeId, ModelSelectionResult> = {} as Record<
-    WorkTypeId,
-    ModelSelectionResult
-  >;
+): Record<string, ModelSelectionResult> {
+  const workTypes = Object.keys(WORK_TYPE_REQUIREMENTS);
+  const results: Record<string, ModelSelectionResult> = {};
 
   for (const workType of workTypes) {
     results[workType] = selectModel(workType, availableModels, options);
@@ -451,12 +447,12 @@ export function selectAllModels(
 export function getSimpleModelMapping(
   availableModels: ModelId[],
   options: SelectionOptions = {}
-): Record<WorkTypeId, ModelId> {
+): Record<string, ModelId> {
   const results = selectAllModels(availableModels, options);
-  const mapping: Record<WorkTypeId, ModelId> = {} as Record<WorkTypeId, ModelId>;
+  const mapping: Record<string, ModelId> = {} as Record<string, ModelId>;
 
   for (const [workType, result] of Object.entries(results)) {
-    mapping[workType as WorkTypeId] = result.model;
+    mapping[workType] = result.model;
   }
 
   return mapping;
@@ -466,7 +462,7 @@ export function getSimpleModelMapping(
  * Pretty print selection results for debugging
  */
 export function formatSelectionResults(
-  results: Record<WorkTypeId, ModelSelectionResult>
+  results: Record<string, ModelSelectionResult>
 ): string {
   const lines: string[] = ['Model Selection Results', '='.repeat(60)];
 

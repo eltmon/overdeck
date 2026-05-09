@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react';
 import { AgentCard, AgentPhase } from './AgentCard';
 import { ModelOverrideModal } from './ModelOverrideModal';
-import { WorkTypeId, ModelId, Provider } from '../types';
+import { ModelRouteId, ModelId, Provider } from '../types';
 import { getEffectiveModelId } from '../modelDefaults';
 
-// Agent definitions with their work types
+// Agent definitions with their model routes
 const AGENT_DEFINITIONS = {
   // Main worker agent with phases
   issueAgent: {
@@ -12,11 +12,11 @@ const AGENT_DEFINITIONS = {
     icon: 'smart_toy',
     description: 'Main worker that handles issues end-to-end',
     phases: [
-      { id: 'issue-agent:exploration' as WorkTypeId, name: 'Exploration' },
-      { id: 'issue-agent:implementation' as WorkTypeId, name: 'Implementation' },
-      { id: 'issue-agent:testing' as WorkTypeId, name: 'Testing' },
-      { id: 'issue-agent:documentation' as WorkTypeId, name: 'Documentation' },
-      { id: 'issue-agent:review-response' as WorkTypeId, name: 'Review Response' },
+      { id: 'issue-agent:exploration' as ModelRouteId, name: 'Exploration' },
+      { id: 'issue-agent:implementation' as ModelRouteId, name: 'Implementation' },
+      { id: 'issue-agent:testing' as ModelRouteId, name: 'Testing' },
+      { id: 'issue-agent:documentation' as ModelRouteId, name: 'Documentation' },
+      { id: 'issue-agent:review-response' as ModelRouteId, name: 'Review Response' },
     ],
   },
 
@@ -25,19 +25,19 @@ const AGENT_DEFINITIONS = {
     name: 'Review Agent',
     icon: 'rate_review',
     description: 'Comprehensive code review specialist',
-    workType: 'specialist-review-agent' as WorkTypeId,
+    workType: 'specialist-review-agent' as ModelRouteId,
   },
   testAgent: {
     name: 'Test Agent',
     icon: 'bug_report',
     description: 'Test generation and verification',
-    workType: 'specialist-test-agent' as WorkTypeId,
+    workType: 'specialist-test-agent' as ModelRouteId,
   },
   mergeAgent: {
     name: 'Merge Agent',
     icon: 'merge',
     description: 'Merge request finalization',
-    workType: 'specialist-merge-agent' as WorkTypeId,
+    workType: 'specialist-merge-agent' as ModelRouteId,
   },
 
   // Review agents
@@ -45,31 +45,31 @@ const AGENT_DEFINITIONS = {
     name: 'Security Reviewer',
     icon: 'shield',
     description: 'Security-focused code review',
-    workType: 'review:security' as WorkTypeId,
+    workType: 'review:security' as ModelRouteId,
   },
   performanceReviewer: {
     name: 'Performance Reviewer',
     icon: 'speed',
     description: 'Performance-focused review',
-    workType: 'review:performance' as WorkTypeId,
+    workType: 'review:performance' as ModelRouteId,
   },
   correctnessReviewer: {
     name: 'Correctness Reviewer',
     icon: 'verified',
     description: 'Correctness-focused review',
-    workType: 'review:correctness' as WorkTypeId,
+    workType: 'review:correctness' as ModelRouteId,
   },
   requirementsReviewer: {
     name: 'Requirements Reviewer',
     icon: 'checklist',
     description: 'Verifies requirements coverage vs issue + vBRIEF',
-    workType: 'review:requirements' as WorkTypeId,
+    workType: 'review:requirements' as ModelRouteId,
   },
   synthesisAgent: {
     name: 'Synthesis Agent',
     icon: 'hub',
     description: 'Combines reviewer findings',
-    workType: 'review:synthesis' as WorkTypeId,
+    workType: 'review:synthesis' as ModelRouteId,
   },
 
   // Subagents
@@ -77,25 +77,25 @@ const AGENT_DEFINITIONS = {
     name: 'Explore',
     icon: 'search',
     description: 'Fast codebase exploration',
-    workType: 'subagent:explore' as WorkTypeId,
+    workType: 'subagent:explore' as ModelRouteId,
   },
   planSubagent: {
     name: 'Plan',
     icon: 'architecture',
     description: 'Implementation planning',
-    workType: 'subagent:plan' as WorkTypeId,
+    workType: 'subagent:plan' as ModelRouteId,
   },
   bashSubagent: {
     name: 'Bash',
     icon: 'terminal',
     description: 'Command execution specialist',
-    workType: 'subagent:bash' as WorkTypeId,
+    workType: 'subagent:bash' as ModelRouteId,
   },
   generalSubagent: {
     name: 'General Purpose',
     icon: 'apps',
     description: 'General-purpose tasks',
-    workType: 'subagent:general-purpose' as WorkTypeId,
+    workType: 'subagent:general-purpose' as ModelRouteId,
   },
 
   // CLI contexts
@@ -103,21 +103,21 @@ const AGENT_DEFINITIONS = {
     name: 'CLI Interactive',
     icon: 'chat',
     description: 'Interactive CLI sessions',
-    workType: 'cli:interactive' as WorkTypeId,
+    workType: 'cli:interactive' as ModelRouteId,
   },
   cliQuickCommand: {
     name: 'CLI Quick Command',
     icon: 'bolt',
     description: 'Quick one-off commands',
-    workType: 'cli:quick-command' as WorkTypeId,
+    workType: 'cli:quick-command' as ModelRouteId,
   },
 };
 
 interface AgentCardsPanelProps {
-  overrides: Partial<Record<WorkTypeId, ModelId>>;
+  overrides: Partial<Record<ModelRouteId, ModelId>>;
   enabledProviders: Record<Provider, boolean>;
-  onSetOverride: (workType: WorkTypeId, model: ModelId) => void;
-  onRemoveOverride: (workType: WorkTypeId) => void;
+  onSetOverride: (workType: ModelRouteId, model: ModelId) => void;
+  onRemoveOverride: (workType: ModelRouteId) => void;
   onResetAllOverrides: () => void;
 }
 
@@ -129,7 +129,7 @@ export function AgentCardsPanel({
   onResetAllOverrides,
 }: AgentCardsPanelProps) {
   // Modal state
-  const [modalWorkType, setModalWorkType] = useState<WorkTypeId | null>(null);
+  const [modalWorkType, setModalWorkType] = useState<ModelRouteId | null>(null);
 
   // Get list of enabled provider names for the modal
   const enabledProviderList = useMemo(() => {
@@ -138,8 +138,8 @@ export function AgentCardsPanel({
       .map(([provider]) => provider);
   }, [enabledProviders]);
 
-  // Helper to get model for a work type
-  const getModel = (workType: WorkTypeId): { model: ModelId; isOverride: boolean } => {
+  // Helper to get model for a model route
+  const getModel = (workType: ModelRouteId): { model: ModelId; isOverride: boolean } => {
     return {
       model: getEffectiveModelId(workType, overrides),
       isOverride: !!overrides[workType],
@@ -166,7 +166,7 @@ export function AgentCardsPanel({
   }, [issueAgentPhases]);
 
   // Handle opening modal
-  const handleConfigureOverride = (workType: WorkTypeId) => {
+  const handleConfigureOverride = (workType: ModelRouteId) => {
     setModalWorkType(workType);
   };
 

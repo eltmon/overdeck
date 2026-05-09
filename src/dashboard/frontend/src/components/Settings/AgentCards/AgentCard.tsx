@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Settings2, Zap } from 'lucide-react';
-import { WorkTypeId, ModelId } from '../types';
+import { ModelRouteId, ModelId } from '../types';
 
 export interface AgentPhase {
-  id: WorkTypeId;
+  id: ModelRouteId;
   name: string;
   model: ModelId;
   isOverride: boolean;
@@ -17,8 +17,8 @@ export interface AgentCardProps {
   isOverride: boolean;
   phases?: AgentPhase[];
   variant?: 'default' | 'compact';
-  onConfigureOverride?: (workType: WorkTypeId) => void;
-  onRemoveOverride?: (workType: WorkTypeId) => void;
+  onConfigureOverride?: (workType: ModelRouteId) => void;
+  onRemoveOverride?: (workType: ModelRouteId) => void;
 }
 
 const MODEL_COLORS: Record<string, { bg: string; text: string; border: string }> = {

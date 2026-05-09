@@ -55,11 +55,6 @@ vi.mock('fs/promises', async () => {
   };
 });
 
-// Prevent reloadGlobalRouter from running during save operations
-vi.mock('../../src/lib/work-type-router.js', async () => {
-  const actual = await vi.importActual<typeof import('../../src/lib/work-type-router.js')>('../../src/lib/work-type-router.js');
-  return { ...actual, reloadGlobalRouter: vi.fn() };
-});
 
 describe('settings-api', () => {
   describe('loadSettingsApi', () => {
@@ -102,7 +97,7 @@ describe('settings-api', () => {
       expect(settings.models.providers.kimi).toBe(true);
     });
 
-    it('does not surface legacy WorkTypeId overrides in the settings API', () => {
+    it('does not surface legacy model-route overrides in the settings API', () => {
       vi.mocked(loadConfig).mockReturnValueOnce({
         config: {
           preset: 'balanced',
@@ -270,7 +265,7 @@ describe('settings-api', () => {
       });
     });
 
-    it('should cover all unified roles without legacy WorkTypeId overrides', () => {
+    it('should cover all unified roles without legacy model-route overrides', () => {
       const settings = getMiniMaxDefaultsApi();
 
       expect(settings.models.overrides).toBeUndefined();

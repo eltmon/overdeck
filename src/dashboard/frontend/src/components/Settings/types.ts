@@ -3,7 +3,7 @@
 
 export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'mimo' | 'openrouter';
 
-export type WorkTypeId =
+export type ModelRouteId =
   // Issue agent phases
   | 'issue-agent:exploration'
   | 'issue-agent:implementation'
@@ -51,7 +51,7 @@ export interface ProvidersConfig {
 
 export interface ModelsConfig {
   providers: ProvidersConfig;
-  overrides: Partial<Record<WorkTypeId, ModelId>>;
+  overrides: Partial<Record<ModelRouteId, ModelId>>;
   gemini_thinking_level?: number; // 1-4 (Minimal, Low, Medium, High)
   default_conversation_model?: ModelId;
 }
@@ -74,7 +74,7 @@ export interface TrackerKeysConfig {
 }
 
 export interface DeprecationWarning {
-  workType: WorkTypeId;
+  workType: ModelRouteId;
   from: string;
   to: string;
 }
@@ -113,7 +113,7 @@ export interface SettingsConfig {
 
 
 export interface WorkTypeInfo {
-  id: WorkTypeId;
+  id: ModelRouteId;
   category: WorkTypeCategory;
   displayName: string;
   description?: string;
