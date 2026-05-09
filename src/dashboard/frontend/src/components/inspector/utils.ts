@@ -28,8 +28,8 @@ export interface ReviewButtonState {
 interface ReviewButtonInput {
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
-  mergeStatus?: string;
-  verificationStatus?: string;
+  mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
+  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
   updatedAt?: string;
   reviewSpawnedAt?: string;
   queuePosition?: number | null;
