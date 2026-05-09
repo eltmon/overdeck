@@ -21,7 +21,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
 import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
 import { buildTmuxCommandString, buildTmuxArgs, capturePaneAsync, getWindowDimensionsAsync, listSessionNamesAsync, resizeWindowAsync, sessionExistsAsync } from '../../lib/tmux.js';
-import { getReauthSessionToken, invalidateReauthToken } from './routes/codex-auth.js';
+import { consumeReauthTerminalToken } from './routes/codex-auth.js';
 import { buildChildEnvWithoutTmux } from '../../lib/child-env.js';
 
 type ClientControlMessage =
@@ -142,15 +142,25 @@ export function setupTerminalWebSocket(server: http.Server): void {
       return;
     }
 
-    // Re-auth sessions require a valid one-time token to prevent hijacking.
+    // Re-auth sessions require a valid one-time terminal token to prevent hijacking.
     if (sessionName.startsWith('reauth-')) {
-      const token = url.searchParams.get('token');
-      const expected = getReauthSessionToken(sessionName);
-      if (!token || !expected || expected !== token) {
+      const cookie = req.headers.cookie ?? '';
+      const token = cookie
+        .split(';')
+        .map((part) => part.trim())
+        .find((part) => part.startsWith('pan_codex_reauth='))
+        ?.slice('pan_codex_reauth='.length);
+      let decodedToken = '';
+      try {
+        decodedToken = token ? decodeURIComponent(token) : '';
+      } catch {
+        decodedToken = '';
+      }
+      const [cookieSessionName, terminalToken] = decodedToken.split(':');
+      if (cookieSessionName !== sessionName || !consumeReauthTerminalToken(sessionName, terminalToken)) {
         ws.close(1008, 'Invalid or missing re-auth token');
         return;
       }
-      invalidateReauthToken(sessionName);
     }
 
     console.log(`[ws-terminal] WebSocket connected for session: ${sessionName}`);

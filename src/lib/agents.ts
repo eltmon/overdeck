@@ -25,6 +25,7 @@ import { readCavemanVariant } from './caveman/workspace.js';
 import { loadConfig } from './config.js';
 import { getOpenAIAuthStatus, getOpenAIAuthStatusSync } from './openai-auth.js';
 import { bridgeGeminiAuthToCliproxyAsync, getCliproxyClientEnv } from './cliproxy.js';
+import { checkCodexAuthStatus } from './codex-auth.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix, resolveProjectFromIssue } from './projects.js';
@@ -89,6 +90,19 @@ export async function getProviderAuthMode(model: string): Promise<AuthMode | und
   }
 
   return undefined;
+}
+
+export async function assertCodexAuthReadyForModel(model: string): Promise<void> {
+  if (getProviderForModel(model).name !== 'openai') return;
+  if ((await getProviderAuthMode(model)) !== 'subscription') return;
+
+  const codexAuth = await checkCodexAuthStatus();
+  if (codexAuth.status === 'expired' || codexAuth.status === 'burned') {
+    throw new Error(
+      `Codex authentication ${codexAuth.status}. GPT subscription agents cannot spawn with expired/burned tokens. `
+      + 'Re-authenticate in the dashboard Codex auth banner or Settings page to refresh your OpenAI subscription tokens.',
+    );
+  }
 }
 
 /** Map abstract/future model names to CLIProxy-supported names.
@@ -1520,6 +1534,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Determine model based on configuration
   const selectedModel = determineModel(options);
   console.log(`[DEBUG] Selected model: ${selectedModel}`);
+
+  await assertCodexAuthReadyForModel(selectedModel);
 
   // When routing a GPT agent through ChatGPT subscription auth, the local
   // CLIProxyAPI sidecar MUST already be running. We only check — never

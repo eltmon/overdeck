@@ -11,29 +11,36 @@ import { createSessionAsync, sessionExistsAsync, listSessionNamesAsync } from '.
 // ─── Re-auth session registry ──────────────────────────────────────────────────
 
 interface ReauthSession {
-  token: string;
+  terminalToken: string;
+  statusToken: string;
   createdAt: number;
+  terminalAttached: boolean;
 }
 
 const reauthSessions = new Map<string, ReauthSession>();
 const SESSION_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 
-function generateReauthSession(): { sessionName: string; token: string } {
+function generateReauthSession(): { sessionName: string; terminalToken: string; statusToken: string } {
   const sessionName = `reauth-${randomUUID()}`;
-  const token = randomUUID();
-  reauthSessions.set(sessionName, { token, createdAt: Date.now() });
-  return { sessionName, token };
+  const terminalToken = randomUUID();
+  const statusToken = randomUUID();
+  reauthSessions.set(sessionName, { terminalToken, statusToken, createdAt: Date.now(), terminalAttached: false });
+  return { sessionName, terminalToken, statusToken };
 }
 
-function validateReauthToken(sessionName: string, token: string): boolean {
+function getLiveReauthSession(sessionName: string): ReauthSession | undefined {
   const session = reauthSessions.get(sessionName);
-  if (!session) return false;
-  if (session.token !== token) return false;
+  if (!session) return undefined;
   if (Date.now() - session.createdAt > SESSION_MAX_AGE_MS) {
     reauthSessions.delete(sessionName);
-    return false;
+    return undefined;
   }
-  return true;
+  return session;
+}
+
+function validateReauthStatusToken(sessionName: string, token: string): boolean {
+  const session = getLiveReauthSession(sessionName);
+  return !!session && session.statusToken === token;
 }
 
 function cleanupExpiredReauthSessions(): void {
@@ -45,18 +52,17 @@ function cleanupExpiredReauthSessions(): void {
   }
 }
 
-export function getReauthSessionToken(sessionName: string): string | undefined {
-  const session = reauthSessions.get(sessionName);
-  if (!session) return undefined;
-  if (Date.now() - session.createdAt > SESSION_MAX_AGE_MS) {
-    reauthSessions.delete(sessionName);
-    return undefined;
-  }
-  return session.token;
+export function consumeReauthTerminalToken(sessionName: string, token: string | undefined): boolean {
+  const session = getLiveReauthSession(sessionName);
+  if (!session || !token || session.terminalToken !== token || session.terminalAttached) return false;
+  session.terminalAttached = true;
+  session.terminalToken = '';
+  return true;
 }
 
-export function invalidateReauthToken(sessionName: string): void {
-  reauthSessions.delete(sessionName);
+function buildTerminalCookie(sessionName: string, terminalToken: string): string {
+  const value = encodeURIComponent(`${sessionName}:${terminalToken}`);
+  return `pan_codex_reauth=${value}; HttpOnly; SameSite=Strict; Path=/ws/terminal; Max-Age=${Math.floor(SESSION_MAX_AGE_MS / 1000)}`;
 }
 
 // ─── Route: GET /api/settings/codex-auth ───────────────────────────────────────
@@ -74,15 +80,10 @@ const getCodexAuthRoute = HttpRouter.add(
 
 // ─── Route: POST /api/settings/codex-reauth ────────────────────────────────────
 
-async function findExistingLiveReauthSession(): Promise<{ sessionName: string; token: string } | null> {
+async function hasExistingLiveReauthSession(): Promise<boolean> {
   cleanupExpiredReauthSessions();
   const sessions = await listSessionNamesAsync();
-  for (const [name, session] of reauthSessions.entries()) {
-    if (sessions.includes(name)) {
-      return { sessionName: name, token: session.token };
-    }
-  }
-  return null;
+  return [...reauthSessions.keys()].some((name) => sessions.includes(name));
 }
 
 const postCodexReauthRoute = HttpRouter.add(
@@ -90,16 +91,14 @@ const postCodexReauthRoute = HttpRouter.add(
   '/api/settings/codex-reauth',
   httpHandler(
     Effect.gen(function* () {
-      const existing = yield* Effect.promise(() => findExistingLiveReauthSession());
+      const existing = yield* Effect.promise(() => hasExistingLiveReauthSession());
       if (existing) {
         return jsonResponse({
-          sessionName: existing.sessionName,
-          token: existing.token,
-          headless: !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY,
-        });
+          error: 'A Codex re-authentication session is already running.',
+        }, { status: 409 });
       }
 
-      const { sessionName, token } = generateReauthSession();
+      const { sessionName, terminalToken, statusToken } = generateReauthSession();
 
       const headless = !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
       const command = headless ? 'codex login --device-auth' : 'codex login';
@@ -110,7 +109,10 @@ const postCodexReauthRoute = HttpRouter.add(
         }),
       );
 
-      return jsonResponse({ sessionName, token, headless });
+      return jsonResponse(
+        { sessionName, statusToken, headless },
+        { headers: { 'Set-Cookie': buildTerminalCookie(sessionName, terminalToken) } },
+      );
     }),
   ),
 );
@@ -130,7 +132,7 @@ const getCodexReauthStatusRoute = HttpRouter.add(
       const sessionName = searchParams.get('session') ?? '';
       const token = searchParams.get('token') ?? '';
 
-      if (!validateReauthToken(sessionName, token)) {
+      if (!validateReauthStatusToken(sessionName, token)) {
         return jsonResponse({ completed: false });
       }
 

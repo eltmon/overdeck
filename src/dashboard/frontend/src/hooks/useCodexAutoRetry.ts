@@ -17,7 +17,9 @@ export function useCodexAutoRetry() {
   // Poll the re-auth completion endpoint when a pending spawn has a session name.
   useEffect(() => {
     const pending = getPendingCodexSpawn();
-    if (!pending?.reauthSessionName) return;
+    if (!pending?.reauthSessionName || !pending.reauthStatusToken) return;
+    const reauthSessionName = pending.reauthSessionName;
+    const reauthStatusToken = pending.reauthStatusToken;
 
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -26,7 +28,7 @@ export function useCodexAutoRetry() {
     intervalRef.current = setInterval(async () => {
       try {
         const res = await fetch(
-          `/api/settings/codex-reauth/status?session=${encodeURIComponent(pending.reauthSessionName!)}`,
+          `/api/settings/codex-reauth/status?session=${encodeURIComponent(reauthSessionName)}&token=${encodeURIComponent(reauthStatusToken)}`,
         );
         if (!res.ok) return;
         const data = (await res.json()) as { completed?: boolean };

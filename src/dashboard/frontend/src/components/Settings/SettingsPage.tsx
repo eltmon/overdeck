@@ -896,8 +896,8 @@ export function SettingsPage() {
                                     const body = await res.json().catch(() => ({}));
                                     throw new Error(body.error || `Failed (${res.status})`);
                                   }
-                                  const { sessionName, token } = await res.json() as { sessionName: string; token: string };
-                                  window.location.href = `/terminal/${sessionName}?token=${encodeURIComponent(token)}`;
+                                  const { sessionName } = await res.json() as { sessionName: string };
+                                  window.location.href = `/terminal/${sessionName}`;
                                 } catch (err) {
                                   toast.error(err instanceof Error ? err.message : 'Failed to start re-authentication');
                                 }

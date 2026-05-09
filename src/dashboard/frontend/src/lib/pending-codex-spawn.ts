@@ -4,6 +4,7 @@ interface PendingSpawn {
   requestBody: Record<string, unknown>;
   timestamp: number;
   reauthSessionName?: string;
+  reauthStatusToken?: string;
 }
 
 let pendingSpawn: PendingSpawn | null = null;
@@ -14,9 +15,10 @@ export function setPendingCodexSpawn(requestBody: Record<string, unknown>) {
   pendingSpawn = { requestBody, timestamp: Date.now() };
 }
 
-export function setReauthSessionName(sessionName: string) {
+export function setReauthSession(sessionName: string, statusToken: string) {
   if (!pendingSpawn) return;
   pendingSpawn.reauthSessionName = sessionName;
+  pendingSpawn.reauthStatusToken = statusToken;
 }
 
 export function getPendingCodexSpawn(): PendingSpawn | null {

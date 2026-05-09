@@ -23,7 +23,7 @@ import { loadCloisterConfig } from './config.js';
 import { readCavemanVariant } from '../caveman/workspace.js';
 import { getModelId, WorkTypeId } from '../work-type-router.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
-import { getProviderEnvForModel } from '../agents.js';
+import { assertCodexAuthReadyForModel, getProviderEnvForModel } from '../agents.js';
 import { generateLauncherScript, generateLauncherWrapper } from '../launcher-generator.js';
 import { resolveSpecialistBaseCommand } from './router.js';
 import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery, createSessionAsync, killSessionAsync, buildTmuxCommandString, listPaneValuesAsync, listSessionNamesAsync, sessionExistsAsync } from '../tmux.js';
@@ -1009,6 +1009,8 @@ ${basePrompt}`;
       currentActivity: `Running ${specialistType} for ${task.issueId}`,
       writeScope: 'full',
     });
+
+    await assertCodexAuthReadyForModel(model);
 
     // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
     const providerEnv = await getProviderEnvForModel(model);
@@ -2294,6 +2296,8 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
   });
 
   try {
+    await assertCodexAuthReadyForModel(model);
+
     // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
     const providerEnv = await getProviderEnvForModel(model);
     const envFlags = buildTmuxEnvFlags(providerEnv);

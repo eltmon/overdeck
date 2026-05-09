@@ -101,23 +101,26 @@ When the frontend receives `expired` or `burned` status, it renders a yellow ban
 
 Clicking **Re-authenticate**:
 1. Calls `POST /api/settings/codex-reauth`
-2. The server spawns a tmux session named `codex-reauth`
-3. The session runs `codex login` (or `codex login --device-auth` on headless systems)
-4. The browser navigates to `/terminal/codex-reauth` so you can complete the OAuth flow
+2. The server creates a generated tmux session named `reauth-<uuid>`
+3. The response sets an httpOnly, same-site terminal capability cookie and returns a separate `statusToken`
+4. The session runs `codex login` (or `codex login --device-auth` on headless systems)
+5. The browser navigates to `/terminal/reauth-<uuid>` so you can complete the OAuth flow
+
+Only the client that initiated the flow receives the terminal cookie and status token. Duplicate re-auth starts return `409` while a live re-auth session exists and never redisclose another client's capabilities. On headless systems, the device-auth URL/code is shown in the terminal session output.
 
 ### Automatic Retry
 
 When you finish logging in and close the terminal:
 
-1. The auth status polling detects `valid`
-2. `bridgeCodexAuthToCliproxyAsync()` copies the new token to `~/.codex/`
+1. The auto-retry hook polls `/api/settings/codex-reauth/status` with the generated session name and `statusToken`
+2. When the re-auth tmux session exits, `bridgeCodexAuthToCliproxyAsync()` copies the new token to `~/.codex/`
 3. Any **blocked spawn** that was queued during the expired state is **automatically retried**
 
 This means if you clicked "Start Agent" while Codex auth was expired, the agent starts automatically after you re-authenticate — you don't need to click Start again.
 
 ### Spawn Guardrails
 
-The `POST /api/agents` endpoint checks Codex auth **before** spawning any agent that routes to an OpenAI model (`gpt-*`). If auth is `expired` or `burned`:
+Panopticon checks Codex auth **before** spawning any subscription-routed OpenAI model (`gpt-*`) from the dashboard work-agent route, direct work-agent spawns, reviewers, and specialists. If auth is `expired` or `burned`:
 
 - Returns HTTP `429` with `blocked: true`
 - Error message: `Codex authentication expired. Re-authenticate to continue.`

@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { AlertTriangle, Loader2, ExternalLink } from 'lucide-react';
 import { SensitiveText } from './SensitiveText';
 import { useCodexAuthStatus } from '../hooks/useCodexAuthStatus';
-import { setReauthSessionName } from '../lib/pending-codex-spawn';
+import { setReauthSession } from '../lib/pending-codex-spawn';
 
 export function CodexAuthBanner() {
   const { data: authStatus } = useCodexAuthStatus();
@@ -22,10 +22,10 @@ export function CodexAuthBanner() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `Failed to spawn re-auth session (${res.status})`);
       }
-      const { sessionName, token } = await res.json() as { sessionName: string; token: string };
-      setReauthSessionName(sessionName);
+      const { sessionName, statusToken } = await res.json() as { sessionName: string; statusToken: string };
+      setReauthSession(sessionName, statusToken);
       toast.success('Re-authentication session started — opening terminal…');
-      window.location.href = `/terminal/${sessionName}?token=${encodeURIComponent(token)}`;
+      window.location.href = `/terminal/${sessionName}`;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to start re-authentication');
     } finally {

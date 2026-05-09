@@ -13,7 +13,7 @@ import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
 import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync, isPaneDeadAsync, listPaneValuesAsync, detectTerminalApiError, type TerminalApiError, buildTmuxCommandString } from '../tmux.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { getProviderExportsForModel } from '../agents.js';
+import { assertCodexAuthReadyForModel, getProviderExportsForModel } from '../agents.js';
 import { resolveSpecialistBaseCommand } from './router.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { getModelId, hasOverride } from '../work-type-router.js';
@@ -574,6 +574,7 @@ export async function spawnSingleReviewer(
   // on the claude-code path, or fall back to Pi when configured. The harness
   // routing + ToS gate live inside resolveSpecialistBaseCommand so a stale
   // Settings selection cannot bypass the gate.
+  await assertCodexAuthReadyForModel(model);
   const claudeCmd = await resolveSpecialistBaseCommand('review-agent', model, sessionName);
   const providerExports = await getProviderExportsForModel(model);
 
