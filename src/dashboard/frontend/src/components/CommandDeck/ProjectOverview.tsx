@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import type { ReviewStatusSnapshot } from '@panctl/contracts';
 import { useDashboardStore } from '../../lib/store';
@@ -107,6 +107,7 @@ export function ProjectOverview({
   projectName,
   features,
   issueCosts,
+  issueCostDetails,
   onSelectFeature,
 }: ProjectOverviewProps) {
   const reviewStatusByIssueId = useDashboardStore(state => state.reviewStatusByIssueId);
@@ -167,6 +168,7 @@ export function ProjectOverview({
         <StuckCallout
           entries={stuckFeatures}
           issueCosts={issueCosts}
+          issueCostDetails={issueCostDetails}
           onSelectFeature={onSelectFeature}
         />
       )}
@@ -259,10 +261,12 @@ function HeroBillboard({
 function StuckCallout({
   entries,
   issueCosts,
+  issueCostDetails,
   onSelectFeature,
 }: {
   entries: BucketedFeature[];
   issueCosts: Record<string, number>;
+  issueCostDetails: Record<string, IssueCostBreakdown> | undefined;
   onSelectFeature: (feature: ProjectFeature) => void;
 }) {
   return (
@@ -297,6 +301,7 @@ function StuckCallout({
             key={entry.feature.issueId}
             entry={entry}
             issueCosts={issueCosts}
+            issueCostDetails={issueCostDetails}
             onSelectFeature={onSelectFeature}
             reason={stuckReason(entry.reviewStatus)}
           />
@@ -310,11 +315,13 @@ function PipelineSection({
   stage,
   entries,
   issueCosts,
+  issueCostDetails,
   onSelectFeature,
 }: {
   stage: PipelineStage;
   entries: BucketedFeature[];
   issueCosts: Record<string, number>;
+  issueCostDetails: Record<string, IssueCostBreakdown> | undefined;
   onSelectFeature: (feature: ProjectFeature) => void;
 }) {
   const config = STAGE_CONFIG[stage];
@@ -364,6 +371,7 @@ function PipelineSection({
             key={entry.feature.issueId}
             entry={entry}
             issueCosts={issueCosts}
+            issueCostDetails={issueCostDetails}
             onSelectFeature={onSelectFeature}
             reason={subStatus(entry)}
           />
@@ -376,15 +384,18 @@ function PipelineSection({
 function IssueCard({
   entry,
   issueCosts,
+  issueCostDetails,
   onSelectFeature,
   reason,
 }: {
   entry: BucketedFeature;
   issueCosts: Record<string, number>;
+  issueCostDetails: Record<string, IssueCostBreakdown> | undefined;
   onSelectFeature: (feature: ProjectFeature) => void;
   reason?: string;
 }) {
   const cost = issueCosts[entry.feature.issueId];
+  const costDetails = issueCostDetails?.[entry.feature.issueId];
 
   return (
     <button
@@ -409,7 +420,7 @@ function IssueCard({
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)' }}>
           {entry.feature.issueId}
         </span>
-        {cost !== undefined && <CostBadge cost={cost} />}
+        {cost !== undefined && <CostBadge cost={cost} details={costDetails} />}
       </div>
       <span
         title={entry.feature.title}
@@ -428,10 +439,19 @@ function IssueCard({
   );
 }
 
-function CostBadge({ cost }: { cost: number }) {
+function CostBadge({ cost, details }: { cost: number; details?: IssueCostBreakdown }) {
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const hasDetails = Boolean(details);
+
   return (
     <span
+      tabIndex={hasDetails ? 0 : undefined}
+      onMouseEnter={() => setPopoverOpen(true)}
+      onMouseLeave={() => setPopoverOpen(false)}
+      onFocus={() => setPopoverOpen(true)}
+      onBlur={() => setPopoverOpen(false)}
       style={{
+        position: 'relative',
         borderRadius: '999px',
         padding: '2px 6px',
         fontSize: 11,
@@ -441,9 +461,125 @@ function CostBadge({ cost }: { cost: number }) {
         whiteSpace: 'nowrap',
       }}
     >
-      ${cost.toFixed(2)}
+      {formatCost(cost)}
+      {details && popoverOpen && <CostBreakdownPopover details={details} />}
     </span>
   );
+}
+
+function CostBreakdownPopover({ details }: { details: IssueCostBreakdown }) {
+  const modelRows = sortedCostRows(details.byModel).map(([model, row]) => ({
+    key: model,
+    label: friendlyModelName(model),
+    cost: row.cost,
+  }));
+  const stageRows = sortedCostRows(details.byStage).map(([stage, row]) => ({
+    key: stage,
+    label: friendlyStageName(stage),
+    cost: row.cost,
+  }));
+
+  return (
+    <span
+      role="tooltip"
+      style={{
+        position: 'absolute',
+        right: 0,
+        top: 'calc(100% + 6px)',
+        zIndex: 30,
+        width: 240,
+        border: '1px solid var(--border)',
+        borderRadius: 12,
+        padding: 10,
+        background: 'var(--popover)',
+        color: 'var(--popover-foreground)',
+        boxShadow: 'var(--shadow-lg)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+      }}
+    >
+      <CostBreakdownSection title="Models" rows={modelRows} />
+      <CostBreakdownSection title="Stages" rows={stageRows} />
+    </span>
+  );
+}
+
+function CostBreakdownSection({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: Array<{ key: string; label: string; cost: number }>;
+}) {
+  return (
+    <span style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <span
+        style={{
+          fontSize: 10,
+          color: 'var(--muted-foreground)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+        }}
+      >
+        {title}
+      </span>
+      {rows.length > 0 ? rows.map(row => (
+        <span
+          key={row.key}
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 10,
+            fontSize: 11,
+            color: 'var(--popover-foreground)',
+          }}
+        >
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.label}</span>
+          <span style={{ color: 'var(--success)', fontVariantNumeric: 'tabular-nums' }}>
+            {formatCost(row.cost)}
+          </span>
+        </span>
+      )) : (
+        <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>No cost data</span>
+      )}
+    </span>
+  );
+}
+
+function sortedCostRows(rows: Record<string, { cost: number; tokens: number }>) {
+  return Object.entries(rows).sort(([, a], [, b]) => b.cost - a.cost);
+}
+
+function formatCost(cost: number): string {
+  if (cost >= 100) return `$${cost.toFixed(0)}`;
+  if (cost >= 10) return `$${cost.toFixed(1)}`;
+  if (cost >= 0.01) return `$${cost.toFixed(2)}`;
+  if (cost > 0) return `$${cost.toFixed(4)}`;
+  return '$0';
+}
+
+function friendlyModelName(model: string): string {
+  return model
+    .replace('claude-', '')
+    .replace(/-20\d{6}$/, '')
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function friendlyStageName(stage: string): string {
+  const labels: Record<string, string> = {
+    planning: 'Planning',
+    implementation: 'Implementation',
+    review: 'Review',
+    test: 'Testing',
+    testing: 'Testing',
+    merge: 'Merge',
+    interactive: 'Interactive',
+    other: 'Other',
+    unknown: 'Other',
+  };
+  return labels[stage] ?? stage.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 function CountBadge({ count, color }: { count: number; color: string }) {
