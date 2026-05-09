@@ -2014,10 +2014,20 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     if (!hasBeads) {
+      // PAN-977 bug: previously logged a warning and started the agent anyway,
+      // which produced ghost workspaces with no work to do (agent self-halts and
+      // documents the missing beads in RECOVERY-STATE.md). Block the spawn so
+      // planning has to actually finish before the work agent runs.
       const errorDetail = recoveryError
-        ? ` Recovery failed: ${recoveryError}.`
-        : '';
-      console.warn(`[agents] No beads for ${issueId} — starting anyway.${errorDetail}`);
+        ? ` Beads recovery failed: ${recoveryError}.`
+        : ' No beads exist for this issue.';
+      console.warn(`[agents] Refusing to start agent for ${issueId} — no beads.${errorDetail}`);
+      return jsonResponse({
+        error: `No beads tasks found for ${issueId}.${errorDetail}`,
+        hint: 'Run "pan plan" to (re)plan this issue and generate beads tasks before starting work.',
+        issueId,
+        recoveryError,
+      }, { status: 422 });
     }
 
     const health = yield* readModel.getSnapshot.pipe(
