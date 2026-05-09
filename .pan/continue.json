@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-945",
   "created": "2026-05-07T09:30:00Z",
-  "updated": "2026-05-09T01:47:00.668Z",
+  "updated": "2026-05-09T01:48:21.086Z",
   "gitState": {
     "branch": "feature/pan-945",
     "sha": "f7e0507d0",
@@ -96,7 +96,7 @@
     }
   ],
   "resumePoint": {
-    "description": "PAN-945 work is complete. All beads are closed, full quality gates passed after rebuilding the CLI dist, the branch was pushed, and `pan done PAN-945` marked the issue complete; Panopticon reported the issue was already merged and skipped the review pipeline.",
+    "description": "PAN-945 work is complete. All beads are closed, full quality gates passed after rebuilding the CLI dist, the branch was pushed, and `pan done PAN-945` marked the issue In Review. Panopticon reported the issue was already merged and skipped the review pipeline even though PR #1045 remains open, so no further work-agent changes are pending unless review feedback arrives.",
     "beadId": null,
     "filesToRead": []
   },
@@ -155,6 +155,11 @@
       "timestamp": "2026-05-09T01:47:00.668Z",
       "reason": "end",
       "note": "Imported PRD-directory vBRIEFs into workspace plans for dashboard and CLI start flows with coverage for discovery, import, and non-overwrite behavior."
+    },
+    {
+      "timestamp": "2026-05-09T01:48:21.085Z",
+      "reason": "end",
+      "note": "Final continue state pushed after completion marker; PAN-945 PR remains open for review pipeline."
     }
   ],
   "feedback": []
