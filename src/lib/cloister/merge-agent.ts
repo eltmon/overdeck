@@ -182,6 +182,58 @@ async function dropLingeringPreMergeStashes(issueId: string, projectPath: string
   }
 }
 
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
+
+async function verifyMergedBeforeLifecycle(issueId: string, projectPath: string, sourceBranch?: string): Promise<{ merged: boolean; reason: string }> {
+  const branchName = sourceBranch?.trim() || `feature/${issueId.toLowerCase()}`;
+  const quotedBranch = shellQuote(branchName);
+
+  await execAsync('git fetch origin main --prune', { cwd: projectPath }).catch(() => undefined);
+  await execAsync(`git fetch origin ${shellQuote(`${branchName}:refs/remotes/origin/${branchName}`)}`, { cwd: projectPath }).catch(() => undefined);
+
+  const refsToCheck = [branchName, `origin/${branchName}`];
+  for (const ref of refsToCheck) {
+    const quotedRef = shellQuote(ref);
+    const { stdout } = await execAsync(`git rev-parse --verify ${quotedRef} 2>/dev/null || true`, { cwd: projectPath });
+    if (!stdout.trim()) continue;
+
+    try {
+      await execAsync(`git merge-base --is-ancestor ${quotedRef} origin/main`, { cwd: projectPath });
+      return { merged: true, reason: `${ref} is an ancestor of origin/main` };
+    } catch {
+      const { stdout: codeDiff } = await execAsync(
+        `git diff origin/main...${quotedRef} -- ':!.planning' ':!docs/prds' ':!.panopticon/prompts' 2>/dev/null || true`,
+        { cwd: projectPath },
+      );
+      if (!codeDiff.trim()) {
+        return { merged: true, reason: `${ref} has no remaining code diff against origin/main` };
+      }
+      return { merged: false, reason: `${ref} still has unmerged changes` };
+    }
+  }
+
+  const ghResolved = resolveGitHubIssue(issueId);
+  if (ghResolved.isGitHub) {
+    const { owner, repo } = ghResolved;
+    const { stdout } = await execAsync(
+      `gh pr list --repo ${shellQuote(`${owner}/${repo}`)} --state all --head ${quotedBranch} --json number,mergedAt,mergeCommit --limit 5`,
+      { cwd: projectPath },
+    ).catch(() => ({ stdout: '[]' }));
+    const prs = JSON.parse(stdout || '[]') as Array<{ number: number; mergedAt: string | null; mergeCommit: unknown | null }>;
+    const mergedPr = prs.find((pr) => pr.mergedAt || pr.mergeCommit);
+    if (mergedPr) {
+      return { merged: true, reason: `GitHub PR #${mergedPr.number} is merged` };
+    }
+    if (prs.length > 0) {
+      return { merged: false, reason: `GitHub PR #${prs[0]?.number} is not merged` };
+    }
+  }
+
+  return { merged: false, reason: `No merged branch or PR found for ${branchName}` };
+}
+
 export async function postMergeLifecycle(issueId: string, projectPath: string, sourceBranch?: string, options?: { skipDeploy?: boolean }): Promise<void> {
   // Guard 1: skip if already completed (defense-in-depth against infinite loops)
   if (_completedPostMerge.has(issueId)) {
@@ -189,9 +241,14 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     return;
   }
 
-  // Set mergeStatus='merged' before anything else — callers may have already done this,
-  // but if the merge happened outside the dashboard (manual git merge, direct push),
-  // the status would be stale. setReviewStatus is idempotent on same-value writes.
+  const mergeVerification = await verifyMergedBeforeLifecycle(issueId, projectPath, sourceBranch);
+  if (!mergeVerification.merged) {
+    console.warn(`[merge-agent] Refusing post-merge lifecycle for ${issueId}: ${mergeVerification.reason}`);
+    return;
+  }
+  console.log(`[merge-agent] Verified merge before lifecycle for ${issueId}: ${mergeVerification.reason}`);
+
+  // Set mergeStatus='merged' after verifying the branch or PR actually landed.
   try {
     setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false });
     console.log(`[merge-agent] ✓ mergeStatus set to 'merged' for ${issueId}`);

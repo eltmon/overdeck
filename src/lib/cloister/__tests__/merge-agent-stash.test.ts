@@ -26,7 +26,7 @@ vi.mock('../validation.js', () => ({
 vi.mock('../../git-utils.js', () => ({ cleanupStaleLocks: vi.fn(async () => ({ found: [], removed: [], errors: [] })) }));
 vi.mock('../prompts.js', () => ({ renderPrompt: vi.fn(() => 'merge prompt') }));
 vi.mock('../../git/operations.js', () => ({ gitPush: vi.fn(), gitForcePush: vi.fn(), MainDivergedError: class MainDivergedError extends Error {} }));
-vi.mock('../../review-status.js', () => ({ markWorkspaceStuck: vi.fn() }));
+vi.mock('../../review-status.js', () => ({ markWorkspaceStuck: vi.fn(), setReviewStatus: vi.fn() }));
 vi.mock('../../git-activity.js', () => ({ appendGitOperation: vi.fn() }));
 vi.mock('../../stashes.js', () => ({
   buildStashMessage: vi.fn(() => 'pre-merge:PAN-1:2026-04-27T14:15:16Z'),
@@ -114,6 +114,12 @@ describe('merge-agent pre-merge stash lifecycle', () => {
   });
 
   it('drops lingering pre-merge stashes during post-merge lifecycle', async () => {
+    execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
+      const callback = (typeof _opts === 'function' ? _opts : cb)!;
+      if (cmd.includes('git rev-parse --verify')) return callback(null, { stdout: 'branch-sha\n', stderr: '' });
+      if (cmd.includes('git merge-base --is-ancestor')) return callback(null, { stdout: '', stderr: '' });
+      callback(null, { stdout: '', stderr: '' });
+    });
     vi.mocked(listStashes).mockResolvedValueOnce([
       {
         ref: 'def456abc123def456abc123def456abc123def4',
