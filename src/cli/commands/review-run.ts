@@ -28,6 +28,7 @@ import {
 } from '../../lib/cloister/review-agent.js';
 import { setReviewStatus } from '../../lib/review-status.js';
 import { findProjectByPath } from '../../lib/projects.js';
+import { getDashboardApiUrl } from '../../lib/config.js';
 
 const execAsync = promisify(exec);
 
@@ -209,18 +210,41 @@ export async function reviewRunCommand(
 
   const exitCode = mapToExitCode(result.reviewResult, verdict, result.success);
 
-  // Persist the terminal review status. The dashboard reads this from the DB
-  // on next observation — no server API needed.
+  // Persist the terminal review status via the dashboard API so the test-agent
+  // dispatch (async IIFE in setReviewStatus) runs in the dashboard server's
+  // event loop — not in this CLI process which exits immediately after.
+  // Fall back to direct setReviewStatus for resilience if the API is unreachable.
   try {
     const mapped = reviewResultToReviewStatus(result);
-    setReviewStatus(issueId, {
-      reviewStatus: mapped,
-      reviewNotes: result.notes,
-      reviewRetryCount: 0,
-      recoveryStartedAt: undefined,
+    const dashboardUrl = getDashboardApiUrl();
+    const apiRes = await fetch(`${dashboardUrl}/api/review/${issueId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewStatus: mapped,
+        reviewNotes: result.notes,
+        reviewRetryCount: 0,
+        recoveryStartedAt: null,
+      }),
     });
-  } catch (err) {
-    console.warn(chalk.yellow(`[review-run] setReviewStatus(terminal) failed: ${err instanceof Error ? err.message : String(err)}`));
+    if (!apiRes.ok) {
+      console.warn(chalk.yellow(`[review-run] API status update failed (${apiRes.status}), falling back to direct setReviewStatus`));
+      throw new Error(`API ${apiRes.status}`);
+    }
+  } catch (apiErr) {
+    // Fallback: write directly to SQLite. The test-agent dispatch IIFE still won't
+    // run (process exits), but at least the status is persisted for the next patrol.
+    console.warn(chalk.yellow(`[review-run] API status update failed: ${apiErr instanceof Error ? apiErr.message : String(apiErr)}`));
+    try {
+      setReviewStatus(issueId, {
+        reviewStatus: reviewResultToReviewStatus(result),
+        reviewNotes: result.notes,
+        reviewRetryCount: 0,
+        recoveryStartedAt: undefined,
+      });
+    } catch (setErr) {
+      console.warn(chalk.yellow(`[review-run] setReviewStatus(terminal) failed: ${setErr instanceof Error ? setErr.message : String(setErr)}`));
+    }
   }
 
   if (exitCode === 0) {

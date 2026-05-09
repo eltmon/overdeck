@@ -2905,7 +2905,23 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
       readyForMerge?: boolean;
     };
 
+    // Snapshot reviewedAtCommit BEFORE the first setReviewStatus call so canSkipTests
+    // fires correctly in that same call — setting it afterward is too late (the
+    // async test-agent dispatch is already scheduled).
     const update: Partial<ReviewStatus> = {};
+    if (reviewStatus === 'passed') {
+      const workspaceInfo = getWorkspaceInfoForIssue(issueId);
+      if (workspaceInfo.exists) {
+        const { getWorkspaceGitInfo } = yield* Effect.promise(() => import('../../../lib/git-utils.js'));
+        try {
+          const gitInfo = yield* Effect.promise(() => getWorkspaceGitInfo(workspaceInfo.path));
+          if (gitInfo.HEAD) {
+            update.reviewedAtCommit = gitInfo.HEAD;
+            console.log(`[review-status] Will snapshot reviewedAtCommit=${gitInfo.HEAD.substring(0, 8)} for ${issueId}`);
+          }
+        } catch {}
+      }
+    }
     if (reviewStatus) update.reviewStatus = reviewStatus as any;
     if (testStatus) update.testStatus = testStatus as any;
     if (mergeStatus) update.mergeStatus = mergeStatus as any;
