@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from 'fs';
+import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
@@ -35,6 +35,18 @@ async function listBeadsByStatus(
   issueId: string,
   status: 'open' | 'closed',
 ): Promise<string> {
+  const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
+  if (existsSync(jsonlPath)) {
+    const label = issueId.toLowerCase();
+    const beads = readFileSync(jsonlPath, 'utf-8')
+      .split('\n')
+      .filter((line) => line.trim().length > 0)
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .filter((bead) => bead.status === status)
+      .filter((bead) => Array.isArray(bead.labels) && bead.labels.map(String).includes(label));
+    return JSON.stringify(beads);
+  }
+
   const { stdout } = await execFileAsync(
     'bd',
     ['list', '--status', status, '-l', issueId.toLowerCase(), '--limit', '0', '--json'],
