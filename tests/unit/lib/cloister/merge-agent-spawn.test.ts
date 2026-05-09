@@ -19,6 +19,7 @@ const execMock = vi.hoisted(() =>
     return { stdout: '' };
   })
 );
+const spawnRunMock = vi.hoisted(() => vi.fn().mockResolvedValue({ id: 'agent-pan-333-ship' }));
 
 vi.mock('child_process', () => {
   const kCustom = Symbol.for('nodejs.util.promisify.custom');
@@ -54,21 +55,26 @@ vi.mock('../../../../src/lib/git-utils.js', () => ({
 vi.mock('../../../../src/lib/tmux.js', () => ({
   sendKeysAsync: vi.fn().mockResolvedValue(undefined),
   sessionExists: vi.fn().mockReturnValue(false),
+  sessionExistsAsync: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock('../../../../src/lib/paths.js', () => ({
   PANOPTICON_HOME: '/tmp/panopticon-test',
+  AGENTS_DIR: '/tmp/panopticon-test/agents',
+  getPanopticonHome: vi.fn(() => '/tmp/panopticon-test'),
 }));
 
 vi.mock('../../../../src/lib/tracker-utils.js', () => ({
   resolveGitHubIssue: vi.fn(),
 }));
 
+vi.mock('../../../../src/lib/agents.js', () => ({
+  spawnRun: (...args: unknown[]) => spawnRunMock(...args),
+}));
+
 vi.mock('../../../../src/lib/cloister/specialists.js', () => ({
-  getSessionId: vi.fn().mockReturnValue(null),
   recordWake: vi.fn(),
   getTmuxSessionName: vi.fn().mockReturnValue('specialist-merge-agent'),
-  wakeSpecialist: vi.fn().mockResolvedValue({ success: false, reason: 'test-stop' }),
   spawnEphemeralSpecialist: vi.fn().mockResolvedValue({ success: false, reason: 'test-stop' }),
   isRunning: vi.fn().mockResolvedValue(false),
 }));
@@ -163,7 +169,7 @@ describe('spawnMergeAgentForBranches — no-op merge detection', () => {
     // git merge-base --is-ancestor exits 1 → not an ancestor, proceed with merge
     setExecError('git merge-base --is-ancestor', 1, 'not an ancestor');
 
-    // The function continues and ultimately fails trying to spawn/wake specialist
+    // The function continues and delegates the remaining conflict work to the ship role
     const result = await spawnMergeAgentForBranches(PROJECT_PATH, SOURCE, TARGET, ISSUE_ID);
 
     // Should NOT short-circuit with the "already integrated" message

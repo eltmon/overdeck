@@ -50,18 +50,13 @@ vi.mock('../../../src/lib/cloister/feedback-writer.js', () => ({
   writeFeedbackFile: (...args: unknown[]) => mockWriteFeedbackFile(...args),
 }));
 
-// Stub out heavy transitive dependencies that deacon imports at module level
-// Note: submitToSpecialistQueue, checkSpecialistQueue, getNextSpecialistTask,
-// and completeSpecialistTask were removed from specialists.ts in PAN-722.
+// Stub out heavy transitive dependencies that deacon imports at module level.
 vi.mock('../../../src/lib/cloister/specialists.js', () => ({
   getEnabledSpecialists: vi.fn().mockReturnValue([]),
   getTmuxSessionName: vi.fn(),
   isRunning: vi.fn().mockResolvedValue(false),
   initializeSpecialist: vi.fn(),
-  wakeSpecialist: vi.fn(),
-  clearSessionId: vi.fn(),
   spawnEphemeralSpecialist: vi.fn(),
-  wakeSpecialistWithTask: vi.fn(),
   getAllProjectSpecialistStatuses: vi.fn().mockResolvedValue([]),
 }));
 

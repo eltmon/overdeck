@@ -5,13 +5,13 @@
  * Specialists maintain context across invocations via session files.
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, appendFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, appendFileSync } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID, createHash } from 'crypto';
-import { PANOPTICON_HOME } from '../paths.js';
+import { AGENTS_DIR, PANOPTICON_HOME } from '../paths.js';
 import { getDevrootPath } from '../config.js';
 import { getClaudePermissionFlagsString } from '../claude-permissions.js';
 import { getProject } from '../projects.js';
@@ -25,7 +25,7 @@ import { getModelId, WorkTypeId } from '../work-type-router.js';
 import { getProviderForModel, setupCredentialFileAuth, clearCredentialFileAuth } from '../providers.js';
 import { getProviderEnvForModel } from '../agents.js';
 import { generateLauncherScript, generateLauncherWrapper } from '../launcher-generator.js';
-import { resolveSpecialistBaseCommand } from './router.js';
+import { getSpecialistHarness } from './router.js';
 import { sendKeysAsync, capturePaneAsync, waitForClaudePrompt, confirmDelivery, createSessionAsync, killSessionAsync, buildTmuxCommandString, listPaneValuesAsync, listSessionNamesAsync, sessionExistsAsync } from '../tmux.js';
 import { notifyPipeline } from '../pipeline-notifier.js';
 import { isTaskReady } from './task-readiness.js';
@@ -121,6 +121,40 @@ function buildTmuxEnvFlags(env: Record<string, string>): string {
   return flags;
 }
 
+
+async function buildSpecialistBaseCommand(
+  specialistType: string,
+  model: string,
+  sessionName?: string,
+): Promise<string> {
+  const { canUseHarness } = await import('../harness-policy.js');
+  const { getAgentRuntimeBaseCommand, getProviderAuthMode } = await import('../agents.js');
+  const requestedHarness = getSpecialistHarness(specialistType);
+  const authMode = await getProviderAuthMode(model);
+  const decision = canUseHarness(requestedHarness, model, authMode);
+  const harness = decision.allowed ? requestedHarness : 'claude-code';
+  if (!decision.allowed) {
+    console.warn(
+      `[specialist] ${specialistType}: canUseHarness(${requestedHarness},${model},${authMode}) blocked — ${decision.reason}. Falling back to claude-code.`,
+    );
+  }
+  const agentType = specialistType.endsWith('-agent')
+    ? specialistType.slice(0, -'-agent'.length)
+    : specialistType;
+  return getAgentRuntimeBaseCommand(model, sessionName, agentType as any, harness);
+}
+
+function readRecordedClaudeSessionId(tmuxSession: string): string | null {
+  const sessionFile = join(AGENTS_DIR, tmuxSession, 'session.id');
+  if (!existsSync(sessionFile)) return null;
+  try {
+    const sessionId = readFileSync(sessionFile, 'utf-8').trim();
+    return sessionId || null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Build shell export lines for caveman compression for specialist agents.
  *
@@ -164,7 +198,6 @@ export async function buildSpecialistCavemanExports(
 
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const REGISTRY_FILE = join(SPECIALISTS_DIR, 'registry.json');
-const TASKS_DIR = join(SPECIALISTS_DIR, 'tasks');
 
 /**
  * Supported specialist types
@@ -459,127 +492,6 @@ function deterministicUUID(input: string): string {
 }
 
 /**
- * Get session file path for a specialist.
- * Per-project specialists use a project-scoped subdirectory to prevent
- * session ID collision when multiple projects share the same specialist type.
- *
- * @param name - Specialist name
- * @param projectKey - Optional project key (per-project specialists only)
- * @returns Path to session file
- */
-export function getSessionFilePath(name: SpecialistType, projectKey?: string): string {
-  if (projectKey) {
-    return join(SPECIALISTS_DIR, 'projects', projectKey, `${name}.session`);
-  }
-  return join(SPECIALISTS_DIR, `${name}.session`);
-}
-
-/**
- * Read session ID from file
- *
- * @param name - Specialist name
- * @param projectKey - Optional project key (per-project specialists only)
- * @returns Session ID or null if not found
- */
-export function getSessionId(name: SpecialistType, projectKey?: string): string | null {
-  const sessionFile = getSessionFilePath(name, projectKey);
-
-  if (!existsSync(sessionFile)) {
-    return null;
-  }
-
-  try {
-    const sessionId = readFileSync(sessionFile, 'utf-8').trim();
-    // Validate UUID format — Claude Code requires valid UUIDs for --resume and --session-id.
-    // Old deterministic IDs (e.g., "specialist-mind-your-now-review-agent") are not valid UUIDs.
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(sessionId)) {
-      console.warn(`[specialist] Invalid session ID format for ${name} (${projectKey ?? 'global'}): ${sessionId} — discarding`);
-      unlinkSync(sessionFile);
-      return null;
-    }
-    return sessionId;
-  } catch (error) {
-    console.error(`Failed to read session file for ${name} (${projectKey ?? 'global'}):`, error);
-    return null;
-  }
-}
-
-/**
- * Write session ID to file
- *
- * @param name - Specialist name
- * @param sessionId - Session ID to store
- * @param projectKey - Optional project key (per-project specialists only)
- */
-/**
- * Get the current session generation (for rotating session IDs).
- * Returns 0 if no generation file exists.
- */
-export function getSessionGeneration(name: SpecialistType, projectKey?: string): number {
-  const genFile = getSessionFilePath(name, projectKey) + '.gen';
-  if (!existsSync(genFile)) return 0;
-  try {
-    return parseInt(readFileSync(genFile, 'utf-8').trim(), 10) || 0;
-  } catch { return 0; }
-}
-
-/**
- * Bump the session generation — next dispatch will use a new session ID.
- * Old JSONL files are preserved (not deleted).
- */
-export function bumpSessionGeneration(name: SpecialistType, projectKey?: string): number {
-  const genFile = getSessionFilePath(name, projectKey) + '.gen';
-  const dir = projectKey
-    ? join(SPECIALISTS_DIR, 'projects', projectKey)
-    : SPECIALISTS_DIR;
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  const newGen = getSessionGeneration(name, projectKey) + 1;
-  writeFileSync(genFile, String(newGen));
-  return newGen;
-}
-
-export function setSessionId(name: SpecialistType, sessionId: string, projectKey?: string): void {
-  const sessionFile = getSessionFilePath(name, projectKey);
-  const dir = projectKey
-    ? join(SPECIALISTS_DIR, 'projects', projectKey)
-    : SPECIALISTS_DIR;
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-
-  try {
-    writeFileSync(sessionFile, sessionId.trim(), 'utf-8');
-  } catch (error) {
-    console.error(`Failed to write session file for ${name} (${projectKey ?? 'global'}):`, error);
-    throw error;
-  }
-}
-
-/**
- * Delete session file
- *
- * @param name - Specialist name
- * @param projectKey - Optional project key (per-project specialists only)
- * @returns True if file was deleted, false if it didn't exist
- */
-export function clearSessionId(name: SpecialistType, projectKey?: string): boolean {
-  const sessionFile = getSessionFilePath(name, projectKey);
-
-  if (!existsSync(sessionFile)) {
-    return false;
-  }
-
-  try {
-    unlinkSync(sessionFile);
-    return true;
-  } catch (error) {
-    console.error(`Failed to delete session file for ${name} (${projectKey ?? 'global'}):`, error);
-    throw error;
-  }
-}
-
-/**
  * Get metadata for a specific specialist
  *
  * @param name - Specialist name
@@ -630,19 +542,19 @@ export function getAllSpecialists(): SpecialistMetadata[] {
 }
 
 /**
- * Check if a specialist is initialized (has session file)
+ * Check if a legacy specialist has a recorded Claude session.
  *
  * @param name - Specialist name
- * @returns True if specialist has a session file
+ * @returns True if the specialist has a recorded session id in its agent directory
  */
 export function isInitialized(name: SpecialistType): boolean {
-  return getSessionId(name) !== null;
+  return readRecordedClaudeSessionId(getTmuxSessionName(name)) !== null;
 }
 
 /**
- * Get the state of a specialist based on session file
+ * Get the state of a specialist from recorded agent metadata.
  *
- * Note: This only checks if session exists, not if it's actually running.
+ * Note: This only checks whether a recorded Claude session exists, not if it's actually running.
  * Use getSpecialistStatus() for runtime state.
  *
  * @param name - Specialist name
@@ -780,6 +692,20 @@ export interface GracePeriodState {
 }
 
 const gracePeriodStates = new Map<string, GracePeriodState>();
+
+/**
+ * Task context interface for specialist tasks.
+ */
+export interface TaskContext {
+  prUrl?: string;
+  workspace?: string;
+  branch?: string;
+  filesChanged?: string[];
+  reason?: string;
+  targetModel?: string;
+  additionalInstructions?: string;
+  [key: string]: string | string[] | undefined;
+}
 
 /**
  * Spawn an ephemeral specialist for a project
@@ -1046,9 +972,6 @@ ${basePrompt}`;
     // with --session-id when a prior session exists. randomUUID avoids collisions.
     const sessionId = randomUUID();
 
-    // Write session file for informational purposes (pan specialists list)
-    setSessionId(specialistType, sessionId, projectKey);
-
     // Pre-write session.id into the agent dir so the dashboard's jsonl-resolver
     // can locate the JSONL transcript before the heartbeat hook fires. Without
     // this, hasJsonl is false and the Command Deck conversation panel renders
@@ -1111,10 +1034,10 @@ ${basePrompt}`;
         // PAN-982: emit `claude --agent ${specialistAgentName}` on the claude-code
         // path (the agent frontmatter declares model/permissions/tools/hooks, so
         // we drop --model and --permission flags entirely). PAN-636 routes through
-        // resolveSpecialistBaseCommand so a Pi-configured specialist gets a
+        // buildSpecialistBaseCommand so a Pi-configured specialist gets a
         // `pi --mode rpc --model <model>` line instead, with the ToS gate falling
         // back to claude-code for the blocked Pi+Anthropic+subscription cell.
-        baseCommand: await resolveSpecialistBaseCommand(specialistType, model),
+        baseCommand: await buildSpecialistBaseCommand(specialistType, model),
         sessionId,
         model,
       }),
@@ -1163,7 +1086,7 @@ ${basePrompt}`;
       currentIssue: task.issueId,
     });
 
-    console.log(`[claude-invoke] SUCCESS purpose=specialist-dispatch | model=${model} | source=specialists.ts:dispatchSpecialist | session=${tmuxSession} | specialist=${specialistType} | issue=${task.issueId} | run=${runId}`);
+    console.log(`[claude-invoke] SUCCESS purpose=specialist-dispatch | model=${model} | source=specialists.ts:spawnEphemeralSpecialist | session=${tmuxSession} | specialist=${specialistType} | issue=${task.issueId} | run=${runId}`);
 
 
     return {
@@ -1188,7 +1111,7 @@ ${basePrompt}`;
 
 /**
  * Shared test-agent prompt builder — used by both buildTaskPrompt (ephemeral spawn)
- * and wakeSpecialistWithTask (queue-based wake). Extracted to avoid the bug where
+ * and the legacy queue wake path (queue-based wake). Extracted to avoid the bug where
  * ephemeral test specialists got empty prompts (PAN-511).
  */
 export async function buildTestAgentPromptContent(task: {
@@ -2009,25 +1932,6 @@ export function updateContextTokens(name: SpecialistType, tokens: number): void 
 }
 
 /**
- * List all session files in the specialists directory
- *
- * @returns Array of specialist names that have session files
- */
-export function listSessionFiles(): SpecialistType[] {
-  initSpecialistsDirectory();
-
-  try {
-    const files = readdirSync(SPECIALISTS_DIR);
-    const sessionFiles = files.filter((f) => f.endsWith('.session'));
-
-    return sessionFiles.map((f) => f.replace('.session', '') as SpecialistType);
-  } catch (error) {
-    console.error('Failed to list session files:', error);
-    return [];
-  }
-}
-
-/**
  * Enable a specialist
  *
  * @param name - Specialist name
@@ -2100,7 +2004,7 @@ export function findSessionFile(sessionId: string): string | null {
  * @returns Total token count or null if session not found
  */
 export function countContextTokens(name: SpecialistType): number | null {
-  const sessionId = getSessionId(name);
+  const sessionId = readRecordedClaudeSessionId(getTmuxSessionName(name));
 
   if (!sessionId) {
     return null;
@@ -2177,7 +2081,7 @@ export async function getSpecialistStatus(
     autoWake: false,
   };
 
-  const sessionId = getSessionId(name, projectKey);
+  const sessionId = readRecordedClaudeSessionId(getTmuxSessionName(name, projectKey));
   const running = await isRunning(name, projectKey);
   const contextTokens = countContextTokens(name);
 
@@ -2261,10 +2165,10 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
   }
 
   // Check if already initialized
-  if (getSessionId(name)) {
+  if (readRecordedClaudeSessionId(getTmuxSessionName(name))) {
     return {
       success: false,
-      message: `Specialist ${name} is already initialized. Use wake to start it.`,
+      message: `Specialist ${name} is already initialized. It will be spawned on demand by role flows.`,
       error: 'already_initialized',
     };
   }
@@ -2329,16 +2233,14 @@ export async function initializeSpecialist(name: SpecialistType): Promise<{
         providerExports: initProviderExportLines,
         promptFile,
         // Same PAN-982 + PAN-636 handling as the dispatch path above —
-        // resolveSpecialistBaseCommand emits the --agent form on claude-code and
+        // buildSpecialistBaseCommand emits the --agent form on claude-code and
         // a pi --mode rpc line when the role is configured for Pi.
-        baseCommand: await resolveSpecialistBaseCommand(name, model),
+        baseCommand: await buildSpecialistBaseCommand(name, model),
         sessionId: newSessionId,
         model,
       }),
       { mode: 0o755 },
     );
-    setSessionId(name, newSessionId);
-
     // Pre-trust cwd so specialists don't hit the trust prompt (same as spawnSpecialist)
     try {
       const { preTrustDirectory } = await import('../workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
@@ -2388,574 +2290,14 @@ export async function initializeEnabledSpecialists(): Promise<Array<{
   const results: Array<{ name: SpecialistType; success: boolean; message: string }> = [];
 
   for (const specialist of enabled) {
-    const sessionId = getSessionId(specialist.name);
-
-    if (!sessionId) {
-      // Specialist is enabled but not initialized
-      console.log(`  → Auto-initializing specialist: ${specialist.name}`);
-      const result = await initializeSpecialist(specialist.name);
-      results.push({
-        name: specialist.name,
-        success: result.success,
-        message: result.message,
-      });
-
-      // Small delay between initializations to avoid overwhelming the system
-      if (results.length < enabled.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    } else {
-      results.push({
-        name: specialist.name,
-        success: true,
-        message: `Already initialized with session ${sessionId.substring(0, 8)}...`,
-      });
-    }
+    results.push({
+      name: specialist.name,
+      success: true,
+      message: 'Legacy global specialist initialization removed; role flows spawn agents on demand.',
+    });
   }
 
   return results;
-}
-
-/**
- * Reset specialist state before sending a new task
- *
- * Clears stale state from previous tasks:
- * 1. Sends Ctrl+C to cancel any pending command
- * 2. Runs 'cd ~' to reset working directory
- * 3. Sends Ctrl+U to clear the prompt buffer
- *
- * @param name - Specialist name
- */
-async function resetSpecialist(name: SpecialistType): Promise<void> {
-  const tmuxSession = getTmuxSessionName(name);
-
-  try {
-    // 1. Cancel any pending command with Ctrl+C and wait for Claude to return to idle.
-    //    Do NOT send 'cd ~' here — that triggers LLM inference (2-5s) and creates a race:
-    //    the task message arrives while Claude is still processing the cd command and gets lost.
-    await execAsync(buildTmuxCommandString(['send-keys', '-t', tmuxSession, 'C-c']), { encoding: 'utf-8' });
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // 2. Clear any partial input on the prompt line
-    await execAsync(buildTmuxCommandString(['send-keys', '-t', tmuxSession, 'C-u']), { encoding: 'utf-8' });
-    await new Promise(resolve => setTimeout(resolve, 100));
-  } catch (error) {
-    console.error(`[specialist] Failed to reset ${name}:`, error);
-    // Non-fatal - continue with wake
-  }
-}
-
-/**
- * Wake a specialist to process a task
- *
- * Sends a task prompt to a running specialist. If the specialist isn't running,
- * starts it first (with --resume if it has a session).
- *
- * @param name - Specialist name
- * @param taskPrompt - The task prompt to send to the specialist
- * @param options - Additional options
- * @returns Promise with wake result
- */
-export async function wakeSpecialist(
-  name: SpecialistType,
-  taskPrompt: string,
-  options: {
-    waitForReady?: boolean; // Wait for agent to be ready before sending prompt (default: true)
-    startIfNotRunning?: boolean; // Start the agent if not running (default: true)
-    issueId?: string; // Issue ID being worked on (for tracking)
-    skipBusyGuard?: boolean; // Skip busy check (caller already verified idle + set active)
-  } = {}
-): Promise<{
-  success: boolean;
-  message: string;
-  tmuxSession?: string;
-  wasAlreadyRunning: boolean;
-  error?: string;
-}> {
-  const { waitForReady = true, startIfNotRunning = true, issueId } = options;
-  const tmuxSession = getTmuxSessionName(name);
-  const sessionId = getSessionId(name);
-  const wasAlreadyRunning = await isRunning(name);
-
-  // Guard: if specialist is running and busy, refuse to send a new task.
-  // Sending a message to a busy Claude session causes "Interrupted" behavior —
-  // the running tool is cancelled and the previous task is abandoned mid-flight.
-  // Callers should use wakeSpecialistOrQueue() for automatic busy handling.
-  // Skip this guard when called from wakeSpecialistOrQueue (skipBusyGuard),
-  // since the caller already verified idle state and pre-set active to prevent races.
-  if (wasAlreadyRunning && !options.skipBusyGuard) {
-    const { getAgentRuntimeState } = await import('../agents.js');
-    const runtimeState = getAgentRuntimeState(tmuxSession);
-    if (runtimeState?.state === 'active') {
-      console.warn(`[specialist] ${name} is busy (working on ${runtimeState.currentIssue}), refusing to interrupt`);
-      return {
-        success: false,
-        message: `Specialist ${name} is busy (working on ${runtimeState.currentIssue}). Use wakeSpecialistOrQueue() instead.`,
-        tmuxSession,
-        wasAlreadyRunning: true,
-        error: 'specialist_busy',
-      };
-    }
-  }
-
-  // If not running, start it first
-  if (!wasAlreadyRunning) {
-    if (!startIfNotRunning) {
-      return {
-        success: false,
-        message: `Specialist ${name} is not running`,
-        wasAlreadyRunning: false,
-        error: 'not_running',
-      };
-    }
-
-    // Use devroot (~/Projects) — already trusted in Claude Code
-    const cwd = getDevrootPath() || join(process.env.HOME || '/home/eltmon', 'Projects');
-
-    // Pre-trust cwd so specialists don't hit the trust prompt
-    try {
-      const { preTrustDirectory } = await import('../workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
-      preTrustDirectory(cwd);
-    } catch { /* non-fatal */ }
-
-    try {
-      // Resolve model from work type router (respects config.yaml overrides)
-      let model = 'claude-sonnet-4-6'; // default fallback
-      try {
-        const workTypeId: WorkTypeId = `specialist-${name}` as WorkTypeId;
-        model = getModelId(workTypeId);
-      } catch (error) {
-        console.warn(`[specialist] Could not resolve model for ${name}, using default`);
-      }
-      const modelFlag = `--model ${model}`;
-
-      // Get provider-specific env vars (BASE_URL, AUTH_TOKEN) for non-Anthropic models
-      const providerEnv = await getProviderEnvForModel(model);
-      // Add Panopticon cost attribution env vars
-      const wakeSessionType = name.replace('-agent', ''); // review-agent → review
-      const wakePanEnv: Record<string, string> = {
-        PANOPTICON_AGENT_ID: tmuxSession,
-        PANOPTICON_SESSION_TYPE: wakeSessionType,
-      };
-      if (issueId) {
-        wakePanEnv.PANOPTICON_ISSUE_ID = issueId;
-      }
-      const terminalEnv: Record<string, string> = {
-        TERM: 'xterm-256color',
-        COLORTERM: 'truecolor',
-        LANG: 'C.UTF-8',
-        LC_ALL: 'C.UTF-8',
-      };
-      const envFlags = buildTmuxEnvFlags({ ...terminalEnv, ...providerEnv, ...wakePanEnv });
-
-      // For credential-file providers (e.g. Kimi), configure apiKeyHelper for token refresh.
-      // For all other providers, clear stale apiKeyHelper from previous runs.
-      const provCfg = getProviderForModel(model as ModelId);
-      if (provCfg.authType === 'credential-file') {
-        setupCredentialFileAuth(provCfg, cwd);
-      } else {
-        clearCredentialFileAuth(cwd);
-      }
-
-      // Permission flags resolved from config / --yolo / PAN_YOLO (default: auto)
-      const permissionFlags = getClaudePermissionFlagsString();
-
-      // Start with --resume if we have a session, otherwise generate a new session ID
-      // Always start fresh — no --resume. Context compaction corrupts thinking block
-      // signatures, making resumed sessions permanently fail (PAN-612).
-      const effectiveSessionId = sessionId || randomUUID();
-      if (!sessionId) setSessionId(name, effectiveSessionId);
-      const providerExportCmd = Object.entries(providerEnv)
-        .map(([k, v]) => `export ${k}="${v}"`)
-        .join('; ');
-      const providerSetupCmd = providerExportCmd ? `${providerExportCmd}; ` : '';
-      const claudeCmd = `${PROVIDER_UNSET_CMD}; ${providerSetupCmd}export TERM=xterm-256color; export COLORTERM=truecolor; exec claude --session-id "${effectiveSessionId}" ${modelFlag} ${permissionFlags}`;
-      console.log(`[claude-invoke] purpose=specialist-wake | model=${model} | source=specialists.ts:wakeSpecialist | session=${tmuxSession} | specialist=${name} | command="exec claude ..."`);
-
-      // Kill stale session first to prevent "duplicate session" error (PAN-430)
-      await killSessionAsync(tmuxSession).catch(() => { /* no stale session */ });
-      await execAsync(
-        `${buildTmuxCommandString(['new-session', '-d', '-s', tmuxSession, '-c', cwd])}${envFlags} "${claudeCmd}"`,
-        { encoding: 'utf-8' }
-      );
-
-      if (waitForReady) {
-        // Poll for Claude's interactive prompt instead of fixed sleep.
-        // Fresh starts can take 5-10s; 15s timeout covers slow models.
-        const ready = await waitForClaudePrompt(tmuxSession, 15000);
-        if (!ready) {
-          console.warn(`[specialist] ${name}: prompt not detected within 15s, proceeding anyway`);
-        }
-      }
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      return {
-        success: false,
-        message: `Failed to start specialist ${name}: ${msg}`,
-        wasAlreadyRunning: false,
-        error: msg,
-      };
-    }
-  }
-
-  // Reset specialist state to clear stale context from previous tasks
-  await resetSpecialist(name);
-
-  // Wait for Claude to be at its interactive prompt before sending the task.
-  // For already-running specialists this should be near-instant; for freshly-started
-  // ones the waitForReady above already waited, but resetSpecialist's C-c may have
-  // interrupted something so we re-confirm here.
-  const promptReady = await waitForClaudePrompt(tmuxSession, wasAlreadyRunning ? 5000 : 15000);
-  if (!promptReady) {
-    console.warn(`[specialist] ${name}: prompt not detected after reset, proceeding anyway`);
-  }
-
-  // Send the task prompt
-  try {
-    // For large prompts (>500 chars or multiline), write to file to avoid tmux paste issues
-    // Tmux send-keys with large text shows as "[Pasted text #1 +N lines]" which Claude doesn't process
-    const isLargePrompt = taskPrompt.length > 500 || taskPrompt.includes('\n');
-
-    // Prepare the message to send
-    let messageToSend: string;
-    if (isLargePrompt) {
-      if (!existsSync(TASKS_DIR)) {
-        mkdirSync(TASKS_DIR, { recursive: true });
-      }
-      const taskFile = join(TASKS_DIR, `${name}-${Date.now()}.md`);
-      writeFileSync(taskFile, taskPrompt, 'utf-8');
-      messageToSend = `Read and execute the task in: ${taskFile}`;
-    } else {
-      messageToSend = taskPrompt;
-    }
-
-    // Snapshot tmux output BEFORE sending so we can detect new activity
-    const outputBefore = await capturePaneAsync(tmuxSession, 50);
-
-    // Send the task message
-    await sendKeysAsync(tmuxSession, messageToSend);
-
-    // Verify Claude received the message by watching for new output (tool calls, responses).
-    // This catches silent delivery failures — the structural root cause of lost tasks.
-    const delivered = await confirmDelivery(tmuxSession, outputBefore, 10000);
-    if (!delivered) {
-      console.warn(`[specialist] ${name}: no activity detected after task send, retrying...`);
-      // Re-snapshot and retry once
-      const retryBefore = await capturePaneAsync(tmuxSession, 50);
-      await sendKeysAsync(tmuxSession, messageToSend);
-      const retryDelivered = await confirmDelivery(tmuxSession, retryBefore, 10000);
-      if (!retryDelivered) {
-        return {
-          success: false,
-          message: `Task message not received by specialist ${name} after retry`,
-          tmuxSession,
-          wasAlreadyRunning,
-          error: 'delivery_failed',
-        };
-      }
-    }
-
-    // Record wake event
-    recordWake(name, sessionId || undefined);
-
-    // Set state to active immediately (PAN-80: spinner should show right away)
-    const { saveAgentRuntimeState } = await import('../agents.js');
-    saveAgentRuntimeState(tmuxSession, {
-      state: 'active',
-      lastActivity: new Date().toISOString(),
-      currentIssue: issueId,
-    });
-
-    return {
-      success: true,
-      message: wasAlreadyRunning
-        ? `Sent task to running specialist ${name}`
-        : `Started specialist ${name} and sent task`,
-      tmuxSession,
-      wasAlreadyRunning,
-    };
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return {
-      success: false,
-      message: `Failed to send task to specialist ${name}: ${msg}`,
-      tmuxSession,
-      wasAlreadyRunning,
-      error: msg,
-    };
-  }
-}
-
-/**
- * Wake specialist with a task from the queue
- *
- * Convenience wrapper that formats task details into a prompt.
- *
- * @param name - Specialist name
- * @param task - Task from the queue
- * @returns Promise with wake result
- */
-export async function wakeSpecialistWithTask(
-  name: SpecialistType,
-  task: {
-    issueId: string;
-    branch?: string;
-    workspace?: string;
-    prUrl?: string;
-    context?: TaskContext;
-  },
-  options: { skipBusyGuard?: boolean } = {}
-): Promise<ReturnType<typeof wakeSpecialist>> {
-  // Build context-aware prompt based on specialist type and task
-  const apiPort = process.env.API_PORT || process.env.PORT || '3011';
-  const apiUrl = process.env.DASHBOARD_URL || `http://localhost:${apiPort}`;
-  let prompt: string;
-
-  switch (name) {
-    case 'merge-agent': {
-      const mergeWorkspace = task.workspace || 'unknown';
-      const mergeInfo = await resolveWorkspaceGitInfo(task.workspace, task.branch);
-      const mergeBranch = mergeInfo.branch;
-
-      prompt = renderPrompt({
-        name: 'merge',
-        vars: {
-          ISSUE_ID: task.issueId,
-          SOURCE_BRANCH: mergeBranch || 'unknown',
-          TARGET_BRANCH: 'main',
-          PROJECT_PATH: mergeWorkspace,
-          DO_PUSH: false,
-          DO_BUILD: false,
-          API_URL: apiUrl,
-          IS_POLYREPO: mergeInfo.isPolyrepo,
-          POLYREPO_DIRS: mergeInfo.isPolyrepo ? mergeInfo.gitDirs.map(d => basename(d)).join(', ') : '',
-          PR_URL: task.prUrl || '',
-        },
-      });
-      break;
-    }
-
-    case 'review-agent': {
-      const diffBase = (task.context?.targetBranch as string | undefined) || 'main';
-      // Pre-check: detect stale branch (0 diff from main) before waking the agent
-      const workspace = task.workspace || 'unknown';
-
-      // Resolve git directories and branch from workspace
-      const reviewGitInfo = await resolveWorkspaceGitInfo(task.workspace, task.branch);
-      const gitDirs = reviewGitInfo.gitDirs;
-      // Use first git dir for pre-check (primary repo), fall back to workspace root
-      const gitDir = gitDirs[0] || workspace;
-
-      let staleBranch = false;
-      if (workspace !== 'unknown' && gitDirs.length > 0) {
-        try {
-          // For polyrepos, check all git dirs — if ANY has changes, it's not stale
-          let totalChangedFiles = 0;
-          for (const dir of gitDirs) {
-            const { stdout: dirDiff } = await execAsync(
-              `cd "${dir}" && git fetch origin ${diffBase} 2>/dev/null; git diff --name-only ${diffBase}...HEAD 2>/dev/null`,
-              { encoding: 'utf-8', timeout: 15000 }
-            );
-            totalChangedFiles += dirDiff.trim().split('\n').filter((f: string) => f.length > 0).length;
-          }
-          if (totalChangedFiles === 0) {
-            staleBranch = true;
-            console.log(`[specialist] review-agent: stale branch detected for ${task.issueId} — 0 files changed vs ${diffBase}`);
-
-            // Auto-complete the review: set reviewStatus to passed
-            const { setReviewStatus } = await import('../review-status.js');
-            setReviewStatus(task.issueId.toUpperCase(), {
-              reviewStatus: 'passed',
-              reviewNotes: `No changes to review — branch identical to ${diffBase} (already merged or stale)`,
-            });
-            console.log(`[specialist] review-agent: auto-passed ${task.issueId} (stale branch)`);
-
-            // Also try to signal via the specialists/done path for idle state management
-            const tmuxSession = getTmuxSessionName('review-agent');
-            const { saveAgentRuntimeState } = await import('../agents.js');
-            saveAgentRuntimeState(tmuxSession, {
-              state: 'idle',
-              lastActivity: new Date().toISOString(),
-            });
-
-            return { success: true, message: `Stale branch auto-passed for ${task.issueId}`, wasAlreadyRunning: false, error: undefined };
-          }
-        } catch (err) {
-          // If pre-check fails, fall through to normal wake — agent will handle it
-          console.warn(`[specialist] review-agent: stale branch pre-check failed for ${task.issueId}:`, err);
-        }
-      }
-
-      // Build git commands for the prompt — polyrepo workspaces need git commands in subdirectories
-      const isPolyrepo = gitDirs.length > 1;
-      const gitDiffCommands = gitDirs.length > 0
-        ? gitDirs.map(d => `cd "${d}" && git diff --name-only ${diffBase}...HEAD`).join('\n')
-        : `cd "${workspace}" && git diff --name-only ${diffBase}...HEAD`;
-      const gitDiffFileCmd = gitDirs.length > 0
-        ? `cd "${gitDir}" && git diff ${diffBase}...HEAD -- <file>`
-        : `cd "${workspace}" && git diff ${diffBase}...HEAD -- <file>`;
-
-      prompt = renderPrompt({
-        name: 'review',
-        vars: {
-          ISSUE_ID: task.issueId,
-          BRANCH: task.branch || 'unknown',
-          WORKSPACE: workspace,
-          DIFF_BASE: diffBase,
-          IS_POLYREPO: isPolyrepo,
-          GIT_DIFF_COMMANDS: gitDiffCommands,
-          GIT_DIFF_FILE_CMD: gitDiffFileCmd,
-          API_URL: apiUrl,
-          PR_URL: task.prUrl || '',
-          POLYREPO_DIRS: isPolyrepo ? gitDirs.map(d => basename(d)).join(', ') : '',
-        },
-      });
-      break;
-    }
-
-    case 'test-agent': {
-      prompt = await buildTestAgentPromptContent(task);
-      break;
-    }
-
-    default:
-      prompt = `Task for ${task.issueId}: Please process this task and report findings.`;
-  }
-
-  return wakeSpecialist(name, prompt, { issueId: task.issueId, skipBusyGuard: options.skipBusyGuard });
-}
-
-/**
- * Task context interface for handoffs and specialist tasks
- */
-export interface TaskContext {
-  prUrl?: string;
-  workspace?: string;
-  branch?: string;
-  filesChanged?: string[];
-  reason?: string;
-  targetModel?: string;
-  additionalInstructions?: string;
-  [key: string]: string | string[] | undefined;
-}
-
-/**
- * Wake a specialist, returning specialist_busy if currently active.
- *
- * This wrapper checks if the specialist is busy before waking.
- * If the specialist is running but not idle, returns error: 'specialist_busy'
- * — callers should set dispatch_failed so the deacon can retry on the next patrol.
- *
- * @param name - Specialist name
- * @param task - Task details
- * @param priority - Task priority (default: 'normal')
- * @param source - Source of the task (default: 'handoff')
- * @returns Promise with result indicating success or busy error
- */
-export async function wakeSpecialistOrQueue(
-  name: SpecialistType,
-  task: {
-    issueId: string;
-    branch?: string;
-    workspace?: string;
-    prUrl?: string;
-    context?: TaskContext;
-  },
-  options: {
-    priority?: 'urgent' | 'high' | 'normal' | 'low';
-    source?: string;
-  } = {}
-): Promise<{
-  success: boolean;
-  queued: boolean;
-  message: string;
-  error?: string;
-}> {
-  const { priority = 'normal', source = 'handoff' } = options;
-
-  // DAG-aware readiness gate: if a vBRIEF item ID is provided in context,
-  // check that all its blocking dependencies are completed before scheduling.
-  // This prevents scheduling work whose dependencies aren't done yet.
-  const vbriefItemId = task.context?.vbriefItemId as string | undefined;
-  const workspacePath = task.workspace || (task.context?.workspace as string | undefined);
-  if (vbriefItemId && workspacePath) {
-    try {
-      if (!isTaskReady(vbriefItemId, workspacePath)) {
-        return {
-          success: false,
-          queued: false,
-          message: `Task "${vbriefItemId}" has incomplete blocking dependencies — not ready to schedule`,
-        };
-      }
-    } catch (readinessErr: any) {
-      // Non-fatal: proceed if readiness check fails
-      console.warn(`[specialist] Task readiness check failed for ${vbriefItemId}: ${readinessErr.message}`);
-    }
-  }
-
-  // Check if specialist is running and get state (PAN-80)
-  const running = await isRunning(name);
-  const { getAgentRuntimeState } = await import('../agents.js');
-  const tmuxSession = getTmuxSessionName(name);
-  const runtimeState = getAgentRuntimeState(tmuxSession);
-  const idle = runtimeState?.state === 'idle' || runtimeState?.state === 'suspended';
-
-  // If running and busy (active), return specialist_busy — callers handle retry
-  if (running && !idle) {
-    console.log(`[specialist] ${name} busy for ${task.issueId} — caller should retry or deacon will recover`);
-    return {
-      success: false,
-      queued: false,
-      message: `Specialist ${name} is busy. Deacon will retry on next patrol.`,
-      error: 'specialist_busy',
-    };
-  }
-
-  // Otherwise, wake the specialist directly
-  // PAN-88: Set state to 'active' IMMEDIATELY to prevent race conditions
-  // This must happen BEFORE the actual wake to block concurrent requests
-  const { saveAgentRuntimeState } = await import('../agents.js');
-  saveAgentRuntimeState(tmuxSession, {
-    state: 'active',
-    lastActivity: new Date().toISOString(),
-    currentIssue: task.issueId,
-  });
-  console.log(`[specialist] ${name} marked active (preventing concurrent wakes)`);
-
-  try {
-    const wakeResult = await wakeSpecialistWithTask(name, task, { skipBusyGuard: true });
-
-    if (!wakeResult.success) {
-      // Wake failed - revert state to idle and clear currentIssue
-      saveAgentRuntimeState(tmuxSession, {
-        state: 'idle',
-        lastActivity: new Date().toISOString(),
-        currentIssue: undefined,
-      });
-    }
-
-    return {
-      success: wakeResult.success,
-      queued: false,
-      message: wakeResult.message,
-      error: wakeResult.error,
-    };
-  } catch (error: unknown) {
-    // Exception - revert state to idle and clear currentIssue
-    saveAgentRuntimeState(tmuxSession, {
-      state: 'idle',
-      lastActivity: new Date().toISOString(),
-      currentIssue: undefined,
-    });
-
-    const msg = error instanceof Error ? error.message : String(error);
-    return {
-      success: false,
-      queued: false,
-      message: `Failed to wake specialist ${name}: ${msg}`,
-      error: msg,
-    };
-  }
 }
 
 /**

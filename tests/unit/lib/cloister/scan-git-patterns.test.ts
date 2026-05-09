@@ -40,10 +40,8 @@ vi.mock('../../../../src/lib/tracker-utils.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/cloister/specialists.js', () => ({
-  getSessionId: vi.fn().mockReturnValue(null),
   recordWake: vi.fn(),
   getTmuxSessionName: vi.fn().mockReturnValue('specialist-merge-agent'),
-  wakeSpecialist: vi.fn().mockResolvedValue({ success: false }),
   spawnEphemeralSpecialist: vi.fn().mockResolvedValue({ success: false }),
   isRunning: vi.fn().mockResolvedValue(false),
 }));

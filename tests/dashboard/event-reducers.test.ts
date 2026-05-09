@@ -13,7 +13,8 @@ import {
   INITIAL_READ_MODEL_STATE,
   ReadModelState,
 } from '../../packages/contracts/src/event-reducers.js'
-import type { AgentSnapshot, SpecialistSnapshot, DashboardSnapshot } from '../../packages/contracts/src/index.js'
+import type { AgentSnapshot, DashboardSnapshot } from '../../packages/contracts/src/index.js'
+import type { SpecialistProjection } from '../../packages/contracts/src/event-reducers.js'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -36,11 +37,12 @@ const baseAgent: AgentSnapshot = {
   model: 'claude-opus-4-6',
 }
 
-const baseSpecialist: SpecialistSnapshot = {
+const baseSpecialist: SpecialistProjection = {
   name: 'review-agent',
-  type: 'review-agent',
   state: 'sleeping',
   isRunning: false,
+  currentIssue: undefined,
+  lastWake: undefined,
 }
 
 // ─── INITIAL_READ_MODEL_STATE ────────────────────────────────────────────────
@@ -262,12 +264,12 @@ describe('applyEvent — agent.output_received', () => {
 
 describe('applyEvent — specialist.started', () => {
   it('adds specialist to specialistsByName', () => {
-    const specialist: SpecialistSnapshot = { ...baseSpecialist, state: 'active', isRunning: true }
+    const specialist: SpecialistProjection = { ...baseSpecialist, state: 'active', isRunning: true }
     const state = applyEvent(makeState(), {
       type: 'specialist.started',
       sequence: 10,
       timestamp: ts(),
-      payload: { specialist },
+      payload: specialist,
     })
     expect(state.specialistsByName['review-agent']).toEqual(specialist)
   })
@@ -275,7 +277,7 @@ describe('applyEvent — specialist.started', () => {
 
 describe('applyEvent — specialist.completed', () => {
   it('sets state to sleeping and isRunning to false', () => {
-    const activeSpec: SpecialistSnapshot = { ...baseSpecialist, state: 'active', isRunning: true, currentIssue: 'PAN-1' }
+    const activeSpec: SpecialistProjection = { ...baseSpecialist, state: 'active', isRunning: true, currentIssue: 'PAN-1' }
     const state = makeState({ specialistsByName: { 'review-agent': activeSpec } })
     const next = applyEvent(state, {
       type: 'specialist.completed',
@@ -303,7 +305,7 @@ describe('applyEvent — specialist.completed', () => {
 
 describe('applyEvent — specialist.failed', () => {
   it('sets state to sleeping and isRunning to false', () => {
-    const activeSpec: SpecialistSnapshot = { ...baseSpecialist, state: 'active', isRunning: true }
+    const activeSpec: SpecialistProjection = { ...baseSpecialist, state: 'active', isRunning: true }
     const state = makeState({ specialistsByName: { 'review-agent': activeSpec } })
     const next = applyEvent(state, {
       type: 'specialist.failed',

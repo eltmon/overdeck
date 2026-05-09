@@ -173,7 +173,6 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const {
       getAllSpecialists,
-      clearSessionId,
       isRunning,
       getTmuxSessionName,
     } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
@@ -194,9 +193,8 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
         killed = killResult;
       }
 
-      const sessionCleared = clearSessionId(name);
       clearHook(name);
-      results.push({ name, killed, sessionCleared, queueCleared: true });
+      results.push({ name, killed, sessionCleared: false, queueCleared: true });
     }
 
     // Reset any "reviewing" statuses to "pending" — use per-issue atomic updates
@@ -669,80 +667,10 @@ const postSpecialistWakeRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
-    const body = yield* readJsonBody;
-    const { sessionId } = body as { sessionId?: string };
-    const eventStore = yield* EventStoreService;
-
-    const {
-      getTmuxSessionName,
-      getSessionId,
-      recordWake,
-      isRunning,
-    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-
-    if (yield* Effect.promise(() => isRunning(name as SpecialistType))) {
-      return jsonResponse(
-        { error: `Specialist ${name} is already running` },
-        { status: 400 },
-      );
-    }
-
-    const existingSessionId = getSessionId(name as SpecialistType);
-    const tmuxSession = getTmuxSessionName(name as SpecialistType);
-
-    if (!existingSessionId && !sessionId) {
-      return jsonResponse(
-        {
-          error: 'No session ID found. Specialist must be initialized first or provide sessionId in request.',
-        },
-        { status: 400 },
-      );
-    }
-
-    const useSessionId = sessionId || existingSessionId;
-
-    // Get specialist model from work-type router (config.yaml)
-    let specModel = 'claude-sonnet-4-6';
-    try {
-      const { getModelId } = yield* Effect.promise(() => import('../../../lib/work-type-router.js'));
-      const workTypeId = `specialist-${name}` as any;
-      specModel = getModelId(workTypeId);
-    } catch { /* fall back to default */ }
-    const specCmd = getAgentCommand(specModel);
-    const specPermissionFlags = getClaudePermissionFlagsString();
-    const specCmdWithArgs =
-      specCmd.args.length > 0
-        ? `${specCmd.command} ${specCmd.args.join(' ')} ${specPermissionFlags}`
-        : `${specCmd.command} ${specPermissionFlags}`;
-
-    const cwd = homedir();
-    yield* Effect.promise(() => createSessionAsync(
-      tmuxSession,
-      cwd,
-      `${specCmdWithArgs} --resume ${useSessionId}`,
-    ));
-
-    recordWake(name as SpecialistType, useSessionId!);
-
-    yield* eventStore.append({
-      type: 'specialist.started',
-      timestamp: new Date().toISOString(),
-      payload: {
-        specialist: {
-          name: name as SpecialistType,
-          state: 'active',
-          isRunning: true,
-          lastWake: new Date().toISOString(),
-        },
-      },
-    });
-
-    return jsonResponse({
-      success: true,
-      message: `Specialist ${name} woken up`,
-      tmuxSession,
-      sessionId: useSessionId,
-    });
+    return jsonResponse(
+      { error: `Legacy specialist wake is no longer supported for ${name}; role runs spawn agents directly.` },
+      { status: 410 },
+    );
   })),
 );
 
@@ -754,37 +682,10 @@ const postSpecialistResetRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
-    const body = yield* readJsonBody;
-    const { reinitialize = false } = body as { reinitialize?: boolean };
-
-    const {
-      clearSessionId,
-      isRunning,
-      getTmuxSessionName,
-    } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-
-    if (yield* Effect.promise(() => isRunning(name as SpecialistType))) {
-      const tmuxSession = getTmuxSessionName(name as SpecialistType);
-      return jsonResponse(
-        {
-          error: `Specialist ${name} is currently running. Stop it first (tmux kill-session -t ${tmuxSession})`,
-        },
-        { status: 400 },
-      );
-    }
-
-    const wasDeleted = clearSessionId(name as SpecialistType);
-
-    if (reinitialize) {
-      // TODO: Add initialization logic if needed
-      // For now, just clearing is sufficient
-    }
-
-    return jsonResponse({
-      success: true,
-      message: `Specialist ${name} reset`,
-      sessionCleared: wasDeleted,
-    });
+    return jsonResponse(
+      { error: `Legacy specialist session reset is no longer supported for ${name}; role agents are managed through the normal agent lifecycle.` },
+      { status: 410 },
+    );
   })),
 );
 
@@ -796,20 +697,10 @@ const postSpecialistInitRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const name = params['name'] as string;
-
-    const { initializeSpecialist } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    const result = yield* Effect.promise(() => initializeSpecialist(name as SpecialistType));
-
-    if (!result.success) {
-      return jsonResponse({ error: result.message }, { status: 400 });
-    }
-
-    return jsonResponse({
-      success: true,
-      message: result.message,
-      tmuxSession: result.tmuxSession,
-      note: 'Session ID will be available after Claude responds. Use "claude config get sessionId" in the tmux session to get it, then update via /reset with reinitialize.',
-    });
+    return jsonResponse(
+      { error: `Legacy specialist initialization is no longer supported for ${name}; role flows spawn agents on demand.` },
+      { status: 410 },
+    );
   })),
 );
 
@@ -895,85 +786,7 @@ const getSpecialistCostRoute = HttpRouter.add(
   'GET',
   '/api/specialists/:name/cost',
   httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const name = params['name'] as string;
-
-    const { getSessionId } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    const sessionId = getSessionId(name as SpecialistType);
-
-    if (!sessionId) {
-      return jsonResponse({ cost: 0, inputTokens: 0, outputTokens: 0 });
-    }
-
-    // Find the JSONL session file
-    const homeDir = process.env.HOME || homedir();
-    const claudeProjectsDir = join(homeDir, '.claude', 'projects');
-
-    const projectDirName = encodeClaudeProjectDir(homeDir);
-    const projectDir = join(claudeProjectsDir, projectDirName);
-    const sessionsIndexPath = join(projectDir, 'sessions-index.json');
-
-    let cost = 0;
-    let inputTokens = 0;
-    let outputTokens = 0;
-    let cacheReadTokens = 0;
-    let cacheWriteTokens = 0;
-    let detectedModel = '';
-
-    if (existsSync(sessionsIndexPath)) {
-      const indexContent = JSON.parse(yield* Effect.promise(() => readFile(sessionsIndexPath, 'utf-8')));
-      const sessionEntry = indexContent.entries?.find(
-        (e: { sessionId: string }) => e.sessionId === sessionId,
-      );
-
-      if (sessionEntry?.fullPath && existsSync(sessionEntry.fullPath)) {
-        const jsonlContent = yield* Effect.promise(() => readFile(sessionEntry.fullPath, 'utf-8'));
-        const lines = jsonlContent.split('\n').filter((l: string) => l.trim());
-
-        for (const line of lines) {
-          try {
-            const entry = JSON.parse(line);
-            const usage = entry.message?.usage || entry.usage;
-            const model = entry.message?.model || entry.model;
-
-            if (usage) {
-              inputTokens += usage.input_tokens || 0;
-              outputTokens += usage.output_tokens || 0;
-              cacheReadTokens += usage.cache_read_input_tokens || 0;
-              cacheWriteTokens += usage.cache_creation_input_tokens || 0;
-            }
-            if (model && !detectedModel) {
-              detectedModel = model;
-            }
-          } catch {
-            // Skip malformed lines
-          }
-        }
-      }
-    }
-
-    if (inputTokens > 0 || outputTokens > 0) {
-      const modelInfo = normalizeModelName(detectedModel || 'claude-sonnet-4');
-      const pricing = getPricing(modelInfo.provider, modelInfo.model);
-      if (pricing) {
-        const usage: TokenUsage = {
-          inputTokens,
-          outputTokens,
-          cacheReadTokens,
-          cacheWriteTokens,
-        };
-        cost = calculateCost(usage, pricing);
-      }
-    }
-
-    return jsonResponse({
-      cost,
-      inputTokens,
-      outputTokens,
-      cacheReadTokens,
-      cacheWriteTokens,
-      model: detectedModel,
-    });
+    return jsonResponse({ cost: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, model: '' });
   })),
 );
 
@@ -1147,7 +960,7 @@ const postProjectSpecialistKillRoute = HttpRouter.add(
       ?? getTmuxSessionName(type, project, issueId);
 
     yield* Effect.promise(() => killSessionAsync(tmuxSession).catch(() => {}));
-    // Do NOT clearSessionId — the Claude session persists and should be resumed on next dispatch
+    // Leave Claude JSONL/session artifacts intact; only reset Panopticon runtime state.
     saveAgentRuntimeState(tmuxSession, {
       state: 'idle',
       lastActivity: new Date().toISOString(),
@@ -1644,21 +1457,10 @@ const postProjectSpecialistResetSessionRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const projectKey = params['project'] ?? '';
     const name = params['name'] ?? '';
-
-    const { bumpSessionGeneration } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
-    const specialistType = name as any;
-    const newGen = bumpSessionGeneration(specialistType, projectKey);
-
-    // Also kill the tmux session so it doesn't linger with old context.
-    // NOTE: try/catch does NOT work with yield* in Effect.gen — use .catch() in the Promise chain.
-    const tmuxSession = `specialist-${projectKey}-${name}`;
-    yield* Effect.promise(() =>
-      killSessionAsync(tmuxSession)
-        .catch(() => { /* no session to kill */ })
+    return jsonResponse(
+      { error: `Legacy specialist session rotation is no longer supported for ${projectKey}/${name}.` },
+      { status: 410 },
     );
-
-    console.log(`[specialist] Reset session for ${projectKey}/${name} → generation ${newGen}`);
-    return jsonResponse({ success: true, specialist: name, project: projectKey, generation: newGen });
   })),
 );
 

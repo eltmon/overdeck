@@ -14,7 +14,7 @@ import { PANOPTICON_HOME } from '../paths.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import { getAgentState } from '../agents.js';
 import type { SpecialistType } from './specialists.js';
-import { getTmuxSessionName, setSessionId } from './specialists.js';
+import { getTmuxSessionName } from './specialists.js';
 import { killSessionAsync } from '../tmux.js';
 
 const execAsync = promisify(exec);
@@ -262,11 +262,6 @@ export async function rotateSpecialistSession(
     });
 
     console.log(`Started fresh session: ${newAgent.sessionId.substring(0, 8)}`);
-
-    // Persist the new session ID so subsequent wakes use --resume
-    if (newAgent.sessionId && newAgent.sessionId !== 'unknown') {
-      setSessionId(specialistName, newAgent.sessionId);
-    }
 
     return {
       success: true,

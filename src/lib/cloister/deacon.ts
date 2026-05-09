@@ -1512,7 +1512,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
           `[deacon] Orphaned test detected: ${issueId} shows '${status.testStatus}' but test-agent is not active`,
         );
 
-        // Re-dispatch using per-project ephemeral specialist (no queue fallback)
+        // Re-dispatch through the unified test role runner (no specialist queue fallback)
         const agentId = `agent-${issueId.toLowerCase()}`;
         const agentState = getAgentState(agentId);
         const { resolveProjectFromIssue } = await import('../projects.js');
@@ -3745,7 +3745,7 @@ export async function runPatrol(): Promise<PatrolResult> {
 
       const runtimeState = getAgentRuntimeState(projSpec.tmuxSession);
       // A running ephemeral specialist with no runtime state, or active for more than
-      // the max specialist timeout (wakeSpecialistWithTask uses 15 min), is considered stuck.
+      // the max specialist timeout (ephemeral specialist spawn uses 15 min), is considered stuck.
       const isStuck = runtimeState?.state === 'active' && runtimeState.lastActivity
         ? (Date.now() - new Date(runtimeState.lastActivity).getTime()) > 15 * 60 * 1000
         : false;
@@ -3755,9 +3755,7 @@ export async function runPatrol(): Promise<PatrolResult> {
         console.log(`[deacon] Per-project ${projSpec.specialistType} (${projSpec.projectKey}) stuck, force-killing ${projSpec.tmuxSession}`);
         try {
           await killSessionAsync(projSpec.tmuxSession);
-          // Do NOT clearSessionId — the Claude session still exists in storage
-          // and should be resumed on next dispatch. Clearing causes --session-id
-          // "already in use" errors.
+          // Preserve Claude JSONL/session artifacts; only reset Panopticon runtime state.
           saveAgentRuntimeState(projSpec.tmuxSession, { state: 'idle', lastActivity: new Date().toISOString() });
           actions.push(`Force-killed stuck per-project ${projSpec.specialistType} (${projSpec.projectKey})`);
         } catch {

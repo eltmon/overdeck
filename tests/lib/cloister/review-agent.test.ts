@@ -991,13 +991,13 @@ describe('reviewStatus type-safety regression', () => {
 
 // ── passed-state rerun uses dispatchParallelReview ───────────────────────────
 // Regression: the passed-state rerun path in /api/review/:issueId/request must
-// use dispatchParallelReview (not wakeSpecialistOrQueue) so review:* model routing
-// and the parallel pipeline are applied consistently.
+// use dispatchParallelReview so review:* model routing and the parallel pipeline
+// are applied consistently.
 
 describe('passed-state rerun regression', () => {
-  it('workspaces.ts request-review route does not call wakeSpecialistOrQueue in the rerun path', async () => {
-    // Read the route source and verify it has no wakeSpecialistOrQueue calls in the
-    // passed-state IIFE (the block between shouldTreatAsRerun and the early return).
+  it('workspaces.ts request-review route uses dispatchParallelReview in the rerun path', async () => {
+    // Read the route source and verify the passed-state IIFE uses the parallel
+    // review launcher (the block between shouldTreatAsRerun and the early return).
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
@@ -1013,7 +1013,6 @@ describe('passed-state rerun regression', () => {
     expect(rerunBlockMatch).not.toBeNull();
     const rerunBlock = rerunBlockMatch![0];
 
-    expect(rerunBlock).not.toContain('wakeSpecialistOrQueue');
     expect(rerunBlock).toContain('dispatchParallelReview');
   });
 });
@@ -1028,12 +1027,11 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 function readTemplate(name: string): string {
-  // Review prompt templates live at src/lib/cloister/prompts/review/<name>.prompt-template.md
-  // (workspace root, three directories up from tests/lib/cloister/).
+  // Review prompts now live as Claude Code agent definitions.
   const templatePath = resolve(
     import.meta.dirname,
-    '../../../src/lib/cloister/prompts/review',
-    `${name}.prompt-template.md`,
+    '../../../.claude/agents',
+    `${name}.md`,
   );
   return readFileSync(templatePath, 'utf-8');
 }
@@ -1189,14 +1187,9 @@ describe('runParallelReview configuration regressions', () => {
 // ── resolvePromptTemplatePath (legacy alias: resolveTemplatePath) ────────────
 
 describe('resolvePromptTemplatePath', () => {
-  it('returns a path under either review-prompts (new) or agent-definitions (legacy fallback)', () => {
-    // In test env, the new CACHE_REVIEW_PROMPTS_DIR typically does not exist
-    // (no `pan sync` run), so resolvePromptTemplatePath falls back to the
-    // legacy CACHE_AGENTS_DIR path. Either layout is accepted.
+  it('returns the repo Claude agent definition when present', () => {
     const result = resolveTemplatePath('code-review-correctness', '/any/workspace');
-    const isNew = result.includes('review-prompts') && result.endsWith('.prompt-template.md');
-    const isLegacy = result.includes('agent-definitions') && result.endsWith('code-review-correctness.md');
-    expect(isNew || isLegacy).toBe(true);
+    expect(result).toContain('.claude/agents/code-review-correctness.md');
   });
 });
 
@@ -1378,17 +1371,18 @@ describe('dispatch failure reviewStatus regression', () => {
 // providers (OpenAI, Google, direct Anthropic-compatible providers) get the same
 // command construction as work agents instead of using a hardcoded `claude --model`.
 describe('spawnReviewer runtime command routing regression', () => {
-  it('review-agent.ts imports resolveSpecialistBaseCommand from router.js (PAN-636: harness-aware routing)', async () => {
+  it('review-agent.ts no longer imports the legacy specialist router helper', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const src = readFileSync(
       resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
       'utf-8',
     );
-    expect(src).toMatch(/import\s*\{[^}]*resolveSpecialistBaseCommand[^}]*\}\s*from\s*['"]\.\/router\.js['"]/);
+    expect(src).not.toContain('resolveSpecialistBaseCommand');
+    expect(src).toMatch(/getAgentRuntimeBaseCommand/);
   });
 
-  it('spawnReviewer body uses resolveSpecialistBaseCommand, not a hardcoded claude --model string', async () => {
+  it('spawnReviewer body uses the local review base-command helper, not a hardcoded claude --model string', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const src = readFileSync(
@@ -1402,8 +1396,7 @@ describe('spawnReviewer runtime command routing regression', () => {
     const fn = spawnReviewerMatch![0];
 
     // Must use the harness-aware routing helper — not a bare `claude --model` string.
-    // resolveSpecialistBaseCommand wraps getAgentRuntimeBaseCommand and adds harness/ToS routing.
-    expect(fn).toContain('resolveSpecialistBaseCommand(');
+    expect(fn).toContain('buildReviewBaseCommand(');
     expect(fn).not.toMatch(/`claude\s+--(?:dangerously-skip-permissions|model)/);
   });
 

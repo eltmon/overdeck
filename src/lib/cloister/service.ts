@@ -60,6 +60,7 @@ import {
 } from './deacon.js';
 import { PANOPTICON_HOME } from '../paths.js';
 import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync, renameSync, statSync } from 'fs';
+import { rm } from 'fs/promises';
 import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
 import { loadReviewStatuses, setReviewStatus } from '../review-status.js';
@@ -68,6 +69,11 @@ import { emitActivityEntry } from '../activity-logger.js';
 
 // State file for cross-process communication
 const CLOISTER_STATE_FILE = join(PANOPTICON_HOME, 'cloister.state');
+const LEGACY_SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
+
+async function cleanupLegacySpecialistsDirectory(): Promise<void> {
+  await rm(LEGACY_SPECIALISTS_DIR, { recursive: true, force: true });
+}
 
 /**
  * Pure helper: from a map of review statuses, return the issue IDs that are
@@ -429,6 +435,13 @@ export class CloisterService {
       console.error('  ✗ Failed to initialize panopticon database:', error);
     }
 
+    try {
+      await cleanupLegacySpecialistsDirectory();
+      console.log('  ✓ Removed legacy ~/.panopticon/specialists directory');
+    } catch (error) {
+      console.error('  ✗ Failed to remove legacy specialists directory:', error);
+    }
+
     // PAN-493: Reset orphaned verificationStatus === 'running' states.
     // If Cloister dies mid-verification, the status is left stuck at 'running' and the
     // pipeline halts indefinitely. On startup, reset any such states to 'pending' so
@@ -453,8 +466,8 @@ export class CloisterService {
     // PAN-511: Clear stale currentIssue from specialist agents that are not actually running.
     // If Cloister dies while a specialist is between tasks or mid-run, the specialist's
     // runtime.json may retain currentIssue and state='active' even though the process is dead.
-    // wakeSpecialistOrQueue and spawnEphemeralSpecialist check these fields to decide whether
-    // to queue or dispatch — a stale 'active' state permanently blocks new dispatches.
+    // spawnEphemeralSpecialist checks these fields to decide whether
+    // to dispatch — a stale 'active' state permanently blocks new dispatches.
     // On startup, clear currentIssue and reset state from any specialist agent that is:
     //   (a) idle — safe: idle means no active task, currentIssue is leftover
     //   (b) active but tmux session no longer running — state is stale from a crash

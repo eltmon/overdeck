@@ -8,10 +8,7 @@ vi.mock('child_process', async (importOriginal) => {
 });
 
 vi.mock('../specialists.js', () => ({
-  getSessionId: vi.fn(),
-  recordWake: vi.fn(),
   getTmuxSessionName: vi.fn(() => 'merge-session'),
-  wakeSpecialist: vi.fn(async () => ({ success: true })),
   spawnEphemeralSpecialist: vi.fn(async () => ({ success: true })),
   isRunning: vi.fn(async () => true),
   REVIEWER_ROLES: ['security', 'correctness', 'performance', 'requirements'],

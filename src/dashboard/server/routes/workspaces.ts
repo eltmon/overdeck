@@ -3118,7 +3118,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
         'Operation timed out',
         'specialist.*not running',
         'specialist.*busy',
-        'wakeSpecialistOrQueue',
+        'legacy specialist wake',
       ];
       const isInfraFailure = infraFailurePatterns.some(pattern =>
         new RegExp(pattern, 'i').test(existingStatus.reviewNotes || '')

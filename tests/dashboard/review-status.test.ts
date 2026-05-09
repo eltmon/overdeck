@@ -246,7 +246,7 @@ describe('clearReviewStatus', () => {
 
 describe('stale branch auto-pass', () => {
   it('sets reviewStatus to passed with stale branch notes', () => {
-    // Simulates what the stale branch pre-check in wakeSpecialistWithTask does
+    // Simulates what the stale branch pre-check records when review is a no-op
     const result = setReviewStatus('PAN-STALE', {
       reviewStatus: 'passed',
       reviewNotes: 'No changes to review — branch identical to main (already merged or stale)',

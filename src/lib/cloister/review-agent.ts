@@ -13,8 +13,8 @@ import { parse as parseYaml } from 'yaml';
 import { loadCloisterConfig, type ReviewAgentConfig } from './config.js';
 import { createSessionAsync, killSessionAsync, sessionExistsAsync, sendKeysAsync, listSessionNamesAsync, capturePaneAsync, setOptionAsync, isPaneDeadAsync, listPaneValuesAsync, detectTerminalApiError, type TerminalApiError, buildTmuxCommandString } from '../tmux.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { getProviderExportsForModel } from '../agents.js';
-import { resolveSpecialistBaseCommand } from './router.js';
+import { getAgentRuntimeBaseCommand, getProviderAuthMode, getProviderExportsForModel } from '../agents.js';
+import { getSpecialistHarness } from './router.js';
 import { generateLauncherScript } from '../launcher-generator.js';
 import { getModelId, hasOverride } from '../work-type-router.js';
 import { AGENTS_DIR, CACHE_AGENTS_DIR, CACHE_REVIEW_PROMPTS_DIR, PANOPTICON_HOME, packageRoot } from '../paths.js';
@@ -30,6 +30,20 @@ const execAsync = promisify(exec);
 const SPECIALISTS_DIR = join(PANOPTICON_HOME, 'specialists');
 const REVIEW_HISTORY_DIR = join(SPECIALISTS_DIR, 'review-agent');
 const REVIEW_HISTORY_FILE = join(REVIEW_HISTORY_DIR, 'history.jsonl');
+
+async function buildReviewBaseCommand(model: string, sessionName: string): Promise<string> {
+  const { canUseHarness } = await import('../harness-policy.js');
+  const requestedHarness = getSpecialistHarness('review-agent');
+  const authMode = await getProviderAuthMode(model);
+  const decision = canUseHarness(requestedHarness, model, authMode);
+  const harness = decision.allowed ? requestedHarness : 'claude-code';
+  if (!decision.allowed) {
+    console.warn(
+      `[review-agent] canUseHarness(${requestedHarness},${model},${authMode}) blocked — ${decision.reason}. Falling back to claude-code.`,
+    );
+  }
+  return getAgentRuntimeBaseCommand(model, sessionName, 'review', harness);
+}
 
 /**
  * Context for a code review request
@@ -540,9 +554,8 @@ export async function spawnSingleReviewer(
 ): Promise<void> {
   // PAN-982 + PAN-636: emit 'claude --agent pan-review-agent --name <sessionName>'
   // on the claude-code path, or fall back to Pi when configured. The harness
-  // routing + ToS gate live inside resolveSpecialistBaseCommand so a stale
-  // Settings selection cannot bypass the gate.
-  const claudeCmd = await resolveSpecialistBaseCommand('review-agent', model, sessionName);
+  // routing + ToS gate are local now that the legacy specialist router helper is gone.
+  const claudeCmd = await buildReviewBaseCommand(model, sessionName);
   const providerExports = await getProviderExportsForModel(model);
 
   // Pre-generate the Claude session UUID and persist it to the canonical reviewer
@@ -602,9 +615,9 @@ export async function spawnSingleReviewer(
     envFlags += ` -e ${key}="${value.replace(/"/g, '\\"')}"`;
   }
 
-  // Kill stale session first to prevent "duplicate session" error (matches dispatchSpecialist pattern)
+  // Kill stale session first to prevent "duplicate session" error (matches review launcher pattern)
   await killSessionAsync(sessionName).catch(() => {});
-  // Use the same atomic spawn pattern as dispatchSpecialist: new-session + bash launcher in one execAsync call.
+  // Use the same atomic spawn pattern as review launcher: new-session + bash launcher in one execAsync call.
   // createSessionAsync only created the session — it never executed the launcher, so the bash/claude
   // process never started and sendKeysAsync had no process to deliver keys to (PAN-1034).
   await execAsync(
@@ -931,21 +944,18 @@ export function selectCompletedReviewers(
 /**
  * Resolve the prompt template path for a review agent.
  *
- * Reviewer/synthesis prompts are primitives — they live at
- * `src/lib/cloister/prompts/review/<promptName>.prompt-template.md` in the Panopticon repo,
- * synced to `CACHE_REVIEW_PROMPTS_DIR` (~/.panopticon/review-prompts/).
- *
- * Falls back to the legacy location (`CACHE_AGENTS_DIR` with `.md` suffix) for
- * backward compatibility with pre-refactor installs. See
- * docs/REVIEW-AGENT-ARCHITECTURE.md for the naming convention.
+ * Reviewer/synthesis prompts are Claude agent definitions under
+ * `.claude/agents/<promptName>.md`. Older cache locations are retained only
+ * as fallbacks for already-synced installs.
  *
  * Review prompts run from the main Panopticon codebase, so they must use
- * templates from the main cache — never from a workspace's agents/ directory.
+ * templates from the main repo/cache — never from a workspace's agents/ directory.
  */
 export function resolvePromptTemplatePath(promptName: string, _projectPath: string): string {
-  const newPath = join(CACHE_REVIEW_PROMPTS_DIR, `${promptName}.prompt-template.md`);
-  if (existsSync(newPath)) return newPath;
-  // Legacy fallback: `<name>.md` under CACHE_AGENTS_DIR (pre-refactor layout)
+  const repoAgentDefinition = join(packageRoot, '.claude', 'agents', `${promptName}.md`);
+  if (existsSync(repoAgentDefinition)) return repoAgentDefinition;
+  const cachedTemplate = join(CACHE_REVIEW_PROMPTS_DIR, `${promptName}.prompt-template.md`);
+  if (existsSync(cachedTemplate)) return cachedTemplate;
   return join(CACHE_AGENTS_DIR, `${promptName}.md`);
 }
 

@@ -189,50 +189,6 @@ export function getSpecialistHarness(specialistName: string): 'claude-code' | 'p
 }
 
 /**
- * Resolve a specialist's launcher base command (PAN-636).
- *
- * Single producer of `LauncherConfig.baseCommand` strings for all
- * specialist dispatch sites in cloister/. Routes by harness and gates
- * the harness/model combination through canUseHarness; if the gate
- * blocks the request, the helper falls back to claude-code and logs a
- * warning with the human-readable reason.
- *
- * @param role        specialist role name ('review-agent', 'merge-agent', etc.)
- * @param model       model id for the specialist
- * @param sessionName optional tmux/Claude session handle; PAN-982 forwards
- *                    this as `claude --name <sessionName>` for direct Anthropic
- *                    spawns. Ignored on the Pi path.
- * @param harness     optional harness override; defaults to the role's
- *                    configured harness via getSpecialistHarness
- */
-export async function resolveSpecialistBaseCommand(
-  role: string,
-  model: string,
-  sessionName?: string,
-  harness?: 'claude-code' | 'pi',
-): Promise<string> {
-  const { canUseHarness } = await import('../harness-policy.js')
-  const { getAgentRuntimeBaseCommand, getProviderAuthMode } = await import('../agents.js')
-
-  // role is e.g. 'review-agent'; PAN-982's PanopticonAgentType strips the
-  // '-agent' suffix. We accept either form so callers do not have to know.
-  const agentType = role.endsWith('-agent')
-    ? (role.slice(0, -'-agent'.length) as 'review' | 'merge' | 'test' | 'inspect' | 'uat' | 'work' | 'planning')
-    : (role as 'review' | 'merge' | 'test' | 'inspect' | 'uat' | 'work' | 'planning')
-
-  const requested = harness ?? getSpecialistHarness(role)
-  const authMode = await getProviderAuthMode(model)
-  const decision = canUseHarness(requested, model, authMode)
-  if (!decision.allowed) {
-    console.warn(
-      `[router] specialist ${role}: canUseHarness(${requested},${model},${authMode}) blocked — ${decision.reason}. Falling back to claude-code.`,
-    )
-    return getAgentRuntimeBaseCommand(model, sessionName, agentType, 'claude-code')
-  }
-  return getAgentRuntimeBaseCommand(model, sessionName, agentType, requested)
-}
-
-/**
  * Convenience function to get default model using the global router
  *
  * @returns Default model name
