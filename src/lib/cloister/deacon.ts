@@ -2117,14 +2117,17 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
         // Not a regular merge ancestor — try squash-merge detection
       }
 
-      // Check 2: squash merge — main has a commit referencing the issue ID
+      // Check 2: squash merge — match issue IDs in subjects only to avoid body-reference false positives.
       if (!isMerged) {
         try {
           const { stdout } = await execFileAsync(
-            'git', ['log', 'main', '--oneline', '--grep', issueId.toUpperCase(), '-1'],
+            'git', ['log', 'main', '--pretty=%s', '-200'],
             { cwd: project.projectPath },
           );
-          if (stdout.trim()) isMerged = true;
+          const id = issueId.toUpperCase();
+          // Anchored patterns: ^PAN-1030(:| |$)  OR  ((PAN-1030|...))
+          const anchored = new RegExp(`(^${id}([:\\s]|$))|\\(${id}[ )]`, 'm');
+          if (anchored.test(stdout)) isMerged = true;
         } catch {
           // git log failed — skip
         }
