@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T21:22:51.368Z",
+  "updated": "2026-05-09T21:30:40.885Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "pending-s3",
+    "sha": "pending-u2",
     "dirty": true
   },
   "decisions": [
@@ -158,13 +158,11 @@
     }
   ],
   "resumePoint": {
-    "description": "S3 review role wiring implemented and verified: agents.ts exports spawnRun(issueId, role, opts) plus role runtime command helpers, review runs launch with roles/review.md and state.role=review, handoff review wake and dashboard approve review pipeline now start spawnRun(issueId, review) instead of legacy review-agent wake. Commit, close workspace-xwgy, then inspect because requiresInspection is true.",
-    "beadId": "workspace-xwgy",
+    "description": "U2 RolesPanel implemented and verified: new Settings/RolesPanel.tsx renders Plan, Work, Review, Test, Ship cards with Material Icons, model pickers with Workhorse and provider-specific options, expandable Work and Review sub-role pickers, live workhorse tooltips, and /api/settings role/sub-role PUT round-trips. Next: commit, close workspace-16lf (no inspection required), then continue to the next ready bead.",
+    "beadId": "workspace-16lf",
     "filesToRead": [
-      "src/lib/agents.ts",
-      "src/lib/cloister/handoff.ts",
-      "src/dashboard/server/routes/workspaces.ts",
-      "src/lib/__tests__/agent-state-role.test.ts"
+      "src/dashboard/frontend/src/components/Settings/RolesPanel.tsx",
+      "src/dashboard/frontend/src/components/Settings/__tests__/RolesPanel.test.tsx"
     ]
   },
   "beadsMapping": {},
@@ -283,6 +281,12 @@
       "timestamp": "2026-05-09T21:22:51.368Z",
       "reason": "bead-complete",
       "note": "Implemented S3 review role wiring. Added generic spawnRun(issueId, role, opts) for role-based runs, roleAgentDefinitionPath/getRoleRuntimeBaseCommand helpers that launch roles/review.md, and launcher type support for test/ship role runs. Migrated review handoff and dashboard approval review pipeline from legacy review-agent wake to spawnRun(issueId, review). Verified no convoy specialist wake callsites, added role runtime command coverage, and ran targeted tests, typecheck, lint, and graphify update.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T21:30:40.885Z",
+      "reason": "bead-complete",
+      "note": "Implemented U2 RolesPanel with five role cards in order, work/review sub-role expansion, live-resolved workhorse option labels and tooltips, provider-grouped specific model options, and settings GET/PUT persistence for roles.<id>.model plus roles.<id>.sub.<sub>.model. Targeted RolesPanel tests, typecheck, and lint pass.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

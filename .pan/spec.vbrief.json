@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T21:22:51.368Z"
+    "updated": "2026-05-09T21:30:29.345Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 19,
+    "sequence": 20,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T21:22:51.368Z",
+    "updated": "2026-05-09T21:30:29.345Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -1003,7 +1003,7 @@
       {
         "id": "u2-roles-panel-with-cards",
         "title": "Settings UI: RolesPanel.tsx with 5 role cards + sub-role expansion",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -1018,7 +1018,7 @@
           {
             "id": "u2-roles-panel-with-cards.ac1",
             "title": "RolesPanel.tsx renders 5 cards: Plan, Work, Review, Test, Ship (in that order)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1026,7 +1026,7 @@
           {
             "id": "u2-roles-panel-with-cards.ac2",
             "title": "Work card expands to reveal inspect (workhorse:cheap default) + inspect-deep (workhorse:mid default) sub-pickers",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1034,7 +1034,7 @@
           {
             "id": "u2-roles-panel-with-cards.ac3",
             "title": "Review card expands to reveal security/correctness/performance/requirements sub-pickers (security defaults to workhorse:expensive; others to workhorse:mid)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1042,7 +1042,7 @@
           {
             "id": "u2-roles-panel-with-cards.ac4",
             "title": "Each model picker has a 'Workhorse' group (3 options, live-resolving) on top and a 'Specific model' group (full provider list) below",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1050,7 +1050,7 @@
           {
             "id": "u2-roles-panel-with-cards.ac5",
             "title": "Hovering a 'Workhorse: <slot>' selection shows a tooltip with the current literal value (live, not frozen)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -1058,12 +1058,13 @@
           {
             "id": "u2-roles-panel-with-cards.ac6",
             "title": "Plan card defaults to workhorse:expensive; Work/Test/Ship default to workhorse:mid; Review defaults to workhorse:expensive",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-09T21:30:29.345Z"
       },
       {
         "id": "u3-settings-page-rewire",

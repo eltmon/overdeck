@@ -3319,6 +3319,10 @@
     "mtime": 1778301111.3661814,
     "hash": "6cc9ed261897e7227d0ffbda4ec292f3"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/Settings/RolesPanel.tsx": {
+    "mtime": 1778362100.1088934,
+    "hash": "31b03b987fcbf49a939902c4bbc07fb4"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/Settings/SettingsPage.tsx": {
     "mtime": 1778360806.2553163,
     "hash": "6e13f1541b6b02ae150bf1df6c389b04"
@@ -3378,6 +3382,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/Settings/Provider/ProviderPanel.tsx": {
     "mtime": 1778301111.3632638,
     "hash": "87040db99d3d65c3cc9547e1937032c6"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/Settings/__tests__/RolesPanel.test.tsx": {
+    "mtime": 1778362131.7714388,
+    "hash": "0f07b87318c53c473792b5c473f9f937"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/Settings/__tests__/SettingsPage.test.ts": {
     "mtime": 1778301111.3636842,
