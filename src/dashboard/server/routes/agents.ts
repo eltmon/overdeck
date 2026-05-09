@@ -311,9 +311,9 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
 
   if (workAgentCount >= hardWorkAgentLimit) {
     warnings.push({
-      severity: 'critical',
+      severity: 'warning',
       code: 'agent_capacity',
-      message: `Work agent count is at the limit (${workAgentCount}/${hardWorkAgentLimit}).`,
+      message: `Work agent count is at the configured ceiling (${workAgentCount}/${hardWorkAgentLimit}).`,
     });
   } else if (workAgentCount >= warnWorkAgentLimit) {
     warnings.push({
@@ -325,7 +325,7 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
 
   if (leakedSpecialists.length > 0) {
     warnings.push({
-      severity: workAgentCount >= hardWorkAgentLimit || health.summary.availableMemoryBytes < health.thresholds.memoryAvailableCriticalBytes ? 'critical' : 'warning',
+      severity: health.summary.availableMemoryBytes < health.thresholds.memoryAvailableCriticalBytes ? 'critical' : 'warning',
       code: 'leaked_specialists',
       message: `Leaked specialist sessions detected: ${formatLeakedSpecialistSummary(leakedSpecialists)}${leakedSpecialists.length > 3 ? `, +${leakedSpecialists.length - 3} more` : ''}.`,
     });

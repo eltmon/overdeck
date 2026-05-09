@@ -141,7 +141,7 @@ describe('evaluateSpawnGuardrails', () => {
     ]);
   });
 
-  it('escalates leaked specialists to a blocking hint when critical conditions are also present', async () => {
+  it('warns instead of blocking when work agent count reaches the configured ceiling', async () => {
     vi.stubEnv('PAN_AGENT_BLOCK_COUNT', '6');
     await readGlobalResourceConfig();
 
@@ -159,19 +159,19 @@ describe('evaluateSpawnGuardrails', () => {
       ],
     }));
 
-    expect(decision.blocked).toBe(true);
-    expect(decision.requiresAcknowledgement).toBe(false);
-    expect(decision.status).toBe(429);
-    expect(decision.hint).toBe('Clean up leaked specialist sessions first, then retry the spawn.');
+    expect(decision.blocked).toBe(false);
+    expect(decision.requiresAcknowledgement).toBe(true);
+    expect(decision.status).toBe(409);
+    expect(decision.hint).toBe('Acknowledge the system health warnings before starting this agent.');
     expect(decision.warnings).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          severity: 'critical',
+          severity: 'warning',
           code: 'agent_capacity',
-          message: 'Work agent count is at the limit (6/6).',
+          message: 'Work agent count is at the configured ceiling (6/6).',
         }),
         expect.objectContaining({
-          severity: 'critical',
+          severity: 'warning',
           code: 'leaked_specialists',
           message: 'Leaked specialist sessions detected: specialist-pan-1 (PAN-1), specialist-pan-2 (PAN-2), specialist-pan-3 (PAN-3), +1 more.',
         }),
