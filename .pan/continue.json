@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-945",
   "created": "2026-05-07T09:30:00Z",
-  "updated": "2026-05-09T01:30:53Z",
+  "updated": "2026-05-09T01:35:25Z",
   "gitState": {
     "branch": "feature/pan-945",
-    "sha": "ccf26a582",
+    "sha": "406dedef4",
     "dirty": true
   },
   "decisions": [
@@ -38,6 +38,12 @@
       "summary": "Wired `pan start` to call `importVBriefFromPrdDirs` before validating the workspace plan or recovering beads.",
       "rationale": "CLI starts need the same fixed point as dashboard starts: if a PRD-scoped vBRIEF exists and the workspace lacks `.pan/spec.vbrief.json`, the start flow must materialize the workspace-local plan before stale-plan validation, beads recovery, or simple-issue bead creation run. This prevents `pan start` from treating a PRD-first planned issue as unplanned and creating the wrong fallback bead.",
       "recordedAt": "2026-05-09T01:30:53Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Updated path module mocks in existing tests to include the PRD directory constants now imported by vBRIEF I/O.",
+      "rationale": "Adding PRD vBRIEF discovery made `src/lib/vbrief/io.ts` import `PROJECT_DOCS_SUBDIR`, `PROJECT_PRDS_SUBDIR`, `PROJECT_PRDS_ACTIVE_SUBDIR`, and `PROJECT_PRDS_PLANNED_SUBDIR`. Several older tests mock `paths.js` narrowly for unrelated agent or lifecycle behavior, so the full suite failed at module import time even though the production constants exist. Extending those mocks keeps the tests focused on their original subjects while satisfying the expanded public surface they transitively import.",
+      "recordedAt": "2026-05-09T01:35:25Z"
     }
   ],
   "hazards": [
@@ -60,14 +66,20 @@
       "id": "H4",
       "summary": "If CLI import of an existing PRD vBRIEF fails, silently continuing would allow the old simple-issue fallback to create misleading beads for a planned issue.",
       "mitigation": "`pan start` now fails immediately when `importVBriefFromPrdDirs` throws. Missing PRD vBRIEFs remain non-fatal, but copy errors for discovered artifacts stop the start flow so the underlying filesystem or permissions problem is visible."
+    },
+    {
+      "id": "H5",
+      "summary": "Tests that mock `paths.js` can fail at import time when production modules add new exported path constants, even if those tests do not exercise the new behavior directly.",
+      "mitigation": "The affected mocks now include the PRD path constants used by vBRIEF I/O. The previously failing suites were rerun together and passed, proving the test scaffolding matches the production module surface again."
     }
   ],
   "resumePoint": {
-    "description": "Finish bead workspace-bqcl by committing the CLI `pan start` import wiring, closing the bead, and then resolve the remaining core discovery bead workspace-linp if it is still open because the initial helper commit predates the recovered bead close state.",
-    "beadId": "workspace-bqcl",
+    "description": "All PAN-945 beads are closed. Commit the test mock compatibility fixes, rerun the full quality gates, push `feature/pan-945`, and call `pan done PAN-945` with a terse summary if the tree is clean and the gates pass.",
+    "beadId": null,
     "filesToRead": [
-      "src/cli/commands/start.ts",
       "src/lib/vbrief/io.ts",
+      "src/cli/commands/start.ts",
+      "src/dashboard/server/routes/agents.ts",
       ".pan/continue.json"
     ]
   },
@@ -102,6 +114,12 @@
       "timestamp": "2026-05-09T01:30:53Z",
       "reason": "progress",
       "note": "Completed CLI start wiring by calling `importVBriefFromPrdDirs` after continue-state validation and before plan validation or beads recovery. This lets `pan start` import PRD-first vBRIEF plans into `.pan/spec.vbrief.json` before the runtime decides whether planning exists. `npm run typecheck` and the focused vBRIEF I/O test file both passed after the change.",
+      "agentModel": "kc@kimi-k2.6"
+    },
+    {
+      "timestamp": "2026-05-09T01:35:25Z",
+      "reason": "progress",
+      "note": "The full quality gate initially failed because several unrelated tests mocked `paths.js` without the PRD path constants that `src/lib/vbrief/io.ts` now imports. I updated those mocks to include the missing constants and reran the four previously failing suites together; they all passed. The next step is to commit these test compatibility fixes and rerun the full quality gate.",
       "agentModel": "kc@kimi-k2.6"
     }
   ]

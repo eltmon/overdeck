@@ -53,6 +53,8 @@ vi.mock('../config.js', () => ({
 vi.mock('../../paths.js', () => ({
   PANOPTICON_HOME: '/tmp/test-panopticon',
   AGENTS_DIR: '/tmp/test-agents',
+  PROJECT_DOCS_SUBDIR: 'docs',
+  PROJECT_PRDS_SUBDIR: 'prds',
   PROJECT_PRDS_ACTIVE_SUBDIR: 'active',
   PROJECT_PRDS_PLANNED_SUBDIR: 'planned',
   PROJECT_PRDS_COMPLETED_SUBDIR: 'completed',
