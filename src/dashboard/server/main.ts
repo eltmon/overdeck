@@ -188,6 +188,20 @@ setPipelineHandler((event) => {
       }
       return;
     }
+
+    case 'coordinator_died': {
+      try {
+        const es = getEventStore();
+        es.append({
+          type: 'review.coordinator.died',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: event.issueId, sessionName: event.sessionName, reason: event.reason },
+        } as any);
+      } catch (err) {
+        console.error('[pipeline] Failed to append coordinator_died event:', err);
+      }
+      return;
+    }
   }
 });
 console.log('[panopticon] Pipeline notifier → domain events wired');

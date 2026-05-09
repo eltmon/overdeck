@@ -97,8 +97,9 @@ vi.mock('../../paths.js', () => ({
   packageRoot: '/tmp/pkg',
 }));
 
-import { dispatchParallelReview, runParallelReview } from '../review-agent.js';
+import { dispatchParallelReview, runParallelReview, spawnReviewCoordinatorSession } from '../review-agent.js';
 import { notifyPipeline } from '../../pipeline-notifier.js';
+import { createSessionAsync, isPaneDeadAsync, killSessionAsync, listSessionNamesAsync } from '../../tmux.js';
 
 describe('review-temp stash lifecycle', () => {
   beforeEach(() => {
@@ -152,6 +153,43 @@ describe('review-temp stash lifecycle', () => {
     expect(reviewStatusState.get('PAN-9')?.reviewTempStashRef).toBeUndefined();
     expect(reviewStatusState.get('PAN-9')?.reviewTempStashMessage).toBeUndefined();
     expect(reviewStatusState.get('PAN-9')?.reviewTempStashSequence).toBeUndefined();
+  });
+
+  it('keeps failed coordinator sessions alive for inspection', async () => {
+    const { sessionName } = await spawnReviewCoordinatorSession({
+      issueId: 'PAN-4',
+      workspace: '/tmp/workspace',
+    });
+
+    const command = vi.mocked(createSessionAsync).mock.calls[0]?.[2] as string;
+    expect(sessionName).toMatch(/^review-coordinator-PAN-4-/);
+    expect(command).toContain(`${sessionName}.exit`);
+    expect(command).toContain('if [ "$status" -lt 2 ]; then exit "$status"; fi');
+    expect(command).toContain('exec bash -li');
+  });
+
+  it('emits coordinator_died telemetry before replacing an unexpectedly dead coordinator', async () => {
+    execMock.mockImplementation((cmd: string, _opts: unknown, cb?: (err: Error | null, result?: { stdout: string; stderr: string }) => void) => {
+      const callback = (typeof _opts === 'function' ? _opts : cb)!;
+      if (cmd === 'git status --porcelain') return callback(null, { stdout: ' M file.ts\n', stderr: '' });
+      callback(new Error(`unexpected command: ${cmd}`));
+    });
+    vi.mocked(listSessionNamesAsync).mockResolvedValueOnce(['review-coordinator-PAN-5-1']);
+    vi.mocked(isPaneDeadAsync).mockResolvedValueOnce(true);
+
+    const result = await dispatchParallelReview(
+      { issueId: 'PAN-5', workspace: '/tmp/workspace', branch: 'feature/pan-5' },
+      { coordinatorSpawnFn: async () => ({ sessionName: 'review-coordinator-PAN-5-2' }) },
+    );
+
+    expect(result.success).toBe(true);
+    expect(killSessionAsync).toHaveBeenCalledWith('review-coordinator-PAN-5-1');
+    expect(notifyPipeline).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'coordinator_died',
+      issueId: 'PAN-5',
+      sessionName: 'review-coordinator-PAN-5-1',
+      reason: 'pane_dead',
+    }));
   });
 
   it('drops persisted review-temp stash in runParallelReview finally block', async () => {

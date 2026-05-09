@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "1034",
   "created": "2026-05-09T01:13:00Z",
-  "updated": "2026-05-09T01:48:48Z",
+  "updated": "2026-05-09T01:55:28Z",
   "gitState": {
     "branch": "feature/1034",
-    "sha": "ac576a588",
+    "sha": "c7eaa3dce",
     "dirty": true
   },
   "decisions": [
@@ -33,6 +33,11 @@
       "id": "D5",
       "summary": "Dashboard stranded-review detection is computed from reviewSpawnedAt/updatedAt: pending reviews with no active queue/specialist older than two 30-minute reviewer timeouts are treated as stranded and get a Re-request Review inspector action.",
       "recordedAt": "2026-05-09T01:48:48Z"
+    },
+    {
+      "id": "D6",
+      "summary": "Coordinator survival is handled in the tmux launcher: pan review run still exits normally for approved/changes-requested results, but failed/protocol exit codes keep an interactive shell alive with the log visible; subsequent dispatch treats sessions with exit markers as completed/restartable and emits review.coordinator.died only for sessions that died without an exit marker.",
+      "recordedAt": "2026-05-09T01:55:28Z"
     }
   ],
   "hazards": [
@@ -48,13 +53,15 @@
     }
   ],
   "resumePoint": {
-    "description": "Bead workspace-8pl5 is implemented and verified locally: dashboard inspector detects pending reviews stranded beyond two 30-minute reviewer timeouts, forces the rerun path, and surfaces a Re-request Review action. Next step is commit only this bead, close workspace-8pl5, then continue to coordinator-survival bead workspace-9gr0.",
-    "beadId": "workspace-8pl5",
+    "description": "Bead workspace-9gr0 is implemented and verified locally: failed/protocol review coordinator exits now preserve an inspectable shell, completed coordinator sessions are restartable on the next dispatch, and unexpected coordinator deaths emit review.coordinator.died telemetry. Next step is commit only this bead, close workspace-9gr0, then run final verification for PAN-1034.",
+    "beadId": "workspace-9gr0",
     "filesToRead": [
-      "src/dashboard/frontend/src/lib/pipeline-state.ts",
-      "src/dashboard/frontend/src/components/InspectorPanel.tsx",
-      "src/dashboard/frontend/src/components/inspector/ActionsSection.tsx",
-      "src/dashboard/frontend/src/components/inspector/utils.ts"
+      "src/lib/cloister/review-agent.ts",
+      "src/lib/pipeline-notifier.ts",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/routes/workspaces.ts",
+      "packages/contracts/src/events.ts",
+      "packages/contracts/src/event-reducers.ts"
     ]
   },
   "beadsMapping": {
@@ -89,6 +96,12 @@
       "timestamp": "2026-05-09T01:48:48Z",
       "reason": "manual",
       "note": "Implemented workspace-8pl5. Added shared dashboard detection for pending reviews older than two 30-minute reviewer timeouts with no active queue/specialist, made the inspector force the review trigger and label the action Re-request Review, surfaced a stranded-review banner in the inspector, and covered the helper/button behavior in InspectorPanel tests. Verified with npm test -- src/dashboard/frontend/src/components/InspectorPanel.test.tsx --run and npm run typecheck.",
+      "agentModel": "claude-code"
+    },
+    {
+      "timestamp": "2026-05-09T01:55:28Z",
+      "reason": "manual",
+      "note": "Implemented workspace-9gr0. The review coordinator launcher now keeps failed/protocol pan review run exits (status >=2) alive in an interactive shell for inspection, records exit markers keyed by coordinator session name so the next dispatch can kill/restart completed coordinators, and emits coordinator_died/review.coordinator.died telemetry only for sessions that disappear without an exit marker. Added focused lifecycle tests and verified with npm test -- src/lib/cloister/__tests__/review-temp-lifecycle.test.ts --run and npm run typecheck.",
       "agentModel": "claude-code"
     }
   ],

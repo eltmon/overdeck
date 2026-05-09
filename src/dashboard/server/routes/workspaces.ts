@@ -5636,6 +5636,7 @@ const getMergeQueueRoute = HttpRouter.add(
 //   { type: 'reviewer_completed', issueId, role }
 //   { type: 'reviewer_timed_out', issueId, role, sessionName, attempt, maxRetries, willRetry }
 //   { type: 'coordinator_started', issueId, sessionName }
+//   { type: 'coordinator_died', issueId, sessionName, reason }
 //     — Forwarded verbatim to the in-process handler.
 
 const postInternalPipelineNotifyRoute = HttpRouter.add(
@@ -5729,6 +5730,16 @@ const postInternalPipelineNotifyRoute = HttpRouter.add(
           return jsonResponse({ ok: false, error: 'coordinator_started requires issueId, sessionName' }, 400);
         }
         notifyPipeline({ type: 'coordinator_started', issueId, sessionName });
+        return jsonResponse({ ok: true });
+      }
+      case 'coordinator_died': {
+        const issueId = event.issueId as string | undefined;
+        const sessionName = event.sessionName as string | undefined;
+        const reason = event.reason as string | undefined;
+        if (!issueId || !sessionName || !reason) {
+          return jsonResponse({ ok: false, error: 'coordinator_died requires issueId, sessionName, reason' }, 400);
+        }
+        notifyPipeline({ type: 'coordinator_died', issueId, sessionName, reason });
         return jsonResponse({ ok: true });
       }
       default:

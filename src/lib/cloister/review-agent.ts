@@ -839,6 +839,27 @@ async function isCoordinatorAliveAsync(sessionName: string): Promise<boolean> {
   }
 }
 
+async function coordinatorExitStatus(opts: { workspace: string; sessionName: string }): Promise<number | null> {
+  try {
+    const exitPath = join(opts.workspace, '.pan', 'review', 'coordinator', `${opts.sessionName}.exit`);
+    if (!existsSync(exitPath)) return null;
+    const raw = await readFile(exitPath, 'utf-8');
+    const parsed = Number.parseInt(raw.trim(), 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function emitCoordinatorDied(issueId: string, sessionName: string, reason: string): Promise<void> {
+  try {
+    const { notifyPipeline } = await import('../pipeline-notifier.js');
+    notifyPipeline({ type: 'coordinator_died', issueId, sessionName, reason });
+  } catch {
+    // Non-fatal: event emission is best-effort.
+  }
+}
+
 /**
  * Kill ALL review-related tmux sessions on the panopticon socket.
  *
@@ -1632,10 +1653,16 @@ export async function dispatchParallelReview(
       (s) => s.startsWith(`review-coordinator-${opts.issueId}-`),
     );
     if (existingCoordinator) {
+      const exitStatus = await coordinatorExitStatus({ workspace: opts.workspace, sessionName: existingCoordinator });
       const paneDead = await isPaneDeadAsync(existingCoordinator);
       const actuallyAlive = !paneDead && (await isCoordinatorAliveAsync(existingCoordinator));
-      if (paneDead || !actuallyAlive) {
-        console.log(`[review-agent] Idempotency guard: coordinator ${existingCoordinator} is dead (paneDead=${paneDead}, alive=${actuallyAlive}) — killing stale session and proceeding with dispatch`);
+      if (exitStatus !== null) {
+        console.log(`[review-agent] Idempotency guard: coordinator ${existingCoordinator} already exited with status ${exitStatus} — killing inspectable session and proceeding with dispatch`);
+        await killSessionAsync(existingCoordinator).catch(() => {});
+      } else if (paneDead || !actuallyAlive) {
+        const reason = paneDead ? 'pane_dead' : 'process_not_alive';
+        console.log(`[review-agent] Idempotency guard: coordinator ${existingCoordinator} died unexpectedly (${reason}; alive=${actuallyAlive}) — killing stale session and proceeding with dispatch`);
+        await emitCoordinatorDied(opts.issueId, existingCoordinator, reason);
         await killSessionAsync(existingCoordinator).catch(() => {});
       } else {
         console.log(`[review-agent] Idempotency guard: coordinator ${existingCoordinator} already running for ${opts.issueId} — skipping dispatch`);
@@ -1754,14 +1781,15 @@ export async function spawnReviewCoordinatorSession(opts: {
   workspace: string;
   model?: string;
 }): Promise<{ sessionName: string }> {
-  const sessionName = `review-coordinator-${opts.issueId}-${Date.now()}`;
+  const runId = Date.now();
+  const sessionName = `review-coordinator-${opts.issueId}-${runId}`;
   const logDir = join(opts.workspace, '.pan', 'review', 'coordinator');
   await mkdir(logDir, { recursive: true });
-  const logStem = `${opts.issueId}-${Date.now()}`;
+  const logStem = sessionName;
   const logFile = join(logDir, `${logStem}.log`);
   const exitCodeFile = join(logDir, `${logStem}.exit`);
   const panBin = join(dirname(process.execPath), 'pan');
-  const command = `bash -lc 'set -o pipefail; ${panBin} review run ${opts.issueId} 2>&1 | tee -a "${logFile}"; status=\${PIPESTATUS[0]}; printf "%s\\n" "$status" > "${exitCodeFile}"; printf "\\n[pan review run exit %s at %s]\\n" "$status" "$(date -Is)" >> "${logFile}"; exit "$status"'`;
+  const command = `bash -lc 'set -o pipefail; ${panBin} review run ${opts.issueId} 2>&1 | tee -a "${logFile}"; status=\${PIPESTATUS[0]}; printf "%s\\n" "$status" > "${exitCodeFile}"; printf "\\n[pan review run exit %s at %s]\\n" "$status" "$(date -Is)" >> "${logFile}"; if [ "$status" -lt 2 ]; then exit "$status"; fi; printf "\\n[coordinator preserved after failed review exit %s at %s]\\n" "$status" "$(date -Is)" | tee -a "${logFile}"; printf "Inspect the log above, then re-request review from the dashboard or run: pan review request ${opts.issueId} -m \\\"Retry review\\\"\\n"; exec bash -li'`;
   const env: Record<string, string> = {
     ...BLANKED_PROVIDER_ENV,
     PANOPTICON_AGENT_ID: '',
