@@ -17,7 +17,6 @@ import type {
   DomainEvent,
   ResourceStats,
   ReviewStatusSnapshot,
-  SpecialistSnapshot,
   TurnDiffSummary,
 } from './index'
 
@@ -26,8 +25,16 @@ import type {
 export interface ResolvedChannelPermissionDecision {
   requestId: string
   agentId: string
-  issueId: string
+  issueId?: string
   behavior: 'allow' | 'deny'
+}
+
+export interface SpecialistProjection {
+  name: string
+  state: 'active' | 'sleeping' | 'uninitialized'
+  isRunning: boolean
+  currentIssue?: string
+  lastWake?: string
 }
 
 export interface ReadModelState {
@@ -39,7 +46,7 @@ export interface ReadModelState {
    * would cause the whole AgentSnapshot to re-diff on the frontend.
    */
   agentRuntimeById: Record<string, AgentRuntimeSnapshot>
-  specialistsByName: Record<string, SpecialistSnapshot>
+  specialistsByName: Record<string, SpecialistProjection>
   reviewStatusByIssueId: Record<string, ReviewStatusSnapshot>
   resources: ResourceStats | null
   agentOutputById: Record<string, string[]>
@@ -145,9 +152,18 @@ export function syncSnapshot(state: ReadModelState, snapshot: DashboardSnapshot)
     agentsById[agent.id] = agent
   }
 
-  const specialistsByName: Record<string, SpecialistSnapshot> = {}
-  for (const spec of snapshot.specialists) {
-    specialistsByName[spec.name] = spec
+  const specialistsByName: Record<string, SpecialistProjection> = {}
+  for (const rawSpec of snapshot.specialists) {
+    if (!rawSpec || typeof rawSpec !== 'object') continue
+    const spec = rawSpec as Partial<SpecialistProjection>
+    if (typeof spec.name !== 'string') continue
+    specialistsByName[spec.name] = {
+      name: spec.name,
+      state: spec.state ?? 'uninitialized',
+      isRunning: spec.isRunning ?? false,
+      currentIssue: spec.currentIssue,
+      lastWake: spec.lastWake,
+    }
   }
 
   const reviewStatusByIssueId: Record<string, ReviewStatusSnapshot> = {}
@@ -217,7 +233,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
           ...state.agentsById,
           [event.payload.agentId]: {
             ...agent,
-            agentPhase: event.payload.agentPhase,
+            role: event.payload.role,
             hasPendingQuestion: event.payload.hasPendingQuestion,
             pendingQuestionCount: event.payload.pendingQuestionCount,
             resolution: event.payload.resolution,
@@ -383,7 +399,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         sequence: Math.max(state.sequence, event.sequence),
         specialistsByName: {
           ...state.specialistsByName,
-          [event.payload.specialist.name]: event.payload.specialist,
+          [event.payload.name]: event.payload,
         },
       }
 
@@ -480,7 +496,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
               status: 'running',
               startedAt: event.timestamp,
               runtime: 'claude-code',
-              agentPhase: 'planning' as const,
+              role: 'plan' as const,
             },
           },
         }

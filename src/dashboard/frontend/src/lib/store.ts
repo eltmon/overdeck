@@ -14,7 +14,7 @@ import type {
   DomainEvent,
   ResourceStats,
   ReviewStatusSnapshot,
-  SpecialistSnapshot,
+  SpecialistProjection,
 } from '@panctl/contracts'
 import {
   type ReadModelState,
@@ -114,7 +114,7 @@ export const selectAgentById =
   (s: DashboardState): AgentSnapshot | undefined =>
     s.agentsById[id]
 
-export const selectSpecialistList = memoizeArraySelector<DashboardState, 'specialistsByName', SpecialistSnapshot[]>(
+export const selectSpecialistList = memoizeArraySelector<DashboardState, 'specialistsByName', SpecialistProjection[]>(
   'specialistsByName',
   (specs) => Object.values(specs),
 )

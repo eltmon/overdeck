@@ -19,7 +19,7 @@ import {
   INITIAL_READ_MODEL_STATE,
   applyEvent as applyEventReducer,
 } from '@panctl/contracts';
-import type { AgentSnapshot, AgentStatus, AgentPhase, AgentResolution, ReviewStatusSnapshot, SpecialistSnapshot, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panctl/contracts';
+import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, SpecialistProjection, SpecialistType, SpecialistState, ReviewStatusValue, TestStatusValue, MergeStatusValue, VerificationStatusValue } from '@panctl/contracts';
 import type { ReviewStatus } from '../../lib/review-status.js';
 import { logDeaconEvent } from '../../lib/persistent-logger.js';
 
@@ -42,7 +42,7 @@ let _cachedEventStore: any = null;
 // ─── Value validators for strict literal types ──────────────────────────────
 
 const VALID_AGENT_STATUSES = new Set<AgentStatus>(["starting", "running", "stopped", "error", "unknown"]);
-const VALID_AGENT_PHASES = new Set<AgentPhase>(["planning", "exploration", "implementation", "testing", "documentation", "pre_push", "post_push", "review", "review-response", "merge"]);
+const VALID_ROLES = new Set<Role>(["plan", "work", "review", "test", "ship"]);
 const VALID_RESOLUTIONS = new Set<AgentResolution>(["working", "done", "needs_input", "stuck", "completed", "unclear"]);
 const VALID_SPECIALIST_TYPES = new Set<SpecialistType>(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"]);
 const VALID_SPECIALIST_STATES = new Set<SpecialistState>(["active", "sleeping", "uninitialized"]);
@@ -54,8 +54,17 @@ const VALID_VERIFICATION_STATUSES = new Set<VerificationStatusValue>(["pending",
 export function toAgentStatus(v: unknown): AgentStatus {
   return VALID_AGENT_STATUSES.has(v as AgentStatus) ? v as AgentStatus : "unknown";
 }
-export function toAgentPhase(v: unknown): AgentPhase | undefined {
-  return v && VALID_AGENT_PHASES.has(v as AgentPhase) ? v as AgentPhase : undefined;
+export function toRole(v: unknown): Role | undefined {
+  return v && VALID_ROLES.has(v as Role) ? v as Role : undefined;
+}
+
+function legacyPhaseToRole(v: unknown): Role | undefined {
+  if (v === 'planning') return 'plan';
+  if (v === 'testing') return 'test';
+  if (v === 'review' || v === 'review-response') return 'review';
+  if (v === 'merge') return 'ship';
+  if (typeof v === 'string') return 'work';
+  return undefined;
 }
 export function toAgentResolution(v: unknown): AgentResolution | undefined {
   return v && VALID_RESOLUTIONS.has(v as AgentResolution) ? v as AgentResolution : undefined;
@@ -316,9 +325,8 @@ export const ReadModelServiceLive = Layer.effect(
               branch: a.branch || undefined,
               costSoFar: a.costSoFar,
               sessionId: a.sessionId || undefined,
-              phase: toAgentPhase(a.phase),
+              role: toRole((a as { role?: unknown }).role) ?? toRole((cachedAgent as { role?: unknown } | undefined)?.role) ?? legacyPhaseToRole(a.phase) ?? legacyPhaseToRole((cachedAgent as { agentPhase?: unknown; phase?: unknown } | undefined)?.agentPhase ?? (cachedAgent as { phase?: unknown } | undefined)?.phase),
               runtimeState: cachedAgent?.runtimeState,
-              agentPhase: cachedAgent?.agentPhase,
               hasPendingQuestion: cachedAgent?.hasPendingQuestion,
               pendingQuestionCount: cachedAgent?.pendingQuestionCount,
               resolution: cachedAgent?.resolution,
@@ -420,10 +428,9 @@ export const ReadModelServiceLive = Layer.effect(
             branch: a.branch || undefined,
             costSoFar: a.costSoFar,
             sessionId: a.sessionId || undefined,
-            phase: toAgentPhase(a.phase),
+            role: toRole((a as { role?: unknown }).role) ?? legacyPhaseToRole(enrichment?.agentPhase ?? a.phase) ?? 'work',
             runtimeState: completedNormally ? 'completed' : undefined,
             // Enrichment fields (PAN-440)
-            agentPhase: enrichment ? toAgentPhase(enrichment.agentPhase) : undefined,
             hasPendingQuestion: enrichment?.hasPendingQuestion,
             pendingQuestionCount: enrichment?.pendingQuestionCount,
             resolution: enrichment ? toAgentResolution(enrichment.resolution) : undefined,
@@ -433,7 +440,7 @@ export const ReadModelServiceLive = Layer.effect(
 
         // ── Specialists ────────────────────────────────────────────────────────
         const allSpecs = getAllSpecialists();
-        const specialistsByName: Record<string, SpecialistSnapshot> = {};
+        const specialistsByName: Record<string, SpecialistProjection> = {};
         for (const s of allSpecs) {
           const specType = toSpecialistType(s.name);
           if (!specType) continue; // Skip unknown specialist types

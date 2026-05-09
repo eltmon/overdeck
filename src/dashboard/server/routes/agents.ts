@@ -52,6 +52,7 @@ import {
   DomainEvent,
   normalizeChannelReplyPayload,
 } from '@panctl/contracts';
+import type { Role } from '@panctl/contracts';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
 import { loadCloisterConfig } from '../../../lib/cloister/config.js';
@@ -117,6 +118,15 @@ import { EventStoreService } from '../services/domain-services.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSessionAsync, listSessionsAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 
 const execAsync = promisify(exec);
+
+function legacyPhaseToRole(phase: unknown, fallback: Role = 'work'): Role {
+  if (phase === 'plan' || phase === 'work' || phase === 'review' || phase === 'test' || phase === 'ship') return phase;
+  if (phase === 'planning') return 'plan';
+  if (phase === 'testing') return 'test';
+  if (phase === 'review-response') return 'review';
+  if (phase === 'merge') return 'ship';
+  return fallback;
+}
 
 function constantTimeTokenEqual(provided: string | undefined, expected: string): boolean {
   if (!provided) return false;
@@ -1492,7 +1502,7 @@ const postAgentResumeRoute = HttpRouter.add(
             status: 'running',
             startedAt: agentState?.startedAt,
             lastActivity: new Date().toISOString(),
-            phase: agentState?.phase,
+            role: legacyPhaseToRole((agentState as { role?: Role; phase?: unknown } | undefined)?.role ?? agentState?.phase),
           },
         },
       })));
@@ -1583,7 +1593,7 @@ const postAgentRestartRoute = HttpRouter.add(
                   status: 'running',
                   startedAt: updatedState?.startedAt || agentState.startedAt,
                   lastActivity: new Date().toISOString(),
-                  phase: updatedState?.phase || agentState.phase,
+                  role: legacyPhaseToRole((updatedState as { role?: Role; phase?: unknown } | undefined)?.role ?? updatedState?.phase ?? agentState.phase),
                 },
               },
             }));
@@ -1629,7 +1639,7 @@ const postAgentRestartRoute = HttpRouter.add(
             status: 'running',
             startedAt: updatedState?.startedAt || agentState.startedAt,
             lastActivity: new Date().toISOString(),
-            phase: updatedState?.phase || agentState.phase,
+            role: legacyPhaseToRole((updatedState as { role?: Role; phase?: unknown } | undefined)?.role ?? updatedState?.phase ?? agentState.phase),
           },
         },
       })));

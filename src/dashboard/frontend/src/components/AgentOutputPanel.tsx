@@ -85,7 +85,7 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
   }, [specialist, agentId, specialistIsRunning]);
 
   // For work and planning agents: derive from store or agentId pattern
-  const isPlanningAgent = agent?.agentPhase === 'planning' || agentId.startsWith('planning-');
+  const isPlanningAgent = agent?.role === 'plan' || agentId.startsWith('planning-');
   const workAgentIssueId = specialist ? null : deriveAgentIssueId(agentId, agent?.issueId);
 
   const label = specialist

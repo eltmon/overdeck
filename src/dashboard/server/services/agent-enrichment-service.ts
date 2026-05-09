@@ -16,8 +16,8 @@ import { listRunningAgentsAsync } from '../../../lib/agents.js'
 import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment } from '../../../lib/agent-enrichment.js'
 import { getReviewStatus } from '../../../lib/review-status.js'
 import { getEventStore } from '../event-store.js'
-import type { AgentEnrichmentChangedEvent, AgentCreatedEvent, AgentStatusChangedEvent } from '@panctl/contracts'
-import { toAgentStatus, toAgentPhase, toAgentResolution } from '../read-model.js'
+import type { AgentEnrichmentChangedEvent, AgentCreatedEvent, AgentStatusChangedEvent, Role } from '@panctl/contracts'
+import { toAgentStatus, toRole, toAgentResolution } from '../read-model.js'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -33,6 +33,15 @@ interface EnrichmentServiceState {
 }
 
 // ─── Diff helpers ─────────────────────────────────────────────────────────────
+
+function legacyPhaseToRole(phase: unknown, fallback: Role = 'work'): Role {
+  if (phase === 'plan' || phase === 'work' || phase === 'review' || phase === 'test' || phase === 'ship') return phase
+  if (phase === 'planning') return 'plan'
+  if (phase === 'testing') return 'test'
+  if (phase === 'review-response') return 'review'
+  if (phase === 'merge') return 'ship'
+  return fallback
+}
 
 function enrichmentChanged(prev: AgentEnrichment | undefined, next: AgentEnrichment): boolean {
   if (!prev) return true
@@ -88,8 +97,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
                 branch: agent.branch || undefined,
                 costSoFar: agent.costSoFar,
                 sessionId: agent.sessionId || undefined,
-                phase: toAgentPhase(agent.phase),
-                agentPhase: undefined,
+                role: toRole((agent as { role?: unknown }).role) ?? legacyPhaseToRole(agent.phase),
                 hasPendingQuestion: undefined,
                 pendingQuestionCount: undefined,
                 resolution: toAgentResolution(agent.resolution),
@@ -160,7 +168,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
         timestamp: new Date().toISOString(),
         payload: {
           agentId,
-          agentPhase: enrichment.agentPhase,
+          role: legacyPhaseToRole(enrichment.agentPhase),
           hasPendingQuestion: enrichment.hasPendingQuestion,
           pendingQuestionCount: enrichment.pendingQuestionCount,
           resolution: enrichment.resolution as AgentEnrichmentChangedEvent['payload']['resolution'],

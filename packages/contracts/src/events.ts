@@ -3,7 +3,6 @@ import {
   Activity,
   AgentChannelReply,
   AgentId,
-  AgentPhase,
   AgentResolution,
   AgentRuntimeSnapshot,
   AgentSnapshot,
@@ -13,8 +12,9 @@ import {
   IssueId,
   ResourceStats,
   ReviewStatusSnapshot,
+  Role,
   SequenceNumber,
-  SpecialistSnapshot,
+  SpecialistState,
   SpecialistType,
   WaitingReason,
 } from "./types"
@@ -68,7 +68,7 @@ export const AgentEnrichmentChangedEvent = Schema.Struct({
   timestamp: Schema.String,
   payload: Schema.Struct({
     agentId: AgentId,
-    agentPhase: Schema.optional(AgentPhase),
+    role: Schema.optional(Role),
     hasPendingQuestion: Schema.Boolean,
     pendingQuestionCount: Schema.Number,
     resolution: Schema.optional(AgentResolution),
@@ -451,7 +451,13 @@ export const SpecialistStartedEvent = Schema.Struct({
   type: Schema.Literal("specialist.started"),
   sequence: SequenceNumber,
   timestamp: Schema.String,
-  payload: Schema.Struct({ specialist: SpecialistSnapshot }),
+  payload: Schema.Struct({
+    name: SpecialistType,
+    state: SpecialistState,
+    isRunning: Schema.Boolean,
+    currentIssue: Schema.optional(Schema.String),
+    lastWake: Schema.optional(Schema.String),
+  }),
 })
 export type SpecialistStartedEvent = typeof SpecialistStartedEvent.Type
 
