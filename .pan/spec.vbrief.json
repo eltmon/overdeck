@@ -3,18 +3,18 @@
     "version": "0.5",
     "created": "2026-05-08T00:00:00Z",
     "author": "planning-agent:claude-opus-4-5",
-    "description": "Plan for PAN-1044: Command Deck — Project Overview Panel with pipeline swimlanes. Empirically scoped 2026-05-08 — see docs/prds/planned/PAN-1044-project-overview-panel.md.",
-    "updated": "2026-05-09T16:43:59.314Z"
+    "description": "Plan for PAN-1044: Command Deck — Project Overview Panel with pipeline swimlanes. Empirically scoped 2026-05-09 (revised with cost-breakdown-tooltip bead and cost-on-stuck-callout) — see docs/prds/planned/PAN-1044-project-overview-panel.md.",
+    "updated": "2026-05-09T17:11:38.216Z"
   },
   "plan": {
     "id": "pan-1044",
     "title": "Command Deck: Project Overview Panel with pipeline swimlanes",
-    "status": "running",
+    "status": "proposed",
     "uid": "b2a7f3c1-4d8e-4f29-9a6b-3c5e7f8d2b1a",
     "author": "planning-agent:claude-opus-4-5",
-    "sequence": 4,
+    "sequence": 7,
     "created": "2026-05-08T00:00:00Z",
-    "updated": "2026-05-09T16:43:59.314Z",
+    "updated": "2026-05-09T17:11:38.216Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1044",
@@ -35,9 +35,8 @@
       "swimlanes"
     ],
     "narratives": {
-      "summary": "Add a Project Overview panel to the Command Deck right content area. Clicking a project name (not the chevron) selects the project and shows a hero billboard, stuck/blocked callout, and pipeline swimlane board. All data is available client-side — no new API endpoints.",
-      "decisions": "D1: SessionNode.type (not role) classifies session types — PRD erroneously used s.role === 'work'. D2: issueCosts is Record<string,number> not Map. D3: feature.issueId is uppercase, reviewStatusByIssueId keys are uppercase — direct lookup is safe. D4: Use useDashboardStore(s => s.reviewStatusByIssueId) once at component top, not in a loop. D5: Export bucketFeature for testability, tests co-located in B2.",
-      "hazards": "H1: ProjectNode is currently one <button> — split with chevron <span onClick e.stopPropagation> inside the button. H2: issueCosts must be passed to ProjectOverview explicitly in routing block. H3: projectsWithSessions is ProjectData[] — use .find(p => p.name === selectedProject)?.features ?? []."
+      "Problem": "When clicking a project name in the Command Deck sidebar, the only behavior is toggling expand/collapse. There is no way to see a holistic view of a project — how many issues are active, where they sit in the pipeline, which are stuck, and what the aggregate and per-issue cost is.",
+      "Proposal": "Add a Project Overview panel in the Command Deck right content area. Clicking a project name (not the chevron) selects the project and shows: a hero billboard with aggregate stats, a stuck/blocked callout, and pipeline swimlanes bucketing every issue by its current stage. Each issue card shows its cost, and hovering the cost badge reveals a popover with per-model and per-stage cost breakdown. All data is client-side — no new API endpoints. One new bead (cost-breakdown-tooltip) handles the tooltip independently from the core swimlane layout."
     },
     "items": [
       {
@@ -48,11 +47,11 @@
         "created": "2026-05-08T00:00:00Z",
         "metadata": {
           "requiresInspection": false,
-          "issueLabel": "pan-1044",
-          "beadId": "workspace-99sr"
+          "difficulty": "simple",
+          "issueLabel": "pan-1044"
         },
         "narrative": {
-          "Action": "File docs/prds/planned/PAN-1044-project-overview-panel.md already created by planning agent. Mark bead workspace-ma73 complete."
+          "Action": "File docs/prds/planned/PAN-1044-project-overview-panel.md already created by the previous planning pass. Verify the file exists and contains the codebase corrections (SessionNode.type not role, Record not Map, uppercase issueId). Mark bead complete."
         },
         "subItems": [
           {
@@ -81,15 +80,15 @@
         "created": "2026-05-08T00:00:00Z",
         "metadata": {
           "requiresInspection": true,
+          "difficulty": "medium",
           "issueLabel": "pan-1044",
-          "beadId": "workspace-z09w",
           "files": [
             "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
             "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx"
           ]
         },
         "narrative": {
-          "Action": "Create ProjectOverview.tsx with: (1) exported bucketFeature(feature, reviewStatus) and PipelineStage type — see PRD for 9-stage bucketing logic with s.type === 'work' correction. (2) Hero billboard: background gradient, project name, issue count, total cost via LiveCounter, active agent count. (3) useDashboardStore(s => s.reviewStatusByIssueId) at top of component. (4) ProjectOverviewProps: { projectName, features: ProjectFeature[], issueCosts: Record<string, number>, onSelectFeature }. Create ProjectOverview.test.tsx covering all 9 bucketFeature stage branches (stuck via stuck flag, stuck via failed status, stuck via blockerReasons, merging, awaitingMerge, tests, review, buildGate, working, planning, idle)."
+          "Action": "Create ProjectOverview.tsx with: (1) exported bucketFeature(feature, reviewStatus) function returning PipelineStage — bucketing order: stuck (via reviewStatus.stuck, failed statuses, blockerReasons), merging, awaitingMerge, tests, review, buildGate, working (agentStatus !== null && !reviewStatus), planning (hasPlanning && no s.type==='work' session), idle. Use s.type === 'work' NOT s.role. Export PipelineStage type. (2) ProjectOverviewProps: { projectName: string; features: ProjectFeature[]; issueCosts: Record<string, number>; issueCostDetails?: Record<string, { byModel: Record<string, { cost: number; tokens: number }>; byStage: Record<string, { cost: number; tokens: number }> }>; onSelectFeature: (feature: ProjectFeature) => void }. (3) Hero billboard: background linear-gradient(135deg, color-mix(in srgb, var(--primary) 8%, transparent), transparent), project name 18px weight 700, issue count, total cost via LiveCounter, active agent count. (4) useDashboardStore(s => s.reviewStatusByIssueId) at top of component — NOT in a loop. Create ProjectOverview.test.tsx covering all 9 bucketFeature stage branches: stuck via stuck flag, stuck via failed status, stuck via blockerReasons, merging, awaitingMerge, tests, review, buildGate, working, planning, idle."
         },
         "subItems": [
           {
@@ -102,7 +101,7 @@
           },
           {
             "id": "project-overview-skeleton.ac2",
-            "title": "bucketFeature exported, returns correct PipelineStage for all 9 inputs",
+            "title": "bucketFeature exported, returns correct PipelineStage for all 9 inputs, uses s.type === 'work'",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -118,6 +117,14 @@
           },
           {
             "id": "project-overview-skeleton.ac4",
+            "title": "issueCostDetails is an optional prop on ProjectOverviewProps (can be undefined — no tooltip yet)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-overview-skeleton.ac5",
             "title": "npm run typecheck and npm test pass",
             "status": "pending",
             "metadata": {
@@ -128,25 +135,25 @@
       },
       {
         "id": "pipeline-swimlanes",
-        "title": "Pipeline swimlanes + stuck/blocked callout",
+        "title": "Pipeline swimlanes + stuck/blocked callout with per-issue cost badges",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-08T00:00:00Z",
         "metadata": {
           "requiresInspection": true,
+          "difficulty": "medium",
           "issueLabel": "pan-1044",
-          "beadId": "workspace-fgzt",
           "files": [
             "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx"
           ]
         },
         "narrative": {
-          "Action": "Complete ProjectOverview.tsx: (1) Add stuck/blocked callout section at top with AlertTriangle icon, var(--destructive) accent, only shown when stuck issues exist. Each stuck card shows: Issue ID (clickable onSelectFeature), title truncated 1 line, stuck reason (stuckReason or blockerReasons[0] or failed status name). (2) Add pipeline swimlane sections — one Section per non-empty stage. Header: stage name + count badge. Body: horizontal flex-wrap of issue cards. Cards: Issue ID (clickable), title truncated (12px), cost badge if cost exists, sub-status pill (review: reviewSubStatuses roles, merge: mergeStep, buildGate: verificationCycleCount if > 1). Empty stages hidden. All colors via CSS variables only."
+          "Action": "Complete ProjectOverview.tsx with stuck callout and pipeline swimlanes: (1) Stuck/blocked callout: AlertTriangle icon, var(--destructive) accent, rendered only when stuck issues exist. Per stuck card: Issue ID (clickable onSelectFeature), title truncated to 1 line, stuck reason (stuckReason or blockerReasons[0] or failed status name), PLUS a cost badge showing the issue cost when issueCosts[feature.issueId] exists — consistent with swimlane cards. (2) Pipeline swimlane sections: one Section per non-empty stage. Header: stage name + count badge using the stage color token (var(--destructive)/var(--info)/var(--success)/var(--signal-review)/var(--warning)/var(--primary)/var(--muted-foreground) per PRD). Body: horizontal flex-wrap of issue cards. Per swimlane card: Issue ID (clickable), title truncated (12px), cost badge showing issueCosts[feature.issueId] when present, sub-status pill (review: reviewSubStatuses roles; merge: mergeStep; buildGate: verificationCycleCount if > 1). Empty stages hidden. ALL colors via CSS variables only — no hardcoded hex or rgb values. The cost badge in both stuck callout and swimlane cards is the same element that the cost-breakdown-tooltip bead (next) will add hover behavior to."
         },
         "subItems": [
           {
             "id": "pipeline-swimlanes.ac1",
-            "title": "Stuck/blocked callout appears only when stuck issues exist, with AlertTriangle icon",
+            "title": "Stuck/blocked callout appears only when stuck issues exist, with AlertTriangle icon and var(--destructive) accent",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -154,7 +161,7 @@
           },
           {
             "id": "pipeline-swimlanes.ac2",
-            "title": "Pipeline swimlane sections rendered, one per non-empty stage",
+            "title": "Stuck callout cards show cost badge (same as swimlane cards) when issueCosts entry exists",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -162,7 +169,7 @@
           },
           {
             "id": "pipeline-swimlanes.ac3",
-            "title": "Empty pipeline stages are hidden",
+            "title": "Pipeline swimlane sections rendered, one per non-empty stage, with correct stage color token",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -170,7 +177,7 @@
           },
           {
             "id": "pipeline-swimlanes.ac4",
-            "title": "Clicking issue card in any swimlane calls onSelectFeature with correct feature",
+            "title": "Empty pipeline stages are hidden",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -178,7 +185,7 @@
           },
           {
             "id": "pipeline-swimlanes.ac5",
-            "title": "All colors use CSS variables only (no hardcoded values)",
+            "title": "Swimlane cards show cost badge when issueCosts entry exists",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -186,6 +193,98 @@
           },
           {
             "id": "pipeline-swimlanes.ac6",
+            "title": "Clicking issue card in any swimlane or stuck callout calls onSelectFeature with correct feature",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-swimlanes.ac7",
+            "title": "All colors use CSS variables only (no hardcoded values)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-swimlanes.ac8",
+            "title": "npm run typecheck and npm test pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cost-breakdown-tooltip",
+        "title": "ProjectOverview — cost badge hover tooltip with model/stage breakdown",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-05-09T17:30:00.000Z",
+        "metadata": {
+          "requiresInspection": false,
+          "difficulty": "medium",
+          "issueLabel": "pan-1044",
+          "files": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx"
+          ]
+        },
+        "narrative": {
+          "Action": "Add inline CostBreakdownTooltip component to ProjectOverview.tsx. Use the same hover-popover pattern as FeatureItem.tsx: onMouseEnter={() => setPopoverOpen(true)}, onMouseLeave={() => setPopoverOpen(false)}, onFocus/onBlur for keyboard accessibility. The cost badge in both stuck callout cards and swimlane cards becomes the hover target. When issueCostDetails[feature.issueId] is available: show a CSS-positioned popover panel containing (1) model rows sorted by cost desc — model name (friendly display, strip 'claude-' prefix and date suffix) + formatted cost '$X.XX'; (2) stage rows sorted by cost desc — stage label (use same STAGE_CONFIG labels as CostBreakdownModal.tsx: planning/implementation/review/testing/merge/interactive/other) + formatted cost. Use CSS variables only. Graceful degradation: if issueCostDetails is absent or the specific issue has no entry, cost badge still renders normally with no hover behavior. Tooltip must reflect live data: since issueCostDetails is a prop derived from costData (refetched every 15s in CommandDeck), tooltip rows update automatically when the prop changes — no additional local state or fetch needed."
+        },
+        "subItems": [
+          {
+            "id": "cost-breakdown-tooltip.ac1",
+            "title": "Hovering the cost badge opens a popover showing model rows sorted by cost desc",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-breakdown-tooltip.ac2",
+            "title": "Popover also shows stage rows sorted by cost desc with friendly stage labels",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-breakdown-tooltip.ac3",
+            "title": "Mouse-leave closes the popover",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-breakdown-tooltip.ac4",
+            "title": "When issueCostDetails is absent or has no entry for the issue, cost badge still renders with no tooltip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-breakdown-tooltip.ac5",
+            "title": "Tooltip data updates automatically when issueCostDetails prop changes (no stale snapshot)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-breakdown-tooltip.ac6",
+            "title": "Hover pattern matches FeatureItem.tsx resource popover (onMouseEnter/onMouseLeave/onFocus/onBlur)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cost-breakdown-tooltip.ac7",
             "title": "npm run typecheck and npm test pass",
             "status": "pending",
             "metadata": {
@@ -202,19 +301,19 @@
         "created": "2026-05-08T00:00:00Z",
         "metadata": {
           "requiresInspection": true,
+          "difficulty": "medium",
           "issueLabel": "pan-1044",
-          "beadId": "workspace-fzdg",
           "files": [
             "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx"
           ]
         },
         "narrative": {
-          "Action": "Modify ProjectTree/ProjectNode.tsx: (1) Add props: onSelectProject?: (projectName: string) => void and selectedProject?: string | null. (2) Split click targets: wrap ChevronRight in <span onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>. Outer button onClick: calls onSelectProject?.(name) AND if (!expanded) setExpanded(true). (3) Apply style={{ background: selectedProject === name ? 'var(--accent)' : undefined }} to the projectHeader button. MessageSquarePlus e.stopPropagation() must be preserved."
+          "Action": "Modify ProjectTree/ProjectNode.tsx: (1) Add props: onSelectProject?: (projectName: string) => void and selectedProject?: string | null. (2) Split click targets: wrap ChevronRight in <span onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }} style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>. Outer button onClick: calls onSelectProject?.(name) AND if (!expanded) setExpanded(true). (3) Apply style={{ background: selectedProject === name ? 'var(--accent)' : undefined }} to the projectHeader button. (4) The MessageSquarePlus span already uses e.stopPropagation() — preserve it exactly, do not touch it."
         },
         "subItems": [
           {
             "id": "project-node-click-split.ac1",
-            "title": "Clicking chevron only toggles expand/collapse, does NOT select the project",
+            "title": "Clicking the ChevronRight span only toggles expand/collapse, does NOT call onSelectProject",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -222,7 +321,7 @@
           },
           {
             "id": "project-node-click-split.ac2",
-            "title": "Clicking project name row calls onSelectProject and expands if collapsed",
+            "title": "Clicking the project name row calls onSelectProject and expands if collapsed",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -238,7 +337,7 @@
           },
           {
             "id": "project-node-click-split.ac4",
-            "title": "MessageSquarePlus button still works with e.stopPropagation()",
+            "title": "MessageSquarePlus button still works and e.stopPropagation() is preserved",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -256,20 +355,20 @@
       },
       {
         "id": "commanddeck-routing",
-        "title": "CommandDeck/index.tsx — selectedProject state and four-way routing",
+        "title": "CommandDeck/index.tsx — selectedProject state, four-way routing, IssueCostEntry expansion, issueCostDetails wiring",
         "status": "pending",
         "priority": "high",
         "created": "2026-05-08T00:00:00Z",
         "metadata": {
           "requiresInspection": true,
+          "difficulty": "medium",
           "issueLabel": "pan-1044",
-          "beadId": "workspace-3udk",
           "files": [
             "src/dashboard/frontend/src/components/CommandDeck/index.tsx"
           ]
         },
         "narrative": {
-          "Action": "Modify CommandDeck/index.tsx: (1) Add state: const [selectedProject, setSelectedProject] = useState<string | null>(null). (2) Add handler: const handleSelectProject = useCallback((projectName: string) => { setSelectedProject(projectName); setSelectedFeature(null); setSelectedConversation(null); }, []). (3) Update handleSelectFeature to add setSelectedProject(null). (4) Update handleSelectConversation to add setSelectedProject(null). (5) Pass onSelectProject={handleSelectProject} and selectedProject={selectedProject} to each ProjectNode. (6) In content area routing, add four-way: conversation -> ConversationView, feature -> IssueWorkbench, project -> ProjectOverview (with projectName={selectedProject}, features={projectsWithSessions.find(p => p.name === selectedProject)?.features ?? []}, issueCosts={issueCosts}, onSelectFeature={feature => handleSelectFeature(feature.issueId)}), empty -> EmptyState. Import ProjectOverview from './ProjectOverview'."
+          "Action": "Modify CommandDeck/index.tsx: (1) Add state: const [selectedProject, setSelectedProject] = useState<string | null>(null). (2) Add handler: const handleSelectProject = useCallback((projectName: string) => { setSelectedProject(projectName); setSelectedFeature(null); setSelectedConversation(null); }, []). (3) Update handleSelectFeature to add setSelectedProject(null). (4) Update handleSelectConversation to add setSelectedProject(null). (5) Pass onSelectProject={handleSelectProject} and selectedProject={selectedProject} to each ProjectNode. (6) Expand IssueCostEntry interface to add byModel: Record<string, { cost: number; tokens: number }> and byStage: Record<string, { cost: number; tokens: number }>. (7) Build issueCostDetails: Record<string, { byModel: ..., byStage: ... }> from costData.issues — same memo that builds issueCosts, just capture the full detail too. (8) In content area routing, implement four-way priority: conversation → ConversationView, feature → IssueWorkbench, project → ProjectOverview (projectName={selectedProject}, features={projectsWithSessions.find(p => p.name === selectedProject)?.features ?? []}, issueCosts={issueCosts}, issueCostDetails={issueCostDetails}, onSelectFeature={feature => handleSelectFeature(feature.issueId)}), empty → EmptyState. Import ProjectOverview from './ProjectOverview'."
         },
         "subItems": [
           {
@@ -314,6 +413,14 @@
           },
           {
             "id": "commanddeck-routing.ac6",
+            "title": "IssueCostEntry includes byModel and byStage; issueCostDetails map is built from costData and passed to ProjectOverview",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "commanddeck-routing.ac7",
             "title": "npm run typecheck, npm run lint, and npm test all pass",
             "status": "pending",
             "metadata": {
@@ -336,11 +443,16 @@
       },
       {
         "from": "pipeline-swimlanes",
-        "to": "project-node-click-split",
+        "to": "cost-breakdown-tooltip",
         "type": "blocks"
       },
       {
         "from": "pipeline-swimlanes",
+        "to": "project-node-click-split",
+        "type": "blocks"
+      },
+      {
+        "from": "cost-breakdown-tooltip",
         "to": "commanddeck-routing",
         "type": "blocks"
       },

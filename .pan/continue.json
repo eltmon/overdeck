@@ -1,99 +1,101 @@
 {
   "version": "1",
   "issueId": "PAN-1044",
-  "created": "2026-05-08T00:00:00Z",
-  "updated": "2026-05-09T16:43:59.335Z",
+  "created": "2026-05-09T17:02:13.086Z",
+  "updated": "2026-05-09T17:30:00.000Z",
   "gitState": {
-    "branch": "feature/pan-1044",
-    "sha": "b681ee37b",
-    "dirty": true
+    "branch": "feature/pan-1044"
   },
   "decisions": [
     {
       "id": "D1",
-      "summary": "SessionNode.type (not role) is used to classify session types. The PRD erroneously uses s.role === 'work' in the bucketing code. Actual schema: type: SessionNodeType (literals: planning, work, review, reviewer, test, merge, legacy); role: optional string used only for reviewer specialist sub-roles (e.g., 'correctness', 'security'). Implementation must use s.type === 'work' in bucketFeature.",
-      "recordedAt": "2026-05-08T00:00:00Z"
+      "summary": "SessionNode.type (not role) classifies session types. PRD draft erroneously used s.role === 'work'. Bucketing logic must use s.type === 'work' to detect work agent sessions.",
+      "recordedAt": "2026-05-09T17:30:00.000Z"
     },
     {
       "id": "D2",
-      "summary": "issueCosts in CommandDeck is Record<string, number>, not Map<string, number> as stated in the PRD. CommandDeck stores both casings: map[entry.issueId] and map[entry.issueId.toLowerCase()]. ProjectOverviewProps.issueCosts must be typed as Record<string, number>.",
-      "recordedAt": "2026-05-08T00:00:00Z"
+      "summary": "issueCosts is Record<string, number> (not Map). The CommandDeck index.tsx builds it as a plain object from costData.issues.",
+      "recordedAt": "2026-05-09T17:30:00.000Z"
     },
     {
       "id": "D3",
-      "summary": "feature.issueId from the resource-allocated endpoint is always uppercase (ensureIssue() in resource-discovery.ts calls .toUpperCase()). reviewStatusByIssueId keys are also uppercase (from rs.issueId set via events). Direct lookup reviewStatusByIssueId[feature.issueId] works without normalization.",
-      "recordedAt": "2026-05-08T00:00:00Z"
+      "summary": "feature.issueId is uppercase (e.g., PAN-1044). reviewStatusByIssueId keys are also uppercase. Direct lookup is safe without case normalization.",
+      "recordedAt": "2026-05-09T17:30:00.000Z"
     },
     {
       "id": "D4",
-      "summary": "Store access for multiple issues: use const reviewStatusByIssueId = useDashboardStore(s => s.reviewStatusByIssueId) once at the top of ProjectOverview. Then pass reviewStatusByIssueId[feature.issueId] to bucketFeature for each feature. Cannot use useDashboardStore(selectReviewStatus(id)) inside features.map() because hooks cannot be called in loops.",
-      "recordedAt": "2026-05-08T00:00:00Z"
+      "summary": "useDashboardStore selector for reviewStatusByIssueId must be called once at component top (const reviewStatusByIssueId = useDashboardStore(s => s.reviewStatusByIssueId)), then indexed per feature — React hooks cannot be called in loops.",
+      "recordedAt": "2026-05-09T17:30:00.000Z"
     },
     {
       "id": "D5",
-      "summary": "bucketFeature exported from ProjectOverview.tsx for testability. Tests live in CommandDeck/__tests__/ProjectOverview.test.tsx and are committed in the same bead (B2) as the function. PRD restriction to keep sub-components in same file is followed; the export restriction was not stated.",
-      "recordedAt": "2026-05-08T00:00:00Z"
+      "summary": "projectsWithSessions is ProjectData[] (array), not a Map. In CommandDeck routing: projectsWithSessions.find(p => p.name === selectedProject)?.features ?? [] is the correct lookup.",
+      "recordedAt": "2026-05-09T17:30:00.000Z"
     },
     {
       "id": "D6",
-      "summary": "ProjectNode click behavior: current code uses a single <button className={styles.projectHeader} onClick={() => setExpanded(!expanded)}>. The chevron ChevronRight is just an icon inside the button. To split click targets, wrap ChevronRight in a <span onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}>. The outer button onClick becomes the project-selection handler. This avoids nested buttons (invalid HTML).",
-      "recordedAt": "2026-05-08T00:00:00Z"
+      "summary": "Cost breakdown tooltip uses hover-popover pattern from FeatureItem.tsx (onMouseEnter/onMouseLeave/onFocus/onBlur) — not a click modal. This is the in-repo convention for inline popovers next to issue/feature rows.",
+      "recordedAt": "2026-05-09T17:30:00.000Z"
+    },
+    {
+      "id": "D7",
+      "summary": "IssueCostEntry in index.tsx is expanded to include byModel and byStage from /api/costs/by-issue (the endpoint already returns this data). CommandDeck builds issueCostDetails: Record<string, { byModel, byStage }> from costData.issues and passes it to ProjectOverview. No new API endpoints needed.",
+      "recordedAt": "2026-05-09T17:30:00.000Z"
+    },
+    {
+      "id": "D8",
+      "summary": "ProjectNode click split: ChevronRight wrapped in a span with its own onClick (e.stopPropagation + toggle). The outer button onClick calls onSelectProject and expands if collapsed. MessageSquarePlus already has e.stopPropagation — preserve it exactly.",
+      "recordedAt": "2026-05-09T17:30:00.000Z"
+    },
+    {
+      "id": "D9",
+      "summary": "bucketFeature exported from ProjectOverview.tsx for testability. Tests co-located in __tests__/ProjectOverview.test.tsx covering all 9 stage branches.",
+      "recordedAt": "2026-05-09T17:30:00.000Z"
     }
   ],
   "hazards": [
     {
       "id": "H1",
-      "summary": "ProjectNode is currently a single <button> for the entire header. Splitting click behavior without creating nested buttons (invalid HTML) requires the chevron to be a <span onClick e.stopPropagation> inside the button, while the outer button onClick handles project selection.",
-      "mitigation": "Use span with onClick + e.stopPropagation for the chevron inside the projectHeader button. The outer button onClick calls onSelectProject. Verified this doesn't conflict with existing keyboard behavior."
+      "summary": "ProjectNode is currently a single <button> that toggles expand. The split requires the ChevronRight to be wrapped in a separate <span onClick e.stopPropagation> inside the button. Do not use a nested <button> inside <button> (invalid HTML).",
+      "mitigation": "Use a <span role='button' tabIndex=0> or plain <span onClick e.stopPropagation> for the chevron wrapper. The PRD narrative specifies plain <span>."
     },
     {
       "id": "H2",
-      "summary": "CommandDeck passes issueCosts to ProjectNode for tree item display but not to ProjectOverview. When four-way routing is added, issueCosts must be passed as a prop to ProjectOverview inline in the routing JSX.",
-      "mitigation": "Pass issueCosts directly to ProjectOverview in the routing block in CommandDeck/index.tsx. issueCosts is already in scope."
+      "summary": "issueCosts must be passed to ProjectOverview explicitly in the routing block. projectsWithSessions.find(...) returns undefined if the project name changed since last render — always use the ?. and ?? [] fallback.",
+      "mitigation": "Use: projectsWithSessions.find(p => p.name === selectedProject)?.features ?? []"
     },
     {
       "id": "H3",
-      "summary": "The projectsWithSessions variable in CommandDeck is ProjectData[] not Map. ProjectOverview.features must be found via projectsWithSessions.find(p => p.name === selectedProject)?.features ?? [].",
-      "mitigation": "Use .find() not .get() when computing features for the selected project."
+      "summary": "The cost-breakdown-tooltip bead adds the CostBreakdownTooltip UI inside ProjectOverview.tsx. The issueCostDetails data is only wired in the commanddeck-routing bead. Until bead 6 is done, the tooltip degrades gracefully (badge shows, no hover). This is by design — the optional prop allows independent delivery.",
+      "mitigation": "issueCostDetails is optional in ProjectOverviewProps. The tooltip checks for presence before rendering hover behavior."
+    },
+    {
+      "id": "H4",
+      "summary": "CostBreakdownTooltip reads from the issueCostDetails prop directly — no local fetch or useQuery. Tooltip data freshness depends on CommandDeck's 15s costData refetch interval. This is acceptable: cost data is not real-time.",
+      "mitigation": "No action needed. Document in code comment."
+    },
+    {
+      "id": "H5",
+      "summary": "Friendly model name display should strip 'claude-' prefix and date suffixes (e.g. '-20250120') to avoid displaying raw API model IDs. Reference: friendlyModelName() in CostBreakdownModal.tsx uses replace('claude-', '').replace(/-20\\d{6}$/, '').replace(/-/g, ' ') with title case.",
+      "mitigation": "Copy the friendlyModelName() utility inline in ProjectOverview.tsx."
     }
   ],
-  "resumePoint": {
-    "description": "Planning complete. Start implementation by claiming bead workspace-99sr (B1: PRD file creation — file docs/prds/planned/PAN-1044-project-overview-panel.md was created by planning agent, just commit it). Then proceed to workspace-z09w (B2: ProjectOverview.tsx skeleton + bucketFeature + tests). Read the PRD at docs/prds/planned/PAN-1044-project-overview-panel.md and spec at .pan/spec.vbrief.json before starting. Follow the one-bead-per-commit workflow.",
-    "beadId": "workspace-99sr",
-    "filesToRead": [
-      "docs/prds/planned/PAN-1044-project-overview-panel.md",
-      ".pan/spec.vbrief.json",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/OverviewTab.tsx",
-      "src/dashboard/frontend/src/lib/store.ts",
-      "packages/contracts/src/types.ts"
-    ]
-  },
-  "beadsMapping": {
-    "B1": "workspace-99sr",
-    "B2": "workspace-z09w",
-    "B3": "workspace-fgzt",
-    "B4": "workspace-fzdg",
-    "B5": "workspace-3udk"
-  },
-  "agentModel": "gpt-5.5",
+  "resumePoint": null,
+  "beadsMapping": {},
+  "agentModel": "agent:claude-opus-4-5",
   "sessionHistory": [
     {
-      "timestamp": "2026-05-08T00:00:00Z",
-      "reason": "end",
-      "note": "Planning complete. Created PRD at docs/prds/planned/PAN-1044-project-overview-panel.md with codebase corrections (SessionNode.type vs role, Record vs Map, uppercase issueId). Created spec.vbrief.json with 5 beads (B1-B5). Created all 5 beads in beads database labeled pan-1044. Key finding: PRD had s.role === 'work' wrong — must be s.type === 'work' per SessionNode schema.",
-      "agentModel": "claude-opus-4-5"
+      "timestamp": "2026-05-09T17:02:13.086Z",
+      "reason": "planning",
+      "note": "Planning session started for PAN-1044: Command Deck: Project Overview Panel with pipeline swimlanes",
+      "agentModel": "agent:claude-opus-4-5"
     },
     {
-      "timestamp": "2026-05-09T16:43:41.949Z",
-      "reason": "start",
-      "agentModel": "gpt-5.5"
-    },
-    {
-      "timestamp": "2026-05-09T16:43:59.335Z",
-      "reason": "start",
-      "agentModel": "gpt-5.5"
+      "timestamp": "2026-05-09T17:30:00.000Z",
+      "reason": "planning-revised",
+      "note": "Plan revised: added cost-breakdown-tooltip bead (hover popover for model/stage cost breakdown). Updated pipeline-swimlanes bead to explicitly include cost badge on stuck callout cards. Updated commanddeck-routing to expand IssueCostEntry with byModel/byStage and wire issueCostDetails to ProjectOverview. User requests: (1) cost of issue shown in summary, (2) hover over cost shows model/stage breakdown.",
+      "agentModel": "agent:claude-opus-4-5"
     }
-  ]
+  ],
+  "feedback": []
 }
