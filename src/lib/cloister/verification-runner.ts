@@ -256,7 +256,7 @@ export async function runVerificationForIssue(
               const agentId = `agent-${issueId.toLowerCase()}`;
               const hasConflicts = failures.some(f => f.hasConflicts);
               const repoList = isPolyrepo ? failures.map(f => f.repoName).join(', ') : basename(workspacePath);
-              const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}${hasConflicts ? ' — merge conflicts' : ''} in ${repoList}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix the sync issues and re-run verification. Do NOT stop at the prompt — keep working until verification passes.`;
+              const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}${hasConflicts ? ' — merge conflicts' : ''} in ${repoList}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, fix the sync issues, commit and push every change, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
               await messageAgent(agentId, msg);
               console.log(`[${logPrefix}] Sync failed for ${issueId} — sent feedback to ${agentId}`);
             }
@@ -358,7 +358,7 @@ export async function runVerificationForIssue(
         verificationMaxCycles: VERIFICATION_MAX_CYCLES,
       });
 
-      const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix the failing check, then invoke the /rebase-and-submit skill\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task. Because verification already ran once (a PR exists), the skill will run \`pan review request ${issueId} -m "Fixed ${failedCheck}"\` for you. NEVER curl \`/api/review/...\` or any dashboard endpoint — \`pan review request\` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT run git push manually — the skill handles it. Do NOT stop until \`pan review request\` has completed successfully.`;
+      const feedbackBody = `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run \`pan review request ${issueId} -m "Fixed ${failedCheck}"\` for you. NEVER curl \`/api/review/...\` or any dashboard endpoint — \`pan review request\` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until \`pan review request\` has completed successfully.`;
 
       try {
         const fileResult = await writeFeedbackFile({
@@ -371,7 +371,7 @@ export async function runVerificationForIssue(
         });
         if (fileResult.success) {
           const agentId = `agent-${issueId.toLowerCase()}`;
-          const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix the failing check and re-run verification. Do NOT stop at the prompt — keep working until verification passes.`;
+          const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, fix the failing check, commit every change, and invoke /rebase-and-submit. The skill will push and request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
           await messageAgent(agentId, msg);
           console.log(`[${logPrefix}] Verification failed for ${issueId} — sent feedback to ${agentId}`);
         }
@@ -412,7 +412,7 @@ export async function runVerificationForIssue(
           });
           if (fileResult.success) {
             const agentId = `agent-${issueId.toLowerCase()}`;
-            const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — plan.vbrief.json has merge conflict markers.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then resolve the merge conflict markers and re-run verification. Do NOT stop at the prompt — keep working until verification passes.`;
+            const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — plan.vbrief.json has merge conflict markers.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, resolve the merge conflict markers, commit and push the fix, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
             await messageAgent(agentId, msg);
             console.log(`[${logPrefix}] vBRIEF conflict detected for ${issueId} — sent feedback to ${agentId}`);
           }
@@ -459,7 +459,7 @@ export async function runVerificationForIssue(
         });
         if (fileResult.success) {
           const agentId = `agent-${issueId.toLowerCase()}`;
-          const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — ${acStatus.totalPending} AC incomplete.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then complete all pending acceptance criteria and re-run verification. Do NOT stop at the prompt — keep working until verification passes.`;
+          const msg = `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — ${acStatus.totalPending} AC incomplete.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, complete all pending acceptance criteria, commit and push every change, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
           await messageAgent(agentId, msg);
           console.log(`[${logPrefix}] AC verification failed for ${issueId} — sent feedback to ${agentId}`);
         }

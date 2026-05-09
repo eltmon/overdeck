@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "1034",
   "created": "2026-05-09T01:13:00Z",
-  "updated": "2026-05-09T01:26:00Z",
+  "updated": "2026-05-09T01:41:00Z",
   "gitState": {
     "branch": "feature/1034",
-    "sha": "66d08100b",
+    "sha": "ac576a588",
     "dirty": true
   },
   "decisions": [
@@ -23,6 +23,11 @@
       "id": "D3",
       "summary": "Timeout telemetry uses a new domain event type `review.specialist.timed_out`, forwarded through notifyPipeline as `reviewer_timed_out`, so CLI-hosted coordinators can report timed-out reviewer attempts to the dashboard event stream without requiring an in-process server handler.",
       "recordedAt": "2026-05-09T01:26:00Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Verification-failed recovery now treats verificationStatus=failed as actionable even when reviewStatus remains pending, and all verification feedback nudges explicitly tell the work agent to commit, push, and request a new review instead of stopping after fixing local verification.",
+      "recordedAt": "2026-05-09T01:41:00Z"
     }
   ],
   "hazards": [
@@ -38,23 +43,26 @@
     }
   ],
   "resumePoint": {
-    "description": "Bead workspace-6s0t is implemented locally: review specialists that time out or hit dead panes are respawned with a capped two-retry backoff, timeout attempts emit structured `review.specialist.timed_out` events through the pipeline notifier/internal endpoint, and focused tests cover the retry path. Next agent should commit only the bead files and close/inspect workspace-6s0t, then continue with the next ready bead for PAN-1034.",
-    "beadId": "workspace-6s0t",
+    "description": "Bead workspace-vaqf is implemented locally: verification failure feedback now explicitly instructs agents to commit, push, and request a new review, and deacon dead-end recovery now nudges idle agents when verificationStatus=failed while reviewStatus is still pending. Next step is verify, commit only this bead, close workspace-vaqf, then continue to the remaining dashboard/coordinator beads.",
+    "beadId": "workspace-vaqf",
     "filesToRead": [
-      "src/lib/cloister/review-agent.ts",
-      "src/lib/pipeline-notifier.ts",
-      "src/dashboard/server/main.ts",
-      "src/dashboard/server/routes/workspaces.ts",
-      "packages/contracts/src/events.ts",
-      "packages/contracts/src/event-reducers.ts",
-      "src/lib/cloister/__tests__/review-temp-lifecycle.test.ts"
+      "src/lib/cloister/verification-runner.ts",
+      "src/lib/cloister/deacon.ts"
     ]
   },
   "beadsMapping": {
-    "specialist-timeout-retry": ["workspace-6s0t"],
-    "coordinator-survival": ["workspace-9gr0"],
-    "stranded-review-dashboard": ["workspace-8pl5"],
-    "verify-failed-guidance": ["workspace-vaqf"]
+    "specialist-timeout-retry": [
+      "workspace-6s0t"
+    ],
+    "coordinator-survival": [
+      "workspace-9gr0"
+    ],
+    "stranded-review-dashboard": [
+      "workspace-8pl5"
+    ],
+    "verify-failed-guidance": [
+      "workspace-vaqf"
+    ]
   },
   "agentModel": "claude-opus-4-5",
   "sessionHistory": [
@@ -62,6 +70,12 @@
       "timestamp": "2026-05-09T01:26:00Z",
       "reason": "manual",
       "note": "Created issue-scoped beads for PAN-1034 after finding none in the active beads view. Claimed workspace-6s0t and implemented retry-on-timeout in `runParallelReview`: retryable reviewer timeouts/dead panes now respawn only the failed reviewer with two capped backoff attempts; terminal provider errors still skip respawn. Added `review.specialist.timed_out` domain telemetry via `notifyPipeline`, internal pipeline forwarding, contracts schemas/reducer no-op handling, and a focused fake-timer Vitest regression. Verified with `npm test -- src/lib/cloister/__tests__/review-temp-lifecycle.test.ts --run` and `npm run typecheck`.",
+      "agentModel": "claude-code"
+    },
+    {
+      "timestamp": "2026-05-09T01:41:00Z",
+      "reason": "manual",
+      "note": "Claimed workspace-vaqf and updated verification failure recovery. The verification runner messages now direct agents to fix, commit, push, and request a new review/pan review request rather than merely re-run verification. Deacon dead-end detection now treats verificationStatus=failed as a recovery condition even when reviewStatus remains pending, and sends a pending-review-specific nudge with the exact new-review command.",
       "agentModel": "claude-code"
     }
   ],

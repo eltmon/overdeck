@@ -2413,11 +2413,12 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       // 'failed' covers verification gate errors (e.g. JSON parse error in `.pan/spec.vbrief.json`)
       // that prevent the review specialist from running at all.
       const isReviewBlocked = status.reviewStatus === 'blocked' || status.reviewStatus === 'failed';
+      const isVerificationFailed = status.verificationStatus === 'failed';
       const isTestFailed = status.testStatus === 'failed';
       const isMergeCiFailed = status.mergeStatus === 'failed' &&
         typeof status.mergeNotes === 'string' &&
         status.mergeNotes.includes('failing required checks');
-      if (!isReviewBlocked && !isTestFailed && !isMergeCiFailed) continue;
+      if (!isReviewBlocked && !isVerificationFailed && !isTestFailed && !isMergeCiFailed) continue;
 
       // Skip merged/completed issues
       if (status.mergeStatus === 'merged' || status.readyForMerge) continue;
@@ -2468,6 +2469,10 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       let statusType: string;
       if (isReviewBlocked) {
         statusType = status.reviewStatus === 'failed' ? 'review failed' : 'review blocked';
+      } else if (isVerificationFailed) {
+        statusType = status.reviewStatus === 'pending'
+          ? 'verification failed while review pending'
+          : 'verification failed';
       } else if (isTestFailed) {
         statusType = 'tests failed';
       } else {
@@ -2524,7 +2529,9 @@ export async function checkDeadEndAgents(): Promise<string[]> {
           ? `Review verification failed for ${issueId}.${feedbackPart}\n\nCommon cause: merge conflict markers in .pan/spec.vbrief.json — fix by resolving conflicts in that file, then run: pan review request ${issueId} -m "Fixed verification error"`
           : isReviewBlocked
             ? `The review agent found issues in your code.${feedbackPart}\n\nFix every issue listed, commit all changes, then run: pan review request ${issueId} -m "Fixed review issues". Do NOT stop until pan review request completes successfully.`
-            : `Tests failed for your changes.${feedbackPart}\n\nFix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". Do NOT stop until pan review request completes successfully.`;
+            : isVerificationFailed
+              ? `Verification failed for ${issueId} while review is pending.${feedbackPart}\n\nFix the failing verification check, commit every change, push your branch, then request a new review with: pan review request ${issueId} -m "Fixed verification failure". Do NOT stop until pan review request completes successfully.`
+              : `Tests failed for your changes.${feedbackPart}\n\nFix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". Do NOT stop until pan review request completes successfully.`;
 
         await sendKeysAsync(agentSessionName, nudgeMessage);
         actions.push(`Dead-end recovery: nudged ${agentSessionName} (${statusType}, idle for ${Math.round((now - new Date(status.updatedAt || '').getTime()) / 60000)}m)`);
