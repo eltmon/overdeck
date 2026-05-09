@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-09T21:10:00.000Z",
+  "updated": "2026-05-09T21:14:00.000Z",
   "gitState": {
     "branch": "feature/pan-1055",
-    "sha": "2497e06cc",
-    "dirty": false
+    "sha": "e32f5774c",
+    "dirty": true
   },
   "decisions": [
     {
@@ -23,6 +23,11 @@
       "id": "D3",
       "summary": "Fixed postMergeLifecycle verification to tolerate removed source refs after merge cleanup; the previous behavior broke the full test suite when no branch ref remained.",
       "recordedAt": "2026-05-09T21:07:00.000Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Fixed CLI build prompt-copy root cause after pan inspect could not find dist/cli/prompts/inspect-agent.md; build-cli now copies prompt templates to both dist/prompts and dist/cli/prompts.",
+      "recordedAt": "2026-05-09T21:14:00.000Z"
     }
   ],
   "hazards": [
@@ -33,7 +38,7 @@
     }
   ],
   "resumePoint": {
-    "description": "Bead workspace-xgc6 committed; close bead, run inspection if required, then continue to any remaining pan-1055 beads or submit.",
+    "description": "Bead workspace-xgc6 was closed; inspection tool prompt path was fixed and needs recommit then pan inspect rerun.",
     "beadId": "workspace-xgc6",
     "filesToRead": [
       "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
@@ -56,6 +61,12 @@
       "timestamp": "2026-05-09T21:10:00.000Z",
       "reason": "commit",
       "note": "Committed bead workspace-xgc6 as 2497e06cc after typecheck, lint, and npm test passed.",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-09T21:14:00.000Z",
+      "reason": "inspection-tool-fix",
+      "note": "pan inspect failed because build-cli did not populate dist/cli/prompts; fixed build script and rebuilt CLI locally.",
       "agentModel": "Claude Opus 4.7"
     }
   ]
