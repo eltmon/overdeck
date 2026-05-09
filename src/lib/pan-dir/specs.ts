@@ -56,8 +56,18 @@ function parsePanSpecDocument(path: string): PanSpecDocument {
   }
 
   const doc = parsed as Record<string, unknown>
+  // Auto-recover legacy shape: older specs only carry plan.status, not a
+  // top-level status. A single legacy file blocked feedback delivery for
+  // every issue in the project (PAN-1015 spec on main → review feedback
+  // for PAN-977 silently dropped). Derive root status from plan.status
+  // when missing rather than throwing.
   if (!isPanSpecStatus(doc.status)) {
-    throw new Error(`Invalid pan spec format in ${path}: missing valid root status`)
+    const plan = doc.plan as Record<string, unknown> | undefined
+    if (plan && isPanSpecStatus(plan.status)) {
+      doc.status = plan.status
+    } else {
+      throw new Error(`Invalid pan spec format in ${path}: missing valid root status`)
+    }
   }
 
   return readPlan(path) as PanSpecDocument
