@@ -1,5 +1,14 @@
 import { jsonResponse } from "../http-helpers.js";
 import { httpHandler } from "./http-handler.js";
+import { validateOrigin } from './origin-validation.js';
+import {
+  buildPermissionActivityDetails,
+  buildPermissionWaitingMessage,
+  normalizePermissionRequestBody,
+  parsePermissionResponseBehavior,
+  permissionResolutionVerb,
+  processPermissionResponse,
+} from './agent-permissions.js';
 import { encodeClaudeProjectDir } from '../../../lib/paths.js';
 import { buildChildEnvWithoutTmux } from '../../../lib/child-env.js';
 import { withBdMutex } from '../../../lib/bd-mutex.js';
@@ -30,6 +39,7 @@ import { withBdMutex } from '../../../lib/bd-mutex.js';
  */
 
 import { exec, spawn } from 'node:child_process';
+import { timingSafeEqual } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { appendFile, mkdir, open, readdir, readFile, rename, rm, stat, symlink, lstat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -54,6 +64,7 @@ import {
   getAgentStateAsync,
   getAgentRuntimeState,
   getAgentRuntimeStateAsync,
+  deliverAgentPermissionDecision,
   saveAgentRuntimeState,
   saveAgentState,
   getActivity,
@@ -108,6 +119,16 @@ import { EventStoreService } from '../services/domain-services.js';
 import { buildTmuxCommandString, capturePaneAsync, createSessionAsync, killSessionAsync, listSessionsAsync, sessionExistsAsync } from '../../../lib/tmux.js';
 
 const execAsync = promisify(exec);
+
+function constantTimeTokenEqual(provided: string | undefined, expected: string): boolean {
+  if (!provided) return false;
+  const providedBuffer = Buffer.from(provided, 'utf8');
+  const expectedBuffer = Buffer.from(expected, 'utf8');
+  if (providedBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+  return timingSafeEqual(providedBuffer, expectedBuffer);
+}
 
 async function appendAgentLifecycleLog(agentId: string, event: string, details: Record<string, unknown> = {}): Promise<void> {
   const agentDir = join(homedir(), '.panopticon', 'agents', agentId);
@@ -168,7 +189,7 @@ const readJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const text = yield* request.text;
   try {
-    return text ? JSON.parse(text) : {};
+    return text ? (JSON.parse(text) ?? {}) : {};
   } catch {
     return {};
   }
@@ -1026,7 +1047,10 @@ export const bodyToEvent = (
         timestamp,
         payload: {
           agentId,
-          reply,
+          reply: {
+            ...reply,
+            reportedAt: timestamp,
+          },
         },
       };
     }
@@ -1112,6 +1136,170 @@ const postAgentHeartbeatRoute = HttpRouter.add(
     yield* agentState.emit(decoded.success as never);
 
     return jsonResponse({ success: true, emitted: true });
+  })),
+);
+
+const postInternalAgentPermissionRequestRoute = HttpRouter.add(
+  'POST',
+  '/api/internal/agents/:id/permissions/request',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!id.trim()) {
+      return jsonResponse({ ok: false, error: 'missing agent id' }, { status: 400 });
+    }
+
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const { INTERNAL_TOKEN_HEADER, getInternalToken } = yield* Effect.promise(() =>
+      import('../../../lib/internal-token.js'),
+    );
+    const expected = getInternalToken();
+    if (!expected) {
+      return jsonResponse({ ok: false, error: 'internal token not configured' }, { status: 503 });
+    }
+    const headers = request.headers as Record<string, string | string[] | undefined>;
+    const rawHeader = headers[INTERNAL_TOKEN_HEADER];
+    const provided = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+    if (!constantTimeTokenEqual(provided, expected)) {
+      return jsonResponse({ ok: false, error: 'forbidden' }, { status: 403 });
+    }
+
+    const body = (yield* readJsonBody) as Record<string, unknown>;
+    const normalized = normalizePermissionRequestBody(body);
+    if (!normalized.ok) {
+      return jsonResponse({ ok: false, error: normalized.error }, { status: 400 });
+    }
+    const { requestId, toolName, description, inputPreview } = normalized.value;
+
+    const readModel = yield* ReadModelService;
+    const existing = yield* readModel.getChannelPermissionRequest(requestId);
+    if (existing) {
+      if (existing.agentId !== id) {
+        return jsonResponse({ ok: false, error: `request ${requestId} already belongs to ${existing.agentId}` }, { status: 409 });
+      }
+      return jsonResponse({ ok: true, duplicate: true });
+    }
+
+    const agentState = yield* Effect.promise(() => getAgentStateAsync(id));
+    if (!agentState) {
+      return jsonResponse({ ok: false, error: `agent ${id} not found` }, { status: 404 });
+    }
+    const runtimeState = yield* Effect.promise(() => getAgentRuntimeStateAsync(id));
+    const issueId = runtimeState?.currentIssue ?? agentState.issueId;
+
+    const eventStore = yield* EventStoreService;
+    const timestamp = new Date().toISOString();
+    yield* eventStore.append({
+      type: 'agent.permission_requested',
+      timestamp,
+      payload: {
+        requestId,
+        agentId: id,
+        issueId,
+        toolName,
+        description,
+        inputPreview,
+        createdAt: timestamp,
+      },
+    } as never);
+    yield* eventStore.append({
+      type: 'agent.waiting_started',
+      timestamp,
+      payload: {
+        agentId: id,
+        reason: 'tool_permission',
+        message: buildPermissionWaitingMessage(toolName, description),
+      },
+    } as never);
+
+    emitActivityEntry({
+      source: 'dashboard',
+      level: 'warn',
+      message: `Permission requested for ${toolName}`,
+      details: buildPermissionActivityDetails(description, inputPreview),
+      issueId,
+    });
+
+    return jsonResponse({ ok: true });
+  })),
+);
+
+const postAgentPermissionResponseRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/permissions/:requestId/respond',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const requestId = params['requestId'] ?? '';
+    if (!id.trim() || !requestId.trim()) {
+      return jsonResponse({ ok: false, error: 'missing agent id or request id' }, { status: 400 });
+    }
+
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ ok: false, error: originCheck.error }, { status: 403 });
+    }
+
+    const body = (yield* readJsonBody) as Record<string, unknown>;
+    const behaviorResult = parsePermissionResponseBehavior(body);
+    if (!behaviorResult.ok) {
+      return jsonResponse({ ok: false, error: behaviorResult.error }, { status: 400 });
+    }
+    const behavior = behaviorResult.value;
+
+    const readModel = yield* ReadModelService;
+    const eventStore = yield* EventStoreService;
+    const result = yield* Effect.promise(() => processPermissionResponse(
+      {
+        getPendingRequest: (permissionRequestId) =>
+          Effect.runPromise(readModel.getChannelPermissionRequest(permissionRequestId)),
+        getResolvedDecision: (permissionRequestId) =>
+          Effect.runPromise(readModel.getResolvedChannelPermissionDecision(permissionRequestId)),
+        appendResolutionEvents: async (pendingRequest, decisionBehavior) => {
+          const timestamp = new Date().toISOString();
+          await Effect.runPromise(eventStore.append({
+            type: 'agent.permission_resolved',
+            timestamp,
+            payload: {
+              requestId: pendingRequest.requestId,
+              agentId: pendingRequest.agentId,
+              issueId: pendingRequest.issueId,
+              behavior: decisionBehavior,
+            },
+          } as never));
+          await Effect.runPromise(eventStore.append({
+            type: 'agent.waiting_cleared',
+            timestamp,
+            payload: {
+              agentId: pendingRequest.agentId,
+              clearedBy: 'tool_resumed',
+            },
+          } as never));
+        },
+        deliverDecision: (agentId, permissionRequestId, decisionBehavior) =>
+          deliverAgentPermissionDecision(agentId, permissionRequestId, decisionBehavior),
+        emitResolvedActivity: (pendingRequest, decisionBehavior) => {
+          emitActivityEntry({
+            source: 'dashboard',
+            level: decisionBehavior === 'allow' ? 'success' : 'warn',
+            message: `Permission ${permissionResolutionVerb(decisionBehavior)} for ${pendingRequest.toolName}`,
+            details: buildPermissionActivityDetails(
+              pendingRequest.description,
+              pendingRequest.inputPreview,
+            ),
+            issueId: pendingRequest.issueId,
+          });
+        },
+      },
+      {
+        agentId: id,
+        requestId,
+        behavior,
+      },
+    ));
+
+    return jsonResponse(result.body, { status: result.status });
   })),
 );
 
@@ -2712,6 +2900,8 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentPendingQuestionsRoute,
   postAgentAnswerQuestionRoute,
   postAgentHeartbeatRoute,
+  postInternalAgentPermissionRequestRoute,
+  postAgentPermissionResponseRoute,
   getAgentRuntimeRoute,
   getAgentActivityRoute,
   getAgentFilesRoute,

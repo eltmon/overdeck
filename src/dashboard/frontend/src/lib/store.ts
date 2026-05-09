@@ -9,6 +9,7 @@
 import { create } from 'zustand'
 import type {
   AgentSnapshot,
+  ChannelPermissionRequestSnapshot,
   DashboardSnapshot,
   DomainEvent,
   ResourceStats,
@@ -122,6 +123,18 @@ export const selectReviewStatus =
   (issueId: string) =>
   (s: DashboardState): ReviewStatusSnapshot | undefined =>
     s.reviewStatusByIssueId[issueId]
+
+export const selectChannelPermissionRequests = memoizeArraySelector<
+  DashboardState,
+  'channelPermissionRequestsById',
+  ChannelPermissionRequestSnapshot[]
+>(
+  'channelPermissionRequestsById',
+  (requestsById) =>
+    Object.values(requestsById).sort((a, b) =>
+      a.createdAt === b.createdAt ? a.requestId.localeCompare(b.requestId) : a.createdAt.localeCompare(b.createdAt),
+    ),
+)
 
 /**
  * Issues currently awaiting a human merge click — `readyForMerge: true`

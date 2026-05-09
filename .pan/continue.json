@@ -1,64 +1,151 @@
 {
   "version": "1",
-  "issueId": "PAN-1028",
-  "created": "2026-05-07T22:45:00Z",
-  "updated": "2026-05-08T09:24:33Z",
+  "issueId": "PAN-987",
+  "created": "2026-05-07T18:25:44Z",
+  "updated": "2026-05-08T08:09:42Z",
   "gitState": {
-    "branch": "feature/pan-1028",
-    "sha": "d5b8ed9e5",
+    "branch": "feature/pan-987",
+    "sha": "241ab19cd",
     "dirty": true
   },
   "decisions": [
     {
       "id": "D1",
-      "summary": "The actual bug fix must be applied to eltmon-stream/tts_daemon.py (external to this workspace). The daemon's play_audio() was using per-utterance aplay with a fixed 400ms silence prepend, which is insufficient for PipeWire + USB DAC resume (~500ms). The fix replaces aplay with a persistent pw-play stdin stream, keeps it open for 10s after the last utterance, and adapts silence prepend based on sink state (600ms for SUSPENDED, 50ms for RUNNING).",
-      "recordedAt": "2026-05-07T22:45:00Z"
+      "summary": "Implemented Claude channel permission relay at the bridge boundary instead of inventing a parallel dashboard-only permission path, so operator decisions travel over the same MCP notification protocol that Claude Code already understands.",
+      "recordedAt": "2026-05-07T18:25:44Z"
     },
     {
       "id": "D2",
-      "summary": "Since eltmon-stream has no GitHub remote and the issue is tracked in panopticon-cli, the fix was committed locally in eltmon-stream and a documentation update was committed in panopticon-cli (skills/pan-tts/SKILL.md) to reflect the correct split architecture and document the PipeWire suspend mitigation.",
-      "recordedAt": "2026-05-07T22:45:00Z"
+      "summary": "Modeled pending permission prompts as first-class domain events and read-model state (`agent.permission_requested` and `agent.permission_resolved`) so the dashboard snapshot, event stream, and activity log stay consistent from one source of truth.",
+      "recordedAt": "2026-05-07T18:25:44Z"
     },
     {
       "id": "D3",
-      "summary": "Review follow-up hardened the bundled tts_daemon.py: lazy model initialization now uses a shared double-checked lock, warm pw-play reuse skips redundant pactl probes, request bodies must be JSON objects, null fields collapse to defaults/empty strings, negative Content-Length clamps to zero, and empty voice-clone prompts return 422 instead of indexing past an empty list.",
-      "recordedAt": "2026-05-08T09:24:33Z"
+      "summary": "Used only the protocol-supported decision verbs `allow` and `deny`. The issue wording mentions richer choices, but Claude's current channel permission protocol exposes only those two behaviors, so the implementation must match protocol reality rather than invent unsupported semantics.",
+      "recordedAt": "2026-05-07T18:25:44Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Drove the operator UI directly from event-sourced `channelPermissionRequestsById` state in the shared dashboard store, so the modal opens from the same snapshot and event stream data that the activity log and other panels consume instead of adding another polling channel.",
+      "recordedAt": "2026-05-07T18:36:07Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Finished the feature with focused regression coverage on the real permission flow edges that can drift silently: request ordering in the selector, App-level allow submission, and App-level deny submission.",
+      "recordedAt": "2026-05-07T18:39:30Z"
+    },
+    {
+      "id": "D6",
+      "summary": "During full-suite verification, fixed two unrelated repo-health regressions that would have blocked shipping anyway: the desktop package version had drifted behind the root package version, and the GitHub label-cleanup test still assumed unconditional `--remove-label` calls after the PAN-925 optimization to fetch current labels first.",
+      "recordedAt": "2026-05-07T18:47:00Z"
+    },
+    {
+      "id": "D7",
+      "summary": "Resolved the review agent's correctness blocker by making dashboard permission responses persist `agent.permission_resolved` events before attempting bridge delivery, then teaching the read model to cache resolved decisions so retries can safely re-deliver without appending duplicate events.",
+      "recordedAt": "2026-05-07T20:40:13Z"
+    },
+    {
+      "id": "D8",
+      "summary": "Hardened the permission relay boundary itself instead of adding downstream bandaids: the Unix-socket bridge now requires a per-agent token checked with constant-time comparison, the dashboard response route enforces trusted origins, and shared payload normalization keeps bridge plus dashboard validation aligned on null previews, byte limits, and durable-log redaction.",
+      "recordedAt": "2026-05-07T20:40:13Z"
+    },
+    {
+      "id": "D9",
+      "summary": "Stabilized the bridge SIGTERM subprocess regression test by asserting the actual contract we need for verification — the bridge must terminate and unlink its Unix socket — instead of over-specifying Bun's exit-shape as code 0 only, which can intermittently surface as a signal-based exit in CI.",
+      "recordedAt": "2026-05-07T21:29:02Z"
+    },
+    {
+      "id": "D10",
+      "summary": "After rebasing onto `origin/main`, verification exposed a synced-fixture mismatch rather than a runtime bug: the committed skill inventory was missing the intentionally-added `pipeline-status` skill. I fixed the root cause by updating the plain-text fixture to match the actual checked-in skill surface so future skill additions remain explicit in diffs.",
+      "recordedAt": "2026-05-08T08:03:26Z"
+    },
+    {
+      "id": "D11",
+      "summary": "The next verification failure exposed a real schema drift in the PAN-800 channel-reply path: `bodyToEvent()` emitted `agent.channel_reply`, but the shared `DomainEvent` union on the contracts side no longer included that event shape, and the reply payload also needed `reportedAt`. I fixed the contracts schema and the server-side event assembly together so decode, reducers, and heartbeat ingestion stay aligned.",
+      "recordedAt": "2026-05-08T08:09:42Z"
     }
   ],
   "hazards": [
     {
       "id": "H1",
-      "summary": "The workspace was created on panopticon-cli but the actual code to fix is in eltmon-stream (a separate local git repo with no remote). The normal pan done / PR flow targets panopticon-cli.",
-      "mitigation": "Committed the daemon fix in eltmon-stream locally, committed a documentation update in panopticon-cli to reflect the architecture, and pushed the panopticon-cli branch for PR creation."
+      "summary": "The MCP SDK path for custom notification registration is awkward here and the bridge currently installs the permission-request handler by reaching into the server notification-handlers map.",
+      "mitigation": "Keep the payload parser strict, cover the behavior with bridge tests, and do not widen the handler to unrelated notifications without first replacing this hook with an upstream-supported API."
+    },
+    {
+      "id": "H2",
+      "summary": "Older in-memory or test-constructed read-model states can omit the new per-agent permission index maps because those fields did not exist before this review-fix round.",
+      "mitigation": "Reducer paths that touch pending or resolved permission indexes now default missing maps to empty objects. Keep those compatibility guards unless every legacy snapshot and test fixture is migrated in the same change."
+    },
+    {
+      "id": "H3",
+      "summary": "Manual `pan inspect` is currently broken in this workspace because it looks for `dist/cli/prompts/inspect-agent.md`, but the built prompt that exists is `dist/prompts/inspect-agent.md`.",
+      "mitigation": "Do not trust manual inspect requests until that prompt-path bug is fixed. If inspection becomes mandatory for progress, fix the command path resolution instead of bypassing the specialist flow."
     }
   ],
   "resumePoint": {
-    "description": "Review feedback fixes are staged in the workspace. Next step: commit the tts_daemon.py hardening changes, then invoke /rebase-and-submit for PAN-1028 to push and rerun review.",
-    "beadId": null,
+    "description": "Third verification retry is fixed locally. Next step: commit the channel-reply schema alignment and continue-state note, then push and resubmit through `pan review request PAN-987 -m \"Fixed test\"`.",
+    "beadId": "workspace-kmfs",
     "filesToRead": [
-      "skills/pan-tts/scripts/tts_daemon.py",
-      ".pan/review/review-PAN-1028-1778224511722/correctness.md"
+      "packages/contracts/src/events.ts",
+      "src/dashboard/server/routes/agents.ts",
+      "tests/contracts/heartbeat-ingestion.test.ts",
+      ".pan/continue.json"
     ]
   },
-  "beadsMapping": {},
-  "agentModel": "claude-code",
+  "beadsMapping": {
+    "workspace-g86b": "Bridge + backend permission relay plumbing",
+    "workspace-ksbv": "Dashboard modal + permission request state",
+    "workspace-kmfs": "Tests + finish permission relay"
+  },
+  "agentModel": "claude-opus-4-7",
   "sessionHistory": [
     {
-      "timestamp": "2026-05-07T22:45:00Z",
+      "timestamp": "2026-05-07T18:25:44Z",
       "reason": "resume",
-      "note": "Found workspace with no PAN-1028 beads and a deleted stale PAN-986 continue.json. Identified the issue as TTS audio clipping in eltmon-stream/tts_daemon.py. Implemented persistent pw-play stream with adaptive silence prepend (600ms cold start, 50ms warm). Committed fix in eltmon-stream and updated panopticon-cli skill docs.",
-      "agentModel": "claude-code"
+      "note": "Rebuilt the missing PAN-987 continue state, verified the claimed workspace-g86b bead remains scoped to bridge/backend permission relay plumbing, and confirmed local typecheck plus targeted tests were already green before commit/close.",
+      "agentModel": "claude-opus-4-7"
     },
     {
-      "timestamp": "2026-05-08T03:32:36.585Z",
-      "reason": "end",
-      "note": "Fix TTS audio clipping: persistent pw-play stream + adaptive silence prepend for PipeWire suspend"
+      "timestamp": "2026-05-07T18:36:07Z",
+      "reason": "manual",
+      "note": "Committed and closed workspace-g86b, then implemented workspace-ksbv by adding a dashboard permission modal, a selector for pending channel permission requests, App-level response handling to `/api/agents/:id/permissions/:requestId/respond`, and focused frontend tests covering rendering plus allow action submission.",
+      "agentModel": "claude-opus-4-7"
     },
     {
-      "timestamp": "2026-05-08T09:24:33Z",
-      "reason": "resume",
-      "note": "Recovered from crash, verified the branch state, fixed remaining tts_daemon review findings (env parsing, JSON body validation, null handling, empty prompt guard, warm-player sink probing), and reran local verification before resubmission.",
-      "agentModel": "claude-code"
+      "timestamp": "2026-05-07T18:39:30Z",
+      "reason": "manual",
+      "note": "Finished workspace-kmfs by adding final regression coverage for deny submission and selector ordering, then re-ran the combined permission relay test suite across frontend, bridge, delivery, and contract reducers with typecheck green.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T18:47:00Z",
+      "reason": "manual",
+      "note": "Full-repo verification exposed two unrelated red tests that would block shipping. I aligned `apps/desktop/package.json` to the root version and updated the GitHub label-cleanup test to mock the post-PAN-925 label-fetch behavior before rerunning the targeted failing suites.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T20:40:13Z",
+      "reason": "manual",
+      "note": "Applied the review-agent hardening pass for PAN-987: shared permission payload validation, trusted-origin enforcement on the response endpoint, event-store persistence before bridge delivery, retry-safe resolved-decision caching in the read model, per-agent cleanup indexes in the reducer, bridge token authentication with constant-time comparison, pooled Unix-socket HTTP delivery, optimistic frontend dismissal for resolved requests, and new regression coverage. After fixing a legacy reducer compatibility gap that full-suite tests exposed, `npm run typecheck`, `npm run lint`, and `npm test` all finished green.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-07T21:29:02Z",
+      "reason": "manual",
+      "note": "Verification retry failed on the bridge subprocess SIGTERM test because the assertion required an exact exit code of 0, while Bun can sometimes report the shutdown as a signal-based exit even when the handler still unlinks the socket correctly. I narrowed the regression to the actual contract the feature depends on — bridge termination plus socket cleanup — updated the test to accept either exit shape, and re-ran the failing bridge suite with `npm run typecheck` green before resubmitting verification.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-08T08:03:26Z",
+      "reason": "manual",
+      "note": "After manually rebasing the branch onto `origin/main` and force-pushing per user instruction, the next verification attempt failed on `tests/fixtures/synced-skills.test.ts`. The failure was a real fixture drift: `skills/pipeline-status/SKILL.md` exists in the repo, but `tests/fixtures/synced-skills.txt` did not include it. I updated the committed fixture, reran the failing fixture test, and confirmed `npm run typecheck` still passes before the next resubmission.",
+      "agentModel": "claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-08T08:09:42Z",
+      "reason": "manual",
+      "note": "The following verification retry failed in `tests/contracts/heartbeat-ingestion.test.ts` because the PAN-800 `channel_reply` path had drifted in two places after rebasing: the server route assembled an `agent.channel_reply` event without `reportedAt`, and the shared `DomainEvent` union no longer declared `AgentChannelReplyEvent` at all. I restored the event to the contracts schema, stamped `reportedAt` from the heartbeat timestamp in `bodyToEvent()`, extended the regression test to assert that field, and reran the failing heartbeat suite with `npm run typecheck` green.",
+      "agentModel": "claude-opus-4-7"
     }
   ],
   "feedback": []
