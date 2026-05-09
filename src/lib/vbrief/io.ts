@@ -16,9 +16,9 @@
  * after lifecycle promotion — corrupting the archived plan.
  */
 
-import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
-import { copyFile, mkdir } from 'fs/promises';
-import { dirname, join } from 'path';
+import { constants, existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { lstat, mkdir, open, readdir, realpath, writeFile } from 'fs/promises';
+import { dirname, isAbsolute, join, relative, resolve } from 'path';
 import {
   PROJECT_DOCS_SUBDIR,
   PROJECT_PRDS_ACTIVE_SUBDIR,
@@ -43,32 +43,104 @@ const PRD_VBRIEF_ROOTS = [
   [PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR],
   ['api', PROJECT_DOCS_SUBDIR, PROJECT_PRDS_SUBDIR],
 ] as const;
+const ISSUE_ID_PATTERN = /^[A-Z][A-Z0-9]*-\d+$/i;
 
-/**
- * Returns a PRD-scoped vBRIEF path for an issue when the workspace-local
- * `.pan/spec.vbrief.json` has not been materialized yet.
- *
- * Supports both legacy flat files (`docs/prds/active/PAN-123-plan.vbrief.json`)
- * and canonical subdirectory files (`docs/prds/active/pan-123/plan.vbrief.json`),
- * including the historical uppercase-directory variant and the `api/docs/prds/*`
- * mirror used by some projects.
- */
-export function findVBriefInPrdDirs(projectRoot: string, issueId: string): string | null {
+interface PrdVBriefCandidate {
+  sourcePath: string;
+  rootRealPath: string;
+}
+
+function assertValidIssueId(issueId: string): void {
+  if (!ISSUE_ID_PATTERN.test(issueId)) {
+    throw new Error(
+      `Invalid issue ID "${issueId}": expected PREFIX-123 format with letters, numbers, and a single hyphen.`,
+    );
+  }
+}
+
+function isPathInside(parentPath: string, childPath: string): boolean {
+  const relativePath = relative(parentPath, childPath);
+  return relativePath === '' || (relativePath !== '' && !relativePath.startsWith('..') && !isAbsolute(relativePath));
+}
+
+async function getPrdRootRealPath(root: string): Promise<string | null> {
+  try {
+    const stats = await lstat(root);
+    if (stats.isSymbolicLink()) {
+      throw new Error(`PRD vBRIEF root is a symlink and will not be scanned: ${root}`);
+    }
+    if (!stats.isDirectory()) {
+      throw new Error(`PRD vBRIEF root is not a directory: ${root}`);
+    }
+    return await realpath(root);
+  } catch (err: any) {
+    if (err?.code === 'ENOENT') return null;
+    throw err;
+  }
+}
+
+async function checkedPrdVBriefFile(sourcePath: string, rootRealPath: string): Promise<string | null> {
+  let stats;
+  try {
+    stats = await lstat(sourcePath);
+  } catch (err: any) {
+    if (err?.code === 'ENOENT') return null;
+    throw err;
+  }
+
+  if (stats.isSymbolicLink()) {
+    throw new Error(`Refusing to import PRD vBRIEF symlink: ${sourcePath}`);
+  }
+  if (!stats.isFile()) {
+    throw new Error(`Refusing to import non-regular PRD vBRIEF file: ${sourcePath}`);
+  }
+
+  const sourceRealPath = await realpath(sourcePath);
+  if (!isPathInside(rootRealPath, sourceRealPath)) {
+    throw new Error(`Refusing to import PRD vBRIEF outside PRD root: ${sourcePath}`);
+  }
+
+  return sourcePath;
+}
+
+async function findPrdVBriefCandidate(projectRoot: string, issueId: string): Promise<PrdVBriefCandidate | null> {
+  assertValidIssueId(issueId);
+
   const issueIdLower = issueId.toLowerCase();
   const issueIdUpper = issueId.toUpperCase();
 
   for (const prdRoot of PRD_VBRIEF_ROOTS) {
     for (const statusDir of PRD_VBRIEF_STATUS_DIRS) {
-      const root = join(projectRoot, ...prdRoot, statusDir);
-      const candidates = [
+      const root = resolve(projectRoot, ...prdRoot, statusDir);
+      const rootRealPath = await getPrdRootRealPath(root);
+      if (!rootRealPath) continue;
+
+      const exactCandidates = [
         join(root, `${issueIdUpper}-plan.vbrief.json`),
         join(root, `${issueIdLower}-plan.vbrief.json`),
         join(root, issueIdLower, 'plan.vbrief.json'),
         join(root, issueIdUpper, 'plan.vbrief.json'),
       ];
 
-      for (const candidate of candidates) {
-        if (existsSync(candidate)) return candidate;
+      for (const sourcePath of exactCandidates) {
+        const checked = await checkedPrdVBriefFile(sourcePath, rootRealPath);
+        if (checked) return { sourcePath: checked, rootRealPath };
+      }
+
+      const entries = await readdir(root, { withFileTypes: true });
+      const slugPrefix = `${issueIdLower}-`;
+      const slugMatches = entries
+        .map(entry => entry.name)
+        .filter(name => {
+          const lowerName = name.toLowerCase();
+          return lowerName.startsWith(slugPrefix) && lowerName.endsWith('.vbrief.json');
+        })
+        .sort((a, b) => a.localeCompare(b));
+
+      for (const name of slugMatches) {
+        const sourcePath = join(root, name);
+        const checked = await checkedPrdVBriefFile(sourcePath, rootRealPath);
+        if (checked) return { sourcePath: checked, rootRealPath };
       }
     }
   }
@@ -76,9 +148,44 @@ export function findVBriefInPrdDirs(projectRoot: string, issueId: string): strin
   return null;
 }
 
+/**
+ * Returns a PRD-scoped vBRIEF path for an issue when the workspace-local
+ * `.pan/spec.vbrief.json` has not been materialized yet.
+ *
+ * Supports both legacy flat files (`docs/prds/active/PAN-123-plan.vbrief.json`),
+ * slugged flat files (`docs/prds/active/PAN-123-my-feature.vbrief.json`),
+ * and canonical subdirectory files (`docs/prds/active/pan-123/plan.vbrief.json`),
+ * including the historical uppercase-directory variant and the `api/docs/prds/*`
+ * mirror used by some projects.
+ */
+export async function findVBriefInPrdDirs(projectRoot: string, issueId: string): Promise<string | null> {
+  const candidate = await findPrdVBriefCandidate(projectRoot, issueId);
+  return candidate?.sourcePath ?? null;
+}
+
 export interface ImportedPrdVBrief {
   sourcePath: string;
   workspacePlanPath: string;
+}
+
+async function readCheckedPrdVBrief(candidate: PrdVBriefCandidate): Promise<VBriefDocument> {
+  const handle = await open(candidate.sourcePath, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const stats = await handle.stat();
+    if (!stats.isFile()) {
+      throw new Error(`Refusing to import non-regular PRD vBRIEF file: ${candidate.sourcePath}`);
+    }
+
+    const sourceRealPath = await realpath(candidate.sourcePath);
+    if (!isPathInside(candidate.rootRealPath, sourceRealPath)) {
+      throw new Error(`Refusing to import PRD vBRIEF outside PRD root: ${candidate.sourcePath}`);
+    }
+
+    const raw = await handle.readFile({ encoding: 'utf-8' });
+    return parseVBriefDocument(raw, candidate.sourcePath);
+  } finally {
+    await handle.close();
+  }
 }
 
 /**
@@ -94,21 +201,30 @@ export async function importVBriefFromPrdDirs(
 ): Promise<ImportedPrdVBrief | null> {
   if (findPlan(workspacePath)) return null;
 
-  const sourcePath = findVBriefInPrdDirs(projectRoot, issueId);
-  if (!sourcePath) return null;
+  const candidate = await findPrdVBriefCandidate(projectRoot, issueId);
+  if (!candidate) return null;
+
+  const document = await readCheckedPrdVBrief(candidate);
+  const planIssueId = typeof document.plan?.id === 'string' ? document.plan.id : null;
+  if (planIssueId && planIssueId.toLowerCase() !== issueId.toLowerCase()) {
+    throw new Error(
+      `PRD vBRIEF ${candidate.sourcePath} is for ${planIssueId.toUpperCase()}, not ${issueId.toUpperCase()}.`,
+    );
+  }
 
   const workspacePlanPath = join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME);
   await mkdir(dirname(workspacePlanPath), { recursive: true });
-  await copyFile(sourcePath, workspacePlanPath);
+  if (findPlan(workspacePath)) return null;
+  await writeFile(workspacePlanPath, `${JSON.stringify(document, null, 2)}\n`, { encoding: 'utf-8', flag: 'wx' });
 
-  return { sourcePath, workspacePlanPath };
+  return { sourcePath: candidate.sourcePath, workspacePlanPath };
 }
 
 /**
  * Reads and parses plan.vbrief.json from the given path.
- * Handles both standard format ({ vBRIEFInfo, plan: {...} }) and flat format
- * ({ issue, title, items, edges? }) produced by some planning prompts.
- * Throws if the file does not exist or is invalid JSON.
+ * Accepts the vBRIEF v0.5 document shape ({ vBRIEFInfo, plan: {...} }).
+ * Throws if the file does not exist, contains invalid JSON, or does not match
+ * the required top-level vBRIEF shape.
  */
 export class VBriefMergeConflictError extends Error {
   constructor(planPath: string) {
@@ -120,15 +236,21 @@ export class VBriefMergeConflictError extends Error {
   }
 }
 
-export function readPlan(planPath: string): VBriefDocument {
-  const raw = readFileSync(planPath, 'utf-8');
+export function parseVBriefDocument(raw: string, planPath: string): VBriefDocument {
   if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
     throw new VBriefMergeConflictError(planPath);
   }
   const parsed = JSON.parse(raw);
 
   // vBRIEF v0.5 requires exactly two top-level keys: vBRIEFInfo and plan
-  if (parsed.vBRIEFInfo && parsed.plan) {
+  if (
+    parsed &&
+    typeof parsed === 'object' &&
+    parsed.vBRIEFInfo &&
+    typeof parsed.vBRIEFInfo === 'object' &&
+    parsed.plan &&
+    typeof parsed.plan === 'object'
+  ) {
     return parsed as VBriefDocument;
   }
 
@@ -138,6 +260,10 @@ export function readPlan(planPath: string): VBriefDocument {
     `vBRIEF v0.5 requires exactly { "vBRIEFInfo": { "version": "0.5" }, "plan": { ... } }. ` +
     `See docs/VBRIEF.md for the correct format.`
   );
+}
+
+export function readPlan(planPath: string): VBriefDocument {
+  return parseVBriefDocument(readFileSync(planPath, 'utf-8'), planPath);
 }
 
 /**

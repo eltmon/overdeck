@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
-import { evaluateSpawnGuardrails } from '../agents.js';
+import { evaluateSpawnGuardrails, materializeStartAgentVBrief } from '../agents.js';
 import { readGlobalResourceConfig } from '../../services/system-health-service.js';
 import type { SystemHealthSnapshot } from '../../services/system-health-service.js';
 
@@ -61,6 +64,19 @@ function createHealthSnapshot(overrides: Partial<SystemHealthSnapshot> = {}): Sy
     agents: overrides.agents ?? base.agents,
     leakedSpecialists: overrides.leakedSpecialists ?? base.leakedSpecialists,
     topConsumers: overrides.topConsumers ?? base.topConsumers,
+  };
+}
+
+function makeVBrief(issueId: string) {
+  return {
+    vBRIEFInfo: { version: '0.5', created: '2026-05-08T00:00:00.000Z' },
+    plan: {
+      id: issueId,
+      title: `${issueId}: Test plan`,
+      status: 'active',
+      items: [{ id: 'item-1', title: 'Do work', status: 'pending' }],
+      edges: [],
+    },
   };
 }
 
@@ -177,5 +193,51 @@ describe('evaluateSpawnGuardrails', () => {
         }),
       ]),
     );
+  });
+});
+
+describe('materializeStartAgentVBrief', () => {
+  let testDir: string;
+
+  afterEach(() => {
+    if (testDir) rmSync(testDir, { recursive: true, force: true });
+  });
+
+  it('treats missing PRD vBRIEF artifacts as non-fatal', async () => {
+    testDir = join(tmpdir(), `agents-vbrief-missing-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    const projectPath = join(testDir, 'project');
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-945');
+    mkdirSync(workspacePath, { recursive: true });
+
+    await expect(materializeStartAgentVBrief(projectPath, workspacePath, 'PAN-945')).resolves.toEqual({ planPath: null });
+  });
+
+  it('imports valid PRD vBRIEF artifacts before start-agent spawn', async () => {
+    testDir = join(tmpdir(), `agents-vbrief-valid-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    const projectPath = join(testDir, 'project');
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-945');
+    const sourcePath = join(projectPath, 'api', 'docs', 'prds', 'planned', 'PAN-945-import-prd-vbrief.vbrief.json');
+    mkdirSync(join(sourcePath, '..'), { recursive: true });
+    mkdirSync(workspacePath, { recursive: true });
+    writeFileSync(sourcePath, JSON.stringify(makeVBrief('PAN-945'), null, 2));
+
+    const result = await materializeStartAgentVBrief(projectPath, workspacePath, 'PAN-945');
+
+    expect(result.importedSourcePath).toBe(sourcePath);
+    expect(result.planPath).toBe(join(workspacePath, '.pan', 'spec.vbrief.json'));
+    expect(existsSync(result.planPath!)).toBe(true);
+  });
+
+  it('fails closed when an existing PRD vBRIEF artifact is invalid', async () => {
+    testDir = join(tmpdir(), `agents-vbrief-invalid-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    const projectPath = join(testDir, 'project');
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-945');
+    const sourcePath = join(projectPath, 'api', 'docs', 'prds', 'planned', 'PAN-945-invalid.vbrief.json');
+    mkdirSync(join(sourcePath, '..'), { recursive: true });
+    mkdirSync(workspacePath, { recursive: true });
+    writeFileSync(sourcePath, JSON.stringify({ plan: { id: 'PAN-945' } }, null, 2));
+
+    await expect(materializeStartAgentVBrief(projectPath, workspacePath, 'PAN-945')).rejects.toThrow('Invalid vBRIEF format');
+    expect(existsSync(join(workspacePath, '.pan', 'spec.vbrief.json'))).toBe(false);
   });
 });

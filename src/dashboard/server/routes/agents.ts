@@ -1851,6 +1851,24 @@ const getAgentCostRoute = HttpRouter.add(
 
 // ─── Route: POST /api/agents (start agent) ───────────────────────────────────
 
+export interface StartAgentVBriefMaterialization {
+  planPath: string | null;
+  importedSourcePath?: string;
+}
+
+export async function materializeStartAgentVBrief(
+  projectPath: string,
+  workspacePath: string,
+  issueId: string,
+  initialPlanPath: string | null = findPlan(workspacePath),
+): Promise<StartAgentVBriefMaterialization> {
+  if (initialPlanPath) return { planPath: initialPlanPath };
+
+  const imported = await importVBriefFromPrdDirs(projectPath, workspacePath, issueId);
+  if (!imported) return { planPath: null };
+  return { planPath: imported.workspacePlanPath, importedSourcePath: imported.sourcePath };
+}
+
 const postAgentsRoute = HttpRouter.add(
   'POST',
   '/api/agents',
@@ -1934,18 +1952,20 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     let planPath = findPlan(workspacePath);
-    if (!planPath) {
-      yield* Effect.promise(async () => {
-        try {
-          const imported = await importVBriefFromPrdDirs(projectPath, workspacePath, issueId);
-          if (imported) {
-            planPath = imported.workspacePlanPath;
-            console.log(`[start-agent] Imported PRD vBRIEF for ${issueId} from ${imported.sourcePath}`);
-          }
-        } catch (importErr: any) {
-          console.warn(`[start-agent] Failed to import PRD vBRIEF for ${issueId}: ${importErr?.message ?? importErr}`);
-        }
-      });
+    try {
+      const materialized = yield* Effect.promise(() => materializeStartAgentVBrief(projectPath, workspacePath, issueId, planPath));
+      planPath = materialized.planPath;
+      if (materialized.importedSourcePath) {
+        console.log(`[start-agent] Imported PRD vBRIEF for ${issueId} from ${materialized.importedSourcePath}`);
+      }
+    } catch (importErr: any) {
+      const message = importErr?.message ?? String(importErr);
+      console.warn(`[start-agent] Failed to import PRD vBRIEF for ${issueId}: ${message}`);
+      return jsonResponse({
+        error: `Failed to import PRD vBRIEF for ${issueId}: ${message}`,
+        hint: 'Fix or remove the invalid PRD vBRIEF artifact before starting an agent. Missing PRD vBRIEF artifacts are allowed; unsafe or invalid existing artifacts are not.',
+        issueId,
+      }, { status: 422 });
     }
 
     const hasPlan = planPath !== null;
@@ -1957,31 +1977,37 @@ const postAgentsRoute = HttpRouter.add(
     void hasPlan;
     void isComplete;
 
-    try {
-      const { readPlan } = yield* Effect.promise(() => import('../../../lib/vbrief/io.js'));
-      if (!planPath) {
-        throw new Error('No workspace vBRIEF found');
-      }
-      const planDoc = readPlan(planPath);
-      const planIssueId = planDoc?.plan?.id;
-      if (planIssueId && planIssueId.toLowerCase() !== issueLower) {
+    if (planPath) {
+      try {
+        const { readPlan } = yield* Effect.promise(() => import('../../../lib/vbrief/io.js'));
+        const planDoc = readPlan(planPath);
+        const planIssueId = planDoc?.plan?.id;
+        if (planIssueId && planIssueId.toLowerCase() !== issueLower) {
+          return jsonResponse({
+            error: `Plan in workspace is for ${planIssueId.toUpperCase()}, not ${issueId}. The workspace contains stale planning artifacts from a different issue.`,
+            hint: 'Run planning for this issue first, or clean the workspace planning artifacts.',
+            issueId,
+            expectedIssue: issueId,
+            actualIssue: planIssueId.toUpperCase(),
+          }, { status: 422 });
+        }
+        const itemCount = planDoc?.plan?.items?.length ?? 0;
+        if (itemCount === 0) {
+          return jsonResponse({
+            error: 'Plan exists but contains no items. Planning may have failed or produced an empty plan.',
+            hint: 'Re-run planning to produce a plan with tasks and acceptance criteria.',
+            issueId,
+          }, { status: 422 });
+        }
+      } catch (planErr: any) {
+        const message = planErr?.message ?? String(planErr);
         return jsonResponse({
-          error: `Plan in workspace is for ${planIssueId.toUpperCase()}, not ${issueId}. The workspace contains stale planning artifacts from a different issue.`,
-          hint: 'Run planning for this issue first, or clean the workspace planning artifacts.',
+          error: `Invalid workspace vBRIEF for ${issueId}: ${message}`,
+          hint: 'Fix or remove .pan/spec.vbrief.json before starting an agent.',
           issueId,
-          expectedIssue: issueId,
-          actualIssue: planIssueId.toUpperCase(),
         }, { status: 422 });
       }
-      const itemCount = planDoc?.plan?.items?.length ?? 0;
-      if (itemCount === 0) {
-        return jsonResponse({
-          error: 'Plan exists but contains no items. Planning may have failed or produced an empty plan.',
-          hint: 'Re-run planning to produce a plan with tasks and acceptance criteria.',
-          issueId,
-        }, { status: 422 });
-      }
-    } catch {}
+    }
 
     let hasBeads = false;
     try {

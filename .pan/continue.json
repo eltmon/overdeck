@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-945",
   "created": "2026-05-07T09:30:00Z",
-  "updated": "2026-05-09T01:48:21.086Z",
+  "updated": "2026-05-09T02:22:00.000Z",
   "gitState": {
     "branch": "feature/pan-945",
-    "sha": "f7e0507d0",
+    "sha": "266e38308",
     "dirty": true
   },
   "decisions": [
@@ -56,6 +56,12 @@
       "summary": "Fixed merged `panopticon-bridge.ts` typecheck errors by importing the Node APIs used by the new channel bridge code.",
       "rationale": "After merging `origin/main`, `npm run typecheck` failed because `panopticon-bridge.ts` referenced `timingSafeEqual` and `unlinkSync` without importing them. These were direct missing imports in the merged main changes, not PAN-945 logic. Adding `timingSafeEqual` from `node:crypto` and `unlinkSync` from `node:fs` fixes the TypeScript errors at the source and keeps the channel bridge implementation intact.",
       "recordedAt": "2026-05-09T01:41:20Z"
+    },
+    {
+      "id": "D9",
+      "summary": "Hardened PRD vBRIEF discovery and import after review feedback found slug, symlink, traversal, validation, and dashboard failure-handling gaps.",
+      "rationale": "Review correctly identified that the original helper only checked exact `PAN-945-plan.vbrief.json` paths, trusted raw issue IDs in path construction, and used a copy operation that could follow symlinks into files outside the PRD roots. The revised implementation validates issue IDs against the prefixed issue format, uses asynchronous directory scanning to discover slugged flat files such as `PAN-945-import-prd-vbrief.vbrief.json`, rejects symlinks and non-regular files before reading, verifies realpath containment under the PRD root, parses the vBRIEF before writing the workspace copy, and makes dashboard start-agent return a 422 response when an existing artifact is unsafe or invalid instead of spawning without a valid plan.",
+      "recordedAt": "2026-05-09T02:22:00.000Z"
     }
   ],
   "hazards": [
@@ -93,12 +99,28 @@
       "id": "H7",
       "summary": "Merging a fast-moving main branch can introduce unrelated typecheck failures that block PAN-945 submission even when PAN-945 code is already valid.",
       "mitigation": "The merged `panopticon-bridge.ts` missing imports were fixed directly and `npm run typecheck` was rerun successfully before continuing to full gate verification."
+    },
+    {
+      "id": "H8",
+      "summary": "PRD vBRIEF artifact import is a security boundary because files under docs/prds can be symlinks, directories, or paths derived from malicious issue IDs.",
+      "mitigation": "The import path now fails closed. It rejects unsafe issue IDs before constructing candidate paths, uses `lstat` to reject symlinks and non-regular files, checks realpath containment under the PRD status directory, opens the file with `O_NOFOLLOW`, and only creates `.pan/spec.vbrief.json` after the source parses as a vBRIEF document. Regression tests cover slug discovery, traversal rejection, symlink rejection, non-regular rejection, and invalid-document rejection without creating workspace planning artifacts."
+    },
+    {
+      "id": "H9",
+      "summary": "Dashboard start-agent previously swallowed PRD vBRIEF import failures, which could hide a broken existing artifact and let an agent spawn without the plan the user expected.",
+      "mitigation": "The dashboard route now delegates materialization to a helper that preserves missing-artifact-as-null semantics but throws on unsafe or invalid existing artifacts. The route catches that throw and returns a 422 response before spawn setup continues, matching CLI fail-closed semantics while keeping genuinely missing PRD vBRIEFs non-fatal."
     }
   ],
   "resumePoint": {
-    "description": "PAN-945 work is complete. All beads are closed, full quality gates passed after rebuilding the CLI dist, the branch was pushed, and `pan done PAN-945` marked the issue In Review. Panopticon reported the issue was already merged and skipped the review pipeline even though PR #1045 remains open, so no further work-agent changes are pending unless review feedback arrives.",
-    "beadId": null,
-    "filesToRead": []
+    "description": "Review feedback for PAN-945 has been implemented in workspace-hbu9. PRD vBRIEF discovery now supports slugged filenames, import rejects unsafe paths and invalid documents before writing workspace artifacts, dashboard start-agent fails closed on invalid existing artifacts, and the stale `.pan/spec.vbrief.json` now describes PAN-945 instead of PAN-1025. Focused tests, typecheck, lint, and full `npm test` have passed; commit, bead close inspection, push, and `pan done PAN-945` are still pending.",
+    "beadId": "workspace-hbu9",
+    "filesToRead": [
+      "src/lib/vbrief/io.ts",
+      "src/dashboard/server/routes/agents.ts",
+      "src/lib/vbrief/__tests__/io.test.ts",
+      "src/dashboard/server/routes/__tests__/agents-guardrails.test.ts",
+      ".pan/spec.vbrief.json"
+    ]
   },
   "beadsMapping": {},
   "agentModel": "kc@kimi-k2.6",
@@ -160,6 +182,12 @@
       "timestamp": "2026-05-09T01:48:21.085Z",
       "reason": "end",
       "note": "Final continue state pushed after completion marker; PAN-945 PR remains open for review pipeline."
+    },
+    {
+      "timestamp": "2026-05-09T02:22:00.000Z",
+      "reason": "review-feedback",
+      "note": "Resumed after CHANGES_REQUESTED review feedback. The local `.pan/feedback` files were stale PAN-1025 verification notes, so the actionable review blockers came from the resume prompt. I created and claimed bead workspace-hbu9 for the review fix, hardened PRD vBRIEF discovery and import against slug misses, symlink copying, path traversal, invalid documents, and swallowed dashboard import errors, replaced the stale workspace spec artifact with a PAN-945 vBRIEF, and verified the focused vBRIEF and agent route tests plus typecheck, lint, and the full test suite. Commit, bead close inspection, push, and submission remain pending.",
+      "agentModel": "claude-opus-4-7"
     }
   ],
   "feedback": []

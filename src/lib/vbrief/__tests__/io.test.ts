@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync } from 'fs';
+import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync, symlinkSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { findPlan, findVBriefInPrdDirs, importVBriefFromPrdDirs, isPlanningComplete, isPlanningProposed, readPlan, readWorkspacePlan, updateItemStatus, updateSubItemStatus } from '../io.js';
@@ -124,22 +124,27 @@ describe('findVBriefInPrdDirs', () => {
     ['docs active lowercase subdirectory', ['docs', 'prds', 'active', 'pan-945', 'plan.vbrief.json']],
     ['api docs planned flat lowercase', ['api', 'docs', 'prds', 'planned', 'pan-945-plan.vbrief.json']],
     ['api docs active uppercase subdirectory', ['api', 'docs', 'prds', 'active', 'PAN-945', 'plan.vbrief.json']],
-  ])('finds %s vBRIEF copies', (_name, segments) => {
+    ['api docs planned slugged uppercase flat file', ['api', 'docs', 'prds', 'planned', 'PAN-945-import-prd-vbrief.vbrief.json']],
+  ])('finds %s vBRIEF copies', async (_name, segments) => {
     const projectRoot = join(TEST_DIR, 'project');
     const sourcePath = join(projectRoot, ...segments);
     mkdirSync(join(sourcePath, '..'), { recursive: true });
     writeFileSync(sourcePath, JSON.stringify(makePlanDoc([{ id: 'item-1' }]), null, 2));
 
-    expect(findVBriefInPrdDirs(projectRoot, 'PAN-945')).toBe(sourcePath);
+    await expect(findVBriefInPrdDirs(projectRoot, 'PAN-945')).resolves.toBe(sourcePath);
   });
 
-  it('returns null when no PRD directory vBRIEF exists for the issue', () => {
+  it('returns null when no PRD directory vBRIEF exists for the issue', async () => {
     const projectRoot = join(TEST_DIR, 'project');
     const otherPath = join(projectRoot, 'docs', 'prds', 'planned', 'PAN-944-plan.vbrief.json');
     mkdirSync(join(otherPath, '..'), { recursive: true });
     writeFileSync(otherPath, JSON.stringify(makePlanDoc(), null, 2));
 
-    expect(findVBriefInPrdDirs(projectRoot, 'PAN-945')).toBeNull();
+    await expect(findVBriefInPrdDirs(projectRoot, 'PAN-945')).resolves.toBeNull();
+  });
+
+  it.each(['../PAN-945', 'PAN-945/../../SECRET', 'PAN.945', `PAN-945${String.fromCharCode(0)}`])('rejects unsafe issue ID %s', async unsafeIssueId => {
+    await expect(findVBriefInPrdDirs(join(TEST_DIR, 'project'), unsafeIssueId)).rejects.toThrow('Invalid issue ID');
   });
 });
 
@@ -182,6 +187,60 @@ describe('importVBriefFromPrdDirs', () => {
 
     expect(imported).toBeNull();
     expect(readWorkspacePlan(workspacePath)?.plan.title).toBe('Existing Workspace Plan');
+  });
+
+  it('imports slugged flat vBRIEF files from api/docs/prds/planned', async () => {
+    const projectRoot = join(TEST_DIR, 'project');
+    const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-945');
+    const sourcePath = join(projectRoot, 'api', 'docs', 'prds', 'planned', 'PAN-945-import-prd-vbrief.vbrief.json');
+    const sourceDoc = makePlanDoc([{ id: 'item-1' }]);
+    sourceDoc.plan.id = 'PAN-945';
+    sourceDoc.plan.title = 'Slugged PRD Plan';
+    mkdirSync(join(sourcePath, '..'), { recursive: true });
+    mkdirSync(workspacePath, { recursive: true });
+    writeFileSync(sourcePath, JSON.stringify(sourceDoc, null, 2));
+
+    const imported = await importVBriefFromPrdDirs(projectRoot, workspacePath, 'pan-945');
+
+    expect(imported?.sourcePath).toBe(sourcePath);
+    expect(readWorkspacePlan(workspacePath)?.plan.title).toBe('Slugged PRD Plan');
+  });
+
+  it('rejects symlinked PRD vBRIEF artifacts without creating .pan/spec.vbrief.json', async () => {
+    const projectRoot = join(TEST_DIR, 'project');
+    const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-945');
+    const sourcePath = join(projectRoot, 'docs', 'prds', 'planned', 'PAN-945-plan.vbrief.json');
+    const secretPath = join(TEST_DIR, 'secret.vbrief.json');
+    mkdirSync(join(sourcePath, '..'), { recursive: true });
+    mkdirSync(workspacePath, { recursive: true });
+    writeFileSync(secretPath, JSON.stringify(makePlanDoc([{ id: 'secret' }]), null, 2));
+    symlinkSync(secretPath, sourcePath);
+
+    await expect(importVBriefFromPrdDirs(projectRoot, workspacePath, 'PAN-945')).rejects.toThrow('symlink');
+    expect(existsSync(join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME))).toBe(false);
+  });
+
+  it('rejects non-regular PRD vBRIEF artifacts without creating .pan/spec.vbrief.json', async () => {
+    const projectRoot = join(TEST_DIR, 'project');
+    const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-945');
+    const sourcePath = join(projectRoot, 'docs', 'prds', 'planned', 'PAN-945-plan.vbrief.json');
+    mkdirSync(sourcePath, { recursive: true });
+    mkdirSync(workspacePath, { recursive: true });
+
+    await expect(importVBriefFromPrdDirs(projectRoot, workspacePath, 'PAN-945')).rejects.toThrow('non-regular');
+    expect(existsSync(join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME))).toBe(false);
+  });
+
+  it('rejects invalid existing PRD vBRIEF artifacts without creating .pan/spec.vbrief.json', async () => {
+    const projectRoot = join(TEST_DIR, 'project');
+    const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-945');
+    const sourcePath = join(projectRoot, 'api', 'docs', 'prds', 'planned', 'PAN-945-invalid.vbrief.json');
+    mkdirSync(join(sourcePath, '..'), { recursive: true });
+    mkdirSync(workspacePath, { recursive: true });
+    writeFileSync(sourcePath, JSON.stringify({ plan: { id: 'PAN-945' } }, null, 2));
+
+    await expect(importVBriefFromPrdDirs(projectRoot, workspacePath, 'PAN-945')).rejects.toThrow('Invalid vBRIEF format');
+    expect(existsSync(join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME))).toBe(false);
   });
 });
 
