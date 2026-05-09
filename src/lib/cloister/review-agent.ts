@@ -122,6 +122,24 @@ export function getActiveParallelReviewIssues(sessionNames: string[]): Set<strin
 }
 
 async function ensureReviewTempStash(issueId: string, workspace: string): Promise<{ ref: string; message: string; sequence: number } | null> {
+  // Drop any prior cycle's review-temp stash before creating a new one. Without
+  // this, accumulated stashes from previous rounds leak — PAN-1030 left ten
+  // review-temp:PAN-1030:1..10 stashes behind because each round's cleanup
+  // drops the *current* ref but `setReviewStatus` overwrites the ref before
+  // cleanup runs, so the prior round's ref gets orphaned. Drop-then-create is
+  // the only ordering that guarantees no orphans.
+  const priorStatus = getReviewStatus(issueId);
+  if (priorStatus?.reviewTempStashRef) {
+    try {
+      await dropStash(workspace, priorStatus.reviewTempStashRef);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!/not found|does not exist/i.test(message)) {
+        console.error(`[review-agent] Failed to drop prior review-temp stash for ${issueId} (non-fatal):`, err);
+      }
+    }
+  }
+
   const { stdout } = await execAsync('git status --porcelain', {
     cwd: workspace,
     encoding: 'utf-8',
