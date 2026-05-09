@@ -4,7 +4,7 @@
     "author": "agent:panopticon-agent",
     "description": "PAN-945: Discover and safely import PRD-directory vBRIEF artifacts into workspaces before agent start.",
     "created": "2026-05-07T13:13:37Z",
-    "updated": "2026-05-09T02:05:00.000Z"
+    "updated": "2026-05-09T02:27:34.122Z"
   },
   "plan": {
     "id": "PAN-945",
@@ -14,22 +14,26 @@
       {
         "id": "workspace-d5qf",
         "title": "Add findVBriefInPrdDirs helper to search docs/prds for vBRIEFs",
-        "status": "completed"
+        "status": "completed",
+        "completed": "2026-05-09T02:27:34.122Z"
       },
       {
         "id": "workspace-qmrt",
         "title": "Wire PRD vBRIEF discovery into dashboard start-agent endpoint",
-        "status": "completed"
+        "status": "completed",
+        "completed": "2026-05-09T02:27:34.121Z"
       },
       {
         "id": "workspace-bqcl",
         "title": "Wire PRD vBRIEF discovery into CLI pan start command",
-        "status": "completed"
+        "status": "completed",
+        "completed": "2026-05-09T02:27:34.121Z"
       },
       {
         "id": "workspace-2dp3",
         "title": "Add tests for PRD dir vBRIEF discovery and auto-import",
-        "status": "completed"
+        "status": "completed",
+        "completed": "2026-05-09T02:27:34.120Z"
       },
       {
         "id": "workspace-hbu9",
@@ -38,7 +42,7 @@
       }
     ],
     "edges": [],
-    "updated": "2026-05-09T02:05:00.000Z",
-    "sequence": 1
+    "updated": "2026-05-09T02:27:34.122Z",
+    "sequence": 5
   }
 }
