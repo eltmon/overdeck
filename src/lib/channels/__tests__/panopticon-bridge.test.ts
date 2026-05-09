@@ -262,7 +262,12 @@ describe('panopticon-bridge subprocess (Bun.serve unix listener)', () => {
         await new Promise((r) => setTimeout(r, 100));
       }
       expect(existsSync(sockPath)).toBe(true);
-      const mode = statSync(sockPath).mode & 0o777;
+      // chmod(0o600) races with socket creation; retry until it lands.
+      let mode = statSync(sockPath).mode & 0o777;
+      for (let i = 0; i < 20 && mode !== 0o600; i++) {
+        await new Promise((r) => setTimeout(r, 100));
+        mode = statSync(sockPath).mode & 0o777;
+      }
       expect(mode).toBe(0o600);
 
       // SIGTERM should terminate the bridge and unlink the socket. Bun may
