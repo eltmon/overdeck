@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1055",
   "created": "2026-05-09T21:07:00.000Z",
-  "updated": "2026-05-09T21:14:00.000Z",
+  "updated": "2026-05-09T21:17:00.000Z",
   "gitState": {
     "branch": "feature/pan-1055",
-    "sha": "e32f5774c",
-    "dirty": true
+    "sha": "baba46879",
+    "dirty": false
   },
   "decisions": [
     {
@@ -38,7 +38,7 @@
     }
   ],
   "resumePoint": {
-    "description": "Bead workspace-xgc6 was closed; inspection tool prompt path was fixed and needs recommit then pan inspect rerun.",
+    "description": "Implementation complete: bead workspace-xgc6 closed, inspection passed, typecheck/lint/npm test passed. Ready to push and pan done.",
     "beadId": "workspace-xgc6",
     "filesToRead": [
       "src/dashboard/frontend/src/components/shared/ModelPicker/ModelPicker.tsx",
@@ -67,6 +67,12 @@
       "timestamp": "2026-05-09T21:14:00.000Z",
       "reason": "inspection-tool-fix",
       "note": "pan inspect failed because build-cli did not populate dist/cli/prompts; fixed build script and rebuilt CLI locally.",
+      "agentModel": "Claude Opus 4.7"
+    },
+    {
+      "timestamp": "2026-05-09T21:17:00.000Z",
+      "reason": "inspection-passed",
+      "note": "Inspection passed for workspace-xgc6. Reran npm test after build-cli fix; 375 test files / 4570 tests passed.",
       "agentModel": "Claude Opus 4.7"
     }
   ]
