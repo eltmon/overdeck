@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 21,
+    "sequence": 22,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T21:41:12.083Z",
+    "updated": "2026-05-09T21:48:25.322Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -717,7 +717,7 @@
       {
         "id": "s4-wire-test-end-to-end",
         "title": "Wire `test` role end-to-end (replaces wakeSpecialist for test + UAT)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -732,36 +732,41 @@
           {
             "id": "s4-wire-test-end-to-end.ac1",
             "title": "test-agent.ts uses spawnRun(issueId, 'test'); no calls to wakeSpecialist('test-agent') or wakeSpecialist('uat-agent')",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:48:25.322Z"
           },
           {
             "id": "s4-wire-test-end-to-end.ac2",
             "title": "UAT scenarios run inside the test role (Playwright tools available); no separate UAT spawn",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:48:25.322Z"
           },
           {
             "id": "s4-wire-test-end-to-end.ac3",
             "title": "Dashboard test rendering keys off state.role === 'test'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:48:25.322Z"
           },
           {
             "id": "s4-wire-test-end-to-end.ac4",
             "title": "Existing test-agent tests updated and pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:48:25.322Z"
           }
-        ]
+        ],
+        "completed": "2026-05-09T21:48:25.322Z"
       },
       {
         "id": "s5-wire-ship-end-to-end",
@@ -2008,5 +2013,5 @@
       "canonicalFilename": "2026-05-09-PAN-1048-unify-agent-type-system-5-enums-role-primitive-with-reactive-cloister.vbrief.json"
     }
   },
-  "updated": "2026-05-09T21:41:12.083Z"
+  "updated": "2026-05-09T21:48:25.322Z"
 }

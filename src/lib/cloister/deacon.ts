@@ -1522,40 +1522,34 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
 
         if (workspace && resolved) {
           const branch = `feature/${issueLower}`;
-          const { spawnEphemeralSpecialist } = await import('./specialists.js');
-          const result = await spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
-            issueId,
-            workspace,
-            branch,
-          });
-          if (result.success) {
+          const { spawnRun } = await import('../agents.js');
+          const { buildTestRolePrompt } = await import('./test-agent-queue.js');
+          try {
+            const run = await spawnRun(issueId, 'test', {
+              workspace,
+              prompt: buildTestRolePrompt({ issueId, workspace, branch }),
+            });
             setReviewStatus(issueId, { testStatus: 'testing' });
             status.testStatus = 'testing';
             actions.push(
-              `Re-dispatched orphaned test for ${issueId} via ${resolved.projectKey}/test-agent (deacon-orphan-recovery)`,
+              `Re-dispatched orphaned test for ${issueId} via test role ${run.id} (deacon-orphan-recovery)`,
             );
             console.log(
-              `[deacon] Re-dispatched test for ${issueId} after orphan detection (project: ${resolved.projectKey}, workspace: ${workspace})`,
+              `[deacon] Re-dispatched test role for ${issueId} after orphan detection (project: ${resolved.projectKey}, workspace: ${workspace})`,
             );
-          } else if (result.error === 'specialist_busy') {
-            // Specialist busy — set dispatch_failed so deacon retries next patrol
-            setReviewStatus(issueId, { testStatus: 'dispatch_failed' });
-            status.testStatus = 'dispatch_failed';
-            actions.push(
-              `Orphaned test for ${issueId}: specialist busy — set dispatch_failed for next patrol retry`,
-            );
-            console.log(
-              `[deacon] Specialist busy for ${issueId} — set dispatch_failed for next patrol retry`,
-            );
-          } else {
-            setReviewStatus(issueId, { testStatus: 'dispatch_failed' });
-            status.testStatus = 'dispatch_failed';
-            actions.push(
-              `Orphaned test re-dispatch failed for ${issueId}: ${result.error || result.message}`,
-            );
-            console.log(
-              `[deacon] Orphaned test re-dispatch failed for ${issueId}: ${result.error || result.message}`,
-            );
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            if (msg.includes('already running')) {
+              setReviewStatus(issueId, { testStatus: 'testing' });
+              status.testStatus = 'testing';
+              actions.push(`Orphaned test for ${issueId}: test role already running`);
+              console.log(`[deacon] Test role already running for ${issueId}`);
+            } else {
+              setReviewStatus(issueId, { testStatus: 'dispatch_failed' });
+              status.testStatus = 'dispatch_failed';
+              actions.push(`Orphaned test role dispatch failed for ${issueId}: ${msg}`);
+              console.log(`[deacon] Orphaned test role dispatch failed for ${issueId}: ${msg}`);
+            }
           }
         } else {
           // Cannot derive workspace/project — reset to pending so the pipeline can re-trigger cleanly
@@ -1704,41 +1698,30 @@ export async function checkPendingTestDispatch(): Promise<string[]> {
         continue;
       }
 
-      const { spawnEphemeralSpecialist } = await import('./specialists.js');
+      const { spawnRun } = await import('../agents.js');
+      const { buildTestRolePrompt } = await import('./test-agent-queue.js');
       try {
-        const result = await spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
-          issueId,
+        const run = await spawnRun(issueId, 'test', {
           workspace,
-          branch,
+          prompt: buildTestRolePrompt({ issueId, workspace, branch }),
         });
-        if (result.success) {
+        setReviewStatus(issueId, { testStatus: 'testing', testRetryCount: retryCount + 1 });
+        actions.push(`Dispatched test role ${run.id} for ${issueId} (retry ${retryCount + 1})`);
+        console.log(`[deacon] Dispatched test role for ${issueId} (retry ${retryCount + 1})`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes('already running')) {
           setReviewStatus(issueId, { testStatus: 'testing', testRetryCount: retryCount + 1 });
-          actions.push(`Dispatched test-agent for ${issueId} (retry ${retryCount + 1})`);
-          console.log(`[deacon] Dispatched test-agent for ${issueId} (retry ${retryCount + 1})`);
-        } else if (result.error === 'specialist_busy') {
-          setReviewStatus(issueId, {
-            testStatus: 'dispatch_failed',
-            testNotes: 'Specialist busy',
-            testRetryCount: retryCount + 1,
-          });
-          actions.push(`Test-agent busy for ${issueId} — queued for next patrol retry`);
+          actions.push(`Test role already running for ${issueId} (retry ${retryCount + 1})`);
         } else {
           setReviewStatus(issueId, {
             testStatus: 'dispatch_failed',
-            testNotes: result.message || String(result.error),
+            testNotes: msg,
             testRetryCount: retryCount + 1,
           });
-          actions.push(`Test-agent dispatch failed for ${issueId}: ${result.message || result.error}`);
+          actions.push(`Test role dispatch error for ${issueId}: ${msg}`);
+          console.error(`[deacon] Test role dispatch error for ${issueId}:`, msg);
         }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        setReviewStatus(issueId, {
-          testStatus: 'dispatch_failed',
-          testNotes: msg,
-          testRetryCount: retryCount + 1,
-        });
-        actions.push(`Test-agent dispatch error for ${issueId}: ${msg}`);
-        console.error(`[deacon] Test-agent dispatch error for ${issueId}:`, msg);
       }
     }
   } catch (error: unknown) {

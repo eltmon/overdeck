@@ -28,11 +28,11 @@ function parseSpecialistSession(agentId: string): { projectKey: string; issueId:
   return { projectKey: match[1], issueId: match[2], type: match[3] };
 }
 
-// Derive issueId for work and planning agents: agent-pan-505 → PAN-505, agent-pan-505-2 → PAN-505
+// Derive issueId for role runs: agent-pan-505 → PAN-505, agent-pan-505-test → PAN-505.
 export function deriveAgentIssueId(agentId: string, agentIssueId?: string): string | null {
   if (agentIssueId) return agentIssueId;
   const issuePattern = '((?:[a-z]+-\\d+|(?:f|us|de|ta|tc)\\d+))';
-  const match = agentId.match(new RegExp(`^(?:agent|planning)-${issuePattern}(?:-\\d+)?$`, 'i'));
+  const match = agentId.match(new RegExp(`^(?:agent|planning)-${issuePattern}(?:-(?:\\d+|plan|review|test|ship))?$`, 'i'));
   return match ? match[1]!.toUpperCase() : null;
 }
 
@@ -84,10 +84,11 @@ export function AgentOutputPanel({ agentId }: AgentOutputPanelProps) {
     };
   }, [specialist, agentId, specialistIsRunning]);
 
-  // Planning agents are identified by the persisted role field;
-  // legacy ID prefixes are no longer a role source.
-  const isPlanningAgent = agent?.role === 'plan';
-  const workAgentIssueId = specialist || isPlanningAgent ? null : deriveAgentIssueId(agentId, agent?.issueId);
+  // Role runs are identified by the persisted role field; the planning- prefix is
+  // retained only as a fallback for sessions missing from the dashboard store.
+  const isPlanningAgent = agent?.role === 'plan' || (!agent && agentId.startsWith('planning-'));
+  const roleRunIssueId = agent?.role === 'test' ? agent.issueId : undefined;
+  const workAgentIssueId = specialist ? null : deriveAgentIssueId(agentId, roleRunIssueId ?? agent?.issueId);
 
   const label = specialist
     ? `${specialist.projectKey} / ${specialist.type.replace('-agent', '')}`

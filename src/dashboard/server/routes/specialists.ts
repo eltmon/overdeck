@@ -1007,7 +1007,6 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
 
     const {
       getTmuxSessionName,
-      spawnEphemeralSpecialist,
     } = yield* Effect.promise(() => import('../../../lib/cloister/specialists.js'));
 
     const tmuxSession = getTmuxSessionName(name as SpecialistType);
@@ -1064,26 +1063,9 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
           } catch {}
         }
 
-        const resolved = resolveProjectFromIssue(issueId);
-        if (resolved) {
-          const result = yield* Effect.promise(() => spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
-            issueId,
-            workspace,
-            branch,
-          }));
-          if (result.success) {
-            setReviewStatusBase(issueId, { testStatus: 'testing' });
-            console.log(`[specialists] Dispatched test-agent for ${issueId} after review passed`);
-          } else {
-            setReviewStatusBase(issueId, {
-              testStatus: 'dispatch_failed',
-              testNotes: `Test specialist dispatch failed: ${result.message || result.error}. Deacon will retry.`,
-            });
-            console.log(`[specialists] Test-agent dispatch failed for ${issueId}: ${result.message || result.error}`);
-          }
-        } else {
-          console.warn(`[specialists] Cannot dispatch test-agent for ${issueId}: no project configured`);
-        }
+        const { dispatchTestAgentAndNotify } = yield* Effect.promise(() => import('../../../lib/cloister/test-agent-queue.js'));
+        yield* Effect.promise(() => dispatchTestAgentAndNotify(issueId, workspace, branch));
+        console.log(`[specialists] Dispatched test role for ${issueId} after review passed`);
       }
     } else if (name === 'test-agent') {
       const alreadyReported =

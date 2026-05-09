@@ -1356,8 +1356,8 @@
     "hash": "3621611e5ab17ca3fcde39358053a9d8"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/review-status.ts": {
-    "mtime": 1778301111.4263628,
-    "hash": "299dc057a37ab29a103cf696c260df3d"
+    "mtime": 1778363058.4273658,
+    "hash": "830fc37a0db238d97c4b2abd3d8fc0ad"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/project-repos.ts": {
     "mtime": 1778301111.4253497,
@@ -1696,8 +1696,8 @@
     "hash": "6d45e7ffdc9cef4059d07cf856637649"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/cloister/test-agent-queue.ts": {
-    "mtime": 1778301111.4193625,
-    "hash": "8da239c471394b7cb881525757303b3e"
+    "mtime": 1778363042.324799,
+    "hash": "cd629d8c981f76888ca5e5dad4305a59"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/cloister/session-rotation.ts": {
     "mtime": 1778301111.4183626,
@@ -1724,8 +1724,8 @@
     "hash": "a0f04e0f652be00f76cb4e1c47b31061"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/cloister/deacon.ts": {
-    "mtime": 1778353520.4342115,
-    "hash": "385759a6d6fd7f5a5c951ad78c625a65"
+    "mtime": 1778363073.7279031,
+    "hash": "cc8b6260199ed4bd28d2236264334ba6"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/cloister/feedback-writer.ts": {
     "mtime": 1778301111.4163625,
@@ -1818,6 +1818,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/cloister/__tests__/specialist-harnesses-config.test.ts": {
     "mtime": 1778301111.415878,
     "hash": "27d2fa4ff45d30c2ead17d8632e7a0a4"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/cloister/__tests__/test-agent-queue.test.ts": {
+    "mtime": 1778363220.7300117,
+    "hash": "62ea788013317035d6d8b8a2379f0d05"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/planning/triage-agent.ts": {
     "mtime": 1778301111.4253497,
@@ -2536,8 +2540,8 @@
     "hash": "73ed2207b9c7719867f7e331c4f4326a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/AgentOutputPanel.tsx": {
-    "mtime": 1778360273.0911846,
-    "hash": "b7fd9f40dac1732385a7c458b611f4e5"
+    "mtime": 1778363252.0280886,
+    "hash": "4d9c30fdd2c85fc8f52b751f457cc82a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/BeadsTasksPanel.tsx": {
     "mtime": 1778301111.3533604,
@@ -3152,8 +3156,8 @@
     "hash": "1df7f8795919b9bd1c9662bbdc191be0"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/__tests__/AgentOutputPanel.test.tsx": {
-    "mtime": 1778301111.3643608,
-    "hash": "8ca7ffa18e95a7ea81b2b22183134996"
+    "mtime": 1778363209.4206219,
+    "hash": "b33713a096fecd28d100de64fd400473"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/frontend/src/components/__tests__/IssueAgentCard-harness.test.tsx": {
     "mtime": 1778301111.365324,
@@ -3880,8 +3884,8 @@
     "hash": "8bf704414886cddc060759292cf3d90a"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/server/routes/specialists.ts": {
-    "mtime": 1778301111.3823614,
-    "hash": "a3f0a51db02bbbc8dbc91b617d1bb38c"
+    "mtime": 1778363104.3589754,
+    "hash": "60843078c61466045a9b27fe170864da"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/server/routes/workspaces.ts": {
     "mtime": 1778361690.4618888,

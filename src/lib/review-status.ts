@@ -1,4 +1,3 @@
-import { access, readFile } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import { notifyPipeline } from './pipeline-notifier.js';
@@ -350,41 +349,18 @@ export function setReviewStatus(
     } else {
       (async () => {
         try {
-          const { spawnEphemeralSpecialist } = await import('./cloister/specialists.js');
-          const { resolveProjectFromIssue } = await import('./projects.js');
+          const { getAgentState } = await import('./agents.js');
+          const { dispatchTestAgentAndNotify } = await import('./cloister/test-agent-queue.js');
           const workAgentId = `agent-${issueId.toLowerCase()}`;
-          const workStateFile = join(homedir(), '.panopticon', 'agents', workAgentId, 'state.json');
-          let workspace: string | undefined;
-          let branch: string | undefined;
-          try {
-            await access(workStateFile);
-            const workState = JSON.parse(await readFile(workStateFile, 'utf-8'));
-            workspace = workState.workspace;
-            branch = workState.branch || `feature/${issueId.toLowerCase()}`;
-          } catch {}
-
-          const resolved = resolveProjectFromIssue(issueId);
-          if (!resolved) {
-            console.warn(`[review-status] No project configured for ${issueId} — cannot dispatch test-agent`);
-            setReviewStatus(issueId, { testStatus: 'dispatch_failed', testNotes: `No project configured for ${issueId}` });
-            return;
-          }
+          const workState = getAgentState(workAgentId);
+          const workspace = workState?.workspace;
+          const branch = workState?.branch || `feature/${issueId.toLowerCase()}`;
           const reason = updated.reviewedAtCommit && updated.lastVerifiedCommit
             ? `code drift detected (verified=${updated.lastVerifiedCommit.slice(0, 8)}, reviewed=${updated.reviewedAtCommit.slice(0, 8)})`
             : 'no verification snapshot available';
-          console.log(`[review-status] Dispatching test-agent for ${issueId} — ${reason}`);
-          const result = await spawnEphemeralSpecialist(resolved.projectKey, 'test-agent', {
-            issueId,
-            workspace,
-            branch,
-          });
-          if (result.success) {
-            setReviewStatus(issueId, { testStatus: 'testing' });
-            emitActivityEntry({ source: 'cloister', level: 'info', message: `${issueId} — test-agent dispatched (${reason})`, issueId });
-          } else {
-            console.warn(`[review-status] Failed to dispatch test-agent for ${issueId}: ${result.message}`);
-            setReviewStatus(issueId, { testStatus: 'dispatch_failed', testNotes: `Dispatch failed: ${result.message}` });
-          }
+          console.log(`[review-status] Dispatching test role for ${issueId} — ${reason}`);
+          await dispatchTestAgentAndNotify(issueId, workspace, branch);
+          emitActivityEntry({ source: 'cloister', level: 'info', message: `${issueId} — test role dispatched (${reason})`, issueId });
         } catch (err: any) {
           console.warn(`[review-status] Failed to dispatch test-agent for ${issueId}: ${err.message}`);
         }

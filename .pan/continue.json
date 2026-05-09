@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T21:41:12.083Z",
+  "updated": "2026-05-09T21:48:25.322Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "pending-s5",
+    "sha": "pending-s4",
     "dirty": true
   },
   "decisions": [
@@ -158,11 +158,16 @@
     }
   ],
   "resumePoint": {
-    "description": "S5 ship role wiring implemented and verified: merge-agent.ts now delegates post-approval branch preparation and sync-main conflict resolution to spawnRun(issueId, 'ship'), with prompts requiring rebase/verify/push and readyForMerge status transition while preserving the dashboard Merge button/server merge path for actual merge and postMergeLifecycle. Next: commit, close workspace-qygc (requiresInspection=false), then claim the next ready bead.",
-    "beadId": "workspace-qygc",
+    "description": "S4 test role wiring implemented and verified: test dispatch paths now launch spawnRun(issueId, 'test') instead of test-agent/uat-agent specialists; the role prompt folds Playwright UAT into the test role and updates /api/review status on pass/fail; dashboard AgentOutputPanel uses state.role === 'test' plus issueId for test role activity rendering. Next: commit, close workspace-77lp (requiresInspection=false), then continue to the next ready bead.",
+    "beadId": "workspace-77lp",
     "filesToRead": [
-      "src/lib/cloister/merge-agent.ts",
-      "src/lib/cloister/__tests__/merge-agent-stash.test.ts"
+      "src/lib/cloister/test-agent-queue.ts",
+      "src/lib/review-status.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/dashboard/server/routes/specialists.ts",
+      "src/dashboard/frontend/src/components/AgentOutputPanel.tsx",
+      "src/lib/cloister/__tests__/test-agent-queue.test.ts",
+      "src/dashboard/frontend/src/components/__tests__/AgentOutputPanel.test.tsx"
     ]
   },
   "beadsMapping": {},
@@ -293,6 +298,12 @@
       "timestamp": "2026-05-09T21:41:12.083Z",
       "reason": "bead-complete",
       "note": "Implemented S5 ship role wiring. spawnMergeAgentForBranches/spawnRebaseAgentForBranch and sync-main conflict delegation now start spawnRun(issueId, 'ship') with role prompts that rebase, verify, push, and POST readyForMerge=true without merging. Removed legacy merge-agent specialist wake paths from merge-agent.ts and updated merge-agent tests to assert ship role launch plus postMergeLifecycle stash cleanup. Targeted merge-agent test, typecheck, lint, and graphify update pass.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T21:48:25.322Z",
+      "reason": "bead-complete",
+      "note": "Implemented S4 test role wiring. test-agent-queue now starts spawnRun(issueId, 'test') with a prompt that runs project gates, performs Playwright UAT when required, and posts testStatus/readyForMerge updates. review-status, specialists auto-complete, and Deacon retry/orphan recovery now dispatch the test role instead of test-agent specialists; no uat-agent spawn remains. AgentOutputPanel explicitly renders test role runs from state.role === 'test'. Targeted dispatch/panel tests, typecheck, lint, and graphify update pass.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],
