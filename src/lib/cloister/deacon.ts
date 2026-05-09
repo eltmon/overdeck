@@ -2136,6 +2136,19 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
         const msg = `Reconciled stale mergeStatus for ${issueId} — branch ${branch} is merged to main`;
         actions.push(msg);
         console.log(`[deacon] ${msg}`);
+        // PAN-1027: also run the post-merge cleanup so labels get cleaned, work agent
+        // tmux session is killed, beads compacted, etc. Without this the dashboard knows
+        // the issue is merged but the GitHub labels stay stale ("in-progress"/"in-review")
+        // and orphaned tmux sessions leak memory. skipDeploy avoids respawning the server
+        // — it's a best-effort reconciliation, not a fresh merge.
+        try {
+          const { postMergeLifecycle } = await import('./merge-agent.js');
+          postMergeLifecycle(issueId, project.projectPath, branch, { skipDeploy: true }).catch(err =>
+            console.warn(`[deacon] postMergeLifecycle (reconcile) failed for ${issueId}: ${err}`)
+          );
+        } catch (err) {
+          console.warn(`[deacon] Could not import postMergeLifecycle: ${err}`);
+        }
       }
     }
   } catch (err: any) {
@@ -2593,6 +2606,21 @@ async function reconcileAndCheckIfMerged(
           const prState = await getPullRequestState(prRef[1], prRef[2], Number.parseInt(prRef[3], 10));
           if (prState.merged) {
             setReviewStatus(issueId, { mergeStatus: 'merged', readyForMerge: false, mergeNotes: undefined });
+            // PAN-1027: also run the post-merge cleanup so labels get cleaned and the
+            // work-agent tmux session is killed. Without this, GitHub-detected merges
+            // leave stale "in-progress" / "in-review" labels and leaked tmux sessions.
+            try {
+              const resolved = resolveProjectFromIssue(issueId);
+              if (resolved) {
+                const branch = `feature/${issueId.toLowerCase()}`;
+                const { postMergeLifecycle } = await import('./merge-agent.js');
+                postMergeLifecycle(issueId, resolved.projectPath, branch, { skipDeploy: true }).catch(err =>
+                  console.warn(`[deacon] postMergeLifecycle (gh-reconcile) failed for ${issueId}: ${err}`)
+                );
+              }
+            } catch (err) {
+              console.warn(`[deacon] Could not run post-merge cleanup for ${issueId}: ${err}`);
+            }
             return remember(true);
           }
         }
