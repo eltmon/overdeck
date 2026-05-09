@@ -35,10 +35,15 @@
       "id": "H2",
       "summary": "Full npm test initially failed on a pre-existing synced-skills fixture mismatch and a project-route unit test mock that did not include the newly-used tmux capture helper.",
       "mitigation": "Updated the committed fixture to include the tracked pipeline-status skill and extended the route test tmux mock with capturePaneAsync."
+    },
+    {
+      "id": "H3",
+      "summary": "Merging origin/main conflicted only in the workspace-local continue.json, where main carried unrelated PAN-1025 state.",
+      "mitigation": "Kept the PAN-1030 continue state because this workspace is issue-scoped to PAN-1030."
     }
   ],
   "resumePoint": {
-    "description": "PAN-1030 implementation verified with build, typecheck, lint, and full tests. Next: commit bead workspace-mla7, close it for inspection, then proceed to final gates if inspection passes.",
+    "description": "PAN-1030 implementation verified and merged with origin/main. Next: commit merge conflict resolution, push, and rerun pan done.",
     "beadId": "workspace-mla7",
     "filesToRead": [
       "src/lib/agent-input-detection.ts",

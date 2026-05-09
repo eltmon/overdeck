@@ -56,7 +56,7 @@ These are dedicated long-running workflow stages.
 | `specialist-review-agent` | Dedicated review pass before merge | `claude-opus-4-6` | Lower to Sonnet if you want to reduce cost on routine repos |
 | `specialist-test-agent` | Dedicated test specialist pass | `claude-sonnet-4-6` | Raise to GPT-5.4 for harder debugging-heavy test suites |
 | `specialist-merge-agent` | Merge prep, merge-time validation, conflict handling | `claude-sonnet-4-6` | Raise to Opus for very risky multi-repo or conflict-heavy workflows |
-| `specialist-inspect-agent` | Per-bead inspection gate during implementation | `claude-sonnet-4-6` | Raise to Opus when spec fidelity is critical or diffs are complex |
+| `specialist-inspect-agent` | Per-bead inspection gate during implementation — opt-in via `metadata.requiresInspection: true` on the bead's plan item (PAN-382, revised 2026-05-08; see `docs/prds/planned/PAN-382-inspect-specialist.md`) | `claude-sonnet-4-6` | Raise to Opus when spec fidelity is critical or diffs are complex |
 | `specialist-uat-agent` | Browser-based user acceptance testing after tests pass | `claude-sonnet-4-6` | Raise to Opus for high-stakes UX validation or complex product flows |
 
 ### Guidance

@@ -608,6 +608,84 @@ export async function isPaneDeadAsync(sessionName: string): Promise<boolean> {
 }
 
 /**
+ * Categorizes an API failure surfaced inside an interactive Claude Code pane.
+ *
+ * "Terminal" here means the upstream provider returned an error that won't be
+ * fixed by waiting or retrying the same request — quota exhausted, auth/login
+ * required, permission denied. The CLI prints the error and returns to the
+ * input prompt, which means session-alive and pane-alive checks both pass:
+ * callers polling for completion will sit idle until their timeout fires.
+ * Detecting these in pane content is the only reliable signal.
+ *
+ * Distinct from the transient family the deacon already handles
+ * (Overloaded / Rate limit / 5xx / Timed out), which are nudge-to-retry.
+ */
+export type TerminalApiErrorKind =
+  | 'quota_exhausted'
+  | 'auth_failed'
+  | 'permission_denied'
+  | 'login_required';
+
+export interface TerminalApiError {
+  kind: TerminalApiErrorKind;
+  /** Short, user-facing summary suitable for review_notes / dashboard text. */
+  summary: string;
+  /** First matching line from the pane, for diagnostics. */
+  raw: string;
+}
+
+const TERMINAL_API_ERROR_PATTERNS: Array<{
+  re: RegExp;
+  kind: TerminalApiErrorKind;
+  summary: string;
+}> = [
+  // Order matters: more specific quota/usage messages first so we surface the
+  // most actionable summary even when both a 403 and a quota line are present.
+  { re: /usage limit for this billing cycle/i, kind: 'quota_exhausted', summary: 'Provider quota exhausted (billing cycle limit reached)' },
+  { re: /reached your usage limit/i,           kind: 'quota_exhausted', summary: 'Provider quota exhausted (usage limit reached)' },
+  { re: /(?:^|[^a-z])quota[^a-z].{0,40}(?:exceeded|exhausted|reached)/i, kind: 'quota_exhausted', summary: 'Provider quota exhausted' },
+  { re: /You've hit your limit/i,              kind: 'quota_exhausted', summary: 'Provider usage limit reached' },
+  { re: /credit balance is too low/i,          kind: 'quota_exhausted', summary: 'Provider credit balance too low' },
+  { re: /Please run \/login/i,                 kind: 'login_required',  summary: 'Provider login required' },
+  { re: /authentication_error/i,               kind: 'auth_failed',     summary: 'Provider authentication failed' },
+  { re: /API Error:\s*401\b/i,                 kind: 'auth_failed',     summary: 'Provider rejected request (401 unauthorized)' },
+  { re: /permission_error/i,                   kind: 'permission_denied', summary: 'Provider returned permission_error' },
+  { re: /API Error:\s*403\b/i,                 kind: 'permission_denied', summary: 'Provider rejected request (403 forbidden)' },
+];
+
+/**
+ * Scan a captured tmux pane for terminal upstream-API failures.
+ * Returns the first match, or null if none. Safe to call frequently — pure
+ * regex, no I/O.
+ *
+ * Why we collapse whitespace: real tmux captures wrap long error messages at
+ * the pane width, so a phrase like "usage limit for this billing cycle" can
+ * land across two or three lines. Matching against the raw capture would miss
+ * those. We normalize a copy to a single-spaced string for matching, then
+ * preserve the original for the `raw` diagnostics field.
+ */
+export function detectTerminalApiError(paneOutput: string): TerminalApiError | null {
+  if (!paneOutput) return null;
+  const normalized = paneOutput.replace(/\s+/g, ' ');
+  for (const entry of TERMINAL_API_ERROR_PATTERNS) {
+    const match = normalized.match(entry.re);
+    if (match) {
+      // For raw, find the original line that contained the start of the
+      // match. Approximate: match.index in normalized doesn't map 1:1 to
+      // paneOutput, so just grab the first 240 chars around any line in
+      // paneOutput that contains the matched substring.
+      const matchedText = match[0];
+      const rawIdx = paneOutput.indexOf(matchedText.split(' ')[0] ?? matchedText);
+      const lineStart = rawIdx >= 0 ? paneOutput.lastIndexOf('\n', rawIdx) + 1 : 0;
+      const lineEnd = rawIdx >= 0 ? paneOutput.indexOf('\n', rawIdx) : -1;
+      const raw = paneOutput.slice(lineStart, lineEnd === -1 ? undefined : lineEnd).trim().slice(0, 240);
+      return { kind: entry.kind, summary: entry.summary, raw };
+    }
+  }
+  return null;
+}
+
+/**
  * Wait for Claude Code to reach its interactive prompt (❯) in a tmux session.
  * Polls tmux output until the prompt appears or timeout is reached.
  */

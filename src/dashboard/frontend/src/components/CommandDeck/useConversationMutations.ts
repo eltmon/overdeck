@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { Conversation } from './ConversationList';
@@ -61,6 +61,7 @@ export function useConversationMutations(
 ): ConversationMutations {
   const queryClient = useQueryClient();
   const [forkTarget, setForkTarget] = useState<Conversation | null>(null);
+  const pendingFavoriteNamesRef = useRef(new Set<string>());
 
   const archiveMutation = useMutation({
     mutationFn: archiveConversation,
@@ -93,17 +94,22 @@ export function useConversationMutations(
     mutationFn: ({ name, favorited }: { name: string; favorited: boolean }) =>
       favorited ? unfavoriteConversation(name) : favoriteConversation(name),
     onMutate: async ({ name, favorited }) => {
+      pendingFavoriteNamesRef.current.add(name);
       await queryClient.cancelQueries({ queryKey: ['conversations'] });
-      const prev = queryClient.getQueryData<Conversation[]>(['conversations']);
       queryClient.setQueryData<Conversation[]>(['conversations'], (old) =>
         old?.map((c) => (c.name === name ? { ...c, isFavorited: !favorited } : c)) ?? [],
       );
-      return { prev };
+      return { name, previousFavorited: favorited };
     },
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData(['conversations'], ctx.prev);
+    onError: (_err, vars, ctx) => {
+      const name = ctx?.name ?? vars.name;
+      const previousFavorited = ctx?.previousFavorited ?? vars.favorited;
+      queryClient.setQueryData<Conversation[]>(['conversations'], (old) =>
+        old?.map((c) => (c.name === name ? { ...c, isFavorited: previousFavorited } : c)) ?? [],
+      );
     },
-    onSettled: () => {
+    onSettled: (_data, _error, vars) => {
+      pendingFavoriteNamesRef.current.delete(vars.name);
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
   });
@@ -146,7 +152,10 @@ export function useConversationMutations(
     archive: (name) => archiveMutation.mutate(name),
     stop: (name) => { if (!stopMutation.isPending) stopMutation.mutate(name); },
     rename: (opts) => renameMutation.mutate(opts),
-    toggleFavorite: (opts) => { if (!favoriteMutation.isPending) favoriteMutation.mutate(opts); },
+    toggleFavorite: (opts) => {
+      if (pendingFavoriteNamesRef.current.has(opts.name)) return;
+      favoriteMutation.mutate(opts);
+    },
     openForkModal,
     submitFork,
     forkTarget,

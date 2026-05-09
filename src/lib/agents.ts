@@ -1,12 +1,13 @@
 import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, appendFileSync, unlinkSync, statSync } from 'fs';
 import { readFile, readdir } from 'fs/promises';
+import { Agent as HttpAgent, request as httpRequest } from 'node:http';
 import { join, resolve, dirname } from 'path';
 import { homedir } from 'os';
 import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
 import { AGENTS_DIR } from './paths.js';
-import { getClaudePermissionFlagsString } from './claude-permissions.js';
+import { getClaudePermissionFlagsString, resolvePermissionMode } from './claude-permissions.js';
 import { createSession, createSessionAsync, killSession, killSessionAsync, sendKeysAsync, sendRawKeystrokeAsync, sessionExists, sessionExistsAsync, getAgentSessions, getAgentSessionsAsync, capturePane, capturePaneAsync, listPaneValues, listPaneValuesAsync, waitForClaudePrompt } from './tmux.js';
 import { initHook, checkHook, generateFixedPointPrompt } from './hooks.js';
 import { startWork, completeWork, getAgentCV } from './cv.js';
@@ -23,7 +24,7 @@ import type { AuthMode } from './subscription-types.js';
 import { readCavemanVariant } from './caveman/workspace.js';
 import { loadConfig } from './config.js';
 import { getOpenAIAuthStatus, getOpenAIAuthStatusSync } from './openai-auth.js';
-import { getCliproxyClientEnv } from './cliproxy.js';
+import { bridgeGeminiAuthToCliproxyAsync, getCliproxyClientEnv } from './cliproxy.js';
 import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix, resolveProjectFromIssue } from './projects.js';
@@ -31,13 +32,14 @@ import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
 import { generateLauncherScript } from './launcher-generator.js';
 import { logAgentLifecycle } from './persistent-logger.js';
 import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
+import { BRIDGE_TOKEN_HEADER, readBridgeToken, writeBridgeToken } from './bridge-token.js';
 
 const execAsync = promisify(exec);
 
 /**
- * BFS-walk a process subtree rooted at `rootPid` looking for a claude-family
- * runtime (comm == 'claude' or 'claudish'). Returns true if any process in the
- * tree matches, false if the tree exists but no match, false on any error.
+ * BFS-walk a process subtree rooted at `rootPid` looking for the Claude Code
+ * runtime (comm == 'claude'). Returns true if any process in the tree matches,
+ * false if the tree exists but no match, false on any error.
  *
  * Used by sendAgentMessage zombie detection. pane_pid is the tmux pane's root
  * process, which is bash for work-agent launchers (`bash launcher.sh`) but
@@ -54,7 +56,7 @@ async function hasAgentRuntimeInSubtree(rootPid: string): Promise<boolean> {
     try {
       const { stdout: comm } = await execAsync(`ps -p ${pid} -o comm=`);
       const name = comm.trim();
-      if (name === 'claude' || name === 'claudish') return true;
+      if (name === 'claude') return true;
     } catch {
       continue;
     }
@@ -95,10 +97,6 @@ const CLI_PROXY_MODEL_ALIASES: Record<string, string> = {
   'gpt-5.5-pro': 'gpt-5.5',
   'gpt-5.4-pro': 'gpt-5.4',
 };
-
-export async function getLaunchModelForModel(model: string): Promise<string> {
-  return getClaudishPrefix(model, await getProviderAuthMode(model));
-}
 
 /**
  * Panopticon pipeline agent types that map 1:1 to .claude/agents/pan-<type>-agent.md
@@ -146,46 +144,46 @@ export async function getAgentRuntimeBaseCommand(
   const provider = getProviderForModel(model);
   const permissionFlags = getClaudePermissionFlagsString();
   // PAN-982: --name <agentId> creates a human-readable Claude session name discoverable via
-  // `claude --resume`. Claudish forwards unrecognized flags to Claude Code, so --name works
-  // there too.
+  // `claude --resume`.
   const nameFlag = agentName ? ` --name ${agentName}` : '';
   // PAN-982: When agentType is provided, select the matching .claude/agents/pan-<type>-agent.md
   // definition. The agent frontmatter declares model, permissionMode, tools, and per-agent hooks,
-  // so we omit --dangerously-skip-permissions/--permission-mode and (for Anthropic models) --model.
+  // so we usually omit --permission-mode and (for Anthropic models) --model.
   // Non-Anthropic providers still need --model to pin the routed model id, since the
   // frontmatter `model:` only accepts Anthropic identifiers.
   const agentFlag = agentType ? ` --agent ${panopticonAgentName(agentType)}` : '';
-
-  if (provider.compatibility === 'direct') {
-    if (agentType) {
-      // Anthropic direct: --agent fully replaces --model and permission flags.
-      return `claude${agentFlag}${nameFlag}`;
-    }
-    return `claude ${permissionFlags} --model ${model}${nameFlag}`;
-  }
+  // When the user has opted into full bypass (PAN_YOLO=true or claude.permissionMode=bypass
+  // in config), --dangerously-skip-permissions is added on top of --agent. The agent
+  // frontmatter's permissionMode: bypassPermissions only bypasses prompts INSIDE cwd —
+  // cross-directory reads (e.g. ~/.panopticon/cliproxy/, ~/pan-tts/) still prompt without
+  // DSP. The flag is passed through ahead of --agent so it applies before frontmatter is
+  // resolved.
+  const bypassWithAgent = agentType && resolvePermissionMode() === 'bypass'
+    ? ' --dangerously-skip-permissions'
+    : '';
 
   // OpenAI subscription → local CLIProxyAPI sidecar exposes an
   // Anthropic-compatible /v1/messages endpoint, so Claude Code can drive
-  // gpt-* models directly via ANTHROPIC_BASE_URL (no claudish wrapper).
+  // gpt-* models directly via ANTHROPIC_BASE_URL (no wrapper process).
   // The provider env vars are injected separately by getProviderEnvForModel.
   if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
     // CLIProxy supports gpt-5.x but not the -pro variant; map aliases to real names.
     const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
     if (agentType) {
       // CLIProxy: --agent + --model override (frontmatter model: only accepts Anthropic ids).
-      return `claude${agentFlag} --model ${resolvedModel}${nameFlag}`;
+      return `claude${bypassWithAgent}${agentFlag} --model ${resolvedModel}${nameFlag}`;
     }
     return `claude ${permissionFlags} --model ${resolvedModel}${nameFlag}`;
   }
 
-  // Claudish wrapper path — claudish ≤7.0.3 flag passthrough is broken (Commander.js
-  // rejects --agent, --name as unknown). Skip Claude Code-specific flags; model +
-  // permissions are set directly, workspace CLAUDE.md + vBRIEF provide agent context.
-  // Force bypass: `--permission-mode auto` is a Claude Code research-preview feature
-  // and doesn't translate through claudish to MiniMax/Kimi/GLM/OpenRouter/Mimo backends.
-  const routedModel = await getLaunchModelForModel(model);
-  const claudishFlags = getClaudePermissionFlagsString('bypass');
-  return `claudish -i --model ${routedModel} ${claudishFlags}`;
+  if (agentType) {
+    // Anthropic direct: --agent fully replaces --model. Non-Anthropic
+    // direct providers still need --model because agent frontmatter model:
+    // only accepts Anthropic identifiers.
+    const modelFlag = provider.name === 'anthropic' ? '' : ` --model ${model}`;
+    return `claude${bypassWithAgent}${agentFlag}${modelFlag}${nameFlag}`;
+  }
+  return `claude ${permissionFlags} --model ${model}${nameFlag}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
@@ -221,6 +219,18 @@ export async function getProviderEnvForModel(model: string): Promise<Record<stri
 
   const apiKey = config.apiKeys[provider.name as keyof typeof config.apiKeys];
 
+  if (provider.name === 'google') {
+    if (!apiKey) {
+      throw new Error(`Google API key not configured. Add GOOGLE_API_KEY in Settings → Google or ~/.panopticon.env before using model "${model}".`);
+    }
+
+    if (!await bridgeGeminiAuthToCliproxyAsync(apiKey)) {
+      throw new Error(`Failed to bridge Google API key into CLIProxy before using model "${model}".`);
+    }
+
+    return getCliproxyClientEnv();
+  }
+
   if (provider.name === 'openai') {
     const authStatus = await getOpenAIAuthStatus();
     if (authStatus.loggedIn) {
@@ -229,15 +239,18 @@ export async function getProviderEnvForModel(model: string): Promise<Record<stri
       // Anthropic-compatible endpoint and never needs an API key.
       return getCliproxyClientEnv();
     }
+
+    const configuredKey = apiKey || authStatus.hasOpenAIApiKey;
+    throw new Error(
+      configuredKey
+        ? `OpenAI API-key routing is no longer supported for model "${model}" because api.openai.com does not expose an Anthropic-compatible /v1/messages endpoint. Sign in with a Codex/ChatGPT subscription via \`pan admin specialists codex login\` or Dashboard Settings → Codex Login.`
+        : `Codex/ChatGPT subscription login required for OpenAI model "${model}". Sign in via \`pan admin specialists codex login\` or Dashboard Settings → Codex Login.`,
+    );
   }
 
   if (apiKey) {
     await validateProviderHealth(model, apiKey);
     return getProviderEnv(provider, apiKey);
-  }
-
-  if (provider.name === 'openai' && (await getOpenAIAuthStatus()).loggedIn) {
-    return getCliproxyClientEnv();
   }
 
   throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);
@@ -252,6 +265,10 @@ const PROVIDER_ENV_KEYS = [
   'ANTHROPIC_BASE_URL',
   'ANTHROPIC_AUTH_TOKEN',
   'ANTHROPIC_DEFAULT_HAIKU_MODEL',
+  'ANTHROPIC_DEFAULT_OPUS_MODEL',
+  'ANTHROPIC_DEFAULT_SONNET_MODEL',
+  'ANTHROPIC_SMALL_FAST_MODEL',
+  'CLAUDE_CODE_SUBAGENT_MODEL',
   'OPENAI_API_KEY',
   'GEMINI_API_KEY',
   'API_TIMEOUT_MS',
@@ -264,21 +281,11 @@ export async function getProviderExportsForModel(model: string): Promise<string>
   const exportLines = Object.entries(envVars)
     .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`);
 
-  // claudish bundles an older Claude Code that crashes on some model metadata.
-  // Point CLAUDE_PATH at the system binary so claudish uses the global install.
-  const provider = getProviderForModel(model as ModelId);
-  if (provider.compatibility === 'claudish') {
-    try {
-      const claudePath = execSync('which claude', { encoding: 'utf8' }).trim();
-      if (claudePath) exportLines.push(`export CLAUDE_PATH="${claudePath}"`);
-    } catch { /* system claude not found — claudish will use its bundled copy */ }
-  }
-
   return [...unsetLines, ...exportLines].join('\n') + '\n';
 }
 
 /**
- * Build a sanitized env for programmatically spawning `claude`/`claudish`.
+ * Build a sanitized env for programmatically spawning `claude`.
  *
  * The dashboard parent process may inherit provider env vars (e.g.
  * ANTHROPIC_BASE_URL pointing at the CLIProxy sidecar) that would mis-route
@@ -313,80 +320,6 @@ export async function getProviderTmuxFlags(model: string): Promise<string> {
     flags += ` -e ${key}="${value.replace(/"/g, '\\"')}"`;
   }
   return flags;
-}
-
-/**
- * claudish prefix mapping: auth mode → provider prefix for OpenAI models.
- *
- * claudish routes models using the provider@model syntax:
- *   oai@model  → OpenAI Direct API (API key auth)
- *   cx@model  → ChatGPT OAuth subscription (PLUS/PRO tiers)
- *   go@model  → Google OAuth CodeAssist
- *
- * cx@ is the ChatGPT subscription prefix (confirmed in claudish v6.12+).
- * Note: cx@ is for ChatGPT OAuth, distinct from oai@ which uses OpenAI API keys.
- */
-const CLAUDISH_OPENAI_PREFIX: Record<string, string> = {
-  'api-key': 'oai',
-  subscription: 'cx',
-};
-
-/**
- * Get the claudish prefix for a model based on auth mode.
- *
- * Anthropic models: no prefix (use direct claude CLI).
- * OpenAI models: prefix depends on auth mode (oai@ or cx@).
- * Google models (CodeAssist OAuth): go@ prefix.
- *
- * @param model   Model ID (e.g. 'gpt-5.4', 'claude-sonnet-4-6')
- * @param authMode Auth mode: 'api-key' or 'subscription' (undefined = api-key default)
- * @returns Prefixed model string for claudish, or bare model if not applicable
- */
-export function getClaudishPrefix(model: string, authMode?: string): string {
-  // Anthropic models — use direct claude CLI, no prefix needed
-  if (model.startsWith('claude-')) {
-    return model;
-  }
-
-  // OpenAI models — prefix depends on auth mode
-  if (model.startsWith('gpt-') || model.startsWith('o') && !model.startsWith('ollama')) {
-    const prefix = CLAUDISH_OPENAI_PREFIX[authMode ?? 'api-key'] ?? 'oai';
-    return `${prefix}@${model}`;
-  }
-
-  // Google CodeAssist OAuth — go@ prefix
-  if (model.startsWith('gemini-') && authMode === 'subscription') {
-    return `go@${model}`;
-  }
-
-  // Kimi models — kc@ prefix routes to api.kimi.com/coding/v1 (kimi-coding provider).
-  // sk-kimi-* keys are coding keys, NOT moonshot platform keys (kimi@ → api.moonshot.ai).
-  if (['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(model)) {
-    return `kc@${model}`;
-  }
-
-  // MiniMax models — explicit mm@ prefix
-  if (['minimax-m2.7', 'minimax-m2.7-highspeed'].includes(model)) {
-    return `mm@${model}`;
-  }
-
-  // Z.AI (GLM) models — explicit zai@ prefix
-  if (['glm-5.1', 'glm-4.7', 'glm-4.7-flash'].includes(model)) {
-    return `zai@${model}`;
-  }
-
-  // OpenRouter model IDs always contain '/'
-  if (model.includes('/')) {
-    return `or@${model}`;
-  }
-
-  // Mimo — claudish doesn't auto-detect, use custom URL syntax
-  if (model.startsWith('mimo-')) {
-    return `https://token-plan-sgp.xiaomimimo.com/anthropic/${model}`;
-  }
-
-  // Other providers — return bare model (fallback to default routing)
-  return model;
 }
 
 // ============================================================================
@@ -562,6 +495,29 @@ function panopticonHomeForChannels(): string {
   return process.env.PANOPTICON_HOME ?? join(homedir(), '.panopticon');
 }
 
+const bridgeHttpAgents = new Map<string, HttpAgent>();
+
+function getBridgeHttpAgent(socketPath: string): HttpAgent {
+  const existing = bridgeHttpAgents.get(socketPath);
+  if (existing) {
+    return existing;
+  }
+  const agent = new HttpAgent({
+    keepAlive: true,
+    maxSockets: 1,
+    maxFreeSockets: 1,
+  });
+  bridgeHttpAgents.set(socketPath, agent);
+  return agent;
+}
+
+function destroyBridgeHttpAgent(socketPath: string): void {
+  const agent = bridgeHttpAgents.get(socketPath);
+  if (!agent) return;
+  bridgeHttpAgents.delete(socketPath);
+  agent.destroy();
+}
+
 /**
  * Append a delivery-event log line to the per-agent bridge log. Best-effort.
  */
@@ -600,52 +556,50 @@ async function postUnixSocketJson(
   socketPath: string,
   body: unknown,
   timeoutMs: number,
+  bridgeToken: string,
 ): Promise<{ status: number; body: string }> {
-  const { connect } = await import('node:net');
+  const payload = JSON.stringify(body);
+  const agent = getBridgeHttpAgent(socketPath);
+
   return new Promise((resolveCall, reject) => {
-    const payload = Buffer.from(JSON.stringify(body), 'utf-8');
-    const request =
-      `POST / HTTP/1.1\r\n` +
-      `Host: localhost\r\n` +
-      `Content-Type: application/json\r\n` +
-      `Content-Length: ${payload.byteLength}\r\n` +
-      `Connection: close\r\n` +
-      `\r\n`;
+    const req = httpRequest(
+      {
+        socketPath,
+        path: '/',
+        method: 'POST',
+        agent,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+          [BRIDGE_TOKEN_HEADER]: bridgeToken,
+        },
+      },
+      (res) => {
+        let responseBody = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => {
+          responseBody += chunk;
+        });
+        res.on('end', () => {
+          const status = res.statusCode ?? 0;
+          if (status >= 200 && status < 300) {
+            resolveCall({ status, body: responseBody });
+            return;
+          }
+          reject(new Error(`socket POST: status ${status}: ${responseBody.slice(0, 100)}`));
+        });
+      },
+    );
 
-    const socket = connect(socketPath);
-    let responseBuf = Buffer.alloc(0);
-    const timer = setTimeout(() => {
-      socket.destroy(new Error('socket POST timeout'));
-    }, timeoutMs);
-
-    socket.once('connect', () => {
-      socket.write(request);
-      socket.write(payload);
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error('socket POST timeout'));
     });
-    socket.on('data', (chunk: Buffer) => {
-      responseBuf = Buffer.concat([responseBuf, chunk]);
-    });
-    socket.once('error', (err: Error) => {
-      clearTimeout(timer);
+    req.on('error', (err: Error) => {
+      destroyBridgeHttpAgent(socketPath);
       reject(err);
     });
-    socket.once('close', () => {
-      clearTimeout(timer);
-      const text = responseBuf.toString('utf-8');
-      const m = /^HTTP\/1\.[01] (\d{3})/.exec(text);
-      if (!m) {
-        reject(new Error('socket POST: invalid HTTP response'));
-        return;
-      }
-      const status = parseInt(m[1], 10);
-      const split = text.indexOf('\r\n\r\n');
-      const respBody = split >= 0 ? text.slice(split + 4) : '';
-      if (status >= 200 && status < 300) {
-        resolveCall({ status, body: respBody });
-      } else {
-        reject(new Error(`socket POST: status ${status}: ${respBody.slice(0, 100)}`));
-      }
-    });
+    req.write(payload);
+    req.end();
   });
 }
 
@@ -691,11 +645,23 @@ export async function deliverAgentMessage(
     return;
   }
 
+  const bridgeToken = readBridgeToken(normalizedId);
+  if (!bridgeToken) {
+    await appendChannelDeliveryLog(normalizedId, {
+      path: 'tmux',
+      reason: 'bridge-token-missing',
+      caller,
+    });
+    await sendKeysAsync(normalizedId, message);
+    return;
+  }
+
   try {
     await postUnixSocketJson(
       socketPath,
       { content: message, meta: { caller } },
       2000,
+      bridgeToken,
     );
     await appendChannelDeliveryLog(normalizedId, { path: 'channel', caller });
     return;
@@ -709,6 +675,51 @@ export async function deliverAgentMessage(
     await sendKeysAsync(normalizedId, message);
     return;
   }
+}
+
+export async function deliverAgentPermissionDecision(
+  agentId: string,
+  requestId: string,
+  behavior: 'allow' | 'deny',
+): Promise<void> {
+  const normalizedId = normalizeAgentId(agentId);
+
+  let state: AgentState | null = null;
+  try {
+    state = await getAgentStateAsync(normalizedId);
+  } catch {
+    state = null;
+  }
+
+  if (!state?.channelsEnabled) {
+    throw new Error(`agent ${normalizedId} is not using Claude channels`);
+  }
+
+  const socketPath = join(panopticonHomeForChannels(), 'sockets', `agent-${normalizedId}.sock`);
+  if (!existsSync(socketPath)) {
+    throw new Error(`bridge socket missing for ${normalizedId}`);
+  }
+
+  const bridgeToken = readBridgeToken(normalizedId);
+  if (!bridgeToken) {
+    throw new Error(`bridge token missing for ${normalizedId}`);
+  }
+
+  await postUnixSocketJson(
+    socketPath,
+    {
+      type: 'permission_response',
+      requestId,
+      behavior,
+    },
+    2000,
+    bridgeToken,
+  );
+
+  await appendChannelDeliveryLog(normalizedId, {
+    path: 'channel',
+    caller: `permission-response:${requestId}:${behavior}`,
+  });
 }
 
 /**
@@ -759,8 +770,8 @@ export function decideChannelsForWorkAgent(
   }
 
   // Runtime gate. The runtime field is 'claude' for Claude Code; specialised
-  // launchers set it to 'codex' / 'cursor' / 'gemini' / 'claudish' and those
-  // are not Channel-capable.
+  // launchers set it to 'codex' / 'cursor' / 'gemini' and those are not
+  // Channel-capable.
   const runtime = state.runtime;
   if (runtime !== 'claude' && runtime !== 'claude-code') {
     log(false, `runtime-${runtime}`);
@@ -1600,6 +1611,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   let channelsBridgeMcpConfig: string | undefined;
   if (channelsDecision.eligible) {
     channelsBridgeMcpConfig = join(options.workspace, '.pan', 'agent-mcp.json');
+    writeBridgeToken(agentId);
     await writeChannelsBridgeMcpConfig(channelsBridgeMcpConfig, agentId);
     state.channelsEnabled = true;
     saveAgentState(state);
@@ -2358,7 +2370,10 @@ export function detectCrashedAgents(): AgentState[] {
 /**
  * Recover a crashed agent by restarting it with context
  */
-export async function recoverAgent(agentId: string): Promise<AgentState | null> {
+export async function recoverAgent(
+  agentId: string,
+  opts: { modelOverride?: string } = {},
+): Promise<AgentState | null> {
   const normalizedId = normalizeAgentId(agentId);
   logAgentLifecycle(normalizedId, 'recoverAgent called');
   const state = getAgentState(normalizedId);
@@ -2370,6 +2385,10 @@ export async function recoverAgent(agentId: string): Promise<AgentState | null> 
 
   // Runtime state files may lack required fields (PAN-150)
   if (!state.id) state.id = normalizedId;
+  if (opts.modelOverride) {
+    state.model = opts.modelOverride;
+    logAgentLifecycle(normalizedId, `recoverAgent: model overridden → ${opts.modelOverride}`);
+  }
   if (!state.workspace || !state.model) {
     const reason = `[agents] Cannot recover ${normalizedId}: state.json missing workspace or model`;
     console.error(reason);
@@ -2415,8 +2434,10 @@ export async function recoverAgent(agentId: string): Promise<AgentState | null> 
     }
   }
 
-  // Restart the agent with recovery context (YOLO mode - skip permissions)
-  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model, agentId, 'work', state.harness ?? 'claude-code')} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
+  // Restart the agent with recovery context. Agent type is derived from the session id:
+  // planning sessions use the planner definition; everything else uses the work definition.
+  const recoveryAgentType: PanopticonAgentType = normalizedId.startsWith('planning-') ? 'planning' : 'work';
+  const claudeCmd = `${await getAgentRuntimeBaseCommand(state.model, agentId, recoveryAgentType, state.harness ?? 'claude-code')} "${recoveryPrompt.replace(/"/g, '\\"').replace(/\n/g, '\\n')}"`;
   createSession(normalizedId, state.workspace, claudeCmd, {
     env: {
       PANOPTICON_AGENT_ID: normalizedId,

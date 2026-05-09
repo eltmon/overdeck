@@ -1,0 +1,29 @@
+{
+  "vBRIEFInfo": {
+    "version": "0.5",
+    "author": "agent:claude-opus-4-5",
+    "description": "PAN-1025: Relax localStorage 2MB cap in snapshotCache.ts",
+    "created": "2026-05-07T21:00:00Z",
+    "updated": "2026-05-08T09:22:17.661Z"
+  },
+  "plan": {
+    "title": "PAN-1025: Snapshot localStorage cache — relax 2MB cap",
+    "status": "active",
+    "items": [
+      {
+        "id": "workspace-az36",
+        "title": "Bump MAX_BYTES to 8 MB and make issues-stripping a fallback on QuotaExceededError",
+        "status": "completed",
+        "completed": "2026-05-08T09:22:17.661Z"
+      },
+      {
+        "id": "workspace-rad9",
+        "title": "Add tests for snapshotCache QuotaExceededError fallback and 8MB cap",
+        "status": "completed",
+        "completed": "2026-05-08T09:22:17.660Z"
+      }
+    ],
+    "updated": "2026-05-08T09:22:17.661Z",
+    "sequence": 16
+  }
+}

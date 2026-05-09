@@ -478,7 +478,7 @@ describe('work-type-router', () => {
 
       // Smart selector picks best model from enabled providers
       const explore = router.getModel('issue-agent:exploration');
-      expect(explore.model).toBe('gemini-3-flash');
+      expect(explore.model).toBe('gemini-3-flash-preview');
       expect(explore.usedFallback).toBe(false);
 
       // Smart selector picks best implementation model from anthropic+google

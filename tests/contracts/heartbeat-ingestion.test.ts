@@ -82,6 +82,7 @@ describe('PAN-800 bodyToEvent + DomainEvent decode', () => {
     const decoded = decodeCandidate(ev)!
     expect(decoded._tag).toBe('Success')
     expect((ev as any).type).toBe('agent.channel_reply')
+    expect((ev as any).payload.reply.reportedAt).toBe(TS)
   })
 
   it('channel_reply rejects invalid kind with targeted error', () => {

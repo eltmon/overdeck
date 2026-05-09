@@ -95,14 +95,11 @@ export function httpHandler<R, E>(
         }
         const error = Cause.squash(cause);
         const message = error instanceof Error ? error.message : 'Internal server error';
-        // Try to capture request method+URL for the log, but don't fail the
-        // handler if the service isn't in context (e.g., unit tests that invoke
-        // httpHandler without a full HTTP layer). `Effect.serviceOption` returns
-        // None instead of throwing when the service is missing.
-        const reqOpt = yield* Effect.serviceOption(HttpServerRequest.HttpServerRequest);
-        const route = Option.isSome(reqOpt)
-          ? `${reqOpt.value.method} ${reqOpt.value.url}`
-          : 'unknown';
+        const reqOption = yield* Effect.serviceOption(HttpServerRequest);
+        const route = Option.match(reqOption, {
+          onNone: () => 'unknown',
+          onSome: (req) => `${req.method} ${req.url}`,
+        });
         console.error(`[httpHandler] Unhandled error on ${route}:\n${Cause.pretty(cause)}`);
         return jsonResponse({ error: message }, { status: 500 });
       }),

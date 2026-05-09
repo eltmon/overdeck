@@ -12,6 +12,7 @@ import {
   selectSpecialistList,
   selectReviewStatus,
   selectAgentOutput,
+  selectChannelPermissionRequests,
   selectIsBootstrapped,
   selectResources,
   selectIssues,
@@ -45,6 +46,7 @@ const baseSpec: SpecialistSnapshot = {
 
 const emptyState: DashboardState = {
   bootstrapComplete: false,
+  snapshotTimestamp: null,
   sequence: 0,
   agentsById: {},
   agentRuntimeById: {},
@@ -54,7 +56,23 @@ const emptyState: DashboardState = {
   agentOutputById: {},
   issuesRaw: [],
   recentActivity: [],
+  detailedActivity: [],
+  ttsActivity: [],
   shadowInferenceByIssueId: {},
+  turnDiffSummariesByAgentId: {},
+  channelPermissionRequestsById: {},
+  dashboardLifecycle: {
+    active: false,
+    reason: null,
+    issueId: null,
+    trigger: null,
+    startedAt: null,
+    completedAt: null,
+    failedAt: null,
+    error: null,
+  },
+  conversationsCompactingByName: {},
+  conversationsAwaitingPermissionByName: {},
 }
 
 function makeSnapshot(seq = 5): DashboardSnapshot {
@@ -63,6 +81,8 @@ function makeSnapshot(seq = 5): DashboardSnapshot {
     agents: [baseAgent],
     specialists: [baseSpec],
     reviewStatuses: [],
+    issues: [],
+    channelPermissionRequests: [],
     timestamp: '2026-01-01T00:00:00Z',
   }
 }
@@ -310,6 +330,37 @@ describe('selectors', () => {
 
   it('selectResources returns resource stats', () => {
     expect(selectResources(state)).toEqual({ containers: 5, networks: 3 })
+  })
+
+  it('selectChannelPermissionRequests returns pending requests oldest first', () => {
+    const withPermissions: DashboardState = {
+      ...state,
+      channelPermissionRequestsById: {
+        'perm-2': {
+          requestId: 'perm-2',
+          agentId: 'agent-2',
+          issueId: 'PAN-2',
+          toolName: 'Bash',
+          description: 'Run npm test',
+          inputPreview: '{"command":"npm test"}',
+          createdAt: '2026-05-07T18:31:00.000Z',
+        },
+        'perm-1': {
+          requestId: 'perm-1',
+          agentId: 'agent-1',
+          issueId: 'PAN-1',
+          toolName: 'Read',
+          description: 'Read continue file',
+          inputPreview: '{"file":".pan/continue.json"}',
+          createdAt: '2026-05-07T18:30:00.000Z',
+        },
+      },
+    }
+
+    expect(selectChannelPermissionRequests(withPermissions).map((request) => request.requestId)).toEqual([
+      'perm-1',
+      'perm-2',
+    ])
   })
 })
 

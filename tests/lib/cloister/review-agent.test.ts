@@ -528,7 +528,7 @@ describe('waitForReviewer', () => {
       sessionExists, fileExists, killSession,
     });
 
-    expect(result).toBe('completed');
+    expect(result).toEqual({ status: 'completed' });
     expect(fileExists).toHaveBeenCalledWith('/tmp/out.md');
     expect(killSession).not.toHaveBeenCalled();
   });
@@ -542,13 +542,13 @@ describe('waitForReviewer', () => {
       sessionExists, fileExists, killSession,
     });
 
-    expect(result).toBe('completed');
+    expect(result).toEqual({ status: 'completed' });
     expect(fileExists).toHaveBeenCalledWith('/tmp/out.md');
     // Session is kept alive post-completion for dashboard visibility; no killSession call
     expect(killSession).not.toHaveBeenCalled();
   });
 
-  it('returns failed when session exits without output file', async () => {
+  it('returns failed (session_exited) when session exits without output file', async () => {
     const sessionExists = vi.fn().mockResolvedValue(false);
     const fileExists = vi.fn().mockReturnValue(false);
     const killSession = vi.fn().mockResolvedValue(undefined);
@@ -557,11 +557,11 @@ describe('waitForReviewer', () => {
       sessionExists, fileExists, killSession,
     });
 
-    expect(result).toBe('failed');
+    expect(result).toEqual({ status: 'failed', reason: 'session_exited' });
     expect(killSession).not.toHaveBeenCalled();
   });
 
-  it('kills session and returns failed on timeout', async () => {
+  it('kills session and returns failed (timeout) on timeout', async () => {
     const sessionExists = vi.fn().mockResolvedValue(true); // session always running
     const fileExists = vi.fn().mockReturnValue(false);
     const killSession = vi.fn().mockResolvedValue(undefined);
@@ -571,12 +571,12 @@ describe('waitForReviewer', () => {
       sessionExists, fileExists, killSession,
     });
 
-    expect(result).toBe('failed');
+    expect(result).toEqual({ status: 'failed', reason: 'timeout' });
     expect(sessionExists).not.toHaveBeenCalled(); // never entered loop
     expect(killSession).toHaveBeenCalledWith('review-PAN-999-ts-correctness');
   });
 
-  it('returns failed immediately when pane is dead (remain-on-exit keeps session alive)', async () => {
+  it('returns failed (pane_dead) immediately when pane is dead', async () => {
     mockIsPaneDeadAsync.mockResolvedValueOnce(true);
     const sessionExists = vi.fn().mockResolvedValue(true); // session still alive due to remain-on-exit
     const fileExists = vi.fn().mockReturnValue(false);
@@ -587,10 +587,57 @@ describe('waitForReviewer', () => {
       sessionExists, fileExists, killSession, capturePane,
     });
 
-    expect(result).toBe('failed');
+    expect(result).toEqual({ status: 'failed', reason: 'pane_dead' });
     expect(sessionExists).toHaveBeenCalled();
     expect(capturePane).toHaveBeenCalledWith('review-PAN-999-ts-correctness');
     expect(killSession).not.toHaveBeenCalled();
+  });
+
+  it('fails fast with terminal_api_error + structured TerminalApiError when reviewer hits a 403 quota error', async () => {
+    // Repro of the PAN-1015 silent-30-min-timeout: Kimi quota exhausted, the
+    // pane stays alive at the prompt because Claude Code doesn't exit on API
+    // errors — it just prints the message and waits for input. Without
+    // detection this would hit the 30-minute timeout.
+    const sessionExists = vi.fn().mockResolvedValue(true);
+    const fileExists = vi.fn().mockReturnValue(false);
+    const killSession = vi.fn().mockResolvedValue(undefined);
+    const capturePane = vi.fn().mockResolvedValue([
+      '  Please run /login · API Error: 403',
+      '  {"error":{"type":"permission_error","message":"You\'ve reached your usage',
+      '  limit for this billing cycle. Your quota will be refreshed in the next',
+      '  cycle. Upgrade to get more: https://www.kimi.com/code/console"}}',
+      '❯ ',
+    ].join('\n'));
+
+    const result = await waitForReviewer('review-PAN-999-ts-correctness', '/tmp/out.md', 5000, {
+      sessionExists, fileExists, killSession, capturePane,
+    });
+
+    expect(result.status).toBe('failed');
+    if (result.status === 'failed') {
+      expect(result.reason).toBe('terminal_api_error');
+      expect(result.apiError).toBeDefined();
+      expect(result.apiError!.kind).toBe('quota_exhausted');
+      expect(result.apiError!.summary).toMatch(/quota|usage limit/i);
+    }
+    expect(killSession).toHaveBeenCalledWith('review-PAN-999-ts-correctness');
+  });
+
+  it('detects login_required terminal error from "Please run /login" pattern when no quota line is present', async () => {
+    const sessionExists = vi.fn().mockResolvedValue(true);
+    const fileExists = vi.fn().mockReturnValue(false);
+    const killSession = vi.fn().mockResolvedValue(undefined);
+    const capturePane = vi.fn().mockResolvedValue('  Please run /login\n❯ ');
+
+    const result = await waitForReviewer('review-PAN-999-ts-correctness', '/tmp/out.md', 5000, {
+      sessionExists, fileExists, killSession, capturePane,
+    });
+
+    expect(result.status).toBe('failed');
+    if (result.status === 'failed') {
+      expect(result.reason).toBe('terminal_api_error');
+      expect(result.apiError!.kind).toBe('login_required');
+    }
   });
 });
 
@@ -751,7 +798,7 @@ describe('resolveReviewerModel', () => {
   // Template frontmatter uses "haiku"/"sonnet"/"opus" as shorthand. Aliases must
   // be resolved through the work-type router (getModelId) — NOT hard-coded to
   // Anthropic model IDs — so the returned ID is provider-correct when using
-  // claudish, OpenAI, or other providers.
+  // OpenAI, Gemini, or other routed providers.
   it('resolves "haiku" alias via work-type router (not passed through verbatim)', () => {
     const model = resolveReviewerModel({ name: 'unknown-role', focus: [] }, 'haiku');
     expect(model).not.toBe('haiku');
@@ -1181,8 +1228,8 @@ describe('runParallelReview', () => {
 
   it('happy path: all reviewers succeed → synthesis runs → result returned', async () => {
     const spawnFn = vi.fn().mockResolvedValue(undefined);
-    const waitFn = vi.fn().mockResolvedValue('completed');
-    const waitSynthesisFn = vi.fn().mockResolvedValue('completed');
+    const waitFn = vi.fn().mockResolvedValue({ status: 'completed' });
+    const waitSynthesisFn = vi.fn().mockResolvedValue({ status: 'completed' });
     const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
     const parseSynthesisFn = vi.fn().mockResolvedValue(approvedResult);
     const postReviewFn = vi.fn().mockResolvedValue(undefined);
@@ -1205,7 +1252,7 @@ describe('runParallelReview', () => {
 
   it('failure path: reviewer failure aborts synthesis → COMMENTED returned', async () => {
     const spawnFn = vi.fn().mockResolvedValue(undefined);
-    const waitFn = vi.fn().mockResolvedValue('failed'); // all reviewers fail
+    const waitFn = vi.fn().mockResolvedValue({ status: 'failed', reason: 'timeout' }); // all reviewers fail
     const parseSynthesisFn = vi.fn();
     const postReviewFn = vi.fn();
     const resolvePromptTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
@@ -1233,8 +1280,8 @@ describe('runParallelReview', () => {
     mockKillSessionAsync.mockClear();
 
     const spawnFn = vi.fn().mockResolvedValue(undefined);
-    const waitFn = vi.fn().mockResolvedValue('completed');
-    const waitSynthesisFn = vi.fn().mockResolvedValue('completed');
+    const waitFn = vi.fn().mockResolvedValue({ status: 'completed' });
+    const waitSynthesisFn = vi.fn().mockResolvedValue({ status: 'completed' });
     const approvedResult: ReviewResult = { success: true, reviewResult: 'APPROVED', notes: 'LGTM' };
     const parseSynthesisFn = vi.fn().mockResolvedValue(approvedResult);
     const postReviewFn = vi.fn().mockResolvedValue(undefined);
@@ -1264,7 +1311,7 @@ describe('runParallelReview', () => {
     mockKillSessionAsync.mockClear();
 
     const spawnFn = vi.fn().mockResolvedValue(undefined);
-    const waitFn = vi.fn().mockResolvedValue('failed');
+    const waitFn = vi.fn().mockResolvedValue({ status: 'failed', reason: 'timeout' });
     const parseSynthesisFn = vi.fn();
     const postReviewFn = vi.fn();
     const resolvePromptTemplateFn = (name: string) => join(tmpDir, 'agents', `${name}.md`);
@@ -1326,10 +1373,10 @@ describe('dispatch failure reviewStatus regression', () => {
   });
 });
 
-// ── spawnReviewer claudish routing regression (PAN-540) ───────────────────────
-// Verifies that spawnReviewer uses getAgentRuntimeBaseCommand() so claudish
-// providers (OpenAI, Google) get routed correctly instead of using the old
-// hardcoded `claude --model` which only works for direct Anthropic-compatible providers.
+// ── spawnReviewer provider-routing regression (PAN-540) ───────────────────────
+// Verifies that spawnReviewer uses getAgentRuntimeBaseCommand() so routed
+// providers (OpenAI, Google, direct Anthropic-compatible providers) get the same
+// command construction as work agents instead of using a hardcoded `claude --model`.
 describe('spawnReviewer runtime command routing regression', () => {
   it('review-agent.ts imports resolveSpecialistBaseCommand from router.js (PAN-636: harness-aware routing)', async () => {
     const { readFileSync } = await import('fs');

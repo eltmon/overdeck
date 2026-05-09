@@ -77,7 +77,7 @@ export function generateRouterConfig(settings: SettingsConfig): RouterConfig {
       apiKey: settings.api_keys.google.startsWith('$')
         ? settings.api_keys.google
         : settings.api_keys.google,
-      models: ['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview'],
+      models: ['gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview'],
     });
   }
 
@@ -155,7 +155,7 @@ export function generateRouterConfigFromWorkTypes(): RouterConfig {
       name: 'google',
       baseURL: 'https://generativelanguage.googleapis.com/v1beta',
       apiKey: apiKeys.google.startsWith('$') ? apiKeys.google : apiKeys.google,
-      models: ['gemini-3.1-pro-preview', 'gemini-3-flash', 'gemini-3.1-flash-lite-preview'],
+      models: ['gemini-3.1-pro-preview', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview'],
     });
   }
 

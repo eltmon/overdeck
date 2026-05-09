@@ -79,10 +79,10 @@ describe('cleanupMergedLabels', () => {
       expect(calls.some(c => c.includes('--add-label') && c.includes('"merged"'))).toBe(true);
     });
 
-    it('calls gh issue edit to remove workflow labels present on issue', async () => {
+    it('calls gh issue edit to remove workflow labels that are present on the issue', async () => {
       mockExecAsync.mockImplementation(async (command: string) => {
         if (command.includes('gh issue view') && command.includes('--json labels')) {
-          return { stdout: 'in-review\nmerge-agent\n', stderr: '' };
+          return { stdout: 'in-review\nin-progress\n', stderr: '' };
         }
         return { stdout: '', stderr: '' };
       });
@@ -91,10 +91,13 @@ describe('cleanupMergedLabels', () => {
 
       const calls = mockExecAsync.mock.calls.map((c: any[]) => c[0] as string);
       const removeCalls = calls.filter(c => c.includes('--remove-label'));
-      expect(removeCalls).toHaveLength(2);
-      expect(removeCalls.some(c => c.includes('"in-review"'))).toBe(true);
-      expect(removeCalls.some(c => c.includes('"merge-agent"'))).toBe(true);
-      expect(removeCalls.some(c => c.includes('"in-progress"'))).toBe(false);
+      expect(removeCalls.length).toBe(2);
+      expect(removeCalls).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('"in-review"'),
+          expect.stringContaining('"in-progress"'),
+        ]),
+      );
     });
 
     it('returns stepFailed when gh CLI throws', async () => {

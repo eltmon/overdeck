@@ -92,50 +92,48 @@ export function getReviewButtonState(
 export function getFriendlyModelName(fullModel: string | undefined | null): string {
   if (!fullModel) return 'Unknown';
 
-  // Handle claudish-prefixed models: oai@gpt-5.4, cx@o3, go@gemini-3.1-pro-preview
-  const prefixMatch = fullModel.match(/^((?:oai|cx|go)@)/);
-  const prefix = prefixMatch ? prefixMatch[1] : null;
-  const backingModel = prefix ? fullModel.slice(prefix.length) : fullModel;
+  // Normalize legacy provider-prefixed models without surfacing a routing badge.
+  const backingModel = fullModel.replace(/^(?:oai|cx|go)@/, '');
 
   // Anthropic models
-  if (backingModel.includes('opus-4-6') || backingModel.includes('opus-4.6')) return prefix ? `Opus 4.6 (${prefix})` : 'Opus 4.6';
-  if (backingModel.includes('opus-4-5') || backingModel.includes('opus-4.5')) return prefix ? `Opus 4.5 (${prefix})` : 'Opus 4.5';
-  if (backingModel.includes('opus-4-1')) return prefix ? `Opus 4.1 (${prefix})` : 'Opus 4.1';
-  if (backingModel.includes('opus-4') || backingModel.includes('opus')) return prefix ? `Opus 4 (${prefix})` : 'Opus 4';
-  if (backingModel.includes('sonnet-4-6') || backingModel.includes('sonnet-4.6')) return prefix ? `Sonnet 4.6 (${prefix})` : 'Sonnet 4.6';
-  if (backingModel.includes('sonnet-4-5') || backingModel.includes('sonnet-4.5')) return prefix ? `Sonnet 4.5 (${prefix})` : 'Sonnet 4.5';
-  if (backingModel.includes('sonnet-4') || backingModel.includes('sonnet')) return prefix ? `Sonnet 4 (${prefix})` : 'Sonnet 4';
-  if (backingModel.includes('haiku-4-5') || backingModel.includes('haiku-4.5')) return prefix ? `Haiku 4.5 (${prefix})` : 'Haiku 4.5';
-  if (backingModel.includes('haiku-3')) return prefix ? `Haiku 3 (${prefix})` : 'Haiku 3';
-  if (backingModel.includes('haiku')) return prefix ? `Haiku 4.5 (${prefix})` : 'Haiku 4.5';
+  if (backingModel.includes('opus-4-6') || backingModel.includes('opus-4.6')) return 'Opus 4.6';
+  if (backingModel.includes('opus-4-5') || backingModel.includes('opus-4.5')) return 'Opus 4.5';
+  if (backingModel.includes('opus-4-1')) return 'Opus 4.1';
+  if (backingModel.includes('opus-4') || backingModel.includes('opus')) return 'Opus 4';
+  if (backingModel.includes('sonnet-4-6') || backingModel.includes('sonnet-4.6')) return 'Sonnet 4.6';
+  if (backingModel.includes('sonnet-4-5') || backingModel.includes('sonnet-4.5')) return 'Sonnet 4.5';
+  if (backingModel.includes('sonnet-4') || backingModel.includes('sonnet')) return 'Sonnet 4';
+  if (backingModel.includes('haiku-4-5') || backingModel.includes('haiku-4.5')) return 'Haiku 4.5';
+  if (backingModel.includes('haiku-3')) return 'Haiku 3';
+  if (backingModel.includes('haiku')) return 'Haiku 4.5';
 
   // OpenAI models
-  if (backingModel.includes('gpt-5.5-pro')) return prefix ? `GPT-5.5 Pro (${prefix})` : 'GPT-5.5 Pro';
-  if (backingModel.includes('gpt-5.5-mini')) return prefix ? `GPT-5.5 Mini (${prefix})` : 'GPT-5.5 Mini';
-  if (backingModel.includes('gpt-5.5-nano')) return prefix ? `GPT-5.5 Nano (${prefix})` : 'GPT-5.5 Nano';
-  if (backingModel.includes('gpt-5.5')) return prefix ? `GPT-5.5 (${prefix})` : 'GPT-5.5';
-  if (backingModel.includes('gpt-5.4-pro')) return prefix ? `GPT-5.4 Pro (${prefix})` : 'GPT-5.4 Pro';
-  if (backingModel.includes('gpt-5.4-mini')) return prefix ? `GPT-5.4 Mini (${prefix})` : 'GPT-5.4 Mini';
-  if (backingModel.includes('gpt-5.4-nano')) return prefix ? `GPT-5.4 Nano (${prefix})` : 'GPT-5.4 Nano';
-  if (backingModel.includes('gpt-5.4')) return prefix ? `GPT-5.4 (${prefix})` : 'GPT-5.4';
-  if (backingModel.includes('gpt-5.3')) return prefix ? `GPT-5.3 (${prefix})` : 'GPT-5.3';
-  if (backingModel.includes('gpt-5.2')) return prefix ? `GPT-5.2 (${prefix})` : 'GPT-5.2';
-  if (backingModel.includes('gpt-5.1')) return prefix ? `GPT-5.1 (${prefix})` : 'GPT-5.1';
-  if (backingModel.includes('gpt-5')) return prefix ? `GPT-5 (${prefix})` : 'GPT-5';
-  if (backingModel.includes('gpt-4o')) return prefix ? `GPT-4o (${prefix})` : 'GPT-4o';
-  if (backingModel.includes('gpt-4')) return prefix ? `GPT-4 (${prefix})` : 'GPT-4';
-  if (backingModel.includes('gpt-3')) return prefix ? `GPT-3 (${prefix})` : 'GPT-3';
-  if (backingModel.includes('o4-mini') || backingModel === 'o4-mini') return prefix ? `O4 Mini (${prefix})` : 'O4 Mini';
-  if (backingModel.includes('o3-mini')) return prefix ? `O3 Mini (${prefix})` : 'O3 Mini';
-  if (backingModel.includes('o3')) return prefix ? `O3 (${prefix})` : 'O3';
-  if (backingModel.includes('o1')) return prefix ? `O1 (${prefix})` : 'O1';
+  if (backingModel.includes('gpt-5.5-pro')) return 'GPT-5.5 Pro';
+  if (backingModel.includes('gpt-5.5-mini')) return 'GPT-5.5 Mini';
+  if (backingModel.includes('gpt-5.5-nano')) return 'GPT-5.5 Nano';
+  if (backingModel.includes('gpt-5.5')) return 'GPT-5.5';
+  if (backingModel.includes('gpt-5.4-pro')) return 'GPT-5.4 Pro';
+  if (backingModel.includes('gpt-5.4-mini')) return 'GPT-5.4 Mini';
+  if (backingModel.includes('gpt-5.4-nano')) return 'GPT-5.4 Nano';
+  if (backingModel.includes('gpt-5.4')) return 'GPT-5.4';
+  if (backingModel.includes('gpt-5.3')) return 'GPT-5.3';
+  if (backingModel.includes('gpt-5.2')) return 'GPT-5.2';
+  if (backingModel.includes('gpt-5.1')) return 'GPT-5.1';
+  if (backingModel.includes('gpt-5')) return 'GPT-5';
+  if (backingModel.includes('gpt-4o')) return 'GPT-4o';
+  if (backingModel.includes('gpt-4')) return 'GPT-4';
+  if (backingModel.includes('gpt-3')) return 'GPT-3';
+  if (backingModel.includes('o4-mini') || backingModel === 'o4-mini') return 'O4 Mini';
+  if (backingModel.includes('o3-mini')) return 'O3 Mini';
+  if (backingModel.includes('o3')) return 'O3';
+  if (backingModel.includes('o1')) return 'O1';
 
   // Google models
-  if (backingModel.includes('gemini-3.1-pro-preview') || backingModel.includes('gemini-3.1-pro')) return prefix ? `Gemini 3.1 Pro (${prefix})` : 'Gemini 3.1 Pro';
-  if (backingModel.includes('gemini-3-flash')) return prefix ? `Gemini 3 Flash (${prefix})` : 'Gemini 3 Flash';
-  if (backingModel.includes('gemini-3')) return prefix ? `Gemini 3 (${prefix})` : 'Gemini 3';
-  if (backingModel.includes('gemini-2.5')) return prefix ? `Gemini 2.5 (${prefix})` : 'Gemini 2.5';
-  if (backingModel.includes('gemini')) return prefix ? `Gemini (${prefix})` : 'Gemini';
+  if (backingModel.includes('gemini-3.1-pro-preview') || backingModel.includes('gemini-3.1-pro')) return 'Gemini 3.1 Pro';
+  if (backingModel.includes('gemini-3-flash')) return 'Gemini 3 Flash';
+  if (backingModel.includes('gemini-3')) return 'Gemini 3';
+  if (backingModel.includes('gemini-2.5')) return 'Gemini 2.5';
+  if (backingModel.includes('gemini')) return 'Gemini';
 
   return fullModel;
 }

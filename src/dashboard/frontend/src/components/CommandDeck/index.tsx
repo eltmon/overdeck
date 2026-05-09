@@ -61,10 +61,28 @@ function groupProjects(issues: ProjectFeature[]): ProjectData[] {
 }
 
 async function fetchProjects(): Promise<ProjectData[]> {
-  const res = await fetch('/api/issues/resource-allocated');
-  if (!res.ok) throw new Error('Failed to fetch resource-allocated issues');
-  const issues = await res.json() as ProjectFeature[];
-  return groupProjects(issues);
+  const [issuesRes, registeredRes] = await Promise.all([
+    fetch('/api/issues/resource-allocated'),
+    fetch('/api/registered-projects'),
+  ]);
+  if (!issuesRes.ok) throw new Error('Failed to fetch resource-allocated issues');
+  if (!registeredRes.ok) throw new Error('Failed to fetch registered projects');
+
+  const issues = await issuesRes.json() as ProjectFeature[];
+  const registered = await registeredRes.json() as { key: string; name: string; path: string }[];
+
+  // Start with projects that have qualifying issues
+  const projectMap = new Map(groupProjects(issues).map(p => [p.name, p]));
+
+  // Add registered projects that have no qualifying issues (empty features list)
+  for (const proj of registered) {
+    const name = proj.name ?? proj.key;
+    if (!projectMap.has(name)) {
+      projectMap.set(name, { name, path: proj.path, features: [] });
+    }
+  }
+
+  return [...projectMap.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 interface IssueCostEntry {
@@ -347,6 +365,20 @@ export function CommandDeck({
       return { ...project, features: nextFeatures };
     });
   }, [projects, sessionTreeMap]);
+
+  // Split projects into active (has features) and inactive (empty features from registered projects with no issues)
+  const { activeProjects, inactiveProjects } = useMemo(() => {
+    const active: typeof projects = [];
+    const inactive: typeof projects = [];
+    for (const project of projectsWithSessions) {
+      if (project.features.length > 0) {
+        active.push(project);
+      } else {
+        inactive.push(project);
+      }
+    }
+    return { activeProjects: active, inactiveProjects: inactive };
+  }, [projectsWithSessions]);
 
   const [containerStats, setContainerStats] = useState<Record<string, ContainerStats>>({});
 
@@ -954,7 +986,7 @@ export function CommandDeck({
               {projectsCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
               <span className={styles.sectionTitle}>Projects</span>
               <span className={styles.segmentCount}>
-                {projects.reduce((sum, p) => sum + p.features.length, 0)}
+                {activeProjects.reduce((sum, p) => sum + p.features.length, 0)}
               </span>
             </div>
             {!projectsCollapsed && (
@@ -970,54 +1002,93 @@ export function CommandDeck({
                     </button>
                   ))}
                 </div>
-                {isLoading && projects.length === 0 ? (
+                {isLoading && activeProjects.length === 0 && inactiveProjects.length === 0 ? (
                   <div className={styles.skeletonList}>
                     <div className={styles.skeletonItem} style={{ width: '60%' }} />
                     <div className={styles.skeletonItem} style={{ width: '80%' }} />
                     <div className={styles.skeletonItem} style={{ width: '45%' }} />
                     <div className={styles.skeletonItem} style={{ width: '70%' }} />
                   </div>
-                ) : projects.length === 0 ? (
+                ) : activeProjects.length === 0 && inactiveProjects.length === 0 ? (
                   <div className={styles.emptyProject}>No projects configured</div>
                 ) : (
-                  projectsWithSessions
-                    .filter((project) => {
-                      const hasConvs = (projectConversations[project.name]?.length ?? 0) > 0;
-                      if (treeFilter === 'all') return project.features.length > 0 || hasConvs;
-                      return project.features.some((feature) =>
-                        (feature.sessions ?? []).some((session) => sessionMatchesFilter(session, treeFilter)),
-                      ) || hasConvs;
-                    })
-                    .map(project => (
-                    <ProjectNode
-                      key={project.path}
-                      name={project.name}
-                      features={project.features}
-                      selectedFeature={selectedFeature}
-                      onSelectFeature={handleSelectFeature}
-                      selectedSessionId={selectedSessionId}
-                      onSelectSession={handleSelectSession}
-                      issueTitles={issueTitles}
-                      issueCosts={issueCosts}
-                      filter={treeFilter}
-                      onStopSession={handleStopSession}
-                      onViewTerminal={handleViewTerminal}
-                      onPauseSession={handlePauseSession}
-                      onResumeSession={handleResumeSession}
-                      onRestartSession={handleRestartSession}
-                      onDeepWipe={handleDeepWipe}
-                      onOpenStateDir={handleOpenStateDir}
-                      onViewJsonl={handleViewJsonl}
-                      onCleanupOrphanedResources={handleCleanupOrphanedResources}
-                      onOpenPlanDialog={handleOpenPlanDialog}
-                      onNewConversation={handleNewProjectConversation}
-                      conversations={projectConversations[project.name] ?? []}
-                      selectedConversation={selectedConversation}
-                      onSelectConversation={handleSelectConversation}
-                      conversationMutations={projectConvMutations}
-                      containerStats={containerStats}
-                    />
-                  ))
+                  <>
+                    {activeProjects
+                      .filter((project) => {
+                        const hasConvs = (projectConversations[project.name]?.length ?? 0) > 0;
+                        if (treeFilter === 'all') return project.features.length > 0 || hasConvs;
+                        return project.features.some((feature) =>
+                          (feature.sessions ?? []).some((session) => sessionMatchesFilter(session, treeFilter)),
+                        ) || hasConvs;
+                      })
+                      .map(project => (
+                      <ProjectNode
+                        key={project.path}
+                        name={project.name}
+                        features={project.features}
+                        selectedFeature={selectedFeature}
+                        onSelectFeature={handleSelectFeature}
+                        selectedSessionId={selectedSessionId}
+                        onSelectSession={handleSelectSession}
+                        issueTitles={issueTitles}
+                        issueCosts={issueCosts}
+                        filter={treeFilter}
+                        onStopSession={handleStopSession}
+                        onViewTerminal={handleViewTerminal}
+                        onPauseSession={handlePauseSession}
+                        onResumeSession={handleResumeSession}
+                        onRestartSession={handleRestartSession}
+                        onDeepWipe={handleDeepWipe}
+                        onOpenStateDir={handleOpenStateDir}
+                        onViewJsonl={handleViewJsonl}
+                        onCleanupOrphanedResources={handleCleanupOrphanedResources}
+                        onOpenPlanDialog={handleOpenPlanDialog}
+                        onNewConversation={handleNewProjectConversation}
+                        conversations={projectConversations[project.name] ?? []}
+                        selectedConversation={selectedConversation}
+                        onSelectConversation={handleSelectConversation}
+                        conversationMutations={projectConvMutations}
+                        containerStats={containerStats}
+                      />
+                    ))}
+                    {inactiveProjects.length > 0 && (
+                      <div className={styles.inactiveProjectsSection}>
+                        <div className={styles.inactiveProjectsSectionHeader}>
+                          Projects (Inactive)
+                        </div>
+                        {inactiveProjects.map(project => (
+                          <ProjectNode
+                            key={project.path}
+                            name={project.name}
+                            features={project.features}
+                            selectedFeature={selectedFeature}
+                            onSelectFeature={handleSelectFeature}
+                            selectedSessionId={selectedSessionId}
+                            onSelectSession={handleSelectSession}
+                            issueTitles={issueTitles}
+                            issueCosts={issueCosts}
+                            filter={treeFilter}
+                            onStopSession={handleStopSession}
+                            onViewTerminal={handleViewTerminal}
+                            onPauseSession={handlePauseSession}
+                            onResumeSession={handleResumeSession}
+                            onRestartSession={handleRestartSession}
+                            onDeepWipe={handleDeepWipe}
+                            onOpenStateDir={handleOpenStateDir}
+                            onViewJsonl={handleViewJsonl}
+                            onCleanupOrphanedResources={handleCleanupOrphanedResources}
+                            onOpenPlanDialog={handleOpenPlanDialog}
+                            onNewConversation={handleNewProjectConversation}
+                            conversations={projectConversations[project.name] ?? []}
+                            selectedConversation={selectedConversation}
+                            onSelectConversation={handleSelectConversation}
+                            conversationMutations={projectConvMutations}
+                            containerStats={containerStats}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}

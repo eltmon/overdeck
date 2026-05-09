@@ -1,14 +1,15 @@
 import { Schema } from "effect"
 import {
   Activity,
+  AgentChannelReply,
   AgentId,
   AgentPhase,
   AgentResolution,
   AgentRuntimeSnapshot,
   AgentSnapshot,
   AgentStatus,
-  ChannelReplyArtifactRef,
-  ChannelReplyKind,
+  ChannelPermissionRequestSnapshot,
+  ClaudeChannelPermissionBehavior,
   IssueId,
   ResourceStats,
   ReviewStatusSnapshot,
@@ -148,6 +149,27 @@ export const AgentWaitingClearedEvent = Schema.Struct({
 })
 export type AgentWaitingClearedEvent = typeof AgentWaitingClearedEvent.Type
 
+export const AgentPermissionRequestedEvent = Schema.Struct({
+  type: Schema.Literal("agent.permission_requested"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: ChannelPermissionRequestSnapshot,
+})
+export type AgentPermissionRequestedEvent = typeof AgentPermissionRequestedEvent.Type
+
+export const AgentPermissionResolvedEvent = Schema.Struct({
+  type: Schema.Literal("agent.permission_resolved"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    requestId: Schema.String,
+    agentId: AgentId,
+    issueId: Schema.optional(IssueId),
+    behavior: ClaudeChannelPermissionBehavior,
+  }),
+})
+export type AgentPermissionResolvedEvent = typeof AgentPermissionResolvedEvent.Type
+
 export const AgentMessageReceivedEvent = Schema.Struct({
   type: Schema.Literal("agent.message_received"),
   sequence: SequenceNumber,
@@ -166,11 +188,7 @@ export const AgentChannelReplyEvent = Schema.Struct({
   timestamp: Schema.String,
   payload: Schema.Struct({
     agentId: AgentId,
-    reply: Schema.Struct({
-      kind: ChannelReplyKind,
-      summary: Schema.String,
-      artifactRefs: Schema.Array(ChannelReplyArtifactRef),
-    }),
+    reply: AgentChannelReply,
   }),
 })
 export type AgentChannelReplyEvent = typeof AgentChannelReplyEvent.Type
@@ -734,6 +752,8 @@ export const DomainEvent = Schema.Union([
   AgentThinkingStoppedEvent,
   AgentWaitingStartedEvent,
   AgentWaitingClearedEvent,
+  AgentPermissionRequestedEvent,
+  AgentPermissionResolvedEvent,
   AgentMessageReceivedEvent,
   AgentChannelReplyEvent,
   AgentModelSetEvent,

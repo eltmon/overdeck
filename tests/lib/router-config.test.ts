@@ -152,7 +152,7 @@ describe('router-config', () => {
       expect(googleProvider?.apiKey).toBe('AIza-test-key');
       expect(googleProvider?.models).toEqual([
         'gemini-3.1-pro-preview',
-        'gemini-3-flash',
+        'gemini-3-flash-preview',
         'gemini-3.1-flash-lite-preview',
       ]);
     });

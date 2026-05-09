@@ -8,7 +8,7 @@
  * 4. Task completion - Implementation done, ready for specialist testing
  */
 
-import { existsSync } from 'fs';
+import { existsSync, statSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -18,6 +18,24 @@ import { loadCloisterConfig } from './config.js';
 import { withBdMutex } from '../bd-mutex.js';
 
 const execAsync = promisify(exec);
+
+/**
+ * Cache for checkTaskCompletion keyed by `${workspace}::${issueId}`.
+ * Invalidated by mtime of `.beads/issues.jsonl` — same trick as
+ * computePlanningState (PAN-1024 hotfix). The handoff-suggestion endpoint
+ * is polled every 30s per agent panel; without this cache, every poll
+ * fires two `bd list --json` invocations which each take ~1.87s wall-clock
+ * and 1+ MB of disk I/O, causing sustained disk thrashing across N agents.
+ *
+ * Single-flight via a Promise map prevents stampedes when the page first
+ * loads multiple agent panels concurrently.
+ */
+interface TaskCompletionCacheEntry {
+  mtimeMs: number;
+  result: TriggerDetection;
+}
+const taskCompletionCache = new Map<string, TaskCompletionCacheEntry>();
+const taskCompletionInflight = new Map<string, Promise<TriggerDetection>>();
 
 /**
  * Trigger type
@@ -228,19 +246,28 @@ function detectTestFailure(workspace: string): {
 }
 
 /**
- * Check if implementation is complete and ready for testing
+ * Check if implementation is complete and ready for testing.
  *
  * Detection:
  * - Beads task with "implement" in title is closed
  * - No remaining implementation tasks
  *
+ * Cached by `.beads/issues.jsonl` mtime: the polled `/handoff/suggestion`
+ * endpoint hits this every 30s per agent panel, and each cold call fires
+ * two `bd list --json` invocations (~1.87s + ~1MB I/O each). Cache hits
+ * are a single statSync. The cache is invalidated whenever beads changes,
+ * so suggestions stay current.
+ *
+ * @param workspace - Workspace path (used to stat .beads/issues.jsonl).
+ *                    When omitted (legacy callers), the cache is bypassed.
  * @param issueId - Issue ID
  * @param config - Cloister configuration
  * @returns Trigger detection result
  */
 export async function checkTaskCompletion(
   issueId: string,
-  config?: CloisterConfig
+  config?: CloisterConfig,
+  workspace?: string,
 ): Promise<TriggerDetection> {
   const conf = config || loadCloisterConfig();
 
@@ -255,33 +282,54 @@ export async function checkTaskCompletion(
     };
   }
 
-  // Check for closed implementation task
-  try {
-    const { stdout: output } = await withBdMutex(() => execAsync(`bd list --json -l ${issueId.toLowerCase()} --status closed`, {
-      encoding: 'utf-8',
-    }));
-    const tasks = JSON.parse(output);
-    const implementTask = tasks.find((t: any) =>
-      t.title.toLowerCase().includes('implement') ||
-      t.labels?.includes('implementation')
-    );
+  // mtime-based cache
+  const cacheKey = `${workspace ?? ''}::${issueId.toLowerCase()}`;
+  let mtimeMs = 0;
+  if (workspace) {
+    const beadsFile = join(workspace, '.beads', 'issues.jsonl');
+    try {
+      mtimeMs = statSync(beadsFile).mtimeMs;
+    } catch {
+      // No beads file — fall through to compute (cheap when JSONL absent).
+    }
+    if (mtimeMs > 0) {
+      const cached = taskCompletionCache.get(cacheKey);
+      if (cached && cached.mtimeMs === mtimeMs) {
+        return cached.result;
+      }
+      // Single-flight: if another request is computing this same key, await
+      // its result instead of firing another pair of `bd list` invocations.
+      const inflight = taskCompletionInflight.get(cacheKey);
+      if (inflight) return inflight;
+    }
+  }
 
-    if (implementTask) {
-      // Check if there are remaining open tasks
-      const { stdout: openOutput } = await execAsync(`bd list --json -l ${issueId.toLowerCase()} --status open`, {
+  const computePromise = (async (): Promise<TriggerDetection> => {
+    try {
+      const { stdout: output } = await withBdMutex(() => execAsync(`bd list --json -l ${issueId.toLowerCase()} --status closed`, {
         encoding: 'utf-8',
-      });
-      const openTasks = JSON.parse(openOutput);
+      }));
+      const tasks = JSON.parse(output);
+      const implementTask = tasks.find((t: any) =>
+        t.title.toLowerCase().includes('implement') ||
+        t.labels?.includes('implementation')
+      );
 
-      if (openTasks.length === 0) {
-        return {
-          triggered: true,
-          type: 'task_complete',
-          reason: 'Implementation task closed, no remaining tasks',
-          suggestedModel: completionConfig.to_specialist,
-          confidence: 'high',
-        };
-      } else {
+      if (implementTask) {
+        const { stdout: openOutput } = await execAsync(`bd list --json -l ${issueId.toLowerCase()} --status open`, {
+          encoding: 'utf-8',
+        });
+        const openTasks = JSON.parse(openOutput);
+
+        if (openTasks.length === 0) {
+          return {
+            triggered: true,
+            type: 'task_complete',
+            reason: 'Implementation task closed, no remaining tasks',
+            suggestedModel: completionConfig.to_specialist,
+            confidence: 'high',
+          };
+        }
         return {
           triggered: false,
           type: 'task_complete',
@@ -289,17 +337,29 @@ export async function checkTaskCompletion(
           confidence: 'medium',
         };
       }
+    } catch {
+      // Beads not available or error querying — fall through to default.
     }
-  } catch (error) {
-    // Beads not available or error querying
-  }
 
-  return {
-    triggered: false,
-    type: 'task_complete',
-    reason: 'No implementation completion signals detected',
-    confidence: 'high',
-  };
+    return {
+      triggered: false,
+      type: 'task_complete',
+      reason: 'No implementation completion signals detected',
+      confidence: 'high',
+    };
+  })();
+
+  if (workspace && mtimeMs > 0) {
+    taskCompletionInflight.set(cacheKey, computePromise);
+    try {
+      const result = await computePromise;
+      taskCompletionCache.set(cacheKey, { mtimeMs, result });
+      return result;
+    } finally {
+      taskCompletionInflight.delete(cacheKey);
+    }
+  }
+  return computePromise;
 }
 
 /**
@@ -330,7 +390,7 @@ export async function checkAllTriggers(
   const testCheck = checkTestFailure(workspace, currentModel, config);
   if (testCheck.triggered) triggers.push(testCheck);
 
-  const completionCheck = await checkTaskCompletion(issueId, config);
+  const completionCheck = await checkTaskCompletion(issueId, config, workspace);
   if (completionCheck.triggered) triggers.push(completionCheck);
 
   return triggers;

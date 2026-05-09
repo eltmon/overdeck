@@ -24,6 +24,7 @@ import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 
 import { resolveClaudeSessionId } from './jsonl-resolver.js';
+import { validateOrigin } from './origin-validation.js';
 import { getProject } from '../../../lib/projects.js';
 import {
   findCommitAtTime,
@@ -297,81 +298,11 @@ function getCachedFavoritedIds(): Set<string> {
   return ids;
 }
 
+function invalidateFavoritesCache(): void {
+  favoritesCache = null;
+}
+
 // ─── CSRF / Origin validation ────────────────────────────────────────────────
-
-let cachedTrustedOrigins: string[] | undefined;
-
-function getTrustedOrigins(): string[] {
-  if (cachedTrustedOrigins !== undefined) {
-    return cachedTrustedOrigins;
-  }
-  const port = parseInt(process.env['API_PORT'] ?? process.env['PORT'] ?? '3011', 10);
-  const dashboardUrl = process.env['DASHBOARD_URL'] ?? `http://localhost:${port}`;
-  const origins = new Set<string>();
-  origins.add(dashboardUrl);
-  // Always trust direct localhost access — the dashboard may be reached via
-  // reverse proxy (e.g. https://pan.localhost) OR directly (http://localhost:3011).
-  origins.add(`http://localhost:${port}`);
-  origins.add(`http://127.0.0.1:${port}`);
-  // Trust additional local dev origins
-  if (process.env['NODE_ENV'] === 'development') {
-    origins.add('http://localhost:3000');
-    origins.add('http://127.0.0.1:3000');
-  }
-  cachedTrustedOrigins = Array.from(origins);
-  return cachedTrustedOrigins;
-}
-
-function normalizeOrigin(origin: string): string | null {
-  try {
-    const url = new URL(origin);
-    return `${url.protocol}//${url.host}`;
-  } catch {
-    return null;
-  }
-}
-
-function getHeader(
-  request: HttpServerRequest.HttpServerRequest,
-  name: string,
-): string | undefined {
-  const value = (request.headers as Record<string, string | string[] | undefined>)[name];
-  if (Array.isArray(value)) return value[0];
-  return value;
-}
-
-function validateOrigin(request: HttpServerRequest.HttpServerRequest): { ok: true } | { ok: false; error: string } {
-  const origin = getHeader(request, 'origin');
-  const referer = getHeader(request, 'referer');
-  const trusted = getTrustedOrigins();
-
-  // Safe reads can omit both Origin and Referer on same-origin fetches.
-  // Enforce origin checks only when a caller supplies one, or when the
-  // request method can mutate state.
-  if (!origin && !referer) {
-    const method = request.method.toUpperCase();
-    if (method === 'GET' || method === 'HEAD') {
-      return { ok: true };
-    }
-    return { ok: false, error: 'Missing origin' };
-  }
-
-  // If Origin is present, it must exactly match a trusted origin
-  if (origin) {
-    const normalized = normalizeOrigin(origin);
-    if (normalized && trusted.includes(normalized)) {
-      return { ok: true };
-    }
-    return { ok: false, error: 'Invalid origin' };
-  }
-
-  // If no Origin but Referer is present, normalize and check it
-  const normalized = normalizeOrigin(referer);
-  if (normalized && trusted.includes(normalized)) {
-    return { ok: true };
-  }
-  return { ok: false, error: 'Invalid referer' };
-}
 
 /** Validate a caller-supplied cwd is an existing directory under the user's home. */
 async function validateCwdContainment(cwd: string): Promise<boolean> {
@@ -734,12 +665,26 @@ async function spawnConversationSession(
       throw new Error('Invalid model name');
     }
     runtimeCommand = await getAgentRuntimeBaseCommand(model);
-    // Defensive: agent-frontmatter branches in getAgentRuntimeBaseCommand intentionally
-    // omit permission flags; ensure the resolved mode's flags are present here.
+    // Defensive permission-flag injection.
+    // getAgentRuntimeBaseCommand already emits the correct flags for every code path
+    // (direct/CLIProxy/--agent/claudish), so in a healthy build the appends below are
+    // no-ops. They exist as a belt-and-braces guard for future code paths that might
+    // forget to thread the resolved mode through. The critical safety property:
+    // NEVER add --dangerously-skip-permissions when the resolved mode is 'auto'.
+    // Enterprise users rely on Auto being honored; a silent escalation to bypass is
+    // a P0 trust violation.
     const mode = resolvePermissionMode();
     if (mode === 'auto') {
       if (!runtimeCommand.includes('--permission-mode')) {
         runtimeCommand = `${runtimeCommand} --permission-mode auto`;
+      }
+      // Refuse to run with mixed signals: if the base command already contains DSP
+      // while the user explicitly chose Auto, that is a substrate bug that must
+      // surface, not be silently downgraded.
+      if (runtimeCommand.includes('--dangerously-skip-permissions')) {
+        throw new Error(
+          `Refusing to spawn ${tmuxSession}: resolved mode is 'auto' but base command for model "${model}" contains --dangerously-skip-permissions. This is a substrate bug; do not silently bypass user Settings.`,
+        );
       }
     } else {
       if (!runtimeCommand.includes('--dangerously-skip-permissions')) {
@@ -1680,6 +1625,7 @@ const postConversationArchiveRoute = HttpRouter.add(
         markConversationEnded(name);
         archiveConversation(name);
         removeFavorite('conversation', name);
+        invalidateFavoritesCache();
         // Unconditionally remove all attachments — archiving is permanent and
         // unsent paste uploads should not leak.
         await cleanupConversationAttachments(name);
@@ -1808,6 +1754,7 @@ const postConversationFavoriteRoute = HttpRouter.add(
         const conv = getConversationByName(name);
         if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         setFavorite('conversation', name);
+        invalidateFavoritesCache();
         return jsonResponse({ favorited: true });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -1836,6 +1783,7 @@ const deleteConversationFavoriteRoute = HttpRouter.add(
         const conv = getConversationByName(name);
         if (!conv) return jsonResponse({ error: 'Conversation not found' }, { status: 404 });
         removeFavorite('conversation', name);
+        invalidateFavoritesCache();
         return jsonResponse({ favorited: false });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);

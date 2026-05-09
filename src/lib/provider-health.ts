@@ -6,7 +6,7 @@
  * network issues BEFORE the agent enters Claude Code's opaque retry loop.
  */
 
-import { getProviderForModel, type ProviderConfig } from './providers.js';
+import { getProviderEnv, getProviderForModel, type ProviderConfig } from './providers.js';
 import { loadConfig as loadYamlConfig } from './config-yaml.js';
 import type { ModelId } from './settings.js';
 
@@ -61,6 +61,13 @@ function parseErrorMessage(body: string): string {
   }
 }
 
+export function buildAnthropicMessagesUrl(baseUrl: string): string {
+  const normalized = baseUrl.replace(/\/+$/, '');
+  return normalized.endsWith('/v1')
+    ? `${normalized}/messages`
+    : `${normalized}/v1/messages`;
+}
+
 /**
  * Probe a direct provider's API to verify it can serve requests.
  * Returns cached results within the TTL window.
@@ -100,10 +107,11 @@ async function doProbe(
   apiKey: string,
   model: string,
 ): Promise<ProbeResult> {
-  const baseUrl = provider.baseUrl;
+  const providerEnv = getProviderEnv(provider, apiKey);
+  const baseUrl = providerEnv.ANTHROPIC_BASE_URL ?? provider.baseUrl;
   if (!baseUrl) return { ok: true };
 
-  const url = `${baseUrl}/v1/messages`;
+  const url = buildAnthropicMessagesUrl(baseUrl);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
 
@@ -173,7 +181,7 @@ export function formatProbeError(provider: ProviderConfig, model: string, result
 /**
  * Pre-flight validation for a model before agent spawn.
  * Throws with a descriptive message if the provider is unhealthy.
- * Skips probing for Anthropic and claudish-routed providers.
+ * Skips probing for Anthropic and providers with separate local sidecar checks.
  *
  * If apiKey is not provided, resolves it from config.yaml.
  */
@@ -183,8 +191,8 @@ export async function validateProviderHealth(
 ): Promise<void> {
   const provider = getProviderForModel(model as ModelId);
 
-  // Skip: Anthropic native, claudish-routed (openai/google have their own checks)
-  if (provider.name === 'anthropic' || provider.compatibility === 'claudish') {
+  // Skip: Anthropic native and OpenAI subscription routing have their own checks.
+  if (provider.name === 'anthropic' || provider.name === 'openai') {
     return;
   }
 
