@@ -4,7 +4,7 @@
     "created": "2026-05-08T00:00:00Z",
     "author": "planning-agent:claude-opus-4-5",
     "description": "Plan for PAN-1044: Command Deck — Project Overview Panel with pipeline swimlanes. Empirically scoped 2026-05-08 — see docs/prds/planned/PAN-1044-project-overview-panel.md.",
-    "updated": "2026-05-09T16:43:41.928Z"
+    "updated": "2026-05-09T16:43:59.314Z"
   },
   "plan": {
     "id": "pan-1044",
@@ -12,9 +12,9 @@
     "status": "running",
     "uid": "b2a7f3c1-4d8e-4f29-9a6b-3c5e7f8d2b1a",
     "author": "planning-agent:claude-opus-4-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-05-08T00:00:00Z",
-    "updated": "2026-05-09T16:43:41.928Z",
+    "updated": "2026-05-09T16:43:59.314Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1044",

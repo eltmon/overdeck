@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1044",
   "created": "2026-05-08T00:00:00Z",
-  "updated": "2026-05-09T16:43:41.950Z",
+  "updated": "2026-05-09T16:43:59.335Z",
   "gitState": {
     "branch": "feature/pan-1044",
-    "sha": "acfc101dc",
+    "sha": "b681ee37b",
     "dirty": true
   },
   "decisions": [
@@ -87,6 +87,11 @@
     },
     {
       "timestamp": "2026-05-09T16:43:41.949Z",
+      "reason": "start",
+      "agentModel": "gpt-5.5"
+    },
+    {
+      "timestamp": "2026-05-09T16:43:59.335Z",
       "reason": "start",
       "agentModel": "gpt-5.5"
     }
