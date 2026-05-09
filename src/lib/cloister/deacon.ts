@@ -2157,6 +2157,57 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
   return actions;
 }
 
+/**
+ * PAN-1027 reverse direction: detect issues whose internal mergeStatus='merged' but
+ * whose GitHub PR is NOT merged (open, closed-without-merge, or reverted). When the
+ * dashboard previously detected a merge that later got reverted (or the deacon's
+ * forward-direction reconciler matched a squash-commit grep that wasn't actually a
+ * merge), the issue gets stuck because every gate that checks `mergeStatus !== 'merged'`
+ * skips it. This sweep resets the stale merged status so the issue can flow through
+ * the pipeline again.
+ */
+const falseMergedReset = new Set<string>();
+
+export async function reconcileFalseMerged(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const { getPullRequestState, isGitHubAppConfigured } = await import('../github-app.js');
+    if (!isGitHubAppConfigured()) return actions;
+
+    const statuses = loadReviewStatuses();
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if (status.mergeStatus !== 'merged') continue;
+      if (!status.prUrl) continue;
+      if (falseMergedReset.has(issueId)) continue;
+
+      const prRef = status.prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
+      if (!prRef) continue;
+
+      try {
+        const prState = await getPullRequestState(prRef[1], prRef[2], Number.parseInt(prRef[3], 10));
+        if (!prState.merged) {
+          // GitHub says not merged but our DB says merged — reset internal state.
+          // Leave reviewStatus alone (it may legitimately be passed/failed/blocked from
+          // the prior cycle); the issue can proceed through the pipeline once mergeStatus
+          // is no longer blocking.
+          setReviewStatus(issueId, { mergeStatus: 'pending' });
+          falseMergedReset.add(issueId);
+          const msg = `Reset stale mergeStatus=merged for ${issueId} — PR ${status.prUrl} is not merged on GitHub`;
+          actions.push(msg);
+          console.log(`[deacon] ${msg}`);
+        }
+      } catch (err: any) {
+        // Non-fatal: GitHub API hiccup. Try again next patrol.
+        console.warn(`[deacon] Failed false-merged check for ${issueId}: ${err.message}`);
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[deacon] Error in reconcileFalseMerged: ${err.message}`);
+  }
+  return actions;
+}
+
 // Track per-issue cooldowns for failed-merge retry to avoid rapid re-queuing
 const failedMergeRetryCooldowns = new Map<string, number>();
 // Track per-issue cooldowns for timeout nudges to avoid spamming the work agent
@@ -3521,6 +3572,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   const staleMergeActions = await reconcileStaleMergeStatus();
   actions.push(...staleMergeActions);
   for (const a of staleMergeActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-1027 reverse: detect mergeStatus=merged issues whose GitHub PR is not merged
+  // (closed-without-merge, reopened after revert, or false positive from squash detection).
+  // Without this, those issues get stuck because mergeStatus blocks all pipeline gates.
+  const falseMergedActions = await reconcileFalseMerged();
+  actions.push(...falseMergedActions);
+  for (const a of falseMergedActions) addLog('action', a, state.patrolCycle);
 
   // Dead-end agent recovery: nudge agents stuck with reviewStatus=blocked/failed after
   // fixing review issues but not re-requesting review. Has 10-min per-issue cooldown and
