@@ -40,6 +40,8 @@ function enrichmentChanged(prev: AgentEnrichment | undefined, next: AgentEnrichm
     prev.agentPhase !== next.agentPhase ||
     prev.hasPendingQuestion !== next.hasPendingQuestion ||
     prev.pendingQuestionCount !== next.pendingQuestionCount ||
+    prev.pendingQuestionPrompt !== next.pendingQuestionPrompt ||
+    prev.pendingQuestionReason !== next.pendingQuestionReason ||
     prev.resolution !== next.resolution ||
     prev.resolutionCount !== next.resolutionCount
   )
@@ -92,6 +94,8 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
                 agentPhase: undefined,
                 hasPendingQuestion: undefined,
                 pendingQuestionCount: undefined,
+                pendingQuestionPrompt: undefined,
+                pendingQuestionReason: undefined,
                 resolution: toAgentResolution(agent.resolution),
                 resolutionCount: undefined,
               },
@@ -136,7 +140,8 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
       // Skip JSONL scan if file mtime is unchanged (avoids I/O on static sessions)
       const currentMtime = await getAgentJsonlMtime(agentId)
       const prevMtime = state.lastMtime.get(agentId)
-      const jsonlUnchanged = prevMtime !== undefined && currentMtime === prevMtime
+      const previousEnrichment = state.lastEnrichment.get(agentId)
+      const jsonlUnchanged = prevMtime !== undefined && currentMtime === prevMtime && previousEnrichment?.hasPendingQuestion !== true
       state.lastMtime.set(agentId, currentMtime)
 
       let enrichment: AgentEnrichment
@@ -163,6 +168,8 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
           agentPhase: enrichment.agentPhase,
           hasPendingQuestion: enrichment.hasPendingQuestion,
           pendingQuestionCount: enrichment.pendingQuestionCount,
+          pendingQuestionPrompt: enrichment.pendingQuestionPrompt,
+          pendingQuestionReason: enrichment.pendingQuestionReason,
           resolution: enrichment.resolution as AgentEnrichmentChangedEvent['payload']['resolution'],
           resolutionCount: enrichment.resolutionCount,
         },

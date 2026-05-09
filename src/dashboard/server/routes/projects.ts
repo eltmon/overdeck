@@ -23,6 +23,7 @@ import type { SessionNode, SessionNodePresence, SessionNodeType } from '@panctl/
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { getAgentRuntimeStateAsync } from '../../../lib/agents.js';
+import { detectAwaitingInputForAgent } from '../../../lib/agent-input-detection.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { getReviewStatus } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
@@ -174,6 +175,9 @@ async function collectSessionTreeNodes(
       if (isPlanning) hasPlanningSection = true;
       const rtState = await getAgentRuntimeStateAsync(checkId);
       const presence = await deriveSessionPresence(checkId, rtState, context.tmuxSessionNames);
+      const awaitingInput = context.tmuxSessionNames.has(checkId)
+        ? await detectAwaitingInputForAgent(checkId, { isPlanning })
+        : null;
       const sessionWorkspacePath = getSessionTreeWorkspacePath(issueLower, workspacePath, projectPath, checkId);
       const jsonlPath = await resolveJsonlPath(checkId, sessionWorkspacePath);
       sections.push({
@@ -197,6 +201,9 @@ async function collectSessionTreeNodes(
               : (state.status || 'completed'),
         ),
         presence,
+        awaitingInput: awaitingInput !== null,
+        awaitingInputPrompt: awaitingInput?.prompt,
+        awaitingInputReason: awaitingInput?.reason,
         hasJsonl: !!jsonlPath,
       });
     } catch {

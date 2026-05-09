@@ -26,8 +26,25 @@ type PipelineStateLike = {
 export const REVIEW_SPECIALIST_TIMEOUT_MS = 30 * 60 * 1000;
 export const PENDING_REVIEW_STRANDED_MS = REVIEW_SPECIALIST_TIMEOUT_MS * 2;
 
-export function hasActualPendingQuestion(agent?: Pick<Agent, 'hasPendingQuestion' | 'pendingQuestionCount'> | null): boolean {
-  return agent?.hasPendingQuestion === true && (agent.pendingQuestionCount ?? 0) > 0;
+export function hasActualPendingQuestion(agent?: Pick<Agent, 'hasPendingQuestion' | 'pendingQuestionCount' | 'pendingQuestionPrompt'> | null): boolean {
+  return agent?.hasPendingQuestion === true && ((agent.pendingQuestionCount ?? 0) > 0 || !!agent.pendingQuestionPrompt?.trim());
+}
+
+export function getPendingQuestionTitle(agent?: Pick<Agent, 'pendingQuestionCount' | 'pendingQuestionPrompt' | 'pendingQuestionReason'> | null): string {
+  const prompt = agent?.pendingQuestionPrompt?.trim();
+  if (prompt) {
+    const firstLine = prompt.split('\n').find((line) => line.trim().length > 0)?.trim() ?? prompt;
+    const prefix = agent?.pendingQuestionReason === 'tool_permission'
+      ? 'Permission prompt'
+      : agent?.pendingQuestionReason === 'planning_done'
+        ? 'Planning complete'
+        : agent?.pendingQuestionReason === 'confirmation'
+          ? 'Confirmation prompt'
+          : 'Awaiting input';
+    return `${prefix}: ${firstLine}`;
+  }
+  const count = agent?.pendingQuestionCount || 1;
+  return `Agent is waiting for user input (${count} question${count > 1 ? 's' : ''})`;
 }
 
 export function isReviewPipelineStuck(status?: PipelineStateLike | null): boolean {

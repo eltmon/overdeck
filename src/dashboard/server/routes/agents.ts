@@ -109,6 +109,7 @@ import {
   getAgentJsonlPath as getAgentJsonlPathShared,
   getPendingQuestions as getPendingQuestionsShared,
   getAgentPendingQuestions as getAgentPendingQuestionsShared,
+  computeAgentEnrichment,
   type PendingQuestion,
 } from '../../../lib/agent-enrichment.js';
 import { parseConversationMessages } from '../services/conversation-service.js';
@@ -453,22 +454,13 @@ const getAgentsRoute = HttpRouter.add(
               ? name.replace('planning-', '').toUpperCase()
               : name.replace('agent-', '').toUpperCase();
 
-            let pendingQuestions = await getAgentPendingQuestions(name);
-            if (pendingQuestions.length > 0 && startedAt) {
-              const agentStartTime = new Date(startedAt).getTime();
-              pendingQuestions = pendingQuestions.filter(q => {
-                const qTime = new Date(q.timestamp).getTime();
-                return !isNaN(qTime) && qTime >= agentStartTime;
-              });
-            }
-
             const runtimeState = await getAgentRuntimeStateAsync(name);
-            const isIdle = runtimeState?.state === 'idle' || (runtimeState?.currentTool === 'AskUserQuestion' && pendingQuestions.length === 0);
 
             const issueReviewStatus = getReviewStatus(issueId);
             const hasActiveSpecialist = issueReviewStatus?.reviewStatus === 'reviewing'
               || issueReviewStatus?.testStatus === 'testing'
               || issueReviewStatus?.mergeStatus === 'merging';
+            const enrichment = await computeAgentEnrichment(name, startedAt, hasActiveSpecialist);
 
             const workspaceLocation = await getWorkspaceLocation(issueId);
 
@@ -495,11 +487,13 @@ const getAgentsRoute = HttpRouter.add(
               workspaceLocation,
               git: gitStatus,
               type: 'agent',
-              agentPhase: isPlanning ? 'planning' : (state.phase || 'implementation'),
-              hasPendingQuestion: !hasActiveSpecialist && (pendingQuestions.length > 0 || isIdle || runtimeState?.resolution === 'needs_input'),
-              pendingQuestionCount: pendingQuestions.length,
-              resolution: runtimeState?.resolution || 'working',
-              resolutionCount: runtimeState?.resolutionCount || 0,
+              agentPhase: enrichment.agentPhase || (isPlanning ? 'planning' : (state.phase || 'implementation')),
+              hasPendingQuestion: enrichment.hasPendingQuestion,
+              pendingQuestionCount: enrichment.pendingQuestionCount,
+              pendingQuestionPrompt: enrichment.pendingQuestionPrompt,
+              pendingQuestionReason: enrichment.pendingQuestionReason,
+              resolution: runtimeState?.resolution || enrichment.resolution || 'working',
+              resolutionCount: runtimeState?.resolutionCount || enrichment.resolutionCount || 0,
               contextPercent,
               initialContextPercent,
             };
