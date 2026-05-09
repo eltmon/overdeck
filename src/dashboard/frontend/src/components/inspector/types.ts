@@ -25,6 +25,8 @@ export interface ReviewStatus {
   mergeNotes?: string;
   mergeRetryCount?: number;
   updatedAt: string;
+  /** Timestamp when the current/last review fan-out was dispatched. */
+  reviewSpawnedAt?: string;
   readyForMerge: boolean;
   autoRequeueCount?: number;
   history?: StatusHistoryEntry[];

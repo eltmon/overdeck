@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "1034",
   "created": "2026-05-09T01:13:00Z",
-  "updated": "2026-05-09T01:41:00Z",
+  "updated": "2026-05-09T01:48:48Z",
   "gitState": {
     "branch": "feature/1034",
     "sha": "ac576a588",
@@ -28,6 +28,11 @@
       "id": "D4",
       "summary": "Verification-failed recovery now treats verificationStatus=failed as actionable even when reviewStatus remains pending, and all verification feedback nudges explicitly tell the work agent to commit, push, and request a new review instead of stopping after fixing local verification.",
       "recordedAt": "2026-05-09T01:41:00Z"
+    },
+    {
+      "id": "D5",
+      "summary": "Dashboard stranded-review detection is computed from reviewSpawnedAt/updatedAt: pending reviews with no active queue/specialist older than two 30-minute reviewer timeouts are treated as stranded and get a Re-request Review inspector action.",
+      "recordedAt": "2026-05-09T01:48:48Z"
     }
   ],
   "hazards": [
@@ -43,11 +48,13 @@
     }
   ],
   "resumePoint": {
-    "description": "Bead workspace-vaqf is implemented locally: verification failure feedback now explicitly instructs agents to commit, push, and request a new review, and deacon dead-end recovery now nudges idle agents when verificationStatus=failed while reviewStatus is still pending. Next step is verify, commit only this bead, close workspace-vaqf, then continue to the remaining dashboard/coordinator beads.",
-    "beadId": "workspace-vaqf",
+    "description": "Bead workspace-8pl5 is implemented and verified locally: dashboard inspector detects pending reviews stranded beyond two 30-minute reviewer timeouts, forces the rerun path, and surfaces a Re-request Review action. Next step is commit only this bead, close workspace-8pl5, then continue to coordinator-survival bead workspace-9gr0.",
+    "beadId": "workspace-8pl5",
     "filesToRead": [
-      "src/lib/cloister/verification-runner.ts",
-      "src/lib/cloister/deacon.ts"
+      "src/dashboard/frontend/src/lib/pipeline-state.ts",
+      "src/dashboard/frontend/src/components/InspectorPanel.tsx",
+      "src/dashboard/frontend/src/components/inspector/ActionsSection.tsx",
+      "src/dashboard/frontend/src/components/inspector/utils.ts"
     ]
   },
   "beadsMapping": {
@@ -76,6 +83,12 @@
       "timestamp": "2026-05-09T01:41:00Z",
       "reason": "manual",
       "note": "Claimed workspace-vaqf and updated verification failure recovery. The verification runner messages now direct agents to fix, commit, push, and request a new review/pan review request rather than merely re-run verification. Deacon dead-end detection now treats verificationStatus=failed as a recovery condition even when reviewStatus remains pending, and sends a pending-review-specific nudge with the exact new-review command.",
+      "agentModel": "claude-code"
+    },
+    {
+      "timestamp": "2026-05-09T01:48:48Z",
+      "reason": "manual",
+      "note": "Implemented workspace-8pl5. Added shared dashboard detection for pending reviews older than two 30-minute reviewer timeouts with no active queue/specialist, made the inspector force the review trigger and label the action Re-request Review, surfaced a stranded-review banner in the inspector, and covered the helper/button behavior in InspectorPanel tests. Verified with npm test -- src/dashboard/frontend/src/components/InspectorPanel.test.tsx --run and npm run typecheck.",
       "agentModel": "claude-code"
     }
   ],
