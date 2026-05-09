@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T20:28:21.639Z"
+    "updated": "2026-05-09T20:30:28.904Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 9,
+    "sequence": 10,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T20:28:21.639Z",
+    "updated": "2026-05-09T20:30:28.904Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -256,7 +256,7 @@
       {
         "id": "r1-role-plan-md",
         "title": "Create roles/plan.md (migrated from .claude/agents/pan-planning-agent.md)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -271,7 +271,7 @@
           {
             "id": "r1-role-plan-md.ac1",
             "title": "File exists at roles/plan.md with valid Claude Code agent frontmatter (name: plan)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -279,7 +279,7 @@
           {
             "id": "r1-role-plan-md.ac2",
             "title": "Body covers planning workflow: read PRD, explore codebase, ask clarifying questions, write vBRIEF, run pan plan-finalize, stop",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -287,7 +287,7 @@
           {
             "id": "r1-role-plan-md.ac3",
             "title": "Old .claude/agents/pan-planning-agent.md NOT deleted (X1 handles deletion)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

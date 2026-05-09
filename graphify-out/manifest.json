@@ -2035,6 +2035,10 @@
     "mtime": 1778301111.4124203,
     "hash": "eca7fa2d87f475c8ec415fe314be6084"
   },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/__tests__/role-definitions.test.ts": {
+    "mtime": 1778358591.4216225,
+    "hash": "dbe8c5acb16d8b8c27f9cca050ef4aeb"
+  },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/__tests__/manifest.test.ts": {
     "mtime": 1778301111.4124203,
     "hash": "660fdf1751d64fd214772861ecfd83b8"
@@ -6134,6 +6138,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/design/prd/PRD-REBRAND.md": {
     "mtime": 1778301110.9546225,
     "hash": "24795bee4e1b55b0e3df28a9452bbb98"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/roles/plan.md": {
+    "mtime": 1778358584.6313622,
+    "hash": "52aea102c579d3b67ff86de71c610704"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/benchmarks/templates/quantumllama.md": {
     "mtime": 1778301110.9504535,

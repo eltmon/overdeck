@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T20:28:21.639Z",
+  "updated": "2026-05-09T20:30:28.904Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "pending-v1",
+    "sha": "pending-r1",
     "dirty": true
   },
   "decisions": [
@@ -158,14 +158,11 @@
     }
   ],
   "resumePoint": {
-    "description": "V1 convoy agent migration implemented: four code-review Claude Code agent definitions exist under .claude/agents with source prompt bodies unchanged and smoke tests passing. Close workspace-2e54 and continue with bd ready.",
-    "beadId": "workspace-2e54",
+    "description": "R1 plan role file implemented: roles/plan.md exists with name: plan frontmatter, planning workflow including pan plan-finalize, and legacy pan-planning-agent.md retained. Close workspace-1tdm and continue with bd ready.",
+    "beadId": "workspace-1tdm",
     "filesToRead": [
-      ".claude/agents/code-review-security.md",
-      ".claude/agents/code-review-correctness.md",
-      ".claude/agents/code-review-performance.md",
-      ".claude/agents/code-review-requirements.md",
-      "src/lib/__tests__/code-review-agent-definitions.test.ts"
+      "roles/plan.md",
+      "src/lib/__tests__/role-definitions.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -230,6 +227,12 @@
       "timestamp": "2026-05-09T20:28:21.639Z",
       "reason": "bead-complete",
       "note": "Implemented V1 convoy reviewer migration by copying the four review prompt templates into .claude/agents/code-review-{security,correctness,performance,requirements}.md and adding a smoke test that validates frontmatter shape plus body parity with the source templates. Source prompt-template files were not deleted. Targeted test, typecheck, and lint pass.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T20:30:28.904Z",
+      "reason": "bead-complete",
+      "note": "Implemented R1 plan role file at roles/plan.md with Claude Code frontmatter, migrated planning workflow, explicit pan plan-finalize and stop instructions, and retained the legacy .claude/agents/pan-planning-agent.md. Added role definition smoke coverage. Targeted test, typecheck, and lint pass.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],
