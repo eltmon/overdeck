@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Compass, Plus, ChevronDown, ChevronRight } from 'lucide-react';
 import { ProjectNode, ProjectFeature } from './ProjectTree/ProjectNode';
 import { sessionMatchesFilter, type TreeSessionFilter } from './ProjectTree/FeatureItem';
+import { ProjectOverview, type IssueCostBreakdown } from './ProjectOverview';
 import { DeaconStatus } from './DeaconStatus';
 import { IssueWorkbench } from './IssueWorkbench';
 import { BeadsDialog } from '../BeadsDialog';
@@ -88,6 +89,8 @@ async function fetchProjects(): Promise<ProjectData[]> {
 interface IssueCostEntry {
   issueId: string;
   totalCost: number;
+  byModel: IssueCostBreakdown['byModel'];
+  byStage: IssueCostBreakdown['byStage'];
 }
 
 async function fetchCostsByIssue(): Promise<{ issues: IssueCostEntry[] }> {
@@ -200,6 +203,7 @@ export function CommandDeck({
 }: CommandDeckProps) {
   const [projectQueryEpoch, bumpProjectQueryEpoch] = useReducer((value: number) => value + 1, 0);
   const [selectedFeature, setSelectedFeature] = useState<string | null>(null);
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [showBeads, setShowBeads] = useState(false);
   const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null);
@@ -412,12 +416,25 @@ export function CommandDeck({
   // Agents from dashboard store (for terminal panel in detail view)
   const agents = useDashboardStore(selectAgentList) as unknown as Agent[];
 
-  // Map aggregated costs per issue for the project tree sidebar.
+  // Map aggregated costs per issue for the project tree sidebar and project overview.
   const issueCosts = useMemo(() => {
     const map: Record<string, number> = {};
     for (const entry of costData?.issues || []) {
       map[entry.issueId] = entry.totalCost;
       map[entry.issueId.toLowerCase()] = entry.totalCost;
+    }
+    return map;
+  }, [costData]);
+
+  const issueCostDetails = useMemo(() => {
+    const map: Record<string, IssueCostBreakdown> = {};
+    for (const entry of costData?.issues || []) {
+      const details: IssueCostBreakdown = {
+        byModel: entry.byModel,
+        byStage: entry.byStage,
+      };
+      map[entry.issueId] = details;
+      map[entry.issueId.toLowerCase()] = details;
     }
     return map;
   }, [costData]);
@@ -476,6 +493,7 @@ export function CommandDeck({
     const conv = conversations.find((c) => String(c.id) === convId);
     if (conv) {
       setSelectedConversation(conv.name);
+      setSelectedProject(null);
       appliedConvId.current = convId;
     }
   }, [convId, conversations]);
@@ -484,10 +502,10 @@ export function CommandDeck({
   const hasAutoSelected = useRef(false);
   useEffect(() => {
     if (hasAutoSelected.current) return;
-    if (conversations.length === 0 || convId || selectedConversation !== null || selectedFeature !== null) return;
+    if (conversations.length === 0 || convId || selectedConversation !== null || selectedFeature !== null || selectedProject !== null) return;
     setSelectedConversation(conversations[0].name);
     hasAutoSelected.current = true;
-  }, [conversations, convId, selectedConversation, selectedFeature]);
+  }, [conversations, convId, selectedConversation, selectedFeature, selectedProject]);
 
   // Sync URL when selected conversation changes (user clicks, draft promoted, etc.)
   // Use a ref to track the previous value so we only call onConvIdChange when it actually changes.
@@ -510,6 +528,7 @@ export function CommandDeck({
 
   const handleSelectFeature = useCallback((issueId: string) => {
     setSelectedFeature(issueId);
+    setSelectedProject(null);
     setSelectedConversation(null);
 
     // Auto-select the active work agent session so the user lands in
@@ -525,6 +544,7 @@ export function CommandDeck({
 
   const handleSelectSession = useCallback((issueId: string, sessionId: string) => {
     setSelectedFeature(issueId);
+    setSelectedProject(null);
     selectSession(issueId, sessionId);
     setSelectedConversation(null);
   }, [selectSession]);
@@ -559,6 +579,7 @@ export function CommandDeck({
       for (const feature of project.features) {
         if (feature.sessions?.some(s => s.sessionId === sessionId)) {
           setSelectedFeature(feature.issueId);
+          setSelectedProject(null);
           selectSession(feature.issueId, sessionId);
           setSelectedConversation(null);
           return;
@@ -746,6 +767,7 @@ export function CommandDeck({
       for (const feature of project.features) {
         if (feature.sessions?.some(s => s.sessionId === sessionId)) {
           setSelectedFeature(feature.issueId);
+          setSelectedProject(null);
           selectSession(feature.issueId, sessionId);
           setSelectedConversation(null);
           return;
@@ -754,12 +776,19 @@ export function CommandDeck({
     }
   }, [projectsWithSessions, selectSession]);
 
+  const handleSelectProject = useCallback((projectName: string) => {
+    setSelectedProject(projectName);
+    setSelectedFeature(null);
+    setSelectedConversation(null);
+  }, []);
+
   const handleSelectConversation = useCallback((name: string | null) => {
     setSelectedConversation(name);
     if (selectedFeature) {
       selectSession(selectedFeature, null);
     }
     if (name !== null) {
+      setSelectedProject(null);
       setSelectedFeature(null);
     }
   }, [selectSession, selectedFeature]);
@@ -781,6 +810,7 @@ export function CommandDeck({
       }
       const conv = await res.json() as Conversation;
       setSelectedConversation(conv.name);
+      setSelectedProject(null);
       setSelectedFeature(null);
       if (convsCollapsed) setConvsCollapsed(false);
       if (onConvIdChange) {
@@ -902,6 +932,11 @@ export function CommandDeck({
     }
     return null;
   }, [projectsWithSessions, selectedFeature]);
+
+  const selectedProjectData = useMemo(() => {
+    if (!selectedProject) return null;
+    return projectsWithSessions.find(p => p.name === selectedProject) ?? null;
+  }, [projectsWithSessions, selectedProject]);
 
   const selectedIssueTitle = selectedFeature
     ? issueTitles[selectedFeature.toLowerCase()] || issueTitles[selectedFeature] || selectedFeature
@@ -1028,6 +1063,8 @@ export function CommandDeck({
                         features={project.features}
                         selectedFeature={selectedFeature}
                         onSelectFeature={handleSelectFeature}
+                        onSelectProject={handleSelectProject}
+                        selectedProject={selectedProject}
                         selectedSessionId={selectedSessionId}
                         onSelectSession={handleSelectSession}
                         issueTitles={issueTitles}
@@ -1063,6 +1100,8 @@ export function CommandDeck({
                             features={project.features}
                             selectedFeature={selectedFeature}
                             onSelectFeature={handleSelectFeature}
+                            onSelectProject={handleSelectProject}
+                            selectedProject={selectedProject}
                             selectedSessionId={selectedSessionId}
                             onSelectSession={handleSelectSession}
                             issueTitles={issueTitles}
@@ -1155,6 +1194,14 @@ export function CommandDeck({
               onOpenBeads={() => setShowBeads(true)}
               agent={selectedAgent}
               issue={selectedIssue ?? undefined}
+            />
+          ) : selectedProject ? (
+            <ProjectOverview
+              projectName={selectedProject}
+              features={selectedProjectData?.features ?? []}
+              issueCosts={issueCosts}
+              issueCostDetails={issueCostDetails}
+              onSelectFeature={(feature) => handleSelectFeature(feature.issueId)}
             />
           ) : (
             <div className={styles.contentEmpty}>
