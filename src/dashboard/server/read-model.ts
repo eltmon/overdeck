@@ -18,6 +18,7 @@ import {
   type ReadModelState,
   INITIAL_READ_MODEL_STATE,
   applyEvent as applyEventReducer,
+  getMaxTurnDiffSummariesPerAgent,
   isTerminalTurnDiffSummaryStatus,
   trimTurnDiffSummaries,
 } from '@panctl/contracts';
@@ -511,6 +512,12 @@ export const ReadModelServiceLive = Layer.effect(
               const checkpoints = await listCheckpoints(workspace);
               if (checkpoints.length === 0) continue;
 
+              const maxRetainedSummaries = getMaxTurnDiffSummariesPerAgent();
+              const retainedCheckpoints = checkpoints.length > maxRetainedSummaries
+                ? checkpoints.slice(-maxRetainedSummaries)
+                : checkpoints;
+              const checkpointOffset = checkpoints.length - retainedCheckpoints.length;
+
               const summaries: Array<{
                 turnId: string;
                 completedAt: string;
@@ -520,9 +527,10 @@ export const ReadModelServiceLive = Layer.effect(
                 checkpointTurnCount?: number;
               }> = [];
 
-              for (let i = 0; i < checkpoints.length; i++) {
-                const turnId = checkpoints[i];
-                const prevTurnId = i > 0 ? checkpoints[i - 1] : null;
+              for (let i = 0; i < retainedCheckpoints.length; i++) {
+                const absoluteIndex = checkpointOffset + i;
+                const turnId = retainedCheckpoints[i];
+                const prevTurnId = absoluteIndex > 0 ? checkpoints[absoluteIndex - 1] : null;
                 let files: Array<{ path: string; kind?: string; additions?: number; deletions?: number }> = [];
                 if (prevTurnId) {
                   try {
@@ -535,7 +543,7 @@ export const ReadModelServiceLive = Layer.effect(
                   completedAt,
                   files,
                   checkpointRef: `refs/pan/turn/${turnId}`,
-                  checkpointTurnCount: i + 1,
+                  checkpointTurnCount: absoluteIndex + 1,
                 });
               }
 

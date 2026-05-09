@@ -10,13 +10,25 @@ import { join } from 'path';
 const mockUnref = vi.hoisted(() => vi.fn());
 const mockSpawnChild = vi.hoisted(() => ({ pid: 12345, unref: mockUnref }));
 const mockSpawn = vi.hoisted(() => vi.fn(() => mockSpawnChild));
-const mockExec = vi.hoisted(() => vi.fn((_cmd: string, _opts: any, cb: any) => {
-  if (typeof _opts === 'function') _opts(null, '', '');
-  else if (cb) cb(null, '', '');
+const mockExec = vi.hoisted(() => vi.fn((cmd: string, _opts: any, cb: any) => {
+  const stdout = cmd.includes('git rev-parse --verify')
+    ? 'deadbeef\n'
+    : cmd.includes('gh pr list')
+      ? '[]'
+      : '';
+  const result = { stdout, stderr: '' };
+  if (typeof _opts === 'function') _opts(null, result);
+  else if (cb) cb(null, result);
 }));
 
 const kCustom = Symbol.for('nodejs.util.promisify.custom');
-(mockExec as any)[kCustom] = vi.fn().mockResolvedValue({ stdout: '', stderr: '' });
+(mockExec as any)[kCustom] = vi.fn(async (cmd: string) => {
+  if (cmd.includes('git rev-parse --verify')) return { stdout: 'deadbeef\n', stderr: '' };
+  if (cmd.includes('git merge-base --is-ancestor')) return { stdout: '', stderr: '' };
+  if (cmd.includes('git diff origin/main...')) return { stdout: '', stderr: '' };
+  if (cmd.includes('gh pr list')) return { stdout: '[]', stderr: '' };
+  return { stdout: '', stderr: '' };
+});
 
 vi.mock('child_process', () => ({
   spawn: mockSpawn,
