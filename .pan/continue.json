@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T21:15:51.659Z",
+  "updated": "2026-05-09T21:22:51.368Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "pending-r4",
+    "sha": "pending-s3",
     "dirty": true
   },
   "decisions": [
@@ -158,11 +158,13 @@
     }
   ],
   "resumePoint": {
-    "description": "R4 test role definition implemented and verified: roles/test.md folds project test-suite execution and browser UAT into the test role, declares Playwright MCP availability, and documents isolated browser sessions plus TESTS PASSED/FAILED sentinels. Commit and close workspace-x4w0 next; no inspection required because requiresInspection is false.",
-    "beadId": "workspace-x4w0",
+    "description": "S3 review role wiring implemented and verified: agents.ts exports spawnRun(issueId, role, opts) plus role runtime command helpers, review runs launch with roles/review.md and state.role=review, handoff review wake and dashboard approve review pipeline now start spawnRun(issueId, review) instead of legacy review-agent wake. Commit, close workspace-xwgy, then inspect because requiresInspection is true.",
+    "beadId": "workspace-xwgy",
     "filesToRead": [
-      "roles/test.md",
-      "src/lib/__tests__/role-definitions.test.ts"
+      "src/lib/agents.ts",
+      "src/lib/cloister/handoff.ts",
+      "src/dashboard/server/routes/workspaces.ts",
+      "src/lib/__tests__/agent-state-role.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -275,6 +277,12 @@
       "timestamp": "2026-05-09T21:15:51.659Z",
       "reason": "bead-complete",
       "note": "Implemented R4 test role definition at roles/test.md. The role runs configured project verification and folds browser UAT into the same role when continue.json, vBRIEF acceptance criteria, PR notes, or issue text require end-to-end proof. It declares Playwright MCP availability, requires an isolated browser instance per session, emits TESTS PASSED/TESTS FAILED sentinels, and keeps legacy pan-test-agent and pan-uat-agent definitions. Verified role definition test, typecheck, lint, and graphify update.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T21:22:51.368Z",
+      "reason": "bead-complete",
+      "note": "Implemented S3 review role wiring. Added generic spawnRun(issueId, role, opts) for role-based runs, roleAgentDefinitionPath/getRoleRuntimeBaseCommand helpers that launch roles/review.md, and launcher type support for test/ship role runs. Migrated review handoff and dashboard approval review pipeline from legacy review-agent wake to spawnRun(issueId, review). Verified no convoy specialist wake callsites, added role runtime command coverage, and ran targeted tests, typecheck, lint, and graphify update.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

@@ -1116,8 +1116,8 @@
     "hash": "da862d544a549a96182555b069029dc6"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/agents.ts": {
-    "mtime": 1778360229.5153196,
-    "hash": "e1cb61f3960bb5c3c15d3762c0ccfd4d"
+    "mtime": 1778361670.9343734,
+    "hash": "1d07f1f16cf7b50adf37bdb82c6d1fbb"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/git-activity.ts": {
     "mtime": 1778301111.4233627,
@@ -1436,8 +1436,8 @@
     "hash": "72266e05d0b2b40791e4fc95524d82d1"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/launcher-generator.ts": {
-    "mtime": 1778301111.4238956,
-    "hash": "46c4ab12ba2e3c4bc204ceb3cfe49da1"
+    "mtime": 1778361622.372098,
+    "hash": "10655d6277e6f697cef5809457fb4ab7"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/manifest.ts": {
     "mtime": 1778301111.4243321,
@@ -1664,8 +1664,8 @@
     "hash": "ed5d2d6d219a2519c60d16cddc6b9364"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/cloister/handoff.ts": {
-    "mtime": 1778359533.612663,
-    "hash": "1f8a7e7fa8c7ad9c2258d718be179fe7"
+    "mtime": 1778361700.6981595,
+    "hash": "a8cc6a278f0897371b9966b969ad058d"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/cloister/validation.ts": {
     "mtime": 1778301111.4193625,
@@ -2028,8 +2028,8 @@
     "hash": "115a2b409e072a3f4bdabc90ec66f582"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/__tests__/agent-state-role.test.ts": {
-    "mtime": 1778359501.420433,
-    "hash": "57fec1d3760e69a20ed3c92ce73944bb"
+    "mtime": 1778361724.4287887,
+    "hash": "f9643128099ac0b5f5253fd5ea0896bc"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/__tests__/permission-mode-leak.test.ts": {
     "mtime": 1778360237.6066668,
@@ -3876,8 +3876,8 @@
     "hash": "a3f0a51db02bbbc8dbc91b617d1bb38c"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/server/routes/workspaces.ts": {
-    "mtime": 1778359460.7618792,
-    "hash": "ab7505064e2749d6d83fa94a619a5b08"
+    "mtime": 1778361690.4618888,
+    "hash": "8ac16600b06552317d46a94ddedffd79"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/dashboard/server/routes/webhooks.ts": {
     "mtime": 1778301111.3823614,

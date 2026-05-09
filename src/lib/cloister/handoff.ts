@@ -9,7 +9,7 @@
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import type { AgentState } from '../agents.js';
-import { getAgentState, saveAgentState, stopAgent, spawnAgent, getAgentDir } from '../agents.js';
+import { getAgentState, saveAgentState, stopAgent, spawnAgent, spawnRun, getAgentDir } from '../agents.js';
 import type { HandoffContext } from './handoff-context.js';
 import { captureHandoffContext, buildHandoffPrompt } from './handoff-context.js';
 import { sessionExists } from '../tmux.js';
@@ -218,6 +218,21 @@ async function performSpecialistWake(
         success: false,
         method: 'specialist-wake',
         error: 'Could not determine specialist name from agent ID',
+      };
+    }
+
+    // Review has migrated to a role run; it is not woken as a legacy specialist.
+    if (specialistName === 'review-agent') {
+      const reviewRun = await spawnRun(state.issueId, 'review', {
+        workspace: state.workspace,
+        model: options.targetModel,
+        prompt,
+      });
+      return {
+        success: true,
+        method: 'specialist-wake',
+        newAgentId: reviewRun.id,
+        context,
       };
     }
 

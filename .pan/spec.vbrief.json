@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T21:15:51.659Z"
+    "updated": "2026-05-09T21:22:51.368Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 18,
+    "sequence": 19,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T21:15:51.659Z",
+    "updated": "2026-05-09T21:22:51.368Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -651,7 +651,7 @@
       {
         "id": "s3-wire-review-end-to-end",
         "title": "Wire `review` role end-to-end (replaces wakeSpecialist for review + 4 convoy specialists)",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -666,7 +666,7 @@
           {
             "id": "s3-wire-review-end-to-end.ac1",
             "title": "src/lib/agents.ts exports `spawnRun(issueId, role, opts?)` that writes role/model/harness to state.json and starts the tmux session for any role",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -674,7 +674,7 @@
           {
             "id": "s3-wire-review-end-to-end.ac2",
             "title": "cloister/handoff.ts review path calls `spawnRun(issueId, 'review')` instead of `wakeSpecialistOrQueue('review-agent', ...)`",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -682,7 +682,7 @@
           {
             "id": "s3-wire-review-end-to-end.ac3",
             "title": "No code path wakes the 4 convoy specialists separately; convoy is invoked from inside roles/review.md via the Agent tool",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -690,7 +690,7 @@
           {
             "id": "s3-wire-review-end-to-end.ac4",
             "title": "Dashboard reads `state.role === 'review'` for review identification (no SpecialistType reads)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -698,7 +698,7 @@
           {
             "id": "s3-wire-review-end-to-end.ac5",
             "title": "End-to-end test: triggering review on a test PR spawns a single review run, fans out to 4 convoy sub-runs, posts a synthesized decision",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -706,12 +706,13 @@
           {
             "id": "s3-wire-review-end-to-end.ac6",
             "title": "Existing review-related tests updated and pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-09T21:22:51.368Z"
       },
       {
         "id": "s4-wire-test-end-to-end",

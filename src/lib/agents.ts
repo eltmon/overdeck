@@ -28,7 +28,7 @@ import { createTrackerFromConfig, createTracker } from './tracker/factory.js';
 import type { IssueState } from './tracker/interface.js';
 import { findProjectByPath, getIssuePrefix, resolveProjectFromIssue } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
-import { generateLauncherScript } from './launcher-generator.js';
+import { generateLauncherScript, type LauncherAgentType } from './launcher-generator.js';
 import { logAgentLifecycle } from './persistent-logger.js';
 import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeToken, writeBridgeToken } from './bridge-token.js';
@@ -187,6 +187,37 @@ export async function getAgentRuntimeBaseCommand(
     return `claude${bypassWithAgent}${agentFlag}${modelFlag}${nameFlag}`;
   }
   return `claude ${permissionFlags} --model ${model}${nameFlag}`;
+}
+
+export function roleAgentDefinitionPath(role: Role): string {
+  return `roles/${role}.md`;
+}
+
+/** Build a Claude/Pi base command for role-based runs. */
+export async function getRoleRuntimeBaseCommand(
+  model: string,
+  agentName: string,
+  role: Role,
+  harness: 'claude-code' | 'pi' = 'claude-code',
+): Promise<string> {
+  if (harness === 'pi') {
+    return `pi --mode rpc --model ${model}`;
+  }
+
+  const provider = getProviderForModel(model);
+  const agentFlag = ` --agent ${roleAgentDefinitionPath(role)}`;
+  const nameFlag = ` --name ${agentName}`;
+  const bypassWithAgent = resolvePermissionMode() === 'bypass'
+    ? ' --dangerously-skip-permissions'
+    : '';
+
+  if (provider.name === 'openai' && (await getProviderAuthMode(model)) === 'subscription') {
+    const resolvedModel = CLI_PROXY_MODEL_ALIASES[model] ?? model;
+    return `claude${bypassWithAgent}${agentFlag} --model ${resolvedModel}${nameFlag}`;
+  }
+
+  const modelFlag = provider.name === 'anthropic' ? '' : ` --model ${model}`;
+  return `claude${bypassWithAgent}${agentFlag}${modelFlag}${nameFlag}`;
 }
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
@@ -1203,6 +1234,15 @@ export interface SpawnOptions {
   swarmItemId?: string; // vBRIEF item ID this slot is working on
 }
 
+export interface SpawnRunOptions {
+  workspace?: string;
+  runtime?: string;
+  harness?: 'claude-code' | 'pi';
+  model?: string;
+  prompt?: string;
+  agentId?: string;
+}
+
 /**
  * Build shell export lines to inject into a work agent's launcher.sh.
  *
@@ -1246,7 +1286,7 @@ export async function buildCavemanExports(
  * 2. Role routing via config.yaml roles/workhorses (defaults to work)
  * 3. Safe fallback (claude-sonnet-4-6)
  */
-export function determineModel(options: { model?: string; role?: 'work' } = {}): string {
+export function determineModel(options: { model?: string; role?: Role } = {}): string {
   console.log(`[DEBUG] determineModel called with:`, { model: options.model, role: options.role ?? 'work' });
 
   if (options.model) {
@@ -1442,6 +1482,142 @@ export async function buildAgentLaunchConfig(opts: {
   });
 
   return { launcherContent, providerEnv };
+}
+
+function defaultRunWorkspace(issueId: string): string {
+  const project = resolveProjectFromIssue(issueId);
+  if (!project) {
+    throw new Error(`Cannot spawn role run for ${issueId}: no project is configured for this issue prefix`);
+  }
+  return join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+}
+
+function runAgentId(issueId: string, role: Role): string {
+  return role === 'work'
+    ? `agent-${issueId.toLowerCase()}`
+    : `agent-${issueId.toLowerCase()}-${role}`;
+}
+
+/**
+ * Spawn a role-based Panopticon run. Work delegates to the existing work-agent
+ * path; review/test/ship use the role definition files under roles/.
+ */
+export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
+  const workspace = options.workspace ?? defaultRunWorkspace(issueId);
+
+  if (role === 'work') {
+    return spawnAgent({
+      issueId,
+      workspace,
+      runtime: options.runtime,
+      harness: options.harness,
+      model: options.model,
+      prompt: options.prompt,
+      role: 'work',
+    });
+  }
+
+  const agentId = options.agentId ?? runAgentId(issueId, role);
+  if (await sessionExistsAsync(agentId)) {
+    throw new Error(`Role run ${agentId} already running. Use 'pan tell' to message it.`);
+  }
+
+  initHook(agentId);
+  const selectedModel = determineModel({ model: options.model, role });
+
+  if (
+    getProviderForModel(selectedModel).name === 'openai'
+    && (await getProviderAuthMode(selectedModel)) === 'subscription'
+  ) {
+    const { isCliproxyRunningAsync } = await import('./cliproxy.js');
+    if (!(await isCliproxyRunningAsync())) {
+      throw new Error(
+        'CLIProxyAPI sidecar is not running. GPT subscription role runs route through '
+        + 'a local cliproxy process managed by `pan up`. Run `pan up` (or restart the '
+        + 'dashboard) before spawning a GPT role run.',
+      );
+    }
+  }
+
+  const state: AgentState = {
+    id: agentId,
+    issueId,
+    workspace,
+    runtime: options.runtime || 'claude',
+    harness: options.harness ?? 'claude-code',
+    role,
+    model: selectedModel,
+    status: 'starting',
+    startedAt: new Date().toISOString(),
+    costSoFar: 0,
+  };
+  saveAgentState(state);
+
+  let promptFile: string | undefined;
+  if (options.prompt) {
+    promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
+    writeFileSync(promptFile, options.prompt);
+  }
+
+  checkAndSetupHooks();
+
+  const provider = getProviderForModel(selectedModel as ModelId);
+  if (provider.authType === 'credential-file') {
+    setupCredentialFileAuth(provider, workspace);
+  } else {
+    clearCredentialFileAuth(workspace);
+  }
+
+  const providerExports = await getProviderExportsForModel(selectedModel);
+  const providerEnv = await getProviderEnvForModel(selectedModel);
+  const launcherAgentType: LauncherAgentType = role === 'plan' ? 'planning' : role;
+  const launcherContent = generateLauncherScript({
+    agentType: launcherAgentType,
+    workingDir: workspace,
+    changeDir: false,
+    setCi: true,
+    setTerminalEnv: true,
+    providerExports,
+    promptFile,
+    panopticonEnv: { agentId, issueId, sessionType: role },
+    baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, state.harness ?? 'claude-code'),
+  });
+
+  const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
+  writeFileSync(launcherScript, launcherContent, { mode: 0o755 });
+  const claudeCmd = `bash ${launcherScript}`;
+  console.log(`[claude-invoke] purpose=role-run | role=${role} | model=${state.model} | source=agents.ts:spawnRun | session=${agentId} | command="${claudeCmd}"`);
+
+  try {
+    const { preTrustDirectory } = await import('./workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
+    preTrustDirectory(workspace);
+  } catch { /* non-fatal */ }
+
+  await createSessionAsync(agentId, workspace, claudeCmd, {
+    env: {
+      ...BLANKED_PROVIDER_ENV,
+      TERM: 'xterm-256color',
+      PANOPTICON_AGENT_ID: agentId,
+      PANOPTICON_ISSUE_ID: issueId,
+      PANOPTICON_SESSION_TYPE: role,
+      CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
+      GIT_SEQUENCE_EDITOR: 'false',
+      ...providerEnv,
+    },
+  });
+
+  state.status = 'running';
+  state.lastActivity = new Date().toISOString();
+  saveAgentState(state);
+
+  emitActivityEntry({
+    source: 'dashboard',
+    level: 'info',
+    message: `${role} role started for ${issueId}`,
+    issueId,
+  });
+
+  return state;
 }
 
 export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {

@@ -4,6 +4,8 @@ export type LauncherAgentType =
   | 'specialist-dispatch'
   | 'specialist-init'
   | 'review'
+  | 'test'
+  | 'ship'
   | 'conversation'
   | 'remote'
   | 'runtime'

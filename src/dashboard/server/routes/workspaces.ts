@@ -84,6 +84,7 @@ import {
   getAgentState,
   getAgentStateAsync,
   spawnAgent,
+  spawnRun,
 } from '../../../lib/agents.js';
 import { getActiveSessionModel } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { getCostsForIssue } from '../../../lib/costs/index.js';
@@ -5341,11 +5342,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
           }
         } catch {}
 
-        const { wakeSpecialist, spawnEphemeralSpecialist: spawnApproveEphemeral } =
-          await import('../../../lib/cloister/specialists.js');
-        const approveProjectKey = resolveProjectFromIssue(issueId)?.projectKey ?? null;
-
-        console.log(`[approve] Starting specialist pipeline for ${issueId}...`);
+        console.log(`[approve] Starting role pipeline for ${issueId}...`);
 
         const pipelinePrompt = `STRICT REVIEW WORKFLOW for ${issueId}
 
@@ -5399,33 +5396,33 @@ curl -X POST http://localhost:${PORT}/api/specialists/test-agent/queue -H "Conte
 - Find EVERYTHING. The agent should learn from your feedback.`;
 
         let reviewResult: { success: boolean; message: string; error?: string };
-        if (approveProjectKey) {
-          reviewResult = await spawnApproveEphemeral(approveProjectKey, 'review-agent', {
-            issueId,
-            branch: branchName,
+        try {
+          const reviewRun = await spawnRun(issueId, 'review', {
             workspace: workspacePath,
-            promptOverride: pipelinePrompt,
+            prompt: pipelinePrompt,
           });
-        } else {
-          reviewResult = await wakeSpecialist('review-agent', pipelinePrompt, {
-            waitForReady: true,
-            startIfNotRunning: true,
-          });
+          reviewResult = { success: true, message: `review role started as ${reviewRun.id}` };
+        } catch (err: any) {
+          reviewResult = {
+            success: false,
+            message: err?.message ?? 'Failed to start review role',
+            error: err?.message,
+          };
         }
 
         if (!reviewResult.success) {
-          console.warn(`[approve] review-agent failed to wake: ${reviewResult.message}`);
+          console.warn(`[approve] review role failed to start: ${reviewResult.message}`);
           console.log(`[approve] Falling back to direct merge...`);
         } else {
           console.log(
-            `[approve] Pipeline started - review-agent will queue test-agent when done`
+            `[approve] Pipeline started - review role will synthesize convoy findings`
           );
           completePendingOperation(issueId, null);
           return jsonResponse({
             success: true,
-            message: `Approval pipeline started for ${issueId}. Specialists: review → test`,
+            message: `Approval pipeline started for ${issueId}. Role: review`,
             pipeline: 'running',
-            note: 'Watch the specialists panel for progress. Click Merge when review+test pass.',
+            note: 'Watch the role run for progress. Click Merge when review+test pass.',
             ...(recentPushWarning && { recentPushWarning }),
             ...(mainAdvancedBy > 0 && { mainAdvancedBy }),
           });
