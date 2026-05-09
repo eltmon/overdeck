@@ -372,6 +372,11 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       }
     }
 
+    case 'review.coordinator.died':
+      // Telemetry-only. The durable review-status row is updated by recovery
+      // checks; keep clients in sequence so event stream subscribers can alert.
+      return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+
     case 'pipeline.review-started':
     case 'pipeline.review-completed':
     case 'pipeline.test-started':

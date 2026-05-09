@@ -464,6 +464,19 @@ export const ReviewCoordinatorStartedEvent = Schema.Struct({
 })
 export type ReviewCoordinatorStartedEvent = typeof ReviewCoordinatorStartedEvent.Type
 
+/** Review coordinator died before writing a terminal exit marker. */
+export const ReviewCoordinatorDiedEvent = Schema.Struct({
+  type: Schema.Literal("review.coordinator.died"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    sessionName: Schema.String,
+    reason: Schema.String,
+  }),
+})
+export type ReviewCoordinatorDiedEvent = typeof ReviewCoordinatorDiedEvent.Type
+
 // ─── Specialist Events ────────────────────────────────────────────────────────
 
 /** New — specialist became active */
@@ -796,6 +809,7 @@ export const DomainEvent = Schema.Union([
   ReviewReviewerCompletedEvent,
   ReviewSpecialistTimedOutEvent,
   ReviewCoordinatorStartedEvent,
+  ReviewCoordinatorDiedEvent,
   SpecialistStartedEvent,
   SpecialistCompletedEvent,
   SpecialistFailedEvent,
