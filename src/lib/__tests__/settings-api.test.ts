@@ -21,6 +21,18 @@ vi.mock('../config-yaml.js', () => ({
     test: 'workhorse:mid',
     ship: 'workhorse:mid',
   },
+  DEFAULT_WORKHORSES: {
+    expensive: 'claude-opus-4-7',
+    mid: 'claude-sonnet-4-6',
+    cheap: 'claude-haiku-4-5',
+  },
+  DEFAULT_ROLES: {
+    plan: { model: 'workhorse:expensive' },
+    work: { model: 'workhorse:mid', sub: { inspect: { model: 'workhorse:cheap' }, 'inspect-deep': { model: 'workhorse:mid' } } },
+    review: { model: 'workhorse:expensive', sub: { security: { model: 'workhorse:expensive' }, correctness: { model: 'workhorse:mid' }, performance: { model: 'workhorse:mid' }, requirements: { model: 'workhorse:mid' } } },
+    test: { model: 'workhorse:mid' },
+    ship: { model: 'workhorse:mid' },
+  },
   loadConfig: () => mockLoadConfig(),
   getGlobalConfigPath: () => '/tmp/config.yaml',
   clearConfigCache: () => mockClearConfigCache(),

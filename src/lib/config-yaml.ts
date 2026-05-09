@@ -107,6 +107,45 @@ export const DEFAULT_MODEL_REFS: Record<Role, ModelRef> = {
   ship: 'workhorse:mid',
 };
 
+export const DEFAULT_WORKHORSES: Required<WorkhorsesConfig> = {
+  expensive: 'claude-opus-4-7',
+  mid: 'claude-sonnet-4-6',
+  cheap: 'claude-haiku-4-5',
+};
+
+export const DEFAULT_ROLES: Record<Role, RoleConfig> = {
+  plan: { model: 'workhorse:expensive' },
+  work: {
+    model: 'workhorse:mid',
+    sub: {
+      inspect: { model: 'workhorse:cheap' },
+      'inspect-deep': { model: 'workhorse:mid' },
+    },
+  },
+  review: {
+    model: 'workhorse:expensive',
+    sub: {
+      security: { model: 'workhorse:expensive' },
+      correctness: { model: 'workhorse:mid' },
+      performance: { model: 'workhorse:mid' },
+      requirements: { model: 'workhorse:mid' },
+    },
+  },
+  test: { model: 'workhorse:mid' },
+  ship: { model: 'workhorse:mid' },
+};
+
+function cloneRoles(roles: RolesConfig): RolesConfig {
+  const cloned: RolesConfig = {};
+  for (const [role, roleConfig] of Object.entries(roles) as Array<[Role, RoleConfig]>) {
+    cloned[role] = {
+      ...roleConfig,
+      sub: roleConfig.sub ? { ...roleConfig.sub } : undefined,
+    };
+  }
+  return cloned;
+}
+
 export interface ResourcesConfig {
   /** Available RAM threshold that triggers a warning state/guardrail (GiB) */
   memory_warn_gb?: number;
@@ -459,6 +498,8 @@ const DEFAULT_CONFIG: NormalizedConfig = {
   providerAuth: {},
   providerPlan: {},
   openrouterFavorites: [],
+  workhorses: { ...DEFAULT_WORKHORSES },
+  roles: cloneRoles(DEFAULT_ROLES),
   overrides: {},
   geminiThinkingLevel: 3,
   trackerKeys: {},
@@ -776,6 +817,8 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       ...DEFAULT_CONFIG.tmux,
     },
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
+    workhorses: { ...DEFAULT_WORKHORSES },
+    roles: cloneRoles(DEFAULT_ROLES),
     shadow: {
       enabled: DEFAULT_CONFIG.shadow.enabled,
       trackers: { ...DEFAULT_CONFIG.shadow.trackers },

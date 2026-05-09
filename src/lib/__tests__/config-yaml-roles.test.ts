@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_MODEL_REFS,
+  DEFAULT_ROLES,
+  DEFAULT_WORKHORSES,
   derefWorkhorse,
   mergeConfigs,
   resolveModel,
@@ -68,11 +70,10 @@ describe('role model configuration', () => {
     expect(resolveModel('review', 'requirements', config)).toBe('glm-5.1');
   });
 
-  it('rejects missing workhorse slots with the offending field path', () => {
+  it('rejects unknown workhorse slots with the offending field path', () => {
     expect(() => mergeConfigs({
-      workhorses: { mid: 'claude-sonnet-4-6' },
-      roles: { review: { model: 'workhorse:expensive' } },
-    })).toThrow('config.yaml: roles.review.model references workhorse:expensive but workhorses.expensive is not defined');
+      roles: { review: { model: 'workhorse:missing' } },
+    })).toThrow('config.yaml: roles.review.model references workhorse:missing but workhorses.missing is not defined');
   });
 
   it('rejects chained workhorse refs at config parse time', () => {
@@ -100,5 +101,47 @@ describe('role model configuration', () => {
     expect(config.roles?.review?.harness).toBe('claude-code');
     expect(config.roles?.review?.sub?.performance?.model).toBe('workhorse:mid');
     expect(resolveModel('review', 'performance', config)).toBe('claude-sonnet-4-6');
+  });
+
+  it('seeds default workhorses and roles when config omits both sections', () => {
+    const { config } = mergeConfigs({});
+
+    expect(config.workhorses).toEqual(DEFAULT_WORKHORSES);
+    expect(config.roles).toEqual(DEFAULT_ROLES);
+    expect(resolveModel('work', 'inspect', config)).toBe('claude-haiku-4-5');
+    expect(resolveModel('review', 'security', config)).toBe('claude-opus-4-7');
+  });
+
+  it('seeds missing roles while preserving partial user role config', () => {
+    const { config } = mergeConfigs({
+      roles: {
+        work: {
+          model: 'gpt-5.5',
+          sub: {
+            inspect: { model: 'claude-sonnet-4-6' },
+          },
+        },
+      },
+    });
+
+    expect(config.roles?.work?.model).toBe('gpt-5.5');
+    expect(config.roles?.work?.sub?.inspect?.model).toBe('claude-sonnet-4-6');
+    expect(config.roles?.work?.sub?.['inspect-deep']?.model).toBe('workhorse:mid');
+    expect(config.roles?.plan).toEqual(DEFAULT_ROLES.plan);
+    expect(config.roles?.ship).toEqual(DEFAULT_ROLES.ship);
+  });
+
+  it('seeds missing workhorse slots while preserving user-defined slots', () => {
+    const { config } = mergeConfigs({
+      workhorses: {
+        mid: 'gpt-5.5-mini',
+      },
+    });
+
+    expect(config.workhorses).toEqual({
+      ...DEFAULT_WORKHORSES,
+      mid: 'gpt-5.5-mini',
+    });
+    expect(resolveModel('work', undefined, config)).toBe('gpt-5.5-mini');
   });
 });

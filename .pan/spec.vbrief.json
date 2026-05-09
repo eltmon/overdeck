@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T20:23:41.119Z"
+    "updated": "2026-05-09T20:26:32.285Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 7,
+    "sequence": 8,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T20:23:41.119Z",
+    "updated": "2026-05-09T20:26:32.285Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -158,7 +158,7 @@
       {
         "id": "f3-default-config-seed",
         "title": "Foundation: seed default workhorses + roles when missing from config.yaml",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -173,7 +173,7 @@
           {
             "id": "f3-default-config-seed.ac1",
             "title": "Missing workhorses section → defaults applied in-memory (claude-opus-4-7 / claude-sonnet-4-7 / claude-haiku-4-5)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -181,7 +181,7 @@
           {
             "id": "f3-default-config-seed.ac2",
             "title": "Missing roles section → all 5 roles + sub-roles seeded with documented defaults (plan/review = workhorse:expensive; work/test/ship = workhorse:mid; inspect = workhorse:cheap)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -189,7 +189,7 @@
           {
             "id": "f3-default-config-seed.ac3",
             "title": "Partial user config (e.g. only `roles.work` set) preserves user values and seeds missing roles",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -197,7 +197,7 @@
           {
             "id": "f3-default-config-seed.ac4",
             "title": "config.yaml on disk is NOT rewritten by the seed; only Settings edits persist",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }

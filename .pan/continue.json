@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T20:23:41.119Z",
+  "updated": "2026-05-09T20:26:32.285Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "pending-f2",
+    "sha": "pending-f3",
     "dirty": true
   },
   "decisions": [
@@ -158,11 +158,12 @@
     }
   ],
   "resumePoint": {
-    "description": "F2 AgentState role field implemented: AgentState has optional role, state.json round-trip preserves it, and targeted test/typecheck/lint pass. Close workspace-47mw and continue with bd ready.",
-    "beadId": "workspace-47mw",
+    "description": "F3 default config seeding implemented: mergeConfigs seeds default workhorses and five roles/sub-roles in memory, preserves partial user values, and Settings API uses shared defaults. Close workspace-xq98 and continue with bd ready.",
+    "beadId": "workspace-xq98",
     "filesToRead": [
-      "src/lib/agents.ts",
-      "src/lib/__tests__/agent-state-role.test.ts"
+      "src/lib/config-yaml.ts",
+      "src/lib/settings-api.ts",
+      "src/lib/__tests__/config-yaml-roles.test.ts"
     ]
   },
   "beadsMapping": {},
@@ -215,6 +216,12 @@
       "timestamp": "2026-05-09T20:23:41.119Z",
       "reason": "bead-complete",
       "note": "Implemented F2 AgentState role field as an additive optional Role on AgentState. Existing JSON parse/save path already preserves unknown typed fields, and a new vitest proves role persists through state.json. Verified targeted test, typecheck, and lint pass.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T20:26:32.285Z",
+      "reason": "bead-complete",
+      "note": "Implemented F3 default workhorse/role seeding in config-yaml: DEFAULT_WORKHORSES and DEFAULT_ROLES are in-memory defaults, mergeConfigs clones them before overlaying user config, and partial role/workhorse configs preserve user values while seeding missing entries. Settings API now consumes the shared defaults. Targeted config/settings tests, typecheck, and lint pass.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],

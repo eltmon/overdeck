@@ -8,7 +8,8 @@
 import { readFile, writeFile } from 'fs/promises';
 import { parseDocument } from 'yaml';
 import {
-  DEFAULT_MODEL_REFS,
+  DEFAULT_ROLES,
+  DEFAULT_WORKHORSES,
   loadConfig,
   getGlobalConfigPath,
   clearConfigCache,
@@ -200,12 +201,6 @@ const ALLOWED_SUB_ROLES: Partial<Record<Role, readonly string[]>> = {
   work: ['inspect', 'inspect-deep'],
   review: ['security', 'performance', 'correctness', 'requirements'],
 };
-const DEFAULT_WORKHORSES: Required<WorkhorsesConfig> = {
-  expensive: 'claude-opus-4-7',
-  mid: 'claude-sonnet-4-6',
-  cheap: 'claude-haiku-4-5',
-};
-
 function seededWorkhorses(config: Pick<ReturnType<typeof loadConfig>['config'], 'workhorses'>): WorkhorsesConfig {
   return { ...DEFAULT_WORKHORSES, ...(config.workhorses ?? {}) };
 }
@@ -213,10 +208,16 @@ function seededWorkhorses(config: Pick<ReturnType<typeof loadConfig>['config'], 
 function seededRoles(config: Pick<ReturnType<typeof loadConfig>['config'], 'roles'>): RolesConfig {
   const roles: RolesConfig = {};
   for (const role of ROLE_NAMES) {
+    const defaultRole = DEFAULT_ROLES[role];
+    const configuredRole = config.roles?.[role];
+    const sub = {
+      ...(defaultRole.sub ?? {}),
+      ...(configuredRole?.sub ?? {}),
+    };
     roles[role] = {
-      model: DEFAULT_MODEL_REFS[role],
-      ...(config.roles?.[role] ?? {}),
-      sub: config.roles?.[role]?.sub ? { ...config.roles[role]!.sub } : undefined,
+      ...defaultRole,
+      ...(configuredRole ?? {}),
+      sub: Object.keys(sub).length > 0 ? sub : undefined,
     };
   }
   return roles;
