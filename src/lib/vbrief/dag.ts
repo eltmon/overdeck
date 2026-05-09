@@ -2,7 +2,7 @@
  * vBRIEF DAG utilities — critical path, graph analysis, wave scheduling, per-item dispatch
  */
 
-import type { VBriefDocument, VBriefItem } from './types.js';
+import type { VBriefDocument, VBriefItem, VBriefItemStatus } from './types.js';
 
 export interface WaveItem {
   id: string;
@@ -213,7 +213,7 @@ export function getDispatchableItems(
 
   // Collect 'blocks' edges whose target is actionable
   const blockEdges = doc.plan.edges.filter(
-    e => e.type === 'blocks' && actionableIds.has(e.to),
+    e => e.type === 'blocks' && actionableIds.has(e.to) && itemById.has(e.from),
   );
 
   // Build map: itemId → list of blocker IDs
@@ -266,15 +266,27 @@ function globToRegex(pattern: string): RegExp {
  * Returns true if a path matches at least one glob pattern in the list.
  * Patterns ending in `/**` also match exact directory paths.
  */
+interface CompiledGlob {
+  pattern: string;
+  regex: RegExp;
+  exactDirectory?: string;
+}
+
+function compileGlob(pattern: string): CompiledGlob {
+  const withoutTrail = pattern.replace(/\/\*\*$/, '');
+  return {
+    pattern,
+    regex: globToRegex(pattern),
+    exactDirectory: withoutTrail !== pattern ? withoutTrail : undefined,
+  };
+}
+
+function pathMatchesAnyCompiled(filePath: string, patterns: CompiledGlob[]): boolean {
+  return patterns.some(pattern => pattern.regex.test(filePath) || pattern.exactDirectory === filePath);
+}
+
 function pathMatchesAny(filePath: string, patterns: string[]): boolean {
-  return patterns.some(pattern => {
-    const re = globToRegex(pattern);
-    if (re.test(filePath)) return true;
-    // "src/foo/**" should also match "src/foo" itself
-    const withoutTrail = pattern.replace(/\/\*\*$/, '');
-    if (withoutTrail !== pattern && filePath === withoutTrail) return true;
-    return false;
-  });
+  return pathMatchesAnyCompiled(filePath, patterns.map(compileGlob));
 }
 
 /**
@@ -288,19 +300,218 @@ export function hasFileOverlap(runningItems: VBriefItem[], candidate: VBriefItem
   const candidateScope = candidate.metadata?.files_scope;
   if (!candidateScope || candidateScope.length === 0) return false;
 
+  const compiledCandidateScope = candidateScope.map(compileGlob);
+
   for (const running of runningItems) {
     const runningScope = running.metadata?.files_scope;
     if (!runningScope || runningScope.length === 0) continue;
+    const compiledRunningScope = runningScope.map(compileGlob);
 
     // Check candidate patterns against running scope paths
     for (const runningPath of runningScope) {
-      if (pathMatchesAny(runningPath, candidateScope)) return true;
+      if (pathMatchesAnyCompiled(runningPath, compiledCandidateScope)) return true;
     }
     // Check running patterns against candidate scope paths
     for (const candidatePath of candidateScope) {
-      if (pathMatchesAny(candidatePath, runningScope)) return true;
+      if (pathMatchesAnyCompiled(candidatePath, compiledRunningScope)) return true;
     }
   }
 
   return false;
+}
+
+
+/** Active-slice prompt contract for a single work item. */
+export interface ActiveSlice {
+  issueId: string;
+  planId: string;
+  planSequence: number;
+  item: VBriefItem;
+  /** Blocking parent items that have already completed/merged and should inform this item. */
+  dependencies: VBriefItem[];
+  /** Direct child acceptance criteria/subItems for the item, copied for prompt-size boundedness. */
+  acceptanceCriteria: NonNullable<VBriefItem['subItems']>;
+  /** Synthesis context for DAG convergence points, when available. */
+  synthesisContext?: string;
+  /** Minimal markdown prompt payload for work agents. */
+  prompt: string;
+}
+
+export interface ActiveSliceOptions {
+  issueId: string;
+  itemId: string;
+  synthesisOutputs?: Record<string, { contextUpdate: string }>;
+}
+
+function directBlockingParents(doc: VBriefDocument, itemId: string): VBriefItem[] {
+  const itemById = new Map(doc.plan.items.map(i => [i.id, i]));
+  return doc.plan.edges
+    .filter(e => e.type === 'blocks' && e.to === itemId)
+    .map(e => itemById.get(e.from))
+    .filter((item): item is VBriefItem => Boolean(item));
+}
+
+/**
+ * Build the bounded "active slice" that work-agent prompts should receive by
+ * default instead of the full vBRIEF. The slice contains only the target item,
+ * its direct resolved dependencies, its acceptance criteria, and optional
+ * synthesis output for convergence points.
+ */
+export function createActiveSlice(doc: VBriefDocument, options: ActiveSliceOptions): ActiveSlice {
+  const item = doc.plan.items.find(i => i.id === options.itemId);
+  if (!item) throw new Error(`Plan item not found: ${options.itemId}`);
+  const dependencies = directBlockingParents(doc, item.id);
+  const acceptanceCriteria = item.subItems ?? [];
+  const synthesisContext = options.synthesisOutputs?.[item.id]?.contextUpdate;
+  const prompt = renderActiveSlicePrompt({
+    issueId: options.issueId,
+    planId: doc.plan.id,
+    planSequence: doc.plan.sequence ?? 0,
+    item,
+    dependencies,
+    acceptanceCriteria,
+    synthesisContext,
+  });
+  return {
+    issueId: options.issueId,
+    planId: doc.plan.id,
+    planSequence: doc.plan.sequence ?? 0,
+    item,
+    dependencies,
+    acceptanceCriteria,
+    synthesisContext,
+    prompt,
+  };
+}
+
+export function renderActiveSlicePrompt(slice: Omit<ActiveSlice, 'prompt'>): string {
+  const lines = [
+    `# Active vBRIEF Slice: ${slice.issueId}`,
+    `Plan: ${slice.planId} @ sequence ${slice.planSequence}`,
+    ``,
+    `## Target Item`,
+    `- ${slice.item.id}: ${slice.item.title} [${slice.item.status}]`,
+  ];
+  if (slice.item.narrative?.Action) lines.push(`- Action: ${slice.item.narrative.Action}`);
+  if (slice.dependencies.length > 0) {
+    lines.push(``, `## Resolved Dependencies`);
+    for (const dep of slice.dependencies) lines.push(`- ${dep.id}: ${dep.title} [${dep.status}]`);
+  }
+  if (slice.acceptanceCriteria.length > 0) {
+    lines.push(``, `## Acceptance Criteria`);
+    for (const ac of slice.acceptanceCriteria) lines.push(`- ${ac.id}: ${ac.title} [${ac.status}]`);
+  }
+  if (slice.synthesisContext) lines.push(``, `## Synthesis Context`, slice.synthesisContext);
+  return lines.join('\n');
+}
+
+export type TaskOperationType = 'claim' | 'done' | 'block' | 'unblock' | 'cancel';
+
+export interface TaskOperation {
+  type: TaskOperationType;
+  itemId: string;
+  expectedSequence?: number;
+  reason?: string;
+  subItemIds?: string[];
+  pipeline?: PlanPipelineMirror;
+}
+
+export interface TaskOperationResult {
+  doc: VBriefDocument;
+  item: VBriefItem;
+}
+
+function statusForOperation(type: TaskOperationType): VBriefItemStatus {
+  switch (type) {
+    case 'claim': return 'running';
+    case 'done': return 'completed';
+    case 'block': return 'blocked';
+    case 'unblock': return 'pending';
+    case 'cancel': return 'cancelled';
+  }
+}
+
+function cloneDoc(doc: VBriefDocument): VBriefDocument {
+  return JSON.parse(JSON.stringify(doc)) as VBriefDocument;
+}
+
+/**
+ * Apply a Panopticon-native task operation to the vBRIEF itself. This is the
+ * single mutation authority for swarm task status: Beads can mirror state during
+ * migration, but the plan document wins and receives the sequence bump.
+ */
+export function applyTaskOperation(doc: VBriefDocument, operation: TaskOperation): TaskOperationResult {
+  const currentSequence = doc.plan.sequence ?? 0;
+  if (operation.expectedSequence !== undefined && operation.expectedSequence !== currentSequence) {
+    throw new Error(`vBRIEF sequence conflict: expected ${operation.expectedSequence}, found ${currentSequence}`);
+  }
+  const next = cloneDoc(doc);
+  const item = next.plan.items.find(i => i.id === operation.itemId);
+  if (!item) throw new Error(`Plan item not found: ${operation.itemId}`);
+
+  const now = new Date().toISOString();
+  item.status = statusForOperation(operation.type);
+  if (operation.type === 'done') item.completed = now;
+  if (operation.reason) {
+    item.metadata = { ...(item.metadata ?? {}), statusReason: operation.reason, statusUpdatedAt: now };
+  }
+  if (operation.subItemIds?.length) {
+    const ids = new Set(operation.subItemIds);
+    for (const sub of item.subItems ?? []) {
+      if (ids.has(sub.id)) {
+        sub.status = item.status;
+        if (operation.type === 'done') sub.completed = now;
+      }
+    }
+  } else if (operation.type === 'done') {
+    for (const sub of item.subItems ?? []) {
+      sub.status = 'completed';
+      sub.completed = now;
+    }
+  }
+  next.plan.sequence = currentSequence + 1;
+  next.plan.updated = now;
+  next.vBRIEFInfo.updated = now;
+  if (operation.pipeline) setPipelineMirror(next, operation.pipeline);
+  return { doc: next, item };
+}
+
+export interface PlanPipelineMirror {
+  issueId: string;
+  reviewStatus?: string;
+  testStatus?: string;
+  mergeStatus?: string;
+  updatedAt: string;
+  [key: string]: unknown;
+}
+
+export function getPipelineMirror(doc: VBriefDocument): PlanPipelineMirror | undefined {
+  return doc.plan.metadata?.pipeline as PlanPipelineMirror | undefined;
+}
+
+/** Write pipeline state into plan.metadata.pipeline for pan-oversee and dashboard readers. */
+export function setPipelineMirror(doc: VBriefDocument, pipeline: PlanPipelineMirror): VBriefDocument {
+  doc.plan.metadata = { ...(doc.plan.metadata ?? {}), pipeline };
+  return doc;
+}
+
+export interface TaskGraphView {
+  source: 'vbrief';
+  next: VBriefItem[];
+  waves: Wave[];
+  criticalPath: string[];
+}
+
+/** vBRIEF-first task graph view. Beads are intentionally not consulted here. */
+export function getTaskGraphView(doc: VBriefDocument, mergedItemIds: Set<string> = new Set()): TaskGraphView {
+  return {
+    source: 'vbrief',
+    next: getDispatchableItems(doc, mergedItemIds),
+    waves: groupItemsByWave(doc),
+    criticalPath: criticalPath(doc),
+  };
+}
+
+export function activeSlicePromptSize(slice: ActiveSlice): number {
+  return Buffer.byteLength(slice.prompt, 'utf8');
 }

@@ -3,7 +3,7 @@
  *   getDispatchableItems, blockingParentCount, hasFileOverlap
  */
 import { describe, it, expect } from 'vitest';
-import { getDispatchableItems, blockingParentCount, hasFileOverlap } from '../dag.js';
+import { getDispatchableItems, blockingParentCount, hasFileOverlap, createActiveSlice, applyTaskOperation, getPipelineMirror, setPipelineMirror, getTaskGraphView, activeSlicePromptSize } from '../dag.js';
 import type { VBriefDocument, VBriefItem } from '../types.js';
 
 function makeDoc(
@@ -94,6 +94,12 @@ describe('getDispatchableItems', () => {
     const doc = makeDoc([{ id: 'a', status: 'completed' }, { id: 'b', status: 'completed' }], []);
     expect(getDispatchableItems(doc, new Set(['a', 'b']))).toHaveLength(0);
   });
+
+  it('ignores dangling blockers whose source item is missing', () => {
+    const doc = makeDoc([{ id: 'a' }], [{ from: 'missing', to: 'a' }]);
+    expect(getDispatchableItems(doc, new Set()).map(i => i.id)).toContain('a');
+  });
+
 });
 
 // ─── blockingParentCount ──────────────────────────────────────────────────
@@ -193,5 +199,62 @@ describe('hasFileOverlap', () => {
     ];
     const candidate = item('c', ['src/lib/agents.ts']);
     expect(hasFileOverlap(running, candidate)).toBe(true);
+  });
+});
+
+
+// ─── Active slices and task operations ──────────────────────────────────────
+
+describe('active slices and task operations', () => {
+  it('builds a bounded active slice with dependencies and acceptance criteria', () => {
+    const doc = makeDoc(
+      [{ id: 'a', status: 'completed' }, { id: 'b' }],
+      [{ from: 'a', to: 'b' }],
+    );
+    doc.plan.sequence = 7;
+    doc.plan.items[1]!.subItems = [{ id: 'ac-1', title: 'Works', status: 'pending' }];
+    const slice = createActiveSlice(doc, {
+      issueId: 'PAN-977',
+      itemId: 'b',
+      synthesisOutputs: { b: { contextUpdate: 'A changed API shape' } },
+    });
+
+    expect(slice.planSequence).toBe(7);
+    expect(slice.dependencies.map(i => i.id)).toEqual(['a']);
+    expect(slice.acceptanceCriteria.map(i => i.id)).toEqual(['ac-1']);
+    expect(slice.prompt).toContain('A changed API shape');
+    expect(activeSlicePromptSize(slice)).toBeLessThan(8 * 1024);
+  });
+
+  it('applies task operations with sequence CAS and writes plan status', () => {
+    const doc = makeDoc([{ id: 'a' }], []);
+    doc.plan.sequence = 3;
+    doc.plan.items[0]!.subItems = [{ id: 'ac-1', title: 'AC', status: 'pending' }];
+
+    const { doc: next } = applyTaskOperation(doc, {
+      type: 'done',
+      itemId: 'a',
+      expectedSequence: 3,
+      reason: 'implemented',
+    });
+
+    expect(next.plan.sequence).toBe(4);
+    expect(next.plan.items[0]!.status).toBe('completed');
+    expect(next.plan.items[0]!.subItems?.[0]?.status).toBe('completed');
+    expect(() => applyTaskOperation(next, { type: 'claim', itemId: 'a', expectedSequence: 3 })).toThrow(/sequence conflict/);
+  });
+
+  it('stores and reads pipeline mirror state in plan metadata', () => {
+    const doc = makeDoc([{ id: 'a' }], []);
+    setPipelineMirror(doc, { issueId: 'PAN-977', reviewStatus: 'pending', updatedAt: '2026-01-01T00:00:00Z' });
+    expect(getPipelineMirror(doc)?.reviewStatus).toBe('pending');
+  });
+
+  it('exposes a vBRIEF-first task graph view instead of consulting Beads', () => {
+    const doc = makeDoc([{ id: 'a' }, { id: 'b' }], [{ from: 'a', to: 'b' }]);
+    const view = getTaskGraphView(doc);
+    expect(view.source).toBe('vbrief');
+    expect(view.next.map(i => i.id)).toEqual(['a']);
+    expect(view.waves[0]?.items.map(i => i.id)).toEqual(['a']);
   });
 });

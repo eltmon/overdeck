@@ -2,13 +2,14 @@
  * Tests for PAN-977 swarm runtime fields on ContinueState.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'fs';
+import { existsSync, mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import {
   readContinueState,
   writeContinueState,
   readContinueStateAsync,
   writeContinueStateAsync,
+  continueFilePath,
   type ContinueState,
   type SwarmRuntime,
 } from '../continue-state.js';
@@ -111,6 +112,28 @@ describe('swarmRuntime in ContinueState', () => {
     writeContinueState(TEST_DIR, 'PAN-946', state);
     const read = readContinueState(TEST_DIR, 'PAN-946')!;
     expect(read.swarmRuntime).toBeUndefined();
+  });
+
+
+
+  it('canonicalizes lowercase and uppercase issue IDs to the same sync file', () => {
+    const state: ContinueState = { ...freshState('pan-977'), swarmRuntime: freshRuntime() };
+    writeContinueState(TEST_DIR, 'pan-977', state);
+
+    expect(existsSync(continueFilePath(TEST_DIR, 'PAN-977'))).toBe(true);
+    expect(existsSync(continueFilePath(TEST_DIR, 'pan-977'))).toBe(true);
+    const read = readContinueState(TEST_DIR, 'PAN-977')!;
+    expect(read.issueId).toBe('PAN-977');
+    expect(read.swarmRuntime?.model).toBe('test-model');
+  });
+
+  it('canonicalizes lowercase and uppercase issue IDs to the same async file', async () => {
+    const state: ContinueState = { ...freshState('PAN-977'), swarmRuntime: freshRuntime() };
+    await writeContinueStateAsync(TEST_DIR, 'PAN-977', state);
+
+    const read = await readContinueStateAsync(TEST_DIR, 'pan-977');
+    expect(read?.issueId).toBe('PAN-977');
+    expect(read?.swarmRuntime?.model).toBe('test-model');
   });
 
   it('async read returns null for missing file', async () => {

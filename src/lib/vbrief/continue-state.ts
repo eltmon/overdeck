@@ -208,7 +208,7 @@ export function writeContinueState(projectRoot: string, issueId: string, state: 
   const now = new Date().toISOString();
   const next: ContinueState = {
     ...state,
-    issueId,
+    issueId: issueId.toUpperCase(),
     version: '1',
     created: state.created || now,
     updated: now,
@@ -257,7 +257,7 @@ export function appendSessionEntry(
     ? { ...existing, sessionHistory: [...existing.sessionHistory, fullEntry] }
     : {
         version: '1',
-        issueId,
+        issueId: issueId.toUpperCase(),
         created: now,
         updated: now,
         gitState: {},
@@ -287,7 +287,7 @@ export function appendFeedbackEntry(
     ? { ...existing, feedback: [...(existing.feedback ?? []), entry] }
     : {
         version: '1',
-        issueId,
+        issueId: issueId.toUpperCase(),
         created: now,
         updated: now,
         gitState: {},
@@ -323,7 +323,7 @@ export async function writeContinueStateAsync(dir: string, issueId: string, stat
   const now = new Date().toISOString();
   const next: ContinueState = {
     ...state,
-    issueId,
+    issueId: issueId.toUpperCase(),
     version: '1',
     created: state.created || now,
     updated: now,
