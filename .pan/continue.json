@@ -2,11 +2,11 @@
   "version": "1",
   "issueId": "PAN-1030",
   "created": "2026-05-09T00:00:00Z",
-  "updated": "2026-05-09T02:10:38.307Z",
+  "updated": "2026-05-09T04:52:48.811Z",
   "gitState": {
     "branch": "feature/pan-1030",
-    "sha": "8f1fd3692",
-    "dirty": true
+    "sha": "14fe5133d",
+    "dirty": false
   },
   "decisions": [
     {
@@ -23,6 +23,11 @@
       "id": "D3",
       "summary": "The existing pipeline-status skill was already tracked on this branch but missing from the synced-skills fixture, so the fixture was updated to keep the full test suite green without changing skill contents.",
       "recordedAt": "2026-05-09T01:37:27Z"
+    },
+    {
+      "id": "D4",
+      "summary": "Review feedback requires planning-only awaiting-input badges to open the Issue Inspector, not the Plan dialog, because the inspector owns the exact prompt text and one-click terminal attach affordance.",
+      "recordedAt": "2026-05-09T04:52:48.811Z"
     }
   ],
   "hazards": [
@@ -40,10 +45,15 @@
       "id": "H3",
       "summary": "Merging origin/main conflicted only in the workspace-local continue.json, where main carried unrelated PAN-1025 state.",
       "mitigation": "Kept the PAN-1030 continue state because this workspace is issue-scoped to PAN-1030."
+    },
+    {
+      "id": "H4",
+      "summary": "Review reruns can leave local and remote merge commits divergent when a remote ref is repaired through the GitHub API.",
+      "mitigation": "Merged origin/feature/pan-1030 back into the local branch before pushing the review-fix commit, restoring fast-forward push behavior."
     }
   ],
   "resumePoint": {
-    "description": "PAN-1030 implementation verified and merged with origin/main. Next: commit merge conflict resolution, push, and rerun pan done.",
+    "description": "Review feedback fixed and pushed. Next: rerun pan review request PAN-1030 -m \"Fixed verification error\" and monitor the review pipeline.",
     "beadId": "workspace-mla7",
     "filesToRead": [
       "src/lib/agent-input-detection.ts",
@@ -78,6 +88,12 @@
       "timestamp": "2026-05-09T02:10:38.307Z",
       "reason": "end",
       "note": "Implementation complete"
+    },
+    {
+      "timestamp": "2026-05-09T04:52:48.811Z",
+      "reason": "review-fix",
+      "note": "Addressed review feedback by routing planning-only input badges to the inspector, adding regression coverage, bounding pane-detection cache growth, verifying typecheck/lint/full tests, and pushing the reconciled branch.",
+      "agentModel": "claude-code"
     }
   ],
   "feedback": []
