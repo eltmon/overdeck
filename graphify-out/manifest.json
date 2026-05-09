@@ -2036,8 +2036,8 @@
     "hash": "e68c146ca8c9cb6091ab63266248f5d1"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/__tests__/role-definitions.test.ts": {
-    "mtime": 1778361116.9146419,
-    "hash": "a1198d9853515b34ae2b0442d3498f0c"
+    "mtime": 1778361313.5002646,
+    "hash": "720a4a5742b8690b7cb8c7e682062383"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/src/lib/__tests__/manifest.test.ts": {
     "mtime": 1778301111.4124203,
@@ -6158,6 +6158,10 @@
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/roles/review.md": {
     "mtime": 1778360571.1728265,
     "hash": "be1f28acba6bcc2874fa7f65027ad2e3"
+  },
+  "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/roles/test.md": {
+    "mtime": 1778361302.3259928,
+    "hash": "01f80a9c7c4272a09c6bd4c7909dbfb8"
   },
   "/home/eltmon/Projects/panopticon-cli/workspaces/feature-pan-1048/roles/plan.md": {
     "mtime": 1778358584.6313622,

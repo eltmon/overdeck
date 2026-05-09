@@ -4,7 +4,7 @@
     "created": "2026-05-09T17:43:03Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1048: Unify agent type system — 5 enums → Role primitive, Workhorse Models indirection, reactive Cloister",
-    "updated": "2026-05-09T21:12:31.161Z"
+    "updated": "2026-05-09T21:15:51.659Z"
   },
   "plan": {
     "id": "pan-1048",
@@ -12,9 +12,9 @@
     "status": "proposed",
     "uid": "12be9073-23be-48a6-830a-1bfc122cb983",
     "author": "agent:claude-opus-4-7",
-    "sequence": 17,
+    "sequence": 18,
     "created": "2026-05-09T17:43:03Z",
-    "updated": "2026-05-09T21:12:31.161Z",
+    "updated": "2026-05-09T21:15:51.659Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1048",
@@ -421,7 +421,7 @@
       {
         "id": "r4-role-test-md-uat",
         "title": "Create roles/test.md folding UAT (Playwright tools available)",
-        "status": "pending",
+        "status": "completed",
         "priority": "medium",
         "created": "2026-05-09T17:43:03Z",
         "metadata": {
@@ -436,7 +436,7 @@
           {
             "id": "r4-role-test-md-uat.ac1",
             "title": "File exists at roles/test.md (frontmatter: name: test) covering project test suite + browser-based UAT",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -444,7 +444,7 @@
           {
             "id": "r4-role-test-md-uat.ac2",
             "title": "Documents Playwright isolation: isolated browser instance per session; no shared state with other agents",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
@@ -452,12 +452,13 @@
           {
             "id": "r4-role-test-md-uat.ac3",
             "title": "Old .claude/agents/pan-test-agent.md and pan-uat-agent.md NOT deleted (X1 handles deletion)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
             }
           }
-        ]
+        ],
+        "completed": "2026-05-09T21:15:51.659Z"
       },
       {
         "id": "r5-role-ship-md-human-merge",

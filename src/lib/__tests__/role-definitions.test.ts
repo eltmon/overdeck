@@ -99,6 +99,27 @@ describe('role definitions', () => {
     expect(body).toContain("resolveModel('review', 'requirements')");
   });
 
+  it('defines the test role as suite verification plus browser UAT', () => {
+    const { frontmatter, body } = splitFrontmatter(readRepoFile('roles/test.md'));
+
+    expect(frontmatter).toMatchObject({
+      name: 'test',
+      model: 'sonnet',
+      permissionMode: 'bypassPermissions',
+      effort: 'high',
+    });
+    expect(frontmatter.tools).toEqual(expect.arrayContaining(['Read', 'Grep', 'Glob', 'Bash']));
+    expect(frontmatter.hooks).toEqual(expect.any(Object));
+    expect(frontmatter.mcpServers).toEqual(expect.any(Array));
+    expect(body).toContain('There is no separate UAT role');
+    expect(body).toContain('Playwright MCP tools');
+    expect(body).toContain('isolated browser instance per session');
+    expect(body).toContain(".pan/continue.json");
+    expect(body).toContain('vBRIEF acceptance criteria');
+    expect(body).toContain('TESTS PASSED');
+    expect(body).toContain('TESTS FAILED');
+  });
+
   it('defines the ship role as ready-to-merge preparation without merge authority', () => {
     const { frontmatter, body } = splitFrontmatter(readRepoFile('roles/ship.md'));
 
@@ -120,11 +141,13 @@ describe('role definitions', () => {
     expect(body).toContain('npm test');
   });
 
-  it('keeps legacy pan plan/work/review/inspect/merge agent definitions until spawn migration deletes them', () => {
+  it('keeps legacy pan plan/work/review/inspect/test/uat/merge agent definitions until spawn migration deletes them', () => {
     expect(existsSync(join(process.cwd(), '.claude/agents/pan-planning-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), '.claude/agents/pan-work-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), '.claude/agents/pan-review-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), '.claude/agents/pan-inspect-agent.md'))).toBe(true);
+    expect(existsSync(join(process.cwd(), '.claude/agents/pan-test-agent.md'))).toBe(true);
+    expect(existsSync(join(process.cwd(), '.claude/agents/pan-uat-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), '.claude/agents/pan-merge-agent.md'))).toBe(true);
   });
 });

@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1048",
   "created": "2026-05-09T16:17:55.063Z",
-  "updated": "2026-05-09T21:12:31.161Z",
+  "updated": "2026-05-09T21:15:51.659Z",
   "gitState": {
     "branch": "feature/pan-1048",
-    "sha": "pending-r5",
+    "sha": "pending-r4",
     "dirty": true
   },
   "decisions": [
@@ -158,10 +158,10 @@
     }
   ],
   "resumePoint": {
-    "description": "R5 ship role definition implemented and verified: roles/ship.md prepares approved PRs by rebasing, resolving conflicts, re-running verification, pushing the feature branch, and transitioning to ready-to-merge while explicitly banning all merge operations. Commit, close workspace-6u9n, then run inspection because requiresInspection is true.",
-    "beadId": "workspace-6u9n",
+    "description": "R4 test role definition implemented and verified: roles/test.md folds project test-suite execution and browser UAT into the test role, declares Playwright MCP availability, and documents isolated browser sessions plus TESTS PASSED/FAILED sentinels. Commit and close workspace-x4w0 next; no inspection required because requiresInspection is false.",
+    "beadId": "workspace-x4w0",
     "filesToRead": [
-      "roles/ship.md",
+      "roles/test.md",
       "src/lib/__tests__/role-definitions.test.ts"
     ]
   },
@@ -269,6 +269,12 @@
       "timestamp": "2026-05-09T21:12:31.161Z",
       "reason": "bead-complete",
       "note": "Implemented R5 ship role definition at roles/ship.md. The role prepares an approved PR for human merge by fetching/rebasing onto main, resolving conflicts, running typecheck/lint/test, pushing the feature branch, and transitioning the issue/PR to ready-to-merge. It explicitly bans gh pr merge, merge API POSTs, git merge into main, direct/force pushes to main, and hook bypasses; legacy pan-merge-agent remains. Verified role definition test, typecheck, lint, and graphify update.",
+      "agentModel": "agent:claude-opus-4-7"
+    },
+    {
+      "timestamp": "2026-05-09T21:15:51.659Z",
+      "reason": "bead-complete",
+      "note": "Implemented R4 test role definition at roles/test.md. The role runs configured project verification and folds browser UAT into the same role when continue.json, vBRIEF acceptance criteria, PR notes, or issue text require end-to-end proof. It declares Playwright MCP availability, requires an isolated browser instance per session, emits TESTS PASSED/TESTS FAILED sentinels, and keeps legacy pan-test-agent and pan-uat-agent definitions. Verified role definition test, typecheck, lint, and graphify update.",
       "agentModel": "agent:claude-opus-4-7"
     }
   ],
