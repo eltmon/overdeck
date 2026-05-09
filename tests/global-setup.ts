@@ -10,6 +10,6 @@ const CLI_DIST = join(ROOT, 'dist/cli/index.js');
 export default function setup() {
   if (!existsSync(CLI_DIST)) {
     console.log('[global-setup] dist/cli/index.js missing — building CLI...');
-    execSync('npm run build', { cwd: ROOT, stdio: 'inherit' });
+    execSync('npm run build:contracts && npm run build:cli', { cwd: ROOT, stdio: 'inherit' });
   }
 }

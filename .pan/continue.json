@@ -2,10 +2,10 @@
   "version": "1",
   "issueId": "PAN-1044",
   "created": "2026-05-09T17:02:13.086Z",
-  "updated": "2026-05-09T23:46:44.876Z",
+  "updated": "2026-05-09T23:54:00.459Z",
   "gitState": {
     "branch": "feature/pan-1044",
-    "sha": "051b851d7",
+    "sha": "751e6f45f",
     "dirty": true
   },
   "decisions": [
@@ -140,6 +140,12 @@
       "timestamp": "2026-05-09T23:46:44.875Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "timestamp": "2026-05-09T23:54:00.459Z",
+      "reason": "feedback-fix",
+      "note": "Fixed test verification failure by narrowing tests/global-setup.ts fallback from full npm run build to npm run build:contracts && npm run build:cli, avoiding unrelated dashboard Vite build during clean test setup. Verified npm run build:contracts && npm run build:cli and npm test.",
+      "agentModel": "gpt-5.5"
     }
   ],
   "feedback": []
