@@ -4,7 +4,16 @@
 # Fires on Claude Code UserPromptSubmit. Emits three events:
 #   1. agent.waiting_cleared  — clears hasPendingQuestion / suspension
 #   2. agent.message_received — updates lastActivity + lastMessageAt
-#   3. agent.activity_changed — sets activity=idle so the dashboard spinner restarts
+#   3. agent.activity_changed(thinking) — Claude is processing the prompt now
+#
+# Previously emitted activity=idle "so the dashboard spinner restarts." That
+# was a UI hack that lied about runtime state: Claude is NOT idle right after
+# the user submits a prompt — it's about to start thinking and may take many
+# minutes before the first PreToolUse hook fires. The deacon's stale-active
+# check would then read state=idle + old lastActivity and nudge with a
+# "you appear to have stopped working" message, cancelling Claude mid-think
+# (PAN-1024 reproduced this loop). Emitting activity=thinking keeps the
+# runtime snapshot honest until pre-tool-hook takes over.
 
 set +e
 
@@ -18,6 +27,6 @@ TS=$(date -Iseconds)
 
 pan_emit_event "$AGENT_ID" "{\"kind\":\"waiting_clear\",\"clearedBy\":\"user_response\",\"timestamp\":\"$TS\"}"
 pan_emit_event "$AGENT_ID" "{\"kind\":\"message_received\",\"direction\":\"to_agent\",\"source\":\"user\",\"timestamp\":\"$TS\"}"
-pan_emit_event "$AGENT_ID" "{\"kind\":\"activity\",\"activity\":\"idle\",\"timestamp\":\"$TS\"}"
+pan_emit_event "$AGENT_ID" "{\"kind\":\"thinking_start\",\"lastToolAt\":\"$TS\",\"timestamp\":\"$TS\"}"
 
 exit 0

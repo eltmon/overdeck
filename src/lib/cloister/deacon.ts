@@ -2975,22 +2975,6 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
       }
       if (!hasCommits) continue; // No commits — agent may not have started yet
 
-      // FINAL GATE: pane-content check. The PostToolUse heartbeat doesn't fire
-      // for in-flight tool calls (e.g. a long Edit), so an actively-working agent
-      // can look stale by the runtime.json signal. Without this gate, the nudge
-      // gets sent mid-tool-call, cancels the in-flight tool, and creates a feedback
-      // loop where the agent never makes progress (PAN-1024 reproduced this).
-      // isAgentActiveInTmux scans the bottom of the pane for Claude Code's live
-      // status indicators (◆ Bash, ✻ Brewed, ⏵⏵, etc.) — any of those means the
-      // agent is doing something right now and must not be interrupted.
-      try {
-        const paneActive = await isAgentActiveInTmux(agent.id);
-        if (paneActive) {
-          console.log(`[deacon] First-completion gate: skipping ${agent.id} — pane shows active Claude Code status (heartbeat lagging)`);
-          continue;
-        }
-      } catch { /* pane capture failed — proceed with nudge as fallback */ }
-
       // All heuristics passed: agent likely forgot pan done
       const idleMinutes = Math.round(idleMs / 60000);
       console.log(`[deacon] First-completion gap detected: ${agent.id} (${issueId}) idle for ${idleMinutes}m with commits but no completion marker`);
