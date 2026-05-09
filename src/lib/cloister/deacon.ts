@@ -2123,19 +2123,30 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
         // Not a regular merge ancestor — try squash-merge detection
       }
 
-      // Check 2: squash merge — match issue IDs in subjects only to avoid body-reference false positives.
+      // Check 2: squash merge — query GitHub for PR mergedAt/mergeCommit. The
+      // old regex-based detection (`\(PAN-XXXX[ )]` against `git log --pretty=%s`)
+      // matched ANY commit that mentioned the issue in a trailer, not just
+      // genuine squash merges. That's how PAN-977/945/913/544/457 got
+      // mergeStatus=merged and rolled into close-out without an actual merge:
+      // unrelated commits landed on main with `(PAN-977)` references and the
+      // deacon trusted them. GitHub's API is the only authoritative source.
       if (!isMerged) {
-        try {
-          const { stdout } = await execFileAsync(
-            'git', ['log', 'main', '--pretty=%s', '-200'],
-            { cwd: project.projectPath },
-          );
-          const id = issueId.toUpperCase();
-          // Anchored patterns: ^PAN-1030(:| |$)  OR  ((PAN-1030|...))
-          const anchored = new RegExp(`(^${id}([:\\s]|$))|\\(${id}[ )]`, 'm');
-          if (anchored.test(stdout)) isMerged = true;
-        } catch {
-          // git log failed — skip
+        const { resolveGitHubIssue: _resolveGitHubIssue } = await import('../tracker-utils.js');
+        const ghResolved = _resolveGitHubIssue(issueId);
+        if (ghResolved.isGitHub) {
+          try {
+            const repoArg = `${ghResolved.owner}/${ghResolved.repo}`;
+            const { stdout } = await execFileAsync(
+              'gh', ['pr', 'list', '--repo', repoArg, '--head', branch, '--state', 'all', '--json', 'number,mergedAt,mergeCommit', '--limit', '5'],
+              { cwd: project.projectPath },
+            );
+            const prs = JSON.parse(stdout || '[]') as Array<{ number: number; mergedAt: string | null; mergeCommit: unknown | null }>;
+            if (prs.some((pr) => pr.mergedAt || pr.mergeCommit)) {
+              isMerged = true;
+            }
+          } catch {
+            // gh query failed — leave isMerged as false rather than guess.
+          }
         }
       }
 
