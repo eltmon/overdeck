@@ -2208,6 +2208,39 @@ export async function reconcileFalseMerged(): Promise<string[]> {
   return actions;
 }
 
+/**
+ * Detect issues whose merge_status='merged' but review_status is still in a
+ * non-terminal state (reviewing, pending, etc.). If the merge actually
+ * happened, the review must have passed at some point even if the dashboard
+ * missed the transition (e.g. coordinator crashed mid-run, dashboard restart
+ * dropped an in-flight update). Reconciling to review_status='passed' clears
+ * the "running reviewers with no data" UI state PAN-1028 reproduced.
+ */
+const mergedReviewingReconciled = new Set<string>();
+
+export async function reconcileMergedButReviewing(): Promise<string[]> {
+  const actions: string[] = [];
+  try {
+    const statuses = loadReviewStatuses();
+    const nonTerminal = new Set(['reviewing', 'pending', undefined, null]);
+
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if (status.mergeStatus !== 'merged') continue;
+      if (!nonTerminal.has(status.reviewStatus as string | undefined)) continue;
+      if (mergedReviewingReconciled.has(issueId)) continue;
+
+      setReviewStatus(issueId, { reviewStatus: 'passed' });
+      mergedReviewingReconciled.add(issueId);
+      const msg = `Reconciled review_status=${status.reviewStatus ?? 'null'} → passed for ${issueId} (merge_status=merged is terminal)`;
+      actions.push(msg);
+      console.log(`[deacon] ${msg}`);
+    }
+  } catch (err: any) {
+    console.warn(`[deacon] Error in reconcileMergedButReviewing: ${err.message}`);
+  }
+  return actions;
+}
+
 // Track per-issue cooldowns for failed-merge retry to avoid rapid re-queuing
 const failedMergeRetryCooldowns = new Map<string, number>();
 // Track per-issue cooldowns for timeout nudges to avoid spamming the work agent
@@ -3579,6 +3612,13 @@ export async function runPatrol(): Promise<PatrolResult> {
   const falseMergedActions = await reconcileFalseMerged();
   actions.push(...falseMergedActions);
   for (const a of falseMergedActions) addLog('action', a, state.patrolCycle);
+
+  // PAN-1028: detect merge_status=merged but review_status non-terminal (coordinator
+  // crashed mid-run, dashboard missed the transition). Reconcile to review_status=passed
+  // so the dashboard stops showing "running reviewers with no data."
+  const mergedReviewingActions = await reconcileMergedButReviewing();
+  actions.push(...mergedReviewingActions);
+  for (const a of mergedReviewingActions) addLog('action', a, state.patrolCycle);
 
   // Dead-end agent recovery: nudge agents stuck with reviewStatus=blocked/failed after
   // fixing review issues but not re-requesting review. Has 10-min per-issue cooldown and
