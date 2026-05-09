@@ -4,7 +4,7 @@
     "created": "2026-05-08T00:00:00Z",
     "author": "planning-agent:claude-opus-4-5",
     "description": "Plan for PAN-1044: Command Deck — Project Overview Panel with pipeline swimlanes. Empirically scoped 2026-05-09 (revised with cost-breakdown-tooltip bead and cost-on-stuck-callout) — see docs/prds/planned/PAN-1044-project-overview-panel.md.",
-    "updated": "2026-05-09T17:19:07.829Z"
+    "updated": "2026-05-09T21:20:47.908Z"
   },
   "plan": {
     "id": "pan-1044",
@@ -12,9 +12,9 @@
     "status": "running",
     "uid": "b2a7f3c1-4d8e-4f29-9a6b-3c5e7f8d2b1a",
     "author": "planning-agent:claude-opus-4-5",
-    "sequence": 8,
+    "sequence": 51,
     "created": "2026-05-08T00:00:00Z",
-    "updated": "2026-05-09T17:19:07.829Z",
+    "updated": "2026-05-09T21:20:47.908Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1044",
@@ -42,7 +42,7 @@
       {
         "id": "prd-file",
         "title": "PRD file creation in workspace",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-08T00:00:00Z",
         "metadata": {
@@ -57,25 +57,28 @@
           {
             "id": "prd-file.ac1",
             "title": "File exists at docs/prds/planned/PAN-1044-project-overview-panel.md",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.907Z"
           },
           {
             "id": "prd-file.ac2",
             "title": "Codebase corrections documented (SessionNode.type, Record types, uppercase issueId)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.907Z"
           }
-        ]
+        ],
+        "completed": "2026-05-09T21:20:47.908Z"
       },
       {
         "id": "project-overview-skeleton",
         "title": "ProjectOverview.tsx skeleton + bucketFeature utility + tests",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-08T00:00:00Z",
         "metadata": {
@@ -94,49 +97,55 @@
           {
             "id": "project-overview-skeleton.ac1",
             "title": "ProjectOverview.tsx renders hero billboard with project name, issue count, total cost (LiveCounter), active agent count",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.906Z"
           },
           {
             "id": "project-overview-skeleton.ac2",
             "title": "bucketFeature exported, returns correct PipelineStage for all 9 inputs, uses s.type === 'work'",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.906Z"
           },
           {
             "id": "project-overview-skeleton.ac3",
             "title": "ProjectOverview.test.tsx covers all 9 stage branches of bucketFeature",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.906Z"
           },
           {
             "id": "project-overview-skeleton.ac4",
             "title": "issueCostDetails is an optional prop on ProjectOverviewProps (can be undefined — no tooltip yet)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.907Z"
           },
           {
             "id": "project-overview-skeleton.ac5",
             "title": "npm run typecheck and npm test pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.907Z"
           }
-        ]
+        ],
+        "completed": "2026-05-09T21:20:47.908Z"
       },
       {
         "id": "pipeline-swimlanes",
         "title": "Pipeline swimlanes + stuck/blocked callout with per-issue cost badges",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-08T00:00:00Z",
         "metadata": {
@@ -154,73 +163,82 @@
           {
             "id": "pipeline-swimlanes.ac1",
             "title": "Stuck/blocked callout appears only when stuck issues exist, with AlertTriangle icon and var(--destructive) accent",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.905Z"
           },
           {
             "id": "pipeline-swimlanes.ac2",
             "title": "Stuck callout cards show cost badge (same as swimlane cards) when issueCosts entry exists",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.905Z"
           },
           {
             "id": "pipeline-swimlanes.ac3",
             "title": "Pipeline swimlane sections rendered, one per non-empty stage, with correct stage color token",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.905Z"
           },
           {
             "id": "pipeline-swimlanes.ac4",
             "title": "Empty pipeline stages are hidden",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.905Z"
           },
           {
             "id": "pipeline-swimlanes.ac5",
             "title": "Swimlane cards show cost badge when issueCosts entry exists",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.905Z"
           },
           {
             "id": "pipeline-swimlanes.ac6",
             "title": "Clicking issue card in any swimlane or stuck callout calls onSelectFeature with correct feature",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.905Z"
           },
           {
             "id": "pipeline-swimlanes.ac7",
             "title": "All colors use CSS variables only (no hardcoded values)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.906Z"
           },
           {
             "id": "pipeline-swimlanes.ac8",
             "title": "npm run typecheck and npm test pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.906Z"
           }
-        ]
+        ],
+        "completed": "2026-05-09T21:20:47.905Z"
       },
       {
         "id": "cost-breakdown-tooltip",
         "title": "ProjectOverview — cost badge hover tooltip with model/stage breakdown",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-09T17:30:00.000Z",
         "metadata": {
@@ -238,65 +256,73 @@
           {
             "id": "cost-breakdown-tooltip.ac1",
             "title": "Hovering the cost badge opens a popover showing model rows sorted by cost desc",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.903Z"
           },
           {
             "id": "cost-breakdown-tooltip.ac2",
             "title": "Popover also shows stage rows sorted by cost desc with friendly stage labels",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.904Z"
           },
           {
             "id": "cost-breakdown-tooltip.ac3",
             "title": "Mouse-leave closes the popover",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.904Z"
           },
           {
             "id": "cost-breakdown-tooltip.ac4",
             "title": "When issueCostDetails is absent or has no entry for the issue, cost badge still renders with no tooltip",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.904Z"
           },
           {
             "id": "cost-breakdown-tooltip.ac5",
             "title": "Tooltip data updates automatically when issueCostDetails prop changes (no stale snapshot)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.904Z"
           },
           {
             "id": "cost-breakdown-tooltip.ac6",
             "title": "Hover pattern matches FeatureItem.tsx resource popover (onMouseEnter/onMouseLeave/onFocus/onBlur)",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.904Z"
           },
           {
             "id": "cost-breakdown-tooltip.ac7",
             "title": "npm run typecheck and npm test pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.904Z"
           }
-        ]
+        ],
+        "completed": "2026-05-09T21:20:47.903Z"
       },
       {
         "id": "project-node-click-split",
         "title": "ProjectNode.tsx — split click behavior and selection visual",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-08T00:00:00Z",
         "metadata": {
@@ -314,49 +340,55 @@
           {
             "id": "project-node-click-split.ac1",
             "title": "Clicking the ChevronRight span only toggles expand/collapse, does NOT call onSelectProject",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.902Z"
           },
           {
             "id": "project-node-click-split.ac2",
             "title": "Clicking the project name row calls onSelectProject and expands if collapsed",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.902Z"
           },
           {
             "id": "project-node-click-split.ac3",
             "title": "Selected project row shows var(--accent) background",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.902Z"
           },
           {
             "id": "project-node-click-split.ac4",
             "title": "MessageSquarePlus button still works and e.stopPropagation() is preserved",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.902Z"
           },
           {
             "id": "project-node-click-split.ac5",
             "title": "npm run typecheck passes",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.903Z"
           }
-        ]
+        ],
+        "completed": "2026-05-09T21:20:47.907Z"
       },
       {
         "id": "commanddeck-routing",
         "title": "CommandDeck/index.tsx — selectedProject state, four-way routing, IssueCostEntry expansion, issueCostDetails wiring",
-        "status": "pending",
+        "status": "completed",
         "priority": "high",
         "created": "2026-05-08T00:00:00Z",
         "metadata": {
@@ -374,60 +406,68 @@
           {
             "id": "commanddeck-routing.ac1",
             "title": "Selecting a project shows ProjectOverview in the content area",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.899Z"
           },
           {
             "id": "commanddeck-routing.ac2",
             "title": "Selecting a feature clears selectedProject",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.899Z"
           },
           {
             "id": "commanddeck-routing.ac3",
             "title": "Selecting a conversation clears selectedProject",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.900Z"
           },
           {
             "id": "commanddeck-routing.ac4",
             "title": "Four-way routing priority: conversation > feature > project > empty",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.900Z"
           },
           {
             "id": "commanddeck-routing.ac5",
             "title": "Clicking issue card in ProjectOverview navigates to that issue's IssueWorkbench",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.900Z"
           },
           {
             "id": "commanddeck-routing.ac6",
             "title": "IssueCostEntry includes byModel and byStage; issueCostDetails map is built from costData and passed to ProjectOverview",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.900Z"
           },
           {
             "id": "commanddeck-routing.ac7",
             "title": "npm run typecheck, npm run lint, and npm test all pass",
-            "status": "pending",
+            "status": "completed",
             "metadata": {
               "kind": "acceptance_criterion"
-            }
+            },
+            "completed": "2026-05-09T21:20:47.900Z"
           }
-        ]
+        ],
+        "completed": "2026-05-09T21:20:47.898Z"
       }
     ],
     "edges": [
