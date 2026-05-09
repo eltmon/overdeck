@@ -85,8 +85,6 @@ import {
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
 import { getProviderForModel } from '../../../lib/providers.js';
 import { validateProviderHealth, ProviderHealthError } from '../../../lib/provider-health.js';
-import { hasPRDDraft } from '../../../lib/prd-draft.js';
-import { findPrdAnywhere } from '../../../lib/prd-locations.js';
 import { resolveProjectFromIssue } from '../../../lib/projects.js';
 import { findPlan, isPlanningComplete } from '../../../lib/vbrief/io.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../../lib/vbrief/lifecycle-io.js';
@@ -1899,22 +1897,6 @@ const postAgentsRoute = HttpRouter.add(
     const issuePrefix = extractPrefix(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(projectId, issuePrefix);
 
-    const workspaceExists = existsSync(join(projectPath, 'workspaces', `feature-${issueLower}`));
-    // findPrdAnywhere checks active → completed → planned and tolerates all four
-    // legacy/buggy formats (subdir vs flat file, lowercase vs uppercase). The previous
-    // direct path build only matched a single format and wrongly rejected reopens of
-    // issues whose PRD was stranded in an uppercase subdirectory.
-    const hasPrd = findPrdAnywhere(projectPath, issueId) !== null;
-    const hasDraftPrd = hasPRDDraft(issueId);
-
-    if (!hasPrd && !hasDraftPrd && !workspaceExists) {
-      return jsonResponse({
-        error: `No PRD found for ${issueId}. Create a PRD before starting work.`,
-        hint: 'Use "pan plan" to create a PRD draft, then start work.',
-        issueId,
-      }, { status: 422 });
-    }
-
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     if (!existsSync(workspacePath)) {
       try {
@@ -2014,20 +1996,10 @@ const postAgentsRoute = HttpRouter.add(
     }
 
     if (!hasBeads) {
-      // PAN-977 bug: previously logged a warning and started the agent anyway,
-      // which produced ghost workspaces with no work to do (agent self-halts and
-      // documents the missing beads in RECOVERY-STATE.md). Block the spawn so
-      // planning has to actually finish before the work agent runs.
-      const errorDetail = recoveryError
+      const detail = recoveryError
         ? ` Beads recovery failed: ${recoveryError}.`
         : ' No beads exist for this issue.';
-      console.warn(`[agents] Refusing to start agent for ${issueId} — no beads.${errorDetail}`);
-      return jsonResponse({
-        error: `No beads tasks found for ${issueId}.${errorDetail}`,
-        hint: 'Run "pan plan" to (re)plan this issue and generate beads tasks before starting work.',
-        issueId,
-        recoveryError,
-      }, { status: 422 });
+      console.warn(`[agents] Starting direct work agent for ${issueId} without beads.${detail}`);
     }
 
     const health = yield* readModel.getSnapshot.pipe(
