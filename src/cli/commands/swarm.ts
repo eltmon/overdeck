@@ -18,7 +18,7 @@ import { existsSync } from 'fs';
 import { getDashboardApiUrl } from '../../lib/config.js';
 import { resolveProjectFromIssue } from '../../lib/projects.js';
 import { readWorkspacePlan } from '../../lib/vbrief/io.js';
-import { groupItemsByWave, type Wave } from '../../lib/vbrief/dag.js';
+import { groupItemsByWave, runTaskCommand, createActiveSlice, verifyActiveSlicePromptReduction, type Wave } from '../../lib/vbrief/dag.js';
 
 const DASHBOARD_URL = getDashboardApiUrl();
 
@@ -55,9 +55,13 @@ function printWavePlan(waves: Wave[], issueId: string): void {
 
 export async function swarmCommand(
   id: string,
-  options: { dryRun?: boolean; wave?: string; model?: string; maxSlots?: string; autoAdvance?: boolean },
+  options: { dryRun?: boolean; wave?: string; model?: string; maxSlots?: string; autoAdvance?: boolean; task?: string; item?: string; reason?: string; sequence?: string },
 ): Promise<void> {
   const issueId = id.toUpperCase();
+
+  if (options.task) {
+    return taskOperation(issueId, options);
+  }
 
   if (options.dryRun) {
     return dryRun(issueId);
@@ -139,4 +143,51 @@ async function dryRun(issueId: string): Promise<void> {
   }
 
   printWavePlan(waves, issueId);
+}
+
+async function taskOperation(
+  issueId: string,
+  options: { task?: string; item?: string; reason?: string; sequence?: string },
+): Promise<void> {
+  const project = resolveProjectFromIssue(issueId);
+  if (!project) {
+    console.error(chalk.red(`Could not resolve project for ${issueId}`));
+    process.exit(1);
+  }
+  const workspacePath = join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+  const command = options.task as any;
+  const result = runTaskCommand(command, {
+    issueId,
+    workspacePath,
+    itemId: options.item,
+    expectedSequence: options.sequence ? parseInt(options.sequence, 10) : undefined,
+    reason: options.reason,
+    writerId: `pan-swarm-task-${process.pid}`,
+  });
+  if (command === 'next') {
+    const items = result as Array<{ id: string; title: string; status: string }>;
+    for (const item of items) console.log(`${item.id}\t${item.status}\t${item.title}`);
+    return;
+  }
+  if (command === 'show') {
+    const item = result as { id: string; title: string; status: string };
+    console.log(JSON.stringify(item, null, 2));
+    return;
+  }
+  console.log(JSON.stringify(result, null, 2));
+}
+
+export async function printActiveSliceForIssue(issueId: string, itemId?: string): Promise<void> {
+  const project = resolveProjectFromIssue(issueId);
+  if (!project) throw new Error(`Could not resolve project for ${issueId}`);
+  const workspacePath = join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+  const doc = readWorkspacePlan(workspacePath);
+  if (!doc) throw new Error(`No vBRIEF plan found in workspace for ${issueId}`);
+  const target = itemId ? doc.plan.items.find(i => i.id === itemId) : undefined;
+  const item = target ?? doc.plan.items.find(i => i.status !== 'completed' && i.status !== 'cancelled' && i.status !== 'blocked');
+  if (!item) throw new Error(`No active item found for ${issueId}`);
+  const slice = createActiveSlice(doc, { issueId, itemId: item.id });
+  const check = verifyActiveSlicePromptReduction(doc, slice);
+  console.log(slice.prompt);
+  console.log(chalk.dim(`\nActive slice: ${check.activeSliceBytes} bytes; full plan: ${check.fullPlanBytes} bytes; ratio: ${Math.round(check.reductionRatio * 100)}%`));
 }

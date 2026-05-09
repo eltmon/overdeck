@@ -2,6 +2,9 @@
  * vBRIEF DAG utilities — critical path, graph analysis, wave scheduling, per-item dispatch
  */
 
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { mkdir, readFile, rename, writeFile } from 'fs/promises';
+import { dirname, join } from 'path';
 import type { VBriefDocument, VBriefItem, VBriefItemStatus } from './types.js';
 
 export interface WaveItem {
@@ -204,8 +207,8 @@ export function getDispatchableItems(
   doc: VBriefDocument,
   mergedItemIds: Set<string>,
 ): VBriefItem[] {
-  const completedStatuses = new Set(['completed', 'cancelled', 'running']);
-  const actionable = doc.plan.items.filter(i => !completedStatuses.has(i.status));
+  const nonDispatchableStatuses = new Set(['completed', 'cancelled', 'running', 'blocked']);
+  const actionable = doc.plan.items.filter(i => !nonDispatchableStatuses.has(i.status));
   if (actionable.length === 0) return [];
 
   const itemById = new Map(doc.plan.items.map(i => [i.id, i]));
@@ -514,4 +517,191 @@ export function getTaskGraphView(doc: VBriefDocument, mergedItemIds: Set<string>
 
 export function activeSlicePromptSize(slice: ActiveSlice): number {
   return Buffer.byteLength(slice.prompt, 'utf8');
+}
+
+
+export interface PersistedTaskOperation extends TaskOperation {
+  /** Stable ID of the single writer that owns this worktree mutation. */
+  writerId: string;
+}
+
+const activePlanWriters = new Map<string, string>();
+
+function assertSingleWriter(planPath: string, writerId: string): void {
+  const owner = activePlanWriters.get(planPath);
+  if (owner && owner !== writerId) {
+    throw new Error(`vBRIEF plan writer conflict for ${planPath}: ${owner} already owns the worktree`);
+  }
+  activePlanWriters.set(planPath, writerId);
+}
+
+export function releasePlanWriter(planPath: string, writerId: string): void {
+  if (activePlanWriters.get(planPath) === writerId) activePlanWriters.delete(planPath);
+}
+
+export function workspacePlanPath(workspacePath: string): string {
+  return join(workspacePath, '.pan', 'spec.vbrief.json');
+}
+
+function validatePlanIssue(doc: VBriefDocument, issueId: string): void {
+  const target = issueId.toUpperCase();
+  const candidates = [doc.plan.id, ...(doc.plan.tags ?? [])].map(v => String(v).toUpperCase());
+  if (!candidates.some(v => v.includes(target))) {
+    throw new Error(`vBRIEF plan ${doc.plan.id} is not traceable to ${target}`);
+  }
+}
+
+function readPlanFile(planPath: string): VBriefDocument {
+  return JSON.parse(readFileSync(planPath, 'utf-8')) as VBriefDocument;
+}
+
+function writePlanFileAtomic(planPath: string, doc: VBriefDocument): void {
+  mkdirSync(dirname(planPath), { recursive: true });
+  const tmp = `${planPath}.${process.pid}.${Date.now()}.tmp`;
+  writeFileSync(tmp, JSON.stringify(doc, null, 2), 'utf-8');
+  renameSync(tmp, planPath);
+}
+
+async function writePlanFileAtomicAsync(planPath: string, doc: VBriefDocument): Promise<void> {
+  await mkdir(dirname(planPath), { recursive: true });
+  const tmp = `${planPath}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(tmp, JSON.stringify(doc, null, 2), 'utf-8');
+  await rename(tmp, planPath);
+}
+
+/** Persist a task operation to workspace .pan/spec.vbrief.json with CAS + single-writer guard. */
+export function applyTaskOperationToPlanFile(planPath: string, operation: PersistedTaskOperation): TaskOperationResult {
+  if (!existsSync(planPath)) throw new Error(`vBRIEF plan not found: ${planPath}`);
+  assertSingleWriter(planPath, operation.writerId);
+  const current = readPlanFile(planPath);
+  const result = applyTaskOperation(current, operation);
+  writePlanFileAtomic(planPath, result.doc);
+  return result;
+}
+
+export async function applyTaskOperationToPlanFileAsync(planPath: string, operation: PersistedTaskOperation): Promise<TaskOperationResult> {
+  if (!existsSync(planPath)) throw new Error(`vBRIEF plan not found: ${planPath}`);
+  assertSingleWriter(planPath, operation.writerId);
+  const current = readPlanFile(planPath);
+  const result = applyTaskOperation(current, operation);
+  await writePlanFileAtomicAsync(planPath, result.doc);
+  return result;
+}
+
+export type TaskCommand = 'next' | 'show' | TaskOperationType;
+
+export interface TaskCommandOptions {
+  issueId: string;
+  workspacePath: string;
+  itemId?: string;
+  writerId?: string;
+  expectedSequence?: number;
+  reason?: string;
+  mergedItemIds?: Set<string>;
+}
+
+/** CLI/API-facing vBRIEF task operations for next/show/claim/done/block/unblock/cancel. */
+export function runTaskCommand(command: TaskCommand, options: TaskCommandOptions): VBriefItem | VBriefItem[] | TaskOperationResult {
+  const planPath = workspacePlanPath(options.workspacePath);
+  if (!existsSync(planPath)) throw new Error(`vBRIEF plan not found: ${planPath}`);
+  const doc = readPlanFile(planPath);
+  validatePlanIssue(doc, options.issueId);
+  if (command === 'next') return getDispatchableItems(doc, options.mergedItemIds ?? new Set());
+  if (command === 'show') {
+    if (!options.itemId) throw new Error('show requires itemId');
+    const item = doc.plan.items.find(i => i.id === options.itemId);
+    if (!item) throw new Error(`Plan item not found: ${options.itemId}`);
+    return item;
+  }
+  if (!options.itemId) throw new Error(`${command} requires itemId`);
+  return applyTaskOperationToPlanFile(planPath, {
+    type: command,
+    itemId: options.itemId,
+    expectedSequence: options.expectedSequence,
+    reason: options.reason,
+    writerId: options.writerId ?? `pan-task-${process.pid}`,
+  });
+}
+
+export interface PlanPipelineMirrorStatus {
+  status?: string;
+  notes?: string;
+  updatedAt?: string;
+}
+
+export interface NestedPlanPipelineMirror {
+  phase: 'phase-1-sqlite-authoritative';
+  issueId: string;
+  sqliteAuthoritative: true;
+  updatedAt: string;
+  verification?: PlanPipelineMirrorStatus;
+  review?: PlanPipelineMirrorStatus;
+  test?: PlanPipelineMirrorStatus;
+  uat?: PlanPipelineMirrorStatus;
+  merge?: PlanPipelineMirrorStatus;
+  readyForMerge?: boolean;
+  prUrl?: string;
+}
+
+export function buildPipelineMirrorFromStatus(issueId: string, status: Record<string, unknown>, now = new Date().toISOString()): NestedPlanPipelineMirror {
+  return {
+    phase: 'phase-1-sqlite-authoritative',
+    issueId: issueId.toUpperCase(),
+    sqliteAuthoritative: true,
+    updatedAt: now,
+    verification: { status: status.verificationStatus as string | undefined, notes: status.verificationNotes as string | undefined, updatedAt: now },
+    review: { status: status.reviewStatus as string | undefined, notes: status.reviewNotes as string | undefined, updatedAt: now },
+    test: { status: status.testStatus as string | undefined, notes: status.testNotes as string | undefined, updatedAt: now },
+    uat: { status: status.uatStatus as string | undefined, notes: status.uatNotes as string | undefined, updatedAt: now },
+    merge: { status: status.mergeStatus as string | undefined, notes: status.mergeNotes as string | undefined, updatedAt: now },
+    readyForMerge: status.readyForMerge as boolean | undefined,
+    prUrl: status.prUrl as string | undefined,
+  };
+}
+
+export function writePipelineMirrorToPlanFile(planPath: string, mirror: NestedPlanPipelineMirror, writerId = `pipeline-${process.pid}`): VBriefDocument | null {
+  if (!existsSync(planPath)) return null;
+  assertSingleWriter(planPath, writerId);
+  const doc = readPlanFile(planPath);
+  setPipelineMirror(doc, mirror as unknown as PlanPipelineMirror);
+  const now = new Date().toISOString();
+  doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
+  doc.plan.updated = now;
+  doc.vBRIEFInfo.updated = now;
+  writePlanFileAtomic(planPath, doc);
+  return doc;
+}
+
+
+async function readPlanFileAsync(planPath: string): Promise<VBriefDocument> {
+  return JSON.parse(await readFile(planPath, 'utf-8')) as VBriefDocument;
+}
+
+export async function writePipelineMirrorToPlanFileAsync(planPath: string, mirror: NestedPlanPipelineMirror, writerId = `pipeline-${process.pid}`): Promise<VBriefDocument | null> {
+  if (!existsSync(planPath)) return null;
+  assertSingleWriter(planPath, writerId);
+  const doc = await readPlanFileAsync(planPath);
+  setPipelineMirror(doc, mirror as unknown as PlanPipelineMirror);
+  const now = new Date().toISOString();
+  doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
+  doc.plan.updated = now;
+  doc.vBRIEFInfo.updated = now;
+  await writePlanFileAtomicAsync(planPath, doc);
+  return doc;
+}
+
+export interface PromptSizeVerification {
+  fullPlanBytes: number;
+  activeSliceBytes: number;
+  reductionRatio: number;
+}
+
+export function verifyActiveSlicePromptReduction(doc: VBriefDocument, slice: ActiveSlice): PromptSizeVerification {
+  const fullPlanBytes = Buffer.byteLength(JSON.stringify(doc, null, 2), 'utf8');
+  const activeSliceBytes = activeSlicePromptSize(slice);
+  return {
+    fullPlanBytes,
+    activeSliceBytes,
+    reductionRatio: fullPlanBytes === 0 ? 0 : activeSliceBytes / fullPlanBytes,
+  };
 }

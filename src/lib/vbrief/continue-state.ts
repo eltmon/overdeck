@@ -376,4 +376,47 @@ function validateContinueState(value: unknown, path: string): asserts value is C
   } else if (!Array.isArray(v.feedback)) {
     throw new Error(`Continue file ${path} has malformed feedback array`);
   }
+
+  if (v.swarmRuntime !== undefined) {
+    validateSwarmRuntime(v.swarmRuntime, path);
+  }
 }
+
+function validateSwarmRuntime(value: unknown, path: string): asserts value is SwarmRuntime {
+  if (!value || typeof value !== 'object') {
+    throw new Error(`Continue file ${path} has malformed swarmRuntime`);
+  }
+  const runtime = value as Record<string, unknown>;
+  if (typeof runtime.model !== 'string') {
+    throw new Error(`Continue file ${path} has malformed swarmRuntime.model`);
+  }
+  if (!Array.isArray(runtime.slots)) {
+    throw new Error(`Continue file ${path} has malformed swarmRuntime.slots`);
+  }
+  if (!runtime.synthesisOutputs || typeof runtime.synthesisOutputs !== 'object' || Array.isArray(runtime.synthesisOutputs)) {
+    throw new Error(`Continue file ${path} has malformed swarmRuntime.synthesisOutputs`);
+  }
+  if (typeof runtime.createdAt !== 'string' || typeof runtime.updatedAt !== 'string') {
+    throw new Error(`Continue file ${path} has malformed swarmRuntime timestamps`);
+  }
+  for (const slot of runtime.slots) {
+    if (!slot || typeof slot !== 'object') {
+      throw new Error(`Continue file ${path} has malformed swarmRuntime slot`);
+    }
+    const s = slot as Record<string, unknown>;
+    if (typeof s.slotId !== 'number' || typeof s.itemId !== 'string' || typeof s.itemTitle !== 'string' ||
+        typeof s.sessionName !== 'string' || typeof s.workspace !== 'string' || typeof s.status !== 'string') {
+      throw new Error(`Continue file ${path} has malformed swarmRuntime slot fields`);
+    }
+  }
+  for (const output of Object.values(runtime.synthesisOutputs as Record<string, unknown>)) {
+    if (!output || typeof output !== 'object') {
+      throw new Error(`Continue file ${path} has malformed swarmRuntime synthesis output`);
+    }
+    const o = output as Record<string, unknown>;
+    if (typeof o.targetItemId !== 'string' || typeof o.writtenAt !== 'string' || typeof o.contextUpdate !== 'string') {
+      throw new Error(`Continue file ${path} has malformed swarmRuntime synthesis output fields`);
+    }
+  }
+}
+

@@ -5,6 +5,7 @@ import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeam } from '../projects.js';
 import { getWorkspacePanPaths, readWorkspaceContext, readFeedback, readWorkspaceContinue, writeWorkspaceContext } from '../pan-dir/index.js';
 import { findPlan, readWorkspacePlan, readPlan } from '../vbrief/io.js';
+import { createActiveSlice, getDispatchableItems, verifyActiveSlicePromptReduction } from '../vbrief/dag.js';
 import { extractACFromDocument } from '../vbrief/acceptance-criteria.js';
 import { loadConfig } from '../config.js';
 import { createTrackerFromConfig } from '../tracker/factory.js';
@@ -44,7 +45,10 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       stitchDesignsStr = stitchDesigns;
     }
 
-    if (featureContext) {
+    const activeSliceContext = buildActiveSliceContext(ctx.workspacePath, ctx.issueId);
+    if (activeSliceContext) {
+      featureContextStr = activeSliceContext;
+    } else if (featureContext) {
       featureContextStr = featureContext;
     }
 
@@ -69,6 +73,29 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       NEW_TRACKER_CONTEXT: ctx.trackerContext || '',
     },
   });
+}
+
+
+function buildActiveSliceContext(workspacePath: string, issueId: string): string {
+  try {
+    const doc = readWorkspacePlan(workspacePath);
+    if (!doc) return '';
+    const nextItem = getDispatchableItems(doc, new Set())[0];
+    if (!nextItem) return '';
+    const slice = createActiveSlice(doc, { issueId: issueId.toUpperCase(), itemId: nextItem.id });
+    const measurement = verifyActiveSlicePromptReduction(doc, slice);
+    return [
+      '## Active vBRIEF Slice (Canonical Task Graph)',
+      '',
+      slice.prompt,
+      '',
+      `Prompt-size check: active slice ${measurement.activeSliceBytes} bytes vs full plan ${measurement.fullPlanBytes} bytes (${Math.round(measurement.reductionRatio * 100)}%).`,
+      '',
+      '_vBRIEF is the canonical task authority during PAN-977 migration; Beads remain a compatibility mirror._',
+    ].join('\n');
+  } catch {
+    return '';
+  }
 }
 
 /**

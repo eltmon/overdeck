@@ -107,6 +107,15 @@ describe('swarmRuntime in ContinueState', () => {
     expect(read.swarmRuntime!.synthesisOutputs['item-c']?.contextUpdate).toBe('upstream A changed the API shape');
   });
 
+
+
+  it('rejects malformed swarmRuntime on read', () => {
+    const state: ContinueState = { ...freshState('PAN-977'), swarmRuntime: freshRuntime() };
+    (state.swarmRuntime as any).slots = 'not-slots';
+    writeContinueState(TEST_DIR, 'PAN-977', state as ContinueState);
+    expect(() => readContinueState(TEST_DIR, 'PAN-977')).toThrow(/swarmRuntime\.slots/);
+  });
+
   it('survives round-trip without swarmRuntime (backwards compat)', () => {
     const state = freshState('PAN-946');
     writeContinueState(TEST_DIR, 'PAN-946', state);

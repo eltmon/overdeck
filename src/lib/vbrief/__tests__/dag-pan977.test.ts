@@ -2,8 +2,11 @@
  * Tests for PAN-977 DAG functions:
  *   getDispatchableItems, blockingParentCount, hasFileOverlap
  */
-import { describe, it, expect } from 'vitest';
-import { getDispatchableItems, blockingParentCount, hasFileOverlap, createActiveSlice, applyTaskOperation, getPipelineMirror, setPipelineMirror, getTaskGraphView, activeSlicePromptSize } from '../dag.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { getDispatchableItems, blockingParentCount, hasFileOverlap, createActiveSlice, applyTaskOperation, applyTaskOperationToPlanFile, runTaskCommand, getPipelineMirror, setPipelineMirror, getTaskGraphView, activeSlicePromptSize, verifyActiveSlicePromptReduction } from '../dag.js';
 import type { VBriefDocument, VBriefItem } from '../types.js';
 
 function makeDoc(
@@ -20,6 +23,7 @@ function makeDoc(
         id: i.id,
         title: i.id,
         status: (i.status ?? 'pending') as any,
+        subItems: [{ id: `${i.id}.ac1`, title: `${i.id} AC`, status: 'pending' as any }],
         metadata: i.files_scope ? { files_scope: i.files_scope } : undefined,
       })),
       edges: edges.map(e => ({ from: e.from, to: e.to, type: (e.type ?? 'blocks') as any })),
@@ -89,6 +93,16 @@ describe('getDispatchableItems', () => {
     const doc = makeDoc([{ id: 'a', status: 'cancelled' }], []);
     expect(getDispatchableItems(doc, new Set())).toHaveLength(0);
   });
+
+  it('excludes explicitly blocked items from dispatch and graph next until unblocked', () => {
+    const doc = makeDoc([{ id: 'a', status: 'blocked' }, { id: 'b' }], []);
+    expect(getDispatchableItems(doc, new Set()).map(i => i.id)).toEqual(['b']);
+    expect(getTaskGraphView(doc).next.map(i => i.id)).toEqual(['b']);
+
+    const unblocked = applyTaskOperation(doc, { type: 'unblock', itemId: 'a' }).doc;
+    expect(getDispatchableItems(unblocked, new Set()).map(i => i.id)).toEqual(expect.arrayContaining(['a', 'b']));
+  });
+
 
   it('returns empty for fully merged plan', () => {
     const doc = makeDoc([{ id: 'a', status: 'completed' }, { id: 'b', status: 'completed' }], []);
@@ -256,5 +270,62 @@ describe('active slices and task operations', () => {
     expect(view.source).toBe('vbrief');
     expect(view.next.map(i => i.id)).toEqual(['a']);
     expect(view.waves[0]?.items.map(i => i.id)).toEqual(['a']);
+  });
+});
+
+
+describe('persisted task authority', () => {
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(`${tmpdir()}/vbrief-task-`); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  function writeDoc(doc: VBriefDocument): string {
+    const planPath = join(dir, '.pan', 'spec.vbrief.json');
+    mkdirSync(join(dir, '.pan'), { recursive: true });
+    writeFileSync(planPath, JSON.stringify(doc, null, 2), 'utf-8');
+    return planPath;
+  }
+
+  it('persists claim/done/block operations to .pan/spec.vbrief.json atomically', () => {
+    const doc = makeDoc([{ id: 'PAN-977-a' }], []);
+    doc.plan.id = 'PAN-977';
+    doc.plan.sequence = 1;
+    const planPath = writeDoc(doc);
+
+    applyTaskOperationToPlanFile(planPath, { type: 'claim', itemId: 'PAN-977-a', expectedSequence: 1, writerId: 'writer-1' });
+    const claimed = JSON.parse(readFileSync(planPath, 'utf-8')) as VBriefDocument;
+    expect(claimed.plan.items[0]!.status).toBe('running');
+    expect(claimed.plan.sequence).toBe(2);
+
+    applyTaskOperationToPlanFile(planPath, { type: 'done', itemId: 'PAN-977-a', expectedSequence: 2, writerId: 'writer-1' });
+    const done = JSON.parse(readFileSync(planPath, 'utf-8')) as VBriefDocument;
+    expect(done.plan.items[0]!.status).toBe('completed');
+    expect(done.plan.items[0]!.subItems?.[0]?.status).toBe('completed');
+  });
+
+  it('exposes next/show/block via task command API and validates issue traceability', () => {
+    const doc = makeDoc([{ id: 'task-a' }], []);
+    doc.plan.id = 'PAN-977';
+    doc.plan.sequence = 1;
+    writeDoc(doc);
+
+    expect((runTaskCommand('next', { issueId: 'PAN-977', workspacePath: dir }) as VBriefItem[]).map(i => i.id)).toEqual(['task-a']);
+    expect((runTaskCommand('show', { issueId: 'PAN-977', workspacePath: dir, itemId: 'task-a' }) as VBriefItem).id).toBe('task-a');
+    runTaskCommand('block', { issueId: 'PAN-977', workspacePath: dir, itemId: 'task-a', expectedSequence: 1, writerId: 'writer-1' });
+    expect((runTaskCommand('next', { issueId: 'PAN-977', workspacePath: dir }) as VBriefItem[])).toHaveLength(0);
+  });
+
+  it('verifies active-slice prompt stays much smaller than a large plan', () => {
+    const many = Array.from({ length: 250 }, (_, idx) => ({ id: `item-${idx}`, status: idx === 0 ? 'pending' : 'blocked' }));
+    const doc = makeDoc(many, []);
+    doc.plan.id = 'PAN-977';
+    for (const item of doc.plan.items) {
+      item.narrative = { Action: 'x'.repeat(500) };
+      item.subItems = Array.from({ length: 5 }, (_, i) => ({ id: `${item.id}.ac${i}`, title: 'y'.repeat(120), status: 'pending' as any }));
+    }
+    const slice = createActiveSlice(doc, { issueId: 'PAN-977', itemId: 'item-0' });
+    const check = verifyActiveSlicePromptReduction(doc, slice);
+    expect(check.fullPlanBytes).toBeGreaterThan(300_000);
+    expect(check.reductionRatio).toBeLessThan(0.05);
   });
 });

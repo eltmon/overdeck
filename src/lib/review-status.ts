@@ -1,7 +1,10 @@
+import { access, readFile } from 'fs/promises';
+import { existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { notifyPipeline } from './pipeline-notifier.js';
 import { emitActivityEntry, emitActivityTts } from './activity-logger.js';
+import { buildPipelineMirrorFromStatus, writePipelineMirrorToPlanFileAsync } from './vbrief/dag.js';
 import {
   upsertReviewStatus as dbUpsert,
   deleteReviewStatus as dbDelete,
@@ -278,8 +281,12 @@ export function setReviewStatus(
     })();
   }
 
-  // Single-row upsert — atomic, no TOCTOU risk.
+  // Single-row upsert — atomic, no TOCTOU risk. SQLite remains authoritative
+  // for Phase 1 live runtime state; the vBRIEF pipeline mirror below is a
+  // corroborating durable task-graph view for pan-oversee/dashboard readers.
   dbUpsert(updated);
+
+  mirrorPipelineStatusToVBrief(issueId, updated);
 
   notifyPipeline({ type: 'status_changed', issueId, status: updated });
 
@@ -577,4 +584,25 @@ export function setDeaconIgnored(
   } catch (err) {
     console.error(`[review-status] Failed to set deaconIgnored for ${issueId}:`, err);
   }
+}
+
+
+function mirrorPipelineStatusToVBrief(issueId: string, status: ReviewStatus): void {
+  void (async () => {
+    try {
+      const agentId = `agent-${issueId.toLowerCase()}`;
+      const workStateFile = join(homedir(), '.panopticon', 'agents', agentId, 'state.json');
+      if (!existsSync(workStateFile)) return;
+      const workState = JSON.parse(await readFile(workStateFile, 'utf-8')) as { workspace?: string };
+      if (!workState.workspace) return;
+      const planPath = join(workState.workspace, '.pan', 'spec.vbrief.json');
+      await writePipelineMirrorToPlanFileAsync(
+        planPath,
+        buildPipelineMirrorFromStatus(issueId, status as unknown as Record<string, unknown>),
+        `review-status-${process.pid}`,
+      );
+    } catch (err: any) {
+      console.warn(`[review-status] Failed to mirror pipeline state to vBRIEF for ${issueId}: ${err.message}`);
+    }
+  })();
 }
