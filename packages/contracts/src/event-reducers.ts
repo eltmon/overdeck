@@ -127,10 +127,10 @@ export function trimTurnDiffSummaries(summaries: TurnDiffSummary[]): TurnDiffSum
 }
 
 export function omitTurnDiffSummariesForAgent(
-  turnDiffSummariesByAgentId: ReadModelState['turnDiffSummariesByAgentId'],
+  turnDiffSummariesByAgentId: ReadModelState['turnDiffSummariesByAgentId'] | undefined,
   agentId: string,
 ): ReadModelState['turnDiffSummariesByAgentId'] {
-  const { [agentId]: _removed, ...rest } = turnDiffSummariesByAgentId
+  const { [agentId]: _removed, ...rest } = turnDiffSummariesByAgentId ?? {}
   return rest
 }
 
