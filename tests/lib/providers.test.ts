@@ -48,7 +48,7 @@ describe('providers', () => {
   it('routes MiniMax through its direct Anthropic-compatible endpoint', () => {
     expect(PROVIDERS.minimax.compatibility).toBe('direct');
     expect(getProviderEnv(PROVIDERS.minimax, 'sk-minimax-test')).toEqual({
-      ANTHROPIC_BASE_URL: 'https://api.minimaxi.com/anthropic',
+      ANTHROPIC_BASE_URL: 'https://api.minimax.io/anthropic',
       ANTHROPIC_AUTH_TOKEN: 'sk-minimax-test',
       API_TIMEOUT_MS: '300000',
       ANTHROPIC_DEFAULT_OPUS_MODEL: 'minimax-m2.7',

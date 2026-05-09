@@ -97,7 +97,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'minimax',
     displayName: 'MiniMax',
     compatibility: 'direct',
-    baseUrl: 'https://api.minimaxi.com/anthropic',
+    baseUrl: 'https://api.minimax.io/anthropic',
     authType: 'static',
     models: ['minimax-m2.7', 'minimax-m2.7-highspeed'],
     haikuModel: 'minimax-m2.7-highspeed',
