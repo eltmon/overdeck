@@ -4347,6 +4347,17 @@ export async function autoResumeStoppedWorkAgents(): Promise<string[]> {
       continue;
     }
 
+    // Hard gate: postMergeLifecycle stamps `merged: true` on the agent state when
+    // the issue's PR is merged. This is the authoritative do-not-resume signal —
+    // it doesn't depend on review_status being correct (which can flap during
+    // squash-detection races) and doesn't depend on shadow-state being up to
+    // date (old issues may have no shadow file). Saw 10 spurious work agents
+    // get respawned for already-merged issues during a mergeStatus flap window.
+    if ((state as any).merged === true) {
+      logDeaconEvent(`autoResumeStoppedWorkAgents: ${agentId} skipped — agent state has merged=true (mergedAt=${(state as any).mergedAt ?? 'unknown'})`);
+      continue;
+    }
+
     const shadowState = await getShadowState(state.issueId);
     const issueClosed = shadowState?.trackerStatus === 'closed';
     if (issueClosed) {

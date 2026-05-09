@@ -374,13 +374,24 @@ export async function postMergeLifecycle(issueId: string, projectPath: string, s
     const { getAgentState, markAgentStoppedState, saveAgentState } = await import('../agents.js');
     const { killSession, sessionExists } = await import('../tmux.js');
     const agentId = `agent-${issueId.toLowerCase()}`;
-    if (sessionExists(agentId)) {
-      killSession(agentId);
+    // Stamp merged: true on the agent state UNCONDITIONALLY (whether or not the
+    // tmux session is alive). autoResumeStoppedWorkAgents reads this flag as a
+    // hard "do-not-resume" signal — without it, an old state.json that says
+    // status='running' can get respawned by orphan recovery during a mergeStatus
+    // flap, putting a work agent on a long-merged issue (saw 10 of these tonight).
+    try {
       const agentState = getAgentState(agentId);
       if (agentState) {
         markAgentStoppedState(agentState);
+        (agentState as any).merged = true;
+        (agentState as any).mergedAt = new Date().toISOString();
         saveAgentState(agentState);
       }
+    } catch (stateErr) {
+      console.warn(`[merge-agent] Could not stamp merged flag on ${agentId}: ${stateErr}`);
+    }
+    if (sessionExists(agentId)) {
+      killSession(agentId);
       console.log(`[merge-agent] ✓ Killed work agent session ${agentId} to free resources`);
       logActivity('agent_session_killed', `Freed resources: killed tmux session for ${agentId}`);
     }
